@@ -66,6 +66,8 @@ bash skills/splunk-app-install/scripts/install_app.sh
 
 Prompts for: source type (Local/Remote/Splunkbase), file/URL/app-ID, version, upgrade y/n. Credentials
 are read from the project-root `credentials` file (falls back to `~/.splunk/credentials`).
+After a successful install, the script restarts Splunk automatically and waits
+for the management API to return. Use `--no-restart` only when batching changes.
 
 For remote Splunk hosts, local package installs try a direct REST upload first.
 If the target does not support upload, the script falls back to SSH staging using
@@ -88,6 +90,7 @@ bash scripts/install_app.sh \
 | `--app-version VER` | Splunkbase version (blank = latest) |
 | `--update` | Upgrade an existing app |
 | `--no-update` | Fresh install (skip upgrade prompt) |
+| `--no-restart` | Skip the automatic restart after install |
 
 Credentials (Splunk and Splunkbase) are read automatically from the project-root `credentials` file (falls back to `~/.splunk/credentials`).
 
@@ -113,7 +116,9 @@ Prompts for: optional name filter. Credentials are read from the project-root `c
 ### uninstall_app.sh
 
 Removes a Splunk app. Lists all installed apps so the user can pick by number.
-Asks for confirmation before removing.
+Asks for confirmation before removing, then restarts Splunk automatically and
+waits for the management API to return. Use `--no-restart` only when batching
+changes.
 
 ```bash
 bash skills/splunk-app-install/scripts/uninstall_app.sh
@@ -126,12 +131,13 @@ Prompts for: app selection and confirmation. Credentials are read from the proje
 1. **Determine the operation** — install, list, or uninstall.
 2. **Ask the user** for all required information (source, details).
 3. **Run the script** with gathered values as flags.
-4. **Verify** — run `list_apps.sh` after install to confirm.
-5. **Restart if needed** — Restart Splunk via the UI, CLI on the server, or REST API.
+4. **Wait for the automatic restart** — successful installs and uninstalls restart Splunk and wait for the management API.
+5. **Verify** — run `list_apps.sh` after install to confirm.
 
 ## Post-Install Notes
 
-- Some apps require a Splunk restart to activate.
+- The install and uninstall scripts restart Splunk automatically by default.
+- Use `--no-restart` only when intentionally batching multiple changes before a single final restart.
 - If the app has a setup page, the user configures it via Splunk Web or a
   dedicated setup skill (e.g., `cisco-catalyst-ta-setup`).
 - Downloaded files are cached locally (path varies by environment) for reuse.

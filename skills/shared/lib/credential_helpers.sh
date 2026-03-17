@@ -855,9 +855,58 @@ print(r[0].get('${field}', '0') if r else '0')
 " 2>/dev/null || echo "0"
 }
 
-# Restart Splunk via REST.
+# Restart Splunk via REST and print the HTTP status code. A code of 000 can
+# occur if the connection closes as splunkd begins shutting down.
 # Usage: rest_restart_splunk <session_key> <splunk_uri>
 rest_restart_splunk() {
     local sk="$1" uri="$2"
-    splunk_curl_post "${sk}" "" "${uri}/services/server/control/restart" >/dev/null 2>&1
+    splunk_curl_post "${sk}" "" "${uri}/services/server/control/restart" \
+        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000"
+}
+
+# Wait until Splunk stops accepting login requests.
+# Usage: wait_for_splunk_unavailable <splunk_uri> [timeout_secs] [interval_secs]
+wait_for_splunk_unavailable() {
+    local uri="$1" timeout_secs="${2:-90}" interval_secs="${3:-2}"
+    local waited=0
+    while (( waited < timeout_secs )); do
+        if ! get_session_key "${uri}" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep "${interval_secs}"
+        waited=$((waited + interval_secs))
+    done
+    return 1
+}
+
+# Wait until Splunk accepts login requests again after a restart.
+# Usage: wait_for_splunk_ready <splunk_uri> [timeout_secs] [interval_secs]
+wait_for_splunk_ready() {
+    local uri="$1" timeout_secs="${2:-300}" interval_secs="${3:-5}"
+    local waited=0
+    while (( waited < timeout_secs )); do
+        if get_session_key "${uri}" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep "${interval_secs}"
+        waited=$((waited + interval_secs))
+    done
+    return 1
+}
+
+# Request a restart and wait for the management API to go down and come back.
+# Sets SPLUNK_RESTART_HTTP_CODE for callers that want to log the initial result.
+# Usage: restart_splunk_and_wait <session_key> <splunk_uri> [shutdown_timeout] [startup_timeout]
+restart_splunk_and_wait() {
+    local sk="$1" uri="$2" shutdown_timeout="${3:-90}" startup_timeout="${4:-300}"
+
+    SPLUNK_RESTART_HTTP_CODE=$(rest_restart_splunk "${sk}" "${uri}")
+    case "${SPLUNK_RESTART_HTTP_CODE}" in
+        000|200|201|204) ;;
+        *) return 1 ;;
+    esac
+
+    sleep 2
+    wait_for_splunk_unavailable "${uri}" "${shutdown_timeout}" 2 || return 2
+    wait_for_splunk_ready "${uri}" "${startup_timeout}" 5 || return 3
 }

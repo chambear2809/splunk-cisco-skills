@@ -16,6 +16,7 @@ APP_VERSION=""
 APP_PACKAGE_NAME=""
 UPDATE=false
 UPDATE_SET=false
+RESTART_SPLUNK=true
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
@@ -70,6 +71,7 @@ while [[ $# -gt 0 ]]; do
         --app-version)  APP_VERSION="$2";  shift 2 ;;
         --update)       UPDATE=true;  UPDATE_SET=true;  shift ;;
         --no-update)    UPDATE=false; UPDATE_SET=true;  shift ;;
+        --no-restart)   RESTART_SPLUNK=false; shift ;;
         --help)
             cat <<EOF
 Splunk App Installer (interactive)
@@ -87,6 +89,7 @@ Optional flags (skip the corresponding prompt):
   --app-version VER     Splunkbase version
   --update              Upgrade mode
   --no-update           Fresh install (skip upgrade prompt)
+  --no-restart          Skip the automatic restart after install
 
 Credentials and remote host settings are read from the project-root credentials file automatically.
 For remote local-package installs, the script tries REST upload first, then falls back
@@ -228,6 +231,54 @@ splunkbase_auth() {
         exit 1
     fi
     log "Authenticated to Splunkbase"
+}
+
+restart_splunk_or_exit() {
+    local operation="$1"
+    local rc
+
+    if ! "${RESTART_SPLUNK}"; then
+        log "Skipping Splunk restart (--no-restart). Restart manually before using the updated app."
+        return 0
+    fi
+
+    log ""
+    log "Restarting Splunk to complete ${operation}..."
+    log "Waiting for the management API to cycle..."
+
+    restart_splunk_and_wait "${SK}" "${SPLUNK_URI}"
+    rc=$?
+
+    case "${SPLUNK_RESTART_HTTP_CODE:-}" in
+        000)
+            log "Restart request closed before an HTTP response was returned, which can happen during shutdown."
+            ;;
+        200|201|204)
+            log "Restart request accepted (HTTP ${SPLUNK_RESTART_HTTP_CODE})."
+            ;;
+    esac
+
+    case "${rc}" in
+        0)
+            log "SUCCESS: Splunk restart completed and the management API is responding again."
+            ;;
+        1)
+            log "ERROR: Failed to request a Splunk restart (HTTP ${SPLUNK_RESTART_HTTP_CODE:-unknown})."
+            exit 1
+            ;;
+        2)
+            log "ERROR: Splunk did not stop responding after the restart request."
+            exit 1
+            ;;
+        3)
+            log "ERROR: Splunk did not come back online before the restart timeout expired."
+            exit 1
+            ;;
+        *)
+            log "ERROR: Unexpected restart failure."
+            exit 1
+            ;;
+    esac
 }
 
 resolve_splunkbase_release_metadata() {
@@ -579,8 +630,7 @@ except Exception:
         log "Check Splunk: ${SPLUNK_HOME}/etc/apps/"
     fi
 
-    log ""
-    log "Note: A Splunk restart may be required to activate the app."
+    restart_splunk_or_exit "app installation"
 }
 
 # ── Main ────────────────────────────────────────────────────────────

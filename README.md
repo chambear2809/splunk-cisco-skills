@@ -59,7 +59,8 @@ The normal workflow is:
 3. Install the app or TA.
 4. Run the skill-specific setup script.
 5. Validate the deployment.
-6. Restart Splunk if the setup script tells you to.
+6. Restart Splunk if the setup script tells you to. The generic install/uninstall
+   scripts already restart Splunk automatically unless you explicitly skip it.
 
 ### 1. Configure Credentials
 
@@ -152,6 +153,11 @@ When the target Splunk host is remote, the installer will:
 
 1. try a direct REST upload first
 2. fall back to SSH staging when the target does not support that upload path
+
+After a successful install or uninstall, the generic app-management scripts
+restart Splunk automatically and wait for the management API on `8089` to come
+back. Use `--no-restart` only when batching multiple changes before a single
+final restart.
 
 ### 4. Run A Skill-Specific Setup
 

@@ -6,6 +6,7 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
 APP_NAME=""
+RESTART_SPLUNK=true
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
@@ -13,6 +14,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --app-name) APP_NAME="$2"; shift 2 ;;
+        --no-restart) RESTART_SPLUNK=false; shift ;;
         --help)
             cat <<EOF
 Uninstall a Splunk App (interactive)
@@ -21,6 +23,7 @@ Usage: $(basename "$0") [OPTIONS]
 
 Optional flags (skip the corresponding prompt):
   --app-name NAME    Name of the app to remove
+  --no-restart       Skip the automatic restart after uninstall
 
 Credentials are read from the project-root credentials file automatically.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
@@ -29,6 +32,54 @@ EOF
         *) log "Unknown option: $1"; exit 1 ;;
     esac
 done
+
+restart_splunk_or_exit() {
+    local operation="$1"
+    local rc
+
+    if ! "${RESTART_SPLUNK}"; then
+        log "Skipping Splunk restart (--no-restart). Restart manually before relying on the uninstall state."
+        return 0
+    fi
+
+    log ""
+    log "Restarting Splunk to complete ${operation}..."
+    log "Waiting for the management API to cycle..."
+
+    restart_splunk_and_wait "${SK}" "${SPLUNK_URI}"
+    rc=$?
+
+    case "${SPLUNK_RESTART_HTTP_CODE:-}" in
+        000)
+            log "Restart request closed before an HTTP response was returned, which can happen during shutdown."
+            ;;
+        200|201|204)
+            log "Restart request accepted (HTTP ${SPLUNK_RESTART_HTTP_CODE})."
+            ;;
+    esac
+
+    case "${rc}" in
+        0)
+            log "SUCCESS: Splunk restart completed and the management API is responding again."
+            ;;
+        1)
+            log "ERROR: Failed to request a Splunk restart (HTTP ${SPLUNK_RESTART_HTTP_CODE:-unknown})."
+            exit 1
+            ;;
+        2)
+            log "ERROR: Splunk did not stop responding after the restart request."
+            exit 1
+            ;;
+        3)
+            log "ERROR: Splunk did not come back online before the restart timeout expired."
+            exit 1
+            ;;
+        *)
+            log "ERROR: Unexpected restart failure."
+            exit 1
+            ;;
+    esac
+}
 
 echo "=== Splunk App Uninstaller ==="
 echo ""
@@ -110,7 +161,7 @@ if [[ "${http_code}" -eq 200 ]]; then
     log ""
     log "Note: The app directory may still exist at:"
     log "  ${SPLUNK_HOME}/etc/apps/${APP_NAME}/"
-    log "Restart Splunk to apply changes."
+    restart_splunk_or_exit "app removal"
 else
     log "ERROR: Failed to remove app '${APP_NAME}' (HTTP ${http_code})"
     error_msg=$(echo "${body}" | python3 -c "
