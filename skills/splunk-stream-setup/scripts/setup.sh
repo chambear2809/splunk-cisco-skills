@@ -6,6 +6,7 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 PROJECT_TA_DIR="${SCRIPT_DIR}/../../../splunk-ta"
 TA_CACHE="${TA_CACHE:-${PROJECT_TA_DIR}}"
+APP_INSTALL_SCRIPT="${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh"
 
 INSTALL=false
 INDEXES_ONLY=false
@@ -106,21 +107,12 @@ install_app_from_file() {
         return 1
     fi
 
-    log "  Installing ${app_name} from ${pkg_file}..."
-    local response
-    response=$(splunk_curl "${SK}" \
-        "${SPLUNK_URI}/services/apps/local" \
-        -F "name=${pkg_file}" \
-        -F "filename=true" \
-        -F "update=true" 2>&1)
-
-    if echo "${response}" | grep -q "<title>${app_name}</title>\|<id>.*${app_name}"; then
-        log "  ${app_name} installed successfully"
-    elif echo "${response}" | grep -q "already exists"; then
-        log "  ${app_name} already exists"
+    log "  Installing ${app_name} from ${pkg_file} via splunk-app-install..."
+    if bash "${APP_INSTALL_SCRIPT}" --source local --file "${pkg_file}" --no-update; then
+        log "  ${app_name} installation completed."
     else
-        log "  WARNING: Install response for ${app_name} — verify manually"
-        echo "${response}" | head -5
+        log "  ERROR: Failed to install ${app_name} from ${pkg_file}"
+        return 1
     fi
 }
 
@@ -147,8 +139,18 @@ create_indexes() {
     log "=== Creating Indexes ==="
     _get_session_key || exit 1
 
-    rest_create_index "${SK}" "${SPLUNK_URI}" "netflow" "512000" || true
-    rest_create_index "${SK}" "${SPLUNK_URI}" "stream" "512000" || true
+    if rest_create_index "${SK}" "${SPLUNK_URI}" "netflow" "512000"; then
+        log "  Index 'netflow' created or already exists."
+    else
+        log "  ERROR: Failed to create index 'netflow'."
+        exit 1
+    fi
+    if rest_create_index "${SK}" "${SPLUNK_URI}" "stream" "512000"; then
+        log "  Index 'stream' created or already exists."
+    else
+        log "  ERROR: Failed to create index 'stream'."
+        exit 1
+    fi
 
     log "Index creation complete."
 }
@@ -164,21 +166,35 @@ configure_streamfwd() {
         read -rp "Splunk Web URL (e.g. https://host:8000): " SPLUNK_WEB_URL
     fi
 
-    local streamfwd_body="port=${PORT}&ipAddr=${IP_ADDR}"
+    local streamfwd_body
+    streamfwd_body=$(form_urlencode_pairs port "${PORT}" ipAddr "${IP_ADDR}")
     if [[ -n "${NETFLOW_IP}" && -n "${NETFLOW_PORT}" ]]; then
         log "  Adding NetFlow receiver (${NETFLOW_IP}:${NETFLOW_PORT}, decoder=${NETFLOW_DECODER})..."
-        streamfwd_body="${streamfwd_body}&netflowReceiver.0.ip=${NETFLOW_IP}&netflowReceiver.0.port=${NETFLOW_PORT}&netflowReceiver.0.decoder=${NETFLOW_DECODER}"
+        streamfwd_body="${streamfwd_body}&$(form_urlencode_pairs \
+            netflowReceiver.0.ip "${NETFLOW_IP}" \
+            netflowReceiver.0.port "${NETFLOW_PORT}" \
+            netflowReceiver.0.decoder "${NETFLOW_DECODER}")"
     fi
 
     log "  Setting streamfwd.conf (ipAddr=${IP_ADDR}, port=${PORT})..."
-    rest_set_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "streamfwd" "streamfwd" "${streamfwd_body}" || true
+    if ! rest_set_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "streamfwd" "streamfwd" "${streamfwd_body}"; then
+        log "  ERROR: Failed to update streamfwd.conf settings."
+        exit 1
+    fi
 
-    local stream_app_location="${SPLUNK_WEB_URL}/en-us/custom/splunk_app_stream/"
-    local stream_app_encoded
-    stream_app_encoded=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "${stream_app_location}" 2>/dev/null) || stream_app_encoded="${stream_app_location}"
+    local inputs_body stream_app_location
+    stream_app_location="${SPLUNK_WEB_URL}/en-us/custom/splunk_app_stream/"
+    inputs_body=$(form_urlencode_pairs \
+        splunk_stream_app_location "${stream_app_location}" \
+        stream_forwarder_id "" \
+        disabled "0" \
+        sslVerifyServerCert "${SSL_VERIFY}")
     log "  Setting inputs.conf (stream_app_location=${stream_app_location})..."
-    rest_set_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "inputs" "streamfwd://streamfwd" \
-        "splunk_stream_app_location=${stream_app_encoded}&stream_forwarder_id=&disabled=0&sslVerifyServerCert=${SSL_VERIFY}" || true
+    if ! rest_set_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "inputs" "streamfwd://streamfwd" \
+        "${inputs_body}"; then
+        log "  ERROR: Failed to update streamfwd input settings."
+        exit 1
+    fi
 
     log "Stream forwarder configuration complete."
 }

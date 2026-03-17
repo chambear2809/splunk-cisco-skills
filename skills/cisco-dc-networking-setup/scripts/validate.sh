@@ -15,14 +15,13 @@ pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 
-load_splunk_credentials || true
-SK=$(get_session_key "${SPLUNK_URI}") || true
-
 log "=== Cisco DC Networking TA Validation ==="
 log ""
 
 log "--- App Installation ---"
-if [[ -z "${SK}" ]]; then
+if ! load_splunk_credentials; then
+    fail "Could not load Splunk credentials — check credentials file"
+elif ! SK=$(get_session_key "${SPLUNK_URI}"); then
     fail "Could not authenticate to Splunk REST API — check credentials"
 else
     if rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null; then

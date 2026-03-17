@@ -66,10 +66,21 @@ check_prereqs() {
 
 create_indexes() {
     log "Creating indexes..."
+    local failed=0 idx
 
-    rest_create_index "$SK" "$SPLUNK_URI" "cisco_aci" "512000" || true
-    rest_create_index "$SK" "$SPLUNK_URI" "cisco_nd" "512000" || true
-    rest_create_index "$SK" "$SPLUNK_URI" "cisco_nexus_9k" "512000" || true
+    for idx in cisco_aci cisco_nd cisco_nexus_9k; do
+        if rest_create_index "$SK" "$SPLUNK_URI" "${idx}" "512000"; then
+            log "  Index '${idx}' created or already exists."
+        else
+            log "  ERROR: Failed to create index '${idx}'."
+            failed=1
+        fi
+    done
+
+    if (( failed != 0 )); then
+        log "Index creation failed."
+        return 1
+    fi
 
     log "Index creation complete."
 }
@@ -82,9 +93,18 @@ update_macros() {
     def_nd=$(python3 -c "import urllib.parse; print(urllib.parse.quote('index IN (\"cisco_nd\")', safe=''))")
     def_n9k=$(python3 -c "import urllib.parse; print(urllib.parse.quote('index IN (\"cisco_nexus_9k\")', safe=''))")
 
-    rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_aci_index" "definition=${def_aci}" || true
-    rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_nd_index" "definition=${def_nd}" || true
-    rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_nexus_9k_index" "definition=${def_n9k}" || true
+    if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_aci_index" "definition=${def_aci}"; then
+        log "ERROR: Failed to update macro 'cisco_dc_aci_index'."
+        return 1
+    fi
+    if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_nd_index" "definition=${def_nd}"; then
+        log "ERROR: Failed to update macro 'cisco_dc_nd_index'."
+        return 1
+    fi
+    if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_nexus_9k_index" "definition=${def_n9k}"; then
+        log "ERROR: Failed to update macro 'cisco_dc_nexus_9k_index'."
+        return 1
+    fi
 
     log "Macros updated: cisco_dc_aci_index, cisco_dc_nd_index, cisco_dc_nexus_9k_index"
 }
@@ -107,12 +127,26 @@ enable_aci_inputs() {
         "cisco_nexus_aci://stats"
     )
 
+    local failures=0
     for input_spec in "${aci_inputs[@]}"; do
         local input_type="${input_spec%%://*}"
         local input_name="${input_spec#*://}"
-        local body="disabled=0&apic_account=${account}&index=${index}"
-        rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "$input_type" "$input_name" "$body" || true
+        local body
+        body=$(form_urlencode_pairs \
+            disabled "0" \
+            apic_account "${account}" \
+            index "${index}")
+        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "$input_type" "$input_name" "$body"; then
+            log "  ERROR: Failed to enable ${input_type}://${input_name}"
+            failures=$((failures + 1))
+        fi
     done
+
+    if (( failures != 0 )); then
+        log "ACI input enablement failed for ${failures} input(s)."
+        return 1
+    fi
+
     log "ACI inputs enabled."
 }
 
@@ -136,12 +170,26 @@ enable_nd_inputs() {
         "cisco_nexus_dashboard://mso_audit_user"
     )
 
+    local failures=0
     for input_spec in "${nd_inputs[@]}"; do
         local input_type="${input_spec%%://*}"
         local input_name="${input_spec#*://}"
-        local body="disabled=0&nd_account=${account}&index=${index}"
-        rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "$input_type" "$input_name" "$body" || true
+        local body
+        body=$(form_urlencode_pairs \
+            disabled "0" \
+            nd_account "${account}" \
+            index "${index}")
+        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "$input_type" "$input_name" "$body"; then
+            log "  ERROR: Failed to enable ${input_type}://${input_name}"
+            failures=$((failures + 1))
+        fi
     done
+
+    if (( failures != 0 )); then
+        log "Nexus Dashboard input enablement failed for ${failures} input(s)."
+        return 1
+    fi
+
     log "Nexus Dashboard inputs enabled."
 }
 
@@ -164,12 +212,26 @@ enable_nexus9k_inputs() {
         "cisco_nexus_9k://nxresource"
     )
 
+    local failures=0
     for input_spec in "${n9k_inputs[@]}"; do
         local input_type="${input_spec%%://*}"
         local input_name="${input_spec#*://}"
-        local body="disabled=0&nexus_9k_account=${account}&index=${index}"
-        rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "$input_type" "$input_name" "$body" || true
+        local body
+        body=$(form_urlencode_pairs \
+            disabled "0" \
+            nexus_9k_account "${account}" \
+            index "${index}")
+        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "$input_type" "$input_name" "$body"; then
+            log "  ERROR: Failed to enable ${input_type}://${input_name}"
+            failures=$((failures + 1))
+        fi
     done
+
+    if (( failures != 0 )); then
+        log "Nexus 9K input enablement failed for ${failures} input(s)."
+        return 1
+    fi
+
     log "Nexus 9K inputs enabled."
 }
 

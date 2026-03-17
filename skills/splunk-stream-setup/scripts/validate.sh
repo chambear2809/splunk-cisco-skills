@@ -18,10 +18,12 @@ info() { log "  INFO: $*"; }
 log "=== Splunk Stream Validation ==="
 log ""
 
-load_splunk_credentials || true
-SK=$(get_session_key "${SPLUNK_URI}") || true
+if ! load_splunk_credentials; then
+    log "ERROR: Could not load Splunk credentials. Check credentials file."
+    exit 1
+fi
 
-if [[ -z "${SK}" ]]; then
+if ! SK=$(get_session_key "${SPLUNK_URI}"); then
     log "ERROR: Could not authenticate to Splunk. Check credentials and SPLUNK_URI."
     exit 1
 fi

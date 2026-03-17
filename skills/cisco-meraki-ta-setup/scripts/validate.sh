@@ -15,18 +15,23 @@ pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 
-load_splunk_credentials || true
-SK=$(get_session_key "${SPLUNK_URI}") || true
-
-if [[ -z "${SK}" ]]; then
-    log "ERROR: Could not authenticate to Splunk. Check credentials."
-    exit 1
-fi
-
 log "=== Cisco Meraki TA Validation ==="
 log ""
 
 log "--- App Installation ---"
+if ! load_splunk_credentials; then
+    fail "Could not load Splunk credentials — check credentials file"
+elif ! SK=$(get_session_key "${SPLUNK_URI}"); then
+    fail "Could not authenticate to Splunk REST API — check credentials"
+fi
+
+if [[ ${FAIL} -gt 0 ]]; then
+    log ""
+    log "=== Validation Summary ==="
+    log "  PASS: ${PASS} | WARN: ${WARN} | FAIL: ${FAIL}"
+    exit 1
+fi
+
 if rest_check_app "${SK}" "${SPLUNK_URI}" "${APP_NAME}"; then
     version=$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "${APP_NAME}")
     pass "TA installed, version: ${version}"

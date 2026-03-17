@@ -1,8 +1,8 @@
-# Ignore everything in .cursor by default
+# Ignore everything by default, then explicitly allow tracked repo content below
 *
 # Project-level files
 credentials
-README.md
+!README.md
 !credentials.example
 !.gitignore
 !blocklist

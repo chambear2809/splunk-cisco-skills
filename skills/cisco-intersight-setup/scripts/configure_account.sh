@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="Splunk_TA_Cisco_Intersight"
+SETUP_SCRIPT="${SCRIPT_DIR}/setup.sh"
 
 ACCT_NAME=""
 HOSTNAME="intersight.com"
@@ -26,7 +27,7 @@ Required:
 
 Optional:
   --hostname HOST            Intersight hostname (default: intersight.com)
-  --create-defaults          Create default inputs during account creation
+  --create-defaults          Enable the default input set after account creation
 
 Splunk credentials are read from the project-root credentials file (falls back to ~/.splunk/credentials) automatically.
 Set SPLUNK_URI for remote Splunk (default: https://localhost:8089).
@@ -63,23 +64,30 @@ log "Authenticated to Splunk REST API."
 local_endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/Splunk_TA_Cisco_Intersight_account"
 log "Creating Intersight account '${ACCT_NAME}' (hostname: ${HOSTNAME})..."
 
-create_default_val="0"
-if [[ "${CREATE_DEFAULTS}" == "true" ]]; then
-    create_default_val="1"
-fi
-
+body=""
+update_body=""
 http_code=""
+body=$(form_urlencode_pairs \
+    name "${ACCT_NAME}" \
+    intersight_hostname "${HOSTNAME}" \
+    client_id "${CLIENT_ID}" \
+    client_secret "${CLIENT_SECRET}") || exit 1
 resp=$(splunk_curl_post "${SK}" \
-    "name=${ACCT_NAME}&intersight_hostname=${HOSTNAME}&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&create_default_inputs=${create_default_val}" \
+    "${body}" \
     "${local_endpoint}" -w '\n%{http_code}' 2>/dev/null)
 http_code=$(echo "${resp}" | tail -1)
+resp_body=$(printf '%s\n' "${resp}" | sed '$d')
 
 if [[ "${http_code}" == "201" || "${http_code}" == "200" ]]; then
     log "  SUCCESS: Account '${ACCT_NAME}' created (HTTP ${http_code})"
-elif [[ "${http_code}" == "409" ]]; then
+elif [[ "${http_code}" == "409" ]] || { [[ "${http_code}" == "400" ]] && echo "${resp_body}" | grep -q 'Conflict'; }; then
     log "  Account already exists. Updating..."
+    update_body=$(form_urlencode_pairs \
+        intersight_hostname "${HOSTNAME}" \
+        client_id "${CLIENT_ID}" \
+        client_secret "${CLIENT_SECRET}") || exit 1
     resp=$(splunk_curl_post "${SK}" \
-        "intersight_hostname=${HOSTNAME}&client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&create_default_inputs=${create_default_val}" \
+        "${update_body}" \
         "${local_endpoint}/${ACCT_NAME}" -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     if [[ "${http_code}" == "200" ]]; then
@@ -93,6 +101,11 @@ else
     log "  ERROR: HTTP ${http_code}"
     sanitize_response "${resp}"
     exit 1
+fi
+
+if [[ "${CREATE_DEFAULTS}" == "true" ]]; then
+    log "Enabling default Intersight inputs for account '${ACCT_NAME}'..."
+    bash "${SETUP_SCRIPT}" --enable-inputs --account "${ACCT_NAME}" --index "intersight" --input-type all
 fi
 
 log "Account configuration complete."

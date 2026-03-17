@@ -63,11 +63,21 @@ check_prereqs() {
 
 create_indexes() {
     log "Creating indexes..."
+    local failed=0 idx
 
-    rest_create_index "$SK" "$SPLUNK_URI" "catalyst" "512000" || true
-    rest_create_index "$SK" "$SPLUNK_URI" "ise" "512000" || true
-    rest_create_index "$SK" "$SPLUNK_URI" "sdwan" "512000" || true
-    rest_create_index "$SK" "$SPLUNK_URI" "cybervision" "512000" || true
+    for idx in catalyst ise sdwan cybervision; do
+        if rest_create_index "$SK" "$SPLUNK_URI" "${idx}" "512000"; then
+            log "  Index '${idx}' created or already exists."
+        else
+            log "  ERROR: Failed to create index '${idx}'."
+            failed=1
+        fi
+    done
+
+    if (( failed != 0 )); then
+        log "Index creation failed."
+        return 1
+    fi
 
     log "Index creation complete."
 }
@@ -101,10 +111,25 @@ enable_catalyst_center_inputs() {
         "Site_Topology"
     )
 
+    local failures=0
     for i in "${!input_types[@]}"; do
-        local body="cisco_dna_center_account=${account}&index=${index}&interval=3600&logging_level=INFO"
-        rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_types[$i]}" "${input_names[$i]}" "$body" || true
+        local body
+        body=$(form_urlencode_pairs \
+            cisco_dna_center_account "${account}" \
+            index "${index}" \
+            interval "3600" \
+            logging_level "INFO")
+        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_types[$i]}" "${input_names[$i]}" "$body"; then
+            log "  ERROR: Failed to enable ${input_types[$i]}://${input_names[$i]}"
+            failures=$((failures + 1))
+        fi
     done
+
+    if (( failures != 0 )); then
+        log "Catalyst Center input enablement failed for ${failures} input(s)."
+        return 1
+    fi
+
     log "Catalyst Center inputs enabled (9 inputs)."
 }
 
@@ -114,8 +139,17 @@ enable_ise_inputs() {
 
     log "Enabling ISE inputs for account='${account}' index='${index}'..."
 
-    local body="ise_account=${account}&data_type=security_group_tags,authz_policy_hit,ise_tacacs_rule_hit&index=${index}&interval=3600&logging_level=INFO"
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_ise_administrative_input" "ISE_Inputs" "$body" || true
+    local body
+    body=$(form_urlencode_pairs \
+        ise_account "${account}" \
+        data_type "security_group_tags,authz_policy_hit,ise_tacacs_rule_hit" \
+        index "${index}" \
+        interval "3600" \
+        logging_level "INFO")
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_ise_administrative_input" "ISE_Inputs" "$body"; then
+        log "  ERROR: Failed to enable cisco_catalyst_ise_administrative_input://ISE_Inputs"
+        return 1
+    fi
     log "ISE inputs enabled (1 input with 3 data types)."
 }
 
@@ -125,9 +159,20 @@ enable_sdwan_inputs() {
 
     log "Enabling SD-WAN inputs for account='${account}' index='${index}'..."
 
-    local body="sdwan_account=${account}&index=${index}&interval=3600&logging_level=INFO"
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_health" "SDWAN_Health" "$body" || true
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_site_and_tunnel_health" "SDWAN_Site_Tunnel_Health" "$body" || true
+    local body
+    body=$(form_urlencode_pairs \
+        sdwan_account "${account}" \
+        index "${index}" \
+        interval "3600" \
+        logging_level "INFO")
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_health" "SDWAN_Health" "$body"; then
+        log "  ERROR: Failed to enable cisco_catalyst_sdwan_health://SDWAN_Health"
+        return 1
+    fi
+    if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_site_and_tunnel_health" "SDWAN_Site_Tunnel_Health" "$body"; then
+        log "  ERROR: Failed to enable cisco_catalyst_sdwan_site_and_tunnel_health://SDWAN_Site_Tunnel_Health"
+        return 1
+    fi
     log "SD-WAN inputs enabled (2 inputs)."
 }
 
@@ -154,10 +199,25 @@ enable_cybervision_inputs() {
         "CV_Vulnerabilities"
     )
 
-    local body="cyber_vision_account=${account}&index=${index}&logging_level=INFO&page_size=100"
+    local body
+    body=$(form_urlencode_pairs \
+        cyber_vision_account "${account}" \
+        index "${index}" \
+        logging_level "INFO" \
+        page_size "100")
+    local failures=0
     for i in "${!input_types[@]}"; do
-        rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_types[$i]}" "${input_names[$i]}" "$body" || true
+        if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_types[$i]}" "${input_names[$i]}" "$body"; then
+            log "  ERROR: Failed to enable ${input_types[$i]}://${input_names[$i]}"
+            failures=$((failures + 1))
+        fi
     done
+
+    if (( failures != 0 )); then
+        log "Cyber Vision input enablement failed for ${failures} input(s)."
+        return 1
+    fi
+
     log "Cyber Vision inputs enabled (6 inputs)."
 }
 

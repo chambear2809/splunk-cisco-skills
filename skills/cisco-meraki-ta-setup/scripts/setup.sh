@@ -53,12 +53,8 @@ log_live_input_summary() {
 }
 
 check_prereqs() {
-    load_splunk_credentials || true
-    SK=$(get_session_key "${SPLUNK_URI}") || true
-    if [[ -z "${SK}" ]]; then
-        log "ERROR: Could not authenticate to Splunk. Check credentials."
-        exit 1
-    fi
+    load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+    SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk. Check credentials."; exit 1; }
     if ! rest_check_app "${SK}" "${SPLUNK_URI}" "${APP_NAME}"; then
         log "ERROR: Cisco Meraki TA not found. Install the app first."
         exit 1
@@ -81,9 +77,11 @@ add_input() {
     local input_name="$2"
     local account="$3"
     local index="$4"
-    local org_encoded
-    org_encoded=$(_urlencode "${account}")
-    local body="disabled=0&index=${index}&organization_name=${org_encoded}"
+    local body
+    body=$(form_urlencode_pairs \
+        disabled "0" \
+        index "${index}" \
+        organization_name "${account}")
     rest_create_input "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "cisco_meraki_${input_type}" "${input_name}_${account}" "${body}"
 }
 

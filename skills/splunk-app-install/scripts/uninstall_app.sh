@@ -43,7 +43,10 @@ if [[ -z "${APP_NAME}" ]]; then
     response=$(splunk_curl "${SK}" \
         "${SPLUNK_URI}/services/apps/local?output_mode=json&count=0" 2>/dev/null)
 
-    mapfile -t app_list < <(echo "${response}" | python3 -c "
+    app_list=()
+    while IFS= read -r app_name; do
+        [[ -n "${app_name}" ]] && app_list+=("${app_name}")
+    done < <(echo "${response}" | python3 -c "
 import json, sys
 try:
     data = json.load(sys.stdin)
@@ -100,7 +103,7 @@ delete_response=$(splunk_curl "${SK}" -w "\n%{http_code}" \
     -X DELETE "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null || true)
 
 http_code=$(echo "${delete_response}" | tail -1)
-body=$(echo "${delete_response}" | head -n -1)
+body=$(printf '%s\n' "${delete_response}" | sed '$d')
 
 if [[ "${http_code}" -eq 200 ]]; then
     log "SUCCESS: App '${APP_NAME}' has been removed"

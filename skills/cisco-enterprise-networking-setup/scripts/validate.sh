@@ -5,6 +5,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="cisco-catalyst-app"
+readonly SAVED_SEARCHES=(
+    "cisco_catalyst_location"
+    "cisco_catalyst_sdwan_netflow"
+    "cisco_catalyst_sdwan_policy"
+    "cisco_catalyst_meraki_organization_mapping"
+    "cisco_catalyst_meraki_devices_serial_mapping"
+)
 
 PASS=0
 FAIL=0
@@ -15,14 +22,13 @@ pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 
-load_splunk_credentials || true
-SK=$(get_session_key "${SPLUNK_URI}") || true
-
 log "=== Cisco Enterprise Networking App Validation ==="
 log ""
 
 log "--- App Installation ---"
-if [[ -z "${SK}" ]]; then
+if ! load_splunk_credentials; then
+    fail "Could not load Splunk credentials — check credentials file"
+elif ! SK=$(get_session_key "${SPLUNK_URI}"); then
     fail "Could not authenticate to Splunk REST API — check credentials"
 else
     if rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null; then
@@ -66,6 +72,26 @@ if [[ "${accel}" == "true" ]]; then
 else
     warn "Data model acceleration is not enabled (optional for production)"
 fi
+
+log ""
+log "--- Saved Searches ---"
+for search_name in "${SAVED_SEARCHES[@]}"; do
+    if ! rest_check_saved_search "$SK" "$SPLUNK_URI" "$APP_NAME" "${search_name}" 2>/dev/null; then
+        fail "Saved search '${search_name}' not found"
+        continue
+    fi
+
+    disabled=$(rest_get_saved_search_value "$SK" "$SPLUNK_URI" "$APP_NAME" "${search_name}" "disabled" 2>/dev/null || true)
+    cron_schedule=$(rest_get_saved_search_value "$SK" "$SPLUNK_URI" "$APP_NAME" "${search_name}" "cron_schedule" 2>/dev/null || true)
+    case "${disabled}" in
+        0|false|False|"")
+            pass "Saved search '${search_name}' enabled${cron_schedule:+ (schedule: ${cron_schedule})}"
+            ;;
+        *)
+            warn "Saved search '${search_name}' is disabled${cron_schedule:+ (schedule: ${cron_schedule})}"
+            ;;
+    esac
+done
 
 log ""
 log "--- Data Flow Check ---"

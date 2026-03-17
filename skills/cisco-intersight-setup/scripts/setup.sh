@@ -56,12 +56,8 @@ log_live_input_summary() {
 }
 
 check_prereqs() {
-    load_splunk_credentials
-    SK=$(get_session_key "${SPLUNK_URI}") || true
-    if [[ -z "${SK}" ]]; then
-        log "ERROR: Could not authenticate to Splunk"
-        exit 1
-    fi
+    load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+    SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk"; exit 1; }
     if ! rest_check_app "$SK" "$SPLUNK_URI" "Splunk_TA_Cisco_Intersight"; then
         log "ERROR: Cisco Intersight TA not installed"
         exit 1
@@ -98,10 +94,39 @@ enable_audit_alarms_inputs() {
 
     log "Enabling Audit & Alarms inputs for account='${account}' index='${index}'..."
 
-    local body="global_account=${account}&index=${index}&interval=900&date_input=7&enable_aaa_audit_records=1&enable_alarms=1&acknowledge=1&suppressed=1&info_alarms=1&disabled=0"
+    local body
+    body=$(form_urlencode_pairs \
+        global_account "${account}" \
+        index "${index}" \
+        interval "900" \
+        date_input "7" \
+        enable_aaa_audit_records "1" \
+        enable_alarms "1" \
+        acknowledge "1" \
+        suppressed "1" \
+        info_alarms "1" \
+        disabled "0")
 
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "audit_alarms" "${account}_audit_logs" "${body}" && log "  Added: audit_alarms://${account}_audit_logs"
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "audit_alarms" "${account}_alarms" "${body}" && log "  Added: audit_alarms://${account}_alarms"
+    local failures=0
+
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "audit_alarms" "${account}_audit_logs" "${body}"; then
+        log "  Added: audit_alarms://${account}_audit_logs"
+    else
+        log "  ERROR: Failed to create audit_alarms://${account}_audit_logs"
+        failures=$((failures + 1))
+    fi
+
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "audit_alarms" "${account}_alarms" "${body}"; then
+        log "  Added: audit_alarms://${account}_alarms"
+    else
+        log "  ERROR: Failed to create audit_alarms://${account}_alarms"
+        failures=$((failures + 1))
+    fi
+
+    if (( failures != 0 )); then
+        log "Audit & Alarms input enablement failed for ${failures} input(s)."
+        return 1
+    fi
 
     log "Audit & Alarms inputs enabled (2 inputs)."
 }
@@ -112,14 +137,57 @@ enable_inventory_inputs() {
 
     log "Enabling Inventory inputs for account='${account}' index='${index}'..."
 
-    local body_main="global_account=${account}&index=${index}&interval=1800&disabled=0&inventory=advisories,compute,fabric,network,target,contract,license&enable_compute_bladeidentities=1&enable_server_profiles=1&enable_chassis_profiles=1&enable_switch_cluster_profiles=1&enable_psucontrols=1&enable_processorunits=1&enable_memoryunits=1&enable_tpms=1&enable_storage_virtualdrives=1&enable_fancontrols=1&enable_license_account_license_data=1&enable_license_licenseinfos=1&enable_iocards=1&enable_chassisidentities=1&enable_expandermodules=1&enable_transceivers=1&enable_frus=1&enable_graphicscards=1&enable_supervisorcards=1&enable_switchcards=1&enable_hclstatuses=1&enable_devicecontractinformations=1&enable_advisory_instances=1&enable_advisory_definitions=1&enable_security_advisories=1&enable_chasses=1&enable_rackenclosures=1&enable_rackenclosureslots=1&enable_vnictemplates=1&enable_storage_items=1&enable_storage_physicaldisks=1&enable_equipment_fans=1&enable_equipment_fanmodules=1&enable_equipment_psus=1&enable_equipment_locatorleds=1"
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "inventory" "${account}_intersight_inventory" "${body_main}" && log "  Added: inventory://${account}_intersight_inventory"
+    local body_main
+    body_main=$(form_urlencode_pairs \
+        global_account "${account}" \
+        index "${index}" \
+        interval "1800" \
+        disabled "0" \
+        inventory "advisories,compute,fabric,network,target,contract,license")
 
-    local body_ports="global_account=${account}&index=${index}&interval=1800&disabled=0&inventory=ports&enable_ether_hostports=1&enable_ether_networkports=1&enable_ether_physicalports=1&enable_ether_portchannels=1&enable_adapter_hostfcinterfaces=1&enable_fc_physicalports=1&enable_network_vfcs=1&enable_network_vethernets=1&enable_fc_portchannels=1&enable_adapter_hostethinterfaces=1"
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "inventory" "${account}_intersight_ports_and_interfaces_inventory" "${body_ports}" && log "  Added: inventory://${account}_intersight_ports_and_interfaces_inventory"
+    local body_ports
+    body_ports=$(form_urlencode_pairs \
+        global_account "${account}" \
+        index "${index}" \
+        interval "1800" \
+        disabled "0" \
+        inventory "ports")
 
-    local body_pools="global_account=${account}&index=${index}&interval=1800&disabled=0&inventory=pools&enable_fcpool_pools=1&enable_ippool_pools=1&enable_iqnpool_pools=1&enable_macpool_pools=1&enable_uuidpool_pools=1&enable_resourcepool_pools=1&enable_compute_rackunitidentities=1&enable_fabric_elementidentities=1"
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "inventory" "${account}_intersight_pools_inventory" "${body_pools}" && log "  Added: inventory://${account}_intersight_pools_inventory"
+    local body_pools
+    body_pools=$(form_urlencode_pairs \
+        global_account "${account}" \
+        index "${index}" \
+        interval "1800" \
+        disabled "0" \
+        inventory "pools")
+
+    local failures=0
+
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "inventory" "${account}_intersight_inventory" "${body_main}"; then
+        log "  Added: inventory://${account}_intersight_inventory"
+    else
+        log "  ERROR: Failed to create inventory://${account}_intersight_inventory"
+        failures=$((failures + 1))
+    fi
+
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "inventory" "${account}_intersight_ports_and_interfaces_inventory" "${body_ports}"; then
+        log "  Added: inventory://${account}_intersight_ports_and_interfaces_inventory"
+    else
+        log "  ERROR: Failed to create inventory://${account}_intersight_ports_and_interfaces_inventory"
+        failures=$((failures + 1))
+    fi
+
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "inventory" "${account}_intersight_pools_inventory" "${body_pools}"; then
+        log "  Added: inventory://${account}_intersight_pools_inventory"
+    else
+        log "  ERROR: Failed to create inventory://${account}_intersight_pools_inventory"
+        failures=$((failures + 1))
+    fi
+
+    if (( failures != 0 )); then
+        log "Inventory input enablement failed for ${failures} input(s)."
+        return 1
+    fi
 
     log "Inventory inputs enabled (3 inputs)."
 }
@@ -130,11 +198,40 @@ enable_metrics_inputs() {
 
     log "Enabling Metrics inputs for account='${account}' index='${index}'..."
 
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "metrics" "${account}_device_metrics" \
-        "global_account=${account}&index=${index}&interval=900&disabled=0&metrics=temperature,cpu_utilization,memory,host,fan" && log "  Added: metrics://${account}_device_metrics"
+    local device_body network_body
+    device_body=$(form_urlencode_pairs \
+        global_account "${account}" \
+        index "${index}" \
+        interval "900" \
+        disabled "0" \
+        metrics "temperature,cpu_utilization,memory,host,fan")
+    local failures=0
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "metrics" "${account}_device_metrics" \
+        "${device_body}"; then
+        log "  Added: metrics://${account}_device_metrics"
+    else
+        log "  ERROR: Failed to create metrics://${account}_device_metrics"
+        failures=$((failures + 1))
+    fi
 
-    rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "metrics" "${account}_network_metrics" \
-        "global_account=${account}&index=${index}&interval=900&disabled=0&metrics=network" && log "  Added: metrics://${account}_network_metrics"
+    network_body=$(form_urlencode_pairs \
+        global_account "${account}" \
+        index "${index}" \
+        interval "900" \
+        disabled "0" \
+        metrics "network")
+    if rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "metrics" "${account}_network_metrics" \
+        "${network_body}"; then
+        log "  Added: metrics://${account}_network_metrics"
+    else
+        log "  ERROR: Failed to create metrics://${account}_network_metrics"
+        failures=$((failures + 1))
+    fi
+
+    if (( failures != 0 )); then
+        log "Metrics input enablement failed for ${failures} input(s)."
+        return 1
+    fi
 
     log "Metrics inputs enabled (2 inputs)."
 }

@@ -84,9 +84,21 @@ log "Authenticated to Splunk REST API."
 local_endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/Splunk_TA_cisco_meraki_account"
 log "Creating Meraki organization account '${ACCT_NAME}' (region=${REGION}, base_url=${BASE_URL})..."
 
+local_body=""
+update_body=""
 http_code=""
+local_body=$(form_urlencode_pairs \
+    name "${ACCT_NAME}" \
+    organization_api_key "${API_KEY}" \
+    organization_id "${ORG_ID}" \
+    region "${REGION}" \
+    base_url "${BASE_URL}" \
+    max_api_calls_per_second "${MAX_API_RATE}" \
+    auth_type "basic" \
+    automatic_input_creation "${AUTO_INPUTS}" \
+    automatic_input_creation_index "${AUTO_INDEX}") || exit 1
 resp=$(splunk_curl_post "${SK}" \
-    "name=${ACCT_NAME}&organization_api_key=${API_KEY}&organization_id=${ORG_ID}&region=${REGION}&base_url=${BASE_URL}&max_api_calls_per_second=${MAX_API_RATE}&auth_type=basic&automatic_input_creation=${AUTO_INPUTS}&automatic_input_creation_index=${AUTO_INDEX}" \
+    "${local_body}" \
     "${local_endpoint}" -w '\n%{http_code}')
 http_code=$(echo "${resp}" | tail -1)
 
@@ -94,8 +106,17 @@ if [[ "${http_code}" == "201" || "${http_code}" == "200" ]]; then
     log "  SUCCESS: Account '${ACCT_NAME}' created (HTTP ${http_code})"
 elif [[ "${http_code}" == "409" ]]; then
     log "  Account already exists. Updating..."
+    update_body=$(form_urlencode_pairs \
+        organization_api_key "${API_KEY}" \
+        organization_id "${ORG_ID}" \
+        region "${REGION}" \
+        base_url "${BASE_URL}" \
+        max_api_calls_per_second "${MAX_API_RATE}" \
+        auth_type "basic" \
+        automatic_input_creation "${AUTO_INPUTS}" \
+        automatic_input_creation_index "${AUTO_INDEX}") || exit 1
     resp=$(splunk_curl_post "${SK}" \
-        "organization_api_key=${API_KEY}&organization_id=${ORG_ID}&region=${REGION}&base_url=${BASE_URL}&max_api_calls_per_second=${MAX_API_RATE}&auth_type=basic&automatic_input_creation=${AUTO_INPUTS}&automatic_input_creation_index=${AUTO_INDEX}" \
+        "${update_body}" \
         "${local_endpoint}/${ACCT_NAME}" -w '\n%{http_code}')
     http_code=$(echo "${resp}" | tail -1)
     log "  UPDATE: HTTP ${http_code}"

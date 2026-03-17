@@ -57,6 +57,15 @@ done
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
+capitalize_word() {
+    local word="${1:-}"
+    if [[ -z "${word}" ]]; then
+        printf ''
+        return 0
+    fi
+    printf '%s%s' "$(printf '%s' "${word:0:1}" | tr '[:lower:]' '[:upper:]')" "${word:1}"
+}
+
 _get_session_key() {
     load_splunk_credentials || return 1
     SK=$(get_session_key "${SPLUNK_URI}") || return 1
@@ -191,13 +200,13 @@ stream_enable_disable() {
         -o /dev/null -w '%{http_code}' 2>/dev/null) || echo "000"
 
     if [[ "${http_code}" == "200" ]]; then
-        log "  ${action^}d: ${stream_id}"
+        log "  $(capitalize_word "${action}")d: ${stream_id}"
         return 0
     fi
 
     # Fallback: update via KV Store
     if kvstore_update_stream "${stream_id}" "${enable}" "${index}"; then
-        log "  ${action^}d: ${stream_id} (via KV Store)"
+        log "  $(capitalize_word "${action}")d: ${stream_id} (via KV Store)"
         return 0
     fi
 

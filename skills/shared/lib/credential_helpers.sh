@@ -5,7 +5,6 @@
 # helpers for remote Splunk management.
 
 _CRED_HELPERS_LOADED=true
-_SB_CRED_LOADED=false
 
 # Resolve SCRIPT_DIR for the sourcing script if not already set.
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
@@ -23,22 +22,92 @@ else
     _CRED_FILE="${HOME}/.splunk/credentials"
 fi
 
+_read_credential_file_entries() {
+    local file_path="$1"
+    python3 - "$file_path" <<'PY'
+import ast
+import os
+import re
+import sys
+
+path = sys.argv[1]
+allowed_keys = [
+    "SPLUNK_HOST",
+    "SPLUNK_MGMT_PORT",
+    "SPLUNK_URI",
+    "SPLUNK_SSH_HOST",
+    "SPLUNK_SSH_PORT",
+    "SPLUNK_SSH_USER",
+    "SPLUNK_SSH_PASS",
+    "SPLUNK_USER",
+    "SPLUNK_PASS",
+    "SB_USER",
+    "SB_PASS",
+]
+allowed = set(allowed_keys)
+raw_values = {}
+
+with open(path, encoding="utf-8") as handle:
+    for raw_line in handle:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if "=" not in raw_line:
+            continue
+
+        key, value = raw_line.split("=", 1)
+        key = key.strip()
+        if key not in allowed:
+            continue
+
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            try:
+                value = ast.literal_eval(value)
+            except Exception:
+                value = value[1:-1]
+
+        raw_values[key] = value
+
+pattern = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+
+def resolve_value(value, stack):
+    def repl(match):
+        name = match.group(1)
+        if name in stack:
+            return match.group(0)
+        if name in raw_values:
+            return resolve_value(raw_values[name], stack | {name})
+        return os.environ.get(name, match.group(0))
+    return pattern.sub(repl, value)
+
+for key in allowed_keys:
+    if key not in raw_values:
+        continue
+    resolved = resolve_value(raw_values[key], {key})
+    sys.stdout.buffer.write(key.encode("utf-8"))
+    sys.stdout.buffer.write(b"\0")
+    sys.stdout.buffer.write(resolved.encode("utf-8"))
+    sys.stdout.buffer.write(b"\0")
+PY
+}
+
+_load_credential_values_from_file() {
+    local file_path="${1:-${_CRED_FILE}}"
+    local key value current_value
+
+    [[ -f "${file_path}" ]] || return 0
+
+    while IFS= read -r -d '' key && IFS= read -r -d '' value; do
+        current_value="${!key-}"
+        if [[ -z "${current_value}" ]]; then
+            printf -v "${key}" '%s' "${value}"
+        fi
+    done < <(_read_credential_file_entries "${file_path}")
+}
+
 load_splunk_connection_settings() {
-    if [[ -f "${_CRED_FILE}" ]]; then
-        local line
-        while IFS= read -r line || [[ -n "${line}" ]]; do
-            line="${line%%#*}"
-            [[ -z "${line}" ]] && continue
-            case "${line}" in
-                SPLUNK_HOST=*)      [[ -z "${SPLUNK_HOST:-}" ]]      && eval "${line}" ;;
-                SPLUNK_MGMT_PORT=*) [[ -z "${SPLUNK_MGMT_PORT:-}" ]] && eval "${line}" ;;
-                SPLUNK_URI=*)       [[ -z "${SPLUNK_URI:-}" ]]       && eval "${line}" ;;
-                SPLUNK_SSH_HOST=*)  [[ -z "${SPLUNK_SSH_HOST:-}" ]]  && eval "${line}" ;;
-                SPLUNK_SSH_PORT=*)  [[ -z "${SPLUNK_SSH_PORT:-}" ]]  && eval "${line}" ;;
-                SPLUNK_SSH_USER=*)  [[ -z "${SPLUNK_SSH_USER:-}" ]]  && eval "${line}" ;;
-            esac
-        done < "${_CRED_FILE}"
-    fi
+    _load_credential_values_from_file "${_CRED_FILE}"
 
     SPLUNK_MGMT_PORT="${SPLUNK_MGMT_PORT:-8089}"
     if [[ -z "${SPLUNK_URI:-}" && -n "${SPLUNK_HOST:-}" ]]; then
@@ -58,21 +127,7 @@ splunk_host_from_uri() {
 load_splunk_connection_settings
 
 load_splunk_credentials() {
-    if [[ -f "${_CRED_FILE}" ]]; then
-        local line
-        while IFS= read -r line || [[ -n "${line}" ]]; do
-            line="${line%%#*}"
-            [[ -z "${line}" ]] && continue
-            case "${line}" in
-                SPLUNK_USER=*)
-                    [[ -z "${SPLUNK_USER:-}" ]] && eval "${line}"
-                    ;;
-                SPLUNK_PASS=*)
-                    [[ -z "${SPLUNK_PASS:-}" ]] && eval "${line}"
-                    ;;
-            esac
-        done < "${_CRED_FILE}"
-    fi
+    _load_credential_values_from_file "${_CRED_FILE}"
 
     if [[ -z "${SPLUNK_USER:-}" ]]; then
         read -rp "Splunk username: " SPLUNK_USER
@@ -89,17 +144,7 @@ load_splunk_credentials() {
 }
 
 load_splunkbase_credentials() {
-    if [[ -f "${_CRED_FILE}" ]]; then
-        local line
-        while IFS= read -r line || [[ -n "${line}" ]]; do
-            line="${line%%#*}"
-            [[ -z "${line}" ]] && continue
-            case "${line}" in
-                SB_USER=*) [[ -z "${SB_USER:-}" ]] && eval "${line}" ;;
-                SB_PASS=*) [[ -z "${SB_PASS:-}" ]] && eval "${line}" ;;
-            esac
-        done < "${_CRED_FILE}"
-    fi
+    _load_credential_values_from_file "${_CRED_FILE}"
 
     if [[ -z "${SB_USER:-}" ]]; then
         read -rp "Splunkbase (splunk.com) username: " SB_USER
@@ -116,19 +161,7 @@ load_splunkbase_credentials() {
 }
 
 load_splunk_ssh_credentials() {
-    if [[ -f "${_CRED_FILE}" ]]; then
-        local line
-        while IFS= read -r line || [[ -n "${line}" ]]; do
-            line="${line%%#*}"
-            [[ -z "${line}" ]] && continue
-            case "${line}" in
-                SPLUNK_SSH_HOST=*) [[ -z "${SPLUNK_SSH_HOST:-}" ]] && eval "${line}" ;;
-                SPLUNK_SSH_PORT=*) [[ -z "${SPLUNK_SSH_PORT:-}" ]] && eval "${line}" ;;
-                SPLUNK_SSH_USER=*) [[ -z "${SPLUNK_SSH_USER:-}" ]] && eval "${line}" ;;
-                SPLUNK_SSH_PASS=*) [[ -z "${SPLUNK_SSH_PASS:-}" ]] && eval "${line}" ;;
-            esac
-        done < "${_CRED_FILE}"
-    fi
+    _load_credential_values_from_file "${_CRED_FILE}"
 
     SPLUNK_SSH_HOST="${SPLUNK_SSH_HOST:-${SPLUNK_HOST:-$(splunk_host_from_uri "${SPLUNK_URI}")}}"
     SPLUNK_SSH_PORT="${SPLUNK_SSH_PORT:-22}"
@@ -153,8 +186,9 @@ load_splunk_ssh_credentials() {
 # Password is sent via stdin to curl, not via argv.
 get_session_key() {
     local uri="${1:-https://localhost:8089}"
-    local sk
-    sk=$(printf 'username=%s&password=%s' "${SPLUNK_USER}" "${SPLUNK_PASS}" \
+    local body sk
+    body=$(form_urlencode_pairs username "${SPLUNK_USER}" password "${SPLUNK_PASS}") || return 1
+    sk=$(printf '%s' "${body}" \
         | curl -sk "${uri}/services/auth/login" -d @- 2>/dev/null \
         | sed -n 's/.*<sessionKey>\([^<]*\)<.*/\1/p' || true)
 
@@ -194,25 +228,6 @@ read_secret_file() {
     val=$(<"${fpath}")
     val="${val#"${val%%[![:space:]]*}"}"
     val="${val%"${val##*[![:space:]]}"}"
-    printf '%s' "${val}"
-}
-
-# Resolve a credential that may come from a --*-file flag, a direct value,
-# or an interactive prompt.
-# Usage: resolve_secret <value> <prompt_text>
-#   If value is empty, prompts interactively.
-#   If value is a readable file path, reads from the file.
-#   Otherwise returns the value as-is (backward compat).
-resolve_secret() {
-    local val="$1"
-    local prompt="$2"
-
-    if [[ -z "${val}" ]]; then
-        read -rsp "${prompt}: " val
-        echo "" >&2
-    elif [[ -f "${val}" ]]; then
-        val=$(read_secret_file "${val}")
-    fi
     printf '%s' "${val}"
 }
 
@@ -379,41 +394,48 @@ download_splunkbase_release() {
     return 1
 }
 
-# Legacy Splunkbase helper kept for backward compatibility with older scripts.
-# Authenticates via Okta, returning sid and SSOID cookies.
-# Sets SB_SID and SB_SSOID globals. Credentials piped via stdin to avoid argv exposure.
-get_splunkbase_cookies() {
-    local json_payload
-    json_payload=$(printf '%s\n%s\n' "${SB_USER}" "${SB_PASS}" | python3 -c "
-import json, sys
-u = sys.stdin.readline().rstrip('\n')
-p = sys.stdin.readline().rstrip('\n')
-print(json.dumps({'username': u, 'password': p}))
-" 2>/dev/null)
+# Read a cookie value from a Netscape-format curl cookie jar.
+# Usage: _read_cookie_jar_value <cookie_jar_path> <cookie_name>
+_read_cookie_jar_value() {
+    python3 - "$1" "$2" <<'PY'
+import sys
 
-    local auth_response
-    auth_response=$(printf '%s' "${json_payload}" | curl -sk -D - \
-        -X POST \
-        -H 'Accept: application/json' \
-        -H 'Content-Type: application/json' \
-        -d @- \
-        "https://account.splunk.com/api/v1/okta/auth" 2>/dev/null || true)
+cookie_file = sys.argv[1]
+target_name = sys.argv[2]
 
-    SB_SID=$(printf '%s' "${auth_response}" | sed -n 's/^[Ss]et-[Cc]ookie: sid=\([^;]*\);.*/\1/p' | head -1)
-    # Parse JSON body (after headers) for ssoid_cookie; body is everything after first blank line
-    local body
-    body=$(printf '%s' "${auth_response}" | sed -n '/^$/,$ p' | tail -n +2)
-    SB_SSOID=$(printf '%s' "${body}" | python3 -c "
-import json, sys
 try:
-    data = json.load(sys.stdin)
-    print(data.get('ssoid_cookie', data.get('ssoid', '')))
-except (json.JSONDecodeError, ValueError, KeyError):
+    with open(cookie_file, encoding="utf-8") as handle:
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = raw_line.rstrip("\n").split("\t")
+            if len(parts) < 7:
+                continue
+            name = parts[5]
+            value = parts[6]
+            if name == target_name:
+                print(value, end="")
+                break
+except FileNotFoundError:
     pass
-" 2>/dev/null || true)
+PY
+}
 
-    if [[ -z "${SB_SID}" && -z "${SB_SSOID}" ]]; then
-        echo "ERROR: Failed to authenticate to Splunkbase (no sid or ssoid). Check splunk.com credentials and network." >&2
+# Legacy Splunkbase helper kept for backward compatibility with older scripts.
+# It now maps legacy globals onto the current Splunkbase session flow:
+#   - SB_SID   -> current sessionid cookie
+#   - SB_SSOID -> current csrf_splunkbase_token cookie
+get_splunkbase_cookies() {
+    if [[ -z "${SB_SESSION_ID:-}" || -z "${SB_COOKIE_JAR:-}" || ! -f "${SB_COOKIE_JAR:-}" ]]; then
+        get_splunkbase_session || return 1
+    fi
+
+    SB_SID=$(_read_cookie_jar_value "${SB_COOKIE_JAR}" "sessionid")
+    SB_SSOID=$(_read_cookie_jar_value "${SB_COOKIE_JAR}" "csrf_splunkbase_token")
+
+    if [[ -z "${SB_SID}" ]]; then
+        echo "ERROR: Failed to read sessionid cookie from Splunkbase cookie jar." >&2
         return 1
     fi
 }
@@ -421,10 +443,10 @@ except (json.JSONDecodeError, ValueError, KeyError):
 # Legacy wrapper — kept for backward compatibility.
 # Calls get_splunkbase_cookies() and returns a cookie string.
 get_splunkbase_token() {
-    get_splunkbase_cookies
+    get_splunkbase_cookies || return 1
     local cookie_str=""
-    [[ -n "${SB_SID:-}" ]] && cookie_str="sid=${SB_SID}"
-    [[ -n "${SB_SSOID:-}" ]] && cookie_str="${cookie_str:+${cookie_str}; }SSOID=${SB_SSOID}"
+    [[ -n "${SB_SID:-}" ]] && cookie_str="sessionid=${SB_SID}"
+    [[ -n "${SB_SSOID:-}" ]] && cookie_str="${cookie_str:+${cookie_str}; }csrf_splunkbase_token=${SB_SSOID}"
     printf '%s' "${cookie_str}"
 }
 
@@ -445,6 +467,27 @@ sanitize_response() {
 # URL-encode a string for use in REST API URL paths.
 _urlencode() {
     python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"
+}
+
+form_urlencode_pairs() {
+    if (( $# % 2 != 0 )); then
+        echo "ERROR: form_urlencode_pairs requires key/value pairs." >&2
+        return 1
+    fi
+
+    python3 - "$@" <<'PY'
+import sys
+from urllib.parse import quote_plus
+
+args = sys.argv[1:]
+parts = []
+for i in range(0, len(args), 2):
+    key = args[i]
+    value = args[i + 1]
+    parts.append(f"{quote_plus(key)}={quote_plus(value)}")
+
+print("&".join(parts), end="")
+PY
 }
 
 # Check if a Splunk app is installed via REST.
@@ -472,6 +515,51 @@ print(entries[0].get('content', {}).get('version', 'unknown') if entries else 'u
 " 2>/dev/null || echo "unknown"
 }
 
+# Check if a saved search exists via REST.
+# Usage: rest_check_saved_search <session_key> <splunk_uri> <app_name> <saved_search_name>
+rest_check_saved_search() {
+    local sk="$1" uri="$2" app="$3" search_name="$4"
+    local encoded_name http_code
+    encoded_name=$(_urlencode "${search_name}")
+    http_code=$(splunk_curl "${sk}" \
+        "${uri}/servicesNS/nobody/${app}/saved/searches/${encoded_name}?output_mode=json" \
+        -o /dev/null -w '%{http_code}' 2>/dev/null)
+    [[ "${http_code}" == "200" ]]
+}
+
+# Get a saved search content field via REST.
+# Usage: rest_get_saved_search_value <session_key> <splunk_uri> <app_name> <saved_search_name> <key>
+rest_get_saved_search_value() {
+    local sk="$1" uri="$2" app="$3" search_name="$4" key="$5"
+    local encoded_name
+    encoded_name=$(_urlencode "${search_name}")
+    splunk_curl "${sk}" \
+        "${uri}/servicesNS/nobody/${app}/saved/searches/${encoded_name}?output_mode=json" \
+        2>/dev/null \
+        | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+entries = d.get('entry', [])
+print(entries[0].get('content', {}).get('${key}', '') if entries else '')
+" 2>/dev/null || echo ""
+}
+
+# Enable a saved search via REST.
+# Usage: rest_enable_saved_search <session_key> <splunk_uri> <app_name> <saved_search_name>
+rest_enable_saved_search() {
+    local sk="$1" uri="$2" app="$3" search_name="$4"
+    local encoded_name http_code resp
+    encoded_name=$(_urlencode "${search_name}")
+    resp=$(splunk_curl_post "${sk}" "" \
+        "${uri}/servicesNS/nobody/${app}/saved/searches/${encoded_name}/enable" \
+        -w '\n%{http_code}' 2>/dev/null)
+    http_code=$(echo "${resp}" | tail -1)
+    case "${http_code}" in
+        200|201|409) return 0 ;;
+        *) echo "ERROR: Enable saved search '${search_name}' failed (HTTP ${http_code})" >&2; return 1 ;;
+    esac
+}
+
 # Check if a Splunk index exists via REST.
 # Usage: rest_check_index <session_key> <splunk_uri> <index_name>
 rest_check_index() {
@@ -487,9 +575,10 @@ rest_check_index() {
 # Usage: rest_create_index <session_key> <splunk_uri> <index_name> [maxTotalDataSizeMB]
 rest_create_index() {
     local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}"
-    local http_code resp
+    local body http_code resp
+    body=$(form_urlencode_pairs name "${idx}" maxTotalDataSizeMB "${max_size}") || return 1
     resp=$(splunk_curl_post "${sk}" \
-        "name=${idx}&maxTotalDataSizeMB=${max_size}" \
+        "${body}" \
         "${uri}/services/data/indexes" -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     case "${http_code}" in
@@ -503,14 +592,18 @@ rest_create_index() {
 # Usage: rest_set_conf <sk> <uri> <app> <conf_name> <stanza> <post_body>
 rest_set_conf() {
     local sk="$1" uri="$2" app="$3" conf="$4" stanza="$5" body="$6"
-    local encoded_stanza http_code resp
+    local create_body encoded_stanza http_code resp
     encoded_stanza=$(_urlencode "${stanza}")
     resp=$(splunk_curl_post "${sk}" "${body}" \
         "${uri}/servicesNS/nobody/${app}/configs/conf-${conf}/${encoded_stanza}" \
         -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     [[ "${http_code}" == "200" ]] && return 0
-    resp=$(splunk_curl_post "${sk}" "name=${stanza}&${body}" \
+    create_body=$(form_urlencode_pairs name "${stanza}") || return 1
+    if [[ -n "${body}" ]]; then
+        create_body="${create_body}&${body}"
+    fi
+    resp=$(splunk_curl_post "${sk}" "${create_body}" \
         "${uri}/servicesNS/nobody/${app}/configs/conf-${conf}" \
         -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
@@ -691,7 +784,7 @@ rest_apply_input_enable_state() {
 rest_create_input() {
     local sk="$1" uri="$2" app="$3" input_type="$4" input_name="$5" body="$6"
     local endpoint="${uri}/servicesNS/nobody/${app}/data/inputs/${input_type}"
-    local encoded_name http_code resp enable_state body_without_disabled
+    local create_body encoded_name http_code resp enable_state body_without_disabled
     encoded_name=$(_urlencode "${input_name}")
 
     if [[ "${body}" =~ (^|&)disabled=([^&]+) ]]; then
@@ -700,13 +793,13 @@ rest_create_input() {
         enable_state=""
     fi
 
+    body_without_disabled=$(printf '%s' "${body}" \
+        | sed -E 's/(^|&)disabled=[^&]*//g; s/^&//; s/&+$//; s/&&+/\&/g')
+
     http_code=$(splunk_curl "${sk}" \
         "${endpoint}/${encoded_name}?output_mode=json" \
         -o /dev/null -w '%{http_code}' 2>/dev/null)
     if [[ "${http_code}" == "200" ]]; then
-        body_without_disabled=$(printf '%s' "${body}" \
-            | sed -E 's/(^|&)disabled=[^&]*//g; s/^&//; s/&+$//; s/&&+/\&/g')
-
         if [[ -n "${body_without_disabled}" ]]; then
             resp=$(splunk_curl_post "${sk}" "${body_without_disabled}" \
                 "${endpoint}/${encoded_name}" -w '\n%{http_code}' 2>/dev/null)
@@ -726,7 +819,11 @@ rest_create_input() {
         return 0
     fi
 
-    resp=$(splunk_curl_post "${sk}" "name=${input_name}&${body}" \
+    create_body=$(form_urlencode_pairs name "${input_name}") || return 1
+    if [[ -n "${body_without_disabled}" ]]; then
+        create_body="${create_body}&${body_without_disabled}"
+    fi
+    resp=$(splunk_curl_post "${sk}" "${create_body}" \
         "${endpoint}" -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     case "${http_code}" in
@@ -745,8 +842,10 @@ rest_create_input() {
 # Usage: rest_oneshot_search <sk> <uri> <search_string> <result_field>
 rest_oneshot_search() {
     local sk="$1" uri="$2" search="$3" field="$4"
+    local body
+    body=$(form_urlencode_pairs search "${search}" exec_mode "oneshot" output_mode "json") || return 1
     splunk_curl_post "${sk}" \
-        "search=${search}&exec_mode=oneshot&output_mode=json" \
+        "${body}" \
         "${uri}/services/search/jobs" 2>/dev/null \
         | python3 -c "
 import json, sys

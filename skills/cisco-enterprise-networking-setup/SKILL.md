@@ -89,7 +89,7 @@ them by default:
 ### Step 3: Enable Data Model Acceleration (Optional)
 
 ```bash
-bash scripts/setup.sh --accelerate
+bash skills/cisco-enterprise-networking-setup/scripts/setup.sh --accelerate
 ```
 
 Enables acceleration on the `Cisco_Catalyst_App` data model for faster
@@ -98,7 +98,7 @@ dashboard loading.
 ### Step 4: Validate
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-enterprise-networking-setup/scripts/validate.sh
 ```
 
 Checks: app installation, macros, saved searches, data model, data presence.
@@ -132,7 +132,7 @@ index IN ("catalyst", "ise", "sdwan", "cybervision")
 ## MCP Server Integration
 
 ```bash
-bash scripts/load_mcp_tools.sh
+bash skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh
 ```
 
 ## Key Learnings / Known Issues

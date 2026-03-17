@@ -18,9 +18,15 @@ warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 log "=== Cisco Intersight TA Validation ==="
 log ""
 
-load_splunk_credentials
-SK=$(get_session_key "${SPLUNK_URI}") || true
-if [[ -z "${SK}" ]]; then
+if ! load_splunk_credentials; then
+    fail "Could not load Splunk credentials — check credentials file"
+    log ""
+    log "=== Validation Summary ==="
+    log "  PASS: ${PASS} | WARN: ${WARN} | FAIL: ${FAIL}"
+    exit 1
+fi
+
+if ! SK=$(get_session_key "${SPLUNK_URI}"); then
     fail "Could not authenticate to Splunk REST API — check credentials"
     log ""
     log "=== Validation Summary ==="
@@ -66,9 +72,8 @@ try:
     d = json.load(sys.stdin)
     entries = d.get('entry', [])
     print(len(entries))
-    for e in entries:
-        print(e.get('name', '?'))
-except: print(0)
+except Exception:
+    print(0)
 " 2>/dev/null || echo "0")
 if [[ "${acct_count}" -gt 0 ]]; then
     pass "Intersight account(s) configured: ${acct_count}"
@@ -82,7 +87,8 @@ try:
         hostname = c.get('intersight_hostname', '?')
         acct_name = c.get('intersight_account_name', '?')
         print(f'    Account: {name} (hostname={hostname}, intersight_account={acct_name})')
-except: pass
+except Exception:
+    pass
 " 2>/dev/null || true
 else
     warn "No Intersight accounts configured"
@@ -122,8 +128,12 @@ else
     warn "Index 'intersight' has no events (may be normal if just configured)"
 fi
 
+sourcetype_breakdown_body=$(form_urlencode_pairs \
+    search "| tstats count where index=intersight by sourcetype | sort -count" \
+    exec_mode "oneshot" \
+    output_mode "json")
 sourcetype_breakdown=$(splunk_curl_post "${SK}" \
-    "search=| tstats count where index=intersight by sourcetype | sort -count&exec_mode=oneshot&output_mode=json" \
+    "${sourcetype_breakdown_body}" \
     "${SPLUNK_URI}/services/search/jobs" 2>/dev/null \
     | python3 -c "
 import json, sys

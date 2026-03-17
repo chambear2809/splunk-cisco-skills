@@ -89,9 +89,17 @@ configure_catalyst_center() {
     local endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/TA_cisco_catalyst_account"
     log "Creating Catalyst Center account '${ACCT_NAME}'..."
 
-    local http_code resp
+    local body http_code resp update_body
+    body=$(form_urlencode_pairs \
+        name "${ACCT_NAME}" \
+        cisco_dna_center_host "${HOST}" \
+        username "${USERNAME}" \
+        password "${PASSWORD}" \
+        copy_account_name "${ACCT_NAME}" \
+        use_ca_cert "${USE_CA_CERT}" \
+        custom_certificate "") || exit 1
     resp=$(splunk_curl_post "${SK}" \
-        "name=${ACCT_NAME}&cisco_dna_center_host=${HOST}&username=${USERNAME}&password=${PASSWORD}&copy_account_name=${ACCT_NAME}&use_ca_cert=${USE_CA_CERT}&custom_certificate=" \
+        "${body}" \
         "${endpoint}" -w '\n%{http_code}')
     http_code=$(echo "${resp}" | tail -1)
 
@@ -99,8 +107,15 @@ configure_catalyst_center() {
         log "  SUCCESS: Account '${ACCT_NAME}' created (HTTP ${http_code})"
     elif [[ "${http_code}" == "409" ]]; then
         log "  Account already exists. Updating..."
+        update_body=$(form_urlencode_pairs \
+            cisco_dna_center_host "${HOST}" \
+            username "${USERNAME}" \
+            password "${PASSWORD}" \
+            copy_account_name "${ACCT_NAME}" \
+            use_ca_cert "${USE_CA_CERT}" \
+            custom_certificate "") || exit 1
         resp=$(splunk_curl_post "${SK}" \
-            "cisco_dna_center_host=${HOST}&username=${USERNAME}&password=${PASSWORD}&copy_account_name=${ACCT_NAME}&use_ca_cert=${USE_CA_CERT}&custom_certificate=" \
+            "${update_body}" \
             "${endpoint}/${ACCT_NAME}" -w '\n%{http_code}')
         http_code=$(echo "${resp}" | tail -1)
         log "  UPDATE: HTTP ${http_code}"
@@ -120,9 +135,18 @@ configure_ise() {
     local endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/TA_cisco_catalyst_ise_account"
     log "Creating ISE account '${ACCT_NAME}'..."
 
-    local http_code resp
+    local body http_code resp update_body
+    body=$(form_urlencode_pairs \
+        name "${ACCT_NAME}" \
+        hostname "${HOST}" \
+        username "${USERNAME}" \
+        password "${PASSWORD}" \
+        copy_account_name "${ACCT_NAME}" \
+        use_ca_cert "${USE_CA_CERT}" \
+        enable_proxy "false" \
+        pxgrid_cert_auth "false") || exit 1
     resp=$(splunk_curl_post "${SK}" \
-        "name=${ACCT_NAME}&hostname=${HOST}&username=${USERNAME}&password=${PASSWORD}&copy_account_name=${ACCT_NAME}&use_ca_cert=${USE_CA_CERT}&enable_proxy=false&pxgrid_cert_auth=false" \
+        "${body}" \
         "${endpoint}" -w '\n%{http_code}')
     http_code=$(echo "${resp}" | tail -1)
 
@@ -130,8 +154,16 @@ configure_ise() {
         log "  SUCCESS: Account '${ACCT_NAME}' created (HTTP ${http_code})"
     elif [[ "${http_code}" == "409" ]]; then
         log "  Account already exists. Updating..."
+        update_body=$(form_urlencode_pairs \
+            hostname "${HOST}" \
+            username "${USERNAME}" \
+            password "${PASSWORD}" \
+            copy_account_name "${ACCT_NAME}" \
+            use_ca_cert "${USE_CA_CERT}" \
+            enable_proxy "false" \
+            pxgrid_cert_auth "false") || exit 1
         resp=$(splunk_curl_post "${SK}" \
-            "hostname=${HOST}&username=${USERNAME}&password=${PASSWORD}&copy_account_name=${ACCT_NAME}&use_ca_cert=${USE_CA_CERT}&enable_proxy=false&pxgrid_cert_auth=false" \
+            "${update_body}" \
             "${endpoint}/${ACCT_NAME}" -w '\n%{http_code}')
         http_code=$(echo "${resp}" | tail -1)
         log "  UPDATE: HTTP ${http_code}"
@@ -151,9 +183,17 @@ configure_sdwan() {
     local endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/TA_cisco_catalyst_sdwan_account"
     log "Creating SD-WAN account '${ACCT_NAME}'..."
 
-    local http_code resp
+    local body http_code resp update_body
+    body=$(form_urlencode_pairs \
+        name "${ACCT_NAME}" \
+        hostname "${HOST}" \
+        username "${USERNAME}" \
+        password "${PASSWORD}" \
+        copy_account_name "${ACCT_NAME}" \
+        use_ca_cert "${USE_CA_CERT}" \
+        enable_proxy "false") || exit 1
     resp=$(splunk_curl_post "${SK}" \
-        "name=${ACCT_NAME}&hostname=${HOST}&username=${USERNAME}&password=${PASSWORD}&copy_account_name=${ACCT_NAME}&use_ca_cert=${USE_CA_CERT}&enable_proxy=false" \
+        "${body}" \
         "${endpoint}" -w '\n%{http_code}')
     http_code=$(echo "${resp}" | tail -1)
 
@@ -161,8 +201,15 @@ configure_sdwan() {
         log "  SUCCESS: Account '${ACCT_NAME}' created (HTTP ${http_code})"
     elif [[ "${http_code}" == "409" ]]; then
         log "  Account already exists. Updating..."
+        update_body=$(form_urlencode_pairs \
+            hostname "${HOST}" \
+            username "${USERNAME}" \
+            password "${PASSWORD}" \
+            copy_account_name "${ACCT_NAME}" \
+            use_ca_cert "${USE_CA_CERT}" \
+            enable_proxy "false") || exit 1
         resp=$(splunk_curl_post "${SK}" \
-            "hostname=${HOST}&username=${USERNAME}&password=${PASSWORD}&copy_account_name=${ACCT_NAME}&use_ca_cert=${USE_CA_CERT}&enable_proxy=false" \
+            "${update_body}" \
             "${endpoint}/${ACCT_NAME}" -w '\n%{http_code}')
         http_code=$(echo "${resp}" | tail -1)
         log "  UPDATE: HTTP ${http_code}"
@@ -182,9 +229,16 @@ configure_cybervision() {
     local endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/TA_cisco_catalyst_cyber_vision_account"
     log "Creating Cyber Vision account '${ACCT_NAME}'..."
 
-    local http_code resp
+    local body http_code resp update_body
+    body=$(form_urlencode_pairs \
+        name "${ACCT_NAME}" \
+        ip_address "${HOST}" \
+        api_token "${API_TOKEN}" \
+        copy_account_name "${ACCT_NAME}" \
+        use_ca_cert "${USE_CA_CERT}" \
+        enable_proxy "false") || exit 1
     resp=$(splunk_curl_post "${SK}" \
-        "name=${ACCT_NAME}&ip_address=${HOST}&api_token=${API_TOKEN}&copy_account_name=${ACCT_NAME}&use_ca_cert=${USE_CA_CERT}&enable_proxy=false" \
+        "${body}" \
         "${endpoint}" -w '\n%{http_code}')
     http_code=$(echo "${resp}" | tail -1)
 
@@ -192,8 +246,14 @@ configure_cybervision() {
         log "  SUCCESS: Account '${ACCT_NAME}' created (HTTP ${http_code})"
     elif [[ "${http_code}" == "409" ]]; then
         log "  Account already exists. Updating..."
+        update_body=$(form_urlencode_pairs \
+            ip_address "${HOST}" \
+            api_token "${API_TOKEN}" \
+            copy_account_name "${ACCT_NAME}" \
+            use_ca_cert "${USE_CA_CERT}" \
+            enable_proxy "false") || exit 1
         resp=$(splunk_curl_post "${SK}" \
-            "ip_address=${HOST}&api_token=${API_TOKEN}&copy_account_name=${ACCT_NAME}&use_ca_cert=${USE_CA_CERT}&enable_proxy=false" \
+            "${update_body}" \
             "${endpoint}/${ACCT_NAME}" -w '\n%{http_code}')
         http_code=$(echo "${resp}" | tail -1)
         log "  UPDATE: HTTP ${http_code}"

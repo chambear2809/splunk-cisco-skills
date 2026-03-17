@@ -21,6 +21,35 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 is_interactive() { [[ -t 0 ]]; }
 
+list_package_files() {
+    python3 - "$@" <<'PY'
+import sys
+from pathlib import Path
+
+paths = []
+seen = set()
+for raw_dir in sys.argv[1:]:
+    directory = Path(raw_dir)
+    if not directory.is_dir():
+        continue
+    for child in sorted(directory.iterdir(), key=lambda p: p.name.lower()):
+        if not child.is_file():
+            continue
+        name = child.name.lower()
+        if not (name.endswith(".tgz") or name.endswith(".spl") or name.endswith(".tar.gz")):
+            continue
+        resolved = str(child.resolve())
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        paths.append(resolved)
+
+for path in paths:
+    sys.stdout.buffer.write(path.encode("utf-8"))
+    sys.stdout.buffer.write(b"\0")
+PY
+}
+
 safe_read() {
     if ! is_interactive; then
         log "ERROR: Missing required value (would prompt for: $1) but stdin is not a terminal."
@@ -100,11 +129,9 @@ prompt_local_file() {
         search_dirs+=("${TA_CACHE}")
     fi
 
-    for dir in "${search_dirs[@]}"; do
-        while IFS= read -r -d '' f; do
-            files+=("$f")
-        done < <(find "${dir}" -maxdepth 1 \( -name '*.tgz' -o -name '*.spl' -o -name '*.tar.gz' \) -print0 2>/dev/null | sort -z)
-    done
+    while IFS= read -r -d '' f; do
+        files+=("$f")
+    done < <(list_package_files "${search_dirs[@]}")
 
     if [[ ${#files[@]} -gt 0 ]]; then
         echo "Available packages:"

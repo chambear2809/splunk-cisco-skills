@@ -10,13 +10,8 @@ INDEX_NAME="${1:-meraki}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
-load_splunk_credentials || true
-SK=$(get_session_key "${SPLUNK_URI}") || true
-
-if [[ -z "${SK}" ]]; then
-    log "ERROR: Could not authenticate to Splunk. Check credentials."
-    exit 1
-fi
+load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk. Check credentials."; exit 1; }
 
 if ! rest_check_app "${SK}" "${SPLUNK_URI}" "${APP_NAME}"; then
     log "ERROR: Cisco Meraki TA not found. Install the app first."

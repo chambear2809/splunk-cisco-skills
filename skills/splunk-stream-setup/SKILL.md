@@ -77,8 +77,9 @@ bash skills/splunk-stream-setup/scripts/setup.sh --install
 ```
 
 Installs any of the three apps that are not already present. Uses the
-`splunk-app-install` skill's `install_app.sh` under the hood or installs
-directly via the REST API.
+`splunk-app-install` skill's `install_app.sh` under the hood, including the
+same remote-host behavior: direct REST upload first, then SSH staging when the
+target cannot read the local package path directly.
 
 ### Step 2: Create Indexes
 
@@ -126,6 +127,10 @@ bash skills/splunk-stream-setup/scripts/configure_streams.sh \
   --index main
 ```
 
+The script manages stream definitions through the Stream KV Store or Stream Web
+API when available. If neither endpoint is reachable, enable or disable streams
+from Splunk Web instead.
+
 Available protocols: `amqp`, `arp`, `dhcp`, `diameter`, `dns`, `ftp`, `http`,
 `icmp`, `igmp`, `imap`, `ip`, `irc`, `ldap`, `mapi`, `modbus`, `mysql`,
 `netflow`, `nfs`, `pop3`, `postgres`, `radius`, `rtcp`, `rtp`, `sflow`, `sip`,
@@ -159,7 +164,7 @@ enabled streams, and data flow.
 | `local/streamfwd.conf` | Splunk_TA_stream | Forwarder IP, port, NetFlow receivers |
 | `local/inputs.conf` | Splunk_TA_stream | Stream app location URL, forwarder ID |
 | `local/indexes.conf` | splunk_app_stream | Index definitions (netflow, stream) |
-| `local/streams/<name>` | splunk_app_stream | Enabled/disabled stream definitions |
+| KV Store / Stream API | splunk_app_stream | Enabled/disabled stream definitions for remote-friendly automation |
 
 ## Sourcetypes
 
@@ -184,8 +189,9 @@ All stream sourcetypes follow the pattern `stream:<protocol>`:
 3. **No sudo needed**: Scripts run as the `splunk` OS user.
 4. **SSL verification**: Set `sslVerifyServerCert = false` in inputs.conf for
    self-signed certs.
-5. **Stream forwarder permissions**: `streamfwd` may need `cap_net_raw`
-   capability for raw packet capture. Run `set_permissions.sh` if needed.
+5. **Stream forwarder permissions**: `streamfwd` may need packet-capture
+   capabilities such as `cap_net_raw` on the Splunk host. Apply those host-side
+   permissions using your standard deployment process if raw capture is required.
 6. **KV Store**: Stream app uses KV Store for stream definitions. Ensure KV
    Store is healthy before configuration.
 
