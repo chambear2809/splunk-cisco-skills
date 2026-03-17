@@ -129,3 +129,39 @@ That is the technical takeaway. [pause]
 Different integrations. [beat]
 Same guided motion. [beat]
 Faster time to usable Splunk visibility.
+
+## Troubleshooting Demo Add-On
+
+Approximate length: 2 minutes
+
+This is an optional section you can use when you want to show that the workflow also handles real-world friction, not just the happy path. [pause]
+
+The first issue we hit was simple, but important. [beat]
+
+When we moved into Cisco DC Networking for ACI, we had the host, username, and password file ready, but we had not included the ACI account name. [pause]
+
+That sounds minor, but it is exactly the kind of small gap that can slow down a real deployment. [beat]
+
+The workflow made the missing field obvious right away. [pause]
+We were able to supply the ACI account name, use `CVF`, and continue without guesswork. [emphasize]
+
+That is a good demo moment because it shows the process is structured. [beat]
+It does not just rush forward and hope for the best. [pause]
+It identifies what is missing, asks for the right value, and keeps the deployment moving. [emphasize]
+
+The second issue was more realistic from an infrastructure point of view. [beat]
+
+When we tried to create the ACI account, the connection failed because SSL certificate verification blocked the request. [pause]
+
+In other words, the platform could reach the APIC, but it did not trust the certificate presented by that endpoint. [beat]
+
+For a production environment, the better path is to use a trusted certificate chain or the correct CA bundle. [pause]
+But for this demo, we made a deliberate choice to disable SSL verification in the Cisco DC Networking app so the onboarding could continue. [emphasize]
+
+Once that setting was changed, the ACI account was created successfully, the inputs were enabled, Splunk restarted, and data validation passed. [pause]
+
+That is the value of including this section in the demo. [beat]
+It shows that the workflow is useful not only when everything is perfect, but also when the environment behaves like a real customer environment. [pause]
+
+So the story is not just that we installed three Cisco integrations. [beat]
+The stronger story is that we handled missing configuration details, resolved certificate friction, and still reached working telemetry in a guided, repeatable way. [emphasize]
