@@ -5,6 +5,7 @@ credentials
 !README.md
 !credentials.example
 !.gitignore
+!DEMO_SCRIPTS.md
 !blocklist
 # Local TA packages directory
 !splunk-ta/
