@@ -1,0 +1,112 @@
+{
+  "name": "Cisco Meraki TA Tools",
+  "description": "MCP tools for managing and querying the Cisco Meraki Add-on for Splunk",
+  "version": "1.0.0",
+  "author": "cisco-meraki-ta-setup skill",
+  "tools": [
+    {
+      "_key": "cisco_meraki:check_health",
+      "name": "cisco_meraki_check_health",
+      "title": "Cisco Meraki Health Check",
+      "description": "Check the health status of Cisco Meraki TA data collection. Shows event counts, active inputs, and sourcetype breakdown.",
+      "category": "cisco_meraki",
+      "tags": ["cisco", "meraki", "health", "status"],
+      "time_range": true,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"Splunk_TA_cisco_meraki\" disabled=0 | stats count as enabled_inputs | appendcols [| tstats count as meraki_events where index=meraki] | appendcols [| tstats dc(sourcetype) as sourcetype_count where index=meraki]",
+      "arguments": [],
+      "examples": ["Check Meraki TA health", "How many Meraki events are being collected?"]
+    },
+    {
+      "_key": "cisco_meraki:list_inputs",
+      "name": "cisco_meraki_list_inputs",
+      "title": "Cisco Meraki List Inputs",
+      "description": "List all configured data inputs for the Cisco Meraki TA with their status.",
+      "category": "cisco_meraki",
+      "tags": ["cisco", "meraki", "inputs", "configuration"],
+      "time_range": false,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"Splunk_TA_cisco_meraki\" | table title, eai:acl.app, disabled, index | sort title",
+      "arguments": [],
+      "examples": ["List all Meraki inputs", "Show me the configured Meraki inputs"]
+    },
+    {
+      "_key": "cisco_meraki:devices",
+      "name": "cisco_meraki_devices",
+      "title": "Meraki Device Inventory",
+      "description": "Show Meraki device inventory including model, serial, network, and status.",
+      "category": "cisco_meraki",
+      "tags": ["cisco", "meraki", "devices", "inventory"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=meraki sourcetype=\"meraki:devices\" | spath | stats latest(name) as name, latest(model) as model, latest(serial) as serial, latest(networkId) as networkId, latest(status) as status by mac | sort name",
+      "arguments": [],
+      "examples": ["Show Meraki devices", "List all Meraki network devices"]
+    },
+    {
+      "_key": "cisco_meraki:audit_log",
+      "name": "cisco_meraki_audit_log",
+      "title": "Meraki Audit Log",
+      "description": "Show recent Meraki Dashboard configuration change audit events.",
+      "category": "cisco_meraki",
+      "tags": ["cisco", "meraki", "audit", "changes"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=meraki sourcetype=\"meraki:audit\" | spath | stats count by adminName, page, label | sort -count",
+      "arguments": [],
+      "examples": ["Show Meraki audit log", "Who changed the Meraki configuration?"]
+    },
+    {
+      "_key": "cisco_meraki:security_events",
+      "name": "cisco_meraki_security_events",
+      "title": "Meraki Organization Security Events",
+      "description": "Show security events from the Meraki organization.",
+      "category": "cisco_meraki",
+      "tags": ["cisco", "meraki", "security", "events"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=meraki sourcetype=\"meraki:organizationsecurity\" | spath | stats count by eventType, clientName, srcIp | sort -count",
+      "arguments": [],
+      "examples": ["Show Meraki security events", "Any security incidents in Meraki?"]
+    },
+    {
+      "_key": "cisco_meraki:vpn_status",
+      "name": "cisco_meraki_vpn_status",
+      "title": "Meraki VPN Status",
+      "description": "Show Meraki appliance VPN tunnel statuses.",
+      "category": "cisco_meraki",
+      "tags": ["cisco", "meraki", "vpn", "tunnel"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=meraki sourcetype=\"meraki:appliancesdwanstatuses\" | spath | stats latest(vpnMode) as vpnMode, latest(exportedSubnets{}.subnet) as subnets by networkName, networkId | sort networkName",
+      "arguments": [],
+      "examples": ["Show Meraki VPN status", "Which VPN tunnels are up?"]
+    },
+    {
+      "_key": "cisco_meraki:licenses",
+      "name": "cisco_meraki_licenses",
+      "title": "Meraki License Overview",
+      "description": "Show Meraki organization license status and expiration.",
+      "category": "cisco_meraki",
+      "tags": ["cisco", "meraki", "licenses"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=meraki sourcetype=\"meraki:licensesoverview\" | spath | head 1 | table status, expirationDate, licensedDeviceCounts.*",
+      "arguments": [],
+      "examples": ["Show Meraki license status", "When do Meraki licenses expire?"]
+    },
+    {
+      "_key": "cisco_meraki:assurance_alerts",
+      "name": "cisco_meraki_assurance_alerts",
+      "title": "Meraki Assurance Alerts",
+      "description": "Show Meraki assurance alerts for network health issues.",
+      "category": "cisco_meraki",
+      "tags": ["cisco", "meraki", "assurance", "alerts"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=meraki sourcetype=\"meraki:assurancealerts\" | spath | stats count by type, severity, category.type, network.name | sort -severity -count",
+      "arguments": [],
+      "examples": ["Show Meraki alerts", "Any network health alerts?"]
+    }
+  ]
+}

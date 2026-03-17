@@ -1,0 +1,177 @@
+{
+  "name": "Cisco DC Networking Tools",
+  "description": "MCP tools for managing and querying the Cisco DC Networking TA for Splunk",
+  "version": "1.0.0",
+  "author": "cisco-dc-networking-setup skill",
+  "tools": [
+    {
+      "_key": "cisco_dc:check_health",
+      "name": "cisco_dc_check_health",
+      "title": "Cisco DC Health Check",
+      "description": "Check the health status of Cisco DC Networking data collection. Shows event counts per index, active inputs, and last event timestamps.",
+      "category": "cisco_dc",
+      "tags": ["cisco", "aci", "nexus", "health", "monitoring"],
+      "time_range": true,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"cisco_dc_networking_app_for_splunk\" disabled=0 | stats count as enabled_inputs | appendcols [| tstats count as aci_events where index=cisco_aci | eval index=\"cisco_aci\"] | appendcols [| tstats count as nd_events where index=cisco_nd | eval index=\"cisco_nd\"] | appendcols [| tstats count as n9k_events where index=cisco_nexus_9k | eval index=\"cisco_nexus_9k\"]",
+      "arguments": [],
+      "examples": [
+        {
+          "name": "Run health check",
+          "description": "Check overall health of Cisco DC data collection",
+          "arguments": {},
+          "expected_use": "Monitoring and troubleshooting data collection issues"
+        }
+      ]
+    },
+    {
+      "_key": "cisco_dc:list_inputs",
+      "name": "cisco_dc_list_inputs",
+      "title": "Cisco DC List Inputs",
+      "description": "List all Cisco DC Networking data inputs with their status, account, index, and interval.",
+      "category": "cisco_dc",
+      "tags": ["cisco", "aci", "nexus", "inputs", "configuration"],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"cisco_dc_networking_app_for_splunk\" | eval status=if(disabled=0,\"enabled\",\"disabled\") | table title, status, eai:acl.app, index | rename title as input_name, eai:acl.app as app | sort input_name",
+      "arguments": [],
+      "examples": [
+        {
+          "name": "List all inputs",
+          "description": "Show all configured Cisco DC inputs",
+          "arguments": {},
+          "expected_use": "Review input configuration and status"
+        }
+      ]
+    },
+    {
+      "_key": "cisco_dc:aci_faults",
+      "name": "cisco_dc_aci_faults",
+      "title": "Cisco ACI Faults",
+      "description": "Query ACI faults from the cisco_aci index. Shows fault code, severity, description, affected DN, and timestamps.",
+      "category": "cisco_dc",
+      "tags": ["cisco", "aci", "faults", "alerts", "troubleshooting"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "search index=cisco_aci sourcetype=\"cisco:apic:faultInst\" | spath | table _time, code, severity, descr, dn, lc, cause | sort -_time",
+      "arguments": [
+        {
+          "name": "severity",
+          "type": "string",
+          "description": "Filter by fault severity (critical, major, minor, warning, cleared)",
+          "required": false,
+          "placeholder": "critical",
+          "quoted": false
+        }
+      ],
+      "examples": [
+        {
+          "name": "Show critical faults",
+          "description": "List all critical ACI faults in the last 24 hours",
+          "arguments": {"severity": "critical"},
+          "expected_use": "Incident response and fault investigation"
+        }
+      ]
+    },
+    {
+      "_key": "cisco_dc:aci_endpoints",
+      "name": "cisco_dc_aci_endpoints",
+      "title": "Cisco ACI Endpoints",
+      "description": "Query ACI endpoint information from the cisco_aci index. Shows MAC, IP, encapsulation, EPG, and path.",
+      "category": "cisco_dc",
+      "tags": ["cisco", "aci", "endpoints", "inventory", "network"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "search index=cisco_aci sourcetype=\"cisco:apic:fvCEp\" | spath | table _time, mac, ip, encap, dn | sort -_time",
+      "arguments": [],
+      "examples": [
+        {
+          "name": "List endpoints",
+          "description": "Show all discovered ACI endpoints",
+          "arguments": {},
+          "expected_use": "Endpoint inventory and tracking"
+        }
+      ]
+    },
+    {
+      "_key": "cisco_dc:aci_health_summary",
+      "name": "cisco_dc_aci_health_summary",
+      "title": "Cisco ACI Fabric Health Summary",
+      "description": "Get the overall ACI fabric health score and top-level health breakdown by tenant and node.",
+      "category": "cisco_dc",
+      "tags": ["cisco", "aci", "health", "fabric", "monitoring"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "search index=cisco_aci sourcetype=\"cisco:apic:fabricHealthTotal\" | spath | table _time, healthAvg, healthMax, healthMin, dn | sort -_time",
+      "arguments": [],
+      "examples": [
+        {
+          "name": "Fabric health summary",
+          "description": "Show overall fabric health scores",
+          "arguments": {},
+          "expected_use": "Proactive health monitoring"
+        }
+      ]
+    },
+    {
+      "_key": "cisco_dc:aci_audit_log",
+      "name": "cisco_dc_aci_audit_log",
+      "title": "Cisco ACI Audit Log",
+      "description": "Query ACI audit and change records. Shows who changed what and when on the APIC.",
+      "category": "cisco_dc",
+      "tags": ["cisco", "aci", "audit", "changes", "compliance"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "search index=cisco_aci sourcetype=\"cisco:apic:aaaModLR\" | spath | table _time, user, action, descr, affected, changeSet | sort -_time",
+      "arguments": [],
+      "examples": [
+        {
+          "name": "Recent changes",
+          "description": "Show recent APIC configuration changes",
+          "arguments": {},
+          "expected_use": "Compliance auditing and change tracking"
+        }
+      ]
+    },
+    {
+      "_key": "cisco_dc:nd_anomalies",
+      "name": "cisco_dc_nd_anomalies",
+      "title": "Cisco Nexus Dashboard Anomalies",
+      "description": "Query anomalies detected by Nexus Dashboard Insights. Shows severity, category, and affected objects.",
+      "category": "cisco_dc",
+      "tags": ["cisco", "nexus-dashboard", "anomalies", "insights", "monitoring"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "search index=cisco_nd sourcetype=\"cisco:nd:anomalies\" | spath | table _time, severity, category, description, affectedObject | sort -_time",
+      "arguments": [],
+      "examples": [
+        {
+          "name": "Recent anomalies",
+          "description": "List anomalies detected in the last 24 hours",
+          "arguments": {},
+          "expected_use": "Proactive issue detection via Nexus Dashboard"
+        }
+      ]
+    },
+    {
+      "_key": "cisco_dc:n9k_interface_stats",
+      "name": "cisco_dc_n9k_interface_stats",
+      "title": "Cisco Nexus 9K Interface Stats",
+      "description": "Query Nexus 9K interface statistics including traffic, errors, and status from the cisco_nexus_9k index.",
+      "category": "cisco_dc",
+      "tags": ["cisco", "nexus-9k", "interfaces", "stats", "performance"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "search index=cisco_nexus_9k sourcetype=\"cisco:nexus9k:nxinterface\" | spath | table _time, interface, state, speed, input_rate, output_rate, input_errors, output_errors | sort -_time",
+      "arguments": [],
+      "examples": [
+        {
+          "name": "Interface overview",
+          "description": "Show interface stats for all Nexus 9K switches",
+          "arguments": {},
+          "expected_use": "Interface performance monitoring"
+        }
+      ]
+    }
+  ]
+}

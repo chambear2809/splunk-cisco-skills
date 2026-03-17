@@ -1,0 +1,56 @@
+# Ignore everything in .cursor by default
+*
+# Project-level files
+credentials
+README.md
+!credentials.example
+!.gitignore
+!blocklist
+# Local TA packages directory
+!splunk-ta/
+!splunk-ta/**
+# Ignore actual TA package binaries (install from Splunkbase or keep in LFS)
+splunk-ta/*.tgz
+splunk-ta/*.spl
+splunk-ta/*.tar.gz
+# Un-ignore projects so we can descend to allowlisted subdirs
+!projects/
+projects/*
+!projects/*/
+projects/*/*
+# MCP tool descriptors, resources, prompts
+!projects/*/mcps/
+!projects/*/mcps/**
+# Agent transcripts for citation
+!projects/*/agent-transcripts/
+!projects/*/agent-transcripts/**
+# Terminal output files
+!projects/*/terminals/
+!projects/*/terminals/**
+# Conversation notes (shared scratchpad)
+!projects/*/agent-notes/
+!projects/*/agent-notes/**
+# Large tool output files
+!projects/*/agent-tools/
+!projects/*/agent-tools/**
+# Plugin cache (rules, skills, agents)
+!plugins/
+!plugins/**
+# Built-in Cursor skills
+!skills-cursor/
+!skills-cursor/**
+# User's personal skills
+!skills/
+!skills/**
+# User's personal slash commands
+!commands/
+!commands/**
+# User's plan files
+!plans/
+!plans/**
+# Subagent state/transcripts
+!subagents/
+!subagents/**
+# User-level cursor rules
+!rules/
+!rules/**

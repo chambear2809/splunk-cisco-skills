@@ -1,0 +1,112 @@
+{
+  "name": "Cisco Intersight TA Tools",
+  "description": "MCP tools for managing and querying the Cisco Intersight Add-on for Splunk",
+  "version": "1.0.0",
+  "author": "cisco-intersight-setup skill",
+  "tools": [
+    {
+      "_key": "cisco_intersight:check_health",
+      "name": "cisco_intersight_check_health",
+      "title": "Cisco Intersight Health Check",
+      "description": "Check the health status of Cisco Intersight TA data collection. Shows event counts, active inputs, and last event timestamps.",
+      "category": "cisco_intersight",
+      "tags": ["cisco", "intersight", "ucs", "health"],
+      "time_range": true,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"Splunk_TA_Cisco_Intersight\" disabled=0 | stats count as enabled_inputs | appendcols [| tstats count as total_events where index=intersight] | appendcols [| tstats latest(_time) as last_event where index=intersight | eval last_event=strftime(last_event, \"%Y-%m-%d %H:%M:%S\")]",
+      "arguments": [],
+      "examples": ["Check Intersight TA health", "How many events are being collected?"]
+    },
+    {
+      "_key": "cisco_intersight:list_inputs",
+      "name": "cisco_intersight_list_inputs",
+      "title": "Cisco Intersight List Inputs",
+      "description": "List all configured data inputs for the Cisco Intersight TA with their status.",
+      "category": "cisco_intersight",
+      "tags": ["cisco", "intersight", "inputs", "configuration"],
+      "time_range": false,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"Splunk_TA_Cisco_Intersight\" | table title, eai:acl.app, disabled, index | sort title",
+      "arguments": [],
+      "examples": ["List all Intersight inputs", "Show me the configured inputs"]
+    },
+    {
+      "_key": "cisco_intersight:alarms",
+      "name": "cisco_intersight_alarms",
+      "title": "Intersight Active Alarms",
+      "description": "Show active alarms from Cisco Intersight with severity and affected objects.",
+      "category": "cisco_intersight",
+      "tags": ["cisco", "intersight", "alarms", "alerts"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=intersight sourcetype=\"cisco:intersight:alarms\" | spath | stats count by Severity, Name, AffectedType | sort -Severity",
+      "arguments": [],
+      "examples": ["Show Intersight alarms", "Any critical alarms?"]
+    },
+    {
+      "_key": "cisco_intersight:audit_log",
+      "name": "cisco_intersight_audit_log",
+      "title": "Intersight Audit Log",
+      "description": "Show recent audit records from Cisco Intersight (logins, changes, admin activity).",
+      "category": "cisco_intersight",
+      "tags": ["cisco", "intersight", "audit", "authentication"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=intersight sourcetype=\"cisco:intersight:auditrecords\" | spath | stats count by Event, Email, SourceIp | sort -count",
+      "arguments": [],
+      "examples": ["Show audit log", "Who logged into Intersight recently?"]
+    },
+    {
+      "_key": "cisco_intersight:server_inventory",
+      "name": "cisco_intersight_server_inventory",
+      "title": "Intersight Server Inventory",
+      "description": "Show compute server inventory from Cisco Intersight (blades and rack units).",
+      "category": "cisco_intersight",
+      "tags": ["cisco", "intersight", "compute", "servers", "inventory"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=intersight sourcetype=\"cisco:intersight:compute\" | spath | stats latest(OperState) as State, latest(Model) as Model, latest(Serial) as Serial, latest(NumCpus) as CPUs, latest(TotalMemory) as MemoryMB by Name | sort Name",
+      "arguments": [],
+      "examples": ["Show server inventory", "List all UCS servers"]
+    },
+    {
+      "_key": "cisco_intersight:security_advisories",
+      "name": "cisco_intersight_security_advisories",
+      "title": "Intersight Security Advisories",
+      "description": "Show security advisories (PSIRTs) affecting devices managed by Cisco Intersight.",
+      "category": "cisco_intersight",
+      "tags": ["cisco", "intersight", "security", "psirt", "advisories"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=intersight sourcetype=\"cisco:intersight:advisories\" | spath | stats count by AdvisoryId, Severity, Name | sort -Severity",
+      "arguments": [],
+      "examples": ["Show security advisories", "Any critical PSIRTs?"]
+    },
+    {
+      "_key": "cisco_intersight:contract_status",
+      "name": "cisco_intersight_contract_status",
+      "title": "Intersight Contract Status",
+      "description": "Show device contract and warranty status from Cisco Intersight.",
+      "category": "cisco_intersight",
+      "tags": ["cisco", "intersight", "contracts", "warranty"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=intersight sourcetype=\"cisco:intersight:contracts\" | spath | stats latest(ContractStatus) as Status, latest(ServiceEndDate) as EndDate by DeviceId, PlatformType | sort EndDate",
+      "arguments": [],
+      "examples": ["Show contract status", "Which devices have expiring contracts?"]
+    },
+    {
+      "_key": "cisco_intersight:metrics_summary",
+      "name": "cisco_intersight_metrics_summary",
+      "title": "Intersight Metrics Summary",
+      "description": "Show a summary of performance metrics (CPU, memory, temperature) from Cisco Intersight.",
+      "category": "cisco_intersight",
+      "tags": ["cisco", "intersight", "metrics", "performance"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=intersight sourcetype=\"cisco:intersight:metrics\" | stats count by source | sort -count",
+      "arguments": [],
+      "examples": ["Show metrics summary", "What performance data is being collected?"]
+    }
+  ]
+}

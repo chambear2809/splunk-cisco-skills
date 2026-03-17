@@ -1,0 +1,86 @@
+{
+  "name": "Cisco Enterprise Networking Tools",
+  "description": "MCP tools for Cisco Enterprise Networking dashboards and cross-product queries",
+  "version": "1.0.0",
+  "author": "cisco-enterprise-networking-setup skill",
+  "tools": [
+    {
+      "_key": "cisco_ent:overview",
+      "name": "cisco_ent_overview",
+      "title": "Enterprise Networking Overview",
+      "description": "Cross-product overview: event counts, sourcetypes, and data freshness across Catalyst Center, ISE, SD-WAN, and Cyber Vision.",
+      "category": "cisco_enterprise",
+      "tags": ["cisco", "enterprise", "overview", "dashboard"],
+      "time_range": true,
+      "row_limiter": false,
+      "spl": "index IN (\"catalyst\", \"ise\", \"sdwan\", \"cybervision\") | stats count as events, dc(sourcetype) as sourcetypes, latest(_time) as last_event by index | eval last_event=strftime(last_event, \"%Y-%m-%d %H:%M:%S\") | sort index",
+      "arguments": [],
+      "examples": ["Show enterprise networking overview", "How much data do we have?"]
+    },
+    {
+      "_key": "cisco_ent:network_health",
+      "name": "cisco_ent_network_health",
+      "title": "Network Health Summary",
+      "description": "Aggregate network health from Catalyst Center device and network health data.",
+      "category": "cisco_enterprise",
+      "tags": ["cisco", "catalyst", "network", "health"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=catalyst sourcetype IN (\"cisco:dnac:networkhealth\", \"cisco:dnac:devicehealth\") | spath | stats latest(overallHealth) as health by sourcetype | eval status=if(health>=80, \"Healthy\", if(health>=50, \"Warning\", \"Critical\"))",
+      "arguments": [],
+      "examples": ["Network health summary", "Is the network healthy?"]
+    },
+    {
+      "_key": "cisco_ent:security_posture",
+      "name": "cisco_ent_security_posture",
+      "title": "Security Posture",
+      "description": "Security summary combining ISE authentication data, Catalyst Center advisories, and Cyber Vision vulnerabilities.",
+      "category": "cisco_enterprise",
+      "tags": ["cisco", "security", "ise", "advisories", "vulnerabilities"],
+      "time_range": true,
+      "row_limiter": false,
+      "spl": "index IN (\"catalyst\", \"ise\", \"cybervision\") sourcetype IN (\"cisco:ise*\", \"cisco:dnac:securityadvisory\", \"cisco:cybervision:vulnerabilities\") | stats count by index, sourcetype | sort -count",
+      "arguments": [],
+      "examples": ["Show security posture", "Security overview across products"]
+    },
+    {
+      "_key": "cisco_ent:ise_auth_failures",
+      "name": "cisco_ent_ise_auth_failures",
+      "title": "ISE Authentication Failures",
+      "description": "Show recent ISE authentication failures for security investigation.",
+      "category": "cisco_enterprise",
+      "tags": ["cisco", "ise", "authentication", "failures", "security"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=ise sourcetype=\"cisco:ise*\" | search failure OR failed OR reject | stats count by src_ip, user, reason | sort -count",
+      "arguments": [],
+      "examples": ["Show ISE auth failures", "Who failed authentication?"]
+    },
+    {
+      "_key": "cisco_ent:catc_issues_priority",
+      "name": "cisco_ent_catc_issues_priority",
+      "title": "Catalyst Center Issues by Priority",
+      "description": "Break down Catalyst Center issues by priority and category for triage.",
+      "category": "cisco_enterprise",
+      "tags": ["cisco", "catalyst", "issues", "priority", "triage"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=catalyst sourcetype=\"cisco:dnac:issue\" | spath | stats count by priority, issueId, name | sort -priority, -count",
+      "arguments": [],
+      "examples": ["Show issues by priority", "What are the critical issues?"]
+    },
+    {
+      "_key": "cisco_ent:cv_ot_devices",
+      "name": "cisco_ent_cv_ot_devices",
+      "title": "Cyber Vision OT Devices",
+      "description": "List OT devices discovered by Cisco Cyber Vision with risk indicators.",
+      "category": "cisco_enterprise",
+      "tags": ["cisco", "cybervision", "ot", "devices", "inventory"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=cybervision sourcetype=\"cisco:cybervision:devices\" | spath | stats count by name, type, ip, risk | sort -risk",
+      "arguments": [],
+      "examples": ["List OT devices", "Cyber Vision device inventory"]
+    }
+  ]
+}

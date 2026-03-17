@@ -1,0 +1,112 @@
+{
+  "name": "Cisco Catalyst TA Tools",
+  "description": "MCP tools for managing and querying the Cisco Catalyst Add-on for Splunk",
+  "version": "1.0.0",
+  "author": "cisco-catalyst-ta-setup skill",
+  "tools": [
+    {
+      "_key": "cisco_catalyst:check_health",
+      "name": "cisco_catalyst_check_health",
+      "title": "Cisco Catalyst Health Check",
+      "description": "Check the health status of Cisco Catalyst TA data collection. Shows event counts per index, active inputs, and last event timestamps.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "catalyst", "ise", "sdwan", "cybervision", "health"],
+      "time_range": true,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"TA_cisco_catalyst\" disabled=0 | stats count as enabled_inputs | appendcols [| tstats count as catalyst_events where index=catalyst] | appendcols [| tstats count as ise_events where index=ise] | appendcols [| tstats count as sdwan_events where index=sdwan] | appendcols [| tstats count as cv_events where index=cybervision]",
+      "arguments": [],
+      "examples": ["Check Catalyst TA health", "How many events are being collected?"]
+    },
+    {
+      "_key": "cisco_catalyst:list_inputs",
+      "name": "cisco_catalyst_list_inputs",
+      "title": "Cisco Catalyst List Inputs",
+      "description": "List all configured data inputs for the Cisco Catalyst TA with their status.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "catalyst", "inputs", "configuration"],
+      "time_range": false,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"TA_cisco_catalyst\" | table title, eai:acl.app, disabled, index | sort title",
+      "arguments": [],
+      "examples": ["List all Catalyst inputs", "Show me the configured inputs"]
+    },
+    {
+      "_key": "cisco_catalyst:dnac_issues",
+      "name": "cisco_catalyst_dnac_issues",
+      "title": "Catalyst Center Issues",
+      "description": "Show recent Catalyst Center (DNA Center) issues and assurance alerts.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "catalyst", "dnac", "issues", "assurance"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=catalyst sourcetype=\"cisco:dnac:issue\" | spath | stats count by name, priority, status, siteHierarchy | sort -count",
+      "arguments": [],
+      "examples": ["Show Catalyst Center issues", "What network problems were detected?"]
+    },
+    {
+      "_key": "cisco_catalyst:dnac_device_health",
+      "name": "cisco_catalyst_dnac_device_health",
+      "title": "Catalyst Center Device Health",
+      "description": "Show device health scores from Catalyst Center.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "catalyst", "dnac", "device", "health"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=catalyst sourcetype=\"cisco:dnac:devicehealth\" | spath | stats latest(overallHealth) as health_score by name, platformId, role, siteHierarchy | sort health_score",
+      "arguments": [],
+      "examples": ["Show device health", "Which devices have low health scores?"]
+    },
+    {
+      "_key": "cisco_catalyst:dnac_compliance",
+      "name": "cisco_catalyst_dnac_compliance",
+      "title": "Catalyst Center Compliance",
+      "description": "Show device compliance status from Catalyst Center.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "catalyst", "dnac", "compliance"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=catalyst sourcetype=\"cisco:dnac:compliance\" | spath | stats count by complianceStatus, deviceName | sort -count",
+      "arguments": [],
+      "examples": ["Show compliance status", "Which devices are non-compliant?"]
+    },
+    {
+      "_key": "cisco_catalyst:dnac_security_advisories",
+      "name": "cisco_catalyst_dnac_security_advisories",
+      "title": "Catalyst Center Security Advisories",
+      "description": "Show security advisories (PSIRTs) from Catalyst Center.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "catalyst", "dnac", "security", "psirt"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=catalyst sourcetype=\"cisco:dnac:securityadvisory\" | spath | stats count by advisoryId, sir, detectionType | sort -sir",
+      "arguments": [],
+      "examples": ["Show security advisories", "Any critical PSIRTs?"]
+    },
+    {
+      "_key": "cisco_catalyst:ise_auth_summary",
+      "name": "cisco_catalyst_ise_auth_summary",
+      "title": "ISE Authentication Summary",
+      "description": "Summarize ISE authentication events by status and policy.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "ise", "authentication", "nac"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=ise sourcetype=\"cisco:ise*\" | stats count by sourcetype, _time | timechart span=1h count by sourcetype",
+      "arguments": [],
+      "examples": ["Show ISE authentication summary", "ISE event trends"]
+    },
+    {
+      "_key": "cisco_catalyst:cybervision_vulnerabilities",
+      "name": "cisco_catalyst_cybervision_vulnerabilities",
+      "title": "Cyber Vision Vulnerabilities",
+      "description": "Show OT vulnerabilities detected by Cisco Cyber Vision.",
+      "category": "cisco_catalyst",
+      "tags": ["cisco", "cybervision", "ot", "vulnerabilities"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=cybervision sourcetype=\"cisco:cybervision:vulnerabilities\" | spath | stats count by cveId, severity, component | sort -severity",
+      "arguments": [],
+      "examples": ["Show OT vulnerabilities", "Cyber Vision vulnerability report"]
+    }
+  ]
+}
