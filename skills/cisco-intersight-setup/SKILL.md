@@ -189,4 +189,3 @@ bash scripts/load_mcp_tools.sh
 
 - [reference.md](reference.md) — Complete input catalog, account fields, sizing
 - [mcp_tools.json](mcp_tools.json) — MCP tool definitions
-- [guide.md](guide.md) — Quick start guide for using this skill with an AI agent
