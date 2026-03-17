@@ -34,8 +34,7 @@ Most of the repo follows the same pattern:
 - `scripts/` contains the actual shell automation.
 - `mcp_tools.json` is present for skills that expose search tooling through MCP.
 
-The old per-skill `guide.md` files have been removed. This `README.md` is now
-the main overview document, while each `SKILL.md` and `reference.md` carries the
+This `README.md` is now the main overview document, while each `SKILL.md` and `reference.md` carries the
 skill-specific details.
 
 ## Supported Skills
