@@ -64,7 +64,6 @@ log_live_input_summary() {
 
 ensure_search_api_session() {
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
-    prefer_current_cloud_search_api_uri
     SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk. Check credentials."; exit 1; }
 }
 

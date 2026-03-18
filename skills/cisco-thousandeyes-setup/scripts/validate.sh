@@ -20,8 +20,6 @@ log ""
 log "--- App Installation ---"
 if ! load_splunk_credentials; then
     fail "Could not load Splunk credentials — check credentials file"
-else
-    prefer_current_cloud_search_api_uri
 fi
 
 if [[ ${FAIL} -eq 0 ]] && ! SK=$(get_session_key "${SPLUNK_URI}"); then

@@ -10,7 +10,6 @@ PASS=0
 FAIL=0
 WARN=0
 
-log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
@@ -41,7 +40,7 @@ fi
 
 log ""
 log "--- Index ---"
-if rest_check_index "${SK}" "${SPLUNK_URI}" "meraki"; then
+if platform_check_index "${SK}" "${SPLUNK_URI}" "meraki" 2>/dev/null; then
     pass "Index 'meraki' exists"
 else
     warn "Index 'meraki' not found (may need to run setup.sh)"

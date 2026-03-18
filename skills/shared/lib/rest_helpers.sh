@@ -15,17 +15,60 @@ _curl_ssl_flags() {
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
+verify_search_api_connectivity() {
+    local uri="${1:-${SPLUNK_URI:-https://localhost:8089}}"
+    local host port ssl_flags http_code
+
+    host="$(python3 -c "from urllib.parse import urlparse; p=urlparse('${uri}'); print(p.hostname or '')" 2>/dev/null || true)"
+    port="$(python3 -c "from urllib.parse import urlparse; p=urlparse('${uri}'); print(p.port or 8089)" 2>/dev/null || echo 8089)"
+
+    if command -v nc >/dev/null 2>&1; then
+        if ! nc -z -G 5 "${host}" "${port}" >/dev/null 2>&1; then
+            echo "ERROR: Cannot reach ${host}:${port} (connection refused or timed out)." >&2
+            if type is_splunk_cloud &>/dev/null && is_splunk_cloud 2>/dev/null; then
+                echo "  HINT: Your IP may not be on the search-api allowlist. Run:" >&2
+                echo "    acs ip-allowlist create search-api --subnets \$(curl -s https://checkip.amazonaws.com)/32" >&2
+            fi
+            return 1
+        fi
+    fi
+
+    ssl_flags="$(_curl_ssl_flags)"
+    http_code=$(curl ${ssl_flags} --connect-timeout 8 --max-time 15 \
+        -o /dev/null -w '%{http_code}' "${uri}/services/auth/login" 2>/dev/null || echo "000")
+    case "${http_code}" in
+        000)
+            echo "ERROR: No HTTP response from ${uri} (TLS handshake or network failure)." >&2
+            return 1
+            ;;
+        401|400|200|303)
+            return 0
+            ;;
+        403)
+            echo "ERROR: HTTP 403 from ${uri}. The endpoint is reachable but rejecting requests." >&2
+            if type is_splunk_cloud &>/dev/null && is_splunk_cloud 2>/dev/null; then
+                echo "  HINT: Your IP may not be on the search-api allowlist." >&2
+            fi
+            return 1
+            ;;
+        *)
+            echo "ERROR: Unexpected HTTP ${http_code} from ${uri}/services/auth/login." >&2
+            return 1
+            ;;
+    esac
+}
+
 get_session_key() {
     local uri="${1:-https://localhost:8089}"
     local body sk ssl_flags
     ssl_flags="$(_curl_ssl_flags)"
     body=$(form_urlencode_pairs username "${SPLUNK_USER}" password "${SPLUNK_PASS}") || return 1
     sk=$(printf '%s' "${body}" \
-        | curl ${ssl_flags} "${uri}/services/auth/login" -d @- 2>/dev/null \
+        | curl ${ssl_flags} --connect-timeout 10 --max-time 30 "${uri}/services/auth/login" -d @- 2>/dev/null \
         | sed -n 's/.*<sessionKey>\([^<]*\)<.*/\1/p' || true)
 
     if [[ -z "${sk}" ]]; then
-        echo "ERROR: Could not authenticate to Splunk. Check credentials." >&2
+        verify_search_api_connectivity "${uri}" 2>&1 | while IFS= read -r line; do echo "${line}" >&2; done
         return 1
     fi
     printf '%s' "${sk}"

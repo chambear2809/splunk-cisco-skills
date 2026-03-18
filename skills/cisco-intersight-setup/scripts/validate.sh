@@ -10,7 +10,6 @@ PASS=0
 FAIL=0
 WARN=0
 
-log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
@@ -44,7 +43,7 @@ fi
 
 log ""
 log "--- Index ---"
-if rest_check_index "$SK" "$SPLUNK_URI" "intersight"; then
+if platform_check_index "$SK" "$SPLUNK_URI" "intersight" 2>/dev/null; then
     pass "Index 'intersight' exists"
 else
     warn "Index 'intersight' not found (may need setup)"

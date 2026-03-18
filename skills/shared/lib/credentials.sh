@@ -529,6 +529,10 @@ load_splunk_credentials() {
         echo "ERROR: Splunk credentials are required." >&2
         return 1
     fi
+
+    if type prefer_current_cloud_search_api_uri &>/dev/null; then
+        prefer_current_cloud_search_api_uri
+    fi
 }
 
 load_splunkbase_credentials() {

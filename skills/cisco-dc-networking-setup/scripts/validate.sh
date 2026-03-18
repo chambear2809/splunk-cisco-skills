@@ -10,7 +10,6 @@ PASS=0
 FAIL=0
 WARN=0
 
-log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
@@ -37,7 +36,7 @@ log ""
 log "--- Indexes ---"
 REQUIRED_INDEXES=("cisco_aci" "cisco_nd" "cisco_nexus_9k")
 for idx in "${REQUIRED_INDEXES[@]}"; do
-    if rest_check_index "$SK" "$SPLUNK_URI" "$idx" 2>/dev/null; then
+    if platform_check_index "$SK" "$SPLUNK_URI" "$idx" 2>/dev/null; then
         pass "Index '${idx}' exists"
     else
         warn "Index '${idx}' not found (may exist at system level)"

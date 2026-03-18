@@ -246,6 +246,82 @@ cloud_current_search_api_uri() {
     printf 'https://%s.%s%s:8089' "${prefix}" "${SPLUNK_CLOUD_STACK}" "${suffix}"
 }
 
+_SEARCH_API_ALLOWLIST_CHECKED=false
+
+_detect_public_ip() {
+    local ip
+    ip=$(curl -sS --connect-timeout 5 --max-time 10 \
+        "https://checkip.amazonaws.com" 2>/dev/null || true)
+    ip="${ip%%[[:space:]]*}"
+    if [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        printf '%s' "${ip}"
+        return 0
+    fi
+    ip=$(curl -sS --connect-timeout 5 --max-time 10 \
+        "https://api.ipify.org" 2>/dev/null || true)
+    ip="${ip%%[[:space:]]*}"
+    if [[ "${ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        printf '%s' "${ip}"
+        return 0
+    fi
+    return 1
+}
+
+acs_ensure_search_api_access() {
+    if [[ "${_SEARCH_API_ALLOWLIST_CHECKED}" == "true" ]]; then
+        return 0
+    fi
+    if [[ "${SPLUNK_SKIP_ALLOWLIST:-false}" == "true" ]]; then
+        _SEARCH_API_ALLOWLIST_CHECKED=true
+        return 0
+    fi
+
+    acs_prepare_context || return 1
+
+    local public_ip
+    public_ip="$(_detect_public_ip 2>/dev/null || true)"
+    if [[ -z "${public_ip}" ]]; then
+        _SEARCH_API_ALLOWLIST_CHECKED=true
+        return 0
+    fi
+
+    local subnet="${public_ip}/32"
+    local allowlist_json already_listed
+    allowlist_json=$(acs_command ip-allowlist list search-api 2>/dev/null \
+        | acs_extract_http_response_json || echo "{}")
+    already_listed=$(printf '%s' "${allowlist_json}" | python3 -c "
+import json, sys
+target = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+    subnets = data.get('subnets', [])
+    for s in subnets:
+        if isinstance(s, dict):
+            s = s.get('subnet', '')
+        if s == target:
+            print('yes', end='')
+            raise SystemExit(0)
+    print('no', end='')
+except Exception:
+    print('unknown', end='')
+" "${subnet}" 2>/dev/null || echo "unknown")
+
+    case "${already_listed}" in
+        yes)
+            ;;
+        no)
+            log "Adding ${subnet} to search-api IP allowlist via ACS..."
+            if acs_command ip-allowlist create search-api --subnets "${subnet}" >/dev/null 2>&1; then
+                log "  ${subnet} added to search-api allowlist."
+            else
+                log "  WARNING: Could not add ${subnet} to search-api allowlist. You may need to add it manually."
+            fi
+            ;;
+    esac
+
+    _SEARCH_API_ALLOWLIST_CHECKED=true
+}
+
 prefer_current_cloud_search_api_uri() {
     local current_host candidate
 
@@ -264,6 +340,8 @@ prefer_current_cloud_search_api_uri() {
         export SPLUNK_USER SPLUNK_PASS
     fi
     export SPLUNK_URI SPLUNK_SEARCH_API_URI
+
+    acs_ensure_search_api_access
 }
 
 log_platform_restart_guidance() {

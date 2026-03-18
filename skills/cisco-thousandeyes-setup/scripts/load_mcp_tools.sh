@@ -15,7 +15,6 @@ if [[ ! -f "${MCP_TOOLS_JSON}" ]]; then
 fi
 
 load_splunk_credentials
-prefer_current_cloud_search_api_uri
 
 SK=$(get_session_key "${SPLUNK_URI}")
 
