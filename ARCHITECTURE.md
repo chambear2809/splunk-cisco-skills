@@ -13,7 +13,12 @@ for app-specific configuration.
 
 ```mermaid
 flowchart TB
-  subgraph userMachine [User Machine]
+  subgraph users [Users]
+    SplunkUser["Analysts / Operators"]
+    Admin["Splunk Admin"]
+  end
+
+  subgraph userMachine [Automation Machine]
     Scripts[Skill Scripts]
     ACSCLI[ACS CLI]
   end
@@ -27,10 +32,10 @@ flowchart TB
       ACSAllowlist[IP Allowlist]
     end
 
-    subgraph searchTier ["Search Tier -- :8089"]
+    subgraph searchTier [Search Tier]
+      SplunkWeb["Splunk Web -- :443\n(dashboards, search, app UI)"]
+      RESTAPI["REST API -- :8089\n(app config, inputs, search jobs)"]
       SHCluster["Search Head Cluster"]
-      AppREST["App REST Handlers\n(accounts, inputs, conf)"]
-      SearchJobs[Search Jobs]
     end
 
     subgraph indexTier [Index Tier]
@@ -39,10 +44,13 @@ flowchart TB
     end
   end
 
+  SplunkUser -->|"Browser :443\n(search-ui allowlist)"| SplunkWeb
+  Admin -->|"Browser :443"| SplunkWeb
   Scripts --> ACSCLI
   ACSCLI -->|"HTTPS"| acsLayer
-  Scripts -->|"REST :8089\n(search-api allowlist)"| searchTier
-  AppREST --> SHCluster
+  Scripts -->|"REST :8089\n(search-api allowlist)"| RESTAPI
+  SplunkWeb --> SHCluster
+  RESTAPI --> SHCluster
   SHCluster --> Indexers
   HECEndpoint --> Indexers
 ```
@@ -63,17 +71,20 @@ operations go through the REST API on port 8089. ACS is not involved.
 
 ```mermaid
 flowchart TB
-  subgraph userMachine [User Machine]
+  subgraph users [Users]
+    SplunkUser["Analysts / Operators"]
+    Admin["Splunk Admin"]
+  end
+
+  subgraph userMachine [Automation Machine]
     Scripts[Skill Scripts]
   end
 
   subgraph splunkEnterprise [Splunk Enterprise]
-    subgraph searchHead ["Search Head -- :8089"]
-      RESTApps[App Install via REST Upload]
-      RESTIndexes[Index Management]
-      RESTHEC[HEC Token Management]
+    subgraph searchHead [Search Head]
+      SplunkWeb["Splunk Web -- :443"]
+      RESTAPI["REST API -- :8089"]
       AppREST["App REST Handlers\n(accounts, inputs, conf)"]
-      SearchJobs[Search Jobs]
     end
 
     subgraph indexer [Indexer Layer]
@@ -82,8 +93,12 @@ flowchart TB
     end
   end
 
-  Scripts -->|"REST :8089"| searchHead
+  SplunkUser -->|"Browser :443"| SplunkWeb
+  Admin -->|"Browser :443"| SplunkWeb
+  Scripts -->|"REST :8089"| RESTAPI
   Scripts -.->|"SSH staging\n(fallback for app install)"| searchHead
+  RESTAPI --> AppREST
+  SplunkWeb --> AppREST
   HECEndpoint --> Indexers
   searchHead --> Indexers
 ```
@@ -103,7 +118,12 @@ customer-controlled heavy forwarder (HF) or universal forwarder (UF).
 
 ```mermaid
 flowchart TB
-  subgraph userMachine [User Machine]
+  subgraph users [Users]
+    SplunkUser["Analysts / Operators"]
+    Admin["Splunk Admin"]
+  end
+
+  subgraph userMachine [Automation Machine]
     Scripts[Skill Scripts]
     ACSCLI[ACS CLI]
   end
@@ -116,9 +136,10 @@ flowchart TB
       ACSRestart[Restart]
     end
 
-    subgraph searchTier ["Search Tier -- :8089"]
+    subgraph searchTier [Search Tier]
+      SplunkWeb["Splunk Web -- :443"]
+      RESTAPI["REST API -- :8089"]
       SHCluster[Search Head Cluster]
-      AppREST["App REST Handlers"]
     end
 
     subgraph indexTier [Index Tier]
@@ -133,11 +154,15 @@ flowchart TB
     DataSources["Data Sources\n(network devices, APIs, agents)"]
   end
 
+  SplunkUser -->|"Browser :443"| SplunkWeb
+  Admin -->|"Browser :443"| SplunkWeb
   Scripts --> ACSCLI
   ACSCLI --> acsLayer
-  Scripts -->|"REST :8089"| searchTier
+  Scripts -->|"REST :8089"| RESTAPI
   Scripts -->|"SSH / REST :8089"| HF
 
+  SplunkWeb --> SHCluster
+  RESTAPI --> SHCluster
   DataSources --> HF
   HF -->|"S2S :9997"| S2SEndpoint
   HF -->|"HEC :443"| HECEndpoint
