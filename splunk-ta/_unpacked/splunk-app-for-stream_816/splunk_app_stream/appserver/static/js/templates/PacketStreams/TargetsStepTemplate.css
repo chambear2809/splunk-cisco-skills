@@ -1,0 +1,83 @@
+.targets-step .step-subheading {
+    position: relative;
+}
+
+.targets-step .step-subheading button {
+    position: absolute;
+    top: 30px;
+    right: 20px;
+}
+
+.targets-step .table-controls {
+    margin-top: -10px;
+    margin-bottom: 12px;
+    position: relative;
+    padding: 0 20px;
+}
+
+.targets-step .target-count {
+    position: absolute;
+    top: 3px;
+    left: 20px;
+}
+
+.targets-step .search {
+    position: relative;
+    width: 175px;
+    margin: auto;
+}
+
+.targets-step .search input {
+    margin-bottom: 0;
+    height: 20px;
+    line-height: 20px;
+    padding: 0 10px;
+}
+
+.targets-step .search .clear {
+    position: absolute;
+    right: 8px;
+    top: 3px;
+    font-size: 18px;
+    color: #999999;
+}
+
+.targets-step .match-all-comps {
+    position: absolute;
+    top: 0;
+    right: 20px;
+}
+
+.targets-step table.target-list td {
+    padding-bottom: 5px;
+    padding-top: 5px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+/*******************************/
+/* #single-target-editor rules */
+/* TODO: Move these to a       */
+/* separate file?              */
+/*******************************/
+#single-target-editor .modal-body {
+    height: 250px;
+    padding: 0; /* overriding .modal-body, since we already have enough padding here */
+    overflow-y: visible; /* so the dropdowns aren't constrained */
+}
+
+#single-target-editor .row-fluid {
+    margin: 20px 0;
+}
+
+#single-target-editor .control-label {
+    /* See /static/css/pages/dashboard-simple-bootstrap.min.css for default .control-label styling. */
+}
+
+#single-target-editor .uneditable-input {
+    cursor: not-allowed;
+}
+
+#single-target-editor .match-all-values .btn-group {
+    margin-top: -1px;
+}

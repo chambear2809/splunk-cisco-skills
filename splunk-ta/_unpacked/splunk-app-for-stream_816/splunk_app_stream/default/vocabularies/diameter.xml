@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="diameter">
+    <Name>Diameter Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+      <Term id="diameter.event">
+          <Type>object</Type>
+          <Comment>Event representing Diameter</Comment>
+      </Term>
+      <Term id="diameter.acct-input-octets">
+          <Type>uint64</Type>
+          <Comment>Indicates how many octets have been received from the port over the course of this service being provided</Comment>
+      </Term>
+      <Term id="diameter.acct-multi-session-id">
+          <Type>shortstring</Type>
+          <Comment>Link between multiple accounting sessions</Comment>
+      </Term>
+      <Term id="diameter.acct-output-octets">
+          <Type>uint64</Type>
+          <Comment>Indicates how many octets have been sent to the port in the course of delivering this service</Comment>
+      </Term>
+      <Term id="diameter.acct-record-number">
+          <Type>uint32</Type>
+          <Comment>Unique identifier for one record within a session</Comment>
+      </Term>
+      <Term id="diameter.acct-record-type">
+          <Type>uint32</Type>
+          <Comment>Record type</Comment>
+      </Term>
+      <Term id="diameter.acct-session-id">
+          <Type>shortstring</Type>
+          <Comment>Accounting session ID</Comment>
+      </Term>
+      <Term id="diameter.acct-sub-session-id">
+          <Type>uint64</Type>
+          <Comment>Sub-session identifier</Comment>
+      </Term>
+      <Term id="diameter.application-id">
+          <Type>uint32</Type>
+          <Comment>Identify which application the message is applicable for</Comment>
+      </Term>
+      <Term id="diameter.auth-request-type">
+          <Type>uint32</Type>
+          <Comment>Requested authentication type</Comment>
+      </Term>
+      <Term id="diameter.called-station-id">
+          <Type>shortstring</Type>
+          <Comment>The phone number that the user called, using Dialed Number Identification (DNIS) or similar technology
+          </Comment>
+      </Term>
+      <Term id="diameter.calling-station-id">
+          <Type>shortstring</Type>
+          <Comment>Client id</Comment>
+      </Term>
+      <Term id="diameter.command-code">
+          <Type>uint32</Type>
+          <Comment>Command associated with the Diameter request</Comment>
+      </Term>
+      <Term id="diameter.command-flags">
+          <Type>uint8</Type>
+          <Comment>Bitfield which defines some attributes of a command on one byte as follows: [RPE.....] ('R'equest/answer, 'P'roxiable, 'E'rror)</Comment>
+      </Term>
+      <Term id="diameter.destination-host">
+          <Type>shortstring</Type>
+          <Comment>Destination Diameter host for the current message</Comment>
+      </Term>
+      <Term id="diameter.end-to-end-id">
+          <Type>uint32</Type>
+          <Comment>Used to detect duplicate messages</Comment>
+      </Term>
+      <Term id="diameter.framed-ip">
+          <Type>shortstring</Type>
+          <Comment>IP address</Comment>
+      </Term>
+      <Term id="diameter.hop-by-hop-id">
+          <Type>uint32</Type>
+          <Comment>Used to match Diameter request and reply messages</Comment>
+      </Term>
+      <Term id="diameter.login">
+          <Type>shortstring</Type>
+          <Comment>User's login string</Comment>
+      </Term>
+      <Term id="diameter.nas-id">
+          <Type>shortstring</Type>
+          <Comment>Unique identifier of NAS originating access request</Comment>
+      </Term>
+      <Term id="diameter.nas-ip">
+          <Type>shortstring</Type>
+          <Comment>IP address of of NAS originating access request</Comment>
+      </Term>
+      <Term id="diameter.nas-port">
+          <Type>uint32</Type>
+          <Comment>Physical port number of the user on the NAS</Comment>
+      </Term>
+      <Term id="diameter.nas-port-id">
+          <Type>shortstring</Type>
+          <Comment>Identifies the NAS</Comment>
+      </Term>
+      <Term id="diameter.nas-port-type">
+          <Type>uint32</Type>
+          <Comment>Indicates the type of physical port NAS is using to authenticate the user</Comment>
+      </Term>
+      <Term id="diameter.origin-host">
+          <Type>shortstring</Type>
+          <Comment>Source Diameter host for the current message</Comment>
+      </Term>
+      <Term id="diameter.result-code">
+          <Type>uint32</Type>
+          <Comment>Indicates whether a particular Diameter request was completed successfully or not</Comment>
+      </Term>
+      <Term id="diameter.session-id">
+          <Type>shortstring</Type>
+          <Comment>Uniquely identifies the current user session</Comment>
+      </Term>
+      <Term id="diameter.terminate-cause">
+          <Type>uint32</Type>
+          <Comment>This attribute indicates how the session was terminated</Comment>
+      </Term>
+  </Vocabulary>
+</CmConfig>

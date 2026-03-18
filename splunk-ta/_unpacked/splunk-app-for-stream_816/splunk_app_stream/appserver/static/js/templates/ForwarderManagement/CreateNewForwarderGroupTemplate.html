@@ -1,0 +1,144 @@
+<script id="new-forwarder-modal-template" type="text/template">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+
+            <!-- ====== -->
+            <!-- Header -->
+            <!-- ====== -->
+            <div class="modal-header">
+                <% if (!isWizard) { %>
+                    <h4 class="modal-title add-stream-title">Editing Forwarder Group: <%- fwdGroupModel.id %> </h4>
+                <% } else { %>
+                    <h4 class="modal-title add-stream-title">Create New Forwarder Group</h4>
+                <% } %>
+            </div>
+
+            <!-- ==== -->
+            <!-- Body -->
+            <!-- ==== -->
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                     <!-- ==== -->
+                     <!-- Name -->
+                     <!-- ==== -->
+                     <div class="row-fluid">
+                        <div class="span4">Name: </div>
+                        <div class="span8 ce-field">
+                             <input type="text"
+                                    id="fwd-group-name"
+                                    placeholder="required"
+                                    value="<%- fwdGroupModel.id %>"
+                                    <% if (!isWizard) { %> disabled <% } %> >
+                        </div>
+                     </div>
+
+                     <!-- =========== -->
+                     <!-- Description -->
+                     <!-- =========== -->
+                     <div class="row-fluid">
+                        <div class="span4">Description: </div>
+                        <div class="span8 ce-field">
+                            <textarea id="fwd-group-description"
+                                      <% if (fwdGroupModel.id === "defaultgroup") { %>
+                                        disabled
+                                      <% } %>
+                                      placeholder="required"><%- fwdGroupModel.description %></textarea>
+                        </div>
+                     </div>
+
+                    <!-- ================== -->
+                    <!-- Include Ephemeral? -->
+                    <!-- ================== -->
+                    <div class="row-fluid">
+                        <div class="span4">Include Ephemeral Streams? </div>
+                        <div class="span8 ce-field">
+
+                            <div class="btn-group btn-group-radio btn-toggle" id="include-ephemeral-toggle">
+
+                                <button type="button"
+                                        class="btn btn-lg
+                                        <% if (fwdGroupModel.includeEphemeralStreams) { %>
+                                            active
+                                        <% } %>"
+                                        id="include-ephemeral">
+                                        Yes
+                                        </button>
+
+                                <button type="button"
+                                        class="btn btn-lg
+                                        <% if (!fwdGroupModel.includeEphemeralStreams) { %> active <% } %>"
+                                        id="dont-include-ephemeral">
+                                        No
+                                        </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <% if (hecSupported) { %>
+                    <hr />
+
+                    <!-- ========== -->
+                    <!-- Autoconfig -->
+                    <!-- ========== -->
+                    <div class="row-fluid">
+                        <div class="span4">HTTP Event Collector Autoconfig: </div>
+                        <div class="span8 ce-field">
+                            <div class="btn-group btn-group-radio btn-toggle" id="hec-autoConfig-toggle">
+                                <button type="button"
+                                        class="btn btn-lg
+                                        <% if (fwdGroupModel.hec.autoConfig) { %> active <% } %>"
+                                        id="hec-autoConfig-on">
+                                        On
+                                        </button>
+                                <button type="button"
+                                        class="btn btn-lg
+                                        <% if (!fwdGroupModel.hec.autoConfig) { %> active <% } %>"
+                                        id="hec-autoConfig-off">
+                                        Off
+                                        </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row-fluid">
+                        <div class="span4"></div>
+                        <div class="span8 ce-field">
+                            <span class="help-block">This option is ignored when HEC is not in use.</span>
+                        </div>
+                    </div>
+
+                    <br />
+
+                    <!-- ============= -->
+                    <!-- Endpoint Urls -->
+                    <!-- ============= -->
+                    <div class="row-fluid">
+                        <div class="span4">Endpoint Urls: (comma-separated)</div>
+                        <div class="span8 ce-field">
+                            <textarea id="hec-endpoint-urls"
+                                    <% if (fwdGroupModel.hec.autoConfig) { %> disabled <% } %>
+                                    ></textarea>
+                        </div>
+                    </div>
+
+                    <% } %>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== -->
+        <!-- Footer -->
+        <!-- ====== -->
+        <div class="modal-footer">
+            <a href="#" data-dismiss="modal" aria-hidden="true" class="btn secondary cancel pull-left">Cancel</a>
+            <% if (isWizard) { %>
+                <a href="#" id="btnYes" class="btn btn-primary next">Next ></a>
+            <% } else { %>
+                <a href="#" id="btnYes" class="btn btn-primary yes">OK</a>
+            <% } %>
+        </div>
+
+    </div>
+</script>

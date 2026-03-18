@@ -1,0 +1,174 @@
+
+div.lion ul.fancytree-connectors.fancytree-container li {
+  background-image: url("../skin-lion/vline.gif");
+  background-position: 0 0;
+}
+ul.fancytree-container li.fancytree-lastsib,
+ul.fancytree-no-connector > li {
+  background-image: none;
+}
+li.fancytree-animating {
+  position: relative;
+}
+/*------------------------------------------------------------------------------
+ * Common icon definitions
+ *----------------------------------------------------------------------------*/
+div.lion span.fancytree-empty,
+div.lion span.fancytree-vline,
+div.lion span.fancytree-expander,
+div.lion span.fancytree-icon,
+div.lion span.fancytree-checkbox,
+div.lion span.fancytree-drag-helper-img,
+div.lion #fancytree-drop-marker {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  vertical-align: top;
+  background-repeat: no-repeat;
+  background-image: url("../skin-lion/icons.gif");
+  background-position: 0px 0px;
+}
+div.lion span.fancytree-icon,
+div.lion span.fancytree-checkbox,
+div.lion span.fancytree-expander,
+div.lion span.fancytree-custom-icon {
+  margin-top: 0px;
+}
+
+/* Used by 'icon' node option: */
+div.lion img.fancytree-icon {
+  width: 16px;
+  height: 16px;
+  margin-left: 3px;
+  margin-top: 0px;
+  vertical-align: top;
+  border-style: none;
+}
+/*------------------------------------------------------------------------------
+ * Expander icon
+ *
+ * Note: IE6 doesn't correctly evaluate multiples class names,
+ *		 so we create combined class names that can be used in the CSS.
+ *
+ * Prefix: fancytree-exp-
+ * 1st character: 'e': expanded, 'c': collapsed, 'n': no children
+ * 2nd character (optional): 'd': lazy (Delayed)
+ * 3rd character (optional): 'l': Last sibling
+ *----------------------------------------------------------------------------*/
+
+div.lion .fancytree-connectors .fancytree-exp-n span.fancytree-expander,
+div.lion .fancytree-connectors .fancytree-exp-nl span.fancytree-expander {
+  background-image: url("../skin-lion/icons.gif");
+  margin-top: 0;
+}
+
+div.lion .fancytree-loading span.fancytree-expander,
+div.lion.fancytree-loading span.fancytree-expander:hover,
+div.lion.fancytree-statusnode-loading span.fancytree-icon,
+div.lion.fancytree-statusnode-loading span.fancytree-icon:hover,
+div.lionspan.fancytree-icon.fancytree-icon-loading {
+  background-image: url("../skin-lion/loading.gif");
+  background-position: 0px 0px;
+}
+
+/*------------------------------------------------------------------------------
+ * Node titles and highlighting
+ *----------------------------------------------------------------------------*/
+span.fancytree-node {
+  /* See #117 */
+  display: inherit;
+  width: 100%;
+  margin-top: 1px;
+  min-height: 16px;
+}
+span.fancytree-title {
+  color: black;
+  cursor: pointer;
+  display: inline-block;
+  vertical-align: top;
+  min-height: 16px;
+  padding: 0 3px 0 3px;
+  margin: 0px 0 0 3px;
+  border: 1px solid transparent;
+  -webkit-border-radius: 0px;
+  -moz-border-radius: 0px;
+  -ms-border-radius: 0px;
+  -o-border-radius: 0px;
+  border-radius: 0px;
+}
+
+div.lion .fancytree-container.fancytree-rtl span.fancytree-connector,
+div.lion .fancytree-container.fancytree-rtl span.fancytree-expander,
+div.lion .fancytree-container.fancytree-rtl span.fancytree-icon,
+div.lion .fancytree-container.fancytree-rtl span.fancytree-drag-helper-img {
+  background-image: url("../skin-lion/icons-rtl.gif");
+}
+
+div.lion .fancytree-container.fancytree-rtl.fancytree-connectors .fancytree-exp-n span.fancytree-expander,
+div.lion .fancytree-container.fancytree-rtl.fancytree-connectors .fancytree-exp-nl span.fancytree-expander {
+  background-image: url("../skin-lion/icons-rtl.gif");
+}
+
+div.lion ul.fancytree-container.fancytree-rtl.fancytree-connectors li {
+  background-position: right 0;
+  background-image: url("../skin-lion/vline-rtl.gif");
+}
+
+#fancytree-drop-marker.fancytree-rtl {
+  background-image: url("../skin-lion/icons-rtl.gif");
+}
+
+/*******************************************************************************
+ * Styles specific to this skin.
+ *
+ * This section is automatically generated from the `ui-fancytree.less` template.
+ ******************************************************************************/
+/*******************************************************************************
+ * Node titles
+ */
+div.lion span.fancytree-title {
+  border: 1px solid transparent;
+  border-radius: 0;
+}
+div.lion span.fancytree-focused span.fancytree-title {
+  outline: 1px dotted black;
+}
+div.lion span.fancytree-selected span.fancytree-title,
+div.lion span.fancytree-active span.fancytree-title {
+  background-color: #D4D4D4;
+}
+div.lion span.fancytree-selected span.fancytree-title {
+  font-style: italic;
+}
+div.lion .fancytree-treefocus span.fancytree-selected span.fancytree-title,
+div.lion .fancytree-treefocus span.fancytree-active span.fancytree-title {
+  color: white;
+  background-color: #3875D7;
+}
+/*******************************************************************************
+ * 'table' extension
+ */
+div.lion table.fancytree-ext-table {
+  border-collapse: collapse;
+}
+div.lion table.fancytree-ext-table tbody tr.fancytree-focused {
+  background-color: #99DEFD;
+}
+div.lion table.fancytree-ext-table tbody tr.fancytree-active {
+  background-color: royalblue;
+}
+div.lion table.fancytree-ext-table tbody tr.fancytree-selected {
+  background-color: #99DEFD;
+}
+/*******************************************************************************
+ * 'columnview' extension
+ */
+div.lion table.fancytree-ext-columnview tbody tr td {
+  border: 1px solid gray;
+}
+div.lion table.fancytree-ext-columnview span.fancytree-node.fancytree-expanded {
+  background-color: #ccc;
+}
+div.lion table.fancytree-ext-columnview span.fancytree-node.fancytree-active {
+  background-color: royalblue;
+}

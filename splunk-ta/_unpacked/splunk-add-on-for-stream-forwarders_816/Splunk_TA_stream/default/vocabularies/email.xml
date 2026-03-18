@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="email">
+    <Name>Base Vocabulary For Email Protocols</Name>
+    <Locked>true</Locked>
+    <Term id="email.attach-content">
+      <Type>blob</Type>
+      <Comment>Attached files content</Comment>
+    </Term>
+    <Term id="email.attach-content-decoded">
+      <Type>blob</Type>
+      <Comment>Decoded attached files content</Comment>
+    </Term>
+    <Term id="email.attach-disposition">
+      <Type>string</Type>
+      <Comment>Attached file disposition, inline vs attachment</Comment>
+    </Term>
+    <Term id="email.attach-filename">
+      <Type>string</Type>
+      <Comment>Attachment file name</Comment>
+    </Term>
+    <Term id="email.attach-size">
+      <Type>uint32</Type>
+      <Comment>Attachment MIME size</Comment>
+    </Term>
+    <Term id="email.attach-size-decoded">
+      <Type>uint32</Type>
+      <Comment>Size of decoded attached file in bytes</Comment>
+    </Term>
+    <Term id="email.attach-transfer-encoding">
+      <Type>string</Type>
+      <Comment>Contains the encoding of the attached content</Comment>
+    </Term>
+    <Term id="email.attach-type">
+      <Type>string</Type>
+      <Comment>Content type of the sent attached file</Comment>
+    </Term>
+    <Term id="email.content-body">
+      <Type>blob</Type>
+      <Comment>Data containing body</Comment>
+    </Term>
+    <Term id="email.content-transfer-encoding">
+      <Type>shortstring</Type>
+      <Comment>Contains the encoding of the content</Comment>
+    </Term>
+    <Term id="email.date">
+      <Type>string</Type>
+      <Comment>Message date</Comment>
+    </Term>
+    <Term id="email.email-index">
+      <Type>string</Type>
+      <Comment>Index of the request which the email is attached to</Comment>
+    </Term>
+    <Term id="email.greeting-message">
+      <Type>string</Type>
+      <Comment>Contains the greeting message of the server</Comment>
+    </Term>
+    <Term id="email.login">
+      <Type>string</Type>
+      <Comment>User's login string</Comment>
+    </Term>
+    <Term id="email.login-server">
+      <Type>string</Type>
+      <Comment>Concatenated login and server</Comment>
+    </Term>
+    <Term id="email.message-id">
+      <Type>string</Type>
+      <Comment>Unique identifier for the e-mail message</Comment>
+    </Term>
+    <Term id="email.method">
+      <Type>shortstring</Type>
+      <Comment>Command sent by the client</Comment>
+    </Term>
+    <Term id="email.mime-type">
+      <Type>shortstring</Type>
+      <Comment>Content-type of the e-mail message</Comment>
+    </Term>
+    <Term id="email.password">
+      <Type>string</Type>
+      <Comment>User's password string</Comment>
+    </Term>
+    <Term id="email.received-by-ip">
+      <Type>string</Type>
+      <Comment>Contains the IP address of the receiving host name</Comment>
+    </Term>
+    <Term id="email.received-by-name">
+      <Type>string</Type>
+      <Comment>Contains the receiving host name</Comment>
+    </Term>
+    <Term id="email.received-date">
+      <Type>string</Type>
+      <Comment>Date when the transport service relayed the message</Comment>
+    </Term>
+    <Term id="email.received-from-ip">
+      <Type>string</Type>
+      <Comment>Contains the IP address of the sending host name</Comment>
+    </Term>
+    <Term id="email.received-from-name">
+      <Type>string</Type>
+      <Comment>Contains the sending host name</Comment>
+    </Term>
+     <Term id="email.received-server-agent">
+      <Type>string</Type>
+      <Comment>Contains the name of the sever agent</Comment>
+    </Term>
+    <Term id="email.received-with">
+      <Type>string</Type>
+      <Comment>Contains the software used to send the email</Comment>
+    </Term>
+    <Term id="email.receiver">
+      <Type>string</Type>
+      <Comment>Full address of email receiver (including cc and bcc receivers)</Comment>
+    </Term>
+    <Term id="email.receiver-alias">
+      <Type>string</Type>
+      <Comment>Name of email receiver (included cc and bcc receivers)</Comment>
+    </Term>
+    <Term id="email.receiver-email">
+      <Type>string</Type>
+      <Comment>E-mail address of the message recipient</Comment>
+    </Term>
+     <Term id="email.receiver-type">
+      <Type>string</Type>
+      <Comment>Type of the email receiver</Comment>
+    </Term>
+    <Term id="email.reply-to">
+      <Type>string</Type>
+      <Comment>Email address to use in a reply for this message</Comment>
+    </Term>
+    <Term id="email.sender">
+      <Type>string</Type>
+      <Comment>Full address of email sender (alias followed by email address)</Comment>
+    </Term>
+    <Term id="email.sender-alias">
+      <Type>string</Type>
+      <Comment>Name of the email sender</Comment>
+    </Term>
+    <Term id="email.sender-email">
+      <Type>string</Type>
+      <Comment>Email address of the email sender</Comment>
+    </Term>
+    <Term id="email.server-response">
+      <Type>string</Type>
+      <Comment>The return code of the server</Comment>
+    </Term>
+    <Term id="email.subject">
+      <Type>string</Type>
+      <Comment>Subject of the e-mail message</Comment>
+    </Term>
+    <Term id="email.user-agent">
+      <Type>shortstring</Type>
+      <Comment>Name of the client software used</Comment>
+    </Term>
+    <Term id="email.xmailer">
+      <Type>string</Type>
+      <Comment>Contains the user_agent of the used mailer</Comment>
+    </Term>
+    <Term id="email.index">
+      <Type>shortstring</Type>
+      <Comment>Identifier of the request and response in a flow</Comment>
+    </Term>
+    <Term id="email.attach-mime-type">
+      <Type>string</Type>
+      <Comment>Mime type of the attached content</Comment>
+    </Term>
+    <Term id="email.content">
+      <Type>string</Type>
+      <Comment>Message content</Comment>
+    </Term>
+    <Term id="email.file-type">
+      <Type>string</Type>
+      <Comment>Received or sent file content type</Comment>
+    </Term>
+    <Term id="email.header-raw">
+      <Type>string</Type>
+      <Comment>Header line</Comment>
+    </Term>
+    <Term id="email.content-header">
+      <Type>string</Type>
+      <Comment>Data containing headers</Comment>
+    </Term>
+    <Term id="email.action">
+      <Type>shortstring</Type>
+      <Comment>Indicates if the message is read (Read) or composed (Compose)</Comment>
+    </Term>
+    <Term id="email.importance">
+      <Type>uint32</Type>
+      <Comment>Indicates if the email has been marked by the user</Comment>
+    </Term>
+    <Term id="email.msglist-sender">
+      <Type>string</Type>
+      <Comment>Full address of email sender (alias and email address) (UTF-16)</Comment>
+    </Term>
+    <Term id="email.msglist-subject">
+      <Type>string</Type>
+      <Comment>Message subject in a message list (UTF-16)</Comment>
+    </Term>
+    <Term id="email.msglist-size">
+      <Type>uint32</Type>
+      <Comment>Message size in a message list</Comment>
+    </Term>
+    <Term id="email.msglist-receiver">
+      <Type>string</Type>
+        <Comment>Full address of email receiver in a message list</Comment>
+    </Term>
+    <Term id="email.msglist-receiver-email">
+      <Type>string</Type>
+      <Comment>Email address of the email receiver</Comment>
+    </Term>
+    <Term id="email.contact-email">
+      <Type>string</Type>
+      <Comment>Email address of a contact (UTF-16)</Comment>
+    </Term>
+    <Term id="email.contact-alias">
+      <Type>string</Type>
+      <Comment>Alias of a contact (UTF-16)</Comment>
+    </Term>
+    <Term id="email.content-type">
+      <Type>shortstring</Type>
+      <Comment>Content type header value</Comment>
+    </Term>
+     <Term id="email.mime-version">
+      <Type>shortstring</Type>
+      <Comment>Mime version header value</Comment>
+    </Term>
+    <Term id="email.attach-content-md5-hash">
+      <Type>string</Type>
+      <Comment>Used for storing the incrementally computed MD5 hash of email.attach-content.</Comment>
+    </Term>
+    <Term id="email.attach-content-sha512-hash">
+      <Type>string</Type>
+      <Comment>Used for storing the incrementally computed SHA512 hash of email.attach-content.</Comment>
+    </Term>
+    <Term id="email.attach-content-decoded-md5-hash">
+      <Type>string</Type>
+      <Comment>Used for storing the incrementally computed MD5 hash of email.attach-content-decoded.</Comment>
+    </Term>
+    <Term id="email.attach-content-decoded-sha512-hash">
+      <Type>string</Type>
+      <Comment>Used for storing the incrementally computed SHA512 hash of email.attach-content-decoded.</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

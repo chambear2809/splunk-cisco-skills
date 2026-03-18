@@ -1,0 +1,166 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Networking", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "icmp.event", 
+        "interval": 60
+    }, 
+    "fields": [
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": true, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "ICMP message checksum", 
+            "enabled": true, 
+            "name": "checksum", 
+            "term": "icmp.checksum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "ICMP message code", 
+            "enabled": true, 
+            "name": "code", 
+            "term": "icmp.code"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "ICMP message code string", 
+            "enabled": true, 
+            "name": "code_string", 
+            "term": "icmp.code-string"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address of the server in dot-quad notation", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "ICMP message Id", 
+            "enabled": true, 
+            "name": "id", 
+            "term": "icmp.id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": true, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "ICMP message sequence", 
+            "enabled": true, 
+            "name": "sequence", 
+            "term": "icmp.sequence"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address of the client in dot-quad notation", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+            "enabled": true, 
+            "name": "time_taken", 
+            "term": "flow.time-taken"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "ICMP message type", 
+            "enabled": true, 
+            "name": "type", 
+            "term": "icmp.type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "ICMP message type string", 
+            "enabled": true, 
+            "name": "type_string", 
+            "term": "icmp.type-string"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "ICMP message data", 
+            "enabled": false, 
+            "name": "data", 
+            "term": "icmp.data"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+    ], 
+    "filters": {
+        "comparisons": [], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ITSI_ICMP_Raw", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "name": "Stream for ITSI Config Template - ICMP Raw", 
+    "protocolName": "ICMP", 
+    "sourcetype": "stream:icmp", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

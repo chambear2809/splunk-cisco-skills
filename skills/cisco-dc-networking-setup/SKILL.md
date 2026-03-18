@@ -12,6 +12,16 @@ description: >-
 
 Automates the **Cisco DC Networking App for Splunk** (`cisco_dc_networking_app_for_splunk` v1.2.0).
 
+## Package Model
+
+Install the original vendor archive from `splunk-ta/` as-is:
+
+- `cisco-dc-networking_120.tgz`
+
+For Splunk Cloud, install that archive with ACS and then use this skill to
+configure accounts, inputs, macros, and validation over search-tier REST. Any
+`splunk-ta/_unpacked/` copy is review-only and not part of the normal workflow.
+
 ## Agent Behavior — Credentials
 
 **The agent must NEVER ask for passwords, API keys, or secrets in chat.**
@@ -38,13 +48,15 @@ The agent may freely ask for non-secret values: account names, hostnames, accoun
 
 ## Environment
 
-All scripts operate entirely via the Splunk REST API and can run from any host with
-network access to the Splunk management port (8089). No local Splunk installation is
-required.
+Setup and validation use the Splunk search-tier REST API and can run from any
+host with network access to the Splunk management port (`8089`). In Splunk
+Cloud, app installation, index creation, and restarts are handled through ACS
+instead of the search-tier REST endpoints.
 
 | Item | Value |
 |------|-------|
-| Management API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Search-tier API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs (`SPLUNK_PLATFORM` is only an override for hybrid runs) |
 | TA app name | `cisco_dc_networking_app_for_splunk` |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/cisco-dc-networking-setup/scripts/` (relative to repo root) |
@@ -82,6 +94,7 @@ bash skills/cisco-dc-networking-setup/scripts/setup.sh
 
 Creates three indexes and three search macros. No `sudo` required when running
 as the `splunk` user.
+In Splunk Cloud, the setup script creates these indexes through ACS.
 
 | Index | Macro | Purpose | Max Size |
 |-------|-------|---------|----------|
@@ -126,10 +139,11 @@ bash scripts/setup.sh --enable-inputs --account "MY_FABRIC" --index "cisco_aci" 
 | `nd` | 11 inputs (advisories, anomalies, congestion, endpoints, fabrics, switches, flows, protocols, MSO) | `cisco_nd` |
 | `nexus9k` | 10 inputs (hostname, version, module, inventory, temp, interfaces, neighbors, transceivers, power, resources) | `cisco_nexus_9k` |
 
-### Step 4: Restart Splunk
+### Step 4: Restart If Required
 
-New indexes require a restart to activate. Restart via the Splunk UI, CLI on the
-server, or REST API.
+On Splunk Enterprise, restart Splunk after new index creation.
+On Splunk Cloud, check `acs status current-stack` and only run
+`acs restart current-stack` when ACS reports `restartRequired=true`.
 
 ### Step 5: Validate
 
@@ -161,7 +175,8 @@ Tools: `cisco_dc_check_health`, `cisco_dc_list_inputs`, `cisco_dc_aci_faults`,
 
 1. **Password storage**: The configure script stores credentials in Splunk's
    encrypted password store automatically. Use `--password-file` for device passwords.
-2. **Splunk restart required**: New indexes are not available until after restart.
+2. **Restart behavior differs by platform**: Enterprise requires a Splunk
+   restart after new index creation. Splunk Cloud uses ACS restart checks.
 3. **No sudo needed**: Scripts run fine as the `splunk` OS user.
 4. **Health data shape**: ACI health events don't always populate `healthAvg`
    at the top level — the dn-based structure varies by object type.

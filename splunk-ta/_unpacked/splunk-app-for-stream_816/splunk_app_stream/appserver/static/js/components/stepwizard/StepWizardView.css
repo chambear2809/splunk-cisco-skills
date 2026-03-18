@@ -1,0 +1,228 @@
+.clearfix {
+    *zoom: 1;
+}
+
+.clearfix:before,.clearfix:after {
+    display: table;
+    content: "";
+    line-height: 0;
+}
+
+.clearfix:after {
+    clear: both;
+}
+
+
+.step-wizard .wizard-label {
+    font-size: 20px;
+    float: left;
+    line-height: 80px;
+}
+
+.step-wizard .step-container {
+    min-height: 80px;
+    float: left;
+    margin: 0;
+    padding: 0;
+    font-size: 12px;
+    width: -moz-min-content;
+}
+
+.step-wizard-nav .step-container {
+	cursor: pointer;
+}
+
+.step-wizard .step-container .step-indicator {
+    position: relative;
+    margin-left: -2%;
+    width: 102%;
+    margin-top: 30px;
+    padding-bottom: 1em;
+}
+
+.step-wizard .step-container .step-indicator .connector {
+    float: left;
+    box-sizing: border-box;
+}
+
+.step-wizard .step-container .step-indicator .connector>div {
+    background-color: #bbb;
+    height: 3px;
+}
+
+.step-wizard.step-wizard-nav .step-container .step-indicator .connector>div {
+    background-color: #4e802a;
+    height: 3px;
+}
+
+
+.step-wizard .step-container .step-indicator .connector>div:first-child {
+    float: left;
+}
+
+.step-wizard .step-container .step-indicator .connector.left {
+    width: 50%;
+}
+
+.step-wizard .step-container .step-indicator .connector.left>div:first-child {
+    width: 1.25em;
+}
+
+.step-wizard .step-container .step-indicator .connector.left>div:last-child {
+    margin-left: 1.25em;
+    width: calc(100% - 1.25em);
+}
+
+.step-wizard .step-container .step-indicator .connector.right {
+    width: 51%;
+    margin-left: -1%;
+}
+
+.step-wizard .step-container .step-indicator .connector.right>div:first-child {
+    width: calc(100% - 1.25em);
+}
+
+.step-wizard .step-container .step-indicator .connector.right>div:last-child {
+    margin-left: calc(100% - 1.25em);
+    width: 1.25em;
+}
+
+.step-wizard .step-container .step-indicator .circle {
+    float: left;
+    position: absolute;
+    margin: 0 auto;
+    left: 0;
+    right: 0;
+    box-sizing: content-box;
+    text-align: center;
+}
+
+.step-wizard .step-container .step-label {
+    color: #999;
+    padding: 4px 1.25em 0;
+    max-width: 150px;
+    display: inline-block;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    width: -moz-max-content;
+}
+
+.step-wizard .step-container.active .connector.left>div {
+    background-color: #4e802a;
+}
+
+.step-wizard .step-container.active .circle {
+    height: 17px;
+    width: 17px;
+    top: -7px;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    background-color: #4e802a;
+}
+
+.step-wizard.step-wizard-nav .step-container .circle, .step-wizard.step-wizard-nav .step-container.last .circle {
+	height: 15px;
+	width: 15px;
+	top: -9px;
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    background-color: inherit;
+    border: 3px solid #4e802a;
+}
+
+
+.step-wizard .step-container.active .step-label {
+    color: #4e802a;
+}
+
+.step-wizard .step-container.first .connector.left>div:first-child {
+    background-color: transparent;
+    width: 1.25em;
+}
+
+.step-wizard .step-container.first .connector.left {
+    visibility:hidden;
+}
+
+.step-wizard .step-container.last .connector.right>div {
+    background-color: transparent;
+}
+
+.step-wizard .step-container.last .connector.right>div:first-child {
+    width: calc(100% - 1.25em);
+}
+
+.step-wizard .step-container.last .connector.right>div:last-child {
+    margin-left: calc(100% - 1.25em);
+    width: 1.25em;
+}
+
+.step-wizard .step-container.last .connector.left>div:first-child {
+    width: calc(50% - 2px);
+}
+
+.step-wizard .step-container.last .connector.left>div:last-child {
+    width: calc(100% - 18px);
+    margin-left: calc(1.25em - 5px);
+}
+
+.step-wizard .step-container.last .circle {
+    height: 16px;
+    width: 16px;
+    top: -10.5px;
+    -webkit-border-radius: 13px;
+    -moz-border-radius: 13px;
+    border-radius: 13px;
+    border: 3px solid #bbb;
+    background-color: transparent;
+}
+
+.step-wizard .step-container.last .finished-icon {
+    font-size: 16px;
+    color: #fff;
+    display: none;
+}
+
+.step-wizard .step-container.last.active .circle {
+    background-color: #4e802a;
+    border-color: #4e802a;
+}
+
+.step-wizard .step-container.last.active .finished-icon {
+    display: block;
+}
+
+.step-wizard .step-container.completed .connector>div {
+    background-color: #4e802a;
+}
+
+.step-wizard .step-container.completed .step-label {
+    opacity: .6;
+    filter: alpha(opacity=60);
+    color: #4e802a;
+}
+
+.step-wizard .nav-buttons {
+    float: left;
+    height: 63px;
+    line-height: 63px;
+    margin-left: 10px;
+}
+
+.step-wizard .nav-buttons .btn {
+    font-size: 14px;
+}
+
+.step-wizard .nav-buttons .next-button {
+    margin-left: 3px;
+}
+
+.step-wizard .nav-buttons .exit-button {
+    margin-left: 10px;
+}
+
+.step-wizard .flashmessages-header-placeholder .shared-flashmessageslegacy {
+    padding: 20px;
+}

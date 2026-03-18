@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<view template="pages/page_with_flag.html" type="html" isDashboard="False" packageName="end-user-xp">
+    <label>Reports</label>
+</view>

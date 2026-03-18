@@ -1,0 +1,101 @@
+<form version="1.1" script="multiselect.js">
+  <label>Resource Summary</label>
+  <search id="baseSearch">
+    <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxresource device = $multiTokenQuery$ | table *</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Range</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="multiselect" token="multiTokenQuery" searchWhenChanged="true">
+      <default>*</default>
+      <label>Device</label>
+      <delimiter> OR device=</delimiter>
+      <choice value="*">All</choice>
+      <search>
+        <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k | lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | eval hostAndHostname = hostname."(".device.")" | stats values(device) as device by hostAndHostname | fields hostAndHostname device | sort 0 hostAndHostname</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>hostAndHostname</fieldForLabel>
+      <fieldForValue>device</fieldForValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <table>
+        <title>Resource Summary</title>
+        <search base="baseSearch">
+          <query>| lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | stats latest(memory_usage_total) AS "Total Memory(KBytes)" latest(memory_usage_used) AS "Used Memory(KBytes)" latest(memory_usage_free) AS "Free Memory(KBytes)" sparkline(avg(memory_usage_used)) AS "Memory Usage Trend" latest(current_memory_status) AS "Current Memory Status"  latest(cpu_state_user) AS "CPU User(Percentage)" latest(cpu_state_idle) AS "CPU Idle(Percentage)" sparkline(avg(cpu_state_idle)) AS "CPU Idle Trend" latest(cpu_state_kernel) AS "CPU Kernel(Percentage)" latest(load_avg_1min) as "Load average(1min)" latest(load_avg_5min) as "Load average(5min)" latest(load_avg_15min) as "Load average(15min)" by hostname,device| rename hostname AS Hostname device as Device</query>
+        </search>
+        <format field="Memory Usage Trend" type="sparkline">
+          <option name="lineColor">#5379af</option>
+          <option name="fillColor">#CCDDFF</option>
+          <option name="lineWidth">1</option>
+          <option name="maxSpotColor">#A2FFA2</option>
+          <option name="spotRadius">3</option>
+          <option name="height">25</option>
+          <option name="width">75</option>
+        </format>
+        <format field="CPU Idle Trend" type="sparkline">
+          <option name="lineColor">#5379af</option>
+          <option name="fillColor">#CCDDFF</option>
+          <option name="lineWidth">1</option>
+          <option name="maxSpotColor">#A2FFA2</option>
+          <option name="spotRadius">3</option>
+          <option name="height">25</option>
+          <option name="width">75</option>
+        </format>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Memory Usage Trend</title>
+        <search base="baseSearch">
+          <query>
+| lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2)
+| timechart latest(memory_usage_used) AS "Memory Usage Trend" by hostname</query>
+        </search>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">Memory Usage(KBytes)</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxresource device=*| lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | where hostname like "$click.name2$" | stats latest(memory_usage_total) AS "Total Memory(KBytes)" latest(memory_usage_used) AS "Used Memory(KBytes)" latest(memory_usage_free) AS "Free Memory(KBytes)" latest(current_memory_status) AS "Memory Status" by hostname,device| rename hostname AS Hostname device as Device&amp;earliest=$earliest$&amp;latest=$latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>CPU Idle Trend</title>
+        <search base="baseSearch">
+          <query>
+| lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) 
+| timechart latest(cpu_state_idle) AS "CPU Idle Trend" by hostname</query>
+        </search>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">CPU Idle (%)</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxresource device=*| lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | where hostname like "$click.name2$" | stats latest(cpu_state_user) AS "CPU User(Percentage)" latest(cpu_state_idle) AS "CPU Idle(Percentage)" latest(cpu_state_kernel) AS "CPU Kernel(Percentage)" latest(load_avg_1min) as "Load average(1min)" latest(load_avg_5min) as "Load average(5min)" latest(load_avg_15min) as "Load average(15min)" by hostname,device| rename hostname AS Hostname device as Device&amp;earliest=$earliest$&amp;latest=$latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+</form>

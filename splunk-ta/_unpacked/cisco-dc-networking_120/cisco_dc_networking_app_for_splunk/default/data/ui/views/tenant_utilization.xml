@@ -1,0 +1,221 @@
+<form script="set_apic_token.js"  stylesheet="table_decorations.css" version="1.1">
+  <label>Tenant Utilization</label>
+  
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-60m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+     <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html id="overview">
+        <style>
+          #overview{
+            height:25% !important;
+          }
+        </style>
+      <h1>Dashboard Overview</h1>
+     <p>This dashboard provides Tenants Utilization and its components over the time period specified using the time picker. <br/>Following drilldown capabilities are provided:<br/>
+          <ul>
+            <li> Drilldown on Ingress/Egress Utilization per Tenant chart</li>
+          </ul>
+        </p>
+     </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Ingress Utilization per Tenant</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_stats component="l2IngrBytesAg15min" | search $formed_apic_host$| dedup dn | table dn,dropRate,floodRate,multicastRate,unicastRate | stats avg(dropRate), avg(floodRate), avg(multicastRate), avg(unicastRate) by dn | rename avg(dropRate) AS avg_dropRate, avg(floodRate) AS avg_floodRate, avg(multicastRate) AS avg_multicastRate, avg(unicastRate) AS avg_unicastRate | eval util = (avg_multicastRate + avg_unicastRate)| rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | stats sum(avg_dropRate) AS "Ingress Total Drop Rate",sum(avg_floodRate) AS "Ingress Total Flood Rate",sum(avg_multicastRate) AS "Ingress Total Multicast Rate",sum(avg_unicastRate) AS "Ingress Total Unicast Rate", sum(util) AS "Utilization" by Tenant | join Tenant [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:stats" component=fvCEp | dedup dn | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=rn "\/pathep-\[(?&lt;Interface&gt;.*?)\]" | table Tenant,Interface ] | table Tenant,Interface,"Ingress Total Drop Rate","Ingress Total Flood Rate","Ingress Total Multicast Rate","Ingress Total Unicast Rate","Utilization" | stats sum(Utilization) AS Utilization by Tenant | join [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" component=l1PhysIf | dedup dn | table dn | rex field=dn "\/node-(?&lt;id&gt;\d*)" | table dn,id | join id [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health"  component=fabricNode role=leaf | dedup name | table name,id] | table dn,name,id | stats count(name) AS total by id | stats sum(total) AS totalInterface] | join [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" component=l1PhysIf | dedup dn | table dn,speed | rex field=dn "\/node-(?&lt;id&gt;\d*)" | eval speed = if(searchmatch("speed=inherit"),"40G",speed) |table dn,id,speed | join id [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health"  component=fabricNode role=leaf | dedup name | table name,id] | table dn,name,id,speed | rex field=speed "(?&lt;bw&gt;\d*)G" | eval bw=bw*1073741824  | stats sum(bw) AS totalBandwidth] | eval tIB=totalInterface*totalBandwidth | eval u=(Utilization*100)/tIB | rename u AS "Total Utilization %" Utilization AS "Ingress Utilization" | table Tenant,"Total Utilization %" | sort 0 -"Total Utilization %" | head 15</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleX.text">Tenant</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">-45</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <drilldown>
+          <set token="gress">$click.value$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Egress Utilization per Tenant</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_stats component="l2EgrBytesAg15min" | search $formed_apic_host$ | dedup dn | table dn,multicastRate,unicastRate | stats avg(multicastRate), avg(unicastRate) by dn | rename avg(multicastRate) AS avg_multicastRate, avg(unicastRate) AS avg_unicastRate | eval util = (avg_multicastRate + avg_unicastRate)| rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | stats sum(avg_multicastRate) AS "Egress Total Multicast Rate",sum(avg_unicastRate) AS "Egress Total Unicast Rate", sum(util) AS "Utilization" by Tenant | join Tenant [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:stats" component=fvCEp | dedup dn | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=rn "\/pathep-\[(?&lt;Interface&gt;.*?)\]" | table Tenant,Interface ] | table Tenant,Interface,"Egress Total Multicast Rate","Egress Total Unicast Rate","Utilization"| stats sum(Utilization) AS Utilization by Tenant | join [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" component=l1PhysIf | dedup dn | table dn | rex field=dn "\/node-(?&lt;id&gt;\d*)" | table dn,id | join id [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health"  component=fabricNode role=leaf | dedup name | table name,id] | table dn,name,id | stats count(name) AS total by id | stats sum(total) AS totalInterface] | join [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" component=l1PhysIf | dedup dn | table dn,speed | rex field=dn "\/node-(?&lt;id&gt;\d*)" | eval speed = if(searchmatch("speed=inherit"),"40G",speed) |table dn,id,speed | join id [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health"  component=fabricNode role=leaf | dedup name | table name,id] | table dn,name,id,speed | rex field=speed "(?&lt;bw&gt;\d*)G" | eval bw=bw*1073741824  | stats sum(bw) AS totalBandwidth] | eval tIB=totalInterface*totalBandwidth | eval u=(Utilization*100)/tIB | rename u AS "Total Utilization %" Utilization AS "Egress Utilization" | table Tenant,"Total Utilization %" | sort 0 -"Total Utilization %" | head 15</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleX.text">Tenant</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">-45</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <drilldown>
+          <set token="gress">$click.value$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$gress$">
+        <title>$gress$-Ingress Utilization Statistics in bytes</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_stats component="l2IngrBytesAg15min"| search $formed_apic_host$  | dedup dn | table dn,dropRate,floodRate,multicastRate,unicastRate | stats avg(dropRate), avg(floodRate), avg(multicastRate), avg(unicastRate) by dn | rename avg(dropRate) AS avg_dropRate, avg(floodRate) AS avg_floodRate, avg(multicastRate) AS avg_multicastRate, avg(unicastRate) AS avg_unicastRate | eval util = (avg_multicastRate + avg_unicastRate)| rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | stats sum(avg_dropRate) AS "Ingress Total Drop Rate",sum(avg_floodRate) AS "Ingress Total Flood Rate",sum(avg_multicastRate) AS "Ingress Total Multicast Rate",sum(avg_unicastRate) AS "Ingress Total Unicast Rate", sum(util) AS "Utilization" by Tenant | join Tenant [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:stats" component=fvCEp | dedup dn | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=rn "\/pathep-\[(?&lt;Interface&gt;.*?)\]" | table Tenant,Interface ] | table Tenant,Interface,"Ingress Total Drop Rate","Ingress Total Flood Rate","Ingress Total Multicast Rate","Ingress Total Unicast Rate","Utilization" | join [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" component=l1PhysIf | dedup dn | table dn | rex field=dn "\/node-(?&lt;id&gt;\d*)" | table dn,id | join id [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health"  component=fabricNode role=leaf | dedup name | table name,id] | table dn,name,id | stats count(name) AS total by id | stats sum(total) AS totalInterface] | search Tenant=$gress$ | join [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" component=l1PhysIf | dedup dn | table dn,speed | rex field=dn "\/node-(?&lt;id&gt;\d*)" | eval speed = if(searchmatch("speed=inherit"),"40G",speed) |table dn,id,speed | join id [search  `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health"  component=fabricNode role=leaf | dedup name | table name,id] | table dn,name,id,speed | rex field=speed "(?&lt;bw&gt;\d*)G" | eval bw=bw*1073741824  | stats sum(bw) AS totalBandwidth] | eval tIB=totalInterface*totalBandwidth | eval u=(Utilization*100)/tIB | rename u AS "Total Utilization %" Utilization AS "Ingress Total Utilization" | table Tenant,Interface,"Ingress Total Utilization","Ingress Total Multicast Rate","Ingress Total Unicast Rate"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">5</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$gress$">
+        <title>$gress$-Egress Utilization Statistics in bytes</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_stats component="l2EgrBytesAg15min" | search $formed_apic_host$  | dedup dn | table dn,multicastRate,unicastRate | stats avg(multicastRate), avg(unicastRate) by dn | rename avg(multicastRate) AS avg_multicastRate, avg(unicastRate) AS avg_unicastRate | eval util = (avg_multicastRate + avg_unicastRate)| rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | stats sum(avg_multicastRate) AS "Egress Total Multicast Rate",sum(avg_unicastRate) AS "Egress Total Unicast Rate", sum(util) AS "Utilization" by Tenant | join Tenant [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:stats" component=fvCEp | dedup dn | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=rn "\/pathep-\[(?&lt;Interface&gt;.*?)\]" | table Tenant,Interface ] | table Tenant,Interface,"Egress Total Multicast Rate","Egress Total Unicast Rate","Utilization"| join [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" component=l1PhysIf | dedup dn | table dn | rex field=dn "\/node-(?&lt;id&gt;\d*)" | table dn,id | join id [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health"  component=fabricNode role=leaf | dedup name | table name,id] | table dn,name,id | stats count(name) AS total by id | stats sum(total) AS totalInterface] | search Tenant=$gress$  | join [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" component=l1PhysIf | dedup dn | table dn,speed | rex field=dn "\/node-(?&lt;id&gt;\d*)" | eval speed = if(searchmatch("speed=inherit"),"40G",speed) |table dn,id,speed | join id [search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health"  component=fabricNode role=leaf | dedup name | table name,id] | table dn,name,id,speed | rex field=speed "(?&lt;bw&gt;\d*)G" | eval bw=bw*1073741824  | stats sum(bw) AS totalBandwidth] | eval tIB=totalInterface*totalBandwidth | eval u=(Utilization*100)/tIB | rename u AS "Total Utilization %" Utilization AS "Egress Total Utilization" | table Tenant,Interface,"Egress Total Utilization","Egress Total Multicast Rate","Egress Total Unicast Rate"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">5</option>
+      </table>
+    </panel>
+  </row>
+</form>

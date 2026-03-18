@@ -1,0 +1,425 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Networking", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "dhcp.event"
+    }, 
+    "fields": [
+        {
+            "aggType": "value", 
+            "desc": "TransactionId", 
+            "enabled": true, 
+            "name": "transaction_id", 
+            "term": "dhcp.transaction-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client Hardware address", 
+            "enabled": true, 
+            "name": "chaddr", 
+            "term": "dhcp.client-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client IP address", 
+            "enabled": true, 
+            "name": "ciaddr", 
+            "term": "dhcp.current-client-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "DNS server ip", 
+            "enabled": true, 
+            "name": "dns_server", 
+            "term": "dhcp.dns-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of boot file used during initialization", 
+            "enabled": true, 
+            "name": "file", 
+            "term": "dhcp.filename"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP addr of the gateway", 
+            "enabled": true, 
+            "name": "router", 
+            "term": "dhcp.gateway-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Specifies lease time DHCP server is willing to offer", 
+            "enabled": true, 
+            "name": "ip_lease_time", 
+            "term": "dhcp.lease-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Type of DHCP message", 
+            "enabled": true, 
+            "name": "opcode", 
+            "term": "dhcp.message-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "New ip address attributed to the client", 
+            "enabled": true, 
+            "name": "yiaddr", 
+            "term": "dhcp.new-client-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Subnet mask assigned to the client", 
+            "enabled": true, 
+            "name": "subnetmask", 
+            "term": "dhcp.new-client-subnet"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Relay agent IP address", 
+            "enabled": true, 
+            "name": "giaddr", 
+            "term": "dhcp.relay-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address of the next server (used when booting via a server)", 
+            "enabled": true, 
+            "name": "siaddr", 
+            "term": "dhcp.server-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Host name of next server", 
+            "enabled": true, 
+            "name": "sname", 
+            "term": "dhcp.server-name"
+        },
+
+        {
+          "aggType": "value", 
+          "desc": "Host name sent by the client in the DCHP option",
+          "enabled": true, 
+          "name": "host_name",
+          "term": "dhcp.host-name"
+        },
+
+        {
+          "aggType": "value", 
+          "desc": "DNS server name sent by the server in the DHCP option",
+          "enabled": true, 
+          "name": "domain_name",
+          "term": "dhcp.domain-name"
+        },
+
+        {
+          "aggType": "value", 
+          "desc": "Fully qualified host name sent by the client in the DHCP option",
+          "enabled": true, 
+          "name": "client_fqdn",
+          "term": "dhcp.client-fqdn"
+        },
+
+        {
+          "aggType": "value", 
+          "desc": "Suboption that contains the remote agent identifier",
+          "enabled": true, 
+          "name": "remote_id_type",
+          "term": "dhcp.remote-id-type"
+        },
+
+        {
+          "aggType": "value", 
+          "desc": "Subtype for the remote agent",
+          "enabled": true, 
+          "name": "remote_id_subtype",
+          "term": "dhcp.remote-id-subtype"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Identifier for the remote agent",
+          "enabled": true, 
+          "name": "remote_id",
+          "term": "dhcp.remote-id"
+        },
+        {
+          "aggType": "value", 
+          "desc": "The circuit identifier",
+          "enabled": true, 
+          "name": "circuit_id",
+          "term": "dhcp.circuit-id"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Time servers",
+          "enabled": true, 
+          "name": "time_server",
+          "term": "dhcp.time-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Name servers",
+          "enabled": true, 
+          "name": "name_server",
+          "term": "dhcp.name-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Log servers",
+          "enabled": true, 
+          "name": "log_server",
+          "term": "dhcp.log-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Quote servers",
+          "enabled": true, 
+          "name": "quote_server",
+          "term": "dhcp.quotes-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Printer servers",
+          "enabled": true, 
+          "name": "printer_server",
+          "term": "dhcp.printer-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Impress servers",
+          "enabled": true, 
+          "name": "impress_server",
+          "term": "dhcp.impress-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "RLP servers",
+          "enabled": true, 
+          "name": "rlp_server",
+          "term": "dhcp.rlp-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Swap servers",
+          "enabled": true, 
+          "name": "swap_server",
+          "term": "dhcp.swap-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Static Routing Table",
+          "enabled": true, 
+          "name": "static_route",
+          "term": "dhcp.static-route"
+        },
+        {
+          "aggType": "value", 
+          "desc": "NIS servers",
+          "enabled": true, 
+          "name": "nis_server",
+          "term": "dhcp.nis-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "NTP servers",
+          "enabled": true, 
+          "name": "ntp_server",
+          "term": "dhcp.ntp-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Netbios servers",
+          "enabled": true, 
+          "name": "netbios_server",
+          "term": "dhcp.netbios-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "X Windows Font Servers",
+          "enabled": true, 
+          "name": "xwindows_font_server",
+          "term": "dhcp.xwin-font-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "DHCP Error Message",
+          "enabled": true, 
+          "name": "dhcp_err_msg",
+          "term": "dhcp.error-msg"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Client requested IP address",
+          "enabled": true, 
+          "name": "requested_ip",
+          "term": "dhcp.requested-ip"
+        },
+        {
+          "aggType": "value", 
+          "desc": "Client Identifier",
+          "enabled": true, 
+          "name": "client_id",
+          "term": "dhcp.client-id"
+        },
+        {
+          "aggType": "value", 
+          "desc": "NIS V3 Servers",
+          "enabled": true, 
+          "name": "nisv3_server",
+          "term": "dhcp.nisv3-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "TFTP Servers",
+          "enabled": true, 
+          "name": "tftp_server",
+          "term": "dhcp.tftp-server"
+        },
+        {
+          "aggType": "value", 
+          "desc": "SIP Servers",
+          "enabled": true, 
+          "name": "sip_server",
+          "term": "dhcp.sip-server"
+        },
+
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client IP Address", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client port number", 
+            "enabled": true, 
+            "name": "src_port", 
+            "term": "flow.c-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from client to server", 
+            "enabled": false, 
+            "name": "packets_in", 
+            "term": "flow.cs-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": false, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": false, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server IP Address", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server port number", 
+            "enabled": true, 
+            "name": "dest_port", 
+            "term": "flow.s-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from server to client", 
+            "enabled": false, 
+            "name": "packets_out", 
+            "term": "flow.sc-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Transport level protocol", 
+            "enabled": true, 
+            "name": "transport", 
+            "term": "flow.transport"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+            "enabled": false, 
+            "name": "vlan_id", 
+            "term": "flow.vlan-id"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+
+    ], 
+    "filters": {
+        "comparisons": [], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ITSI_DHCP_Raw", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "modifiedBy": "admin", 
+    "name": "Stream for ITSI Config Template - DHCP Raw", 
+    "protocolName": "DHCP", 
+    "sourcetype": "stream:dhcp", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

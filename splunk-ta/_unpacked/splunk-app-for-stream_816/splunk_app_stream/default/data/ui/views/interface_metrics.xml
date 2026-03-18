@@ -1,0 +1,187 @@
+<form script="metrics.js" version="1.1">
+  <label>Network Metrics</label>
+  <search id="baseSearch">
+    <query>`stream_stats` host=$host$</query>
+    <earliest>$time.earliest$</earliest>
+    <latest>$time.latest$</latest>
+  </search>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="host" searchWhenChanged="true">
+      <label>Host</label>
+      <choice value="*">all</choice>
+      <search>
+          <query>`stream_stats` | stats estdc(host) as count by host | fields host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+      </search>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <default>*</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>Bandwidth</title>
+        <search base="baseSearch">
+          <query>spath Output=BitsPerSecond path=sniffer{}.captures{}.bitsPerSecond |
+                fields - _raw | fields _time, host, BitsPerSecond |
+                stats sum(BitsPerSecond) as TotalBitsPerSecond by host,_time | eval mbps=TotalBitsPerSecond/1024/1024 |
+                timechart avg(mbps) as Bandwidth(mbps) by host
+            </query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleY.text">Mbps</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Active Network Flows</title>
+        <search base="baseSearch">
+          <query>spath Output=TcpSessionCount path=sniffer{}.processors{}.tcpSessionCount | fields - _raw |
+                fields host, _time, TcpSessionCount  | stats sum(TcpSessionCount) as TotalTcpSessionCount by host,_time |
+                timechart avg(TotalTcpSessionCount) as TcpSessionCount by host
+            </query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Num Flows</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Total Packets</title>
+        <search base="baseSearch">
+          <query>spath Output=TotalPackets path=sniffer{}.captures{}.totalPackets |
+                fields - _raw | fields _time, host, TotalPackets | stats sum(TotalPackets) as SumTotalPackets by host,_time |
+                sort by host, _time | eventstats earliest(_time) as earliestEventTime by host |
+                convert mstime(_time) AS ms_time | delta SumTotalPackets as deltaTotalPackets |
+                where earliestEventTime != ms_time | eval absdelta=case(deltaTotalPackets&lt;=0, 0, deltaTotalPackets&gt;0, deltaTotalPackets) |
+                timechart sum(absdelta) as delta by host
+            </query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Packets</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <eval token="earliest_time">$earliest$-60</eval>
+          <eval token="latest_time">$earliest$+60</eval>
+          <link target="_blank">search?q=%60stream_stats%60%20host=$host$%20%7C%20spath%20Output=TotalPackets%20path=sniffer%7B%7D.captures%7B%7D.totalPackets%20%7C%20fields%20-%20_raw%20%7C%20fields%20_time,%20host,%20TotalPackets%20%7C%20stats%20sum(TotalPackets)%20as%20SumTotalPackets%20by%20host,_time%20%7C%20sort%20by%20host,%20_time%20%7C%20eventstats%20earliest(_time)%20as%20earliestEventTime%20by%20host%20%7C%20convert%20mstime(_time)%20AS%20ms_time%20%7C%20delta%20SumTotalPackets%20as%20deltaTotalPackets%20%7C%20where%20earliestEventTime%20!=%20ms_time%20%7C%20eval%20absdelta=case(deltaTotalPackets%3C=0,%200,%20deltaTotalPackets%3E0,%20deltaTotalPackets)&amp;earliest=$earliest_time$&amp;latest=$latest_time$</link>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Dropped Packets</title>
+        <search base="baseSearch">
+          <query>spath Output=DroppedPackets path=sniffer{}.captures{}.droppedPackets |
+                fields - _raw | fields _time, host, DroppedPackets | stats sum(DroppedPackets) as SumDroppedPackets by host,_time |
+                sort by host, _time | eventstats earliest(_time) as earliestEventTime by host |
+                convert mstime(_time) AS ms_time | delta SumDroppedPackets as deltaDroppedPackets |
+                where earliestEventTime != ms_time | eval absdelta=case(deltaDroppedPackets&lt;=0, 0, deltaDroppedPackets&gt;0, deltaDroppedPackets) |
+                timechart sum(absdelta) as delta by host
+            </query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Packets</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+            <eval token="earliest_time">$earliest$-60</eval>
+            <eval token="latest_time">$earliest$+60</eval>
+
+          <link target="_blank">search?q=%60stream_stats%60%20host=$host$%20%7C%20spath%20Output=DroppedPackets%20path=sniffer%7B%7D.captures%7B%7D.droppedPackets%20%7C%20fields%20-%20_raw%20%7C%20fields%20_time,%20host,%20DroppedPackets%20%7C%20stats%20sum(DroppedPackets)%20as%20SumDroppedPackets%20by%20host,_time%20%7C%20sort%20by%20host,%20_time%20%7C%20eventstats%20earliest(_time)%20as%20earliestEventTime%20by%20host%20%7C%20convert%20mstime(_time)%20AS%20ms_time%20%7C%20delta%20SumDroppedPackets%20as%20deltaDroppedPackets%20%7C%20where%20earliestEventTime%20!=%20ms_time%20%7C%20eval%20absdelta=case(deltaDroppedPackets%3C=0,%200,%20deltaDroppedPackets%3E0,%20deltaDroppedPackets)&amp;earliest=$earliest_time$&amp;latest=$latest_time$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+</form>

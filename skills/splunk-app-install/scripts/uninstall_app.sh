@@ -81,8 +81,136 @@ restart_splunk_or_exit() {
     esac
 }
 
+cloud_wait_for_status() {
+    local timeout_secs="${1:-300}" interval_secs="${2:-5}"
+    local waited=0 status_json state
+
+    while (( waited < timeout_secs )); do
+        status_json=$(acs_command status current-stack 2>/dev/null || true)
+        state=$(printf '%s' "${status_json}" \
+            | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    infra = ((data.get('status') or {}).get('infrastructure') or {}).get('status', '')
+    restart_required = ((data.get('messages') or {}).get('restartRequired', False))
+    if restart_required:
+        print('restart-required')
+    else:
+        print(infra or 'unknown')
+except Exception:
+    print('unknown')
+")
+        case "${state}" in
+            Ready|restart-required)
+                return 0
+                ;;
+        esac
+        sleep "${interval_secs}"
+        waited=$((waited + interval_secs))
+    done
+
+    return 1
+}
+
+cloud_restart_or_exit() {
+    local operation="$1"
+
+    if ! "${RESTART_SPLUNK}"; then
+        log "Skipping Splunk Cloud restart check (--no-restart). Run 'acs status current-stack' and restart if required before relying on the uninstall state."
+        return 0
+    fi
+
+    if ! cloud_wait_for_status 300 5; then
+        log "WARNING: Timed out waiting for the Splunk Cloud stack to settle after ${operation}."
+    fi
+
+    if [[ "$(acs_restart_required 2>/dev/null || echo "false")" != "true" ]]; then
+        log "No Splunk Cloud restart required after ${operation}."
+        return 0
+    fi
+
+    log "Restarting Splunk Cloud search tier via ACS to complete ${operation}..."
+    if ! cloud_restart_if_required 900; then
+        log "ERROR: ACS restart failed or the stack did not return to Ready status."
+        exit 1
+    fi
+    log "SUCCESS: Splunk Cloud restart completed and the stack returned to Ready."
+}
+
 echo "=== Splunk App Uninstaller ==="
 echo ""
+
+if is_splunk_cloud; then
+    acs_prepare_context || exit 1
+
+    if [[ -z "${APP_NAME}" ]]; then
+        echo ""
+        echo "Fetching installed apps from Splunk Cloud..."
+        response=$(acs_command apps list --count 1000 2>/dev/null)
+
+        app_list=()
+        while IFS= read -r app_name; do
+            [[ -n "${app_name}" ]] && app_list+=("${app_name}")
+        done < <(printf '%s' "${response}" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    names = sorted((app.get('name') or app.get('appID') or '') for app in data.get('apps', []))
+    for name in names:
+        if name:
+            print(name)
+except Exception:
+    pass
+" 2>/dev/null)
+
+        if [[ ${#app_list[@]} -gt 0 ]]; then
+            echo ""
+            echo "Installed apps:"
+            for i in "${!app_list[@]}"; do
+                printf "  %d) %s\n" $((i + 1)) "${app_list[$i]}"
+            done
+            echo ""
+            read -rp "Select a number, or type the app name: " choice
+
+            if [[ "${choice}" =~ ^[0-9]+$ ]] && [[ "${choice}" -ge 1 ]] && [[ "${choice}" -le ${#app_list[@]} ]]; then
+                APP_NAME="${app_list[$((choice - 1))]}"
+            else
+                APP_NAME="${choice}"
+            fi
+        else
+            read -rp "Enter the app name to uninstall: " APP_NAME
+        fi
+
+        if [[ -z "${APP_NAME}" ]]; then
+            log "ERROR: No app name specified"
+            exit 1
+        fi
+    fi
+
+    echo ""
+    read -rp "Remove app '${APP_NAME}'? This cannot be undone. [y/N]: " confirm
+    case "${confirm}" in
+        [yY]|[yY][eE][sS]) ;;
+        *) log "Cancelled."; exit 0 ;;
+    esac
+
+    log "Checking if app '${APP_NAME}' exists in Splunk Cloud..."
+    if ! acs_command apps describe "${APP_NAME}" >/dev/null 2>&1; then
+        log "ERROR: App '${APP_NAME}' not found in Splunk Cloud."
+        exit 1
+    fi
+
+    log "Removing app '${APP_NAME}' from Splunk Cloud..."
+    if cloud_requires_local_scope; then
+        acs_command apps uninstall "${APP_NAME}" --scope local >/dev/null
+    else
+        acs_command apps uninstall "${APP_NAME}" >/dev/null
+    fi
+    log "SUCCESS: App '${APP_NAME}' has been removed"
+    cloud_restart_or_exit "app removal"
+    exit 0
+fi
 
 load_splunk_credentials
 

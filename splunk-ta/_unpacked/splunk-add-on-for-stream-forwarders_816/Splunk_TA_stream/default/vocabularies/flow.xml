@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="flow">
+    <Name>Flow</Name>
+    <Comment>Vocabulary for describing netflow events.</Comment>
+    <Locked>true</Locked>
+    <Term id="flow.interface-name">
+      <Type>shortstring</Type>
+      <Comment>Name of network interface</Comment>
+    </Term>
+    <Term id="flow.interface-index">
+        <Type>uint32</Type>
+        <Comment>Network interface index</Comment>
+    </Term>
+    <Term id="flow.interface-type">
+        <Type>uint32</Type>
+        <Comment>Network interface type</Comment>
+    </Term>
+    <Term id="flow.interface-speed">
+        <Type>uint64</Type>
+        <Comment>Network interface speed</Comment>
+    </Term>
+    <Term id="flow.interface-direction">
+        <Type>uint32</Type>
+        <Comment>Interface direction</Comment>
+    </Term>
+    <Term id="flow.interface-status">
+        <Type>uint32</Type>
+        <Comment>Interface status</Comment>
+    </Term>
+    <Term id="flow.interface-input-octets">
+        <Type>uint64</Type>
+        <Comment>Interface input octets</Comment>
+    </Term>
+    <Term id="flow.interface-input-pkts">
+        <Type>uint32</Type>
+        <Comment>Interface input packets</Comment>
+    </Term>
+    <Term id="flow.interface-input-multi-pkts">
+        <Type>uint32</Type>
+        <Comment>Interface multicast packets</Comment>
+    </Term>
+    <Term id="flow.interface-input-broad-pkts">
+        <Type>uint32</Type>
+        <Comment>Interface broadcast packets</Comment>
+    </Term>
+    <Term id="flow.interface-input-discard-pkts">
+        <Type>uint32</Type>
+        <Comment>Interface discarded packets</Comment>
+    </Term>
+    <Term id="flow.interface-input-errors">
+        <Type>uint32</Type>
+        <Comment>Interface input errors</Comment>
+    </Term>
+    <Term id="flow.interface-input-unk-protos">
+        <Type>uint32</Type>
+        <Comment>Interface input unknown protocol packets</Comment>
+    </Term>
+    <Term id="flow.interface-output-octets">
+        <Type>uint64</Type>
+        <Comment>Interface output octets</Comment>
+    </Term>
+    <Term id="flow.interface-output-pkts">
+        <Type>uint32</Type>
+        <Comment>Interface output packets</Comment>
+    </Term>
+    <Term id="flow.interface-output-multi-pkts">
+        <Type>uint32</Type>
+        <Comment>Interface multicast packets</Comment>
+    </Term>
+    <Term id="flow.interface-output-broad-pkts">
+        <Type>uint32</Type>
+        <Comment>Interface broadcast packets</Comment>
+    </Term>
+    <Term id="flow.interface-output-discard-pkts">
+        <Type>uint32</Type>
+        <Comment>Interface discarded packets</Comment>
+    </Term>
+    <Term id="flow.interface-output-errors">
+        <Type>uint32</Type>
+        <Comment>Interface output errors</Comment>
+    </Term>
+    <Term id="flow.interface-promiscuous">
+        <Type>uint32</Type>
+        <Comment>Interface promiscuous mode</Comment>
+    </Term>
+    <Term id="flow.hostname">
+      <Type>shortstring</Type>
+      <Comment>Hostname where flow was captured</Comment>
+    </Term>
+    <Term id="flow.tcp-event">
+      <Type>object</Type>
+      <Comment>Event for a TCP flow</Comment>
+    </Term>
+    <Term id="flow.udp-event">
+      <Type>object</Type>
+      <Comment>Event for a UDP flow</Comment>
+    </Term>
+    <Term id="flow.ip-event">
+      <Type>object</Type>
+      <Comment>Event for a IP flow</Comment>
+    </Term>
+    <Term id="flow.c-ip">
+      <Type>shortstring</Type>
+      <Comment>IP address of the client in dot-quad notation</Comment>
+    </Term>
+    <Term id="flow.s-ip">
+      <Type>shortstring</Type>
+      <Comment>IP address of the server in dot-quad notation</Comment>
+    </Term>
+    <Term id="flow.c-mac">
+      <Type>shortstring</Type>
+      <Comment>Client packets MAC address in hexadecimal format</Comment>
+    </Term>
+    <Term id="flow.s-mac">
+      <Type>shortstring</Type>
+      <Comment>Server packets MAC address in hexadecimal format</Comment>
+    </Term>
+    <Term id="flow.vlan-id">
+      <Type>uint16</Type>
+      <Comment>VLAN ID from 802.1Q header</Comment>
+    </Term>
+    <Term id="flow.cs-packets">
+      <Type>uint32</Type>
+      <Comment>The total number of packets sent from client to server</Comment>
+    </Term>
+    <Term id="flow.sc-packets">
+      <Type>uint32</Type>
+      <Comment>The total number of packets sent from server to client</Comment>
+    </Term>
+    <Term id="flow.cs-ack-packets">
+      <Type>uint32</Type>
+      <Comment>The number of acknowledgement packets sent from client to server</Comment>
+    </Term>
+    <Term id="flow.sc-ack-packets">
+      <Type>uint32</Type>
+      <Comment>The number of acknowledgement packets sent from server to client</Comment>
+    </Term>
+    <Term id="flow.cs-missing-packets">
+      <Type>uint32</Type>
+      <Comment>The number of missing packet gaps detected within the request</Comment>
+    </Term>
+    <Term id="flow.sc-missing-packets">
+      <Type>uint32</Type>
+      <Comment>The number of missing packet gaps detected within the response</Comment>
+    </Term>
+    <Term id="flow.cs-duplicate-packets">
+      <Type>uint32</Type>
+      <Comment>The number of duplicate packets sent from client to server</Comment>
+    </Term>
+    <Term id="flow.sc-duplicate-packets">
+      <Type>uint32</Type>
+      <Comment>The number of duplicate packets sent from server to client</Comment>
+    </Term>
+    <Term id="flow.cs-data-packets">
+      <Type>uint32</Type>
+      <Comment>The number of data packets sent from client to server</Comment>
+    </Term>
+    <Term id="flow.sc-data-packets">
+      <Type>uint32</Type>
+      <Comment>The number of data packets sent from server to client</Comment>
+    </Term>
+    <Term id="flow.cs-bytes">
+      <Type>uint64</Type>
+      <Comment>The number of bytes sent from client to server</Comment>
+    </Term>
+    <Term id="flow.sc-bytes">
+      <Type>uint64</Type>
+      <Comment>The number of bytes sent from server to client</Comment>
+    </Term>
+    <Term id="flow.bytes">
+      <Type>uint64</Type>
+      <Comment>The total number of bytes transferred</Comment>
+    </Term>
+    <Term id="flow.packets">
+        <Type>uint64</Type>
+        <Comment>The total number of packets in the flow</Comment>
+    </Term>
+    <Term id="flow.c-port">
+      <Type>uint16</Type>
+      <Comment>Client port number</Comment>
+    </Term>
+    <Term id="flow.s-port">
+      <Type>uint16</Type>
+      <Comment>Server port number</Comment>
+    </Term>
+    <Term id="flow.time-taken">
+      <Type>uint32</Type>
+      <Comment>Number of microseconds that it took to complete a flow event, from the end user's perspective</Comment>
+    </Term>
+    <Term id="flow.cs-content">
+      <Type>blob</Type>
+      <Comment>Payload content sent from client to server</Comment>
+    </Term>
+    <Term id="flow.sc-content">
+      <Type>zblob</Type>
+      <Comment>Payload content sent from server to client</Comment>
+    </Term>
+    <Term id="flow.cs-send-time">
+      <Type>uint32</Type>
+      <Comment>Number of microseconds that it took the client to send a request</Comment>
+    </Term>
+    <Term id="flow.cs-ack-time">
+      <Type>uint32</Type>
+      <Comment>Number of microseconds that it took the server to acknowledge receipt of the request</Comment>
+    </Term>
+    <Term id="flow.sc-reply-time">
+      <Type>uint32</Type>
+      <Comment>Number of microseconds that it took the server to start replying to a request</Comment>
+    </Term>
+    <Term id="flow.sc-send-time">
+      <Type>uint32</Type>
+      <Comment>Number of microseconds that it took the server to send a response</Comment>
+    </Term>
+    <Term id="flow.sc-ack-time">
+      <Type>uint32</Type>
+      <Comment>Number of microseconds that it took the client to acknowledge receipt of the response</Comment>
+    </Term>
+    <Term id="flow.ssl-time">
+      <Type>uint32</Type>
+      <Comment>Number of microseconds that it took to negotiate an SSL handshake</Comment>
+    </Term>
+    <Term id="flow.ssl-version">
+      <Type>shortstring</Type>
+      <Comment>SSL protocol version used for encryption, or undefined if not encrypted</Comment>
+    </Term>
+    <Term id="flow.data-center-time">
+      <Type>uint32</Type>
+      <Comment>Number of microseconds from the last request packet to the last response packet</Comment>
+    </Term>
+    <Term id="flow.cp-rtt">
+      <Type>uint32</Type>
+      <Comment>Average round trip time in microseconds from the client to the Pion server</Comment>
+    </Term>
+    <Term id="flow.ps-rtt">
+      <Type>uint32</Type>
+      <Comment>Average round trip time in microseconds from the Pion server to the protocol server</Comment>
+    </Term>
+    <Term id="flow.cp-rtt-sum">
+      <Type>uint64</Type>
+      <Comment>Sum of all round trip time measurements from the client to the Pion server</Comment>
+    </Term>
+    <Term id="flow.ps-rtt-sum">
+      <Type>uint64</Type>
+      <Comment>Sum of all round trip time measurements from the Pion server to the protocol server</Comment>
+    </Term>
+    <Term id="flow.cp-rtt-packets">
+      <Type>uint32</Type>
+      <Comment>Number of round trip time measurements from the client to the Pion server</Comment>
+    </Term>
+    <Term id="flow.ps-rtt-packets">
+      <Type>uint32</Type>
+      <Comment>Number of round trip time measurements from the Pion server to the protocol server</Comment>
+    </Term>
+    <Term id="flow.refused">
+      <Type>uint32</Type>
+      <Comment>Indicates server terminated connection with RST flag</Comment>
+    </Term>
+    <Term id="flow.canceled">
+      <Type>uint32</Type>
+      <Comment>Indicates client terminated connection with RST flag</Comment>
+    </Term>
+    <Term id="flow.connection">
+      <Type>shortstring</Type>
+      <Comment>TPC session server endpoint (IP address and TCP port)</Comment>
+    </Term>
+    <Term id="flow.request-status">
+      <Type>uint8</Type>
+      <Comment>HTTP request status (0=NONE, 1=TRUNCATED, 2=PARTIAL, 3=OK)</Comment>
+    </Term>
+    <Term id="flow.response-status">
+      <Type>uint8</Type>
+      <Comment>HTTP response status (0=NONE, 1=TRUNCATED, 2=PARTIAL, 3=OK)</Comment>
+    </Term>
+    <Term id="flow.tcp-status">
+      <Type>uint8</Type>
+      <Comment>TCP handshake status (0=OK, 1=RESET, 2=IGNORED)</Comment>
+    </Term>
+    <Term id="flow.protocol">
+      <Type>shortstring</Type>
+      <Comment>Level 7 protocol name (http, ftp, etc.)</Comment>
+    </Term>
+    <Term id="flow.transport">
+      <Type>shortstring</Type>
+      <Comment>Transport layer protocol (udp or tcp)</Comment>
+    </Term>
+    <Term id="flow.ssl-client-hello-version">
+      <Type>shortstring</Type>
+      <Comment>SSL version in client hello</Comment>
+    </Term>
+    <Term id="flow.ssl-client-cipher-suite-id">
+      <Type>uint32</Type>
+      <Comment>one id from a client's list of cipher suites</Comment>
+    </Term>
+    <Term id="flow.ssl-client-cipher-suite-name">
+      <Type>shortstring</Type>
+      <Comment>one name from a client's list of cipher suites</Comment>
+    </Term>
+    <Term id="flow.ssl-client-compression-method">
+      <Type>uint8</Type>
+      <Comment>one id from a client's list of compression methods</Comment>
+    </Term>
+    <Term id="flow.ssl-cipher-suite-id">
+      <Type>uint32</Type>
+      <Comment>id of cipher suite</Comment>
+    </Term>
+    <Term id="flow.ssl-cipher-suite-name">
+      <Type>shortstring</Type>
+      <Comment>name of cipher suite</Comment>
+    </Term>
+    <Term id="flow.ssl-compression-method">
+      <Type>uint8</Type>
+      <Comment>id of SSL compression method</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-md5">
+      <Type>shortstring</Type>
+      <Comment>md5 of SSL certificate</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-sha1">
+      <Type>shortstring</Type>
+      <Comment>sha1 of SSL certificate</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-sha256">
+      <Type>shortstring</Type>
+      <Comment>sha256 of SSL certificate</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-subject">
+      <Type>shortstring</Type>
+      <Comment>Subject in SSL certificate</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-issuer">
+      <Type>shortstring</Type>
+      <Comment>Issuer in SSL certificate</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-serialnumber">
+      <Type>shortstring</Type>
+      <Comment>Serial number of SSL certificate</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-validity-not-after">
+      <Type>shortstring</Type>
+      <Comment>SSL certificate's validity end date</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-validity-not-before">
+      <Type>shortstring</Type>
+      <Comment>SSL certificate's validity start date</Comment>
+    </Term>
+    <Term id="flow.ssl-session-id">
+      <Type>shortstring</Type>
+      <Comment>SSL session id</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-signature-algorithm">
+      <Type>shortstring</Type>
+      <Comment>Signature algorithm in SSL certificate</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-public-key-algorithm">
+      <Type>shortstring</Type>
+      <Comment>Public key algorithm in SSL certificate</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-public-key-bit-length">
+      <Type>int32</Type>
+      <Comment>Public key bit length</Comment>
+    </Term>
+    <Term id="flow.ssl-cert-self-signed">
+      <Type>int8</Type>
+      <Comment>Self signed certificate</Comment>
+    </Term>
+    <Term id="flow.flow-id">
+      <Type>shortstring</Type>
+      <Comment>Unique Id for a flow</Comment>
+    </Term>
+    <Term id="flow.event-name">
+      <Type>shortstring</Type>
+      <Comment>Name of an event</Comment>
+    </Term>
+    <Term id="flow.ipv6-flow-label">
+        <Type>uint32</Type>
+        <Comment>The value of the IPv6 Flow Label field in the IP packet header</Comment>
+    </Term>
+    <Term id="flow.direction">
+        <Type>uint8</Type>
+        <Comment>The direction of the Flow</Comment>
+    </Term>
+    <Term id="flow.ipv6-ext-headers">
+        <Type>uint32</Type>
+        <Comment>IPv6 extension headers observed in packets of this Flow</Comment>
+    </Term>
+    <Term id="flow.protocol-stack">
+      <Type>shortstring</Type>
+      <Comment>Protocol stack of a flow</Comment>
+    </Term>
+    <Term id="flow.end-reason">
+        <Type>uint8</Type>
+        <Comment>The reason for flow termination</Comment>
+    </Term>
+    <Term id="flow.file-server-id">
+      <Type>shortstring</Type>
+      <Comment>File server Id</Comment>
+    </Term>
+    <Term id="flow.capture-bucket-date">
+      <Type>shortstring</Type>
+      <Comment>Capture bucket date for folder name to save files</Comment>
+    </Term>
+    <Term id="flow.extracted-file-name">
+        <Type>shortstring</Type>
+        <Comment>File name of extracted content(set only when extracted file is saved on to a file system)</Comment>
+    </Term>
+    <Term id="flow.request-extracted-file">
+        <Type>blob</Type>
+        <Comment>Internal term used for storing client to server extracted files</Comment>
+    </Term>
+    <Term id="flow.response-extracted-file">
+        <Type>blob</Type>
+        <Comment>Internal term used for storing server to client extracted files</Comment>
+    </Term>
+    <Term id="flow.initial-tcp-rtt">
+        <Type>uint32</Type>
+        <Comment>Initial TCP connection round-trip time; TCP connection setup time</Comment>
+    </Term>
+    <Term id="flow.vxlan-id">
+        <Type>uint32</Type>
+        <Comment>VXLAN Network identifier</Comment>
+    </Term>
+    <Term id="flow.vlan-tags">
+        <Type>uint16</Type>
+        <Comment>VLAN Tags </Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

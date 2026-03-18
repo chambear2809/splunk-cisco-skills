@@ -137,15 +137,17 @@ install_apps() {
 
 create_indexes() {
     log "=== Creating Indexes ==="
-    _get_session_key || exit 1
+    if ! is_splunk_cloud; then
+        _get_session_key || exit 1
+    fi
 
-    if rest_create_index "${SK}" "${SPLUNK_URI}" "netflow" "512000"; then
+    if platform_create_index "${SK}" "${SPLUNK_URI}" "netflow" "512000"; then
         log "  Index 'netflow' created or already exists."
     else
         log "  ERROR: Failed to create index 'netflow'."
         exit 1
     fi
-    if rest_create_index "${SK}" "${SPLUNK_URI}" "stream" "512000"; then
+    if platform_create_index "${SK}" "${SPLUNK_URI}" "stream" "512000"; then
         log "  Index 'stream' created or already exists."
     else
         log "  ERROR: Failed to create index 'stream'."
@@ -199,26 +201,51 @@ configure_streamfwd() {
     log "Stream forwarder configuration complete."
 }
 
+stream_cloud_guard() {
+    if ! is_splunk_cloud; then
+        return 0
+    fi
+
+    log "ERROR: Splunk Stream on Splunk Cloud is a hybrid deployment."
+    log "The cloud search-tier app is managed on the Splunk Cloud stack, while Splunk_TA_stream runs on forwarders under your control."
+    log "This script's --install and --configure-streamfwd actions assume a single target and are not safe in cloud mode."
+    log "Use --indexes-only against the Splunk Cloud stack, and run forwarder-side Stream configuration against the forwarder management endpoint."
+    log "If your credentials file contains both Cloud and forwarder targets, interactive runs will prompt when needed. For non-interactive runs, use SPLUNK_PLATFORM=enterprise as an override."
+    exit 1
+}
+
 main() {
+    if is_splunk_cloud; then
+        if $INSTALL || $CONFIGURE_STREAMFWD || $FULL_SETUP; then
+            stream_cloud_guard
+        fi
+    fi
+
+    if is_splunk_cloud && $INDEXES_ONLY; then
+        create_indexes
+        log "$(log_platform_restart_guidance "index changes")"
+        exit 0
+    fi
+
     if ! check_connectivity; then
         exit 1
     fi
 
     if $INDEXES_ONLY; then
         create_indexes
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "index changes")"
         exit 0
     fi
 
     if $INSTALL; then
         install_apps
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "app changes")"
         exit 0
     fi
 
     if $CONFIGURE_STREAMFWD; then
         configure_streamfwd
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "stream forwarder changes")"
         exit 0
     fi
 
@@ -228,7 +255,7 @@ main() {
         configure_streamfwd
         log ""
         log "=== Full setup complete ==="
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "app or index changes")"
         log "Then enable protocol streams with configure_streams.sh."
     fi
 }

@@ -1,0 +1,21 @@
+<form version="1.1">
+  <label>Local Users</label>
+  <description></description>
+  <row>
+    <panel>
+      <table>
+        <title>User Details (Host: $display_apic_host$)</title>
+        <search>
+          <query>| tstats `summariesonly` latest(classInfo.firstName) AS "First Name" latest(classInfo.lastName) AS "Last Name" latest(classInfo.email) AS "Email-Id" latest(classInfo.unixUserId) AS UnixUserId latest(classInfo.accountStatus) AS "Account Status" latest(classInfo.pwdLifeTime) AS "Password Life Time" latest(classInfo.expiration) AS Expiration from datamodel=Cisco_DCN_Systems where classInfo.component=aaaUser groupby classInfo.name, classInfo.apic_host | rename classInfo.apic_host as apic_host | search $formed_apic_host$ | rename classInfo.name AS User | fields - apic_host</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+</form>

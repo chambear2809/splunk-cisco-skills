@@ -1,0 +1,30 @@
+<div class="filters-step">
+    <div class="step-subheading">
+        <%- stepTitle %>
+        <div class="step-subsubheading">
+            <p>
+            Define field-specific filters for event data in this stream. 
+            </p><p>
+            For example, for the field http_method, define a filter to include only those events which contain the substring GET.
+            </p>
+        </div>
+        <button class="btn btn-primary create-filter">Create New Filter</button>
+    </div>
+    <div class="table-controls">
+        <div class="filter-count">
+            <%- filters.comparisons.length%> filters created</div>
+        <div class="search filter-search-control">
+            <input type="text" class="input-medium search-query" value="<%-searchString%>" placeholder="Search" />
+            <a class="clear"><i class="icon-x-circle"></i></a>
+        </div>
+        <div class="match-all-comps">
+            <span>Match Filters:</span>
+            <div class="btn-group btn-group-radio btn-toggle match-all-comparisons-group">
+                <button type="button" class="btn btn-small match-all-enabled <% if (filters.matchAllComparisons) { %> active <% } %>">All</button>
+                <button type="button" class="btn btn-small match-all-disabled <% if (!filters.matchAllComparisons) { %> active <% } %>">Any</button>
+            </div>
+        </div>
+    </div>
+    <table class="filter-list" />
+    <div class="modal" role="dialog" aria-labelledby="myLargeModalLabel"></div>
+</div>

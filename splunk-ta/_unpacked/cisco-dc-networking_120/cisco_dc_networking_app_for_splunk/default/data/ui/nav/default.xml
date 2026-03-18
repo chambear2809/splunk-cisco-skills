@@ -1,0 +1,77 @@
+<?xml version="1.0" ?>
+<nav>
+    <view name="inputs"/>
+    <view name="configuration" default="true"/>
+    <collection label="ND">
+      <view name="anomalies" />
+      <view name="advisories" />
+      <collection label="Flows">
+        <view name="nd_flow_overview" />
+        <view name="nd_flow_search" />
+        <view name="nd_flow_traffic" />
+      </collection>
+      <view name="nd_interface_stats" />
+      <view name="nd_congestion" />
+      <view name="nd_endpoints" />
+      <collection label="Orchestrator">
+        <view name="mso_overview"/>
+        <view name="sites"/>
+        <view name="schemas"/>
+        <view name="tenants"/>
+        <view name="users"/>
+        <view name="policy"/>
+      </collection>
+      <collection label="Syslog">
+        <view name="nd_syslog"/>
+        <view name="mso_syslog"/>
+      </collection>
+    </collection>
+    <collection label="ACI">
+      <view name="home_page" />
+      <collection label="Help Desk">
+        <view name="help_desk" />
+        <view name="events" />
+        <view name="tenant_counters"/>
+        <view name="path_degrade"/>
+        <view name="acl_logs"/>
+        <view name="threshold"/>
+      </collection>
+      <collection label="Fabric">  
+        <view name="fabric_dashboard" />
+        <view name="authentication" />
+        <view name="multi-pod" />
+        <view name="fabric_extenders_detail"/>
+        <view name="controller_statistics"/>     
+      </collection>
+      <view name="fabric_temp" />
+      <collection label="Tenants">
+        <view name="tenant_dashboard" />
+        <view name="tenant_utilization"/>
+        <view name="micro_segmentation"/>
+      </collection>
+      <collection label="VM Manager">
+        <view name="vmware" />
+      </collection>
+      <view name="aci_syslog" />
+    </collection>
+    <collection label="Nexus 9K">
+      <view name="home" />
+      <collection label="Inventory">
+          <view name="inventory" />
+          <view name="resource_summary" />
+          <view name="networktopology"/>
+      </collection>
+          <view name="nexus9k_power_details" />
+      <collection label="Performance">
+          <view name="interfaces" />
+          <view name="single_interface"/>
+      </collection>
+      <collection label="Switching">
+          <view name="cdp_neighbor" />
+      </collection>
+          <view name="temperature" />
+          <view name="auditing" />
+          <view name="n9k_syslog" />
+    </collection>
+    <view name="search"/>
+</nav>

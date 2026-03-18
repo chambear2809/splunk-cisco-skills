@@ -1,0 +1,242 @@
+<form version="1.1">
+  <label>Orchestrator Overview</label>
+  <search id="base_search_sitehealth">
+    <query>
+      eventtype="cisco_dc_nd_mso" mso_api_endpoint=siteHealth mso_host=$mso_token$ | table *
+    </query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <search id="base_search_schemadetails">
+    <query>
+      eventtype="cisco_dc_nd_mso" mso_api_endpoint=schemaDetails mso_host=$mso_token$ | table *
+    </query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <fieldset submitButton="false">
+    <input type="time" token="time_token" searchWhenChanged="true">
+      <label>Time Range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="mso_token" searchWhenChanged="true">
+      <label>Nexus Dashboard</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>eventtype="cisco_dc_nd_mso" |stats count by mso_host</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row rejects="$mso_token$">
+      <panel>
+      <html>
+       <p><i>Data is not available in selected time range or Orchestrator data collection is not configured. Try expanding the time range or configure the account: <a href="/app/cisco_dc_networking_app_for_splunk/configuration" target="_blank">Configuration Page</a></i></p>
+     </html>
+    </panel>
+  </row>
+  <row depends="$mso_token$">
+    <panel>
+      <chart>
+        <title>Sites Health</title>
+        <search base="base_search_sitehealth">
+          <query>| dedup mso_site_id | fillnull value="Not Available" health_score | table name health_score | rename name as "Site Name", health_score as "Health Score"</query>
+        </search>
+        <option name="charting.axisTitleX.text">Site</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Health</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+      </chart>
+      <single>
+        <title>Critical Faults</title>
+        <search base="base_search_sitehealth">
+          <query> | dedup mso_site_id |eval faults=mvzip(faults_type,faults_count)| mvexpand faults|eval faults=split(faults,",") |table faults| eval fault_type=mvindex(faults,0)|eval fault_count=mvindex(faults,1) |search fault_type="critical"|stats sum(fault_count)</query>
+        </search>
+        <option name="colorMode">none</option>
+        <option name="drilldown">all</option>
+        <option name="rangeColors">["0xdc4e41"]</option>
+        <option name="rangeValues">[10000000000000000]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.size">medium</option>
+        <option name="trellis.splitBy">faults_type</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/help_desk?form.mso_host=$mso_token$&amp;form.apic_host=all&amp;form.multiTokenQuery=critical&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$</link>
+        </drilldown>
+      </single>
+      <single>
+        <title>Major Faults</title>
+        <search base="base_search_sitehealth">
+          <query>|dedup mso_site_id | eval faults=mvzip(faults_type,faults_count)| mvexpand faults|eval faults=split(faults,",") |table faults| eval fault_type=mvindex(faults,0)|eval fault_count=mvindex(faults,1) |search fault_type="major"|stats sum(fault_count)</query>
+        </search>
+        <option name="colorMode">none</option>
+        <option name="rangeColors">["0xf1813f"]</option>
+        <option name="rangeValues">[10000000000000000]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.splitBy">faults_type</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/help_desk?form.mso_host=$mso_token$&amp;form.apic_host=all&amp;form.multiTokenQuery=major&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$</link>
+        </drilldown>
+      </single>
+      <single>
+        <title>Warning Faults</title>
+        <search base="base_search_sitehealth">
+          <query>|dedup mso_site_id | eval faults=mvzip(faults_type,faults_count)| mvexpand faults|eval faults=split(faults,",") |table faults| eval fault_type=mvindex(faults,0)|eval fault_count=mvindex(faults,1) |search fault_type="warning"|stats sum(fault_count)</query>
+        </search>
+        <option name="colorMode">none</option>
+        <option name="rangeColors">["0xf8be34"]</option>
+        <option name="rangeValues">[10000000000000000]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.splitBy">faults_type</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">1</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/help_desk?form.mso_host=$mso_token$&amp;form.apic_host=all&amp;form.multiTokenQuery=warning&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <map>
+        <title>Site Location</title>
+        <search base="base_search_sitehealth">
+          <query>|dedup mso_site_id |geostats latfield=location_lat longfield=location_long count | rename count as Count, latitude as Latitude, longitude as Longitude</query>
+        </search>
+        <!-- use custom colors -->
+        <!-- adjust marker opacity and size range -->
+        <!-- set initial map center and zoom level -->
+        <option name="height">500</option>
+        <option name="mapping.map.center">(30.810646,-10.556976)</option>
+        <option name="mapping.map.zoom">2</option>
+        <option name="mapping.markerLayer.markerMaxSize">60</option>
+        <option name="mapping.markerLayer.markerMinSize">10</option>
+        <option name="mapping.markerLayer.markerOpacity">0.8</option>
+        <option name="mapping.seriesColors">[0x5379af,0x9ac23c,0xf7902b,0x956d95,0x6ab7c7,0xd85d3c,0xfac51c,0xdd86af]</option>
+        <option name="refresh.display">progressbar</option>
+      </map>
+    </panel>
+  </row>
+  <row depends="$mso_token$">
+    <panel>
+      <single>
+        <title>Sites Count</title>
+        <search base="base_search_sitehealth">
+          <query>|stats dc(mso_site_id)</query>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/sites?form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.mso_host_token=$mso_token$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Schema Count</title>
+        <search base="base_search_schemadetails">
+          <query>| stats dc(id)</query>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/schemas?form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.mso_hostname_token=$mso_token$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Tenant Count</title>
+        <search>
+          <query>eventtype="cisco_dc_nd_mso" "mso_api_endpoint=tenantDetails" mso_host=$mso_token$|stats dc(name)</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/tenants?form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.mso_token=$mso_token$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>User Count</title>
+        <search>
+          <query>eventtype="cisco_dc_nd_mso" mso_api_endpoint=userDetails mso_host=$mso_token$| stats dc(id)</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/users?form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.mso_token=$mso_token$</link>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+  <row depends="$mso_token$">
+    <panel>
+      <single>
+        <title>Policy Count</title>
+        <search>
+          <query>eventtype="cisco_dc_nd_mso" mso_api_endpoint=policyDetails mso_host=$mso_token$| stats dc(id)</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/policy?form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.mso_token=$mso_token$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>EPGs Count</title>
+        <search base="base_search_schemadetails">
+          <query>|eval epg=mvappend(templates_anps_epgs_displayName,templates_externalEpgs_name) | mvexpand epg|stats dc(epg)</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>VRFs Count</title>
+        <search base="base_search_schemadetails">
+          <query>|stats dc(templates_vrfs_name)</query>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+  </row>
+</form>

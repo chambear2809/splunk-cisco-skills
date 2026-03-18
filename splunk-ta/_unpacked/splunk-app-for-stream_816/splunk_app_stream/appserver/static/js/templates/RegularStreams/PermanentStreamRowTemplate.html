@@ -1,0 +1,99 @@
+<script id="permanent-stream-table-row-template" type="text/template">
+
+       <!-- Checkbox -->
+       <td>
+        <% if (stream.app === 'Stream') { %>
+          <span ><input type="checkbox" class="stream-select regular-checkbox"></span>
+        <% } %>
+       </td>
+
+       <!-- Name -->
+       <td class="no-wrap">
+           <a class="stream-id" data-id="<%-stream.id%>"> <%- stream.id %> </a>
+       </td>
+
+       <!-- Actions -->
+       <td class="streams-action-column no-wrap" data-id="<%-stream.id%>">
+           <% if (stream.app === 'Stream') {%>
+             <div class="stream-edit btn-combo">
+
+                 <a class="dropdown-toggle btn-pill edit" href="#">Edit <span class="icon-chevron-down"></span></a>
+
+                 <div class="dropdown-menu dropdown-menu-narrow">
+                     <div class="arrow"></div>
+                     <ul>
+
+                         <!-- Edit -->
+                         <li><a href="#" class="edit-stream">Edit</a></li>
+
+                         <!-- Clone -->
+                         <li><a href="#" class="stream-clone">Clone</a></li>
+
+                         <!-- Delete -->
+                         <li><a href="#" class="stream-delete">Delete</a></li>
+
+                     </ul>
+                 </div>
+             </div>
+           <% } else { %>
+              <div class="faded-msg">Read-Only</div>
+           <% } %>
+       </td>
+
+       <!-- Mode -->
+       <td class="stream-mode-td no-wrap" data-id="<%-stream.id%>">
+
+             <%
+                 var enabled = stream.enabled && !stream.statsOnly;
+                 var disabled = !stream.enabled;
+                 var statsOnly = stream.enabled && stream.statsOnly;
+                 var packetStream = _.has(stream, 'isPacketStream') && stream.isPacketStream === true;
+             %>
+             <span class="<% if (enabled) { %>enabled<% } else { %>disabled<% } %>">
+                 <a href="#" class="stream-enable">Enabled</a>
+             </span>
+             <% if (!packetStream) { %>
+             <span class="<% if (statsOnly) { %>enabled<% } else { %>disabled<% } %>">
+                 <a href="#" class="stream-stats-only">Estimate</a>
+             </span>
+             <% } %>
+             <span class="<% if (disabled) { %>enabled<% } else { %>disabled<% } %>">
+                 <a href="#" class="stream-disable">Disabled</a>
+             </span>
+
+       </td>
+
+       <!-- Protocol -->
+       <td class="no-wrap">
+        <span>
+          <%- stream.protocolName || "N/A" %>
+        </span>
+       </td>
+
+       <!-- Description -->
+       <td>
+           <p> <%- stream.name %> </p>
+       </td>
+
+       <!-- App -->
+       <td class="no-wrap">
+           <p><%- stream.app || "N/A" %></p>
+       </td>
+
+       <!-- Created By -->
+       <td class="no-wrap">
+           <p><%-stream.createdBy || "" %></p>
+       </td>
+
+       <!-- Sparkline -->
+       <td>
+           <% if(!stream.enabled) { %>
+               <p style="color: #bbb">Disabled</p>
+           <% } else { %>
+               <span class="loadingMsg">Loading....</span>
+               <span class="sparkline"></span>
+           <% } %>
+       </td>
+
+
+</script>

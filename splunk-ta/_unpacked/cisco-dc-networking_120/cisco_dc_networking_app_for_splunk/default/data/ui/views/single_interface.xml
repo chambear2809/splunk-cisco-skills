@@ -1,0 +1,132 @@
+<form version="1.1">
+  <label>Single interface details</label>
+  <search id="baseSearch">
+    <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxinterface | lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | stats values(eth_inpkts) AS "Total Input Packets" values(eth_inmcast) AS "Input Multicast Packets" values(eth_inucast) AS "Input Unicast Packets" values(eth_inbcast) AS "Input Broadcast Packets" values(eth_inerr) as "Input Error Packets" values(eth_indiscard) as "Input Discard Packets" values(eth_inrate1_pkts) as "Input Rate" values(eth_outpkts) AS "Total Output Packets" values(eth_outmcast) AS "Output Multicast Packets" values(eth_outucast) AS "Output Unicast Packets" values(eth_outbcast) AS "Output Broadcast Packets" values(eth_outerr) as "Output Error Packets" values(eth_outdiscard) as "Output Discard Packets" values(eth_outrate1_pkts) as "Output Rate" by _time,device,interface | rename device as Device interface as Interface | search Device=$device$ Interface=$interface$</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Range</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="device" searchWhenChanged="true">
+      <label>Device</label>
+      <selectFirstChoice>true</selectFirstChoice>
+       <search>
+         <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k | lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | eval hostAndHostname = hostname."(".device.")" | stats values(device) as Device by hostAndHostname | fields hostAndHostname Device | sort 0 hostAndHostname</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+         <fieldForLabel>hostAndHostname</fieldForLabel>
+         <fieldForValue>Device</fieldForValue>  
+    </input>
+    <input type="dropdown" token="new_mod" searchWhenChanged="true">
+      <label>Linecard</label>
+      <search>
+        <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxinventory | lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval Hostname = coalesce(hostname1, hostname2) | eval eval_ethernet_module=mvfilter(match(modtype, "Ethernet")) | search device = $device$ | stats count  by device,modinf,eval_ethernet_module | rename device AS Device |fields - count | sort 0 modinf | eval new_mod = "Slot".modinf | dedup new_mod | table new_mod</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>new_mod</fieldForLabel>
+      <fieldForValue>new_mod</fieldForValue>
+    </input>
+    <input type="dropdown" token="interface" searchWhenChanged="true">
+      <label>Interface</label>
+      <search>
+        <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxinterface  device = $device$  | stats count by interface,eval_interface | rename interface as Interface  | eval slot=replace("$new_mod$","Slot(\d+)","Ethernet\1")  | where eval_interface=slot | table Interface</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>interface</fieldForLabel>
+      <fieldForValue>Interface</fieldForValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+    <chart>
+      <title>Input Packets History</title>
+      <search base="baseSearch">
+        <query>| timechart avg(Input Multicast Packets) AS "Multicast Packets" avg(Input Unicast Packets) AS "Unicast Packets" avg(Input Broadcast Packets) AS "Broadcast Packets" avg(Input Error Packets) AS "Error Packets" avg(Input Discard Packets) AS "Discard Packets"</query>
+      </search>
+      <option name="charting.axisTitleX.text">Time</option>
+      <option name="charting.axisTitleX.visibility">visible</option>
+      <option name="charting.axisTitleY.visibility">visible</option>
+      <option name="charting.axisTitleY.text">Packets</option>
+      <option name="charting.axisX.scale">linear</option>
+      <option name="charting.axisY.scale">linear</option>
+      <option name="charting.chart">column</option>
+      <option name="charting.chart.stackMode">stacked</option>
+      <option name="charting.legend.placement">right</option>
+     </chart>
+    </panel>
+    <panel>
+    <chart>
+      <title>Input Packet Rate (Packets Per Second) History</title>
+       <search base="baseSearch">
+         <query>| timechart  avg(Input Rate) AS "Input Rate"</query>
+      </search>
+      <option name="charting.axisTitleX.text">Time</option>
+      <option name="charting.axisY.scale">linear</option>
+      <option name="charting.axisX.scale">linear</option>
+      <option name="charting.axisTitleY.text">Input rate</option>
+      <option name="charting.legend.placement">right</option>
+      <option name="charting.legend.labelStyle.overflowMode">ellipsisEnd</option>
+      <option name="charting.chart.stackMode">default</option>
+      <option name="charting.chart.nullValueMode">connect</option>
+      <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+      <option name="charting.chart.style">shiny</option>
+      <option name="charting.axisTitleX.visibility">visible</option>
+      <option name="charting.axisTitleY.visibility">visible</option>
+      <option name="charting.chart">line</option>
+      <option name="charting.layout.splitSeries">0</option>
+    </chart>
+    </panel>
+  </row>
+  <row>
+   <panel>
+    <chart>
+      <title>Output Packets Summary</title>
+      <search base="baseSearch">
+        <query>|timechart avg(Output Multicast Packets) AS "Multicast Packets" avg(Output Unicast Packets) AS "Unicast Packets" avg(Output Broadcast Packets) AS "Broadcast Packets" avg(Output Error Packets) AS "Error Packets" avg(Output Discard Packets) AS "Discard Packets"</query>
+      </search>
+      <option name="charting.axisTitleX.text">Time</option>
+      <option name="charting.axisTitleY.text">Packets</option>
+      <option name="charting.axisTitleX.visibility">visible</option>
+      <option name="charting.axisTitleY.visibility">visible</option>
+      <option name="charting.axisX.scale">linear</option>
+      <option name="charting.axisY.scale">linear</option>
+      <option name="charting.chart">column</option>
+      <option name="charting.chart.stackMode">stacked</option>
+      <option name="charting.legend.placement">right</option>
+    </chart>
+   </panel>
+   <panel>
+    <chart>
+      <title>Output Packet Rate (Packets Per Second) History</title>
+      <search base="baseSearch">
+          <query>| timechart avg(Output Rate) AS "Output Rate"</query>
+      </search>
+      <option name="charting.axisTitleX.text">Time</option>
+      <option name="charting.axisY.scale">linear</option>
+      <option name="charting.axisX.scale">linear</option>
+      <option name="charting.axisTitleY.text">Output rate</option>
+      <option name="charting.legend.placement">right</option>
+      <option name="charting.legend.labelStyle.overflowMode">ellipsisEnd</option>
+      <option name="charting.chart.stackMode">default</option>
+      <option name="charting.chart.nullValueMode">connect</option>
+      <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+      <option name="charting.chart.style">shiny</option>
+      <option name="charting.axisTitleX.visibility">visible</option>
+      <option name="charting.axisTitleY.visibility">visible</option>
+      <option name="charting.chart">line</option>
+      <option name="charting.layout.splitSeries">0</option>
+     </chart>
+    </panel>
+  </row>
+</form>

@@ -1,0 +1,43 @@
+<script id="confirm-dialog-template" type="text/template">
+    <div class="modal-dialog modal-lg" id="datepickerModal">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h4 class="modal-title"> Modify Group: <%- groupName %> </h4>
+            </div>
+
+            <div class="modal-body">
+
+                 <div class="container-fluid">
+
+                    <div class="row-fluid">
+                       <div class="span4">Start Time:</div>  
+                       <div class="span4"><%- startTimeDate %></div>
+                       <div class="span4"><%- startTimeTime %></div>
+                    </div> 
+
+                    <div class="row-fluid">
+                       <div class="span4"> New End Time: </div>
+                       <div class="span4"> 
+                            <input type="text" id="date-picker" class="dateTimeInput" placeholder= <%- endTimeDate %> >
+                            <span id="hhmmss-subtext">Month/Day/Year</span>
+                       </div>
+                       <div class="span4">
+                            <input type="text" id="time" class="dateTimeInput" placeholder= <%- endTimeTime %>>
+                            <span id="hhmmss-subtext">HH:MM:SS (24hr)</span>
+                        </div>
+                    </div>
+
+                 </div>
+
+            </div><!-- end modal body -->
+
+            <div class="modal-footer">
+              <a href="#" data-dismiss="modal" aria-hidden="true" class="btn secondary cancel">Cancel</a>
+              <span id="warning" style="color: #d85d3c">please choose a date and time</span>
+              <a href="#" id="btnYes" class="btn btn-primary apply" disabled="disabled">Apply</a>
+            </div>
+
+        </div>
+    </div>
+</script>

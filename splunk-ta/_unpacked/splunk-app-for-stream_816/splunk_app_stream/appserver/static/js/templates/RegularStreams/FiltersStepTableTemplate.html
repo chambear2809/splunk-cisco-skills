@@ -1,0 +1,45 @@
+<script type="text/template">
+    <table class="filter-list table table-chrome table-hover">
+        <thead>
+            <tr>
+                <th width="8%">Field Name</th>
+                <th width="12%">Comparison</th>
+                <th width="55%">Value</th>
+                <th width="20%">Match All</th>
+                <th width="5%">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% var regex = new RegExp(searchString, "i"); %>
+            <% for (var i = 0; i < filters.comparisons.length; i++) { %>
+                <% var filter = filters.comparisons[i]; %>
+                <% var fieldName = fieldNamesByTerm[filter.term]; %>
+                <% var comparisonDescription = comparisonTypes.get(filter.type).get('description'); %>
+                <% if (regex.test(fieldName) || regex.test(comparisonDescription) || regex.test(filter.value)) { %>
+                    <tr data-index="<%= i %>">
+                        <td class="no-wrap"><%- fieldName %></td>
+                        <td><%- comparisonDescription %></td>
+                        <td><%- filter.value %></td>
+                        <td>
+                            <% if (filter.matchAllValues) { %> Yes <% } else { %> No <% } %>
+                        </td>
+                        <td>
+                            <div class="filter-edit btn-combo">
+                                <a class="dropdown-toggle btn-pill" href="#">
+                                    Edit <span class="icon-chevron-down"></span>
+                                </a>
+                                <div class="dropdown-menu dropdown-menu-narrow">
+                                    <div class="arrow"></div>
+                                    <ul>
+                                        <li><a class="edit">Edit</a></li>
+                                        <li><a class="delete">Delete</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                <% } %>
+            <% } %>
+        </tbody>
+    </table>
+</script>

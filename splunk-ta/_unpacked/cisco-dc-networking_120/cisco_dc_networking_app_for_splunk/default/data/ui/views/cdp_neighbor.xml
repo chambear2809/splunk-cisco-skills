@@ -1,0 +1,38 @@
+<form version="1.1" script="multiselect.js">
+  <label>CDP neighbor</label>
+  
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Range</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+   <input type="multiselect" token="multiTokenQuery" searchWhenChanged="true">
+        <default>*</default>
+        <label>Local Device</label>
+        <delimiter> OR Device=</delimiter>
+        <choice value="*">All</choice>
+         <search>
+         <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k | lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | eval hostAndHostname = hostname."(".device.")" | stats values(device) as Device by hostAndHostname | fields hostAndHostname Device | sort 0 hostAndHostname</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+          <fieldForLabel>hostAndHostname</fieldForLabel>
+          <fieldForValue>Device</fieldForValue>
+      </input>
+  </fieldset>
+  <row>
+    <panel>
+    <table>
+      <search>
+        <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxneighbor | lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | stats latest(hostname) as "Local Device-ID" values(v4mgmtaddr) as "Remote Device" values(device_id) as "Remote Device-ID" values(capability) as "Remote Device Capabilities" values(platform_id) as "Remote Device Platform" values(port_id) as port_id latest(ttl) as "Remote Device Holdtime(sec)" by device,intf_id | rename device as Device | search Device= $multiTokenQuery$ |rename Device as "Local Device" intf_id as "Remote Interface" port_id as "Local Interface"| fields "Local Device","Local Device-ID","Local Interface","Remote Device","Remote Device-ID","Remote Interface","Remote Device Platform","Remote Device Capabilities","Remote Device Holdtime(sec)"</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+       <option name="drilldown">none</option>
+    </table>
+  </panel>
+  </row>
+</form>

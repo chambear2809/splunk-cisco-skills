@@ -1,0 +1,11 @@
+.groups-step .controls {
+    padding-left: 20px;
+}
+
+.groups-step .controls .group {
+    margin-bottom: 10px;
+}
+
+.groups-step .controls .group .regular-checkbox {
+    margin-top: 0;
+}

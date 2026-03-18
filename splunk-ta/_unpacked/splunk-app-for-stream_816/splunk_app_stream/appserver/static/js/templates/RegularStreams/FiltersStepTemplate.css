@@ -1,0 +1,83 @@
+.filters-step .step-subheading {
+    position: relative;
+}
+
+.filters-step .step-subheading button {
+    position: absolute;
+    top: 30px;
+    right: 20px;
+}
+
+.filters-step .table-controls {
+    margin-top: -10px;
+    margin-bottom: 12px;
+    position: relative;
+    padding: 0 20px;
+}
+
+.filters-step .filter-count {
+    position: absolute;
+    top: 3px;
+    left: 20px;
+}
+
+.filters-step .search {
+    position: relative;
+    width: 175px;
+    margin: auto;
+}
+
+.filters-step .search input {
+    margin-bottom: 0;
+    height: 20px;
+    line-height: 20px;
+    padding: 0 10px;
+}
+
+.filters-step .search .clear {
+    position: absolute;
+    right: 8px;
+    top: 3px;
+    font-size: 18px;
+    color: #999999;
+}
+
+.filters-step .match-all-comps {
+    position: absolute;
+    top: 0;
+    right: 20px;
+}
+
+.filters-step table.filter-list td {
+    padding-bottom: 5px;
+    padding-top: 5px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+/*******************************/
+/* #single-filter-editor rules */
+/* TODO: Move these to a       */
+/* separate file?              */
+/*******************************/
+#single-filter-editor .modal-body {
+    height: 250px;
+    padding: 0; /* overriding .modal-body, since we already have enough padding here */
+    overflow-y: visible; /* so the dropdowns aren't constrained */
+}
+
+#single-filter-editor .row-fluid {
+    margin: 20px 0;
+}
+
+#single-filter-editor .control-label {
+    /* See /static/css/pages/dashboard-simple-bootstrap.min.css for default .control-label styling. */
+}
+
+#single-filter-editor .uneditable-input {
+    cursor: not-allowed;
+}
+
+#single-filter-editor .match-all-values .btn-group {
+    margin-top: -1px;
+}

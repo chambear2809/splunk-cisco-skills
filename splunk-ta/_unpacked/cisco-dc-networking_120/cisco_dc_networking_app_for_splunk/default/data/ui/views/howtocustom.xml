@@ -1,0 +1,74 @@
+<dashboard version="1.1">
+  <label>NX-API collector</label>
+  <row>
+    <panel>
+      <html>
+        <div class="container-fluid main-section-body">
+        <p>This app provides a generic NX-API collector which empowers users to make use of NX-API provided by Nexus 9k and periodically track certain data from 9k switch. It simply takes switch CLI and convert it into NX-API call and provide data which can be saved as a dashboard. </p>
+        <p>This app provides feature of Splunk custom search command. We have implemented Splunk custom search command called "ciscodcnxapicollect".</p>
+        <div class="dashboard-header clearfix">
+            <h2><b>HOW TO USE</b></h2>
+        </div>
+    
+        <p><b>Below are the steps to use the ciscodcnxapicollect command. Note that the output of custom search commands is not indexed by default.</b></p>
+        
+        <ol>
+          <li>Provide credentials on setup page of app.</li><br/>
+          <p><img width="80%" src="/static/app/cisco-app-Nexus-9k/img/s1.png"/></p><br/>
+          <br/>
+          <br/>
+      	  <li>
+          <p>Go to search option and enter your search in search bar.</p>
+          	<p>You have different option for custom search command:</p>
+          	<ul>
+          		<li>| ciscodcnxapicollect command="your cli"  ("your cli" will use rest endpoints to get credentials for switch)</li>
+          		<li>| ciscodcnxapicollect command="your cli" device="x.x.x.x" </li>
+          		<li>| ciscodcnxapicollect command="your cli" device="x.x.x.x" username="username" password="password"</li>
+          		<li>| ciscodcnxapicollect command="your cli" device="x.x.x.x,y.y.y.y"  (Make sure credentials for this devices are already provided through setup page) </li>
+          	</ul>
+          	<br/>
+          	<p>
+              <img src="/static/app/cisco-app-Nexus-9k/img/s2.png"/>
+            </p>
+        	</li>
+          <br/>
+          <br/>
+        	<li>
+            <p>Result of your search command</p>
+          	<p>
+              <img src="/static/app/cisco-app-Nexus-9k/img/s3.png"/>
+            </p>
+        	</li>
+          <br/>
+          <br/>
+        	<li>
+          	<p>Click on <b>Save As</b> and click on <b>Dashboard Panel</b> to store your result in dashboard.</p>
+          	<p>
+              <img src="/static/app/cisco-app-Nexus-9k/img/s4.png"/>
+            </p>
+        	</li>
+          <br/>
+          <br/>
+        	<li>
+          	<p>Enter <b>Dashboard Title</b>. You have to give <i>"report"</i> keyword in giving dashboard title.</p>
+          	<p>
+              <img src="/static/app/cisco-app-Nexus-9k/img/s5.png"/>
+            </p>
+        	</li>
+          <br/>
+          <br/>
+        	<li>
+        	<p>You can see your dashboard in <b>Custom reports</b>
+            </p>
+        	<p>
+            <img src="/static/app/cisco-app-Nexus-9k/img/s6.png"/>
+          </p>
+        	</li>
+        	<br/>
+          <br/>
+        </ol>
+        </div>
+    </html>
+    </panel>
+  </row>
+</dashboard>

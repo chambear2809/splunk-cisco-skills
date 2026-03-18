@@ -1,0 +1,147 @@
+<form script="path_degrad_highlighting.js" stylesheet="atomic_counter_decorations.css" version="1.1">
+  <label>Path Degradation</label>
+  
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-15m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+     <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+        </condition>
+      </change>
+    </input>
+    <input type="dropdown" token="src" searchWhenChanged="true">
+      <label>Source Node</label>
+      <choice value="*">All</choice>
+      <search>
+        <query>| tstats `summariesonly` values(classInfo.dn) AS dn from datamodel=Cisco_DCN_Counters where classInfo.component=dbgAcTrail groupby classInfo.Path_Degradation.srcNodeName,classInfo.apic_host | rename classInfo.Path_Degradation.srcNodeName AS srcNodeName, classInfo.apic_host AS apic_host | search $formed_apic_host$ | dedup srcNodeName | table srcNodeName</query>
+         <earliest>$time_token.earliest$</earliest>
+         <latest>$time_token.latest$</latest>
+      </search>
+     
+      <fieldForLabel>srcNodeName</fieldForLabel>
+      <fieldForValue>srcNodeName</fieldForValue>
+      <default>*</default>
+    </input>
+    <input type="dropdown" token="dst" searchWhenChanged="true">
+      <label>Destination Node</label>
+      <choice value="*">All</choice>
+      <search>
+        <query>| tstats `summariesonly` values(classInfo.dn) AS dn from datamodel=Cisco_DCN_Counters where classInfo.component=dbgAcTrail groupby classInfo.Path_Degradation.dstNodeName,classInfo.apic_host | rename classInfo.Path_Degradation.dstNodeName AS dstNodeName, classInfo.apic_host AS apic_host | search $formed_apic_host$| dedup dstNodeName | table dstNodeName</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      
+      <fieldForLabel>dstNodeName</fieldForLabel>
+      <fieldForValue>dstNodeName</fieldForValue>
+      <default>*</default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <html id="overview">
+      <h1>Dashboard Overview</h1>
+     <p>This dashboard provides information on Atomic Counters from Leaf to Leaf.<br/> This will be used to find out issues due to incorrect forwarding in a path of leaf to leaf which will be connected to each other through a transit Node Spine.</p>
+    </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table id="highlight">
+        <search>
+          <query>| tstats `summariesonly` values(classInfo.Path_Degradation.srcNodeName) AS "srcNode" values(classInfo.Path_Degradation.dstNodeName) AS "dstNode"  values(classInfo.Path_Degradation.trnstNodeName) AS "trnstNode" values(classInfo.seqNo) AS "seqNo"  values(classInfo.txPkt) AS "txPkt" values(classInfo.rxPkt) AS "rxPkt" values(classInfo.dropPkt) AS "dropPkt" values(classInfo.excessPkt) AS "excessPkt" values(classInfo.totTxPkt) AS "totTxPkt" values(classInfo.totRxPkt) AS "totRxPkt" values(classInfo.totDropPkt) AS "totDropPkt" values(classInfo.totExcessPkt) AS "totExcessPkt" values(classInfo.dropPktPercentage) AS "dropPktPercentage"   values(classInfo.excessPktPercentage) AS "excessPktPercentage" values(classInfo.totDropPktPercentage) AS "totDropPktPercentage" values(classInfo.totExcessPktPercentage) AS "totExcessPktPercentage"   from datamodel=Cisco_DCN_Counters where classInfo.component=dbgAcTrail  groupby _time,classInfo.dn,classInfo.apic_host | rename classInfo.dn AS dn, classInfo.apic_host AS apic_host | search $formed_apic_host$ | search srcNode=$src$ dstNode=$dst$  | table apic_host _time srcNode dstNode trnstNode totTxPkt totRxPkt totExcessPkt totDropPkt | rename apic_host AS "APIC Site/Cluster" totTxPkt AS "Total Transmitted Packets" totRxPkt AS "Total Received Packets" totExcessPkt AS "Total Excess Packets" totDropPkt AS "Total Dropped Packets" srcNode AS "Source Node Name" dstNode AS "Destination Node Name" trnstNode AS "Transit Node Name"| sort 0 _time | reverse</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="count">20</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</form>

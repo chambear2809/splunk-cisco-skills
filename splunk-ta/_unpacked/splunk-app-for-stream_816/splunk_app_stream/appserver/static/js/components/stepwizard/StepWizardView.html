@@ -1,0 +1,44 @@
+<% if(vars.label) { %>
+	<div class="wizard-label"><%- vars.label %></div>
+<% } %>
+<% vars._.each(vars.steps, function(step, i) { %>
+	<% var isFirst = (i === 0) %>
+	<% var isLast = (i === vars.steps.length - 1) %>
+	<div class="step-container <%- isLast ? 'last' : "" %> <%- isFirst ? 'first' : '' %>" data-value="<%- step.value %>">
+		<div class="step-indicator">
+			<div class="connector left">
+				<div></div>
+				<div></div>
+			</div>
+			<div class="circle">
+				<% if(isLast && (vars.operatingMode === "wizard")) { %>
+					<i class="finished-icon"></i>
+				<% } %>
+			</div>
+			<div class="connector right">
+				<div></div>
+				<div></div>
+			</div>
+		</div>
+		<div><span class="step-label"><%- step.label %></span></div>
+	</div>
+<% }) %>
+<div class="nav-buttons">
+	<a href="#" class="btn previous-button">
+		<i class="icon-chevron-left"></i>
+		<span class="button-text"></span>
+	</a> <a href="#" class="btn btn-primary next-button">
+		<span class="button-text"></span>
+		<i class="icon-chevron-right"></i>
+	</a> <a href="#" class="btn btn-primary save-button">
+		<span class="button-text"></span>
+	</a>
+	<% if(vars.exitButton) { %>
+		<a href="#" class="btn exit-button">
+			<i class="icon-x"></i>
+			<%- vars.inter.gettext("Exit") %>
+		</a>
+	<% } %>
+</div>
+<div class="flashmessages-header-placeholder"></div>
+<div class="clearfix"></div>

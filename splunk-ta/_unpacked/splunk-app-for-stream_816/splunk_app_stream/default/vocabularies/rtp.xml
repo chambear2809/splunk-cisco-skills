@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="rtp">
+    <Name>RTP Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="rtp.event">
+      <Type>object</Type>
+      <Comment>Event representing RTP</Comment>
+    </Term>
+    <Term id="rtp.lost">
+      <Type>uint8</Type>
+      <Comment>Counter of lost packets</Comment>
+    </Term>
+    <Term id="rtp.unseq">
+      <Type>uint32</Type>
+      <Comment>Contains the number of mis-ordered packets</Comment>
+    </Term>
+    <Term id="rtp.ssrc">
+      <Type>uint32</Type>
+      <Comment>Identity of the Synchronization source</Comment>
+    </Term>
+    <Term id="rtp.timestamp">
+      <Type>uint32</Type>
+      <Comment>RTP packet timestamp</Comment>
+    </Term>
+    <Term id="rtp.mos-session">
+      <Type>uint32</Type>
+      <Comment>Standard Mean Opinion Score voice quality indicator</Comment>
+    </Term>
+    <Term id="rtp.rfactor">
+      <Type>uint32</Type>
+      <Comment>Rfactor indicator value, following the E-model from ITU-T G.107 and G.107.1</Comment>
+    </Term>
+    <Term id="rtp.snumber">
+      <Type>uint16</Type>
+      <Comment>Sequence number of RTP packet</Comment>
+    </Term>
+    <Term id="rtp.codec-name">
+      <Type>shortstring</Type>
+      <Comment>Name of the codec (aka Payload type)</Comment>
+    </Term>
+    <Term id="rtp.payload-data">
+      <Type>blob</Type>
+      <Comment>A binary buffer containing the RTP data (without header)</Comment>
+    </Term>
+    <Term id="rtp.end-session">
+      <Type>uint8</Type>
+      <Comment>The end-session attribute is raised at the end of the RTP session</Comment>
+    </Term>
+    <Term id="rtp.codec-index">
+      <Type>uint8</Type>
+      <Comment>Number identifying the codec (aka Payload type)</Comment>
+    </Term>
+    <Term id="rtp.session-duration">
+      <Type>uint32</Type>
+      <Comment>Call setup duration (in microseconds)</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

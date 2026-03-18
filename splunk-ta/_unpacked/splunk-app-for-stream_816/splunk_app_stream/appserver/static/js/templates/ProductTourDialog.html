@@ -1,0 +1,28 @@
+<script type="text/template">
+    <div id="confirm-dialog-template" class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Welcome to Stream<% if (isCloudInstance) { %> on Splunk Cloud<% } %>!</h3>
+            </div>
+            <% if (!isCloudInstance) { %>
+                <div class="modal-body">
+                    Splunk App for Stream delivers real-time applications intelligence. It allows Splunk software to passively ingest streaming network data. The Splunk App for Stream provides pre-built dashboards that help you get operational visibility into applications performance, database activity and performance, troubleshoot security and operational issues using DNS analytics and more.
+                    <br><br>
+                    Would you like to take a tour of the features?
+                </div>
+            <% } else { %>
+                <div class="modal-body">
+                    Splunk App for Stream allows you to capture various network event data for a variety of network protocols, and some of the network data can include private information of you and your organization. Please note that by using Splunk App for Stream in connection with Splunk Cloud, you are transmitting such data outside of your firewall and into your Splunk Cloud instance, which is managed by Splunk.
+                    <br><br>
+                    If you are concerned about certain packet data being transmitted to and stored in the cloud, you can disable such collection by going to your configuration settings and modifying the fields for specific protocol attributes. To learn more about stream configuration, <a class="external" target="_blank" href="http://docs.splunk.com/Documentation/StreamApp/latest/User/ConfigureStreams">click here</a>
+                    <br><br>
+                    <input class="regular-checkbox" id="cloud-agreement-checkbox" type="checkbox" />I understand
+                </div>
+            <% } %>
+            <div class="modal-footer">
+              <button id="btnYes" class="btn btn-primary yes" <% if (isCloudInstance) { %>disabled<% } %>>Take a tour!</button>
+              <button id="btnSkip" class="btn secondary" <% if (isCloudInstance) { %>disabled<% } %>>Skip</button>
+            </div>
+        </div>
+    </div>
+</script>

@@ -1,0 +1,202 @@
+<form version="1.1" theme="light">
+  <label>Congestion</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-7d</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="counter_tkn" searchWhenChanged="true">
+      <label>Counter Name</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>counterName</fieldForLabel>
+      <fieldForValue>counterName</fieldForValue>
+      <search>
+        <query>| tstats `summariesonly` values(congestion.counterName) as counterName from datamodel=Cisco_DCN_nexus_dashboard.congestion | mvexpand counterName</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+    <input type="dropdown" token="host_tkn" searchWhenChanged="true">
+      <label>Host</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>nd_host</fieldForLabel>
+      <fieldForValue>nd_host</fieldForValue>
+      <search>
+        <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.nd_host, congestion.counterName 
+| rename congestion.* as * 
+| search counterName=$counter_tkn$ 
+| table nd_host
+| dedup nd_host</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+    <input type="dropdown" token="fabric_tkn" searchWhenChanged="true">
+      <label>Fabric Name</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>fabricName</fieldForLabel>
+      <fieldForValue>fabricName</fieldForValue>
+      <search>
+        <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.fabricName, congestion.counterName 
+| rename congestion.* as * 
+| search counterName=$counter_tkn$ 
+| table fabricName
+| dedup fabricName</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+    <input type="dropdown" token="switch_tkn" searchWhenChanged="true">
+      <label>Switch Name</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>switchName</fieldForLabel>
+      <fieldForValue>switchName</fieldForValue>
+      <search>
+        <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.switchName, congestion.counterName 
+| rename congestion.* as * 
+| search counterName=$counter_tkn$ 
+| table switchName
+| dedup switchName</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+    <input type="dropdown" token="interface_tkn" searchWhenChanged="true">
+      <label>Interface Name</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>interfaceName</fieldForLabel>
+      <fieldForValue>interfaceName</fieldForValue>
+      <search>
+        <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.interfaceName, congestion.counterName 
+| rename congestion.* as * 
+| search counterName=$counter_tkn$ 
+| table interfaceName
+| dedup interfaceName</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Congestion Value Over Time for $counter_tkn$</title>
+      <chart>
+        <search>
+          <query>| tstats `summariesonly` values(congestion.ts) as ts from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.ts, congestion.counterName, congestion.nd_host, congestion.fabricName, congestion.switchName, congestion.interfaceName, congestion.event_value
+| rename congestion.* as *
+| table counterName nd_host fabricName ts event_value switchName interfaceName
+| search counterName="$counter_tkn$" fabricName="$fabric_tkn$" nd_host="$host_tkn$" switchName="$switch_tkn$" interfaceName="$interface_tkn$"
+| rename ts as Timestamp
+| chart values(event_value) AS Value by Timestamp</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+          <sampleRatio>1</sampleRatio>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=%60cisco_dc_nd_index%60%20sourcetype%3D%22cisco%3Adc%3And%3Acongestion%22%20%0A%7C%20search%20ts%3D%22$click.value$%22%20counterName%3D%22$counter_tkn$%22%20fabricName%3D%22$fabric_tkn$%22%20nd_host%3D%22$host_tkn$%22%20switchName%3D%22$switch_tkn$%22%20interfaceName%3D%22$interface_tkn$%22&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Maximum Value Recorded</title>
+      <single>
+        <search>
+          <query>| tstats `summariesonly` values(congestion.ts) as ts from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.ts, congestion.counterName, congestion.nd_host, congestion.fabricName, congestion.switchName, congestion.interfaceName, congestion.event_value
+| rename congestion.* as *
+| table counterName nd_host fabricName ts event_value switchName interfaceName
+| search counterName="$counter_tkn$" fabricName="$fabric_tkn$" nd_host="$host_tkn$" switchName="$switch_tkn$" interfaceName="$interface_tkn$"
+| stats max(event_value)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">all</option>
+        <option name="rangeColors">["0x118832","0xcba700","0xdc4e41"]</option>
+        <option name="rangeValues">[10,20]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+        <drilldown>
+          <link target="_blank">search?q=%7C%20tstats%20%60summariesonly%60%20values(congestion.ts)%20as%20ts%20from%20datamodel%3DCisco_DCN_nexus_dashboard.congestion%20by%20congestion.ts%2C%20congestion.counterName%2C%20congestion.nd_host%2C%20congestion.fabricName%2C%20congestion.switchName%2C%20congestion.interfaceName%2C%20congestion.event_value%0A%7C%20rename%20congestion.*%20as%20*%0A%7C%20table%20counterName%20nd_host%20fabricName%20ts%20event_value%20switchName%20interfaceName%0A%7C%20search%20counterName%3D%22$counter_tkn$%22%20fabricName%3D%22$fabric_tkn$%22%20nd_host%3D%22$host_tkn$%22%20switchName%3D%22$switch_tkn$%22%20interfaceName%3D%22$interface_tkn$%22%0A%7C%20stats%20max(event_value)&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <title>Minimum Value Recorded</title>
+      <single>
+        <search>
+          <query>| tstats `summariesonly` values(congestion.ts) as ts from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.ts, congestion.counterName, congestion.nd_host, congestion.fabricName, congestion.switchName, congestion.interfaceName, congestion.event_value
+| rename congestion.* as *
+| table counterName nd_host fabricName ts event_value switchName interfaceName
+| search counterName="$counter_tkn$" fabricName="$fabric_tkn$" nd_host="$host_tkn$" switchName="$switch_tkn$" interfaceName="$interface_tkn$"
+| stats min(event_value)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">all</option>
+        <option name="rangeColors">["0x90EE90","0x118832","0xcba700","0xdc4e41"]</option>
+        <option name="rangeValues">[5,10,20]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+        <drilldown>
+          <link target="_blank">search?q=%7C%20tstats%20%60summariesonly%60%20values(congestion.ts)%20as%20ts%20from%20datamodel%3DCisco_DCN_nexus_dashboard.congestion%20by%20congestion.ts%2C%20congestion.counterName%2C%20congestion.nd_host%2C%20congestion.fabricName%2C%20congestion.switchName%2C%20congestion.interfaceName%2C%20congestion.event_value%0A%7C%20rename%20congestion.*%20as%20*%0A%7C%20table%20counterName%20nd_host%20fabricName%20ts%20event_value%20switchName%20interfaceName%0A%7C%20search%20counterName%3D%22$counter_tkn$%22%20fabricName%3D%22$fabric_tkn$%22%20nd_host%3D%22$host_tkn$%22%20switchName%3D%22$switch_tkn$%22%20interfaceName%3D%22$interface_tkn$%22%0A%7C%20stats%20min(event_value)&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <title>Average Value Recorded</title>
+      <single>
+        <search>
+          <query>| tstats `summariesonly` values(congestion.ts) as ts from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.ts, congestion.counterName, congestion.nd_host, congestion.fabricName, congestion.switchName, congestion.interfaceName, congestion.event_value
+| rename congestion.* as *
+| table counterName nd_host fabricName ts event_value switchName interfaceName
+| search counterName="$counter_tkn$" fabricName="$fabric_tkn$" nd_host="$host_tkn$" switchName="$switch_tkn$" interfaceName="$interface_tkn$"
+| stats avg(event_value)</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0.00</option>
+        <option name="rangeColors">["0x118832","0xcba700","0xdc4e41"]</option>
+        <option name="rangeValues">[10,20]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+        <drilldown>
+          <link target="_blank">search?q=%7C%20tstats%20%60summariesonly%60%20values(congestion.ts)%20as%20ts%20from%20datamodel%3DCisco_DCN_nexus_dashboard.congestion%20by%20congestion.ts%2C%20congestion.counterName%2C%20congestion.nd_host%2C%20congestion.fabricName%2C%20congestion.switchName%2C%20congestion.interfaceName%2C%20congestion.event_value%0A%7C%20rename%20congestion.*%20as%20*%0A%7C%20table%20counterName%20nd_host%20fabricName%20ts%20event_value%20switchName%20interfaceName%0A%7C%20search%20counterName%3D%22$counter_tkn$%22%20fabricName%3D%22$fabric_tkn$%22%20nd_host%3D%22$host_tkn$%22%20switchName%3D%22$switch_tkn$%22%20interfaceName%3D%22$interface_tkn$%22%0A%7C%20stats%20avg(event_value)&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Congestion Details for $counter_tkn$</title>
+      <table>
+        <search>
+          <query>| tstats `summariesonly` values(congestion.ts) as ts from datamodel=Cisco_DCN_nexus_dashboard.congestion by congestion.ts, congestion.counterName, congestion.nd_host, congestion.fabricName, congestion.switchName, congestion.interfaceName, congestion.event_value
+| rename congestion.* as *
+| table counterName nd_host fabricName ts event_value switchName interfaceName
+| search counterName="$counter_tkn$" fabricName="$fabric_tkn$" nd_host="$host_tkn$" switchName="$switch_tkn$" interfaceName="$interface_tkn$"
+| rename counterName as "Counter Name" nd_host as "Host" fabricName as "Fabric Name" ts as Timestamp event_value as "Value" switchName as "Switch Name" interfaceName as "Interface Name"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <set token="row_counter_name">$row.Counter Name$</set>
+          <link target="_blank">search?q=%60cisco_dc_nd_index%60%20sourcetype%3D%22cisco%3Adc%3And%3Acongestion%22%20counterName%3D%22$row_counter_name$%22%20nd_host%3D%22$row.Host$%22%20ts%3D%22$row.Timestamp$%22&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>

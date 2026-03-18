@@ -14,9 +14,11 @@ APP_URL=""
 APP_ID=""
 APP_VERSION=""
 APP_PACKAGE_NAME=""
+LICENSE_ACK_URL=""
 UPDATE=false
 UPDATE_SET=false
 RESTART_SPLUNK=true
+PRE_VETTED=false
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
@@ -69,9 +71,11 @@ while [[ $# -gt 0 ]]; do
         --url)          APP_URL="$2";      shift 2 ;;
         --app-id)       APP_ID="$2";       shift 2 ;;
         --app-version)  APP_VERSION="$2";  shift 2 ;;
+        --license-ack-url) LICENSE_ACK_URL="$2"; shift 2 ;;
         --update)       UPDATE=true;  UPDATE_SET=true;  shift ;;
         --no-update)    UPDATE=false; UPDATE_SET=true;  shift ;;
         --no-restart)   RESTART_SPLUNK=false; shift ;;
+        --pre-vetted)   PRE_VETTED=true; shift ;;
         --help)
             cat <<EOF
 Splunk App Installer (interactive)
@@ -87,13 +91,18 @@ Optional flags (skip the corresponding prompt):
   --url URL             Remote download URL
   --app-id ID           Splunkbase app ID
   --app-version VER     Splunkbase version
+  --license-ack-url URL Third-party Splunkbase license URL for ACS installs
   --update              Upgrade mode
   --no-update           Fresh install (skip upgrade prompt)
   --no-restart          Skip the automatic restart after install
+  --pre-vetted          Skip ACS app inspection for pre-vetted private apps
 
 Credentials and remote host settings are read from the project-root credentials file automatically.
-For remote local-package installs, the script tries REST upload first, then falls back
-to SSH staging using SPLUNK_SSH_HOST/SPLUNK_SSH_USER/SPLUNK_SSH_PASS.
+For Splunk Cloud installs, configure ACS access. If one credentials file contains
+both Cloud and Enterprise targets, interactive runs will prompt when needed, or
+you can override with SPLUNK_PLATFORM=cloud or SPLUNK_PLATFORM=enterprise.
+For remote Enterprise local-package installs, the script tries REST upload first,
+then falls back to SSH staging using SPLUNK_SSH_HOST/SPLUNK_SSH_USER/SPLUNK_SSH_PASS.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
 EOF
             exit 0 ;;
@@ -279,6 +288,177 @@ restart_splunk_or_exit() {
             exit 1
             ;;
     esac
+}
+
+cloud_wait_for_status() {
+    local timeout_secs="${1:-300}" interval_secs="${2:-5}"
+    local waited=0 status_json state
+
+    while (( waited < timeout_secs )); do
+        status_json=$(acs_command status current-stack 2>/dev/null || true)
+        state=$(printf '%s' "${status_json}" \
+            | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    infra = ((data.get('status') or {}).get('infrastructure') or {}).get('status', '')
+    restart_required = ((data.get('messages') or {}).get('restartRequired', False))
+    if restart_required:
+        print('restart-required')
+    else:
+        print(infra or 'unknown')
+except Exception:
+    print('unknown')
+")
+        case "${state}" in
+            Ready|restart-required)
+                return 0
+                ;;
+        esac
+        sleep "${interval_secs}"
+        waited=$((waited + interval_secs))
+    done
+
+    return 1
+}
+
+cloud_restart_or_exit() {
+    local operation="$1"
+
+    if ! "${RESTART_SPLUNK}"; then
+        log "Skipping Splunk Cloud restart check (--no-restart). Run 'acs status current-stack' and restart if required before using the updated app."
+        return 0
+    fi
+
+    if ! cloud_wait_for_status 300 5; then
+        log "WARNING: Timed out waiting for the Splunk Cloud stack to settle after ${operation}."
+    fi
+
+    if [[ "$(acs_restart_required 2>/dev/null || echo "false")" != "true" ]]; then
+        log "No Splunk Cloud restart required after ${operation}."
+        return 0
+    fi
+
+    log "Restarting Splunk Cloud search tier via ACS to complete ${operation}..."
+    if ! cloud_restart_if_required 900; then
+        log "ERROR: ACS restart failed or the stack did not return to Ready status."
+        exit 1
+    fi
+    log "SUCCESS: Splunk Cloud restart completed and the stack returned to Ready."
+}
+
+cloud_resolve_splunkbase_app_name() {
+    local splunkbase_id="$1"
+    acs_prepare_context || return 1
+    acs_command apps list --splunkbase --count 1000 2>/dev/null \
+        | python3 -c "
+import json, sys
+target = str(sys.argv[1])
+try:
+    data = json.load(sys.stdin)
+    for app in data.get('apps', []):
+        if str(app.get('splunkbaseID', '')) == target:
+            print(app.get('name', ''), end='')
+            break
+except Exception:
+    pass
+" "${splunkbase_id}"
+}
+
+cloud_install_private_app() {
+    local file_path="$1"
+    local -a cmd=(apps install private --acs-legal-ack Y --app-package "${file_path}")
+    local response app_name version status
+
+    acs_prepare_context || exit 1
+    ${PRE_VETTED} && cmd+=(--pre-vetted)
+    cloud_requires_local_scope && cmd+=(--scope local)
+
+    log "Installing private app package $(basename "${file_path}") to Splunk Cloud via ACS..."
+    response=$(acs_command "${cmd[@]}" 2>/dev/null) || {
+        log "ERROR: ACS private app install failed."
+        exit 1
+    }
+
+    read -r app_name version status <<< "$(printf '%s' "${response}" \
+        | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('name') or data.get('appID', ''), data.get('version', ''), data.get('status', ''))
+except Exception:
+    print('', '', '')
+")"
+
+    log "SUCCESS: Splunk Cloud installed private app '${app_name:-unknown}'${version:+ (version ${version})}${status:+ [${status}]}"
+}
+
+cloud_install_splunkbase_app() {
+    local -a cmd response_fields
+    local response app_name version status installed_name
+
+    acs_prepare_context || exit 1
+
+    if ${UPDATE}; then
+        installed_name="$(cloud_resolve_splunkbase_app_name "${APP_ID}" || true)"
+        if [[ -n "${installed_name}" ]]; then
+            cmd=(apps update "${installed_name}")
+            [[ -n "${APP_VERSION}" ]] && cmd+=(--version "${APP_VERSION}")
+            [[ -n "${LICENSE_ACK_URL}" ]] && cmd+=(--acs-licensing-ack "${LICENSE_ACK_URL}")
+            log "Updating Splunkbase app ${installed_name} (Splunkbase ID ${APP_ID}) via ACS..."
+        else
+            log "No installed Splunkbase app found for ID ${APP_ID}; performing a fresh install instead."
+            cmd=(apps install splunkbase --splunkbase-id "${APP_ID}")
+            [[ -n "${APP_VERSION}" ]] && cmd+=(--version "${APP_VERSION}")
+            [[ -n "${LICENSE_ACK_URL}" ]] && cmd+=(--acs-licensing-ack "${LICENSE_ACK_URL}")
+            cloud_requires_local_scope && cmd+=(--scope local)
+            log "Installing Splunkbase app ID ${APP_ID} via ACS..."
+        fi
+    else
+        cmd=(apps install splunkbase --splunkbase-id "${APP_ID}")
+        [[ -n "${APP_VERSION}" ]] && cmd+=(--version "${APP_VERSION}")
+        [[ -n "${LICENSE_ACK_URL}" ]] && cmd+=(--acs-licensing-ack "${LICENSE_ACK_URL}")
+        cloud_requires_local_scope && cmd+=(--scope local)
+        log "Installing Splunkbase app ID ${APP_ID} via ACS..."
+    fi
+
+    response=$(acs_command "${cmd[@]}" 2>/dev/null) || {
+        log "ERROR: ACS Splunkbase app operation failed."
+        exit 1
+    }
+
+    read -r app_name version status <<< "$(printf '%s' "${response}" \
+        | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    print(data.get('name') or data.get('appID', ''), data.get('version', ''), data.get('status', ''))
+except Exception:
+    print('', '', '')
+")"
+
+    log "SUCCESS: Splunk Cloud applied Splunkbase app '${app_name:-unknown}'${version:+ (version ${version})}${status:+ [${status}]}"
+}
+
+cloud_install_app() {
+    case "${SOURCE}" in
+        local|remote|url)
+            if [[ ! -f "${APP_FILE}" ]]; then
+                log "ERROR: File not found: ${APP_FILE}"
+                exit 1
+            fi
+            cloud_install_private_app "${APP_FILE}"
+            ;;
+        splunkbase)
+            cloud_install_splunkbase_app
+            ;;
+        *)
+            log "ERROR: Unknown source '${SOURCE}'"
+            exit 1
+            ;;
+    esac
+
+    cloud_restart_or_exit "app installation"
 }
 
 resolve_splunkbase_release_metadata() {
@@ -643,6 +823,29 @@ main() {
     mkdir -p "${TA_CACHE}"
 
     prompt_source
+
+    if is_splunk_cloud; then
+        case "${SOURCE}" in
+            local)
+                prompt_local_file
+                ;;
+            remote|url)
+                prompt_url
+                download_from_url
+                ;;
+            splunkbase)
+                prompt_splunkbase
+                ;;
+            *)
+                log "ERROR: Unknown source '${SOURCE}'"
+                exit 1
+                ;;
+        esac
+
+        prompt_update
+        cloud_install_app
+        exit 0
+    fi
 
     case "${SOURCE}" in
         local)

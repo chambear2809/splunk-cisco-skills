@@ -1,0 +1,646 @@
+<form script="custom_link.js" stylesheet="custom_link.css" version="1.1" theme="dark" hideFilters="false">
+  <label>Advisory Insights</label>
+  <init>
+    <set token="AdvisoryInfosState">None</set>
+    <set token="AdvisoryDefinitionType">None</set>
+    <set token="AdvisoryTargetType">None</set>
+    <set token="AdvisoryAffectedObjectType">None</set>
+  </init>
+  <fieldset submitButton="false">
+    <input type="time" token="createtime" searchWhenChanged="true">
+      <label>Advisory Instance Create time</label>
+      <default>
+        <earliest>-7d@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="multiselect" token="account_name" searchWhenChanged="true">
+      <label>Account Name</label>
+      <fieldForLabel>account_name</fieldForLabel>
+      <fieldForValue>account_name</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| dedup account_name
+| table account_name</query>
+        <earliest>0</earliest>
+        <latest></latest>
+      </search>
+      <default>*</default>
+      <choice value="*">All</choice>
+      <delimiter>,</delimiter>
+    </input>
+    <input type="checkbox" token="servers_with_profiles" searchWhenChanged="true">
+      <label></label>
+      <choice value="true">Exclude servers not associated to Server Profiles</choice>
+      <delimiter> </delimiter>
+      <change>
+        <condition match="isnull($servers_with_profiles$)">
+          <set token="servers_with_profiles">false</set>
+        </condition>
+        <condition match="!isnull($servers_with_profiles$)">
+          <set token="servers_with_profiles">true</set>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row depends="$hidden$">
+    <panel>
+      <table>
+        <search>
+          <done>
+            <set token="timeRange.earliest">$result.earliest$</set>
+            <set token="timeRange.latest">$result.latest$</set>
+          </done>
+          <query>| makeresults
+
+| eval earliest_val = if(isnull("$createtime.earliest$") OR "$createtime.earliest$"="0", "-9999d", "$createtime.earliest$")
+| eval latest_val = if(isnull("$createtime.latest$") OR "$createtime.latest$"="now" OR "$createtime.latest$" = "", "-0m", "$createtime.latest$")
+
+| eval earliest = relative_time(now(), earliest_val)
+| eval latest   = relative_time(now(), latest_val)
+| table earliest, latest</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Active Advisory Instances</title>
+      <single>
+        <title>Displays all active advisory instances currently applicable to managed devices within the selected account and time range.</title>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances
+| where splunk_managed_lifecycle == "PRESENT"
+| eval CreateTime=strptime(CreateTime,"%Y-%m-%dT%H:%M:%S.%NZ")
+| where CreateTime &gt;= $timeRange.earliest$ AND CreateTime &lt;= $timeRange.latest$
+
+| search account_name IN ($account_name$)
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid
+| eval affected_moid='AffectedObject.Moid'
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_compute_physicalsummaries
+      | where splunk_managed_lifecycle == "PRESENT"
+      | eval affected_moid=Moid
+      | join type=left affected_moid [ | inputlookup cisco_intersight_server_profiles
+         | eval affected_moid='AssignedServer.Moid' 
+         | rename Name as ProfileName, Moid as ProfileMoid
+      ]
+      | eval HasProfile=if(ProfileMoid!="","true","false")
+      | table HasProfile,affected_moid ]
+
+| where "$servers_with_profiles$"="false" OR HasProfile="$servers_with_profiles$"
+
+| join type=left AdvisoryDefinitionMoid 
+    [| inputlookup cisco_intersight_tam_advisorydefinitions 
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, Type as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [ | inputlookup cisco_intersight_tam_securityadvisories
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, ObjectType as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+        | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisoryinfos | where splunk_managed_lifecycle == "PRESENT"
+    | rename "Advisory.Moid" as AdvisoryDefinitionMoid, Moid as AdvisoryInfosMoid, State as AdvisoryInfosState, Impact as AdvisoryInfosImpact
+    | fields AdvisoryDefinitionMoid AdvisoryInfosMoid AdvisoryInfosState AdvisoryInfosImpact ]
+| eval PublishedDate=strptime(AdvisoryDefinitionDatePublished,"%Y-%m-%dT%H:%M:%S.%NZ")
+| eval AdvisoryInfosState = coalesce(AdvisoryInfosState, State)
+| where AdvisoryInfosState="active" or AdvisoryInfosState="unknown"
+| stats count AS "Active Advisories"</query>
+          <earliest>$createtime.earliest$</earliest>
+          <latest>$createtime.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[10,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="useColors">1</option>
+        <drilldown>
+          <set token="AdvisoryInfosState">active</set>
+          <set token="AdvisoryDefinitionType">None</set>
+          <set token="AdvisoryTargetType">None</set>
+          <set token="AdvisoryAffectedObjectType">None</set>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <title>Acknowledged Advisory Instances</title>
+      <single>
+        <title>Displays all acknowledged advisory instances within the selected account and time range.</title>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| where splunk_managed_lifecycle == "PRESENT"
+| search account_name IN ($account_name$)
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid
+| eval CreateTime=strptime(CreateTime,"%Y-%m-%dT%H:%M:%S.%NZ")
+| where CreateTime &gt;= $timeRange.earliest$ AND CreateTime &lt;= $timeRange.latest$
+
+| eval affected_moid='AffectedObject.Moid'
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_compute_physicalsummaries
+      | where splunk_managed_lifecycle == "PRESENT"
+      | eval affected_moid=Moid
+      | join type=left affected_moid [ | inputlookup cisco_intersight_server_profiles
+         | eval affected_moid='AssignedServer.Moid' 
+         | rename Name as ProfileName, Moid as ProfileMoid
+      ]
+      | eval HasProfile=if(ProfileMoid!="","true","false")
+      | table HasProfile,affected_moid]
+| where "$servers_with_profiles$"="false" OR HasProfile="$servers_with_profiles$"
+
+| join type=left AdvisoryDefinitionMoid 
+    [| inputlookup cisco_intersight_tam_advisorydefinitions 
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, Type as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [ | inputlookup cisco_intersight_tam_securityadvisories
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, ObjectType as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+        | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisoryinfos | where splunk_managed_lifecycle == "PRESENT"
+    | rename "Advisory.Moid" as AdvisoryDefinitionMoid, Moid as AdvisoryInfosMoid, State as AdvisoryInfosState, Impact as AdvisoryInfosImpact
+    | fields AdvisoryDefinitionMoid AdvisoryInfosMoid AdvisoryInfosState AdvisoryInfosImpact ]
+| eval PublishedDate=strptime(AdvisoryDefinitionDatePublished,"%Y-%m-%dT%H:%M:%S.%NZ")
+| where AdvisoryInfosState="acknowledged"
+| stats count AS "Advisories"</query>
+          <earliest>$createtime.earliest$</earliest>
+          <latest>$createtime.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="height">131</option>
+        <option name="rangeColors">["0xd41f1f","0xd94e17","0xf8be34","0x1182f3","0x118832"]</option>
+        <option name="rangeValues">[30,60,90,120]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="useColors">1</option>
+        <drilldown>
+          <set token="AdvisoryInfosState">acknowledged</set>
+          <set token="AdvisoryDefinitionType">None</set>
+          <set token="AdvisoryTargetType">None</set>
+          <set token="AdvisoryAffectedObjectType">None</set>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Advisory Instances by Type</title>
+      <chart>
+        <title>Displays the distribution of Cisco Intersight advisory instances categorized by advisory type.</title>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| where splunk_managed_lifecycle == "PRESENT"
+| search account_name IN ($account_name$)
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid 
+| eval CreateTime=strptime(CreateTime,"%Y-%m-%dT%H:%M:%S.%NZ")
+| where CreateTime &gt;= $timeRange.earliest$ AND CreateTime &lt;= $timeRange.latest$
+
+| eval affected_moid='AffectedObject.Moid'
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_compute_physicalsummaries
+      | where splunk_managed_lifecycle == "PRESENT"
+      | eval affected_moid=Moid
+      | join type=left affected_moid [ | inputlookup cisco_intersight_server_profiles
+         | eval affected_moid='AssignedServer.Moid' 
+         | rename Name as ProfileName, Moid as ProfileMoid
+      ]
+      | eval HasProfile=if(ProfileMoid!="","true","false")
+      | table HasProfile,affected_moid]
+| where "$servers_with_profiles$"="false" OR HasProfile="$servers_with_profiles$"
+
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisorydefinitions 
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, Type as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_securityadvisories
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, ObjectType as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+        | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisoryinfos 
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename "Advisory.Moid" as AdvisoryDefinitionMoid, Moid as AdvisoryInfosMoid, State as AdvisoryInfosState, Impact as AdvisoryInfosImpact
+    | fields AdvisoryDefinitionMoid AdvisoryInfosMoid AdvisoryInfosState AdvisoryInfosImpact ]
+| eval PublishedDate=strptime(AdvisoryDefinitionDatePublished,"%Y-%m-%dT%H:%M:%S.%NZ")
+| stats count AS Advisories by AdvisoryDefinitionType
+| eval "Advisory Type"=AdvisoryDefinitionType
+| fields "Advisory Type" Advisories
+
+| stats sum(Advisories) AS Advisories by "Advisory Type"
+
+| eval "Advisory Type"=case(
+    'Advisory Type'="tam.SecurityAdvisory","Security Advisory",
+    'Advisory Type'="eolAdvisory","End-of-Life Advisory",
+    'Advisory Type'="fieldNotice","Field Notice",
+    1=1,'Advisory Type'
+)</query>
+          <earliest>$createtime.earliest$</earliest>
+          <latest>$createtime.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="AdvisoryDefinitionType">$row.Advisory Type$</set>
+          <set token="AdvisoryInfosState">None</set>
+          <set token="AdvisoryTargetType">None</set>
+          <set token="AdvisoryAffectedObjectType">None</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Advisory Instances by Target Type</title>
+      <chart>
+        <title>Shows advisory instances grouped by platform or target type (for example, IMM, Standalone, Unified Edge and others).</title>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| where splunk_managed_lifecycle == "PRESENT"
+| search account_name IN ($account_name$)
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid 
+| eval CreateTime=strptime(CreateTime,"%Y-%m-%dT%H:%M:%S.%NZ")
+| where CreateTime &gt;= $timeRange.earliest$ AND CreateTime &lt;= $timeRange.latest$
+
+| eval owners_expand='Owners.Owners'
+| mvexpand owners_expand
+| where owners_expand != AccountMoid
+| join type=left owners_expand [ | inputlookup cisco_intersight_asset_targets | rename RegisteredDevice.Moid as owners_expand, Moid as TargetMoid | table TargetType, TargetMoid, owners_expand ] 
+| where isnotnull(TargetType)
+| dedup Moid
+
+| eval affected_moid='AffectedObject.Moid'
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_compute_physicalsummaries
+      | where splunk_managed_lifecycle == "PRESENT"
+      | eval affected_moid=Moid
+      | join type=left affected_moid [ | inputlookup cisco_intersight_server_profiles
+         | eval affected_moid='AssignedServer.Moid' 
+         | rename Name as ProfileName, Moid as ProfileMoid
+      ]
+      | eval HasProfile=if(ProfileMoid!="","true","false")
+      | table HasProfile,affected_moid]
+| where "$servers_with_profiles$"="false" OR HasProfile="$servers_with_profiles$"
+
+| join type=left AdvisoryDefinitionMoid 
+    [| inputlookup cisco_intersight_tam_advisorydefinitions 
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, Type as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_securityadvisories
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, ObjectType as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+        | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisoryinfos
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename "Advisory.Moid" as AdvisoryDefinitionMoid, Moid as AdvisoryInfosMoid, State as AdvisoryInfosState, Impact as AdvisoryInfosImpact
+    | fields AdvisoryDefinitionMoid AdvisoryInfosMoid AdvisoryInfosState AdvisoryInfosImpact ]
+| eval PublishedDate=strptime(AdvisoryDefinitionDatePublished,"%Y-%m-%dT%H:%M:%S.%NZ")
+
+| eval "Target Type"=case(TargetType="UCSFIISM", "IMM", TargetType="UCSXECMC", "Unified Edge", true(), "Standalone")
+| stats count by "Target Type"</query>
+          <earliest>$createtime.earliest$</earliest>
+          <latest>$createtime.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="AdvisoryTargetType">$row.Target Type$</set>
+          <set token="AdvisoryInfosState">None</set>
+          <set token="AdvisoryDefinitionType">None</set>
+          <set token="AdvisoryAffectedObjectType">None</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Advisory Instances by Object Type</title>
+      <chart>
+        <title>Groups Cisco Intersight advisory instances by the type of affected object.</title>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| where splunk_managed_lifecycle == "PRESENT"
+| search account_name IN ($account_name$)
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid 
+| eval CreateTime=strptime(CreateTime,"%Y-%m-%dT%H:%M:%S.%NZ")
+| where CreateTime &gt;= $timeRange.earliest$ AND CreateTime &lt;= $timeRange.latest$
+
+| eval affected_moid='AffectedObject.Moid'
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_compute_physicalsummaries
+      | where splunk_managed_lifecycle == "PRESENT"
+      | eval affected_moid=Moid
+      | join type=left affected_moid [ | inputlookup cisco_intersight_server_profiles
+         | eval affected_moid='AssignedServer.Moid' 
+         | rename Name as ProfileName, Moid as ProfileMoid
+      ]
+      | eval HasProfile=if(ProfileMoid!="","true","false")
+      | table HasProfile,affected_moid]
+| where "$servers_with_profiles$"="false" OR HasProfile="$servers_with_profiles$"
+
+| join type=left AdvisoryDefinitionMoid 
+    [| inputlookup cisco_intersight_tam_advisorydefinitions 
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, Type as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_securityadvisories
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, ObjectType as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+        | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisoryinfos 
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename "Advisory.Moid" as AdvisoryDefinitionMoid, Moid as AdvisoryInfosMoid, State as AdvisoryInfosState, Impact as AdvisoryInfosImpact
+    | fields AdvisoryDefinitionMoid AdvisoryInfosMoid AdvisoryInfosState AdvisoryInfosImpact ]
+| eval PublishedDate=strptime(AdvisoryDefinitionDatePublished,"%Y-%m-%dT%H:%M:%S.%NZ")
+
+| eval "Object Type"=case(
+    'AffectedObject.ObjectType'="compute.Blade","Blade Server",
+    'AffectedObject.ObjectType'="compute.RackUnit","Rack Server",
+    'AffectedObject.ObjectType'="equipment.Chassis","Chassis",
+    'AffectedObject.ObjectType'="equipment.Fex","Equipment Fex",
+    'AffectedObject.ObjectType'="hyperflex.Cluster","Hyperflex Cluster",
+    'AffectedObject.ObjectType'="iaas.UcsdInfo","Iaas UcsdInfo",
+    'AffectedObject.ObjectType'="network.Element","FI",
+    1=1,"Other"
+)
+
+| stats count AS "Total Count" by "Object Type"</query>
+          <earliest>$createtime.earliest$</earliest>
+          <latest>$createtime.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="AdvisoryAffectedObjectType">$row.Object Type$</set>
+          <set token="AdvisoryInfosState">None</set>
+          <set token="AdvisoryDefinitionType">None</set>
+          <set token="AdvisoryTargetType">None</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row depends="$AdvisoryInfosState$">
+    <panel>
+      <title>Advisory Details</title>
+      <input type="text" token="advisory_name" searchWhenChanged="true">
+        <label>Advisory Name</label>
+        <default></default>
+      </input>
+      <input type="dropdown" token="advisory_type" searchWhenChanged="true">
+        <label>Advisory Type</label>
+        <default>*</default>
+        <fieldForLabel>AdvisoryDefinitionType</fieldForLabel>
+        <fieldForValue>AdvisoryDefinitionType</fieldForValue>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| where splunk_managed_lifecycle == "PRESENT"
+| search account_name IN ($account_name$)
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid
+
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisorydefinitions
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, Type as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_securityadvisories
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, ObjectType as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+
+| rename AdvisoryDefinitionDatePublished as DatePublished
+| rename DatePublished as PublishedDate
+
+| dedup AdvisoryDefinitionType
+| eval "AdvisoryDefinitionType"=case(
+    'AdvisoryDefinitionType'="tam.SecurityAdvisory","Security Advisory",
+    'AdvisoryDefinitionType'="eolAdvisory","End-of-Life Advisory",
+    'AdvisoryDefinitionType'="fieldNotice","Field Notice",
+    1=1,'AdvisoryDefinitionType'
+)
+| table "AdvisoryDefinitionType"</query>
+          <earliest>-24h@h</earliest>
+          <latest>now</latest>
+        </search>
+        <choice value="*">All</choice>
+      </input>
+      <input type="dropdown" token="object_type" searchWhenChanged="true">
+        <label>Object Type</label>
+        <default>*</default>
+        <fieldForLabel>AffectedObjectType</fieldForLabel>
+        <fieldForValue>AffectedObjectType</fieldForValue>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| where splunk_managed_lifecycle == "PRESENT"
+| search account_name IN ($account_name$)
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid
+| dedup AffectedObjectType
+| eval "AffectedObjectType"=case(
+    'AffectedObjectType'="compute.Blade","Blade Server",
+    'AffectedObjectType'="compute.RackUnit","Rack Server",
+    'AffectedObjectType'="equipment.Chassis","Chassis",
+    'AffectedObjectType'="network.Element","FI"
+)
+| where isnotnull('AffectedObjectType')
+| table AffectedObjectType</query>
+          <earliest>0</earliest>
+          <latest></latest>
+        </search>
+        <choice value="*">All</choice>
+      </input>
+      <table id="advisory_link_table">
+        <title>Displays detailed information about each Cisco Intersight advisory instance, publication date, and Cisco documentation link(click on Name).</title>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| where splunk_managed_lifecycle == "PRESENT"
+| search account_name IN ($account_name$)
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid
+| eval CreateTime=strptime(CreateTime,"%Y-%m-%dT%H:%M:%S.%NZ")
+| where CreateTime &gt;= $timeRange.earliest$ AND CreateTime &lt;= $timeRange.latest$
+| eval owners_expand='Owners.Owners'
+| mvexpand owners_expand
+| where owners_expand != AccountMoid
+| join type=left owners_expand [ | inputlookup cisco_intersight_asset_targets | rename RegisteredDevice.Moid as owners_expand, Moid as TargetMoid | table TargetType, TargetMoid, owners_expand ] 
+| where isnotnull(TargetType)
+| dedup Moid
+| eval affected_moid='AffectedObject.Moid'
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_compute_physicalsummaries
+      | where splunk_managed_lifecycle == "PRESENT"
+      | eval affected_moid=Moid
+      | join type=left affected_moid [ | inputlookup cisco_intersight_server_profiles
+         | eval affected_moid='AssignedServer.Moid' 
+         | rename Name as ProfileName, Moid as ProfileMoid
+      ]
+      | eval HasProfile=if(ProfileMoid!="","true","false")
+      | table HasProfile,affected_moid]
+| where "$servers_with_profiles$"="false" OR HasProfile="$servers_with_profiles$"
+
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisorydefinitions
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, Type as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_securityadvisories
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename Moid as AdvisoryDefinitionMoid, Name as AdvisoryDefinitionName, Description as AdvisoryDefinitionDescription, ObjectType as AdvisoryDefinitionType, ExternalUrl as AdvisoryDefinitionExternalUrl, DatePublished as AdvisoryDefinitionDatePublished, CveIds.CveIds as SecurityAdvisoryCVEs
+    | fields AdvisoryDefinitionMoid AdvisoryDefinitionName AdvisoryDefinitionDescription AdvisoryDefinitionType AdvisoryDefinitionExternalUrl AdvisoryDefinitionDatePublished SecurityAdvisoryCVEs ]
+| join type=left AdvisoryDefinitionMoid
+    [| inputlookup cisco_intersight_tam_advisoryinfos 
+    | where splunk_managed_lifecycle == "PRESENT"
+    | rename "Advisory.Moid" as AdvisoryDefinitionMoid, Moid as AdvisoryInfosMoid, State as AdvisoryInfosState, Impact as AdvisoryInfosImpact
+    | fields AdvisoryDefinitionMoid AdvisoryInfosMoid AdvisoryInfosState AdvisoryInfosImpact ]
+| rename AdvisoryDefinitionDatePublished as DatePublished
+| rename DatePublished as PublishedDate
+
+| rename AffectedObject.PlatformType AS "Platform Type", AdvisoryDefinitionType AS "Advisory Type", AffectedObject.ObjectType AS "Object Type"
+| eval "Target Type"=case(TargetType="UCSFIISM", "IMM", TargetType="UCSXECMC", "Unified Edge", true(), "Standalone")
+| eval "Advisory Type"=case(
+    'Advisory Type'="tam.SecurityAdvisory","Security Advisory",
+    'Advisory Type'="eolAdvisory","End-of-Life Advisory",
+    'Advisory Type'="fieldNotice","Field Notice",
+    1=1,'Advisory Type'
+)
+| eval "Object Type"=case(
+    'Object Type'="compute.Blade","Blade Server",
+    'Object Type'="compute.RackUnit","Rack Server",
+    'Object Type'="equipment.Chassis","Chassis",
+    'Object Type'="network.Element","FI"
+)
+| where isnotnull('Object Type')
+| eval AdvisoryInfosState = coalesce(AdvisoryInfosState, State)
+
+| eval keep = case(
+    "$AdvisoryInfosState$"="active" AND ('AdvisoryInfosState' = "$AdvisoryInfosState$" or 'AdvisoryInfosState' = "unknown"), 1,
+    "$AdvisoryInfosState$"="acknowledged" AND 'AdvisoryInfosState' = "$AdvisoryInfosState$", 1,
+    "$AdvisoryDefinitionType$"!="None" AND "$AdvisoryDefinitionType$" = 'Advisory Type', 1,
+    "$AdvisoryTargetType$"!="None" AND 'Target Type' = "$AdvisoryTargetType$", 1,
+    "$AdvisoryAffectedObjectType$"!="None" AND 'Object Type' = "$AdvisoryAffectedObjectType$", 1,
+    true(), 0
+)
+| where keep=1 OR (
+    "$AdvisoryInfosState$" = "None" AND "$AdvisoryDefinitionType$" = "None" AND "$AdvisoryTargetType$" = "None" AND "$AdvisoryAffectedObjectType$" = "None"
+)
+
+| eval SourceType="AdvisoryInstance"
+| rename AdvisoryInfosImpact AS Impact AdvisoryInfosState AS State AdvisoryDefinitionName AS "Name" AdvisoryDefinitionExternalUrl AS "Cisco Doc" PublishedDate AS "Published Date"
+
+| eval Name=Name+"_-_"+'Cisco Doc'
+| rename Moid as _moid
+
+| where isnull("$advisory_name$") OR "$advisory_name$"="" OR like(lower(Name), "%" . lower("$advisory_name$") . "%")
+| where ("$advisory_type$"="*" OR 'Advisory Type'="$advisory_type$")
+| where ("$object_type$"="*" OR 'Object Type'="$object_type$")
+
+| stats 
+    values(Name) AS Name
+    values(State) AS State
+    values("Advisory Type") AS "Advisory Type"
+    values("Published Date") AS "Published Date"
+    values("Target Type") AS "Target Type"
+    count AS "Affected Objects"
+    values(SecurityAdvisoryCVEs) AS SecurityAdvisoryCVEs
+    by AdvisoryDefinitionMoid "Object Type"
+
+| eval combo = 'Object Type' . "(" . 'Affected Objects' . ") , "
+
+| stats 
+    values(Name) AS Name
+    values(State) AS State
+    values("Advisory Type") AS "Advisory Type"
+    values(combo) AS "Affected Object Type"
+    values(SecurityAdvisoryCVEs) AS "Referenced Vulnerabilities"
+    values("Target Type") AS "Target Type"
+    values("Published Date") AS "Published Date"
+    by AdvisoryDefinitionMoid
+
+| makemv delim=" , " "Affected Object Type"
+| makemv delim=" , " "Target Type"
+
+| sort "Advisory Type" desc
+| rename AdvisoryDefinitionMoid as _AdvisoryDefinitionMoid</query>
+          <earliest>$createtime.earliest$</earliest>
+          <latest>$createtime.latest$</latest>
+        </search>
+        <option name="drilldown">cell</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="advisory_moid">$row._AdvisoryDefinitionMoid$</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row depends="$advisory_moid$">
+    <panel>
+      <title>Advisory Affected Devices</title>
+      <table id="affected_devices_table">
+        <title>Displays the list of devices affected by each Cisco Intersight advisory instance, including their platform type, object type, and associated profile details.</title>
+        <search>
+          <query>| inputlookup cisco_intersight_tam_advisoryinstances 
+| where splunk_managed_lifecycle == "PRESENT"
+| eval CreateTime=strptime(CreateTime,"%Y-%m-%dT%H:%M:%S.%NZ")
+| where CreateTime &gt;= $timeRange.earliest$ AND CreateTime &lt;= $timeRange.latest$
+| rename "Advisory.Moid" as AdvisoryDefinitionMoid
+| search account_name IN ($account_name$)
+| search AdvisoryDefinitionMoid="$advisory_moid$"
+| eval SourceType="AdvisoryInstance"
+| eval affected_moid='AffectedObject.Moid'
+| eval object_type='AffectedObject.ObjectType'
+| fields affected_moid object_type SourceType
+
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_compute_physicalsummaries
+      | eval ServerMoid=Moid
+      | join type=left ServerMoid [ | inputlookup cisco_intersight_server_profiles
+         | eval ServerMoid='AssignedServer.Moid' 
+         | rename Name as ProfileName, Moid as ProfileMoid
+         | table ProfileName, ProfileMoid, ServerMoid
+      ]
+      | eval HasProfile=if(ProfileMoid!="","true","false")
+      | where (
+         "$servers_with_profiles$"="false" or HasProfile="$servers_with_profiles$"
+      )
+      | rename Moid as affected_moid Name as ObjectName Model as ObjectModel RegisteredDevice.DeviceHostname as DomainName
+      | table affected_moid, ObjectName, ObjectModel, Dn, DomainName ]
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_equipment_chasses
+      | rename Moid as affected_moid Name as ObjectName Model as ObjectModel
+      | table affected_moid, ObjectName, ObjectModel, Dn ]
+| join type=left affected_moid
+    [ | inputlookup cisco_intersight_network_elements
+      | rename Moid as affected_moid Name as ObjectName Model as ObjectModel
+      | table affected_moid, ObjectName, ObjectModel, Dn ]
+
+| eval "Object Type"=case(
+    'object_type'="compute.Blade","Blade Server",
+    'object_type'="compute.RackUnit","Rack Server",
+    'object_type'="equipment.Chassis","Chassis",
+    'object_type'="network.Element","FI"
+)
+| where isnotnull('Object Type')
+
+| where isnotnull(ObjectName)
+| rename ObjectName as "Affected Object Name", ObjectModel as "Affected Object Model", SourceType as "Source Type", DomainName as "Domain Name"
+| table "Domain Name", "Affected Object Name", "Object Type", "Affected Object Model", Dn</query>
+          <earliest>$createtime.earliest$</earliest>
+          <latest>$createtime.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+</form>

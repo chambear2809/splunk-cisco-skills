@@ -1,0 +1,22 @@
+# This is needed for Upload PCAP to work correctly outside the context of splunk_app_stream.
+[]
+access = read : [ * ], write : [ admin, sc_admin ]
+export = none
+
+# Don't export settings in times.conf.
+[times]
+export = none
+
+[views]
+export = none
+
+
+# Export eventtypes so they're available in search.
+# Currently redundant since we're exporting everything above, but keeping in case we stop exporting everything.
+[eventtypes]
+export = system
+
+# Export workflow_actions so they're available in search.
+# Currently redundant since we're exporting everything above, but keeping in case we stop exporting everything.
+[workflow_actions]
+export = system

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="igmp">
+    <Name>IGMP Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="igmp.event">
+      <Type>object</Type>
+      <Comment>Event representing an IGMP message</Comment>
+    </Term>
+    <Term id="igmp.type">
+      <Type>uint8</Type>
+      <Comment>Message type</Comment>
+    </Term>
+     <Term id="igmp.type-string">
+      <Type>shortstring</Type>
+      <Comment>Message type string</Comment>
+    </Term>
+    <Term id="igmp.checksum">
+      <Type>uint16</Type>
+      <Comment>Checksum</Comment>
+    </Term>
+    <Term id="igmp.max-resp-time">
+      <Type>double</Type>
+      <Comment>Maximum allowed time before sending a response report in units of 1/10 second</Comment>
+    </Term>
+     <Term id="igmp.multicast-address">
+      <Type>shortstring</Type>
+      <Comment>IP multicast address</Comment>
+    </Term>
+    <Term id="igmp.misc">
+      <Type>uint8</Type>
+      <Comment>Resv, S and QRV fields</Comment>
+    </Term>
+    <Term id="igmp.qqic">
+      <Type>uint8</Type>
+      <Comment>Querier's query interval code</Comment>
+    </Term>
+    <Term id="igmp.num-sources">
+      <Type>uint16</Type>
+      <Comment>Number of source addresses present in the query</Comment>
+    </Term>
+    <Term id="igmp.source-address">
+      <Type>shortstring</Type>
+      <Comment>Source IP unicast address</Comment>
+    </Term>
+    <Term id="igmp.num-groups">
+      <Type>uint16</Type>
+      <Comment>Number of group records</Comment>
+    </Term>
+    <Term id="igmp.group-record-type">
+      <Type>uint8</Type>
+      <Comment>Group record type</Comment>
+    </Term>
+    <Term id="igmp.group-record-type-string">
+      <Type>shortstring</Type>
+      <Comment>Group record type string</Comment>
+    </Term>
+    <Term id="igmp.group-record-aux-data-len">
+      <Type>uint8</Type>
+      <Comment>Length of the auxiliary data field in the group record</Comment>
+    </Term>
+    <Term id="igmp.group-record-num-sources">
+      <Type>uint16</Type>
+      <Comment>Number of source addresses present in the group record</Comment>
+    </Term>
+     <Term id="igmp.group-record-multicast-address">
+      <Type>shortstring</Type>
+      <Comment>IP multicast address in the group record</Comment>
+    </Term>
+    <Term id="igmp.group-record-source-address">
+      <Type>shortstring</Type>
+      <Comment>Source IP unicast address in the group record</Comment>
+    </Term>
+    <Term id="igmp.group-record-aux-data">
+      <Type>blob</Type>
+      <Comment>Aux data in group record</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

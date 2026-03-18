@@ -1,0 +1,228 @@
+{
+  "app": "Stream", 
+  "category": "Telephony", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "rtp.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "Counter of lost packets",
+      "enabled": true, 
+      "name": "lost", 
+      "term": "rtp.lost"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the number of mis-ordered packets",
+      "enabled": true, 
+      "name": "unseq", 
+      "term": "rtp.unseq"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SSRC Identifier",
+      "enabled": true, 
+      "name": "ssrc", 
+      "term": "rtp.ssrc"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "RTP packet timestamp",
+      "enabled": true, 
+      "name": "rtp_timestamp", 
+      "term": "rtp.timestamp"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Standard Mean Opinion Score voice quality indicator",
+      "enabled": true, 
+      "name": "mos_session", 
+      "term": "rtp.mos-session"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Rfactor indicator value, following the E-model from ITU-T G.107 and G.107.1",
+      "enabled": true, 
+      "name": "rfactor", 
+      "term": "rtp.rfactor"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sequence number of RTP packet",
+      "enabled": true, 
+      "name": "snumber", 
+      "term": "rtp.snumber"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of the codec (aka Payload type)",
+      "enabled": true, 
+      "name": "codec_name", 
+      "term": "rtp.codec-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Present in events containing summary information about an RTP session",
+      "enabled": true, 
+      "name": "end_session", 
+      "term": "rtp.end-session"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number identifying the codec (aka Payload type)",
+      "enabled": true, 
+      "name": "codec_index", 
+      "term": "rtp.codec-index"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Call setup duration (in microseconds)",
+      "enabled": true, 
+      "name": "session_duration", 
+      "term": "rtp.session-duration"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport level protocol", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "rtp", 
+  "isReferenceStream": true,  
+  "name": "RTP Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "RTP", 
+  "sourcetype": "stream:rtp", 
+  "streamType": "event"
+}

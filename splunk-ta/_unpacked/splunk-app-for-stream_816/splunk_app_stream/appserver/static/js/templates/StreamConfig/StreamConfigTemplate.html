@@ -1,0 +1,265 @@
+<script type="text/template">
+    <div class="dashboard-row" >
+        <div class="dashboard-cell span-full">
+
+            <form id="stream">
+
+                <!-- ========================== -->
+                <!-- Header/Controls/Attributes -->
+                <!-- ========================== -->
+                <div class="panel-head stream-header">
+
+                    <!-- Header -->
+                    <div class="stream-title-wrapper">
+                        <div class="stream-title">Configure <%- streamType[0].toUpperCase() + streamType.slice(1) %> Stream - <%- stream.id %></div>
+                        <div class="stream-description"><%-stream.name%></div>
+                        <div class="streams-list-link"><a href="#<%- streamType %>">< Back to streams</a></div>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="stream-config-button-panel">
+                        <div>
+
+                            <!-- hide controls if external stream -->
+                            <% var streamIsOurs = (stream.app === 'Stream') %>
+                            <% if (streamIsOurs) { %>
+                                <span class="btn" id="clone">Clone</span>
+                                <span class="btn" id="delete">Delete</span>
+                                <span class="btn" id="cancel"><a href="#<%- streamType %>">Cancel</a></span>
+                                <span class="btn btn-primary"
+                                        id="save"
+                                        <% if (!pageIsDirty) { %> disabled <% } %> >
+                                        Save
+                                </span>
+                            <% } %>
+
+                        </div>
+
+                        <div style="<% if (!pageIsDirty) { %> display:none <% } %>" id="has-changes"> you have unsaved changes </div>
+
+                    </div>
+
+                    <!-- Begin Attributes -->
+
+                    <!-- Enabled/Disabled -->
+                    <div class="row" style="margin-top: 10px;clear:both;">
+                        <div class="span2 field-label">Mode</div>
+                        <% if (streamIsOurs) { %>
+                        <div class="span3 centered-button">
+                            <div class="btn-group btn-toggle enable-stream-button-group btn-group-radio">
+                                <button type="button" id="stream-enabled"
+                                        class="btn btn-lg <% if(stream.enabled && !stream.statsOnly) { %> active <% } %>">
+                                        Enabled
+                                </button>
+                                <% if (!stream.isPacketStream) { %>
+                                    <button type="button" id="stream-stats-only" class="btn btn-lg <% if(stream.enabled && stream.statsOnly) { %> active <% } %>">
+                                            Estimate
+                                    </button>
+                                <% } %>
+                                <button type="button" id="stream-disabled"
+                                        class="btn btn-lg <% if(!stream.enabled) { %> active <% } %> ">
+                                        Disabled
+                                </button>
+                            </div>
+                        </div>
+                        <% } else { if (stream.enabled) { %>
+                                <span class="span2">Enabled</span>
+                            <% } else { %>
+                                <span class="span2">Disabled</span>
+                            <% } %>
+                        <% } %>
+                        <% if (stream.protocolName == "Netflow" || stream.protocolName == "sflow") { %>
+                        <div class="span7 alert-info">
+                            <i class="icon-alert"></i>
+                            To enable receiving NetFlow or sFlow, you must specify the netflowReceiver
+                            settings in streamfwd.conf on each Stream Forwarder.
+                            <a class="external" target="_blank"
+                               href="http://docs.splunk.com/Documentation/StreamApp/latest/DeployStreamApp/ConfigureFlowcollector">
+                                Read more
+                            </a>
+                        </div>
+                        <% } %>
+                    </div>
+
+                    <!-- Splunk Index -->
+                    <div class="row" style="margin-top: 10px;">
+                        <div class="span2 field-label">Splunk Index</div>
+                        <% if (streamIsOurs) { %>
+                            <div id="indexSelectionWrapper" class="span2 centered-button">
+                                <!-- ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~  -->
+                                <!-- ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~  -->
+                                <!-- Template for indexes selection -->
+                                <!-- ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~  -->
+                                <!-- ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~  -->
+                            </div>
+                        <% } else { %>
+                            <span class="span2"><%- stream.index || "N/A" %></span>
+                        <% } %>
+                    </div>
+
+                    <!-- Protocol -->
+                    <div class="row" style="margin-top: 10px;">
+                        <div class="span2 field-label">Protocol</div>
+                        <div class="span2"><%-stream.protocolName || "N/A" %></div>
+                    </div>
+
+                    <!-- Aggregation controls -->
+                    <% if (!stream.isPacketStream) { %>
+                        <div class="row" id="agg-controls" style="margin-top: 10px;">
+                            <div class="span2 field-label">Aggregation</div>
+                            <div class="controls span4 centered-button">
+                                <div class="btn-group btn-toggle btn-group-radio">
+                                    <button type="button"
+                                            value="no-agg"
+                                            id="aggregation-off"
+                                            class="btn btn-lg
+                                            <% if (stream.streamType === 'event') { %> active <% } %>"
+                                            <% if (!streamIsOurs) { %> disabled <% } %>
+                                            >
+                                        No
+                                    </button>
+                                    <button type="button"
+                                            value="agg"
+                                            id="aggregation-on"
+                                            class="btn btn-lg
+                                            <% if (stream.streamType === 'agg_event') { %> active <% } %>"
+                                            <% if (!streamIsOurs) { %> disabled <% } %>
+                                            >
+                                        Yes, every
+                                    </button>
+                                </div>
+                                <span class="control-group">
+                                    <input type="text"
+                                           class="time-interval"
+                                           <% if (stream.streamType === 'event') { %> disabled <% } %>
+                                           value="<%- streamExtras.interval%>"
+                                           <% if (!streamIsOurs) { %> disabled <% } %>
+                                           />
+                                </span>
+                                <label class="agg-interval-label <% if (stream.streamType === 'event') { %> disabled <% } %>">seconds</label>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <!-- Top Fields -->
+                    <div class="row <% if (!stream.aggregated) { %> hidden <% } %>" style="margin-top: 10px;" id="top-fields-section">
+                        <% var usesTopX = !!streamExtras.topLimit %>
+                        <div class="span2 field-label" id="top-fields-label">
+                            Top Fields
+                        </div>
+                        <div class="controls span6 centered-button" id="topx-controls">
+                            <div class="btn-group btn-toggle btn-group-radio">
+                                <button type="button"
+                                        value="no-top-fields"
+                                        id="topx-off"
+                                        class="btn btn-lg
+                                        <% if (!usesTopX) { %> active <% } %>"
+                                        <% if (!streamIsOurs) { %> disabled <% } %>
+                                        >
+                                    No
+                                </button>
+                                <button type="button"
+                                        value="yes-top-fields"
+                                        id="topx-on"
+                                        class="btn btn-lg
+                                        <% if (usesTopX) { %> active <% } %>"
+                                        <% if (!streamIsOurs) { %> disabled <% } %>
+                                        >
+                                    Yes, only index top
+                                </button>
+                            </div>
+                            <span class="control-group">
+                                <input type="text"
+                                       value="<%- streamExtras.topLimit %>"
+                                       <% if (!streamIsOurs) { %> disabled <% } %>
+                                       id="topLimitInput" <% if (!usesTopX) { %> disabled <% } %>/>
+                            </span>
+                            <label class="topx-fields-label <% if (!usesTopX) { %> disabled <% } %>">events based on</label>
+                            <!-- ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ -->
+                            <!-- ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ -->
+                            <!-- Template for topSortBy  -->
+                            <!-- ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ -->
+                            <!-- ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ -->
+                        </div>
+                    </div>
+
+                    <!-- end attributes -->
+
+                </div>
+
+                <!-- ====================== -->
+                <!-- List of Configurations -->
+                <!-- ====================== -->
+
+
+                <div class="dashboard-panel stream-fields-panel">
+                    <div class="dashboard-element">
+                        <div class="panel-body">
+
+                            <ul class="nav nav-tabs main-tabs">
+                                <li id="fields-tab"
+                                    <% if (configPageStateModel.showTab === 'fields') { %>
+                                        class="active"
+                                    <% } %>>
+                                    <%
+                                        var numEnabled = fieldsCollection.filter(function(field){
+                                            return field.get('enabled');
+                                        }).length;
+                                    %>
+                                    <a href="#">Fields (<span id="enabled-fields-count"><%- numEnabled %></span> enabled)</a>
+                                </li>
+                                <li id="filters-tab"
+                                    <% if (configPageStateModel.showTab === 'filters') { %>
+                                        class="active"
+                                    <% } %>>
+                                    <a href="#"><%- filtersName[0].toUpperCase() + filtersName.slice(1) %> (<span id="filters-count"><%- comparisonsCollection.length %></span> <%- filtersName %>)</a>
+                                </li>
+                                <% if (stream.isPacketStream) { %>
+                                    <li id="expiration-tab"
+                                        <% if (configPageStateModel.showTab === 'expiration') { %>
+                                            class="active"
+                                        <% } %>>
+                                        <a href="#">Expiration</a>
+                                    </li>
+                                <% } %>
+                            </ul>
+
+                            <!-- ============ -->
+                            <!-- Fields View -->
+                            <!-- ============ -->
+                            <div id="fields-view"
+                                <% if (configPageStateModel.showTab !== 'fields') { %>
+                                    style="display:none"
+                                <% } %>>
+                            </div>
+
+                            <!-- ============ -->
+                            <!-- Filters View -->
+                            <!-- ============ -->
+                            <div id="filters-view"
+                                <% if (configPageStateModel.showTab !== 'filters') { %>
+                                    style="display:none"
+                                <% } %>>
+                            </div>
+
+                            <!-- =============== -->
+                            <!-- Expiration View -->
+                            <!-- =============== -->
+                            <% if (stream.isPacketStream) { %>
+                                <div id="expiration-view"
+                                    <% if (configPageStateModel.showTab !== 'expiration') { %>
+                                        style="display:none"
+                                    <% } %>>
+                                </div>
+                            <% } %>
+
+                        </div>
+                    </div>
+                </div>
+
+            </form>
+
+        </div> <!-- end dashboard cell -->
+    </div><!-- end dashboard row -->
+
+</script>

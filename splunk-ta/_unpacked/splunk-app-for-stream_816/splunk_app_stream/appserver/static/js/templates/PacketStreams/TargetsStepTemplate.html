@@ -1,0 +1,28 @@
+<div class="targets-step">
+    <div class="step-subheading">
+        <%- stepTitle %>
+        <div class="step-subsubheading">
+            <p>
+            Specify the criteria for the packets to be captured.
+            </p>
+        </div>
+        <button class="btn btn-primary create-target">Create New Target</button>
+    </div>
+    <div class="table-controls">
+        <div class="target-count">
+            <%- targets.comparisons.length%> targets created</div>
+        <div class="search target-search-control">
+            <input type="text" class="input-medium search-query" value="<%-searchString%>" placeholder="Search" />
+            <a class="clear"><i class="icon-x-circle"></i></a>
+        </div>
+        <div class="match-all-comps">
+            <span>Match Targets:</span>
+            <div class="btn-group btn-group-radio btn-toggle match-all-comparisons-group">
+                <button type="button" class="btn btn-small match-all-enabled <% if (targets.matchAllComparisons) { %> active <% } %>">All</button>
+                <button type="button" class="btn btn-small match-all-disabled <% if (!targets.matchAllComparisons) { %> active <% } %>">Any</button>
+            </div>
+        </div>
+    </div>
+    <table class="target-list" />
+    <div class="modal" role="dialog" aria-labelledby="myLargeModalLabel"></div>
+</div>

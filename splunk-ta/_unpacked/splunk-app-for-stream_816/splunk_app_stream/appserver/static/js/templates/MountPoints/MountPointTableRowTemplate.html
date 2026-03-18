@@ -1,0 +1,37 @@
+<script id="mount-point-table-row-template" type="text/template">
+
+        <!-- =========== -->
+        <!-- File Server -->
+        <!-- =========== -->
+        <td>
+            <%- model.id %>
+        </td>
+
+        <!-- =========== -->
+        <!-- Mount Point -->
+        <!-- =========== -->
+        <td>
+            <% if (model.mount_point) { %>
+            <%- model.mount_point %>
+            <% } else { %>
+            <div class="alert alert-error"><i class="icon-alert"></i></div>
+            <% } %>
+        </td>
+
+        <!-- ======= -->
+        <!-- Actions -->
+        <!-- ======= -->
+        <td>
+            <div class="mount-point-action-popdown btn-combo">
+                <a class="dropdown-toggle btn-pill" href="#"><span class="icon-chevron-down"></span></a>
+
+                <div class="dropdown-menu dropdown-menu-narrow">
+                    <div class="arrow"></div>
+                    <ul>
+                        <li><a href="#" class="mount-point-edit">Edit Mount Point</a></li>
+                        <li><a href="#" class="mount-point-delete">Delete</a></li>
+                    </ul>
+                </div>
+            </div>
+        </td>
+</script>

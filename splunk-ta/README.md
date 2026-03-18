@@ -6,6 +6,10 @@ directory for local installation via the `splunk-app-install` skill.
 The `install_app.sh` script will list files in this directory when you choose
 the **local file** installation source.
 
+For the normal Cloud workflow, these original vendor archives are also the files
+you install through ACS. The repo treats these packaged artifacts as immutable
+deployment inputs.
+
 ## Naming Convention
 
 Use descriptive filenames that include the app name and version:
@@ -29,3 +33,5 @@ cisco_dc_networking_app-1.2.0.tar.gz
   TA packages.
 - Large `.tgz`/`.spl` files are tracked by Git. Consider using Git LFS if
   packages exceed ~50 MB.
+- If you create `splunk-ta/_unpacked/` review copies, treat them as analysis
+  workspaces only. They are not the normal deployment source for this repo.

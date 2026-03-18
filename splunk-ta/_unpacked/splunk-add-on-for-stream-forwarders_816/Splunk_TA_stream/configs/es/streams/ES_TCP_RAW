@@ -1,0 +1,492 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Networking", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "flow.tcp-event"
+    }, 
+    "fields": [
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from client to server", 
+            "enabled": true, 
+            "name": "ack_packets_in", 
+            "term": "flow.cs-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from server to client", 
+            "enabled": true, 
+            "name": "ack_packets_out", 
+            "term": "flow.sc-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Level 7 protocol name (http, ftp, etc.)", 
+            "enabled": true, 
+            "name": "app", 
+            "term": "flow.protocol"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates client terminated connection with RST flag", 
+            "enabled": true, 
+            "name": "canceled", 
+            "term": "flow.canceled"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt", 
+            "term": "flow.cp-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt_packets", 
+            "term": "flow.cp-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt_sum", 
+            "term": "flow.cp-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP session server endpoint (IP address and TCP port)", 
+            "enabled": true, 
+            "name": "connection", 
+            "term": "flow.connection"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from client to server", 
+            "enabled": true, 
+            "name": "data_packets_in", 
+            "term": "flow.cs-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from server to client", 
+            "enabled": true, 
+            "name": "data_packets_out", 
+            "term": "flow.sc-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server IP Address", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server port number", 
+            "enabled": true, 
+            "name": "dest_port", 
+            "term": "flow.s-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from client to server", 
+            "enabled": true, 
+            "name": "duplicate_packets_in", 
+            "term": "flow.cs-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from server to client", 
+            "enabled": true, 
+            "name": "duplicate_packets_out", 
+            "term": "flow.sc-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Flow Id", 
+            "enabled": true, 
+            "name": "flow_id", 
+            "term": "flow.flow-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the request", 
+            "enabled": true, 
+            "name": "missing_packets_in", 
+            "term": "flow.cs-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the response", 
+            "enabled": true, 
+            "name": "missing_packets_out", 
+            "term": "flow.sc-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from client to server", 
+            "enabled": true, 
+            "name": "packets_in", 
+            "term": "flow.cs-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from server to client", 
+            "enabled": true, 
+            "name": "packets_out", 
+            "term": "flow.sc-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Protocol stack of flow", 
+            "enabled": true, 
+            "name": "protocol_stack", 
+            "term": "flow.protocol-stack"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates server terminated connection with RST flag", 
+            "enabled": true, 
+            "name": "refused", 
+            "term": "flow.refused"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to start replying to a request", 
+            "enabled": true, 
+            "name": "reply_time", 
+            "term": "flow.sc-reply-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the client to send a request", 
+            "enabled": true, 
+            "name": "request_time", 
+            "term": "flow.cs-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to send a response", 
+            "enabled": true, 
+            "name": "response_time", 
+            "term": "flow.sc-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt", 
+            "term": "flow.ps-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt_packets", 
+            "term": "flow.ps-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt_sum", 
+            "term": "flow.ps-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client IP Address", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client port number", 
+            "enabled": true, 
+            "name": "src_port", 
+            "term": "flow.c-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "md5 of SSL certificate", 
+            "enabled": true, 
+            "name": "ssl_cert_md5", 
+            "term": "flow.ssl-cert-md5"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates whether the SSL certificate is self-signed (1) or not (0)", 
+            "enabled": true, 
+            "name": "ssl_cert_self_signed", 
+            "term": "flow.ssl-cert-self-signed"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "sha1 of SSL certificate", 
+            "enabled": true, 
+            "name": "ssl_cert_sha1", 
+            "term": "flow.ssl-cert-sha1"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "sha256 of SSL certificate", 
+            "enabled": true, 
+            "name": "ssl_cert_sha256", 
+            "term": "flow.ssl-cert-sha256"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Cipher suite id of selected cipher", 
+            "enabled": true, 
+            "name": "ssl_cipher_id", 
+            "term": "flow.ssl-cipher-suite-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Cipher suite name of selected cipher", 
+            "enabled": true, 
+            "name": "ssl_cipher_name", 
+            "term": "flow.ssl-cipher-suite-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "List of client's cipher suite ids", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "ssl_client_cipher_list", 
+            "term": "flow.ssl-client-cipher-suite-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "List of client's cipher suite names", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "ssl_client_cipher_names", 
+            "term": "flow.ssl-client-cipher-suite-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "List of client's compression methods", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "ssl_client_compression_methods", 
+            "term": "flow.ssl-client-compression-method"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL version in client hello", 
+            "enabled": true, 
+            "name": "ssl_client_hello_version", 
+            "term": "flow.ssl-client-hello-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Selected compression method", 
+            "enabled": true, 
+            "name": "ssl_compression_method", 
+            "term": "flow.ssl-compression-method"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Issuer in SSL certificate", 
+            "enabled": true, 
+            "name": "ssl_issuer", 
+            "term": "flow.ssl-cert-issuer"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Public key algorithm in SSL certificate", 
+            "enabled": true, 
+            "name": "ssl_publickey_algorithm", 
+            "term": "flow.ssl-cert-public-key-algorithm"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Public key bit length", 
+            "enabled": true, 
+            "name": "ssl_publickey_bit_len", 
+            "term": "flow.ssl-cert-public-key-bit-length"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Serial number of SSL certificate", 
+            "enabled": true, 
+            "name": "ssl_serialnumber", 
+            "term": "flow.ssl-cert-serialnumber"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL session id", 
+            "enabled": true, 
+            "name": "ssl_session_id", 
+            "term": "flow.ssl-session-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Signature algorithm in SSL certificate", 
+            "enabled": true, 
+            "name": "ssl_signature_algorithm", 
+            "term": "flow.ssl-cert-signature-algorithm"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Subject in SSL certificate", 
+            "enabled": true, 
+            "name": "ssl_subject", 
+            "term": "flow.ssl-cert-subject"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to negotiate an SSL handshake", 
+            "enabled": true, 
+            "name": "ssl_time", 
+            "term": "flow.ssl-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL certificate's validity end date", 
+            "enabled": true, 
+            "name": "ssl_validity_end", 
+            "term": "flow.ssl-cert-validity-not-after"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL certificate's validity start date", 
+            "enabled": true, 
+            "name": "ssl_validity_start", 
+            "term": "flow.ssl-cert-validity-not-before"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL protocol version used for encryption, or undefined if not encrypted", 
+            "enabled": true, 
+            "name": "ssl_version", 
+            "term": "flow.ssl-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP handshake status (0=OK, 1=RESET, 2=IGNORED)", 
+            "enabled": true, 
+            "name": "tcp_status", 
+            "term": "flow.tcp-status"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+            "enabled": true, 
+            "name": "time_taken", 
+            "term": "flow.time-taken"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+            "enabled": true, 
+            "name": "vlan_id", 
+            "term": "flow.vlan-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": false, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "All raw payload content sent from server to client", 
+            "enabled": false, 
+            "name": "dest_content", 
+            "term": "flow.sc-content"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": false, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "All raw payload content sent from client to server", 
+            "enabled": false, 
+            "name": "src_content", 
+            "term": "flow.cs-content"
+        },
+       {
+            "aggType": "value", 
+            "desc": "Initial TCP connection round-trip time (TCP connection setup time)", 
+            "enabled": true, 
+            "name": "initial_rtt", 
+            "term": "flow.initial-tcp-rtt"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+
+    ], 
+    "filters": {
+        "comparisons": [], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ES_TCP_RAW", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "modifiedBy": "admin", 
+    "name": "Stream for ES Config Template - TCP Raw", 
+    "protocolName": "TCP", 
+    "sourcetype": "stream:tcp", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

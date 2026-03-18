@@ -1,0 +1,1316 @@
+
+<dashboard version="2" theme="dark">
+    <label>Domain</label>
+    <description>Gain comprehensive insights into network performance including utilization, congestion, and error rates for all Network Objects within IMM, Standalone and Unified Edge targets. This dashboard leverages both Inventory and Network Metrics data sources to deliver a unified, correlated view of network health and performance across your infrastructure.</description>
+    <definition><![CDATA[
+{
+    "title": "Domain",
+    "description": "Gain comprehensive insights into network performance including utilization, congestion, and error rates for all Network Objects within IMM, Standalone and Unified Edge targets. This dashboard leverages both Inventory and Network Metrics data sources to deliver a unified, correlated view of network health and performance across your infrastructure.",
+    "inputs": {
+        "input_DWNtKVDG": {
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "label": ">primary | seriesByName(\"account_name\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "value": ">primary | seriesByName(\"account_name\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            },
+            "dataSources": {
+                "primary": "ds_mFgnShzC"
+            },
+            "options": {
+                "defaultValue": [
+                    "*"
+                ],
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "account_name"
+            },
+            "title": "Intersight Account Name",
+            "type": "input.multiselect"
+        },
+        "input_F0hY1ofj": {
+            "options": {
+                "defaultValue": "*",
+                "prefix": "*",
+                "suffix": "*",
+                "token": "errors_port_name"
+            },
+            "title": "Port Name",
+            "type": "input.text"
+        },
+        "input_Xdl4x1T6": {
+            "options": {
+                "defaultValue": "timechart",
+                "items": [
+                    {
+                        "label": "Auto",
+                        "value": "timechart"
+                    },
+                    {
+                        "label": "15 Minute",
+                        "value": "timechart span=15m"
+                    },
+                    {
+                        "label": "30 Minute",
+                        "value": "timechart span=30m"
+                    },
+                    {
+                        "label": "1 Hour",
+                        "value": "timechart span=1h"
+                    }
+                ],
+                "token": "granularity"
+            },
+            "title": "Granularity for Linecharts",
+            "type": "input.dropdown"
+        },
+        "input_global_trp": {
+            "options": {
+                "defaultValue": "-24h@h,now",
+                "token": "time_range"
+            },
+            "title": "Select Time Range",
+            "type": "input.timerange"
+        },
+        "input_lL7jpA9T": {
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "label": ">primary | seriesByName(\"event.DomainName\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "value": ">primary | seriesByName(\"event.DomainId\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            },
+            "dataSources": {
+                "primary": "ds_HDwPB51A"
+            },
+            "options": {
+                "defaultValue": [
+                    "*"
+                ],
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "select_domain"
+            },
+            "title": "Select Domains",
+            "type": "input.multiselect"
+        },
+        "input_vBipVYTY": {
+            "context": {},
+            "dataSources": {},
+            "options": {
+                "defaultValue": "false",
+                "items": [
+                    {
+                        "label": "Exclude zero values",
+                        "value": "false"
+                    },
+                    {
+                        "label": "Include zero values",
+                        "value": "true"
+                    }
+                ],
+                "token": "show_zero_values"
+            },
+            "title": "",
+            "type": "input.dropdown"
+        }
+    },
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {
+                        "earliest": "$global_time.earliest$",
+                        "latest": "$global_time.latest$"
+                    }
+                }
+            }
+        }
+    },
+    "visualizations": {
+        "viz_0Js2d7ws": {
+            "dataSources": {
+                "primary": "ds_9cUNf2gC"
+            },
+            "description": "This panel displays domain-level network congestion by visualizing receive pause frames and priority pause protocol (PPP) frames. These metrics help identify congestion issues at the receiver level, offering insights into traffic flow interruptions and QoS-related throttling across network domains.",
+            "eventHandlers": [
+                {
+                    "options": {
+                        "tokens": [
+                            {
+                                "key": "row._event_id.value",
+                                "token": "clicked_receive_congestion"
+                            },
+                            {
+                                "key": "row.Port Name.value",
+                                "token": "clicked_receive_congestion_name"
+                            }
+                        ]
+                    },
+                    "type": "drilldown.setToken"
+                }
+            ],
+            "options": {
+                "count": 5,
+                "drilldown": "row",
+                "showInternalFields": false
+            },
+            "showProgressBar": true,
+            "title": "Receive Pause Frames",
+            "type": "splunk.table"
+        },
+        "viz_48OtOyXG": {
+            "dataSources": {
+                "primary": "ds_UN22HRpU"
+            },
+            "hideWhenNoData": true,
+            "showProgressBar": true,
+            "title": "Storage Receive Traffic FI-A (Sum): '$clicked_domain_name_storage$'",
+            "type": "splunk.singlevalue"
+        },
+        "viz_5Q7OOnVf": {
+            "dataSources": {
+                "primary": "ds_i3LK2l31"
+            },
+            "description": "This panel displays Fibre Channel uplink traffic distribution. It helps monitor traffic patterns, detect bottlenecks, and ensure balanced utilization across FC and FCoE-based uplinks in the network fabric.",
+            "eventHandlers": [
+                {
+                    "options": {
+                        "tokens": [
+                            {
+                                "key": "row._domain_id.value",
+                                "token": "clicked_domain_storage"
+                            },
+                            {
+                                "key": "row.Domain Name.value",
+                                "token": "clicked_domain_name_storage"
+                            },
+                            {
+                                "key": "row._tx_a_avg.value",
+                                "token": "_tx_a_avg_fibre"
+                            },
+                            {
+                                "key": "row._tx_b_avg.value",
+                                "token": "_tx_b_avg_fibre"
+                            },
+                            {
+                                "key": "row._rx_a_avg.value",
+                                "token": "_rx_a_avg_fibre"
+                            },
+                            {
+                                "key": "row._rx_b_avg.value",
+                                "token": "_rx_b_avg_fibre"
+                            }
+                        ]
+                    },
+                    "type": "drilldown.setToken"
+                }
+            ],
+            "options": {
+                "count": 5,
+                "data": {
+                    "fields": [
+                        {
+                            "name": "Domain Name"
+                        }
+                    ]
+                },
+                "dataOverlayMode": "none",
+                "drilldown": "row",
+                "showInternalFields": false
+            },
+            "showProgressBar": true,
+            "title": "Traffic Distribution Fibre Channel Uplinks",
+            "type": "splunk.table"
+        },
+        "viz_5pup8hmj": {
+            "dataSources": {
+                "primary": "ds_qFZSKKiQ"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "KB",
+                "yAxisTitleVisibility": "hide"
+            },
+            "showProgressBar": true,
+            "title": "Transmit Pause Frames per selected port: '$clicked_transmit_congestion_name$'",
+            "type": "splunk.line"
+        },
+        "viz_9hB0EYXX": {
+            "dataSources": {
+                "primary": "ds_ZHssRxLI"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "KB",
+                "yAxisTitleVisibility": "hide"
+            },
+            "showProgressBar": true,
+            "title": "Errors per selected port: '$clicked_errors_name$'",
+            "type": "splunk.line"
+        },
+        "viz_GsxapOMK": {
+            "dataSources": {
+                "primary": "ds_MfHlXfbY"
+            },
+            "description": "This panel displays domain-level network congestion by visualizing transmit pause frames and priority pause protocol (PPP) frames. These metrics help identify congestion issues at the transmission level, offering insights into traffic flow interruptions and QoS-related throttling across network domains.",
+            "eventHandlers": [
+                {
+                    "options": {
+                        "tokens": [
+                            {
+                                "key": "row._event_id.value",
+                                "token": "clicked_transmit_congestion"
+                            },
+                            {
+                                "key": "row.Port Name.value",
+                                "token": "clicked_transmit_congestion_name"
+                            }
+                        ]
+                    },
+                    "type": "drilldown.setToken"
+                }
+            ],
+            "options": {
+                "count": 5,
+                "drilldown": "row",
+                "showInternalFields": false
+            },
+            "showProgressBar": true,
+            "title": "Congestion - Transmit Pause Frames",
+            "type": "splunk.table"
+        },
+        "viz_JFXSimOr": {
+            "dataSources": {
+                "primary": "ds_EG3b2a2R"
+            },
+            "hideWhenNoData": true,
+            "showProgressBar": true,
+            "title": "Storage Transmit Traffic FI-B (Sum): '$clicked_domain_name_storage$'",
+            "type": "splunk.singlevalue"
+        },
+        "viz_JbDArjPE": {
+            "dataSources": {
+                "primary": "ds_gsJFSJgX"
+            },
+            "description": "This panel provides an overview of domain-level network errors by aggregating various critical error metrics such as total errors, receive/transmit errors, CRC, runt, jabber, and collisions. It helps in identifying and isolating network issues that may impact performance and reliability across the infrastructure.",
+            "eventHandlers": [
+                {
+                    "options": {
+                        "tokens": [
+                            {
+                                "key": "row._event_id.value",
+                                "token": "clicked_errors"
+                            },
+                            {
+                                "key": "row.Port Name.value",
+                                "token": "clicked_errors_name"
+                            }
+                        ]
+                    },
+                    "type": "drilldown.setToken"
+                }
+            ],
+            "options": {
+                "count": 5,
+                "drilldown": "row",
+                "showInternalFields": false
+            },
+            "showProgressBar": true,
+            "title": "Errors - Overview",
+            "type": "splunk.table"
+        },
+        "viz_N8p14lBH": {
+            "dataSources": {
+                "primary": "ds_5sCA35Vp"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "MB"
+            },
+            "showProgressBar": true,
+            "title": "Storage Receive Utilization FI-A (Sum): '$clicked_domain_name_storage$'",
+            "type": "splunk.line"
+        },
+        "viz_OUGDNBRk": {
+            "dataSources": {
+                "primary": "ds_smjSQuD0"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "$_rx_b_avg$"
+            },
+            "showProgressBar": true,
+            "title": "Eth Receive Utilization FI-B (Sum): '$clicked_domain_name$'",
+            "type": "splunk.line"
+        },
+        "viz_WZWJWEVV": {
+            "dataSources": {
+                "primary": "ds_7eUtIFox_ds_9esyun1W"
+            },
+            "hideWhenNoData": true,
+            "showProgressBar": true,
+            "title": "Eth Receive Traffic FI-B (Sum): '$clicked_domain_name$'",
+            "type": "splunk.singlevalue"
+        },
+        "viz_WzAinsTa": {
+            "dataSources": {
+                "primary": "ds_9esyun1W"
+            },
+            "hideWhenNoData": true,
+            "showProgressBar": true,
+            "title": "Eth Receive Traffic FI-A (Sum): '$clicked_domain_name$'",
+            "type": "splunk.singlevalue"
+        },
+        "viz_aXm5lYST": {
+            "dataSources": {
+                "primary": "ds_e7lWB8VM"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "MB"
+            },
+            "showProgressBar": true,
+            "title": "Storage Transmit Utilization FI-A (Sum): '$clicked_domain_name_storage$'",
+            "type": "splunk.line"
+        },
+        "viz_b4fIEkDM": {
+            "dataSources": {
+                "primary": "ds_6G4JaI9N"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "dataValuesDisplay": "off",
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showSplitSeries": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "auto",
+                "yAxisScale": "linear",
+                "yAxisTitleText": "$_tx_a_avg$"
+            },
+            "showProgressBar": true,
+            "title": "Eth Transmit Utilization FI-A (Sum): '$clicked_domain_name$'",
+            "type": "splunk.line"
+        },
+        "viz_cWB1xFNl": {
+            "dataSources": {
+                "primary": "ds_JfD5fwyN"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "$_tx_b_avg$"
+            },
+            "showProgressBar": true,
+            "title": "Eth Transmit Utilization FI-B (Sum): '$clicked_domain_name$'",
+            "type": "splunk.line"
+        },
+        "viz_eT9bXIJC": {
+            "dataSources": {
+                "primary": "ds_8wIXgQAe"
+            },
+            "hideWhenNoData": true,
+            "showProgressBar": true,
+            "title": "Storage Transmit Traffic FI-A (Sum): '$clicked_domain_name_storage$'",
+            "type": "splunk.singlevalue"
+        },
+        "viz_ggSo9gnY": {
+            "dataSources": {
+                "primary": "ds_vf1qN10G"
+            },
+            "description": "This panel presents the transmit utilization percentage for each network port. It leverages the bandwidth utilization metric to identify under or over-utilized ports across different roles.",
+            "options": {
+                "count": 5,
+                "drilldown": "none",
+                "showInternalFields": false
+            },
+            "showProgressBar": true,
+            "title": "Utilization % per port",
+            "type": "splunk.table"
+        },
+        "viz_lVfPE8Z7": {
+            "dataSources": {
+                "primary": "ds_aUQyE1s4"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "dataValuesDisplay": "off",
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showSplitSeries": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "$_rx_a_avg$",
+                "yAxisTitleVisibility": "show"
+            },
+            "showProgressBar": true,
+            "title": "Eth Receive Utilization FI-A (Sum): '$clicked_domain_name$'",
+            "type": "splunk.line"
+        },
+        "viz_oFb7w2Xp": {
+            "dataSources": {
+                "primary": "ds_vKBUG4fH"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "KB",
+                "yAxisTitleVisibility": "hide"
+            },
+            "showProgressBar": true,
+            "title": "Receive Pause Frames per selected port: '$clicked_receive_congestion_name$'",
+            "type": "splunk.line"
+        },
+        "viz_pN03fa2v": {
+            "dataSources": {
+                "primary": "ds_b9kS1q5D"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "MB"
+            },
+            "showProgressBar": true,
+            "title": "Storage Transmit Utilization FI-B (Sum): '$clicked_domain_name_storage$'",
+            "type": "splunk.line"
+        },
+        "viz_r1ltbb8I": {
+            "dataSources": {
+                "primary": "ds_jY5hn9Xf_ds_J9pipK9D"
+            },
+            "hideWhenNoData": true,
+            "showProgressBar": true,
+            "title": "Eth Transmit Traffic FI-B (Sum): '$clicked_domain_name$'",
+            "type": "splunk.singlevalue"
+        },
+        "viz_tWBzcJMR": {
+            "dataSources": {
+                "primary": "ds_knVOZ0nU"
+            },
+            "hideWhenNoData": true,
+            "options": {
+                "legendTruncation": "ellipsisMiddle",
+                "nullValueDisplay": "connect",
+                "showRoundedY2AxisLabels": false,
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "y2AxisAbbreviation": "off",
+                "yAxisAbbreviation": "off",
+                "yAxisTitleText": "MB"
+            },
+            "showProgressBar": true,
+            "title": "Storage Receive Utilization FI-B (Sum): '$clicked_domain_name_storage$'",
+            "type": "splunk.line"
+        },
+        "viz_u1ZRDyrD": {
+            "dataSources": {
+                "primary": "ds_fctOITN2"
+            },
+            "hideWhenNoData": true,
+            "showProgressBar": true,
+            "title": "Storage Receive Traffic FI-B (Sum): '$clicked_domain_name_storage$'",
+            "type": "splunk.singlevalue"
+        },
+        "viz_vlq8ySQh": {
+            "dataSources": {
+                "primary": "ds_J9pipK9D"
+            },
+            "hideWhenNoData": true,
+            "showProgressBar": true,
+            "title": "Eth Transmit Traffic FI-A (Sum): '$clicked_domain_name$'",
+            "type": "splunk.singlevalue"
+        },
+        "viz_yboqdNaK": {
+            "dataSources": {
+                "primary": "ds_BOH96skN"
+            },
+            "description": "This panel shows Ethernet uplink traffic distribution. It helps identify imbalances, detect anomalies, and optimize uplink performance across domain-level network infrastructure.",
+            "eventHandlers": [
+                {
+                    "options": {
+                        "tokens": [
+                            {
+                                "key": "row._domain_id.value",
+                                "token": "clicked_domain"
+                            },
+                            {
+                                "key": "row.Domain Name.value",
+                                "token": "clicked_domain_name"
+                            },
+                            {
+                                "key": "row._tx_a_avg.value",
+                                "token": "_tx_a_avg"
+                            },
+                            {
+                                "key": "row._tx_b_avg.value",
+                                "token": "_tx_b_avg"
+                            },
+                            {
+                                "key": "row._rx_a_avg.value",
+                                "token": "_rx_a_avg"
+                            },
+                            {
+                                "key": "row._rx_b_avg.value",
+                                "token": "_rx_b_avg"
+                            }
+                        ]
+                    },
+                    "type": "drilldown.setToken"
+                }
+            ],
+            "options": {
+                "count": 5,
+                "data": {
+                    "fields": [
+                        {
+                            "name": "Domain Name"
+                        }
+                    ]
+                },
+                "dataOverlayMode": "none",
+                "drilldown": "row",
+                "showInternalFields": false
+            },
+            "showProgressBar": true,
+            "title": "Utilization - Traffic Distribution Ethernet Uplinks",
+            "type": "splunk.table"
+        }
+    },
+    "dataSources": {
+        "ds_5sCA35Vp": {
+            "name": "Storage Receive Utilization FI-A _Sum__ __clicked_domain_name_storage__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain_storage$\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n        AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-A\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\"\n    span=15m\n\n| eval nirs_mb = `cisco_intersight_bytes_to_given_unit(total_nirs, $_rx_a_avg_fibre$)`\n\n|  $granularity$ sum(nirs_mb) AS \"Network IO Receive (Sum)\" by \"cisco_intersight.cisco_intersight_network.network_name\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_6G4JaI9N": {
+            "name": "Eth Transmit Utilization FI-A _Sum__ __clicked_domain_name__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain$\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"eth_uplink\"\n        AND \"cisco_intersight.cisco_intersight_network.network_port_type\" = \"ethernet\"\n        AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-A\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\"\n    span=15m\n\n| eval nits_mb = `cisco_intersight_bytes_to_given_unit(total_nits, $_tx_a_avg$)`\n\n| $granularity$ sum(nits_mb) as \"Network IO Transmit (Sum)\" by \"cisco_intersight.cisco_intersight_network.network_name\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_7eUtIFox_ds_9esyun1W": {
+            "name": "Eth Receive Traffic FI-B _Sum_ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs \n  from datamodel=Cisco_Intersight \n  where nodename=cisco_intersight.cisco_intersight_network\n    AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain$\n    AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-B\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"eth_uplink\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_type\" = \"ethernet\"\n| eval total_nirs_readable = case(\n    total_nirs >= 1099511627776, round(total_nirs/1024/1024/1024/1024, 2) . \" TB\",\n    total_nirs >= 1073741824,    round(total_nirs/1024/1024/1024, 2) . \" GB\",\n    total_nirs >= 1048576,       round(total_nirs/1024/1024, 2) . \" MB\",\n    total_nirs >= 1024,          round(total_nirs/1024, 2) . \" KB\",\n    true(),                      total_nirs . \" B\"\n)\n| table total_nirs_readable",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_8wIXgQAe": {
+            "name": "Storage Transmit Traffic FI-A _Sum_ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n  from datamodel=Cisco_Intersight\n  where nodename=cisco_intersight.cisco_intersight_network\n    AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain_storage$\n    AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-A\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n| eval total_nits_readable = case(\n    total_nits >= 1099511627776, round(total_nits/1024/1024/1024/1024, 2) . \" TB\",\n    total_nits >= 1073741824,    round(total_nits/1024/1024/1024, 2) . \" GB\",\n    total_nits >= 1048576,       round(total_nits/1024/1024, 2) . \" MB\",\n    total_nits >= 1024,          round(total_nits/1024, 2) . \" KB\",\n    true(),                      total_nits . \" B\"\n)\n| table total_nits_readable",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_9cUNf2gC": {
+            "name": "Receive Pause Frames 1 search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_receive_pause_sum) as nrps,\n    sum(cisco_intersight.cisco_intersight_network.network_receive_ppp_sum) as nprppps \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network\n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND NOT cisco_intersight.cisco_intersight_network.network_port_role IN (\"unconfigured\", \"server_pc\", \"fabric_pc\", \"host_pc\", \"vethernet\", \"vfc\", \"vnic\", \"vhba\", \"eth_uplink_pc\")\n    by \n        cisco_intersight.cisco_intersight_network.network_domain_name, \n        cisco_intersight.cisco_intersight_network.network_host_name,\n        cisco_intersight.cisco_intersight_network.network_port_role,\n        cisco_intersight.cisco_intersight_network.network_name,\n        cisco_intersight.cisco_intersight_network.network_id,\n        cisco_intersight.cisco_intersight_network.network_account_name\n\n| where isnotnull(nrps)\n| where isnotnull(nprppps)\n\n| where \"$show_zero_values$\"=\"true\" \n   OR (nrps != 0 or nprppps != 0)\n\n| eval total_congestion = 'nrps' + 'nprppps'\n| rex field=cisco_intersight.cisco_intersight_network.network_host_name \"FI-(?<FI>[AB])\"\n| rename \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_port_role as \"Network Port Role\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_id as _event_id,\n    total_congestion as \"Total Congestion\"\n    nrps as \"Ethernet\",\n    nprppps as \"FC\"\n| table \"Domain Name\", FI, \"Network Port Role\", \"Port Name\", \"Total Congestion\", \"Ethernet\", \"FC\", _event_id",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_9esyun1W": {
+            "name": "Eth Receive Traffic FI-A _Sum_ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs \n  from datamodel=Cisco_Intersight \n  where nodename=cisco_intersight.cisco_intersight_network\n    AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain$\n    AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-A\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"eth_uplink\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_type\" = \"ethernet\"\n| eval total_nirs_readable = case(\n    total_nirs >= 1099511627776, round(total_nirs/1024/1024/1024/1024, 2) . \" TB\",\n    total_nirs >= 1073741824,    round(total_nirs/1024/1024/1024, 2) . \" GB\",\n    total_nirs >= 1048576,       round(total_nirs/1024/1024, 2) . \" MB\",\n    total_nirs >= 1024,          round(total_nirs/1024, 2) . \" KB\",\n    true(),                      total_nirs . \" B\"\n)\n| table total_nirs_readable",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_BOH96skN": {
+            "name": "Domain Utilization - Traffic Distribution Ethernet Uplinks search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n       sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n       sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n       from datamodel=Cisco_Intersight\n       where nodename=cisco_intersight.cisco_intersight_network\n       AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" IN ($select_domain$)\n       AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"eth_uplink\")\n       AND \"cisco_intersight.cisco_intersight_network.network_port_type\" IN (\"ethernet\")\n       AND \"cisco_intersight.cisco_intersight_network.network_account_name\" IN ($account_name$)\n       by \"cisco_intersight.cisco_intersight_network.network_domain_name\",\n          \"cisco_intersight.cisco_intersight_network.network_domain_id\",\n          \"cisco_intersight.cisco_intersight_network.network_host_name\", \"cisco_intersight.cisco_intersight_network.network_account_name\", _time\n       span=1m\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_host_name\" \"(?<fi_type>FI-[AB])\"\n\n| eval fi_type_tx = fi_type . \"_tx\", fi_type_rx = fi_type . \"_rx\"\n| eval {fi_type_tx} = total_nits, {fi_type_rx} = total_nirs\n\n| stats \n    sum(FI-A_tx) as tx_a, \n    sum(FI-A_rx) as rx_a, \n    sum(FI-B_tx) as tx_b, \n    sum(FI-B_rx) as rx_b,\n    avg(FI-A_tx) as tx_a_avg, \n    avg(FI-A_rx) as rx_a_avg, \n    avg(FI-B_tx) as tx_b_avg, \n    avg(FI-B_rx) as rx_b_avg\n    by \"cisco_intersight.cisco_intersight_network.network_domain_name\", \"cisco_intersight.cisco_intersight_network.network_domain_id\"\n\n| eval \n    tx_a = coalesce(tx_a, 0), \n    tx_b = coalesce(tx_b, 0), \n    rx_a = coalesce(rx_a, 0), \n    rx_b = coalesce(rx_b, 0),\n    total_combined_tx = tx_a + tx_b,\n    total_combined_rx = rx_a + rx_b\n\n| where \"$show_zero_values$\"=\"true\" \n      OR (total_combined_tx != 0 or total_combined_rx != 0)\n\n| eval \n    \"Total Transmit FI-A\" = `cisco_intersight_human_readable_bytes(tx_a)`.\" \".`cisco_intersight_human_readable_unit(tx_a)`,\n    \"Total Transmit FI-B\" = `cisco_intersight_human_readable_bytes(tx_b)`.\" \".`cisco_intersight_human_readable_unit(tx_b)`,\n    \"Total Receive FI-A\" = `cisco_intersight_human_readable_bytes(rx_a)`.\" \".`cisco_intersight_human_readable_unit(rx_a)`,\n    \"Total Receive FI-B\" = `cisco_intersight_human_readable_bytes(rx_b)`.\" \".`cisco_intersight_human_readable_unit(rx_b)`,\n    \"Total Transmit\" = `cisco_intersight_human_readable_bytes(total_combined_tx)`.\" \".`cisco_intersight_human_readable_unit(total_combined_tx)`,\n    \"Total Receive\" = `cisco_intersight_human_readable_bytes(total_combined_rx)`.\" \".`cisco_intersight_human_readable_unit(total_combined_rx)`,\n    _tx_a_avg = `cisco_intersight_human_readable_unit(tx_a_avg)`, _rx_a_avg = `cisco_intersight_human_readable_unit(rx_a_avg)`, _tx_b_avg = `cisco_intersight_human_readable_unit(tx_b_avg)`, _rx_b_avg = `cisco_intersight_human_readable_unit(rx_b_avg)`\n\n| rename \"cisco_intersight.cisco_intersight_network.network_domain_name\" as \"Domain Name\", \n         \"cisco_intersight.cisco_intersight_network.network_domain_id\" as event.DomainId, event.DomainId as _domain_id\n\n| table \"Domain Name\", \"Total Transmit\", \"Total Transmit FI-A\", \"Total Transmit FI-B\", \"Total Receive\", \"Total Receive FI-A\", \"Total Receive FI-B\", _domain_id, _tx_a_avg, _rx_a_avg, _tx_b_avg, _rx_b_avg",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_EG3b2a2R": {
+            "name": "Storage Transmit Traffic FI-B _Sum_ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n  from datamodel=Cisco_Intersight\n  where nodename=cisco_intersight.cisco_intersight_network\n    AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain_storage$\n    AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-B\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n| eval total_nits_readable = case(\n    total_nits >= 1099511627776, round(total_nits/1024/1024/1024/1024, 2) . \" TB\",\n    total_nits >= 1073741824,    round(total_nits/1024/1024/1024, 2) . \" GB\",\n    total_nits >= 1048576,       round(total_nits/1024/1024, 2) . \" MB\",\n    total_nits >= 1024,          round(total_nits/1024, 2) . \" KB\",\n    true(),                      total_nits . \" B\"\n)\n| table total_nits_readable",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_HDwPB51A": {
+            "name": "Select Domains search",
+            "options": {
+                "query": "| tstats values(cisco_intersight.cisco_intersight_network.network_domain_name) as DomainName \n         values(cisco_intersight.cisco_intersight_network.network_domain_id) as DomainId\n  from datamodel=Cisco_Intersight \n  where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_domain_name=*,\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n  by cisco_intersight.cisco_intersight_network.network_domain_id, \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| rename DomainName as \"event.DomainName\", DomainId as \"event.DomainId\"\n| table event.DomainName, event.DomainId",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "type": "ds.search"
+        },
+        "ds_J9pipK9D": {
+            "name": "Eth Transmit Traffic FI-A _Sum_ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits \n  from datamodel=Cisco_Intersight \n  where nodename=cisco_intersight.cisco_intersight_network\n    AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain$\n    AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-A\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"eth_uplink\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_type\" = \"ethernet\"\n| eval total_nits_readable = case(\n    total_nits >= 1099511627776, round(total_nits/1024/1024/1024/1024, 2) . \" TB\",\n    total_nits >= 1073741824,    round(total_nits/1024/1024/1024, 2) . \" GB\",\n    total_nits >= 1048576,       round(total_nits/1024/1024, 2) . \" MB\",\n    total_nits >= 1024,          round(total_nits/1024, 2) . \" KB\",\n    true(),                      total_nits . \" B\"\n)\n| table total_nits_readable",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_JfD5fwyN": {
+            "name": "Eth Transmit Utilization FI-B _Sum__ __clicked_domain_name__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain$\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"eth_uplink\"\n        AND \"cisco_intersight.cisco_intersight_network.network_port_type\" = \"ethernet\"\n        AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-B\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\"\n    span=15m\n\n| eval nits_mb = `cisco_intersight_bytes_to_given_unit(total_nits, $_tx_b_avg$)`\n\n| $granularity$ sum(nits_mb) AS \"Network IO Transmit (Sum)\" by \"cisco_intersight.cisco_intersight_network.network_name\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_MfHlXfbY": {
+            "name": "Domain Congestion - Transmit Pause Frames search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_pause_sum) as ntps \n    sum(cisco_intersight.cisco_intersight_network.network_transmit_ppp_sum) as nptppps \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n        AND \"cisco_intersight.cisco_intersight_network.network_account_name\" IN ($account_name$)\n        AND NOT cisco_intersight.cisco_intersight_network.network_port_role IN (\"unconfigured\", \"server_pc\", \"fabric_pc\", \"host_pc\", \"vethernet\", \"vfc\", \"vnic\", \"vhba\", \"eth_uplink_pc\")\n    by \n        cisco_intersight.cisco_intersight_network.network_domain_name, \n        cisco_intersight.cisco_intersight_network.network_host_name, \n        cisco_intersight.cisco_intersight_network.network_port_role, \n        cisco_intersight.cisco_intersight_network.network_name, \n        cisco_intersight.cisco_intersight_network.network_id\n        , cisco_intersight.cisco_intersight_network.network_account_name\n\n| where isnotnull(ntps)\n| where isnotnull(nptppps)\n\n| where \"$show_zero_values$\"=\"true\" \n   OR (ntps != 0 or nptppps != 0)\n\n| eval total_congestion = 'ntps' + 'nptppps'\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_host_name\" \"FI-(?<FI>[AB])\"\n\n| rename \n    ntps as \"Ethernet\", \n    nptppps as \"FC\", \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\", \n    cisco_intersight.cisco_intersight_network.network_port_role as \"Network Port Role\", \n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\", \n    total_congestion as \"Total Congestion\", \n    cisco_intersight.cisco_intersight_network.network_id as _event_id\n\n| table \"Domain Name\", FI, \"Network Port Role\", \"Port Name\", \"Total Congestion\", \"Ethernet\", \"FC\", _event_id",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_UN22HRpU": {
+            "name": "Storage Receive Traffic FI-A _Sum_ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n  from datamodel=Cisco_Intersight\n  where nodename=cisco_intersight.cisco_intersight_network\n    AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain_storage$\n    AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-A\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n| eval total_nirs_readable = case(\n    total_nirs >= 1099511627776, round(total_nirs/1024/1024/1024/1024, 2) . \" TB\",\n    total_nirs >= 1073741824,    round(total_nirs/1024/1024/1024, 2) . \" GB\",\n    total_nirs >= 1048576,       round(total_nirs/1024/1024, 2) . \" MB\",\n    total_nirs >= 1024,          round(total_nirs/1024, 2) . \" KB\",\n    true(),                      total_nirs . \" B\"\n)\n| table total_nirs_readable",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_ZHssRxLI": {
+            "name": "Errors per selected port_ __clicked_errors_name__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_receive_discard_error_sum) as \"enrds\",\n    sum(cisco_intersight.cisco_intersight_network.network_too_short_error_sum) as \"enrtss\",\n    sum(cisco_intersight.cisco_intersight_network.network_no_buffer_sum) as \"enrnbs\",\n    sum(cisco_intersight.cisco_intersight_network.network_crc_duration_sum) as \"ncrccs\",\n    sum(cisco_intersight.cisco_intersight_network.network_too_long_error_sum) as \"enrtls\",\n    sum(cisco_intersight.cisco_intersight_network.network_runt_error_sum) as \"nrrs\",\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_jabber_error_sum) as \"entjs\",\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_discard_error_sum) as \"entds\",\n    sum(cisco_intersight.cisco_intersight_network.network_carrier_sense_error_sum) as \"encss\",\n    sum(cisco_intersight.cisco_intersight_network.network_late_collisions_error_sum) as \"enlcs\",\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_deferred_error_sum) as \"entdfs\"\n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_id=\"$clicked_errors$\"\n    by _time span=15m\n\n|  $granularity$ sum(enrds) as \"Receive Discard\", \n           sum(enrtss) as \"Too Short\", \n           sum(enrnbs) as \"No Buffer\", \n           sum(ncrccs) as \"CRC\", \n           sum(enrtls) as \"Too Long\", \n           sum(nrrs) as \"Runt\", \n           sum(entjs) as \"Jabber\", \n           sum(entds) as \"Transmit Discard\", \n           sum(encss) as \"Carrier Sense\", \n           sum(enlcs) as \"Late Collision\", \n           sum(entdfs) as \"Transmit Deferred\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_aUQyE1s4": {
+            "name": "Eth Receive Utilization FI-A _Sum__ __clicked_domain_name__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain$\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"eth_uplink\"\n        AND \"cisco_intersight.cisco_intersight_network.network_port_type\" = \"ethernet\"\n        AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-A\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\"\n    span=15m\n\n| eval nirs_mb = `cisco_intersight_bytes_to_given_unit(total_nirs, $_rx_a_avg$)`\n\n|  $granularity$ sum(nirs_mb) AS \"Network IO Receive (Sum)\" by \"cisco_intersight.cisco_intersight_network.network_name\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_b9kS1q5D": {
+            "name": "Storage Transmit Utilization FI-B _Sum__ __clicked_domain_name_storage__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain_storage$\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n        AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-B\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\"\n    span=15m\n\n| eval nits_mb = `cisco_intersight_bytes_to_given_unit(total_nits, $_tx_b_avg_fibre$)`\n\n|  $granularity$ sum(nits_mb) AS \"Network IO Transmit (Sum)\" by \"cisco_intersight.cisco_intersight_network.network_name\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_e7lWB8VM": {
+            "name": "Storage Transmit Utilization FI-A _Sum__ __clicked_domain_name_storage__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain_storage$\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n        AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-A\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\"\n    span=15m\n\n| eval nits_mb = `cisco_intersight_bytes_to_given_unit(total_nits, $_tx_a_avg_fibre$)`\n\n|  $granularity$ sum(nits_mb) as \"Network IO Receive (Sum)\" by \"cisco_intersight.cisco_intersight_network.network_name\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_fctOITN2": {
+            "name": "Storage Receive Traffic FI-B _Sum_ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n  from datamodel=Cisco_Intersight\n  where nodename=cisco_intersight.cisco_intersight_network\n    AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain_storage$\n    AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-B\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n| eval total_nirs_readable = case(\n    total_nirs >= 1099511627776, round(total_nirs/1024/1024/1024/1024, 2) . \" TB\",\n    total_nirs >= 1073741824,    round(total_nirs/1024/1024/1024, 2) . \" GB\",\n    total_nirs >= 1048576,       round(total_nirs/1024/1024, 2) . \" MB\",\n    total_nirs >= 1024,          round(total_nirs/1024, 2) . \" KB\",\n    true(),                      total_nirs . \" B\"\n)\n| table total_nirs_readable",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_gsJFSJgX": {
+            "name": "Domain Errors - Overview search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` \n    sum(cisco_intersight.cisco_intersight_network.network_receive_discard_error_sum) as enrds,\n    sum(cisco_intersight.cisco_intersight_network.network_too_short_error_sum) as enrtss,\n    sum(cisco_intersight.cisco_intersight_network.network_no_buffer_sum) as enrnbs,\n    sum(cisco_intersight.cisco_intersight_network.network_crc_duration_sum) as ncrccs,\n    sum(cisco_intersight.cisco_intersight_network.network_too_long_error_sum) as enrtls,\n    sum(cisco_intersight.cisco_intersight_network.network_runt_error_sum) as nrrs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_jabber_error_sum) as entjs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_discard_error_sum) as entds,\n    sum(cisco_intersight.cisco_intersight_network.network_carrier_sense_error_sum) as encss,\n    sum(cisco_intersight.cisco_intersight_network.network_late_collisions_error_sum) as enlcs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_deferred_error_sum) as entdfs\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND cisco_intersight.cisco_intersight_network.network_name=\"*$errors_port_name$*\"\n        AND NOT cisco_intersight.cisco_intersight_network.network_port_role IN (\"unconfigured\", \"server_pc\", \"fabric_pc\", \"host_pc\", \"vethernet\", \"vfc\", \"vnic\", \"vhba\", \"eth_uplink_pc\")\n    by \n        \"cisco_intersight.cisco_intersight_network.network_domain_name\",\n        \"cisco_intersight.cisco_intersight_network.network_host_name\",\n        \"cisco_intersight.cisco_intersight_network.network_port_role\",\n        \"cisco_intersight.cisco_intersight_network.network_name\",\n        \"cisco_intersight.cisco_intersight_network.network_id\",\n        \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| where (\"$show_zero_values$\"=\"false\" \n   AND ((enrds != 0 AND isnotnull(enrds)) OR (enrtss != 0 AND isnotnull(enrtss)) OR (enrnbs != 0 AND isnotnull(enrnbs)) OR (ncrccs != 0 AND isnotnull(ncrccs)) OR (enrtls != 0 AND isnotnull(enrtls)) OR (nrrs != 0 AND isnotnull(nrrs)) OR (entjs != 0 AND isnotnull(entjs)) OR (entds != 0 AND isnotnull(entds)) OR (encss != 0 AND isnotnull(encss)) OR (enlcs != 0 AND isnotnull(enlcs)) OR (entdfs != 0 AND isnotnull(entdfs)))) OR (\"$show_zero_values$\"=\"true\" AND (isnotnull(enrds) OR isnotnull(enrtss) OR isnotnull(enrnbs) OR isnotnull(ncrccs) OR isnotnull(enrtls) OR isnotnull(nrrs) OR isnotnull(entjs) OR isnotnull(entds) OR isnotnull(encss) OR isnotnull(enlcs) OR isnotnull(entdfs)))\n\n| eval rx_sum = enrds + enrtss + enrnbs + ncrccs + enrtls + nrrs\n| eval tx_sum = entjs + entds + encss + enlcs + entdfs\n| eval total = rx_sum + tx_sum\n| rex field=cisco_intersight.cisco_intersight_network.network_host_name \"FI-(?<FI>[AB])\"\n| rename \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_port_role as \"Network Port Role\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_id as _event_id,\n    nrrs as Runt,\n    enrtls as \"Too Long\",\n    enrnbs as \"No Buffer\",\n    enrtss as \"Too Short\",\n    enrds as \"Receive Discard\",\n    entds as \"Transmit Discard\",\n    entdfs as \"Transmit Deferred\",\n    enlcs as \"Late Collision\",\n    encss as \"Carrier Sense\",\n    entjs as Jabber,\n    ncrccs as CRC,\n    rx_sum as \"Receive Errors Sum\",\n    tx_sum as \"Transmit Errors Sum\",\n    total as \"Total Errors\"\n| table \"Domain Name\", FI, \"Network Port Role\", \"Port Name\", \"Total Errors\", \"Receive Errors Sum\", \"Receive Discard\", \"Too Short\", \"No Buffer\", \"CRC\", \"Too Long\", \"Runt\", \"Transmit Errors Sum\", \"Jabber\", \"Transmit Discard\", \"Carrier Sense\", \"Late Collision\", \"Transmit Deferred\", _event_id\n| sort \"Network Port Role\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_i3LK2l31": {
+            "name": "Traffic Distribution Fibre Channel Uplinks search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n       sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n       sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits,\n       from datamodel=Cisco_Intersight\n       where nodename=cisco_intersight.cisco_intersight_network\n       AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" IN ($select_domain$)\n       AND \"cisco_intersight.cisco_intersight_network.network_account_name\" IN ($account_name$)\n       AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n       by \"cisco_intersight.cisco_intersight_network.network_domain_name\",\n          \"cisco_intersight.cisco_intersight_network.network_domain_id\",\n          \"cisco_intersight.cisco_intersight_network.network_host_name\", _time, \"cisco_intersight.cisco_intersight_network.network_account_name\"\n       span=1m\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_host_name\" \"(?<fi_type>FI-[AB])\"\n\n| eval fi_type_tx = fi_type . \"_tx\", fi_type_rx = fi_type . \"_rx\"\n| eval {fi_type_tx} = total_nits, {fi_type_rx} = total_nirs\n\n| stats \n    sum(FI-A_tx) as tx_a, \n    sum(FI-A_rx) as rx_a, \n    sum(FI-B_tx) as tx_b, \n    sum(FI-B_rx) as rx_b,\n    avg(FI-A_tx) as tx_a_avg, \n    avg(FI-A_rx) as rx_a_avg, \n    avg(FI-B_tx) as tx_b_avg, \n    avg(FI-B_rx) as rx_b_avg\n    by \"cisco_intersight.cisco_intersight_network.network_domain_name\", \"cisco_intersight.cisco_intersight_network.network_domain_id\"\n\n| eval \n    tx_a = coalesce(tx_a, 0), \n    tx_b = coalesce(tx_b, 0), \n    rx_a = coalesce(rx_a, 0), \n    rx_b = coalesce(rx_b, 0),\n    total_combined_tx = tx_a + tx_b,\n    total_combined_rx = rx_a + rx_b\n\n| where \"$show_zero_values$\"=\"true\" \n      OR (total_combined_tx != 0 or total_combined_rx != 0)\n\n| eval \n    \"Total Transmit FI-A\" = `cisco_intersight_human_readable_bytes(tx_a)`.\" \".`cisco_intersight_human_readable_unit(tx_a)`,\n    \"Total Transmit FI-B\" = `cisco_intersight_human_readable_bytes(tx_b)`.\" \".`cisco_intersight_human_readable_unit(tx_b)`,\n    \"Total Receive FI-A\" = `cisco_intersight_human_readable_bytes(rx_a)`.\" \".`cisco_intersight_human_readable_unit(rx_a)`,\n    \"Total Receive FI-B\" = `cisco_intersight_human_readable_bytes(rx_b)`.\" \".`cisco_intersight_human_readable_unit(rx_b)`,\n    \"Total Transmit\" = `cisco_intersight_human_readable_bytes(total_combined_tx)`.\" \".`cisco_intersight_human_readable_unit(total_combined_tx)`,\n    \"Total Receive\" = `cisco_intersight_human_readable_bytes(total_combined_rx)`.\" \".`cisco_intersight_human_readable_unit(total_combined_rx)`,\n    _tx_a_avg = `cisco_intersight_human_readable_unit(tx_a_avg)`, _rx_a_avg = `cisco_intersight_human_readable_unit(rx_a_avg)`, _tx_b_avg = `cisco_intersight_human_readable_unit(tx_b_avg)`, _rx_b_avg = `cisco_intersight_human_readable_unit(rx_b_avg)`\n\n| rename \"cisco_intersight.cisco_intersight_network.network_domain_name\" as \"Domain Name\", \n         \"cisco_intersight.cisco_intersight_network.network_domain_id\" as _domain_id\n\n| table \"Domain Name\", \"Total Transmit\", \"Total Transmit FI-A\", \"Total Transmit FI-B\", \"Total Receive\", \"Total Receive FI-A\", \"Total Receive FI-B\", _domain_id, _tx_a_avg, _rx_a_avg, _tx_b_avg, _rx_b_avg",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_jY5hn9Xf_ds_J9pipK9D": {
+            "name": "Eth Transmit Traffic FI-B _Sum_ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n  from datamodel=Cisco_Intersight\n  where nodename=cisco_intersight.cisco_intersight_network\n    AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain$\n    AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-B\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"eth_uplink\"\n    AND \"cisco_intersight.cisco_intersight_network.network_port_type\" = \"ethernet\"\n| eval total_nits_readable = case(\n    total_nits >= 1099511627776, round(total_nits/1024/1024/1024/1024, 2) . \" TB\",\n    total_nits >= 1073741824,    round(total_nits/1024/1024/1024, 2) . \" GB\",\n    total_nits >= 1048576,       round(total_nits/1024/1024, 2) . \" MB\",\n    total_nits >= 1024,          round(total_nits/1024, 2) . \" KB\",\n    true(),                      total_nits . \" B\"\n)\n| table total_nits_readable",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_knVOZ0nU": {
+            "name": "Storage Receive Utilization FI-B _Sum__ __clicked_domain_name_storage__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain_storage$\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"fc_uplink\", \"fc_storage\", \"fcoe_uplink\", \"fcoe_storage\", \"appliance\")\n        AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-B\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\"\n    span=15m\n\n| eval nirs_mb = `cisco_intersight_bytes_to_given_unit(total_nirs, $_rx_b_avg_fibre$)`\n\n|  $granularity$ sum(nirs_mb) AS \"Network IO Receive (Sum)\" by \"cisco_intersight.cisco_intersight_network.network_name\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_mFgnShzC": {
+            "name": "account_name",
+            "options": {
+                "query": "| tstats values(cisco_intersight.cisco_intersight_network.network_account_name) as account_name \n  from datamodel=Cisco_Intersight \n  where nodename=cisco_intersight.cisco_intersight_network \n  by cisco_intersight.cisco_intersight_network.network_account_name\n| dedup account_name\n| table account_name",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "type": "ds.search"
+        },
+        "ds_qFZSKKiQ": {
+            "name": "Transmit Pause Frames per selected port_ __clicked_transmit_congestion_name__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_pause_sum) as \"Ethernet\",\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_ppp_sum) as \"FC\"\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND cisco_intersight.cisco_intersight_network.network_id=\"$clicked_transmit_congestion$\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\", \"cisco_intersight.cisco_intersight_network.network_id\"\n    span=15m\n|  $granularity$ sum(Ethernet) as \"Ethernet\", sum(FC) as \"FC\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_smjSQuD0": {
+            "name": "Eth Receive Utilization FI-B _Sum__ __clicked_domain_name__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" = $clicked_domain$\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"eth_uplink\"\n        AND \"cisco_intersight.cisco_intersight_network.network_port_type\" = \"ethernet\"\n        AND \"cisco_intersight.cisco_intersight_network.network_host_name\" = \"*FI-B\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\"\n    span=15m\n\n| eval nirs_mb = `cisco_intersight_bytes_to_given_unit(total_nirs, $_rx_b_avg$)`\n\n|  $granularity$ sum(nirs_mb) AS \"Network IO Receive (Sum)\" by \"cisco_intersight.cisco_intersight_network.network_name\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_vKBUG4fH": {
+            "name": "Receive Pause Frames per selected port_ __clicked_receive_congestion_name__ search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_receive_pause_sum) as \"Ethernet\",\n    sum(cisco_intersight.cisco_intersight_network.network_receive_ppp_sum) as \"FC\"\n    from datamodel=Cisco_Intersight\n    where nodename=cisco_intersight.cisco_intersight_network\n        AND cisco_intersight.cisco_intersight_network.network_id=\"$clicked_receive_congestion$\"\n    by _time, \"cisco_intersight.cisco_intersight_network.network_name\", \"cisco_intersight.cisco_intersight_network.network_id\"\n    span=15m\n|  $granularity$ sum(Ethernet) as \"Ethernet\", sum(FC) as \"FC\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        },
+        "ds_vf1qN10G": {
+            "name": "Utilization _ per port search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n       avg(\"cisco_intersight.cisco_intersight_network.network_bandwidth_receive_utilization_avg\") as total_nura,\n       max(\"cisco_intersight.cisco_intersight_network.network_bandwidth_receive_utilization_max\") as total_nurmx,\n       avg(\"cisco_intersight.cisco_intersight_network.network_bandwidth_transmit_utilization_avg\") as total_nuta,\n       max(\"cisco_intersight.cisco_intersight_network.network_bandwidth_transmit_utilization_max\") as total_nutmx\n       from datamodel=Cisco_Intersight\n       where nodename=cisco_intersight.cisco_intersight_network\n       AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" IN ($select_domain$)\n       AND \"cisco_intersight.cisco_intersight_network.network_account_name\" IN ($account_name$)\n       AND NOT \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"unconfigured\", \"server_pc\", \"fabric_pc\", \"host_pc\", \"vethernet\", \"vfc\", \"vnic\", \"vhba\", \"eth_uplink_pc\")\n       by \"cisco_intersight.cisco_intersight_network.network_domain_name\",\n          \"cisco_intersight.cisco_intersight_network.network_domain_id\",\n          \"cisco_intersight.cisco_intersight_network.network_host_name\",\n          \"cisco_intersight.cisco_intersight_network.network_id\",\n          \"cisco_intersight.cisco_intersight_network.network_chassis\",\n          \"cisco_intersight.cisco_intersight_network.network_chassis_number\",\n          \"cisco_intersight.cisco_intersight_network.network_name\", \n          \"cisco_intersight.cisco_intersight_network.network_port_role\"\n          \"cisco_intersight.cisco_intersight_network.network_account_moid\",\n          \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| where \"$show_zero_values$\"=\"true\" \n   OR (round(total_nura * 100, 2) > 0 \n       or round(total_nurmx * 100, 2) > 0 \n       or round(total_nuta * 100, 2) > 0 \n       or round(total_nutmx * 100, 2) > 0)\n\n| eval total_nura = round(total_nura * 100, 2) . \"%\"\n| eval total_nurmx = round(total_nurmx * 100, 2) . \"%\"\n| eval total_nuta = round(total_nuta * 100, 2) . \"%\"\n| eval total_nutmx = round(total_nutmx * 100, 2) . \"%\"\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_id\" \"/(?<Moid>[^/]+)$\"\n| eval _key='cisco_intersight.cisco_intersight_network.network_account_moid' + \"_\" + Moid\n\n| join type=left _key [\n    | inputlookup cisco_intersight_ether_hostports\n | where splunk_managed_lifecycle == \"PRESENT\"\n  | append [| inputlookup cisco_intersight_ether_networkports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | append [| inputlookup cisco_intersight_ether_physicalports | where splunk_managed_lifecycle == \"PRESENT\"]\n            | append [| inputlookup cisco_intersight_fc_physicalports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | fields _key PortId Dn OperSpeed OperState PortChannelId Role SwitchId\n]\n\n| eval 'cisco_intersight.cisco_intersight_network.network_chassis_number' = case(isnull('cisco_intersight.cisco_intersight_network.network_chassis_number'), \"\", 1=1, 'cisco_intersight.cisco_intersight_network.network_chassis_number')\n\n| rename \"cisco_intersight.cisco_intersight_network.network_domain_name\" as \"Domain Name\", \n         \"cisco_intersight.cisco_intersight_network.network_domain_id\" as event.DomainId,\n         \"SwitchId\" as \"FI\", \"cisco_intersight.cisco_intersight_network.network_id\" as event_id, \"cisco_intersight.cisco_intersight_network.network_chassis_number\" as \"Chassis Number\", \"cisco_intersight.cisco_intersight_network.network_name\" as Name, \"cisco_intersight.cisco_intersight_network.network_port_role\" as \"Port Role\",\n         total_nura as \"Avg receive Utilization\", total_nuta as \"Avg Transmit Utilization\", total_nurmx as \"Max receive Utilization\", total_nutmx as \"Max transmit Utilization\"\n\n| rename Moid as _moid\n| table \"Domain Name\", \"FI\", \"Chassis Number\", \"Port Role\", Name, _moid, Dn, OperSpeed, OperState, \"Avg Transmit Utilization\", \"Max transmit Utilization\", \"Avg receive Utilization\", \"Max receive Utilization\"\n| sort \"Port Role\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "type": "ds.search"
+        }
+    },
+    "layout": {
+        "globalInputs": [
+            "input_global_trp",
+            "input_DWNtKVDG",
+            "input_lL7jpA9T",
+            "input_Xdl4x1T6",
+            "input_vBipVYTY"
+        ],
+        "options": {
+            "height": 7000,
+            "width": 1440
+        },
+        "structure": [
+            {
+                "item": "input_F0hY1ofj",
+                "position": {
+                    "h": 100,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 4172
+                },
+                "type": "input"
+            },
+            {
+                "item": "viz_yboqdNaK",
+                "position": {
+                    "h": 314,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 0
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_vlq8ySQh",
+                "position": {
+                    "h": 134,
+                    "w": 361,
+                    "x": 0,
+                    "y": 314
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_b4fIEkDM",
+                "position": {
+                    "h": 281,
+                    "w": 717,
+                    "x": 0,
+                    "y": 448
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_lVfPE8Z7",
+                "position": {
+                    "h": 295,
+                    "w": 721,
+                    "x": 0,
+                    "y": 729
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_5Q7OOnVf",
+                "position": {
+                    "h": 314,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 1024
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_eT9bXIJC",
+                "position": {
+                    "h": 172,
+                    "w": 361,
+                    "x": 0,
+                    "y": 1338
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_aXm5lYST",
+                "position": {
+                    "h": 400,
+                    "w": 721,
+                    "x": 0,
+                    "y": 1510
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_pN03fa2v",
+                "position": {
+                    "h": 400,
+                    "w": 721,
+                    "x": 0,
+                    "y": 1910
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_ggSo9gnY",
+                "position": {
+                    "h": 538,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 2310
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_GsxapOMK",
+                "position": {
+                    "h": 352,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 2848
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_5pup8hmj",
+                "position": {
+                    "h": 304,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 3200
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_0Js2d7ws",
+                "position": {
+                    "h": 340,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 3504
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_oFb7w2Xp",
+                "position": {
+                    "h": 328,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 3844
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_JbDArjPE",
+                "position": {
+                    "h": 480,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 4272
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_9hB0EYXX",
+                "position": {
+                    "h": 328,
+                    "w": 1440,
+                    "x": 0,
+                    "y": 4752
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_WzAinsTa",
+                "position": {
+                    "h": 134,
+                    "w": 356,
+                    "x": 361,
+                    "y": 314
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_48OtOyXG",
+                "position": {
+                    "h": 172,
+                    "w": 360,
+                    "x": 361,
+                    "y": 1338
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_r1ltbb8I",
+                "position": {
+                    "h": 134,
+                    "w": 361,
+                    "x": 717,
+                    "y": 314
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_cWB1xFNl",
+                "position": {
+                    "h": 281,
+                    "w": 723,
+                    "x": 717,
+                    "y": 448
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_OUGDNBRk",
+                "position": {
+                    "h": 295,
+                    "w": 719,
+                    "x": 721,
+                    "y": 729
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_JFXSimOr",
+                "position": {
+                    "h": 172,
+                    "w": 360,
+                    "x": 721,
+                    "y": 1338
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_N8p14lBH",
+                "position": {
+                    "h": 400,
+                    "w": 719,
+                    "x": 721,
+                    "y": 1510
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_tWBzcJMR",
+                "position": {
+                    "h": 400,
+                    "w": 719,
+                    "x": 721,
+                    "y": 1910
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_WZWJWEVV",
+                "position": {
+                    "h": 134,
+                    "w": 362,
+                    "x": 1078,
+                    "y": 314
+                },
+                "type": "block"
+            },
+            {
+                "item": "viz_u1ZRDyrD",
+                "position": {
+                    "h": 172,
+                    "w": 359,
+                    "x": 1081,
+                    "y": 1338
+                },
+                "type": "block"
+            }
+        ],
+        "type": "grid"
+    }
+}
+    ]]></definition>
+    <meta type="hiddenElements"><![CDATA[
+{
+    "hideEdit": false,
+    "hideOpenInSearch": false,
+    "hideExport": false
+}
+    ]]></meta>
+</dashboard>

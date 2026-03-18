@@ -1,0 +1,7 @@
+{
+  "id": "defaultgroup",
+  "description": "Used when there is no matching group found for a given stream forwarder ID",
+  "includeEphemeralStreams": true,
+  "rule": "",
+  "streams": []
+}

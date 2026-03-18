@@ -1,0 +1,54 @@
+<script id="streamfwd-auth-template" type="text/template">
+    <div class="modal" id="streamfwd-auth-modal">
+        <div class="modal-content">
+
+            <!-- ====== -->
+            <!-- Header -->
+            <!-- ====== -->
+            <div class="modal-header">
+                    <h4 class="modal-title">Stream Forwarder Authentication</h4>
+            </div>
+
+            <!-- ==== -->
+            <!-- Body -->
+            <!-- ==== -->
+            <div class="modal-body">
+                <div class="container-fluid">
+
+                    <div id="auth-ssl-check">
+                        <span>
+                            <% if (location.protocol == 'https:') { %>
+                                <i class="icon-check" id="auth-check-icon"></i> Splunk Web HTTPS is currently enabled.
+                            <% } else { %>
+                                <i class="icon-alert" id="auth-warning-icon"></i> Splunk Web HTTPS is currently disabled.
+                            <% } %>
+                        </span>
+                    </div>
+
+                    <br />
+
+                    <div id="auth-description">
+                        Authentication token functionality requires Splunk Web HTTPS to be enabled.<br />
+                        <a class="external" target="_blank" href="/en-US/manager/splunk_app_stream/server/settings/settings?action=edit">Server Settings</a>
+                    </div>
+
+
+                    <br />
+
+                    <label>
+                        <input class="regular-checkbox" id="auth-checkbox" type="checkbox" <% if (authEnabled) { %>checked<% } %>/>
+                        <span id="auth-enable-text">Enable Stream Forwarder Authentication Token</span>
+                    </label>
+
+                    <textarea id="auth-textarea" <% if (!authEnabled) { %> disabled <% } %>><%- authKey %></textarea>
+
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <a href="#" data-dismiss="modal" aria-hidden="true" class="btn cancel">Cancel</a>
+                <a href="#" class="btn btn-primary save">Save</a>
+            </div>
+        </div>
+    </div>
+</script>

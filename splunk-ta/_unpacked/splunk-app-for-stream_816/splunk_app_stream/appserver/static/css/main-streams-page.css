@@ -1,0 +1,342 @@
+
+/*
+
+ ##   ##    ##     ######   ##   ##
+ ##   ##    ##       ##     ###  ##
+ ### ###   ####      ##     ###  ##
+ ## # ##   ## #      ##     ## # ##
+ ## # ##  ######     ##     ## # ##
+ ##   ##  ##   #     ##     ##  ###
+ ##   ## ###   ##  ######   ##   ##
+
+
+*/
+
+#main-streams-page{
+	padding: 0px;
+	overflow:auto;
+}
+
+
+/*
+
+ ##   ##  #######    ##     #####    #######  ######
+ ##   ##  ##         ##     ##  ##   ##       ##   ##
+ ##   ##  ##        ####    ##   ##  ##       ##   ##
+ #######  #####     ## #    ##   ##  #####    ######
+ ##   ##  ##       ######   ##   ##  ##       ## ##
+ ##   ##  ##       ##   #   ##  ##   ##       ##  ##
+ ##   ##  ####### ###   ##  #####    #######  ##   ##
+
+*/
+
+#main-streams-page .streams-header{
+	font-size: 20px;
+}
+
+#main-streams-page .top-header{
+	border-bottom: 1px solid #ccc;
+}
+
+#main-streams-page .top-wrapper{
+	margin-left: 0px;
+	margin-bottom: 20px;
+}
+
+#main-streams-page .top-well{
+
+	min-height: 20px;
+	width: 95%;
+	margin: auto;
+	background-color: #fff;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	-webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
+	box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
+	padding: 13px;
+	padding-bottom:11px;
+  border-radius: 3px;
+	font-size:17px;
+	font-weight:100;
+}
+
+#main-streams-page .top-header-title{
+	width: 95%;
+	margin: auto;
+	font-size: 24px;
+	position: relative;
+	left: -9px;
+	top: 5px;
+	font-weight: 100;
+}
+
+#main-streams-page .create-stream-dropdown {
+	font-size: 12px;
+}
+
+.stream-type{
+	font-size: 15px;
+	margin-left:20px;
+	color: #5F92D4;
+}
+
+.top-well .is-selected{
+	background-color: #eee;
+	box-shadow: 0px 0px 0px 5px #eee;
+	border-radius: 3px;
+}
+
+.top-well a{
+	padding: 0px 5px;
+}
+
+/*
+
+  ###    #                                                ###                   ##     #
+ #   #   #                                               #   #                 #  #
+ #      ####   # ##    ###    ###   ## #    ###          #       ###   # ##    #      ##     ## #
+  ###    #     ##  #  #   #      #  # # #  #             #      #   #  ##  #  ####     #    #  #
+     #   #     #      #####   ####  # # #   ###          #      #   #  #   #   #       #     ##
+ #   #   #  #  #      #      #   #  # # #      #         #   #  #   #  #   #   #       #    #
+  ###     ##   #       ###    ####  #   #  ####           ###    ###   #   #   #      ###    ###
+                                                                                            #   #
+                                                                                             ###
+*/
+
+#main-streams-page .right-column{
+	background-color: white;
+	height: 800px;
+	overflow-y:scroll;
+	margin-left:0px;
+}
+
+.streams-bulk-edit-menu {
+    margin-left: -40px !important;
+}
+
+.bulk-edit .dropdown-menu {
+    min-width: 120px;
+}
+
+.bulk-selections {
+	font-size: 12px;
+	margin-left: 20px;
+}
+
+#regular-streams-bulk-edit-controls {
+	visibility: hidden;
+	position: relative;
+  top: 70px;
+  left: 17px;
+}
+
+#num-streams-selected {
+	font-size: 12px;
+}
+
+.streams-list-table input[type=checkbox] {
+    margin-bottom: 5px;
+}
+
+.stream-row td:first-child, .streams-list-table thead th:first-child{
+	padding-left: 9px;
+	width: 20px;
+}
+
+.stream-mode-td span {
+	margin-right: 10px;
+	cursor: pointer;
+}
+.stream-mode-td .icon-check {
+	color: green;
+	font-size: 15px;
+}
+.stream-mode-td span.disabled a,
+.stream-mode-td span.disabled i,
+.dashboard-streams-msg
+{
+	color: #c5c5c5;
+}
+.stream-mode-td span.enabled a{
+	color: #333;
+}
+
+.stream-mode-help {
+	position: relative;
+  top: -3px;
+  font-size: 11px;
+}
+
+.external-def-mode-warning {
+	margin-top:10px;
+	color: #c5c5c5;
+}
+
+#config-page-streams-table  thead tr th:nth-child(1) {
+	position:relative;
+	top: 1px;
+}
+
+.stream-row td:nth-child(2) > *,
+.stream-row td:nth-child(3) > *,
+.stream-row td:nth-child(4) > *,
+.stream-row td:nth-child(5) > *,
+.stream-row td:nth-child(6) > *,
+.stream-row td:nth-child(7) > *,
+.stream-row td:nth-child(8) > *,
+.stream-row td:nth-child(9) > *
+{
+	position:relative;
+	top:3px;
+}
+
+.stream-row td, .ephemeral-stream-row td{
+	padding-bottom: 1px;
+}
+
+.ephemeral-stream-row td:nth-child(1) > *,
+.ephemeral-stream-row td:nth-child(3) > *,
+.ephemeral-stream-row td:nth-child(4) > *,
+.ephemeral-stream-row td:nth-child(5) > *,
+.ephemeral-stream-row td:nth-child(6) > *,
+.ephemeral-stream-row td:nth-child(7) > *,
+.ephemeral-stream-row td:nth-child(8) > *,
+.ephemeral-stream-row td:nth-child(9) > *
+{
+	position:relative;
+	top:4px;
+}
+
+.streams-list-table .icon-chevron-right {
+    margin-top: 3px !important;
+    height: 16px;
+}
+
+.streams-info-column {
+    width: 5px;
+}
+
+.streams-action-column {
+    width: 10px;
+    text-align: center !important;
+}
+
+.streams-action-column .icon-chevron-down {
+    height: 16px;
+}
+
+.streams-action-column .stream-edit {
+    height: 16px;
+}
+
+.streams-action-column .edit {
+	position: relative;
+	top: -4px;
+}
+
+.stream-edit .dropdown-menu {
+    min-width: 120px;
+}
+
+.table-search {
+	display: inline-block;
+	position: relative;
+	margin-bottom: 0;
+}
+
+.main-page-search {
+	top: 65px;
+}
+
+.ephemeral-page-search {
+	display: inline-block;
+	position:relative;
+	margin-bottom: 0;
+}
+
+.table-search input, .ephemeral-page-search input{
+	-webkit-border-radius: 10px;
+	-moz-border-radius: 10px;
+	border-radius: 10px;
+	margin-bottom: 0;
+	height: 20px;
+	line-height: 20px;
+	padding: 0 10px;
+}
+
+.table-search .clear, .ephemeral-page-search .clear {
+    position: absolute;
+    right: 5px;
+    top: 3px;
+    font-size: 18px;
+    color: #999999;
+}
+
+#totalSparklineContainer {
+	overflow:auto;
+	height: 80px;
+	margin: 7px 20px 7px 5px;
+	outline: 1px solid #ccc;
+}
+
+#totalSparklineTitleContainer {
+	font-size: 13px;
+	width: 25%;
+	float:left;
+	text-align: center;
+}
+
+#totalSparklineTitle {
+	display: inline-block;
+	margin: 0px auto;
+	margin-top: 10px;
+}
+
+#avgTraffic {
+	display:inline-block;
+	margin: 0px auto;
+	margin-top: 15px;
+	font-size: 15px;
+	font-weight: bold;
+	color: #888;
+}
+
+#totalSparkline{
+	width: 75%;
+	outline: 1px solid #ccc;
+	float: right;
+}
+
+#totalSparkline canvas{
+	position: relative;
+	top: 3px;
+	left: -2px;
+}
+
+.bulk-selections-table-container{
+	max-height:350px;
+	overflow:auto;
+}
+
+.bulk-selected-streams-container .left{
+	 font-size:12px;
+}
+
+.bulk-selected-streams-container .right{
+	margin-left:20px;
+}
+
+#confirm-dialog-template .action {
+	font-size: 14px;
+	margin-left: 5px;
+	margin-right: 5px;
+}
+
+#status-tooltip {
+	font-size: 10px;
+	position: relative;
+	top: -2px;
+	margin-right: 6px;
+}
+
+

@@ -1,0 +1,163 @@
+<script type="text/template">
+
+<div>
+	<div id="setup-dialog-wrapper">
+
+		<div>
+		  <div class="title">Setup Stream</div>
+			<div class="subtitle">Run stream for the first time</div>
+		</div>
+
+		<div class='block'>
+
+			<div>
+				<input
+					type="checkbox"
+					class='regular-checkbox'
+					id='permissions-checkbox'
+					<% if (!streamfwd_disabled) { %> checked <% } %>
+				/>
+				Collect data from this machine using Wire Data input (Splunk_TA_stream).
+			</div>
+
+			<div id="permissions-inner-blocks">
+
+				<div class='inner-block' id='permissions-loading' <% if (streamfwd_disabled) { %> style='display:none' <% } %>>
+					Loading...
+				</div>
+
+				<div class='inner-block' id='permissions-error' style='display:none'>
+					<i class='icon-alert'></i>
+					Failed to detect Splunk_TA_stream status.
+					<a class='external' target="_blank" href="http://docs.splunk.com/Documentation/StreamApp/latest/DeployStreamApp/InstallSplunkAppforStream">Please refer to the documentation for installation instructions</a>
+					<div class='btn redetect'> <i class='icon-rotate'></i> Redetect </div>
+				</div>
+
+				<div class='inner-block' id='permissions-capture-error' style='display:none'>
+					<i class='icon-alert'></i>
+					Splunk_TA_stream doesn't have proper permissions to run or not configured properly.
+					<div class='btn redetect'> <i class='icon-rotate'></i> Redetect </div>
+					<br> Steps to troubleshoot:
+					<ol>
+						<li>To ensure that Splunk_TA_Stream has proper permissions on Linux/OSX, run this command from the Splunk_TA_stream directory:
+							<div class='quote-well'>
+								sudo ./set_permissions.sh
+							</div>
+						</li>
+						<li>
+							Examine <a class='external' target="_blank" href="/en-us/app/search/search?q=search%20index%3D_internal%20source%3D*streamfwd.log">Splunk_TA_stream  log file</a> for more specific error information.
+						</li>
+					</ol>
+					<a class='external' target="_blank" href="http://docs.splunk.com/Documentation/StreamApp/latest/DeployStreamApp/InstallSplunkAppforStream">Learn More</a>
+				</div>
+
+				<div class='inner-block' id='permissions-sender-error' style='display:none'>
+					<i class='icon-alert'></i>
+					Splunk_TA_stream is not properly configured or still waiting for splunk to initialize. If you restarted Splunk less than a minute ago, click the Redetect button to get the latest Splunk_TA_stream status check results. Otherwise, follow the troubleshooting steps below.
+					<div class='btn redetect'> <i class='icon-rotate'></i> Redetect </div>
+					 <div class="text-error" id="sender-error-message"></div>
+					<br> Steps to troubleshoot:
+					<ol>
+						<li>Check <a class='external' target="_blank" href="/en-US/manager/search/data/inputs/streamfwd">Wire Data Input</a> settings. Click on streamfwd link to edit the data input settings and then click Save to validate.
+						</li>
+						<li>
+							Examine <a class='external' target="_blank" href="/en-us/app/search/search?q=search%20index%3D_internal%20source%3D*streamfwd.log">Splunk_TA_stream log file</a> for more specific error information.
+						</li>
+					</ol>
+					<a class='external' target="_blank" href="http://docs.splunk.com/Documentation/StreamApp/latest/DeployStreamApp/InstallSplunkAppforStream">Learn More</a>
+				</div>
+
+				<div class='inner-block' id='permissions-success' style='display:none'>
+					<i class='icon-check'></i> Proper permissions for Splunk_TA_stream have been set.
+					<a class='external' target="_blank" href="http://docs.splunk.com/Documentation/StreamApp/latest/DeployStreamApp/InstallSplunkAppforStream">Learn More</a>
+					<div class='btn redetect'> <i class='icon-rotate'></i> Redetect </div>
+				</div>
+			</div>
+
+		</div>
+
+		<div class='block'>
+
+			<div>
+				<input type="checkbox" class='regular-checkbox' id='collection-checkbox'/>
+				Collect data from other machines.
+			</div>
+
+			<div class='inner-block' id='collection-inner-block' style="display: none;">
+
+				<div id="hec-token-configuration-blocks">
+
+	                <span class="configuration-block" id="hec-token-loading" style="display: none;">
+	                    Loading...
+	                </span>
+
+	                <span class="configuration-block" id="hec-token-enabled" style="display: none;">
+	                    <i class="icon-check"></i>
+	                    HTTP Event Collector <b>streamfwd</b> token configuration has been enabled.
+	                </span>
+
+	                <span class="configuration-block" id="hec-token-disabled" style="display: none;">
+	                    <i class="icon-alert"></i>
+	                    HTTP Event Collector <b>streamfwd</b> token configuration has been disabled.
+	                </span>
+
+	                <span class="configuration-block" id="hec-global-disabled" style="display: none;">
+	                    <i class="icon-alert"></i>
+	                    HTTP Event Collector global token configuration has been disabled.
+	                </span>
+
+	                <span class="configuration-block" id="hec-token-undefined" style="display: none;">
+	                    <i class="icon-alert"></i>
+	                    HTTP Event Collector <b>streamfwd</b> token does not exist.
+	                </span>
+
+	                <span class="configuration-block" id="hec-unsupported" style="display: none;">
+	                    <i class="icon-alert"></i>
+	                    HTTP Event Collector is not supported by this version of Splunk.
+	                </span>
+
+	                <span id="hec-token-debugging" style="display: none;">
+                            <% if (isShcSetup) { %>
+                                <a class="external" target="_blank" href="http://dev.splunk.com/view/event-collector/SP-CAAAE6Q">Learn More</a>
+                            <% } else { %>
+                                <a class="external" target="_blank" href="../../manager/splunk_app_stream/http-eventcollector">View configuration</a>
+                            <% } %>
+                            <div class="btn redetect"><i class="icon-rotate"></i> Redetect </div>
+	                </span>
+
+	            </div>
+
+                <div id="hec-host-error-message" style="display: none;">
+                    <span>
+                        <i class="icon-alert"></i>
+                        Invalid hostname configured for HTTP Event Collector: <%-hecHostname%>
+                    </span>
+                </div>
+
+				<br />
+
+				<div>
+					Splunk App for Stream auto-configures the token settings only on the search head that it runs on. <br />
+                    In a distributed environment, manual replication of the streamfwd token configuration on each indexer is required.
+				</div>
+
+				<br /><br />
+
+				<span id="hec-config-command">
+					To get data from other machines, run this command on your data source machine:
+					<div class='quote-well'>
+						curl -sSL <%-curlUrl%> | sudo bash
+					</div>
+					<br />
+                    Note: Stream Forwarder (streamfwd) independent installation supports data capture on 64-bit Linux (RHEL and Ubuntu) only.
+				</span>
+
+			</div>
+
+		</div>
+
+		<div class="btn btn-primary block" id='start'>Let's get started</div>
+
+	</div>
+</div>
+</script>

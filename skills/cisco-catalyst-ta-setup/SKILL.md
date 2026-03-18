@@ -13,6 +13,16 @@ description: >-
 
 Automates the **Cisco Catalyst Add-on for Splunk** (`TA_cisco_catalyst` v3.0.0).
 
+## Package Model
+
+Install the original vendor archive from `splunk-ta/` as-is:
+
+- `cisco-catalyst-add-on-for-splunk_310.tar.gz`
+
+For Splunk Cloud, install that archive with ACS and then use this skill to
+configure accounts, inputs, and validation over search-tier REST. Any
+`splunk-ta/_unpacked/` copy is review-only and not part of the normal workflow.
+
 ## Agent Behavior — Credentials
 
 **The agent must NEVER ask for passwords, API keys, or secrets in chat.**
@@ -39,13 +49,15 @@ The agent may freely ask for non-secret values: account names, hostnames, accoun
 
 ## Environment
 
-All scripts operate entirely via the Splunk REST API and can run from any host with
-network access to the Splunk management port (8089). No local Splunk installation is
-required.
+Setup and validation use the Splunk search-tier REST API and can run from any
+host with network access to the Splunk management port (`8089`). In Splunk
+Cloud, app installation, index creation, and restarts are handled through ACS
+instead of the search-tier REST endpoints.
 
 | Item | Value |
 |------|-------|
-| Management API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Search-tier API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs (`SPLUNK_PLATFORM` is only an override for hybrid runs) |
 | TA app name | `TA_cisco_catalyst` |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/cisco-catalyst-ta-setup/scripts/` (relative to repo root) |
@@ -82,6 +94,7 @@ bash skills/cisco-catalyst-ta-setup/scripts/setup.sh
 ```
 
 Creates four indexes. No `sudo` required when running as the `splunk` user.
+In Splunk Cloud, the setup script creates these indexes through ACS.
 
 | Index | Purpose | Max Size |
 |-------|---------|----------|
@@ -141,10 +154,11 @@ bash scripts/setup.sh --enable-inputs \
 | `sdwan` | 2 (health, site_and_tunnel_health) | `sdwan` | `sdwan_account` |
 | `cybervision` | 6 (activities, components, devices, events, flows, vulnerabilities) | `cybervision` | `cyber_vision_account` |
 
-### Step 4: Restart Splunk
+### Step 4: Restart If Required
 
-New indexes require a restart to activate. Restart via the Splunk UI, CLI on the
-server, or REST API.
+On Splunk Enterprise, restart Splunk after new index creation.
+On Splunk Cloud, check `acs status current-stack` and only run
+`acs restart current-stack` when ACS reports `restartRequired=true`.
 
 ### Step 5: Validate
 
@@ -188,7 +202,8 @@ bash scripts/load_mcp_tools.sh
 1. **REST API for accounts**: This TA uses custom REST handlers — always create
    accounts via the REST API, not by writing conf files manually. The handlers
    encrypt passwords automatically.
-2. **Splunk restart required**: New indexes are not available until after restart.
+2. **Restart behavior differs by platform**: Enterprise requires a Splunk
+   restart after new index creation. Splunk Cloud uses ACS restart checks.
 3. **No sudo needed**: Scripts run fine as the `splunk` OS user.
 4. **SSL verification**: The TA's `verify_ssl` setting defaults to True. Set to
    False for self-signed certs via `ta_cisco_catalyst_settings.conf`.

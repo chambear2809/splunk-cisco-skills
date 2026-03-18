@@ -1,0 +1,517 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Messaging", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "xmpp.event"
+    }, 
+    "fields": [
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains call duration in microseconds", 
+            "enabled": true, 
+            "name": "call_duration", 
+            "term": "xmpp.call-duration"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains call id, extracted for each call", 
+            "enabled": true, 
+            "name": "call_id", 
+            "term": "xmpp.call-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the identity (or the phone number) of the called party for a call", 
+            "enabled": true, 
+            "name": "callee", 
+            "term": "xmpp.callee"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains address which could be used by the called party", 
+            "enabled": true, 
+            "name": "callee_addr", 
+            "term": "xmpp.callee-address"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains port on which the callee could receive a call", 
+            "enabled": true, 
+            "name": "callee_port", 
+            "term": "xmpp.callee-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the identity (or the phone number) of the initiator of the call", 
+            "enabled": true, 
+            "name": "caller", 
+            "term": "xmpp.caller"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains address which could be used by the initiator of the call", 
+            "enabled": true, 
+            "name": "caller_addr", 
+            "term": "xmpp.caller-address"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains port on which the caller could start the call", 
+            "enabled": true, 
+            "name": "caller_port", 
+            "term": "xmpp.caller-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contact login", 
+            "enabled": true, 
+            "name": "contact_login", 
+            "term": "xmpp.contact-login"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contact name", 
+            "enabled": true, 
+            "name": "contact_name", 
+            "term": "xmpp.contact-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contact status", 
+            "enabled": true, 
+            "name": "contact_status", 
+            "term": "xmpp.contact-status"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address of the server in dot-quad notation", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server port number", 
+            "enabled": true, 
+            "name": "dest_port", 
+            "term": "flow.s-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Message encoding", 
+            "enabled": true, 
+            "name": "encoding", 
+            "term": "xmpp.message-encoding"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains content of the transferred data", 
+            "enabled": true, 
+            "name": "file_chunk_content", 
+            "term": "xmpp.file-chunk-content"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains size of the transferred piece", 
+            "enabled": true, 
+            "name": "file_chunk_len", 
+            "term": "xmpp.file-chunk-length"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Transferred file identifier", 
+            "enabled": true, 
+            "name": "file_chunk_sid", 
+            "term": "xmpp.file-chunk-sid"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the identity of the sender of a file transfer", 
+            "enabled": true, 
+            "name": "file_sender", 
+            "term": "xmpp.file-sender"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains transferred file identifier", 
+            "enabled": true, 
+            "name": "file_sid", 
+            "term": "xmpp.file-sid"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the name of the transferred file", 
+            "enabled": true, 
+            "name": "filename", 
+            "term": "xmpp.filename"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains size (byte) of the transferred file", 
+            "enabled": true, 
+            "name": "filesize", 
+            "term": "xmpp.file-size"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Flow Id", 
+            "enabled": true, 
+            "name": "flow_id", 
+            "term": "flow.flow-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "User's login string", 
+            "enabled": true, 
+            "name": "login", 
+            "term": "xmpp.login"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the chat message", 
+            "enabled": true, 
+            "name": "message", 
+            "term": "xmpp.message"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Used user name", 
+            "enabled": true, 
+            "name": "nickname", 
+            "term": "xmpp.nickname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the client operating system", 
+            "enabled": true, 
+            "name": "os", 
+            "term": "xmpp.client-os"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Protocol stack of flow", 
+            "enabled": true, 
+            "name": "protocol_stack", 
+            "term": "flow.protocol-stack"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the identity of the receiver for a chat message or a file transfer", 
+            "enabled": true, 
+            "name": "receiver", 
+            "term": "xmpp.receiver"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the identity of the sender of a chat session or a file transfer", 
+            "enabled": true, 
+            "name": "sender", 
+            "term": "xmpp.sender"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address of the client in dot-quad notation", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client port number", 
+            "enabled": true, 
+            "name": "src_port", 
+            "term": "flow.c-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains start date of the call", 
+            "enabled": true, 
+            "name": "start_time", 
+            "term": "xmpp.start-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+            "enabled": true, 
+            "name": "time_taken", 
+            "term": "flow.time-taken"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Transport layer protocol (udp or tcp)", 
+            "enabled": true, 
+            "name": "transport", 
+            "term": "flow.transport"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "JABBER software version", 
+            "enabled": true, 
+            "name": "version", 
+            "term": "xmpp.version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+            "enabled": true, 
+            "name": "vlan_id", 
+            "term": "flow.vlan-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from client to server", 
+            "enabled": false, 
+            "name": "ack_packets_in", 
+            "term": "flow.cs-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from server to client", 
+            "enabled": false, 
+            "name": "ack_packets_out", 
+            "term": "flow.sc-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates client terminated connection with RST flag", 
+            "enabled": false, 
+            "name": "canceled", 
+            "term": "flow.canceled"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": false, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the client to the point of capture", 
+            "enabled": false, 
+            "name": "client_rtt", 
+            "term": "flow.cp-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the client to the point of capture", 
+            "enabled": false, 
+            "name": "client_rtt_packets", 
+            "term": "flow.cp-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the client to the point of capture", 
+            "enabled": false, 
+            "name": "client_rtt_sum", 
+            "term": "flow.cp-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP session server endpoint (IP address and TCP port)", 
+            "enabled": false, 
+            "name": "connection", 
+            "term": "flow.connection"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from client to server", 
+            "enabled": false, 
+            "name": "data_packets_in", 
+            "term": "flow.cs-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from server to client", 
+            "enabled": false, 
+            "name": "data_packets_out", 
+            "term": "flow.sc-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from client to server", 
+            "enabled": false, 
+            "name": "duplicate_packets_in", 
+            "term": "flow.cs-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from server to client", 
+            "enabled": false, 
+            "name": "duplicate_packets_out", 
+            "term": "flow.sc-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the request", 
+            "enabled": false, 
+            "name": "missing_packets_in", 
+            "term": "flow.cs-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the response", 
+            "enabled": false, 
+            "name": "missing_packets_out", 
+            "term": "flow.sc-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": false, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from client to server", 
+            "enabled": false, 
+            "name": "packets_in", 
+            "term": "flow.cs-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from server to client", 
+            "enabled": false, 
+            "name": "packets_out", 
+            "term": "flow.sc-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates server terminated connection with RST flag", 
+            "enabled": false, 
+            "name": "refused", 
+            "term": "flow.refused"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to start replying to a request", 
+            "enabled": false, 
+            "name": "reply_time", 
+            "term": "flow.sc-reply-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the client to send a request", 
+            "enabled": false, 
+            "name": "request_time", 
+            "term": "flow.cs-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to send a response", 
+            "enabled": false, 
+            "name": "response_time", 
+            "term": "flow.sc-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the server to the point of capture", 
+            "enabled": false, 
+            "name": "server_rtt", 
+            "term": "flow.ps-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the server to the point of capture", 
+            "enabled": false, 
+            "name": "server_rtt_packets", 
+            "term": "flow.ps-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the server to the point of capture", 
+            "enabled": false, 
+            "name": "server_rtt_sum", 
+            "term": "flow.ps-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to negotiate an SSL handshake", 
+            "enabled": false, 
+            "name": "ssl_time", 
+            "term": "flow.ssl-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL protocol version used for encryption, or undefined if not encrypted", 
+            "enabled": false, 
+            "name": "ssl_version", 
+            "term": "flow.ssl-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP handshake status (0=OK, 1=RESET, 2=IGNORED)", 
+            "enabled": false, 
+            "name": "tcp_status", 
+            "term": "flow.tcp-status"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+
+    ], 
+    "filters": {
+        "comparisons": [], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ES_XMPP_RAW", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "modifiedBy": "admin", 
+    "name": "Stream for ES Config Template - XMPP Raw", 
+    "protocolName": "XMPP", 
+    "sourcetype": "stream:xmpp", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

@@ -131,7 +131,7 @@ main() {
 
     if $ACCELERATE; then
         enable_acceleration
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "data model changes")"
         if ! $MACROS_ONLY; then
             update_macros
         fi
@@ -145,7 +145,8 @@ main() {
 
     update_macros
     enable_saved_searches
-    log "Setup complete. Restart Splunk to apply changes. Dashboards will use data from the configured indexes."
+    log "Setup complete. Dashboards will use data from the configured indexes."
+    log "$(log_platform_restart_guidance "saved search or macro changes")"
     log "Tip: Run with --accelerate to enable data model acceleration for production."
 }
 

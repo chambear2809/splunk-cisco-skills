@@ -1,0 +1,144 @@
+.tooltip-inner {
+    white-space: pre-wrap;
+}
+
+#metric-inputs {
+    margin-left: 6px;
+}
+
+#time-input {
+    margin-top: 21px;
+    margin-left: -30px;
+}
+
+#metric-dropdown {
+    margin-top: 21px;
+    margin-left: -37px;
+}
+
+#playback-controls {
+    margin-left: -15px;
+}
+
+.input-playback {
+    margin-top: 26px;
+    width: 7px !important;
+}
+
+#playback-timestamps {
+    margin-top: 26px;
+    margin-left: 5px;
+    position: absolute;
+    display: none;
+}
+
+.heatmap-tooltip {
+    width: 8px;
+    height: 8px;
+    position: absolute;
+    z-index: 2;
+}
+
+.heatmap-labels {
+    display: none;
+}
+
+#heatmap-not-found-container {
+    display: none;
+}
+
+#heatmap-waiting-container, #heatmap-not-found-container {
+    text-align: center;
+    height: 100%;
+}
+
+#heatmap-waiting-message, #heatmap-not-found-message {
+    color: #999;
+    padding-top: 300px;
+}
+
+#heatmap-container-wrapper {
+    width: 100%;
+    height: 610px;
+    position: relative;
+    background-color: white;
+}
+
+#heatmap-container {
+    height: 528px;
+    margin-left: 88px;
+    margin-right: 10px;
+    margin-top: 10px;
+}
+
+#axis-label-x {
+    left: 50%;
+    bottom: -70px;
+    position: absolute;
+}
+
+#axis-label-y {
+    left: -105px;
+    top: 50%;
+    position: absolute;
+    -webkit-transform: rotate(-90deg);
+    -moz-transform: rotate(-90deg);
+}
+
+#origin-label {
+    position: absolute;
+    -webkit-transform: rotate(-45deg);
+    -moz-transform: rotate(-45deg);
+    left: 50px;
+    bottom: 50px;
+}
+
+#upper-label-x {
+    position: absolute;
+    -webkit-transform: rotate(-45deg);
+    -moz-transform: rotate(-45deg);
+    bottom: 34px;
+    right: 0%;
+}
+
+#upper-label-y {
+    position: absolute;
+    -webkit-transform: rotate(-45deg);
+    -moz-transform: rotate(-45deg);
+    left: 2px;
+    margin-top: 25px;
+    top: 0%;
+}
+
+.heatmap-hline {
+    background-color: #EEE;
+    width: 100%;
+    height: 1px;
+    position: absolute;
+}
+
+#heatmap-crosshair-vertical {
+    background-color: #555;
+    width: 1px;
+    height: 100%;
+    position: absolute;
+    z-index: 1;
+}
+#heatmap-crosshair-horizontal {
+    background-color: #555;
+    width: 100%;
+    height: 1px;
+    position: absolute;
+    z-index: 1;
+}
+
+#heatmap-crosshair-circle {
+    border-color: #DDD;
+    border-width: 1px;
+    border-style: solid;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    position: absolute;
+    z-index: 1;
+}

@@ -1,0 +1,384 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Database", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "postgres.event", 
+        "interval": 60
+    }, 
+    "fields": [
+        {
+            "aggType": "key", 
+            "desc": "Transport layer protocol (udp or tcp)", 
+            "enabled": true, 
+            "name": "transport", 
+            "term": "flow.transport"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from client to server", 
+            "enabled": true, 
+            "name": "ack_packets_in", 
+            "term": "flow.cs-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from server to client", 
+            "enabled": true, 
+            "name": "ack_packets_out", 
+            "term": "flow.sc-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Authentication method requested by the server", 
+            "enabled": true, 
+            "name": "auth_type", 
+            "term": "postgres.auth-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates client terminated connection with RST flag", 
+            "enabled": true, 
+            "name": "canceled", 
+            "term": "flow.canceled"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": true, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt", 
+            "term": "flow.cp-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt_packets", 
+            "term": "flow.cp-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt_sum", 
+            "term": "flow.cp-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from client to server", 
+            "enabled": true, 
+            "name": "data_packets_in", 
+            "term": "flow.cs-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from server to client", 
+            "enabled": true, 
+            "name": "data_packets_out", 
+            "term": "flow.sc-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Database name", 
+            "enabled": true, 
+            "name": "dbname", 
+            "term": "postgres.dbname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server IP Address", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server port number", 
+            "enabled": true, 
+            "name": "dest_port", 
+            "term": "flow.s-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from client to server", 
+            "enabled": true, 
+            "name": "duplicate_packets_in", 
+            "term": "flow.cs-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from server to client", 
+            "enabled": true, 
+            "name": "duplicate_packets_out", 
+            "term": "flow.sc-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Error message", 
+            "enabled": true, 
+            "name": "error", 
+            "term": "postgres.error"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "User's login string", 
+            "enabled": true, 
+            "name": "login", 
+            "term": "postgres.login"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the request", 
+            "enabled": true, 
+            "name": "missing_packets_in", 
+            "term": "flow.cs-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the response", 
+            "enabled": true, 
+            "name": "missing_packets_out", 
+            "term": "flow.sc-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": true, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from client to server", 
+            "enabled": true, 
+            "name": "packets_in", 
+            "term": "flow.cs-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from server to client", 
+            "enabled": true, 
+            "name": "packets_out", 
+            "term": "flow.sc-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Protocol version", 
+            "enabled": true, 
+            "name": "proto_version", 
+            "term": "postgres.proto-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Query sent", 
+            "enabled": true, 
+            "name": "query", 
+            "term": "postgres.query"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates server terminated connection with RST flag", 
+            "enabled": true, 
+            "name": "refused", 
+            "term": "flow.refused"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to start replying to a request", 
+            "enabled": true, 
+            "name": "reply_time", 
+            "term": "flow.sc-reply-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to acknowledge receipt of the request", 
+            "enabled": true, 
+            "name": "request_ack_time", 
+            "term": "flow.cs-ack-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the client to send a request", 
+            "enabled": true, 
+            "name": "request_time", 
+            "term": "flow.cs-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the client to acknowledge receipt of the response", 
+            "enabled": true, 
+            "name": "response_ack_time", 
+            "term": "flow.sc-ack-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to send a response", 
+            "enabled": true, 
+            "name": "response_time", 
+            "term": "flow.sc-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt", 
+            "term": "flow.ps-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt_packets", 
+            "term": "flow.ps-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt_sum", 
+            "term": "flow.ps-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server version", 
+            "enabled": true, 
+            "name": "server_version", 
+            "term": "postgres.server-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client IP Address", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client port number", 
+            "enabled": true, 
+            "name": "src_port", 
+            "term": "flow.c-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP handshake status (0=OK, 1=RESET, 2=IGNORED)", 
+            "enabled": true, 
+            "name": "tcp_status", 
+            "term": "flow.tcp-status"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+            "enabled": true, 
+            "name": "time_taken", 
+            "term": "flow.time-taken"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+            "enabled": true, 
+            "name": "vlan_id", 
+            "term": "flow.vlan-id"
+        }, 
+        {
+            "aggType": "key", 
+            "desc": "TCP session server endpoint (IP address and TCP port)", 
+            "enabled": false, 
+            "name": "connection", 
+            "term": "flow.connection"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "User's password string", 
+            "enabled": false, 
+            "name": "password", 
+            "term": "postgres.password"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to negotiate an SSL handshake", 
+            "enabled": false, 
+            "name": "ssl_time", 
+            "term": "flow.ssl-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL protocol version used for encryption, or undefined if not encrypted", 
+            "enabled": false, 
+            "name": "ssl_version", 
+            "term": "flow.ssl-version"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+
+    ], 
+    "filters": {
+        "comparisons": [], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ITSI_POSTGRESQL_Raw", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "name": "Stream for ITSI Config Template - PostgreSQL Raw", 
+    "protocolName": "PostgreSQL", 
+    "sourcetype": "stream:postgres", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

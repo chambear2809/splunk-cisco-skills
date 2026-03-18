@@ -1,0 +1,32 @@
+<nav color="#154e7a">
+
+    <collection label="Informational Dashboards">
+        <view name="info_overview" default='true'/>
+        <view name="app_analytics" default='false' />
+        <view name="flow_visualization" default='false' />
+        <view name="http_overview" default='false' />
+        <view name="http_activity" default='false' />
+        <view name="database_metrics" default='false' />
+        <view name="dns_overview" default='false' />
+        <view name="dns_activity" default='false' />
+        <view name="ssl_activity" default='false' />
+    </collection>
+
+    <collection label="Admin Dashboards">
+        <view name="stream_data_volume" default='false' />
+        <view name="interface_metrics" default='false' />
+        <view name="streamfwd_status" default='false' />
+    </collection>
+
+    <view name="stream_estimate" default='false' />
+
+    <collection label="Configuration">
+        <view name="streams" default='false' />
+        <view name="capture_ip_addresses" default='false' />
+        <view name="forwarder_groups_management" default='false' />
+        <view name="mount_points" default='false' />
+    </collection>
+
+    <view name="product_tour" default='false' />
+
+</nav>

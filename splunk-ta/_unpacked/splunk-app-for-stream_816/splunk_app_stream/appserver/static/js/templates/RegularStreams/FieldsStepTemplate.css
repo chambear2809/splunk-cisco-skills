@@ -1,0 +1,72 @@
+.fields-step .field-search {
+    margin-top: -10px;
+    margin-bottom: 12px;
+}
+
+.fields-step .search {
+    position: relative;
+    width: 175px;
+    margin: auto;
+}
+
+.fields-step .field-search input {
+    margin-bottom: 0;
+    height: 20px;
+    line-height: 20px;
+    padding: 0 10px;
+}
+
+.fields-step .search .clear {
+    position: absolute;
+    right: 8px;
+    top: 3px;
+    font-size: 18px;
+    color: #999999;
+}
+
+/* override the extra padding in bootstrap.min.css for first column of a table. */
+.fields-step th:first-child, .fields-step td:first-child {
+    padding-left: 8px;
+}
+
+.fields-step th.enable-disable {
+    width: 5%;
+}
+
+.fields-step th.agg-type {
+    width: 16%;
+}
+
+.fields-step th.name {
+    width: 12%;
+}
+
+.fields-step th.description {
+/*
+    Don't specify width percentage - gets all remaining space.
+*/
+}
+
+.fields-step table.field-list td {
+    padding-bottom: 4px;
+    vertical-align: middle;
+}
+
+.fields-step label.agg-type-label {
+    display: inline-block;
+    position: relative;
+    padding-left: 1px;
+    padding-right: 12px;
+}
+
+.fields-step .key, .fields-step .agg {
+    vertical-align: baseline;
+}
+
+.fields-step td.enabled {
+    text-align: center;
+}
+
+.fields-step td.agg-type {
+    padding-top: 5px;
+}

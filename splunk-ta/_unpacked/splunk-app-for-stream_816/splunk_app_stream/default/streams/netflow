@@ -1,0 +1,1146 @@
+{
+  "app": "Stream", 
+  "category": "Networking", 
+  "enabled": false, 
+  "extras": {
+    "eventType": "netflow.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "Name of event",
+      "enabled": true, 
+      "name": "event_name",
+      "term": "flow.event-name"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Netflow Version",
+      "enabled": true, 
+      "name": "netflow_version",
+      "term": "netflow.version"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Netflow sequence number",
+      "enabled": true, 
+      "name": "seqnumber",
+      "term": "netflow.flow-sequence"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Netflow number of flows",
+      "enabled": true, 
+      "name": "num_flows",
+      "term": "netflow.num-flows"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IP address of device that generated flow",
+      "enabled": true, 
+      "name": "exporter_ip",
+      "term": "netflow.exporterIPAddress"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Type of Flow switching engine",
+      "enabled": true, 
+      "name": "exporter_engine_type",
+      "term": "netflow.engine-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "ID number of the Flow switching engine",
+      "enabled": true, 
+      "name": "exporter_engine_id",
+      "term": "netflow.engine-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sampling algorithm used",
+      "enabled": true, 
+      "name": "exporter_sampling_mode",
+      "term": "netflow.sampling-algorithm"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Rate at which packets are sampled when using sampling",
+      "enabled": true, 
+      "name": "exporter_sampling_interval",
+      "term": "netflow.sampling-interval"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Current time in milliseconds since the export device booted",
+      "enabled": true, 
+      "name": "exporter_uptime",
+      "term": "netflow.sys-uptime-msecs"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Current time Exporter device",
+      "enabled": true, 
+      "name": "exporter_time",
+      "term": "netflow.exporter-time"
+    },
+
+    {
+      "aggType": "value",
+      "desc": "Source address of flow",
+      "enabled": true,
+      "name": "src_ip",
+      "term": "flow.c-ip"
+    },
+    {
+      "aggType": "value",
+      "desc": "Destination address of flow",
+      "enabled": true,
+      "name": "dest_ip",
+      "term": "flow.s-ip"
+    },
+    {
+      "aggType": "value",
+      "desc": "Source port number of flow",
+      "enabled": true,
+      "name": "src_port",
+      "term": "flow.c-port"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Destination port number of flow",
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP protocol type",
+      "enabled": true, 
+      "name": "protoid",
+      "term": "ip.protoid"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Type of Service", 
+      "enabled": true, 
+      "name": "tos", 
+      "term": "ip.tos"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Total number of Layer 3 bytes in the flow",
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "netflow.bytes"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Total number of packets in the flow",
+      "enabled": true, 
+      "name": "packets",
+      "term": "flow.packets"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Duration of flow in milliseconds",
+      "enabled": true, 
+      "name": "time_taken", 
+      "term": "flow.time-taken"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Cumulative OR of TCP flags for this flow",
+      "enabled": true, 
+      "name": "tcp_flags",
+      "term": "netflow.tcp-flags"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "System number of source for this flow",
+      "enabled": true, 
+      "name": "src_sysnum",
+      "term": "netflow.c-sysnum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "System number of destination for this flow",
+      "enabled": true, 
+      "name": "dest_sysnum",
+      "term": "netflow.s-sysnum"
+    },
+    {
+      "aggType": "value", 
+      "desc": "The relative timestamp of the last packet of this Flow. It indicates the number of milliseconds since the last (re-)initialization of the device",
+      "enabled": true, 
+      "name": "flow_end_rel",
+      "term": "netflow.flow-end-rel-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The relative timestamp of the first packet of this Flow. It indicates the number of milliseconds since the last (re-)initialization of the device",
+      "enabled": true, 
+      "name": "flow_start_rel",
+      "term": "netflow.flow-start-rel-time"
+    },
+ 
+    {
+      "aggType": "value", 
+      "desc": "SNMP index of input interface for this flow",
+      "enabled": true, 
+      "name": "input_snmpidx",
+      "term": "netflow.input-snmpidx"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SNMP index of output interface for this flow",
+      "enabled": true, 
+      "name": "output_snmpidx",
+      "term": "netflow.output-snmpidx"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of the next (adjacent) BGP hop",
+      "enabled": true, 
+      "name": "bgp_nxt_hop_ip",
+      "term": "netflow.bgp-nexthop-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Outgoing multicast packets",
+      "enabled": true, 
+      "name": "multicast_out_pkts",
+      "term": "netflow.multicast-out-packets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Outgoing multicast bytes",
+      "enabled": true, 
+      "name": "multicast_out_bytes",
+      "term": "netflow.multicast-out-bytes"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Outgoing counter for number of bytes associated with an IP Flow",
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "netflow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Outgoing counter for number of packets associated with an IP Flow",
+      "enabled": true, 
+      "name": "packets_out",
+      "term": "netflow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Incoming counter for number of packets associated with an IP Flow",
+      "enabled": true, 
+      "name": "packets_in",
+      "term": "netflow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Incoming counter for number of bytes associated with an IP Flow",
+      "enabled": true, 
+      "name": "bytes_in",
+      "term": "netflow.cs-bytes"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Number of contiguous bits that are relevant in the source ip prefix",
+      "enabled": true, 
+      "name": "src_mask",
+      "term": "netflow.src-mask"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Number of contiguous bits that are relevant in the destination ip prefix",
+      "enabled": true, 
+      "name": "dest_mask",
+      "term": "netflow.dest-mask"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "IPv6 Flow Label field",
+      "enabled": true, 
+      "name": "flow_label_ipv6",
+      "term": "flow.ipv6-flow-label"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Control protocol that allocated the top-of-stack label",
+      "enabled": true, 
+      "name": "mpls_top_label_type",
+      "term": "netflow.mpls-top-label-type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IPv4 address of the system that the MPLS top label will cause this Flow to be forwarded to",
+      "enabled": true, 
+      "name": "top_label_ip",
+      "term": "netflow.mplsTopLabelIPAddress"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Unique identifier associated with Selector",
+      "enabled": true, 
+      "name": "selector_id",
+      "term": "netflow.selectorId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Packet selection methods applied ",
+      "enabled": true, 
+      "name": "selector_algorithm",
+      "term": "netflow.selectorAlgorithm"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of packets that are consecutively sampled",
+      "enabled": true, 
+      "name": "sampling_pkt_interval",
+      "term": "netflow.samplingPacketInterval"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Minimum TTL value observed for any packet in this Flow",
+      "enabled": true, 
+      "name": "min_ttl",
+      "term": "netflow-min-ttl"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Max TTL value observed for any packet in this Flow",
+      "enabled": true, 
+      "name": "max_ttl",
+      "term": "netflow-max-ttl"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Value of the Identification field in the IP packet header",
+      "enabled": true, 
+      "name": "ip_frag_id",
+      "term": "ip.id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Modified destination mac address caused by a middlebox function",
+      "enabled": true, 
+      "name": "post_dest_mac",
+      "term": "netflow.post-dest-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Virtual LAN identifier associated with ingress interface",
+      "enabled": true, 
+      "name": "ingress_vlan",
+      "term": "netflow.src-vlan"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Virtual LAN identifier associated with egress interface",
+      "enabled": true, 
+      "name": "egress_vlan",
+      "term": "netflow.dest-vlan"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "IP version", 
+      "enabled": true, 
+      "name": "version", 
+      "term": "ip.version"
+    },
+    {
+      "aggType": "value", 
+      "desc": "The direction of the Flow at observation point",
+      "enabled": true, 
+      "name": "flow_dir",
+      "term": "flow.direction"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Address of the next hop",
+      "enabled": true, 
+      "name": "nexthop_addr",
+      "term": "netflow.nexthop-address"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Modified source mac address caused by a middlebox function",
+      "enabled": true, 
+      "name": "post_src_mac",
+      "term": "netflow.post-src-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Short name uniquely describing an interface",
+      "enabled": true, 
+      "name": "interface_name",
+      "term": "netflow.if-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Running byte counter for a permanent flow(incoming)",
+      "enabled": true, 
+      "name": "perm_cs_bytes",
+      "term": "netflow.perm-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Running packet counter for a permanent flow(incoming)",
+      "enabled": true, 
+      "name": "perm_cs_pkts",
+      "term": "netflow.perm-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Forwarding status of the flow",
+      "enabled": true, 
+      "name": "fwd_status",
+      "term": "netflow.forward-status"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Application Id in the format classificationEngineId : selectorId",
+      "enabled": true, 
+      "name": "app_tag",
+      "term": "netflow.app-tag"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Specifies the name of an application",
+      "enabled": true, 
+      "name": "app",
+      "term": "netflow.app-name"
+    },
+    {
+      "aggType": "value",
+      "desc": "Application description",
+      "enabled": true,
+      "name": "app_desc",
+      "term": "netflow.app-desc"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Number of octets since the previous report (if any) of this Flow dropped by packet treatment",
+      "enabled": true, 
+      "name": "drop_octet_count",
+      "term": "netflow.droppedOctetDeltaCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of packets since the previous report (if any) of this Flow dropped by packet treatment",
+      "enabled": true, 
+      "name": "drop_packet_count",
+      "term": "netflow.droppedPacketDeltaCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of octets of this Flow dropped by packet treatment",
+      "enabled": true, 
+      "name": "drop_octet_total_count",
+      "term": "netflow.droppedOctetTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of packets of this Flow dropped by packet treatment",
+      "enabled": true, 
+      "name": "drop_pkt_total_count",
+      "term": "netflow.droppedPacketTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Reason for Flow termination",
+      "enabled": true, 
+      "name": "flow_end_reason",
+      "term": "flow.end-reason"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Identifier of an Observation Point that is unique per Observation Domain",
+      "enabled": true, 
+      "name": "observation_point_id",
+      "term": "netflow.observationPointId"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Identifier of a line card that is unique per IPFIX Device hosting an Observation Point",
+      "enabled": true, 
+      "name": "linecard_id",
+      "term": "netflow.lineCardId"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Identifier of line port that is unique per IPFIX Device hosting an Observation Point",
+      "enabled": true, 
+      "name": "port_id",
+      "term": "netflow.portId"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Identifier of a Metering Process that is unique per IPFIX Device",
+      "enabled": true, 
+      "name": "metering_process_id",
+      "term": "netflow.meteringProcessId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifier of an Exporting Process that is unique per IPFIX Device",
+      "enabled": true, 
+      "name": "export_process_id",
+      "term": "netflow.exportingProcessId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifier of a Template that is locally unique within a combination of a Transport session and an Observation Domain",
+      "enabled": true, 
+      "name": "template_id",
+      "term": "netflow.templateId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifier of the 802.11 (Wi-Fi) channel",
+      "enabled": true, 
+      "name": "channel",
+      "term": "netflow.wlanChannelId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Service Set Identifier of 802.11 (Wi-Fi) network ",
+      "enabled": true, 
+      "name": "ssid",
+      "term": "netflow.wlanSSID"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifier of a Flow that is unique within an Observation Domain",
+      "enabled": true, 
+      "name": "flow_id",
+      "term": "netflow.flowId"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Identifier of Observation Domain that is locally unique to an Exporting Process",
+      "enabled": true, 
+      "name": "observation_domain_id",
+      "term": "netflow.observationDomainId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the first packet of this Flow",
+      "enabled": true, 
+      "name": "flow_start_time",
+      "term": "time.epoch-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the last packet of this Flow.",
+      "enabled": true, 
+      "name": "flow_end_time",
+      "term": "time.epoch-time-end"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the first packet of this Flow",
+      "enabled": true, 
+      "name": "flow_start_time_milli",
+      "term": "netflow.flowStartMilliseconds"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the last packet of this Flow.",
+      "enabled": true, 
+      "name": "flow_end_time_milli",
+      "term": "netflow.flowEndMilliseconds"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the first packet of this Flow",
+      "enabled": true, 
+      "name": "flow_start_time_micro",
+      "term": "netflow.flowStartMicroseconds"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the last packet of this Flow.",
+      "enabled": true, 
+      "name": "flow_end_time_micro",
+      "term": "netflow.flowEndMicroseconds"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the first packet of this Flow",
+      "enabled": true, 
+      "name": "flow_start_time_nano",
+      "term": "netflow.flowStartNanoseconds"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the last packet of this Flow.",
+      "enabled": true, 
+      "name": "flow_end_time_nano",
+      "term": "netflow.flowEndNanoseconds"
+    }, 
+
+
+    {
+      "aggType": "value", 
+      "desc": "The absolute timestamp of the last (re-)initialization of the IPFIX Device.",
+      "enabled": true, 
+      "name": "sys_init_time_milli",
+      "term": "netflow.systemInitTimeMilliseconds"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The difference in time between the first observed packet of this Flow and the last observed packet of this Flow",
+      "enabled": true, 
+      "name": "flow_duration_milli",
+      "term": "netflow.flowDurationMilliseconds"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The difference in time between the first observed packet of this Flow and the last observed packet of this Flow.",
+      "enabled": true, 
+      "name": "flow_duration_micro",
+      "term": "netflow.flowDurationMicroseconds"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Total number of Flows observed in the Observation Domain since the Metering Process (re-)initialization",
+      "enabled": true, 
+      "name": "obsv_flow_count",
+      "term": "netflow.observedFlowTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Total number of observed IP packets that the Metering Process did not process since the Metering Process (re-)initialization",
+      "enabled": true, 
+      "name": "ignored_pkt_count",
+      "term": "netflow.ignoredPacketTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Total number of octets that the Metering Process did not process since the Metering Process (re-)initialization",
+      "enabled": true, 
+      "name": "ignored_octet_count",
+      "term": "netflow.ignoredOctetTotalCount"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Total number of Flow Records dropped by the Metering Process or by the Exporting Process instead of being sent to the Collecting Process",
+      "enabled": true, 
+      "name": "not_sent_flow_count",
+      "term": "netflow.notSentFlowTotalCount"
+    }, 
+
+
+    {
+      "aggType": "value", 
+      "desc": "Total number of packets dropped by the Metering Process or by the Exporting Process instead of being sent to the Collecting Process",
+      "enabled": true, 
+      "name": "not_sent_pkt_count",
+      "term": "netflow.notSentPacketTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Total number of octets dropped by the Metering Process or by the Exporting Process instead of being sent to the Collecting Process",
+      "enabled": true, 
+      "name": "not_sent_octet_count",
+      "term": "netflow.notSentOctetTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source address prefix",
+      "enabled": true, 
+      "name": "src_ip_prefix",
+      "term": "netflow.sourceIPPrefix"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination address prefix",
+      "enabled": true, 
+      "name": "dest_ip_prefix",
+      "term": "netflow.destinationIPPrefix"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Modified total octet count caused by a middlebox function after the packet passed the Observation Point.",
+      "enabled": true, 
+      "name": "post_octet_count",
+      "term": "netflow.postOctetTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Modified total packet count caused by a middlebox function after the packet passed the Observation Point.",
+      "enabled": true, 
+      "name": "post_pkt_count",
+      "term": "netflow.postPacketTotalCount"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": " The sequence number in the TCP header",
+      "enabled": true, 
+      "name": "tcp_seq_num",
+      "term": "netflow.tcpSequenceNumber"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": " The acknowledgement number in the TCP header",
+      "enabled": true, 
+      "name": "tcp_ack_num",
+      "term": "netflow.tcpAcknowledgementNumber"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": " The window field in the TCP header",
+      "enabled": true, 
+      "name": "tcp_win_size",
+      "term": "netflow.tcpWindowSize"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Fragmentation properties indicated by flags",
+      "enabled": true, 
+      "name": "ip_frag_flags",
+      "term": "ip.fragment-flags"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Number of packets of this Flow with TCP SYN flag set",
+      "enabled": true, 
+      "name": "tcp_total_syn_count",
+      "term": "netflow.tcpSynTotalCount"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Number of packets of this Flow with TCP FIN flag set",
+      "enabled": true, 
+      "name": "tcp_total_fin_count",
+      "term": "netflow.tcpFinTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of packets of this Flow with TCP RST flag set",
+      "enabled": true, 
+      "name": "tcp_total_rst_count",
+      "term": "netflow.tcpRstTotalCount"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Number of packets of this Flow with TCP PSH flag set",
+      "enabled": true, 
+      "name": "tcp_total_psh_count",
+      "term": "netflow.tcpPshTotalCount"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Number of packets of this Flow with TCP ACK flag set",
+      "enabled": true, 
+      "name": "tcp_total_ack_count",
+      "term": "netflow.tcpAckTotalCount"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Number of packets of this Flow with TCP URG flag set",
+      "enabled": true, 
+      "name": "tcp_total_urg_count",
+      "term": "netflow.tcpUrgTotalCount"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Indicates a NAT event",
+      "enabled": true, 
+      "name": "nat_event",
+      "term": "netflow.natEvent"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flags to indicate multicast",
+      "enabled": true, 
+      "name": "multicast_flags",
+      "term": "netflow.isMulticast"
+    },
+    {
+      "aggType": "value",
+      "desc": "Total number of layer 4 payload bytes in a flow from the responder",
+      "enabled": true,
+      "name": "netflow_responder_octets",
+      "term": "netflow.responderOctets"
+    },
+
+    {
+      "aggType": "value",
+      "desc": "Total number of layer 4 payload bytes in a flow from the initiator",
+      "enabled": true,
+      "name": "netflow_initiator_octets",
+      "term": "netflow.initiatorOctets"
+
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Indicates a firewall event",
+      "enabled": true, 
+      "name": "firewall_event",
+      "term": "netflow.firewallEvent"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "The scale of the window field in the TCP header",
+      "enabled": true, 
+      "name": "tcp_window_scale",
+      "term": "netflow.tcpWindowScale"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Networking device's physical interface (example, a switch port) where packets of this flow are being received",
+      "enabled": true, 
+      "name": "ingress_interface",
+      "term": "netflow.ingressPhysicalInterface"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Networking device's physical interface (example, a switch port) where packets of this flow are being sent",
+      "enabled": true, 
+      "name": "egress_interface",
+      "term": "netflow.egressPhysicalInterface"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "MD5 checksum of the IPFIX Message containing this record",
+      "enabled": true, 
+      "name": "msg_md5_chksum",
+      "term": "netflow.messageMD5Checksum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifies a transaction within a connection",
+      "enabled": true, 
+      "name": "txn_id",
+      "term": "netflow.connectionTransactionId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Specifies if Application ID is based on peer-to-peer technology",
+      "enabled": true, 
+      "name": "is_p2p",
+      "term": "netflow.p2pTechnology"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Specifies if Application ID is used as a tunnel technology",
+      "enabled": true, 
+      "name": "is_tunnel",
+      "term": "netflow.tunnelTechnology"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Specifies if Application ID is an encrypted networking protocol",
+      "enabled": true, 
+      "name": "is_encrypted",
+      "term": "netflow.encryptedTechnology"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "IPSec Security Parameters Index (SPI)",
+      "enabled": true, 
+      "name": "ipsec_spi",
+      "term": "netflow.IPSecSPI"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "GRE key, identifying an individual traffic flow within a tunnel",
+      "enabled": true, 
+      "name": "gre_key",
+      "term": "netflow.greKey"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Type of NAT treatment",
+      "enabled": true, 
+      "name": "nat_type",
+      "term": "netflow.natType"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of a selector identified by a selectorID",
+      "enabled": true, 
+      "name": "selector_name",
+      "term": "netflow.selectorName"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Instance Identifier of the interface to a Virtual Station",
+      "enabled": true, 
+      "name": "virtual_station_itf_id",
+      "term": "netflow.virtualStationInterfaceId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of the interface to a Virtual Station",
+      "enabled": true, 
+      "name": "virtual_station_itf_name",
+      "term": "netflow.virtualStationInterfaceName"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Unique Identifier of a Virtual Station",
+      "enabled": true, 
+      "name": "virtual_station_uuid",
+      "term": "netflow.virtualStationUUID"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of a Virtual Station",
+      "enabled": true, 
+      "name": "virtual_station_name",
+      "term": "netflow.virtualStationName"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifier of a layer 2 network segment in an overlay network",
+      "enabled": true, 
+      "name": "layer2_segment_id",
+      "term": "netflow.layer2SegmentId"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Total number of incoming unicast packets",
+      "enabled": true, 
+      "name": "ingress_unicast_pkt_count",
+      "term": "netflow.ingressUnicastPacketTotalCount"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Total number of incoming multicast packets",
+      "enabled": true, 
+      "name": "ingress_multicast_pkt_count",
+      "term": "netflow.ingressMulticastPacketTotalCount"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Total number of incoming broadcast packets",
+      "enabled": true, 
+      "name": "ingress_broadcast_pkt_count",
+      "term": "netflow.ingressBroadcastPacketTotalCount"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Total number of outgoing unicast packets",
+      "enabled": true, 
+      "name": "egress_unicast_pkt_count",
+      "term": "netflow.egressUnicastPacketTotalCount"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Total number of outgoing unicast packets",
+      "enabled": true, 
+      "name": "egress_broadcast_pkt_count",
+      "term": "netflow.egressBroadcastPacketTotalCount"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "IEEE 802 MAC address of a wireless station (STA). ",
+      "enabled": true, 
+      "name": "sta_mac_addr",
+      "term": "netflow.staMacAddress"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of a wireless station",
+      "enabled": true, 
+      "name": "sta_ip_addr",
+      "term": "netflow.staIPAddress"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "IEEE 802 MAC address of a wireless access point",
+      "enabled": true, 
+      "name": "wtp_mac_addr",
+      "term": "netflow.wtpMacAddress"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Type of interface where packets of this Flow are being received",
+      "enabled": true, 
+      "name": "ingress_itf_type",
+      "term": "netflow.ingressInterfaceType"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Type of interface where packets of this Flow are being sent",
+      "enabled": true, 
+      "name": "egress_itf_type",
+      "term": "netflow.egressInterfaceType"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "User name associated with the flow",
+      "enabled": true, 
+      "name": "user_name",
+      "term": "netflow.userName"
+    },
+    {
+        "aggType": "value",
+        "desc": "Common name extracted from SSL certificate",
+        "enabled": true,
+        "name": "cisco_app_ssl_common_name",
+        "term": "netflow.nbar-ssl-common-name"
+    },
+    {
+        "aggType": "value",
+        "desc": "HTTP URL extracted from HTTP transaction",
+        "enabled": true,
+        "name": "cisco_app_http_url",
+        "term": "netflow.nbar-http-url"
+    },
+    {
+        "aggType": "value",
+        "desc": "HTTP Host Name extracted from HTTP transaction",
+        "enabled": true,
+        "name": "cisco_app_http_host",
+        "term": "netflow.nbar-http-host-name"
+    },
+    {
+        "aggType": "value",
+        "desc": "HTTP User Agent extracted from HTTP transaction",
+        "enabled": true,
+        "name": "cisco_app_http_user_agent",
+        "term": "netflow.nbar-http-user-agent"
+    },
+    {
+        "aggType": "value",
+        "desc": "HTTP referer extracted from HTTP transaction",
+        "enabled": true,
+        "name": "cisco_app_http_referer",
+        "term": "netflow.nbar-http-referer"
+    },
+    {
+        "aggType": "value",
+        "desc": "RTSP host name extracted from RTSP transaction",
+        "enabled": true,
+        "name": "cisco_app_rtsp_host",
+        "term": "netflow.nbar-rtsp-host"
+    },
+    {
+        "aggType": "value",
+        "desc": "Server name extracted from SMTP transaction",
+        "enabled": true,
+        "name": "cisco_app_smtp_server",
+        "term": "netflow.nbar-smtp-server"
+    },
+    {
+        "aggType": "value",
+        "desc": "Sender name extracted from SMTP transaction",
+        "enabled": true,
+        "name": "cisco_app_smtp_sender",
+        "term": "netflow.nbar-smtp-sender"
+    },
+    {
+        "aggType": "value",
+        "desc": "Server name extracted from POP3 transaction",
+        "enabled": true,
+        "name": "cisco_app_pop3_server",
+        "term": "netflow.nbar-pop3-server"
+    },
+    {
+        "aggType": "value",
+        "desc": "Group name extracted from NNTP transaction",
+        "enabled": true,
+        "name": "cisco_app_nntp_grp.name",
+        "term": "netflow.nbar-nntp-grp-name"
+    },
+    {
+        "aggType": "value",
+        "desc": "Source domain extracted from SIP transaction",
+        "enabled": true,
+        "name": "cisco.app.sip.src.domain",
+        "term": "netflow.nbar-sip-src-domain"
+    },
+    {
+        "aggType": "value",
+        "desc": "Destination domain extracted from SIP transaction",
+        "enabled": true,
+        "name": "cisco.app.sip.dst.domain",
+        "term": "netflow.nbar-sip-dst-domain"
+    },
+    {
+      "aggType": "value",
+      "desc": "Generic key val pair for Cisco App Host in Key : Value format",
+      "enabled": true,
+      "name": "app_hosts",
+      "term": "netflow.nbar-app-host"
+    },
+    {
+      "aggType": "value",
+      "desc": "Information about the QoS Policy Classification Hierarchy",
+      "enabled": true,
+      "name": "qos_policy",
+      "term": "netflow.nbar-qos-policy"
+    },
+    {
+      "aggType": "value",
+      "desc": "URI and URI hit counts in URI : Count format",
+      "enabled": true,
+      "name": "uri_stats",
+      "term": "netflow.nbar-uri-stats"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Key Value pairs",
+      "enabled": true, 
+      "name": "netflow_elements",
+      "term": "netflow.elements"
+    }
+  ],
+  "id": "netflow",
+  "isReferenceStream": true,
+  "name": "Netflow Protocol Events",
+  "statsOnly": true,
+  "protocolName": "Netflow",
+  "sourcetype": "stream:netflow",
+  "streamType": "event"
+}

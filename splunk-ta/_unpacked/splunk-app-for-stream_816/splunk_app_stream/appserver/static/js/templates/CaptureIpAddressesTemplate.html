@@ -1,0 +1,130 @@
+<script type="text/template">
+<div id="app-main-layout" class="global-ip-filters-page">
+    <div class="dashboard-body container-fluid main-section-body" data-role="main">
+
+        <!-- ===== -->
+        <!-- Title -->
+        <!-- ===== -->
+
+        <div class="row">
+            <div class="span12 dashboard-header clearfix">
+                <h2>IP Address Filters</h2>
+                <h3 class="page-subtitle">
+                    Use whitelist/blacklist filter rules to capture/ignore network data based on IP address.
+                    <span class="icon-question-circle" id="toggle-help"></span>
+                </h3>
+            </div>
+        </div>
+
+        <div id="help"> <!-- Begin help block (this section will be toggled on/off) -->
+
+            <!-- ========================= -->
+            <!-- IP Address Format Tooltip -->
+            <!-- ========================= -->
+
+            <div class="dashboard-row">
+                <div class="dashboard-cell span-half">
+
+                    <div class="dashboard-panel" id="ip-addr-format-tooltip">
+                        You can enter individual IP (v4 or v6) addresses, or a range of addresses, using these forms:
+                            <li>192.168.2.* (IPv4 octets may use * to indicate wildcard)</li>
+                            <li>10.20.30.0/24 (IPv4 CIDR notation)</li>
+                            <li>2001:0db8:85a3:0042:1000:8a2e:0370:7300/120 (IPv6 CIDR notation)</li>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- =================================== -->
+            <!-- Blacklist/Whitelist Breakdown Table -->
+            <!-- =================================== -->
+
+            <div class="dashboard-row">
+                <div class="dashboard-cell span-half">
+                    <div class="dashboard-panel">
+
+                        <table class="table table-striped table-hover" id="white-black-comparison-table">
+                            <tr>
+                                <th>Whitelist</th>
+                                <th>Blacklist</th>
+                                <th>Filter Results</th>
+                                <tr>
+                                    <td>No</td>
+                                    <td>No</td>
+                                    <td>Captures all IPs</td>
+                                </tr>
+                                <tr>
+                                    <td>No</td>
+                                    <td>Yes</td>
+                                    <td>Captures all IPs <i>except</i> blacklist items</td>
+                                </tr>
+                                <tr>
+                                    <td>Yes</td>
+                                    <td>No</td>
+                                    <td>Captures <i>only</i> whitelist IPs</td>
+                                </tr>
+                                 <tr>
+                                    <td>Yes</td>
+                                    <td>Yes</td>
+                                    <td>Captures all IPs in whitelist <i>OR</i> IPs not in blacklist</td>
+                                </tr>
+                            </tr>
+                        </table>
+
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- End Help Block -->
+
+        <!-- ========= -->
+        <!-- Whitelist -->
+        <!-- ========= -->
+
+        <div class="dashboard-row">
+            <div class="dashboard-cell span-half">
+                <div class="dashboard-panel" >
+                    <div class="dashboard-element">
+
+                        <div class="panel-head">
+                            <h3>Whitelist IP Addresses </h3>
+                            <h5>Define a whitelist to capture data from IP addresses on that list only.</h5>
+                        </div>
+
+                        <div id="whitelist">
+                            <div class="ipAddressList" style="margin-top: 10px;"></div>
+                            <div class="ipAddressList-controls" style="margin-top: 10px;"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========= -->
+        <!-- Blacklist -->
+        <!-- ========= -->
+
+        <div class="dashboard-row">
+            <div class="dashboard-cell span-half">
+                <div class="dashboard-panel">
+                    <div class="dashboard-element">
+
+                        <div class="panel-head">
+                            <h3>Blacklist IP Addresses </h3>
+                            <h5>Define a blacklist to ignore those IP addresses, and allow data capture from all other IP addresses.</h5>
+                        </div>
+
+                        <div id="blacklist">
+                            <div class="ipAddressList" style="margin-top: 10px;"></div>
+                            <div class="ipAddressList-controls" style="margin-top: 10px;"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+</script>

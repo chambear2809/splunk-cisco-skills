@@ -1,0 +1,163 @@
+<form version="1.1" script="interface_inpage_drilldown.js" stylesheet="table_decoration.css">
+  <label>All Interfaces details</label>
+  <search id="baseSearch">
+    <query>|`interface_details`</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Range</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="device" searchWhenChanged="true">
+       <label>Device</label>
+       <selectFirstChoice>true</selectFirstChoice>
+       <search>
+         <query> `cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k | lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | eval hostAndHostname = hostname."(".device.")" | stats values(device) as Device by hostAndHostname | fields hostAndHostname Device | sort 0 hostAndHostname </query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+         <fieldForLabel>hostAndHostname</fieldForLabel>
+         <fieldForValue>Device</fieldForValue>  
+    </input>
+    <input type="dropdown" token="state" searchWhenChanged="true">
+      <label>Operational State</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <search>
+         <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxinterface  device=$device$ state=* | dedup state| table state</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+         <fieldForLabel>state</fieldForLabel>
+         <fieldForValue>state</fieldForValue>   
+    </input>
+    <input type="dropdown" token="admin_state" searchWhenChanged="true">
+      <label>Admin State</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <search>
+         <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxinterface device=$device$ admin_state=* | dedup admin_state | table admin_state </query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+         <fieldForLabel>Admin_State</fieldForLabel>
+         <fieldForValue>admin_state</fieldForValue>  
+    </input>
+    <input type="dropdown" token="eth_speed" searchWhenChanged="true">
+      <label>Ethernet speed</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <search>
+         <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k component=nxinterface device=$device$ eth_speed=* | dedup eth_speed| table eth_speed</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+         <fieldForLabel>eth speed</fieldForLabel>
+         <fieldForValue>eth_speed</fieldForValue>  
+    </input>
+  </fieldset>
+  <row>
+   <panel>
+    <html id="overview">
+      <h1>Dashboard Overview</h1>
+      <p>This dashboard gives visibility into traffic pattern on switch interfaces. It lets user drill down into particular interface by clicking on it and display unicast, multicast, broadcast packets count.</p>
+    </html>
+    </panel>
+  </row>
+  <row>
+   <panel>
+    <html>
+      <h1>Interface Statistics (Packets Per Second)</h1>
+      <p>To get more information about Interface click on <I>"Interface"</I> field</p>
+    </html>
+    <table id="master_interface">
+      <search base="baseSearch">
+        <query>|search Device=$device$ state=$state$ admin_state=$admin_state$ eth_speed=$eth_speed|s$ | stats  latest(state) as "Operational State" latest(admin_state) as "Admin State" values(desc) AS "Description" values(eth_speed) AS "Speed" sparkline(avg(eth_inrate1_pkts)) AS "Input Rate Trend" sparkline(avg(eth_indiscard)) AS "Input Discard Trend" sparkline(avg(eth_inerr)) AS "Input Error Trend" sparkline(avg(eth_outrate1_pkts)) AS "Output Rate Trend" sparkline(avg(eth_outdiscard)) AS "Output Discard Trend" sparkline(avg(eth_outerr)) AS "Output Error Trend" by Device,Hostname,Interface | sort 0 "Operational State" | reverse </query>
+      </search>
+      <format type="sparkline" field="Input Discard Trend">
+        <option name="lineColor">#5379af</option>
+        <option name="fillColor">#CCDDFF</option>
+        <option name="lineWidth">1</option>
+        <option name="maxSpotColor">#A2FFA2</option>
+        <option name="spotRadius">3</option>
+        <option name="height">25</option>
+        <option name="width">75</option>
+      </format>
+      <format type="sparkline" field="Input Error Trend">
+        <option name="type">bar</option>
+        <option name="height">25</option>
+        <option name="width">75</option>
+        <!-- Use colorMap to map specific values to selected colors -->      
+        <option name="colorMap">
+          <option name="1:">#FF0000</option>
+        </option>
+        <option name="barWidth">2px</option>
+      </format>
+      <format type="sparkline" field="Input Rate Trend">
+        <option name="lineColor">#5379af</option>
+        <option name="fillColor">#CCDDFF</option>
+        <option name="lineWidth">1</option>
+        <option name="maxSpotColor">#A2FFA2</option>
+        <option name="spotRadius">3</option>
+        <option name="height">25</option>
+        <option name="width">75</option>
+      </format>
+      <format type="sparkline" field="Output Discard Trend">
+        <option name="lineColor">#5379af</option>
+        <option name="fillColor">#CCDDFF</option>
+        <option name="lineWidth">1</option>
+        <option name="maxSpotColor">#A2FFA2</option>
+        <option name="spotRadius">3</option>
+        <option name="height">25</option>
+        <option name="width">75</option>
+      </format>
+      <format type="sparkline" field="Output Error Trend">
+        <option name="type">bar</option>
+        <option name="height">25</option>
+        <option name="width">75</option>
+        <!-- Use colorMap to map specific values to selected colors -->      
+        <option name="colorMap">
+          <option name="1:">#FF0000</option>
+        </option>
+        <option name="barWidth">2px</option>
+      </format>
+      <format type="sparkline" field="Output Rate Trend">
+        <option name="lineColor">#5379af</option>
+        <option name="fillColor">#CCDDFF</option>
+        <option name="lineWidth">1</option>
+        <option name="maxSpotColor">#A2FFA2</option>
+        <option name="spotRadius">3</option>
+        <option name="height">25</option>
+        <option name="width">75</option>
+      </format>
+    </table>
+   </panel>
+  </row>
+  <row>
+   <panel>
+    <table id="detail1">
+      <title>Transmit Statistics (Packets Per Second)</title>
+       <search base="baseSearch">
+         <query>| eval n=split("$Interface$","::") | eval deviceval=mvindex(n,0) | eval interfaceval=mvindex(n,1) | where Device=deviceval AND Interface=interfaceval | stats latest(eth_outpkts) AS "Total Packets" latest(eth_outrate1_pkts) AS "Packet Rate" latest(eth_outerr) AS "Error packets" latest(eth_outdiscard) AS "Discard Packets" latest(eth_outmcast) AS "Multicast Packets" latest(eth_outbcast) AS "BroadCast Packets" latest(eth_outucast) AS "Unicast Packets" by Device,Hostname,Interface</query>
+      </search>
+      <option name="drilldown">none</option>
+    </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+    <table id="detail2">
+      <title>Receive Statistics (Packets Per Second)</title>
+      <search base="baseSearch">
+        <query>| eval n=split("$Interface$","::") | eval deviceval=mvindex(n,0) | eval interfaceval=mvindex(n,1) | where Device=deviceval AND Interface=interfaceval| stats latest(eth_inpkts) AS "Total Packets" latest(eth_inrate1_pkts) AS "Packet Rate" latest(eth_inerr) AS "Error packets" latest(eth_indiscard) AS "Discard Packets" latest(eth_inmcast) AS "Multicast Packets" latest(eth_inbcast) AS "BroadCast Packets" latest(eth_inucast) AS "Unicast Packets" by Device,Hostname,Interface</query>
+      </search>
+      <option name="drilldown">none</option>
+    </table>
+  </panel>
+  </row>
+</form>

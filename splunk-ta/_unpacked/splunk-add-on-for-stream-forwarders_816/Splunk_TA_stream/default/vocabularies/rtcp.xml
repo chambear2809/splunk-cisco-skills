@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="rtcp">
+    <Name>RTCP Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="rtcp.event">
+      <Type>object</Type>
+      <Comment>Event representing an RTCP packet</Comment>
+    </Term>
+    <Term id="rtcp.packet-type">
+      <Type>shortstring</Type>
+      <Comment>Packet type (such as SenderReport)</Comment>
+    </Term>
+    <Term id="rtcp.ssrc">
+      <Type>uint32</Type>
+      <Comment>SSRC (Synchronization Source) identifier</Comment>
+    </Term>
+    <Term id="rtcp.sdes-cname">
+      <Type>shortstring</Type>
+      <Comment>Canonical end-point identifier SDES item</Comment>
+    </Term>
+    <Term id="rtcp.sdes-name">
+      <Type>shortstring</Type>
+      <Comment>User name SDES item</Comment>
+    </Term>
+    <Term id="rtcp.sdes-email">
+      <Type>shortstring</Type>
+      <Comment>Email address SDES item</Comment>
+    </Term>
+    <Term id="rtcp.sdes-phone">
+      <Type>shortstring</Type>
+      <Comment>Phone number SDES item</Comment>
+    </Term>
+    <Term id="rtcp.sdes-loc">
+      <Type>shortstring</Type>
+      <Comment>Geographic user location SDES item</Comment>
+    </Term>
+    <Term id="rtcp.sdes-tool">
+      <Type>shortstring</Type>
+      <Comment>Application or tool name SDES item</Comment>
+    </Term>
+    <Term id="rtcp.sdes-note">
+      <Type>shortstring</Type>
+      <Comment>Notice/Status SDES item</Comment>
+    </Term>
+    <Term id="rtcp.rr-block-ssrc">
+      <Type>uint32</Type>
+      <Comment>SSRC of a report block (receiver report)</Comment>
+    </Term>
+    <Term id="rtcp.rr-fcnlost">
+      <Type>uint8</Type>
+      <Comment>Fraction of packets lost (receiver report)</Comment>
+    </Term>
+    <Term id="rtcp.rr-cumlost">
+      <Type>uint32</Type>
+      <Comment>Cumulative number of packets lost (receiver report)</Comment>
+    </Term>
+    <Term id="rtcp.rr-highestseqnum">
+      <Type>uint32</Type>
+      <Comment>Extended highest sequence number received (receiver report)</Comment>
+    </Term>
+    <Term id="rtcp.rr-jitter">
+      <Type>uint32</Type>
+      <Comment>Interarrival jitter (receiver report)</Comment>
+    </Term>
+    <Term id="rtcp.rr-lsr">
+      <Type>uint32</Type>
+      <Comment>Last SR timestamp (receiver report)</Comment>
+    </Term>
+    <Term id="rtcp.rr-dlsr">
+      <Type>uint32</Type>
+      <Comment>Delay since last SR (receiver report)</Comment>
+    </Term>
+    <Term id="rtcp.sr-ntp-ts-msw">
+      <Type>uint32</Type>
+      <Comment>NTP timestamp, most significant word</Comment>
+    </Term>
+    <Term id="rtcp.sr-ntp-ts-lsw">
+      <Type>uint32</Type>
+      <Comment>NTP timestamp, least significant word</Comment>
+    </Term>
+    <Term id="rtcp.sr-ntp-ts">
+      <Type format="%Y-%m-%dT%H:%M:%S%FZ">datetime</Type>
+      <Comment>NTP timestamp</Comment>
+    </Term>
+    <Term id="rtcp.sr-rtp-ts">
+      <Type>uint32</Type>
+      <Comment>RTP timestamp</Comment>
+    </Term>
+    <Term id="rtcp.sr-pkt-count">
+      <Type>uint32</Type>
+      <Comment>Sender's packet count</Comment>
+    </Term>
+    <Term id="rtcp.sr-octet-count">
+      <Type>uint32</Type>
+      <Comment>Sender's octet count</Comment>
+    </Term>
+    <Term id="rtcp.sr-block-ssrc">
+      <Type>uint32</Type>
+      <Comment>SSRC of a report block (sender report)</Comment>
+    </Term>
+    <Term id="rtcp.sr-fcnlost">
+      <Type>uint8</Type>
+      <Comment>Fraction of packets lost (sender report)</Comment>
+    </Term>
+    <Term id="rtcp.sr-cumlost">
+      <Type>uint32</Type>
+      <Comment>Cumulative number of packets lost (sender report)</Comment>
+    </Term>
+    <Term id="rtcp.sr-highestseqnum">
+      <Type>uint32</Type>
+      <Comment>Extended highest sequence number received (sender report)</Comment>
+    </Term>
+    <Term id="rtcp.sr-jitter">
+      <Type>uint32</Type>
+      <Comment>Interarrival jitter (sender report)</Comment>
+    </Term>
+    <Term id="rtcp.sr-lsr">
+      <Type>uint32</Type>
+      <Comment>Last SR timestamp (sender report)</Comment>
+    </Term>
+    <Term id="rtcp.sr-dlsr">
+      <Type>uint32</Type>
+      <Comment>Delay since last SR (sender report)</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

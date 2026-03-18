@@ -1,0 +1,124 @@
+<form version="1.1">
+  <label>Assurance Alert Data</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Total Alerts</title>
+      <single>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:assurancealerts" $orgid$ 
+| dedup id 
+| stats count as "Alert Count"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="height">249</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:assurancealerts" $orgid$ | dedup id&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <title>Alert Count by Severity</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:assurancealerts" $orgid$
+| dedup id
+| rename severity as "Severity"
+| stats count as "Alert Count" by Severity</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.fieldColors">{"critical":"#FF0000", "warning":"#FFA500", "informational":"#007BFF"}</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:assurancealerts" $orgid$ | dedup id | search severity="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Alert Data</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:assurancealerts" $orgid$ 
+| dedup id
+| rename id as "Alert Id", startedAt as "Alert Time" , categoryType as "Category Type", severity as "Severity", description as "Description" 
+| table "Alert Id", "Alert Time","Category Type", "Severity","Description"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <option name="rowNumbers">false</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:assurancealerts" $orgid$ | dedup id| search id="$row.Alert Id$" startedAt="$row.Alert Time$" categoryType="$row.Category Type$" severity="$row.Severity$" description="$row.Description$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Top Affected Networks</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:assurancealerts" $orgid$
+| dedup id
+| rename network.name as "Network Name", severity as "Severity Level"
+| stats count as "Count" by "Network Name", "Severity Level"
+| sort - 0 Count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:assurancealerts" $orgid$ | dedup id | search network.name="$row.Network Name$" severity="$row.Severity Level$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <title>Top Affected Devices</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:assurancealerts" $orgid$ 
+| dedup id 
+| rename scope.devices{}.name as "Device Name", severity as "Severity Level" 
+| stats count as "Count" by "Device Name", "Severity Level" 
+| sort - 0 Count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:assurancealerts" $orgid$ | dedup id | search scope.devices{}.name="$row.Device Name$" severity="$row.Severity Level$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>

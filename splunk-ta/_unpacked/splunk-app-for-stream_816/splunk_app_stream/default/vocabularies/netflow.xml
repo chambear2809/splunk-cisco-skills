@@ -1,0 +1,1993 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="netflow">
+    <Locked>true</Locked>
+    <Name>Netflow Protocol Vocabulary</Name>
+    <Term id="netflow.event">
+      <Type>object</Type>
+      <Comment>Event representing NetFlow</Comment>
+    </Term>
+    <Term id="netflow.version">
+        <Type>uint16</Type>
+        <Comment>Netflow version number</Comment>
+    </Term>
+    <Term id="netflow.flow-sequence">
+        <Type>uint32</Type>
+        <Comment>Netflow sequence number</Comment>
+    </Term>
+    <Term id="netflow.sys-uptime-msecs">
+        <Type>uint32</Type>
+        <Comment>Current time in milliseconds since the export device booted</Comment>
+    </Term>
+    <Term id="netflow.exporter-time">
+        <Type>shortstring</Type>
+        <Comment>Time on exporter</Comment>
+    </Term>
+    <Term id="netflow.num-flows">
+        <Type>uint64</Type>
+        <Comment>The conservative count of Original Flows contributing to this Aggregated Flow</Comment>
+    </Term>
+    <Term id="netflow.tcp-flags">
+        <Type>uint8</Type>
+        <Comment>Cumulative OR of TCP flags</Comment>
+    </Term>
+    <Term id="netflow.src-mask">
+        <Type>uint8</Type>
+        <Comment>Source address prefix mask</Comment>
+    </Term>
+    <Term id="netflow.input-snmpidx">
+        <Type>uint64</Type>
+        <Comment>SNMP index of input interface</Comment>
+    </Term>
+    <Term id="netflow.dest-mask">
+        <Type>uint8</Type>
+        <Comment>Destination address prefix mask</Comment>
+    </Term>
+    <Term id="netflow.output-snmpidx">
+        <Type>uint64</Type>
+        <Comment>SNMP index of output interface</Comment>
+    </Term>
+    <Term id="netflow.nexthop-address">
+        <Type>shortstring</Type>
+        <Comment>IP address of the next hop router</Comment>
+    </Term>
+    <Term id="netflow.c-sysnum">
+        <Type>uint64</Type>
+        <Comment>The autonomous system (AS) number of the source IP address.</Comment>
+    </Term>
+    <Term id="netflow.s-sysnum">
+        <Type>uint64</Type>
+        <Comment>The autonomous system (AS) number of the destination IP address.</Comment>
+    </Term>
+    <Term id="netflow.flow-end-rel-time">
+        <Type>uint32</Type>
+        <Comment>The relative timestamp of the last packet of this Flow. It indicates the number of milliseconds since the last (re-)initialization of the device.</Comment>
+    </Term>
+    <Term id="netflow.flow-start-rel-time">
+        <Type>uint32</Type>
+        <Comment>The relative timestamp of the first packet of this Flow. It indicates the number of milliseconds since the last (re-)initialization of the device . </Comment>
+    </Term>
+    <Term id="netflow.bgp-nexthop-address">
+        <Type>shortstring</Type>
+        <Comment>Next-hop router’s IP address in the BGP domain</Comment>
+    </Term>
+    <Term id="netflow.multicast-out-packets">
+        <Type>uint64</Type>
+        <Comment>IP multicast outgoing packet counter.</Comment>
+    </Term>
+    <Term id="netflow.multicast-out-bytes">
+        <Type>uint64</Type>
+        <Comment>IP multicast outgoing Octet (byte) counter.</Comment>
+    </Term>
+    <Term id="netflow.min-length">
+        <Type>uint64</Type>
+        <Comment>Length of the smallest packet observed for this Flow.</Comment>
+    </Term>
+    <Term id="netflow.max-length">
+        <Type>uint64</Type>
+        <Comment>Length of the largest packet observed for this Flow.</Comment>
+    </Term>
+    <Term id="netflow.icmp-type">
+        <Type>uint16</Type>
+        <Comment>Type and Code of the IPv4 ICMP message. The combination of both values is reported as (ICMP type * 256) + ICMP code</Comment>
+    </Term>
+    <Term id="netflow.igmp-type">
+        <Type>uint8</Type>
+        <Comment>The type field of the IGMP message.</Comment>
+    </Term>
+    <Term id="netflow.sampling-interval">
+        <Type>uint32</Type>
+        <Comment>Rate at which packets are sampled when using sampling</Comment>
+    </Term>
+    <Term id="netflow.sampling-algorithm">
+        <Type>uint8</Type>
+        <Comment>Sampling algorithm used</Comment>
+    </Term>
+    <Term id="netflow.flow-active-timeout">
+        <Type>uint16</Type>
+        <Comment>Timeout value (in seconds) for active flow entries
+            in the NetFlow cache</Comment>
+    </Term>
+    <Term id="netflow.flow-inactive-timeout">
+        <Type>uint16</Type>
+        <Comment>Timeout value (in seconds) for inactive flow entries
+            in the NetFlow cache</Comment>
+    </Term>
+    <Term id="netflow.engine-type">
+        <Type>uint8</Type>
+        <Comment>Type of Flow switching engine.</Comment>
+    </Term>
+    <Term id="netflow.engine-id">
+        <Type>uint8</Type>
+        <Comment>ID number of the Flow switching engine.</Comment>
+    </Term>
+    <Term id="netflow.bytes">
+        <Type>uint64</Type>
+        <Comment>Total number of Layer 3 bytes in the packets of the flow.</Comment>
+    </Term>
+    <Term id="netflow.cs-bytes">
+        <Type>uint64</Type>
+        <Comment>Incoming counter for number of bytes associated with an IP Flow</Comment>
+    </Term>
+    <Term id="netflow.sc-bytes">
+        <Type>uint64</Type>
+        <Comment>Outgoing counter for number of bytes associated with an IP Flow</Comment>
+    </Term>
+    <Term id="netflow.bytes-exported">
+        <Type>uint64</Type>
+        <Comment>Number of bytes exported by the Observation Domain.</Comment>
+    </Term>
+    <Term id="netflow.packets-exported">
+        <Type>uint64</Type>
+        <Comment>Number of bytes exported by the Observation Domain.</Comment>
+    </Term>
+    <Term id="netflow.flows-exported">
+        <Type>uint64</Type>
+        <Comment>Number of flows exported by the Observation Domain.</Comment>
+    </Term>
+    <Term id="netflow.router-sc">
+        <Type>shortstring</Type>
+        <Comment>Address of a router that is being shortcut when performing MultiLayer Switching.</Comment>
+    </Term>
+    <Term id="netflow.mpls-top-label-type">
+        <Type>uint8</Type>
+        <Comment>MPLS Top Label Type.</Comment>
+    </Term>
+    <Term id="netflow-min-ttl">
+        <Type>uint8</Type>
+        <Comment>Minimum TTL value observed for any packet in this Flow.</Comment>
+    </Term>
+    <Term id="netflow-max-ttl">
+        <Type>uint8</Type>
+        <Comment>Maximum TTL value observed for any packet in this Flow.</Comment>
+    </Term>
+    <Term id="netflow.dest-tos">
+        <Type>uint8</Type>
+        <Comment>Type of Service byte setting when exiting outgoing interface.</Comment>
+    </Term>
+    <Term id="netflow.post-dest-mac">
+        <Type>shortstring</Type>
+        <Comment>Reports a potentially modified value caused by a middlebox function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.src-vlan">
+        <Type>uint16</Type>
+        <Comment>Virtual LAN identifier associated with ingress interface.</Comment>
+    </Term>
+    <Term id="netflow.dest-vlan">
+        <Type>uint16</Type>
+        <Comment>Virtual LAN identifier associated with egress interface.</Comment>
+    </Term>
+    <Term id="netflow.src-vlan_priority">
+        <Type>uint32</Type>
+        <Comment>802.1p priority of incoming frame</Comment>
+    </Term>
+    <Term id="netflow.dest-vlan_priority">
+        <Type>uint32</Type>
+        <Comment>802.1p priority of outgoing frame</Comment>
+    </Term>
+    <Term id="netflow.post-src-mac">
+        <Type>shortstring</Type>
+        <Comment>Reports a potentially modified value caused by a middlebox function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.if-name">
+        <Type>shortstring</Type>
+        <Comment>A short name uniquely describing an interface.</Comment>
+    </Term>
+    <Term id="netflow.if-desc">
+        <Type>shortstring</Type>
+        <Comment>The description of an interface.</Comment>
+    </Term>
+    <Term id="netflow.perm-bytes">
+        <Type>uint64</Type>
+        <Comment>Running byte counter for a permanent flow.</Comment>
+    </Term>
+    <Term id="netflow.perm-packets">
+        <Type>uint64</Type>
+        <Comment>Running packet counter for a permanent flow.</Comment>
+    </Term>
+    <Term id="netflow.forward-status">
+        <Type>uint8</Type>
+        <Comment>Describes the forwarding status of the flow and any attached reasons</Comment>
+    </Term>
+    <Term id="netflow.mpls-route-distinguisher">
+        <Type>shortstring</Type>
+        <Comment>The value of the VPN route distinguisher of a corresponding entry in a VPN routing and forwarding table.</Comment>
+    </Term>
+    <Term id="netflow.mpls-top-label-prefix-len">
+        <Type>uint8</Type>
+        <Comment>Number of consecutive bits in the MPLS prefix length.</Comment>
+    </Term>
+    
+    <Term id="netflow.src-traffic-idx">
+        <Type>uint32</Type>
+        <Comment>BGP Policy Accounting Source Traffic Index.</Comment>
+    </Term>
+    <Term id="netflow.dest-traffic-idx">
+        <Type>uint32</Type>
+        <Comment>BGP Policy Accounting Destination Traffic Index.</Comment>
+    </Term>
+    
+    <Term id="netflow.app-desc">
+        <Type>blob</Type>
+        <Comment>Application description.</Comment>
+    </Term>
+    <Term id="netflow.app-tag">
+        <Type>blob</Type>
+        <Comment>8 bits of engine ID, followed by n bits of classification.</Comment>
+    </Term>
+    
+    <Term id="netflow.app-name">
+        <Type>blob</Type>
+        <Comment>Name associated with a classification.</Comment>
+    </Term>
+    
+    <Term id="netflow.diff-serv-code-point">
+        <Type>uint8</Type>
+        <Comment>The value of a Differentiated Services Code Point (DSCP)
+            encoded in the Differentiated Services Field.</Comment>
+    </Term>
+    
+    <Term id="netflow.multi-cast-replication-factor">
+        <Type>uint32</Type>
+        <Comment>Multicast replication factor.</Comment>
+    </Term>
+    <Term id="netflow.class-engine-id">
+        <Type>uint8</Type>
+        <Comment>A unique identifier for the engine that determined the Selector ID.</Comment>
+    </Term>
+    <Term id="netflow.bgpNextAdjacentAsNumber">
+        <Type>uint32</Type>
+        <Comment>The autonomous system (AS) number of the first AS in the AS
+            path to the destination IP address.</Comment>
+    </Term>
+    <Term id="netflow.bgpPrevAdjacentAsNumber">
+        <Type>uint32</Type>
+        <Comment>The autonomous system (AS) number of the last AS in the AS
+            path from the source IP address.</Comment>
+    </Term>
+    <Term id="netflow.exporterIPAddress">
+        <Type>shortstring</Type>
+        <Comment>The IPv4/v6 address used by the Exporting Process.</Comment>
+    </Term>
+    <Term id="netflow.droppedOctetDeltaCount">
+        <Type>uint64</Type>
+        <Comment>The number of octets since the previous report (if any)
+            in packets of this Flow dropped by packet treatment.</Comment>
+    </Term>
+    <Term id="netflow.droppedPacketDeltaCount">
+        <Type>uint64</Type>
+        <Comment>The number of packets since the previous report (if any)
+            of this Flow dropped by packet treatment.</Comment>
+    </Term>
+    <Term id="netflow.droppedOctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of octets in packets of this Flow dropped
+            by packet treatment since the Metering Process
+            (re-)initialization for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.droppedPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The number of packets of this Flow dropped by packet
+            treatment since the Metering Process
+            (re-)initialization for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.commonPropertiesId">
+        <Type>uint64</Type>
+        <Comment>An identifier of a set of common properties that is
+            unique per Observation Domain and Transport Session.</Comment>
+    </Term>
+    <Term id="netflow.observationPointId">
+        <Type>uint64</Type>
+        <Comment>An identifier of an Observation Point that is unique per
+            Observation Domain.</Comment>
+    </Term>
+    <Term id="netflow.icmpTypeCode">
+        <Type>uint16</Type>
+        <Comment>Type and Code of ICMP message.  The combination of
+            both values is reported as (ICMP type * 256) + ICMP code.</Comment>
+    </Term>
+    <Term id="netflow.mplsTopLabelIPAddress">
+        <Type>shortstring</Type>
+        <Comment>The IP address of the system that the MPLS top label will
+            cause this Flow to be forwarded to.</Comment>
+    </Term>
+    <Term id="netflow.lineCardId">
+        <Type>uint32</Type>
+        <Comment>An identifier of a line card that is unique per IPFIX
+            Device hosting an Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.portId">
+        <Type>uint32</Type>
+        <Comment>An identifier of a line port that is unique per IPFIX
+            Device hosting an Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.meteringProcessId">
+        <Type>uint32</Type>
+        <Comment>An identifier of a Metering Process that is unique per
+            IPFIX Device.</Comment>
+    </Term>
+    <Term id="netflow.exportingProcessId">
+        <Type>uint32</Type>
+        <Comment>An identifier of an Exporting Process that is unique per
+            IPFIX Device.</Comment>
+    </Term>
+    <Term id="netflow.templateId">
+        <Type>uint16</Type>
+        <Comment>An identifier of a Template that is locally unique within a
+            combination of a Transport session and an Observation Domain.
+        </Comment>
+    </Term>
+    <Term id="netflow.wlanChannelId">
+        <Type>uint8</Type>
+        <Comment>The identifier of the 802.11 (Wi-Fi) channel used.</Comment>
+    </Term>
+    <Term id="netflow.wlanSSID">
+        <Type>shortstring</Type>
+        <Comment>The Service Set IDentifier (SSID) identifying an 802.11
+            (Wi-Fi) network used.  According to IEEE.802-11.1999, the
+            SSID is encoded into a string of up to 32 characters.</Comment>
+    </Term>
+    <Term id="netflow.flowId">
+        <Type>uint64</Type>
+        <Comment>An identifier of a Flow that is unique within an Observation
+            Domain.  This Information Element can be used to distinguish
+            between different Flows if Flow Keys such as IP addresses and
+            port numbers are not reported or are reported in separate
+            records.</Comment>
+    </Term>
+    <Term id="netflow.observationDomainId">
+        <Type>uint32</Type>
+        <Comment>An identifier of an Observation Domain that is locally
+            unique to an Exporting Process.</Comment>
+    </Term>
+    <Term id="netflow.flowStartSeconds">
+        <Type>uint32</Type>
+        <Comment>The absolute timestamp of the first packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowEndSeconds">
+        <Type>uint32</Type>
+        <Comment>The absolute timestamp of the last packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowStartMilliseconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp of the first packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowEndMilliseconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp of the last packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowStartMicroseconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp of the first packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowEndMicroseconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp of the last packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowStartNanoseconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp of the first packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowEndNanoseconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp of the last packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowStartDeltaMicroseconds">
+        <Type>uint32</Type>
+        <Comment>This is a relative timestamp only valid within the scope
+            of a single IPFIX Message.</Comment>
+    </Term>
+    <Term id="netflow.flowEndDeltaMicroseconds">
+        <Type>uint32</Type>
+        <Comment>This is a relative timestamp only valid within the scope
+            of a single IPFIX Message.</Comment>
+    </Term>
+    <Term id="netflow.systemInitTimeMilliseconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp of the last (re-)initialization of the
+            IPFIX Device.</Comment>
+    </Term>
+    <Term id="netflow.flowDurationMilliseconds">
+        <Type>uint32</Type>
+        <Comment>The difference in time between the first observed packet
+            of this Flow and the last observed packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.flowDurationMicroseconds">
+        <Type>uint32</Type>
+        <Comment>The difference in time between the first observed packet
+            of this Flow and the last observed packet of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.observedFlowTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of Flows observed in the Observation Domain
+            since the Metering Process (re-)initialization for this
+            Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.ignoredPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of observed IP packets that the
+            Metering Process did not process since the
+            (re-)initialization of the Metering Process.</Comment>
+    </Term>
+    <Term id="netflow.ignoredOctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of octets in observed IP packets
+            (including the IP header) that the Metering Process
+            did not process since the (re-)initialization of the
+            Metering Process.</Comment>
+    </Term>
+    <Term id="netflow.notSentFlowTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of Flow Records that were generated by the
+            Metering Process and dropped by the Metering Process or
+            by the Exporting Process instead of being sent to the
+            Collecting Process.</Comment>
+    </Term>
+    <Term id="netflow.notSentPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of packets in Flow Records that were
+            generated by the Metering Process and dropped
+            by the Metering Process or by the Exporting Process
+            instead of being sent to the Collecting Process.
+        </Comment>
+    </Term>
+    <Term id="netflow.notSentOctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of octets in packets in Flow Records
+            that were generated by the Metering Process and
+            dropped by the Metering Process or by the Exporting
+        </Comment>
+    </Term>
+    <Term id="netflow.destinationIPPrefix">
+        <Type>shortstring</Type>
+        <Comment>IP destination address prefix.</Comment>
+    </Term>
+    <Term id="netflow.sourceIPPrefix">
+        <Type>shortstring</Type>
+        <Comment>IP source address prefix.</Comment>
+    </Term>
+    <Term id="netflow.postOctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>Modified octet count that reports a
+            potentially modified value caused by a middlebox
+            function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.postPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>Modified packet count that reports a
+            potentially modified value caused by a middlebox
+            function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.flowKeyIndicator">
+        <Type>uint64</Type>
+        <Comment>This set of bit fields is used for marking the Information
+            Elements of a Data Record that serve as Flow Key.</Comment>
+    </Term>
+    <Term id="netflow.postMCastPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of outgoing multicast packets sent for
+            packets of this Flow by a multicast daemon within the
+            Observation Domain since the Metering Process
+            (re-)initialization.</Comment>
+    </Term>
+    <Term id="netflow.postMCastOctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of octets in outgoing multicast packets
+            sent for packets of this Flow by a multicast daemon in the
+            Observation Domain since the Metering Process
+            (re-)initialization.</Comment>
+    </Term>
+    <Term id="netflow.tcpSequenceNumber">
+        <Type>uint32</Type>
+        <Comment>The sequence number in the TCP header.</Comment>
+    </Term>
+    <Term id="netflow.tcpAcknowledgementNumber">
+        <Type>uint32</Type>
+        <Comment>The acknowledgement number in the TCP header.</Comment>
+    </Term>
+    <Term id="netflow.tcpWindowSize">
+        <Type>uint16</Type>
+        <Comment>The window field in the TCP header.</Comment>
+    </Term>
+    <Term id="netflow.tcpUrgentPointer">
+        <Type>uint16</Type>
+        <Comment>The urgent pointer in the TCP header.</Comment>
+    </Term>
+    <Term id="netflow.tcpHeaderLength">
+        <Type>uint8</Type>
+        <Comment>The length of the TCP header.</Comment>
+    </Term>
+    <Term id="netflow.ipHeaderLength">
+        <Type>uint8</Type>
+        <Comment>The length of the IP header.  For IPv6, the value of this
+            Information Element is 40.</Comment>
+    </Term>
+    <Term id="netflow.totalLengthIPv4">
+        <Type>uint16</Type>
+        <Comment>The total length of the IPv4 packet.</Comment>
+    </Term>
+    <Term id="netflow.payloadLengthIPv6">
+        <Type>uint16</Type>
+        <Comment>This Information Element reports the value of the Payload
+            Length field in the IPv6 header.</Comment>
+    </Term>
+    <Term id="netflow.ipTTL">
+        <Type>uint8</Type>
+        <Comment>For IPv4, the value of the Information Element matches
+            the value of the Time to Live (TTL) field in the IPv4 packet
+            header.</Comment>
+    </Term>
+    <Term id="netflow.nextHeaderIPv6">
+        <Type>uint8</Type>
+        <Comment>The value of the Next Header field of the IPv6 header.</Comment>
+    </Term>
+    <Term id="netflow.mplsPayloadLength">
+        <Type>uint32</Type>
+        <Comment>The size of the MPLS packet without the label stack.</Comment>
+    </Term>
+    <Term id="netflow.ipDiffServCodePoint">
+        <Type>uint8</Type>
+        <Comment>The value of a Differentiated Services Code Point (DSCP)
+            encoded in the Differentiated Services field.</Comment>
+    </Term>
+    <Term id="netflow.ipPrecedence">
+        <Type>uint8</Type>
+        <Comment>The value of the IP Precedence.</Comment>
+    </Term>
+    <Term id="netflow.fragmentFlags">
+        <Type>uint8</Type>
+        <Comment>Fragmentation properties indicated by flags in the IPv4
+            packet header or the IPv6 Fragment header, respectively.</Comment>
+    </Term>
+    <Term id="netflow.octetDeltaSumOfSquares">
+        <Type>uint64</Type>
+        <Comment>The sum of the squared numbers of octets per incoming
+            packet since the previous report (if any) for this
+            Flow at the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.octetTotalSumOfSquares">
+        <Type>uint64</Type>
+        <Comment>The total sum of the squared numbers of octets in incoming
+            packets for this Flow at the Observation Point since the
+            Metering Process (re-)initialization for this Observation
+            Point.</Comment>
+    </Term>
+    <Term id="netflow.mplsTopLabelTTL">
+        <Type>uint8</Type>
+        <Comment>The TTL field from the top MPLS label stack entry,
+            i.e., the last label that was pushed.</Comment>
+    </Term>
+    <Term id="netflow.mplsLabelStackLength">
+        <Type>uint32</Type>
+        <Comment>The length of the MPLS label stack in units of octets.</Comment>
+    </Term>
+    <Term id="netflow.mplsLabelStackDepth">
+        <Type>uint32</Type>
+        <Comment>The number of labels in the MPLS label stack.</Comment>
+    </Term>
+    <Term id="netflow.mplsTopLabelExp">
+        <Type>uint8</Type>
+        <Comment>The Exp field from the top MPLS label stack entry,
+            i.e., the last label that was pushed.</Comment>
+    </Term>
+    <Term id="netflow.ipPayloadLength">
+        <Type>uint32</Type>
+        <Comment>The effective length of the IP payload.</Comment>
+    </Term>
+    <Term id="netflow.udpMessageLength">
+        <Type>uint16</Type>
+        <Comment>The value of the Length field in the UDP header.</Comment>
+    </Term>
+    <Term id="netflow.isMulticast">
+        <Type>uint8</Type>
+        <Comment>If the IP destination address is not a reserved multicast
+            address, then the value of all bits of the octet (including
+            the reserved ones) is zero.</Comment>
+    </Term>
+    <Term id="netflow.ipv4IHL">
+        <Type>uint8</Type>
+        <Comment>The value of the Internet Header Length (IHL) field in
+            the IPv4 header.</Comment>
+    </Term>
+    <Term id="netflow.ipv4Options">
+        <Type>uint32</Type>
+        <Comment>IPv4 options in packets of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.tcpOptions">
+        <Type>uint64</Type>
+        <Comment>TCP options in packets of this Flow.</Comment>
+    </Term>
+    <Term id="netflow.paddingOctets">
+        <Type>blob</Type>
+        <Comment>The value of this Information Element is always a sequence of
+            0x00 values.</Comment>
+    </Term>
+    <Term id="netflow.collectorIPAddress">
+        <Type>shortstring</Type>
+        <Comment>An IP address to which the Exporting Process sends Flow
+            information.</Comment>
+    </Term>
+    <Term id="netflow.exportInterface">
+        <Type>uint32</Type>
+        <Comment>The index of the interface from which IPFIX Messages sent
+            by the Exporting Process to a Collector leave the IPFIX
+            Device.</Comment>
+    </Term>
+    <Term id="netflow.collectorTransportProtocol">
+        <Type>uint8</Type>
+        <Comment>The value of the protocol number used by the Exporting Process for sending Flow information.</Comment>
+    </Term>
+    
+    <Term id="netflow.collectorTransportPort">
+        <Type>uint16</Type>
+        <Comment>The destination port identifier to which the Exporting
+            Process sends Flow information.</Comment>
+    </Term>
+    <Term id="netflow.exporterTransportPort">
+        <Type>uint16</Type>
+        <Comment>The source port identifier from which the Exporting
+            Process sends Flow information.</Comment>
+    </Term>
+    <Term id="netflow.tcpSynTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of packets of this Flow with
+            TCP SYN flag set.</Comment>
+    </Term>
+    <Term id="netflow.tcpFinTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of packets of this Flow with
+            TCP FIN flag set.</Comment>
+    </Term>
+    <Term id="netflow.tcpRstTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of packets of this Flow with
+            TCP RST flag set.</Comment>
+    </Term>
+    <Term id="netflow.tcpPshTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of packets of this Flow with
+            TCP PSH flag set.</Comment>
+    </Term>
+    <Term id="netflow.tcpAckTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of packets of this Flow with
+            TCP ACK flag set.</Comment>
+    </Term>
+    <Term id="netflow.tcpUrgTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of packets of this Flow with
+            TCP URG flag set.</Comment>
+    </Term>
+    <Term id="netflow.ipTotalLength">
+        <Type>uint64</Type>
+        <Comment>The total length of the IP packet.</Comment>
+    </Term>
+    <Term id="netflow.postNATSourceIPAddress">
+        <Type>shortstring</Type>
+        <Comment>Modified ip address value caused by a NAT middlebox
+            function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.postNATDestinationIPAddress">
+        <Type>shortstring</Type>
+        <Comment>Modified ip address value caused by a NAT
+            middlebox function after the packet passed the Observation
+            Point.</Comment>
+    </Term>
+    <Term id="netflow.postNAPTSourceTransportPort">
+        <Type>uint16</Type>
+        <Comment>Modified port value caused by a Network Address
+            Port Translation (NAPT) middlebox function after the packet
+            passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.postNAPTDestinationTransportPort">
+        <Type>uint16</Type>
+        <Comment>Modified port value caused by a Network
+            Address Port Translation (NAPT) middlebox function after the
+            packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.natOriginatingAddressRealm">
+        <Type>uint8</Type>
+        <Comment>Indicates whether the session was created because traffic
+            originated in the private or public address realm.</Comment>
+    </Term>
+    <Term id="netflow.natEvent">
+        <Type>uint8</Type>
+        <Comment>Indicates a NAT event.</Comment>
+    </Term>
+    <Term id="netflow.initiatorOctets">
+        <Type>uint64</Type>
+        <Comment>The total number of layer 4 payload bytes in a flow from the
+            initiator.</Comment>
+    </Term>
+    <Term id="netflow.responderOctets">
+        <Type>uint64</Type>
+        <Comment>The total number of layer 4 payload bytes in a flow from the
+            responder.
+        </Comment>
+    </Term>
+    <Term id="netflow.firewallEvent">
+        <Type>uint8</Type>
+        <Comment>Indicates a firewall event.</Comment>
+    </Term>
+    <Term id="netflow.ingressVRFID">
+        <Type>uint32</Type>
+        <Comment>An unique identifier of the VRFname where the packets of this
+            flow are being received.</Comment>
+    </Term>
+    <Term id="netflow.egressVRFID">
+        <Type>uint32</Type>
+        <Comment>An unique identifier of the VRFname where the packets of this
+            flow are being sent.</Comment>
+    </Term>
+    <Term id="netflow.VRFname">
+        <Type>string</Type>
+        <Comment>The name of a VPN Routing and Forwarding table (VRF).</Comment>
+    </Term>
+    <Term id="netflow.postMplsTopLabelExp">
+        <Type>uint8</Type>
+        <Comment>Modified mplsTopLabelExp value caused by a
+            middlebox function after the packet passed the Observation
+            Point.</Comment>
+    </Term>
+    <Term id="netflow.tcpWindowScale">
+        <Type>uint16</Type>
+        <Comment>The scale of the window field in the TCP header.</Comment>
+    </Term>
+    <Term id="netflow.biflowDirection">
+        <Type>uint8</Type>
+        <Comment>A description of the direction assignment method used to
+            assign the Biflow Source and Destination.</Comment>
+    </Term>
+    <Term id="netflow.ethernetHeaderLength">
+        <Type>uint8</Type>
+        <Comment>The difference between the length of an Ethernet frame (minus the
+            FCS) and the length of its MAC Client Data section (including any
+            padding) as defined in section 3.1 of [IEEE.802-3.2005].</Comment>
+    </Term>
+    <Term id="netflow.ethernetPayloadLength">
+        <Type>uint16</Type>
+        <Comment>The length of the MAC Client Data section (including any padding)
+            of a frame as defined in section 3.1 of [IEEE.802-3.2005].</Comment>
+    </Term>
+    <Term id="netflow.ethernetTotalLength">
+        <Type>uint16</Type>
+        <Comment>The total length of the Ethernet frame (excluding the Preamble,
+            SFD, Extension and FCS fields) as described in section 3.1 of
+            [IEEE.802-3.2005].</Comment>
+    </Term>
+    <Term id="netflow.dot1qVlanId">
+        <Type>uint16</Type>
+        <Comment>The value of the 12-bit VLAN Identifier portion of the Tag Control
+            Information field of an Ethernet frame.</Comment>
+    </Term>
+    <Term id="netflow.dot1qPriority">
+        <Type>uint8</Type>
+        <Comment>The value of the 3-bit User Priority portion of the Tag Control
+            Information field of an Ethernet frame.</Comment>
+    </Term>
+    <Term id="netflow.dot1qCustomerVlanId">
+        <Type>uint16</Type>
+        <Comment>The value represents the Customer VLAN identifier in the Customer
+            VLAN Tag (C-TAG) Tag Control Information (TCI) field as described
+            in [IEEE802.1Q].</Comment>
+    </Term>
+    <Term id="netflow.dot1qCustomerPriority">
+        <Type>uint8</Type>
+        <Comment>The value represents the 3-bit Priority Code Point (PCP) portion
+            of the Customer VLAN Tag (C-TAG) Tag Control Information (TCI)
+            field as described in [IEEE802.1Q].</Comment>
+    </Term>
+    <Term id="netflow.metroEvcId">
+        <Type>blob</Type>
+        <Comment>The EVC Service Attribute which uniquely identifies the Ethernet
+            Virtual Connection (EVC) within a Metro Ethernet Network, as
+            defined in section 6.2 of MEF 10.1.</Comment>
+    </Term>
+    <Term id="netflow.metroEvcType">
+        <Type>uint8</Type>
+        <Comment>The 3-bit EVC Service Attribute which identifies the type of
+            service provided by an EVC.</Comment>
+    </Term>
+    <Term id="netflow.pseudoWireId">
+        <Type>uint32</Type>
+        <Comment>A 32-bit non-zero connection identifier, which together with the
+            pseudoWireType, identifies the Pseudo Wire (PW) as defined in [RFC4447].</Comment>
+    </Term>
+    <Term id="netflow.pseudoWireType">
+        <Type>uint16</Type>
+        <Comment>The value of this information element identifies the type of MPLS
+            Pseudo Wire (PW) as defined in [RFC4446].</Comment>
+    </Term>
+    <Term id="netflow.pseudoWireControlWord">
+        <Type>uint32</Type>
+        <Comment>The 32-bit Preferred Pseudo Wire (PW) MPLS Control Word as
+            defined in Section 3 of [RFC4385].</Comment>
+    </Term>
+    <Term id="netflow.ingressPhysicalInterface">
+        <Type>uint32</Type>
+        <Comment>The index of a networking device's physical interface (example, a
+            switch port) where packets of this flow are being received.</Comment>
+    </Term>
+    <Term id="netflow.egressPhysicalInterface">
+        <Type>uint32</Type>
+        <Comment>The index of a networking device's physical interface (example, a
+            switch port) where packets of this flow are being sent.</Comment>
+    </Term>
+    <Term id="netflow.postDot1qVlanId">
+        <Type>uint16</Type>
+        <Comment>The definition of this Information Element is identical to the
+            definition of Information Element 'dot1qVlanId', except that it
+            reports a potentially modified value caused by a middlebox
+            function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.postDot1qCustomerVlanId">
+        <Type>uint16</Type>
+        <Comment>The definition of this Information Element is identical to the
+            definition of Information Element 'dot1qCustomerVlanId', except
+            that it reports a potentially modified value caused by a
+            middlebox function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.ethernetType">
+        <Type>uint16</Type>
+        <Comment>The Ethernet type field of an Ethernet frame that identifies the
+            MAC client protocol carried in the payload as defined in
+            paragraph 1.4.349 of [IEEE.802-3.2005].</Comment>
+    </Term>
+    <Term id="netflow.postIpPrecedence">
+        <Type>uint8</Type>
+        <Comment>Modified IP precedence value caused by a middlebox
+            function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.collectionTimeMilliseconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp at which the data within the
+            scope containing this Information Element was received by a
+            Collecting Process.</Comment>
+    </Term>
+    <Term id="netflow.exportSctpStreamId">
+        <Type>uint16</Type>
+        <Comment>The value of the SCTP Stream Identifier used by the
+            Exporting Process for exporting IPFIX Message data.</Comment>
+    </Term>
+    <Term id="netflow.maxExportSeconds">
+        <Type>uint32</Type>
+        <Comment>The absolute Export Time of the latest IPFIX Message
+            within the scope containing this Information Element.</Comment>
+    </Term>
+    <Term id="netflow.maxFlowEndSeconds">
+        <Type>uint32</Type>
+        <Comment>The latest absolute timestamp of the last packet
+            within any Flow within the scope containing this Information
+            Element, rounded up to the second if necessary.</Comment>
+    </Term>
+    <Term id="netflow.messageMD5Checksum">
+        <Type>blob</Type>
+        <Comment>The MD5 checksum of the IPFIX Message containing this
+            record.</Comment>
+    </Term>
+    <Term id="netflow.messageScope">
+        <Type>uint8</Type>
+        <Comment>The presence of this Information Element as scope in
+            an Options Template signifies that the options described by the
+            Template apply to the IPFIX Message that contains them.</Comment>
+    </Term>
+    <Term id="netflow.minExportSeconds">
+        <Type>uint32</Type>
+        <Comment>The absolute Export Time of the earliest IPFIX Message
+            within the scope containing this Information Element.</Comment>
+    </Term>
+    <Term id="netflow.minFlowStartSeconds">
+        <Type>uint32</Type>
+        <Comment>The earliest absolute timestamp of the first packet
+            within any Flow within the scope containing this Information
+            Element, rounded down to the second if necessary.</Comment>
+    </Term>
+    <Term id="netflow.opaqueOctets">
+        <Type>blob</Type>
+        <Comment>This Information Element is used to encapsulate non-
+            IPFIX data into an IPFIX Message stream, for the purpose of
+            allowing a non-IPFIX data processor to store a data stream inline
+            within an IPFIX File.</Comment>
+    </Term>
+    <Term id="netflow.sessionScope">
+        <Type>uint8</Type>
+        <Comment>The presence of this Information Element as scope in
+            an Options Template signifies that the options described by the
+            Template apply to the IPFIX Transport Session that contains them.</Comment>
+    </Term>
+    <Term id="netflow.maxFlowEndMicroseconds">
+        <Type>uint64</Type>
+        <Comment>The latest absolute timestamp of the last packet
+            within any Flow within the scope containing this Information
+            Element, rounded up to the microsecond if necessary.</Comment>
+    </Term>
+    <Term id="netflow.maxFlowEndMilliseconds">
+        <Type>uint64</Type>
+        <Comment>The latest absolute timestamp of the last packet
+            within any Flow within the scope containing this Information
+            Element, rounded up to the millisecond if necessary.</Comment>
+    </Term>
+    <Term id="netflow.maxFlowEndNanoseconds">
+        <Type>uint64</Type>
+        <Comment>The latest absolute timestamp of the last packet
+            within any Flow within the scope containing this Information
+            Element.</Comment>
+    </Term>
+    <Term id="netflow.minFlowStartMicroseconds">
+        <Type>uint64</Type>
+        <Comment>The earliest absolute timestamp of the first packet
+            within any Flow within the scope containing this Information
+            Element, rounded down to the microsecond if necessary.</Comment>
+    </Term>
+    <Term id="netflow.minFlowStartMilliseconds">
+        <Type>uint64</Type>
+        <Comment>The earliest absolute timestamp of the first packet
+            within any Flow within the scope containing this Information
+            Element, rounded down to the millisecond if necessary.</Comment>
+    </Term>
+    <Term id="netflow.minFlowStartNanoseconds">
+        <Type>uint64</Type>
+        <Comment>The earliest absolute timestamp of the first packet
+            within any Flow within the scope containing this Information
+            Element.</Comment>
+    </Term>
+    <Term id="netflow.collectorCertificate">
+        <Type>blob</Type>
+        <Comment>The full X.509 certificate, encoded in ASN.1 DER
+            format, used by the Collector when IPFIX Messages were transmitted
+            using TLS or DTLS.</Comment>
+    </Term>
+    <Term id="netflow.exporterCertificate">
+        <Type>blob</Type>
+        <Comment>The full X.509 certificate, encoded in ASN.1 DER
+            format, used by the Collector when IPFIX Messages were transmitted
+            using TLS or DTLS.</Comment>
+    </Term>
+    <Term id="netflow.dataRecordsReliability">
+        <Type>uint8</Type>
+        <Comment>The export reliability of Data Records, within this SCTP
+            stream, for the element(s) in the Options Template
+            scope.</Comment>
+    </Term>
+    <Term id="netflow.observationPointType">
+        <Type>uint8</Type>
+        <Comment>Type of observation point.</Comment>
+    </Term>
+    <Term id="netflow.newConnectionDeltaCount">
+        <Type>uint32</Type>
+        <Comment>This information element counts the number of TCP or UDP
+            connections which were opened during the observation period.</Comment>
+    </Term>
+    <Term id="netflow.connectionSumDurationSeconds">
+        <Type>uint64</Type>
+        <Comment>This information element aggregates the total time in
+            seconds for all of the TCP or UDP connections which were in use during
+            the observation period.</Comment>
+    </Term>
+    <Term id="netflow.connectionTransactionId">
+        <Type>uint64</Type>
+        <Comment>This information element identifies a transaction within a
+            connection.</Comment>
+    </Term>
+    <Term id="netflow.natPoolId">
+        <Type>uint32</Type>
+        <Comment>Locally unique identifier of a NAT pool.</Comment>
+    </Term>
+    <Term id="netflow.natPoolName">
+        <Type>shortstring</Type>
+        <Comment>The name of a NAT pool identified by a natPoolID.</Comment>
+    </Term>
+    <Term id="netflow.anonymizationFlags">
+        <Type>uint16</Type>
+        <Comment>A flag word describing specialized modifications to
+            the anonymization policy in effect for the anonymization technique
+            applied to a referenced Information Element within a referenced
+            Template.</Comment>
+    </Term>
+    <Term id="netflow.anonymizationTechnique">
+        <Type>uint16</Type>
+        <Comment>A description of the anonymization technique applied
+            to a referenced Information Element within a referenced Template.
+        </Comment>
+    </Term>
+    <Term id="netflow.informationElementIndex">
+        <Type>uint16</Type>
+        <Comment>A zero-based index of an Information Element
+            referenced by informationElementId within a Template referenced by
+            templateId; used to disambiguate scope for templates containing
+            multiple identical Information Elements.</Comment>
+    </Term>
+    <Term id="netflow.p2pTechnology">
+        <Type>shortstring</Type>
+        <Comment>Specifies if the Application ID is based on peer-to-peer
+            technology.</Comment>
+    </Term>
+    <Term id="netflow.tunnelTechnology">
+        <Type>shortstring</Type>
+        <Comment>Specifies if the Application ID is used as a tunnel technology.</Comment>
+    </Term>
+    <Term id="netflow.encryptedTechnology">
+        <Type>shortstring</Type>
+        <Comment>Specifies if the Application ID is an encrypted networking
+            protocol.</Comment>
+    </Term>
+    <Term id="netflow.basicList">
+        <Type>blob</Type>
+        <Comment>Specifies a generic Information Element with a basicList abstract
+            data type.</Comment>
+    </Term>
+    <Term id="netflow.subTemplateList">
+        <Type>blob</Type>
+        <Comment>Specifies a generic Information Element with a subTemplateList
+            abstract data type.</Comment>
+    </Term>
+    <Term id="netflow.subTemplateMultiList">
+        <Type>blob</Type>
+        <Comment>Specifies a generic Information Element with a
+            subTemplateMultiList abstract data type.</Comment>
+    </Term>
+    <Term id="netflow.bgpValidityState">
+        <Type>uint8</Type>
+        <Comment>This element describes the validity state of the BGP route correspondent source or destination IP address.</Comment>
+    </Term>
+    <Term id="netflow.IPSecSPI">
+        <Type>uint32</Type>
+        <Comment>IPSec Security Parameters Index (SPI).</Comment>
+    </Term>
+    <Term id="netflow.greKey">
+        <Type>uint32</Type>
+        <Comment>GRE key, which is used for identifying an individual traffic flow within a tunnel.</Comment>
+    </Term>
+    <Term id="netflow.natType">
+        <Type>uint8</Type>
+        <Comment>The type of NAT treatment</Comment>
+    </Term>
+    <Term id="netflow.initiatorPackets">
+        <Type>uint64</Type>
+        <Comment>The total number of layer 4 packets in a flow from the
+            initiator.</Comment>
+    </Term>
+    <Term id="netflow.responderPackets">
+        <Type>uint64</Type>
+        <Comment>The total number of layer 4 packets in a flow from the
+            responder.</Comment>
+    </Term>
+    <Term id="netflow.observationDomainName">
+        <Type>blob</Type>
+        <Comment>The name of an observation domain identified by an
+            observationDomainId.</Comment>
+    </Term>
+    <Term id="netflow.selectionSequenceId">
+        <Type>uint64</Type>
+        <Comment>From all the packets observed at an Observation Point, a subset of
+            the packets is selected by a sequence of one or more Selectors.
+            The selectionSequenceId is a unique value per Observation Domain,
+            specifying the Observation Point and the sequence of Selectors
+            through which the packets are selected.</Comment>
+    </Term>
+    <Term id="netflow.selectorId">
+        <Type>uint64</Type>
+        <Comment>The Selector ID is the unique ID identifying a Primitive Selector.</Comment>
+    </Term>
+    <Term id="netflow.informationElementId">
+        <Type>uint16</Type>
+        <Comment>This Information Element contains the ID of another Information
+            Element.</Comment>
+    </Term>
+    <Term id="netflow.selectorAlgorithm">
+        <Type>uint16</Type>
+        <Comment>This Information Element identifies the packet selection methods
+            (e.g., Filtering, Sampling) that are applied by the Selection
+            Process.</Comment>
+    </Term>
+    <Term id="netflow.samplingPacketInterval">
+        <Type>uint32</Type>
+        <Comment>This Information Element specifies the number of packets that are
+            consecutively sampled.</Comment>
+    </Term>
+    <Term id="netflow.samplingPacketSpace">
+        <Type>uint32</Type>
+        <Comment>This Information Element specifies the number of packets between
+            two samplingPacketIntervals.</Comment>
+    </Term>
+    <Term id="netflow.samplingTimeInterval">
+        <Type>uint32</Type>
+        <Comment>This Information Element specifies the time interval in
+            microseconds during which all arriving packets are sampled.
+        </Comment>
+    </Term>
+    <Term id="netflow.samplingTimeSpace">
+        <Type>uint32</Type>
+        <Comment>This Information Element specifies the time interval in
+            microseconds between two samplingTimeIntervals.</Comment>
+    </Term>
+    <Term id="netflow.samplingSize">
+        <Type>uint32</Type>
+        <Comment>This Information Element specifies the number of elements taken
+            from the parent Population for random Sampling methods.</Comment>
+    </Term>
+    <Term id="netflow.samplingPopulation">
+        <Type>uint32</Type>
+        <Comment>This Information Element specifies the number of elements in the
+            parent Population for random Sampling methods.</Comment>
+    </Term>
+    <Term id="netflow.samplingProbability">
+        <Type>blob</Type>
+        <Comment>This Information Element specifies the probability that a packet
+            is sampled, expressed as a value between 0 and 1.</Comment>
+    </Term>
+    <Term id="netflow.dataLinkFrameSize">
+        <Type>uint16</Type>
+        <Comment>This Information Element specifies the length of the selected data
+            link frame.</Comment>
+    </Term>
+    <Term id="netflow.ipHeaderPacketSection">
+        <Type>blob</Type>
+        <Comment>This Information Element carries a series of n octets from the IP
+            header of a sampled packet, starting sectionOffset octets into the
+            IP header.</Comment>
+    </Term>
+    <Term id="netflow.ipPayloadPacketSection">
+        <Type>blob</Type>
+        <Comment>This Information Element carries a series of n octets from the IP
+            payload of a sampled packet, starting sectionOffset octets into
+            the IP payload.</Comment>
+    </Term>
+    <Term id="netflow.dataLinkFrameSection">
+        <Type>blob</Type>
+        <Comment>This Information Element carries n octets from the data link frame
+            of a selected frame, starting sectionOffset octets into the frame.</Comment>
+    </Term>
+    <Term id="netflow.mplsLabelStackSection">
+        <Type>blob</Type>
+        <Comment>This Information Element carries a series of n octets from the
+            MPLS label stack of a sampled packet, starting sectionOffset
+            octets into the MPLS label stack.</Comment>
+    </Term>
+    <Term id="netflow.mplsPayloadPacketSection">
+        <Type>blob</Type>
+        <Comment>The mplsPayloadPacketSection carries a series of n octets from the
+            MPLS payload of a sampled packet, starting sectionOffset octets
+            into the MPLS payload, as it is data that follows immediately after
+            the MPLS label stack.</Comment>
+    </Term>
+    <Term id="netflow.selectorIdTotalPktsObserved">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the total number of packets
+            observed by a Selector, for a specific value of SelectorId.</Comment>
+    </Term>
+    <Term id="netflow.selectorIdTotalPktsSelected">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the total number of packets
+            selected by a Selector, for a specific value of SelectorId.</Comment>
+    </Term>
+    <Term id="netflow.absoluteError">
+        <Type>blob</Type>
+        <Comment>This Information Element specifies the maximum possible
+            measurement error of the reported value for a given Information
+            Element.</Comment>
+    </Term>
+    <Term id="netflow.relativeError">
+        <Type>blob</Type>
+        <Comment>This Information Element specifies the maximum possible positive
+            or negative error ratio for the reported value for a given
+            Information Element as percentage of the measured value.</Comment>
+    </Term>
+    <Term id="netflow.observationTimeSeconds">
+        <Type>uint32</Type>
+        <Comment>This Information Element specifies the absolute time in seconds of
+            an observation.</Comment>
+    </Term>
+    <Term id="netflow.observationTimeMilliseconds">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the absolute time in
+            milliseconds of an observation.</Comment>
+    </Term>
+    <Term id="netflow.observationTimeMicroseconds">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the absolute time in
+            microseconds of an observation.</Comment>
+    </Term>
+    <Term id="netflow.observationTimeNanoseconds">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the absolute time in
+            nanoseconds of an observation.</Comment>
+    </Term>
+    <Term id="netflow.digestHashValue">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the value from the digest hash
+            function.</Comment>
+    </Term>
+    <Term id="netflow.hashIPPayloadOffset">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the IP payload offset used by a
+            Hash-based Selection Selector.</Comment>
+    </Term>
+    <Term id="netflow.hashIPPayloadSize">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the IP payload size used by a
+            Hash-based Selection Selector.</Comment>
+    </Term>
+    <Term id="netflow.hashOutputRangeMin">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the value for the beginning of
+            a hash function's potential output range.</Comment>
+    </Term>
+    <Term id="netflow.hashOutputRangeMax">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the value for the end of a hash
+            function's potential output range.</Comment>
+    </Term>
+    <Term id="netflow.hashSelectedRangeMin">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the value for the beginning of
+            a hash function's selected range.</Comment>
+    </Term>
+    <Term id="netflow.hashSelectedRangeMax">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the value for the end of a hash
+            function's selected range.</Comment>
+    </Term>
+    <Term id="netflow.hashDigestOutput">
+        <Type>uint8</Type>
+        <Comment>This Information Element contains a boolean value that is TRUE if
+            the output from this hash Selector has been configured to be
+            included in the packet report as a packet digest, else FALSE.</Comment>
+    </Term>
+    <Term id="netflow.hashInitialiserValue">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the initialiser value to the
+            hash function.</Comment>
+    </Term>
+    <Term id="netflow.selectorName">
+        <Type>blob</Type>
+        <Comment>The name of a selector identified by a selectorID.  Globally
+            unique per Metering Process.</Comment>
+    </Term>
+    <Term id="netflow.upperCILimit">
+        <Type>blob</Type>
+        <Comment>This Information Element specifies the upper limit of a confidence
+            interval.</Comment>
+    </Term>
+    <Term id="netflow.lowerCILimit">
+        <Type>blob</Type>
+        <Comment>This Information Element specifies the lower limit of a confidence
+            interval.</Comment>
+    </Term>
+    <Term id="netflow.confidenceLevel">
+        <Type>blob</Type>
+        <Comment>This Information Element specifies the confidence level.  It is
+            used to provide an accuracy statement for estimated values.</Comment>
+    </Term>
+    <Term id="netflow.informationElementDataType">
+        <Type>uint8</Type>
+        <Comment>A description of the abstract data type of an IPFIX
+            information element.</Comment>
+    </Term>
+    <Term id="netflow.informationElementDescription">
+        <Type>blob</Type>
+        <Comment>A UTF-8 [RFC3629] encoded Unicode string containing a
+            human-readable description of an Information Element.</Comment>
+    </Term>
+    <Term id="netflow.informationElementName">
+        <Type>blob</Type>
+        <Comment>A UTF-8 [RFC3629] encoded Unicode string containing
+            the name of an Information Element, intended as a simple
+            identifier.</Comment>
+    </Term>
+    <Term id="netflow.informationElementRangeBegin">
+        <Type>uint64</Type>
+        <Comment>Contains the inclusive low end of the range of
+            acceptable values for an Information Element.</Comment>
+    </Term>
+    <Term id="netflow.informationElementRangeEnd">
+        <Type>uint64</Type>
+        <Comment>Contains the inclusive high end of the range of
+            acceptable values for an Information Element.</Comment>
+    </Term>
+    <Term id="netflow.informationElementSemantics">
+        <Type>uint8</Type>
+        <Comment>A description of the semantics of an IPFIX Information
+            Element.</Comment>
+    </Term>
+    <Term id="netflow.informationElementUnits">
+        <Type>uint16</Type>
+        <Comment>A description of the units of an IPFIX Information
+            Element.</Comment>
+    </Term>
+    <Term id="netflow.privateEnterpriseNumber">
+        <Type>uint32</Type>
+        <Comment>A private enterprise number, as assigned by IANA.
+            Within the context of an Information Element Type record, this
+            element can be used along with the informationElementId element to
+            scope properties to a specific Information Element.</Comment>
+    </Term>
+    <Term id="netflow.virtualStationInterfaceId">
+        <Type>blob</Type>
+        <Comment>Instance Identifier of the interface to a Virtual Station.</Comment>
+    </Term>
+    <Term id="netflow.virtualStationInterfaceName">
+        <Type>blob</Type>
+        <Comment>Name of the interface to a Virtual Station. A Virtual Station is an end station
+            instance: it can be a virtual machine or a physical host.</Comment>
+    </Term>
+    <Term id="netflow.virtualStationUUID">
+        <Type>blob</Type>
+        <Comment>Unique Identifier of a Virtual Station. A Virtual Station is an end station
+            instance: it can be a virtual machine or a physical host.</Comment>
+    </Term>
+    <Term id="netflow.virtualStationName">
+        <Type>blob</Type>
+        <Comment>Name of a Virtual Station. A Virtual Station is an end station
+            instance: it can be a virtual machine or a physical host.</Comment>
+    </Term>
+    <Term id="netflow.layer2SegmentId">
+        <Type>uint64</Type>
+        <Comment>Identifier of a layer 2 network segment in an overlay network.
+        </Comment>
+    </Term>
+    <Term id="netflow.layer2OctetDeltaCount">
+        <Type>uint64</Type>
+        <Comment>The number of layer 2 octets since the previous report (if any) in
+            incoming packets for this Flow at the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.layer2OctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of layer 2 octets in incoming packets for this
+            Flow at the Observation Point since the Metering Process
+            (re-)initialization for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.ingressUnicastPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of incoming unicast packets metered at the
+            Observation Point since the Metering Process (re-)initialization
+            for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.ingressMulticastPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of incoming multicast packets metered at the
+            Observation Point since the Metering Process (re-)initialization
+            for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.ingressBroadcastPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of incoming broadcast packets metered at the
+            Observation Point since the Metering Process (re-)initialization
+            for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.egressUnicastPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of incoming unicast packets metered at the
+            Observation Point since the Metering Process (re-)initialization
+            for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.egressBroadcastPacketTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of incoming broadcast packets metered at the
+            Observation Point since the Metering Process (re-)initialization
+            for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.monitoringIntervalStartMilliSeconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp at which the monitoring interval
+            started.</Comment>
+    </Term>
+    <Term id="netflow.monitoringIntervalEndMilliSeconds">
+        <Type>uint64</Type>
+        <Comment>The absolute timestamp at which the monitoring interval ended.</Comment>
+    </Term>
+    <Term id="netflow.portRangeStart">
+        <Type>uint16</Type>
+        <Comment>The port number identifying the start of a range of ports.</Comment>
+    </Term>
+    <Term id="netflow.portRangeEnd">
+        <Type>uint16</Type>
+        <Comment>The port number identifying the end of a range of ports.</Comment>
+    </Term>
+    <Term id="netflow.portRangeStepSize">
+        <Type>uint16</Type>
+        <Comment>The step size in a port range. The default step size is 1,
+            which indicates contiguous ports.</Comment>
+    </Term>
+    <Term id="netflow.portRangeNumPorts">
+        <Type>uint16</Type>
+        <Comment>The number of ports in a port range.</Comment>
+    </Term>
+    <Term id="netflow.staMacAddress">
+        <Type>shortstring</Type>
+        <Comment>The IEEE 802 MAC address of a wireless station (STA).</Comment>
+    </Term>
+    <Term id="netflow.staIPAddress">
+        <Type>shortstring</Type>
+        <Comment>The IPv4 address of a wireless station (STA).</Comment>
+    </Term>
+    <Term id="netflow.wtpMacAddress">
+        <Type>shortstring</Type>
+        <Comment>The IEEE 802 MAC address of a wireless access point (WTP).</Comment>
+    </Term>
+    <Term id="netflow.ingressInterfaceType">
+        <Type>uint32</Type>
+        <Comment>The type of interface where packets of this Flow are being received.</Comment>
+    </Term>
+    <Term id="netflow.egressInterfaceType">
+        <Type>uint32</Type>
+        <Comment>The type of interface where packets of this Flow are being sent.</Comment>
+    </Term>
+    <Term id="netflow.rtpSequenceNumber">
+        <Type>uint16</Type>
+        <Comment>The RTP sequence number per [RFC3550].</Comment>
+    </Term>
+    <Term id="netflow.userName">
+        <Type>shortstring</Type>
+        <Comment>User name associated with the flow.</Comment>
+    </Term>
+    <Term id="netflow.applicationCategoryName">
+        <Type>shortstring</Type>
+        <Comment>An attribute that provides a first level categorization for
+            each Application ID.</Comment>
+    </Term>
+    <Term id="netflow.applicationSubCategoryName">
+        <Type>shortstring</Type>
+        <Comment>An attribute that provides a second level categorization
+            for each Application ID.</Comment>
+    </Term>
+    <Term id="netflow.applicationGroupName">
+        <Type>shortstring</Type>
+        <Comment>An attribute that groups multiple Application IDs that
+            belong to the same networking application.</Comment>
+    </Term>
+    <Term id="netflow.originalFlowsPresent">
+        <Type>uint64</Type>
+        <Comment>The non-conservative count of Original Flows
+            contributing to this Aggregated Flow.</Comment>
+    </Term>
+    <Term id="netflow.originalFlowsInitiated">
+        <Type>uint64</Type>
+        <Comment>The conservative count of Original Flows whose first
+            packet is represented within this Aggregated Flow.</Comment>
+    </Term>
+    <Term id="netflow.originalFlowsCompleted">
+        <Type>uint64</Type>
+        <Comment>The conservative count of Original Flows whose last
+            packet is represented within this Aggregated Flow.</Comment>
+    </Term>
+    <Term id="netflow.distinctCountOfSourceIPAddress">
+        <Type>uint64</Type>
+        <Comment>The count of distinct source IP address values for
+            Original Flows contributing to this Aggregated Flow, without
+            regard to IP version.</Comment>
+    </Term>
+    <Term id="netflow.distinctCountOfDestinationIPAddress">
+        <Type>uint64</Type>
+        <Comment>The count of distinct destination IP address values
+            for Original Flows contributing to this Aggregated Flow, without
+            regard to IP version.</Comment>
+    </Term>
+    <Term id="netflow.distinctCountOfSourceIPv4Address">
+        <Type>uint32</Type>
+        <Comment>The count of distinct source IPv4 address values for
+            Original Flows contributing to this Aggregated Flow.</Comment>
+    </Term>
+    <Term id="netflow.distinctCountOfDestinationIPv4Address">
+        <Type>uint32</Type>
+        <Comment>The count of distinct destination IPv4 address values
+            for Original Flows contributing to this Aggregated Flow.</Comment>
+    </Term>
+    <Term id="netflow.distinctCountOfSourceIPv6Address">
+        <Type>uint64</Type>
+        <Comment>The count of distinct source IPv6 address values for
+            Original Flows contributing to this Aggregated Flow.</Comment>
+    </Term>
+    <Term id="netflow.distinctCountOfDestinationIPv6Address">
+        <Type>uint64</Type>
+        <Comment>The count of distinct destination IPv6 address values
+            for Original Flows contributing to this Aggregated Flow.</Comment>
+    </Term>
+    <Term id="netflow.valueDistributionMethod">
+        <Type>uint8</Type>
+        <Comment>A description of the method used to distribute the
+            counters from Contributing Flows into the Aggregated Flow records
+            described by an associated scope, generally a Template.</Comment>
+    </Term>
+    <Term id="netflow.rfc3550JitterMilliseconds">
+        <Type>uint32</Type>
+        <Comment>Interarrival jitter as defined in section 6.4.1 of [RFC3550],
+            measured in milliseconds.</Comment>
+    </Term>
+    <Term id="netflow.rfc3550JitterMicroseconds">
+        <Type>uint32</Type>
+        <Comment>Interarrival jitter as defined in section 6.4.1 of [RFC3550],
+            measured in microseconds.</Comment>
+    </Term>
+    <Term id="netflow.rfc3550JitterNanoseconds">
+        <Type>uint32</Type>
+        <Comment>Interarrival jitter as defined in section 6.4.1 of [RFC3550],
+            measured in nanoseconds.</Comment>
+    </Term>
+    <Term id="netflow.dot1qDEI">
+        <Type>uint8</Type>
+        <Comment>The value of the 1-bit Drop Eligible Indicator (DEI) field of the VLAN tag as
+            described in 802.1Q-2011 subclause 9.6.</Comment>
+    </Term>
+    <Term id="netflow.dot1qCustomerDEI">
+        <Type>uint8</Type>
+        <Comment>In case of a QinQ frame, it represents the inner tag's Drop Eligible Indicator
+            (DEI) field and in case of an IEEE 802.1ad frame it represents the DEI field of
+            the C-TAG.</Comment>
+    </Term>
+    <Term id="netflow.flowSelectorAlgorithm">
+        <Type>uint16</Type>
+        <Comment>This Information Element identifies the Intermediate Flow
+            Selection Process technique (e.g., Filtering, Sampling) that is
+            applied by the Intermediate Flow Selection Process.</Comment>
+    </Term>
+    <Term id="netflow.flowSelectedOctetDeltaCount">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the volume in octets of all
+            Flows that are selected in the Intermediate Flow Selection Process
+            since the previous report.</Comment>
+    </Term>
+    <Term id="netflow.flowSelectedPacketDeltaCount">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the volume in packets of all
+            Flows that were selected in the Intermediate Flow Selection
+            Process since the previous report.</Comment>
+    </Term>
+    <Term id="netflow.flowSelectedFlowDeltaCount">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the number of Flows that were
+            selected in the Intermediate Flow Selection Process since the last
+            report.</Comment>
+    </Term>
+    <Term id="netflow.selectorIDTotalFlowsObserved">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the total number of Flows
+            observed by a Selector, for a specific value of SelectorId.</Comment>
+    </Term>
+    <Term id="netflow.selectorIDTotalFlowsSelected">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the total number of Flows
+            selected by a Selector, for a specific value of SelectorId.</Comment>
+    </Term>
+    <Term id="netflow.samplingFlowInterval">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the number of Flows that are
+            consecutively sampled.</Comment>
+    </Term>
+    <Term id="netflow.samplingFlowSpacing">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the number of Flows between two
+            samplingFlowIntervals.</Comment>
+    </Term>
+    <Term id="netflow.flowSamplingTimeInterval">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the time interval in
+            microseconds during which all arriving Flows are sampled.</Comment>
+    </Term>
+    <Term id="netflow.flowSamplingTimeSpacing">
+        <Type>uint64</Type>
+        <Comment>This Information Element specifies the time interval in
+            microseconds between two flowSamplingTimeIntervals.</Comment>
+    </Term>
+    <Term id="netflow.hashFlowDomain">
+        <Type>uint16</Type>
+        <Comment>This Information Element specifies the Information Elements that
+            are used by the Hash-based Flow Selector as the Hash Domain.</Comment>
+    </Term>
+    <Term id="netflow.transportOctetDeltaCount">
+        <Type>uint64</Type>
+        <Comment>The number of octets, excluding IP header(s) and Layer 4 transport
+            protocol header(s), observed for this Flow at the Observation Point
+            since the previous report (if any).</Comment>
+    </Term>
+    <Term id="netflow.transportPacketDeltaCount">
+        <Type>uint64</Type>
+        <Comment>The number of packets containing at least one octet beyond the IP header(s) and
+            Layer 4 transport protocol header(s), observed for this Flow at the Observation
+            Point since the previous report (if any).</Comment>
+    </Term>
+    <Term id="netflow.originalExporterIPAddress">
+        <Type>shortstring</Type>
+        <Comment>The IPv4 address used by the Exporting Process on an
+            Original Exporter, as seen by the Collecting Process on an IPFIX
+            Mediator.</Comment>
+    </Term>
+    <Term id="netflow.originalObservationDomainId">
+        <Type>uint32</Type>
+        <Comment>The Observation Domain ID reported by the Exporting
+            Process on an Original Exporter, as seen by the Collecting Process
+            on an IPFIX Mediator.</Comment>
+    </Term>
+    <Term id="netflow.intermediateProcessId">
+        <Type>uint32</Type>
+        <Comment>Description: An identifier of an Intermediate Process that is
+            unique per IPFIX Device.</Comment>
+    </Term>
+    <Term id="netflow.ignoredDataRecordTotalCount">
+        <Type>uint64</Type>
+        <Comment>Description: The total number of received Data Records that the
+            Intermediate Process did not process since the (re-)initialization
+            of the Intermediate Process.</Comment>
+    </Term>
+    <Term id="netflow.dataLinkFrameType">
+        <Type>uint16</Type>
+        <Comment>This Information Element specifies the type of the selected data
+            link frame.</Comment>
+    </Term>
+    <Term id="netflow.sectionOffset">
+        <Type>uint16</Type>
+        <Comment>This Information Element specifies the offset of the packet
+            section (e.g., dataLinkFrameSection, ipHeaderPacketSection,
+            ipPayloadPacketSection, mplsLabelStackSection, and
+            mplsPayloadPacketSection).</Comment>
+    </Term>
+    <Term id="netflow.sectionExportedOctets">
+        <Type>uint16</Type>
+        <Comment>This Information Element specifies the observed length of the
+            packet section (e.g., dataLinkFrameSection, ipHeaderPacketSection,
+            ipPayloadPacketSection, mplsLabelStackSection, and
+            mplsPayloadPacketSection) when padding is used.</Comment>
+    </Term>
+    <Term id="netflow.dot1qServiceInstanceTag">
+        <Type>blob</Type>
+        <Comment>This Information Element, which is 16 octets long, represents the
+            Backbone Service Instance Tag (I-TAG) Tag Control Information
+            (TCI) field of an Ethernet frame as described in [IEEE802.1Q].</Comment>
+    </Term>
+    <Term id="netflow.dot1qServiceInstanceId">
+        <Type>uint32</Type>
+        <Comment>The value of the 24-bit Backbone Service Instance Identifier
+            (I-SID) portion of the Backbone Service Instance Tag (I-TAG) Tag
+            Control Information (TCI) field of an Ethernet frame as described
+            in [IEEE802.1Q].</Comment>
+    </Term>
+    <Term id="netflow.dot1qServiceInstancePriority">
+        <Type>uint8</Type>
+        <Comment>The value of the 3-bit Backbone Service Instance Priority Code
+            Point (I-PCP) portion of the Backbone Service Instance Tag (I-TAG)
+            Tag Control Information (TCI) field of an Ethernet frame as
+            described in [IEEE802.1Q].</Comment>
+    </Term>
+    <Term id="netflow.dot1qCustomerSourceMacAddress">
+        <Type>shortstring</Type>
+        <Comment>The value of the Encapsulated Customer Source Address (C-SA)
+            portion of the Backbone Service Instance Tag (I-TAG) Tag Control
+            Information (TCI) field of an Ethernet frame as described in
+            [IEEE802.1Q].</Comment>
+    </Term>
+    <Term id="netflow.dot1qCustomerDestinationMacAddress">
+        <Type>shortstring</Type>
+        <Comment>The value of the Encapsulated Customer Destination Address (C-DA)
+            portion of the Backbone Service Instance Tag (I-TAG) Tag Control
+            Information (TCI) field of an Ethernet frame as described in
+            [IEEE802.1Q].</Comment>
+    </Term>
+    <Term id="netflow.postLayer2OctetDeltaCount">
+        <Type>uint64</Type>
+        <Comment>Modified octet delta value caused by a
+            middlebox function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.postMCastLayer2OctetDeltaCount">
+        <Type>uint64</Type>
+        <Comment>The number of layer 2 octets since the previous report (if any) in
+            outgoing multicast packets sent for packets of this Flow by a
+            multicast daemon within the Observation Domain.</Comment>
+    </Term>
+    <Term id="netflow.postLayer2OctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>Modified octet total count caused by a middlebox function after the packet passed the Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.postMCastLayer2OctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of layer 2 octets in outgoing multicast packets
+            sent for packets of this Flow by a multicast daemon in the
+            Observation Domain since the Metering Process (re-)initialization.</Comment>
+    </Term>
+    <Term id="netflow.minimumLayer2TotalLength">
+        <Type>uint64</Type>
+        <Comment>Layer 2 length of the smallest packet observed for this Flow.  The
+            packet length includes the length of the layer 2 header(s) and the
+            length of the layer 2 payload.</Comment>
+    </Term>
+    <Term id="netflow.maximumLayer2TotalLength">
+        <Type>uint64</Type>
+        <Comment>Layer 2 length of the largest packet observed for this Flow.  The
+            packet length includes the length of the layer 2 header(s) and the length of the layer
+            2 payload.</Comment>
+    </Term>
+    <Term id="netflow.droppedLayer2OctetDeltaCount">
+        <Type>uint64</Type>
+        <Comment>The number of layer 2 octets since the previous report (if any) in
+            packets of this Flow dropped by packet treatment.</Comment>
+    </Term>
+    <Term id="netflow.droppedLayer2OctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of octets in observed layer 2 packets (including
+            the layer 2 header) that were dropped by packet treatment since
+            the (re-)initialization of the Metering Process.</Comment>
+    </Term>
+    <Term id="netflow.ignoredLayer2OctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of octets in observed layer 2 packets (including
+            the layer 2 header) that the Metering Process did not process
+            since the (re-)initialization of the Metering Process.</Comment>
+    </Term>
+    <Term id="netflow.notSentLayer2OctetTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of octets in observed layer 2 packets (including
+            the layer 2 header) that the Metering Process did not process
+            since the (re-)initialization of the Metering Process.</Comment>
+    </Term>
+    <Term id="netflow.layer2OctetDeltaSumOfSquares">
+        <Type>uint64</Type>
+        <Comment>The sum of the squared numbers of layer 2 octets per incoming
+            packet since the previous report (if any) for this Flow at the
+            Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.layer2OctetTotalSumOfSquares">
+        <Type>uint64</Type>
+        <Comment>The total sum of the squared numbers of layer 2 octets in incoming
+            packets for this Flow at the Observation Point since the Metering
+            Process (re-)initialization for this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.layer2FrameDeltaCount">
+        <Type>uint64</Type>
+        <Comment>The number of incoming layer 2 frames since the
+            previous report (if any) for this Flow at the
+            Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.layer2FrameTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of incoming layer 2 frames
+            for this Flow at the Observation Point since
+            the Metering Process (re-)initialization for
+            this Observation Point.</Comment>
+    </Term>
+    <Term id="netflow.pseudoWireDestinationIPv4Address">
+        <Type>shortstring</Type>
+        <Comment>The destination IPv4 address of the PSN tunnel carrying the pseudowire.</Comment>
+    </Term>
+    <Term id="netflow.ignoredLayer2FrameTotalCount">
+        <Type>uint64</Type>
+        <Comment>The total number of observed layer 2 frames that the Metering Process
+            did not process since the (re-)initialization of the Metering Process.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueInteger">
+        <Type>int64</Type>
+        <Comment>An IPFIX Information Element which denotes that the
+            integer value of a MIB object will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueOctetString">
+        <Type>blob</Type>
+        <Comment>An IPFIX Information Element which denotes that an
+            Octet String or Opaque value of a MIB object will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueOID">
+        <Type>blob</Type>
+        <Comment>An IPFIX Information Element which denotes that an
+            Object Identifier or OID value of a MIB object will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueBits">
+        <Type>blob</Type>
+        <Comment>An IPFIX Information Element which denotes that a set
+            of Enumerated flags or bits from a MIB object will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueIPAddress">
+        <Type>shortstring</Type>
+        <Comment>An IPFIX Information Element which denotes that the
+            IPv4 Address of a MIB object will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueCounter">
+        <Type>uint64</Type>
+        <Comment>An IPFIX Information Element which denotes that the
+            counter value of a MIB object will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueGauge">
+        <Type>uint32</Type>
+        <Comment>An IPFIX Information Element which denotes that the
+            Gauge value of a MIB object will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueTimeTicks">
+        <Type>uint32</Type>
+        <Comment>An IPFIX Information Element which denotes that the
+            TimeTicks value of a MIB object will be exported. </Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueUnsigned">
+        <Type>uint64</Type>
+        <Comment>An IPFIX Information Element which denotes that an
+            unsigned integer value of a MIB object will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueTable">
+        <Type>blob</Type>
+        <Comment>An IPFIX Information Element which denotes that a
+            complete or partial conceptual table will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectValueRow">
+        <Type>blob</Type>
+        <Comment>An IPFIX Information Element which denotes that a
+            single row of a conceptual table will be exported.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectIdentifier">
+        <Type>blob</Type>
+        <Comment>An IPFIX Information Element which denotes that a MIB
+            Object Identifier (MIB OID) is exported in the (Options) Template
+            Record.</Comment>
+    </Term>
+    <Term id="netflow.mibSubIdentifier">
+        <Type>uint32</Type>
+        <Comment>A non-negative sub-identifier of an Object Identifier (OID).</Comment>
+    </Term>
+    <Term id="netflow.mibIndexIndicator">
+        <Type>uint64</Type>
+        <Comment>This set of bit fields is used for marking the
+            Information Elements of a Data Record that serve as INDEX MIB
+            objects for an indexed Columnar MIB object.</Comment>
+    </Term>
+    <Term id="netflow.mibCaptureTimeSemantics">
+        <Type>uint8</Type>
+        <Comment>Indicates when in the lifetime of the flow the MIB
+            value was retrieved from the MIB for a mibObjectIdentifier.</Comment>
+    </Term>
+    <Term id="netflow.mibContextEngineID">
+        <Type>blob</Type>
+        <Comment>A mibContextEngineID that specifies the SNMP engine
+            ID for a MIB field being exported over IPFIX.</Comment>
+    </Term>
+    <Term id="netflow.mibContextName">
+        <Type>blob</Type>
+        <Comment>This Information Element denotes that a MIB Context
+            Name is specified for a MIB field being exported over IPFIX. 
+            Reference [RFC3411] section 3.3.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectName">
+        <Type>blob</Type>
+        <Comment>The name (called a descriptor in [RFC2578] 
+            of an object type definition.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectDescription">
+        <Type>blob</Type>
+        <Comment>The value of the DESCRIPTION clause of an MIB object
+            type definition.</Comment>
+    </Term>
+    <Term id="netflow.mibObjectSyntax">
+        <Type>blob</Type>
+        <Comment>The value of the SYNTAX clause of an MIB object type
+            definition, which may include a Textual Convention or Subtyping.
+            See [RFC2578].</Comment>
+    </Term>
+    <Term id="netflow.mibModuleName">
+        <Type>blob</Type>
+        <Comment>The textual name of the MIB module that defines a MIB
+            Object.</Comment>
+    </Term>
+    <Term id="netflow.mobileIMSI">
+        <Type>blob</Type>
+        <Comment>The International Mobile Subscription Identity (IMSI). The
+            IMSI is a decimal digit string with up to a maximum of 15 ASCII/UTF-8
+            encoded digits (0x30 - 0x39).</Comment>
+    </Term>
+    <Term id="netflow.mobileMSISDN">
+        <Type>blob</Type>
+        <Comment>The Mobile Station International Subscriber Directory Number
+            (MSISDN).</Comment>
+    </Term>
+    <Term id="netflow.httpStatusCode">
+        <Type>uint16</Type>
+        <Comment>The HTTP Response Status Code, as defined in 
+            section 6 of [RFC7231], 
+            associated with a flow.</Comment>
+    </Term>
+    <Term id="netflow.cs-packets">
+        <Type>uint64</Type>
+        <Comment>Incoming counter for number of packets associated with an IP Flow</Comment>
+    </Term>
+    <Term id="netflow.sc-packets">
+        <Type>uint64</Type>
+        <Comment>Outgoing counter for number of packets associated with an IP Flow</Comment>
+    </Term>
+    <Term id="netflow.scope-system">
+        <Type>blob</Type>
+        <Comment>System Name</Comment>
+    </Term>
+    <Term id="netflow.scope-interface">
+        <Type>uint64</Type>
+        <Comment>Interface scope</Comment>
+    </Term>
+    <Term id="netflow.scope-linecard">
+        <Type>uint64</Type>
+        <Comment>Linecard scope</Comment>
+    </Term>
+    <Term id="netflow.scope-cache">
+        <Type>blob</Type>
+        <Comment>Cache scope</Comment>
+    </Term>
+    <Term id="netflow.scope-template">
+        <Type>blob</Type>
+        <Comment>Template scope</Comment>
+    </Term>
+    <Term id="netflow.nbar-ssl-common-name">
+        <Type>string</Type>
+        <Comment>Common name extracted from SSL certificate(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-http-url">
+        <Type>string</Type>
+        <Comment>URL extracted from HTTP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-http-host-name">
+        <Type>string</Type>
+        <Comment>Host Name extracted from HTTP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-http-user-agent">
+        <Type>string</Type>
+        <Comment>User agent extracted from HTTP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-http-referer">
+        <Type>string</Type>
+        <Comment>REFERER extracted from HTTP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-rtsp-host">
+        <Type>string</Type>
+        <Comment>RTSP host name extracted from RTSP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-smtp-server">
+        <Type>string</Type>
+        <Comment>Server name extracted from the SMTP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-smtp-sender">
+        <Type>string</Type>
+        <Comment>Sender name extracted from SMTP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-pop3-server">
+        <Type>string</Type>
+        <Comment>Server name extracted from POP3 transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-nntp-grp-name">
+        <Type>string</Type>
+        <Comment>Group name extracted from NNTP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-sip-src-domain">
+        <Type>string</Type>
+        <Comment>Source domain extracted from SIP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-sip-dst-domain">
+        <Type>string</Type>
+        <Comment>Destination domain extracted from SIP transaction(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-app-host">
+        <Type>blob</Type>
+        <Comment>Generic key val pair for Cisco App Host in Key : Value format(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-qos-policy">
+        <Type>uint32</Type>
+        <Comment>QoS policy classification hierarchy format(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.nbar-uri-stats">
+        <Type>string</Type>
+        <Comment>Uri hit counts(Cisco AVC)</Comment>
+    </Term>
+    <Term id="netflow.elements">
+        <Type>blob</Type>
+        <Comment>Generic key val pair for NetFlow in Key : Value format</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

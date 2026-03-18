@@ -1,0 +1,15 @@
+severity_id,severity,severity_name,severity_description
+0,critical,emergency,System unusable
+1,critical,alert,Immediate action needed
+2,critical,critical,Critical condition
+2,critical,major,Critical condition
+3,high,error,Error condition
+3,high,minor,Error condition
+4,medium,warning,Warning condition
+5,low,notification,Normal but significant condition
+5,low,cleared,Normal but significant condition
+5,low,indeterminate,Normal but significant condition
+6,informational,informational,Informational message only
+6,informational,info,Informational message only
+7,informational,debugging,Appears during debugging only
+

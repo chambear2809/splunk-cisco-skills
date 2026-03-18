@@ -1,0 +1,1246 @@
+
+<dashboard version="2" theme="dark">
+    <label>Server Profile Health Monitoring</label>
+    <description>This feature in your Cisco Intersight Add-on helps track and visualize the overall health of server profiles managed via Intersight. It correlates profile-level metadata with underlying hardware and alarm data to give a single health view per server.</description>
+    <definition><![CDATA[
+{
+    "inputs": {
+        "input_yhFQ0ju7": {
+            "options": {
+                "defaultValue": "-7d@h,now",
+                "token": "tr_xAEB84dN"
+            },
+            "title": "Time Range",
+            "type": "input.timerange"
+        },
+        "input_0elhrHjh": {
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "defaultValue": [
+                    "*"
+                ],
+                "token": "server_profiles_filter"
+            },
+            "title": "Server Profiles",
+            "type": "input.multiselect",
+            "dataSources": {
+                "primary": "ds_6rDbkEqY"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"ServerProfileName\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"Moid\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_XHA1wZSX": {
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "defaultValue": [
+                    "*"
+                ],
+                "token": "severity_filter"
+            },
+            "title": "Severity Filter",
+            "type": "input.multiselect",
+            "dataSources": {
+                "primary": "ds_141FtQFs"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"Severity\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"Severity\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        },
+        "input_FyKzOw0H": {
+            "options": {
+                "items": [
+                    {
+                        "label": "All",
+                        "value": "*"
+                    }
+                ],
+                "defaultValue": [
+                    "*"
+                ],
+                "token": "account_name"
+            },
+            "title": "Account Name",
+            "type": "input.multiselect",
+            "dataSources": {
+                "primary": "ds_hBrwQFFi"
+            }
+        },
+        "input_Tjqi0Kjb": {
+            "options": {
+                "items": [
+                    {
+                        "label": "All",
+                        "value": "*"
+                    }
+                ],
+                "defaultValue": "*",
+                "token": "configstatesummary"
+            },
+            "title": "Config State Summary",
+            "type": "input.dropdown",
+            "dataSources": {
+                "primary": "ds_nt3WnoA7"
+            }
+        },
+        "input_Z6JE6gBD": {
+            "options": {
+                "defaultValue": "*",
+                "token": "serverprofilename"
+            },
+            "title": "Server Profile Name",
+            "type": "input.text"
+        },
+        "input_P9ltH0lO": {
+            "options": {
+                "defaultValue": "*",
+                "token": "servername"
+            },
+            "title": "Server Name",
+            "type": "input.text"
+        }
+    },
+    "title": "Server Profile Health Monitoring",
+    "visualizations": {
+        "viz_xCBZnJxT": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_efqDXlnk"
+            },
+            "title": "Active Alarms in Server Profiles by Type",
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "fault_type",
+                                "key": "row.Name.value"
+                            },
+                            {
+                                "token": "clicked_donut_chart",
+                                "value": "fault_type"
+                            },
+                            {
+                                "token": "severity_type",
+                                "value": "null"
+                            },
+                            {
+                                "token": "clicked_single_value",
+                                "value": "None"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "options": {
+                "showDonutHole": true,
+                "seriesColors": [
+                    "#FF969E",
+                    "#708794",
+                    "#ffffff",
+                    "#b6c75a",
+                    "#00CDAF",
+                    "#DD9900",
+                    "#FF677B",
+                    "#CB2196",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#99B100",
+                    "#FFA476",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#E47BFE"
+                ]
+            },
+            "description": "Displays the breakdown of active faults according to their type."
+        },
+        "viz_T1NKz3fh": {
+            "type": "splunk.singlevalue",
+            "title": "Total Server Profiles",
+            "options": {
+                "majorColor": "#708794"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "dataSources": {
+                "primary": "ds_d0DCctlb"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_single_value",
+                                "value": "total"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "description": "Displays the total number of server profiles available in Cisco Intersight."
+        },
+        "viz_Qz1K13M1": {
+            "type": "splunk.singlevalue",
+            "dataSources": {
+                "primary": "ds_U0lHMUTt"
+            },
+            "title": "Total Active Alarms in Server Profiles",
+            "options": {
+                "majorColor": "#dc4e41"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_single_value",
+                                "value": "fault"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "description": "Shows the total number of currently active faults across all server profiles, using alarms data."
+        },
+        "viz_dfw2VHQD": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_gNGCu4b0_ds_efqDXlnk"
+            },
+            "title": "Active Alarms in Server Profiles by Severity",
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "severity_type",
+                                "key": "row.Severity.value"
+                            },
+                            {
+                                "token": "clicked_donut_chart",
+                                "value": "severity"
+                            },
+                            {
+                                "token": "fault_type",
+                                "value": "null"
+                            },
+                            {
+                                "token": "clicked_single_value",
+                                "value": "None"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "options": {
+                "showDonutHole": true,
+                "seriesColors": [
+                    "#f8be44",
+                    "#5a4575",
+                    "#ffffff",
+                    "#0877a6",
+                    "#5a4575",
+                    "#ec9960",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#99B100",
+                    "#FFA476",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ]
+            },
+            "description": "Visualizes the distribution of active faults by their severity levels."
+        },
+        "viz_iw4BBYYK": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_5oa35wJQ"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "title": "Server Profile Target Platforms",
+            "options": {
+                "value": "> primary | seriesByName('count')",
+                "label": "> primary | seriesByName('TargetPlatform')"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_pie_chart",
+                                "value": "target"
+                            },
+                            {
+                                "token": "target_type",
+                                "key": "row.TargetPlatform.value"
+                            },
+                            {
+                                "token": "template_type",
+                                "value": "null"
+                            },
+                            {
+                                "token": "deploy_type",
+                                "value": "null"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "description": "Shows the distribution of server profiles across different target platforms."
+        },
+        "viz_gRvfK5DB": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_3kXnyvOL_ds_5oa35wJQ"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "title": "Server Profile Template Sync Status",
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_pie_chart",
+                                "value": "template"
+                            },
+                            {
+                                "token": "template_type",
+                                "key": "row.TemplateSyncStatus.value"
+                            },
+                            {
+                                "token": "deploy_type",
+                                "value": "null"
+                            },
+                            {
+                                "token": "target_type",
+                                "value": "null"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "options": {
+                "seriesColors": [
+                    "#ffffff",
+                    "#99B100",
+                    "#813193",
+                    "#FFA476",
+                    "#7B56DB",
+                    "#009CEB",
+                    "#00CDAF",
+                    "#DD9900",
+                    "#FF677B",
+                    "#CB2196",
+                    "#0051B5",
+                    "#008C80",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ]
+            },
+            "description": "Indicates whether server profiles are in sync with their associated templates."
+        },
+        "viz_uJAuQDNV": {
+            "type": "splunk.pie",
+            "dataSources": {
+                "primary": "ds_jEaramOl_ds_5oa35wJQ"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "title": "Server Profile Deploy Status",
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_pie_chart",
+                                "value": "deploy"
+                            },
+                            {
+                                "token": "deploy_type",
+                                "key": "row.DeployStatus.value"
+                            },
+                            {
+                                "token": "template_type",
+                                "value": "null"
+                            },
+                            {
+                                "token": "target_type",
+                                "value": "null"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "options": {
+                "seriesColors": [
+                    "#00490A",
+                    "#FF969E",
+                    "#00CDAF",
+                    "#DD9900",
+                    "#00689D",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#E47BFE",
+                    "#7B56DB",
+                    "#009CEB"
+                ]
+            },
+            "description": "Displays the current deployment status of all server profiles."
+        },
+        "viz_9hH2q3kr": {
+            "type": "splunk.singlevalue",
+            "title": "Server Profiles without an assigned server",
+            "options": {
+                "majorColor": "#f8be44"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "dataSources": {
+                "primary": "ds_8mk9Gx44_ds_d0DCctlb"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_single_value",
+                                "value": "unassigned"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "description": "Indicates the count of server profiles not yet mapped to any physical server."
+        },
+        "viz_HdmYvLzd": {
+            "type": "splunk.column",
+            "dataSources": {
+                "primary": "ds_hxXys8gr"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "server_profile_name",
+                                "key": "row.ServerProfileName.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Alarms by Server Profile",
+            "options": {
+                "xAxisTitleText": "Server Profile Names",
+                "legendDisplay": "off",
+                "legendTruncation": "ellipsisOff",
+                "yAxisTitleVisibility": "hide",
+                "xAxisLabelRotation": -45,
+                "resultLimit": 1000,
+                "seriesColors": [
+                    "#FFA476",
+                    "#99B100",
+                    "#DD9900",
+                    "#7B56DB",
+                    "#009CEB",
+                    "#00CDAF",
+                    "#FF677B",
+                    "#CB2196",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ],
+                "yAxisMajorTickInterval": 1
+            },
+            "description": "Shows the number of active faults grouped by each server profile, allowing quick identification of profiles with the most issues."
+        },
+        "viz_ou4URhvn": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_xpQmxts1"
+            },
+            "title": "Detailed Overview of Fault in \"$server_profile_name$\"",
+            "hideWhenNoData": true,
+            "options": {
+                "count": 5,
+                "showInternalFields": false
+            }
+        },
+        "viz_F1EqlNvv": {
+            "type": "splunk.line",
+            "dataSources": {
+                "primary": "ds_jUnR8rLd"
+            },
+            "options": {
+                "legendDisplay": "top",
+                "seriesColors": [
+                    "#99B100",
+                    "#7B56DB",
+                    "#009CEB",
+                    "#00CDAF",
+                    "#DD9900",
+                    "#FF677B",
+                    "#CB2196",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#FFA476",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ]
+            },
+            "hideWhenNoData": true,
+            "title": "Over Time Chart of Fault in \"$server_profile_name$\""
+        },
+        "viz_MjLJaFMa": {
+            "type": "splunk.singlevalue",
+            "title": "Server Profiles with Assigned Server",
+            "options": {
+                "majorColor": "#53a051"
+            },
+            "showProgressBar": false,
+            "showLastUpdated": false,
+            "dataSources": {
+                "primary": "ds_LGdepRvc_ds_8mk9Gx44_ds_d0DCctlb"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_single_value",
+                                "value": "assigned"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "description": "Shows how many server profiles are currently associated with a physical server."
+        },
+        "viz_ZWAJ6yDV": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_Ou1NLGZH"
+            },
+            "title": "",
+            "hideWhenNoData": true,
+            "options": {
+                "count": 5,
+                "showInternalFields": false
+            },
+            "description": "Displays detailed server profile data that dynamically filters based on the selected single stat (Total, Assigned, or Unassigned)."
+        },
+        "viz_LqUpQJbe": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_fQP3XL9N_ds_Ou1NLGZH"
+            },
+            "title": "",
+            "hideWhenNoData": true,
+            "options": {
+                "count": 5,
+                "showInternalFields": false
+            },
+            "description": "Displays detailed server profile data that dynamically filters based on the selected single stat or Donut chart."
+        },
+        "viz_SUyDf2nV": {
+            "type": "splunk.table",
+            "dataSources": {
+                "primary": "ds_bHLn7jGl"
+            },
+            "title": "",
+            "hideWhenNoData": true,
+            "options": {
+                "count": 5,
+                "showInternalFields": false
+            },
+            "description": "Displays detailed server profile information that dynamically updates based on the selected single stat (Target Platform, Deploy Status, or Template Sync Status), allowing quick analysis of the corresponding profiles."
+        },
+        "viz_TfOg5oXQ": {
+            "type": "splunk.table",
+            "title": "Server Profile Config State",
+            "dataSources": {
+                "primary": "ds_CETdq1yO"
+            },
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "backgroundColor": "> themes.defaultBackgroundColor",
+                "columnFormat": {
+                    "Config State Summary": {
+                        "rowBackgroundColors": "> table | seriesByName(\"Config State Summary\") | matchValue(Config_State_SummaryColumnColorConfig)",
+                        "rowColors": "> table | seriesByName(\"Config State Summary\") | matchValue(Config_State_Summary2ColumnColorConfig)"
+                    }
+                }
+            },
+            "context": {
+                "Config_State_SummaryColumnColorConfig": [
+                    {
+                        "match": "Assigned",
+                        "value": "#118832"
+                    },
+                    {
+                        "match": "Associated",
+                        "value": "#55C169"
+                    },
+                    {
+                        "match": "Failed",
+                        "value": "#9E2520"
+                    },
+                    {
+                        "match": "Inconsistent",
+                        "value": "#D94E17"
+                    },
+                    {
+                        "match": "Not-assigned",
+                        "value": "#CBA700"
+                    },
+                    {
+                        "match": "Waiting-for-resource",
+                        "value": "#1182F3"
+                    }
+                ],
+                "Config_State_Summary2ColumnColorConfig": [
+                    {
+                        "match": "Failed",
+                        "value": "#FFFFFF"
+                    },
+                    {
+                        "match": "Inconsistent",
+                        "value": "#FFFFFF"
+                    },
+                    {
+                        "match": "Assigned",
+                        "value": "#FFFFFF"
+                    }
+                ]
+            },
+            "description": "Lists all server profiles along with their current configuration state for quick reference and comparison."
+        },
+        "viz_D0qROCCB": {
+            "type": "splunk.bar",
+            "title": "Server Profile Config State",
+            "dataSources": {
+                "primary": "ds_qHE9cz5K"
+            },
+            "options": {
+                "seriesColors": [
+                    "#00CDAF",
+                    "#7B56DB",
+                    "#009CEB",
+                    "#DD9900",
+                    "#FF677B",
+                    "#CB2196",
+                    "#813193",
+                    "#0051B5",
+                    "#008C80",
+                    "#99B100",
+                    "#FFA476",
+                    "#FF6ACE",
+                    "#AE8CFF",
+                    "#00689D",
+                    "#00490A",
+                    "#465D00",
+                    "#9D6300",
+                    "#F6540B",
+                    "#FF969E",
+                    "#E47BFE"
+                ],
+                "legendDisplay": "off",
+                "yAxisTitleVisibility": "hide"
+            },
+            "description": "Visualizes the distribution of server profiles across different configuration states for an at-a-glance health overview."
+        },
+        "viz_aDDupMoI": {
+            "type": "splunk.rectangle",
+            "options": {
+                "fillColor": "transparent",
+                "strokeColor": "transparent"
+            }
+        }
+    },
+    "dataSources": {
+        "ds_efqDXlnk": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "`cisco_intersight_index` sourcetype=\"cisco:intersight:alarms\" Name=\"ServerProfile*\"\n| search account_name IN ($account_name$)\n| where Severity != \"Cleared\"\n| dedup Moid\n| stats count by Name"
+            },
+            "name": "Total Active Alarms related to Server Profile"
+        },
+        "ds_d0DCctlb": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles\n| where splunk_managed_lifecycle == \"PRESENT\" \n| search account_name IN ($account_name$)\n| dedup Moid\n| stats count as TotalServerProfile"
+            },
+            "name": "Total Number of Server Profile"
+        },
+        "ds_U0lHMUTt": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "`cisco_intersight_index` sourcetype=\"cisco:intersight:alarms\" Name=\"ServerProfile*\"\n| where Severity != \"Cleared\"\n| dedup Moid\n| search account_name IN ($account_name$)\n| rename AffectedMo.Moid as AffectedMoMoid\n| join type=left AffectedMoMoid [ | inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" | rename Moid as AffectedMoMoid, Name as ServerProfileName, AssignedServer.Name as AssignedServerName, AssignedServer.Moid as AssignedServerMoid, AssignedServer.ObjectType as AssignedServerObjectType | table AffectedMoMoid, ServerProfileName, ServerAssignmentMode, ManagementMode, DeployStatus, AssignedServerName, AssignedServerMoid, AssignedServerObjectType ]\n| stats count"
+            },
+            "name": "Total Number of Server Profile with Alarms"
+        },
+        "ds_gNGCu4b0_ds_efqDXlnk": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "`cisco_intersight_index` sourcetype=\"cisco:intersight:alarms\" Name=\"ServerProfile*\"\n| search account_name IN ($account_name$)\n| where Severity != \"Cleared\"\n| dedup Moid\n| stats count by Severity"
+            },
+            "name": "Total Active Alarms related to Server Profile by Severity"
+        },
+        "ds_5oa35wJQ": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" \n| search account_name IN ($account_name$)\n| dedup Moid\n| stats count by TargetPlatform"
+            },
+            "name": "Target Platform"
+        },
+        "ds_3kXnyvOL_ds_5oa35wJQ": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles\n| where splunk_managed_lifecycle == \"PRESENT\" \n| search account_name IN ($account_name$)\n| dedup Moid\n| where TemplateSyncStatus!=\"None\"\n| eval TemplateSyncStatus=case(\n    TemplateSyncStatus=\"OK\", \"In Sync\",\n    true(), TemplateSyncStatus\n)\n| stats count by TemplateSyncStatus"
+            },
+            "name": "Template Sync Status"
+        },
+        "ds_jEaramOl_ds_5oa35wJQ": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles\n| where splunk_managed_lifecycle == \"PRESENT\" \n| search account_name IN ($account_name$)\n| dedup Moid\n| eval DeployStatus=case(\n    DeployStatus=\"None\", \"Not Deployed\",\n    DeployStatus=\"Complete\", \"Deployed\",\n    true(), DeployStatus\n)\n| stats count by DeployStatus"
+            },
+            "name": "Deploy Status"
+        },
+        "ds_8mk9Gx44_ds_d0DCctlb": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" \n| search account_name IN ($account_name$)\n| where ServerAssignmentMode=\"None\"\n| dedup Moid\n| stats count by ServerAssignmentMode"
+            },
+            "name": "Unassigned Server Profile"
+        },
+        "ds_hxXys8gr": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "`cisco_intersight_index` sourcetype=\"cisco:intersight:alarms\" Name=\"ServerProfile*\"\n| dedup Moid\n| search account_name IN ($account_name$)\n| rename AffectedMo.Moid as AffectedMoMoid\n| search AffectedMoMoid IN ($server_profiles_filter$)\n| search Severity IN ($severity_filter$)\n| join type=left AffectedMoMoid [ | inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" \n| rename Moid as AffectedMoMoid, Name as ServerProfileName, Description as ServerProfileDescription, AssignedServer.Name as AssignedServerName, AssignedServer.Moid as AssignedServerMoid, AssignedServer.ObjectType as AssignedServerObjectType | table AffectedMoMoid, ServerProfileName, ServerAssignmentMode, ManagementMode, DeployStatus, AssignedServerName, AssignedServerMoid, AssignedServerObjectType ]\n| rename Name as AlarmName, Description as AlarmDescription\n| stats count by ServerProfileName"
+            },
+            "name": "Server Profile Fault counts"
+        },
+        "ds_xpQmxts1": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "`cisco_intersight_index` sourcetype=\"cisco:intersight:alarms\" Name=\"ServerProfile*\"\n| search account_name IN ($account_name$)\n| dedup Moid\n| rename AffectedMo.Moid as AffectedMoMoid\n| join type=left AffectedMoMoid [ | inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" \n| rename Moid as AffectedMoMoid, Name as ServerProfileName, Description as ServerProfileDescription, AssignedServer.Name as AssignedServerName, AssignedServer.Moid as AssignedServerMoid, AssignedServer.ObjectType as AssignedServerObjectType | table AffectedMoMoid, ServerProfileName, ServerAssignmentMode, ManagementMode, DeployStatus, AssignedServerName, AssignedServerMoid, AssignedServerObjectType ]\n| where ServerProfileName=\"$server_profile_name$\"\n| rename Name as AlarmName, Description as AlarmDescription, AssignedServerName as Server, AssignedServerObjectType as \"Server Type\", ServerProfileName as \"Profile Name\"\n| table AlarmName, AlarmDescription, Severity, Server, \"Server Type\", \"Profile Name\", ManagementMode, DeployStatus"
+            },
+            "name": "Server Profile Drilldown"
+        },
+        "ds_6rDbkEqY": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" \n| rename Name as ServerProfileName| table Moid, ServerProfileName"
+            },
+            "name": "Server Profile Moid and Name"
+        },
+        "ds_jUnR8rLd": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "`cisco_intersight_index` sourcetype=\"cisco:intersight:alarms\" Name=\"ServerProfile*\"\n| search account_name IN ($account_name$)\n| dedup Moid\n| rename AffectedMo.Moid as AffectedMoMoid\n| join type=left AffectedMoMoid [ | inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" \n| rename Moid as AffectedMoMoid, Name as ServerProfileName, Description as ServerProfileDescription, AssignedServer.Name as AssignedServerName, AssignedServer.Moid as AssignedServerMoid, AssignedServer.ObjectType as AssignedServerObjectType | table AffectedMoMoid, ServerProfileName, ServerAssignmentMode, ManagementMode, DeployStatus, AssignedServerName, AssignedServerMoid, AssignedServerObjectType ]\n| where ServerProfileName=\"$server_profile_name$\"\n| rename Name as AlarmName, Description as AlarmDescription\n| timechart span=15m count(AlarmName) by ServerProfileName"
+            },
+            "name": "Server profile Line chart"
+        },
+        "ds_141FtQFs": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "`cisco_intersight_index` sourcetype=\"cisco:intersight:alarms\" Name=\"ServerProfile*\"\n| dedup Severity\n| table Severity"
+            },
+            "name": "Severity Filter"
+        },
+        "ds_LGdepRvc_ds_8mk9Gx44_ds_d0DCctlb": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" \n| search account_name IN ($account_name$)\n| where ServerAssignmentMode!=\"None\"\n| dedup Moid\n| stats count"
+            },
+            "name": "Assigned Server Profile"
+        },
+        "ds_Ou1NLGZH": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles\n| where splunk_managed_lifecycle == \"PRESENT\" \n| search account_name IN ($account_name$)\n| dedup Moid\n| rename Moid as AffectedMoMoid, Name as ServerProfileName, Description as ServerProfileDescription, AssignedServer.Name as AssignedServerName, AssignedServer.Moid as AssignedServerMoid, AssignedServer.ObjectType as AssignedServerObjectType\n| eval keep = case(\n    \"$clicked_single_value$\"=\"total\", 1,\n    \"$clicked_single_value$\"=\"assigned\" AND ServerAssignmentMode!=\"None\", 1,\n    \"$clicked_single_value$\"=\"unassigned\" AND ServerAssignmentMode=\"None\", 1,\n    \"$clicked_single_value$\"=\"fault\" AND FaultCount>0, 1,\n    true(), 0\n)\n| where keep=1\n| table ServerProfileName, AssignedServerName, AssignedServerObjectType, ManagementMode, DeployStatus"
+            },
+            "name": "Drilldown for Server Profile single values widget"
+        },
+        "ds_fQP3XL9N_ds_Ou1NLGZH": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "`cisco_intersight_index` sourcetype=\"cisco:intersight:alarms\" Name=\"ServerProfile*\"\n| search account_name IN ($account_name$)\n| where Severity != \"Cleared\"\n| dedup Moid\n| rename AffectedMo.Moid as AffectedMoMoid\n| join type=left AffectedMoMoid [ | inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\" \n| rename Moid as AffectedMoMoid, Name as ServerProfileName, Description as ServerProfileDescription, AssignedServer.Name as AssignedServerName, AssignedServer.Moid as AssignedServerMoid, AssignedServer.ObjectType as AssignedServerObjectType | table AffectedMoMoid, ServerProfileName, ServerAssignmentMode, ManagementMode, DeployStatus, AssignedServerName, AssignedServerMoid, AssignedServerObjectType ]\n| eval keep = case(\n    \"$clicked_single_value$\"=\"fault\", 1,\n    true(), 0\n)\n| where keep=1\n| rename Name as AlarmName, Description as AlarmDescription\n| table AlarmName, AlarmDescription, Severity, ServerProfileName, AssignedServerName, AssignedServerObjectType, ManagementMode, DeployStatus"
+            },
+            "name": "Drilldown for Server Profile with Alarms"
+        },
+        "ds_bHLn7jGl": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles\n| where splunk_managed_lifecycle == \"PRESENT\" \n| search account_name IN ($account_name$)\n| dedup Moid\n| rename Moid as AffectedMoMoid, Name as ServerProfileName, Description as ServerProfileDescription, AssignedServer.Name as AssignedServerName, AssignedServer.Moid as AssignedServerMoid, AssignedServer.ObjectType as AssignedServerObjectType\n| eval DeployStatus=case(\n    DeployStatus=\"None\", \"Not Deployed\",\n    DeployStatus=\"Complete\", \"Deployed\",\n    true(), DeployStatus\n)\n| eval TemplateSyncStatus=case(\n    TemplateSyncStatus=\"None\", \"Not Sync\",\n    TemplateSyncStatus=\"OK\", \"In Sync\",\n    true(), TemplateSyncStatus\n)\n| eval keep = case(\n    \"$clicked_pie_chart$\"=\"target\" AND TargetPlatform=\"$target_type$\", 1,\n    \"$clicked_pie_chart$\"=\"deploy\" AND DeployStatus=\"$deploy_type$\", 1,\n    \"$clicked_pie_chart$\"=\"template\" AND TemplateSyncStatus=\"$template_type$\", 1,\n    true(), 0\n)\n| where keep=1\n| table ServerProfileName, AssignedServerName, AssignedServerObjectType, TargetPlatform, DeployStatus, TemplateSyncStatus"
+            },
+            "name": "Pie chart drilldown"
+        },
+        "ds_hBrwQFFi": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles\n| where splunk_managed_lifecycle == \"PRESENT\" \n| dedup account_name\n| table account_name"
+            },
+            "name": "Account Name"
+        },
+        "ds_nt3WnoA7": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\"\n| search account_name IN ($account_name$)\n| fillnull value=\"-\"\n| stats count by ConfigContext.ConfigStateSummary\n| rename ConfigContext.ConfigStateSummary as ConfigStateSummary\n| dedup ConfigStateSummary\n| table \"ConfigStateSummary\""
+            },
+            "name": "Config State Summary search"
+        },
+        "ds_CETdq1yO": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\"\r\n| fillnull value=\"-\"\r\n| search account_name IN ($account_name$)\r\n| stats count by AssignedServer.Moid, Name, ConfigContext.ConfigStateSummary, AssignedServer.Name \r\n| rename AssignedServer.Name as ServerName\r\n| rename AssignedServer.Moid as servermoid \r\n| rename Name as Name \r\n| rename ConfigContext.ConfigStateSummary as ConfigStateSummary \r\n| eval servermoid_search = if(isnull(servermoid) OR len(servermoid) == 0, \"\", servermoid) \r\n| search ServerName=\"*$servername$*\"\r\n| search Name=\"*$serverprofilename$*\"\r\n| search ConfigStateSummary=$configstatesummary$\r\n| rename Name as \"Server Profile Name\", ServerName as \"Server Name\", ConfigStateSummary as \"Config State Summary\"\r\n| eval sort_field = case(\r\n'Config State Summary' == \"Assigned\", 6,\r\n'Config State Summary' == \"Associated\", 5,\r\n'Config State Summary' == \"Failed\", 1,\r\n'Config State Summary' == \"Inconsistent\", 2,\r\n'Config State Summary' == \"Not-assigned\", 3,\r\n'Config State Summary' == \"Waiting-for-resource\", 4\r\n) \r\n| eval sort_field = tonumber(sort_field) \r\n| sort 0 sort_field \r\n| table \"Server Profile Name\", \"Server Name\", \"Config State Summary\""
+            },
+            "name": "Server Profile - Table search"
+        },
+        "ds_qHE9cz5K": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$tr_xAEB84dN.earliest$",
+                    "latest": "$tr_xAEB84dN.latest$"
+                },
+                "query": "| inputlookup cisco_intersight_server_profiles | where splunk_managed_lifecycle == \"PRESENT\"\n| search account_name IN ($account_name$)\n| fillnull value=\"-\"\n| stats count by AssignedServer.Moid, Name, ConfigContext.ConfigStateSummary, AssignedServer.Name \n| rename AssignedServer.Name as ServerName\n| rename AssignedServer.Moid as servermoid \n| rename Name as Name \n| rename ConfigContext.ConfigStateSummary as ConfigStateSummary \n| eval servermoid_search = if(isnull(servermoid) OR len(servermoid) == 0, \"\", servermoid) \n| search ServerName=\"*$servername$*\"\n| search Name=\"*$serverprofilename$*\"\n| search ConfigStateSummary=$configstatesummary$\n| rename Name as \"Server Profile Name\", ServerName as \"Server Name\", ConfigStateSummary as \"Config State Summary\"\n| stats Count by \"Config State Summary\""
+            },
+            "name": "Server Profile - Bar chart search"
+        }
+    },
+    "defaults": {
+        "dataSources": {}
+    },
+    "layout": {
+        "type": "grid",
+        "options": {
+            "width": 1440,
+            "height": 7000
+        },
+        "structure": [
+            {
+                "item": "viz_T1NKz3fh",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 462,
+                    "h": 150
+                }
+            },
+            {
+                "item": "viz_ZWAJ6yDV",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 150,
+                    "w": 1440,
+                    "h": 281
+                }
+            },
+            {
+                "item": "viz_iw4BBYYK",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 431,
+                    "w": 462,
+                    "h": 216
+                }
+            },
+            {
+                "item": "viz_SUyDf2nV",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 647,
+                    "w": 1440,
+                    "h": 269
+                }
+            },
+            {
+                "item": "input_Z6JE6gBD",
+                "type": "input",
+                "position": {
+                    "x": 0,
+                    "y": 916,
+                    "w": 478,
+                    "h": 106
+                }
+            },
+            {
+                "item": "viz_TfOg5oXQ",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1022,
+                    "w": 719,
+                    "h": 505
+                }
+            },
+            {
+                "item": "input_yhFQ0ju7",
+                "type": "input",
+                "position": {
+                    "x": 0,
+                    "y": 1527,
+                    "w": 478,
+                    "h": 85
+                }
+            },
+            {
+                "item": "viz_Qz1K13M1",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1612,
+                    "w": 478,
+                    "h": 225
+                }
+            },
+            {
+                "item": "viz_LqUpQJbe",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1837,
+                    "w": 1440,
+                    "h": 432
+                }
+            },
+            {
+                "item": "input_0elhrHjh",
+                "type": "input",
+                "position": {
+                    "x": 0,
+                    "y": 2269,
+                    "w": 721,
+                    "h": 85
+                }
+            },
+            {
+                "item": "viz_HdmYvLzd",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 2354,
+                    "w": 1440,
+                    "h": 696
+                }
+            },
+            {
+                "item": "viz_F1EqlNvv",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3050,
+                    "w": 1440,
+                    "h": 498
+                }
+            },
+            {
+                "item": "viz_ou4URhvn",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3548,
+                    "w": 1440,
+                    "h": 498
+                }
+            },
+            {
+                "item": "viz_uJAuQDNV",
+                "type": "block",
+                "position": {
+                    "x": 462,
+                    "y": 431,
+                    "w": 478,
+                    "h": 216
+                }
+            },
+            {
+                "item": "viz_MjLJaFMa",
+                "type": "block",
+                "position": {
+                    "x": 462,
+                    "y": 0,
+                    "w": 478,
+                    "h": 150
+                }
+            },
+            {
+                "item": "input_P9ltH0lO",
+                "type": "input",
+                "position": {
+                    "x": 478,
+                    "y": 916,
+                    "w": 462,
+                    "h": 106
+                }
+            },
+            {
+                "item": "viz_aDDupMoI",
+                "type": "block",
+                "position": {
+                    "x": 478,
+                    "y": 1527,
+                    "w": 962,
+                    "h": 85
+                }
+            },
+            {
+                "item": "viz_dfw2VHQD",
+                "type": "block",
+                "position": {
+                    "x": 478,
+                    "y": 1612,
+                    "w": 484,
+                    "h": 225
+                }
+            },
+            {
+                "item": "viz_D0qROCCB",
+                "type": "block",
+                "position": {
+                    "x": 719,
+                    "y": 1022,
+                    "w": 721,
+                    "h": 505
+                }
+            },
+            {
+                "item": "input_XHA1wZSX",
+                "type": "input",
+                "position": {
+                    "x": 721,
+                    "y": 2269,
+                    "w": 719,
+                    "h": 85
+                }
+            },
+            {
+                "item": "viz_gRvfK5DB",
+                "type": "block",
+                "position": {
+                    "x": 940,
+                    "y": 431,
+                    "w": 500,
+                    "h": 216
+                }
+            },
+            {
+                "item": "input_Tjqi0Kjb",
+                "type": "input",
+                "position": {
+                    "x": 940,
+                    "y": 916,
+                    "w": 500,
+                    "h": 106
+                }
+            },
+            {
+                "item": "viz_9hH2q3kr",
+                "type": "block",
+                "position": {
+                    "x": 940,
+                    "y": 0,
+                    "w": 500,
+                    "h": 150
+                }
+            },
+            {
+                "item": "viz_xCBZnJxT",
+                "type": "block",
+                "position": {
+                    "x": 962,
+                    "y": 1612,
+                    "w": 478,
+                    "h": 225
+                }
+            }
+        ],
+        "globalInputs": [
+            "input_FyKzOw0H"
+        ]
+    },
+    "description": "This feature in your Cisco Intersight Add-on helps track and visualize the overall health of server profiles managed via Intersight. It correlates profile-level metadata with underlying hardware and alarm data to give a single health view per server."
+}
+    ]]></definition>
+    <meta type="hiddenElements"><![CDATA[
+{
+    "hideEdit": false,
+    "hideOpenInSearch": false,
+    "hideExport": false
+}
+    ]]></meta>
+</dashboard>

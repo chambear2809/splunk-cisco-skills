@@ -1,0 +1,51 @@
+<script type="text/template">
+
+    <!-- ====== -->
+    <!-- Search -->
+    <!-- ====== -->
+    <div class="row search-wrapper">
+        <div style="float:left">
+            <span class="fields-table-desc">Enable the fields to collect events on.</span>
+            <!-- Search -->
+            <span class="search search-control">
+                <input type="text" class="input-medium search-query" placeholder="Search"/>
+                <a class="clear"><i class="icon-x-circle"></i></a>
+            </span>
+        </div>
+        <div style="float:right">
+            <!-- Extract New Field -->
+            <div class="btn" id='extract-new-field'>Extract New Field</div>
+        </div>
+    </div>
+
+    <!-- ===== -->
+    <!-- Table -->
+    <!-- ===== -->
+    <table id="fields" class="field-list table table-chrome table-hover" style="margin-top: 10px;">
+
+    <thead>
+        <tr>
+            <th class="enable-disable">
+                Enable
+            </th>
+            <th class="<% if (!stream.aggregated) { %> hidden <% }%>">Agg. Type</th>
+            <th style="width: 10%">
+                Name
+            </th>
+            <th style="width: 60%">
+                Description
+            </th>
+            <th>
+                Type
+            </th>
+
+            <th class="add-to-filters">Actions</th>
+        </tr>
+    </thead>
+    <tbody id="field-rows">
+        <!-- ================== -->
+        <!-- Table Rows Go Here -->
+        <!-- ================== -->
+    </tbody>
+    </table>
+</script>

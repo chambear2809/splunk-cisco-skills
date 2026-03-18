@@ -1,0 +1,28 @@
+Metadata-Version: 2.1
+Name: solnlib
+Version: 7.0.0
+Summary: The Splunk Software Development Kit for Splunk Solutions
+Home-page: https://github.com/splunk/addonfactory-solutions-library-python
+License: Apache-2.0
+Keywords: splunk,ucc
+Author: Splunk
+Author-email: addonfactory@splunk.com
+Requires-Python: >=3.7,<3.14
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Topic :: Software Development :: Code Generators
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Requires-Dist: defusedxml (>=0.7)
+Requires-Dist: sortedcontainers (>=2)
+Requires-Dist: splunk-sdk (>=2.0.2)
+Project-URL: Repository, https://github.com/splunk/addonfactory-solutions-library-python

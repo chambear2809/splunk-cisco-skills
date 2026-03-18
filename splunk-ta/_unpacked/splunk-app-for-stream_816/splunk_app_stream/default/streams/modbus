@@ -1,0 +1,424 @@
+{
+  "app": "Stream", 
+  "category": "Infrastructure", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "modbus.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "Transaction ID to associate request and response for modbus TCP",
+      "enabled": true, 
+      "name": "transaction_id", 
+      "term": "modbus.transaction-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus protocol ID",
+      "enabled": true, 
+      "name": "protocol_id", 
+      "term": "modbus.protocol-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus length",
+      "enabled": true, 
+      "name": "length", 
+      "term": "modbus.length"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus unit identifier",
+      "enabled": true, 
+      "name": "unit_identifier", 
+      "term": "modbus.unit-identifier"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus function code",
+      "enabled": true, 
+      "name": "function_code", 
+      "term": "modbus.function-code"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus function subcode",
+      "enabled": true, 
+      "name": "function_subcode", 
+      "term": "modbus.function-subcode"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus exception code",
+      "enabled": true, 
+      "name": "exception_code", 
+      "term": "modbus.exception-code"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus pdu",
+      "enabled": true, 
+      "name": "pdu", 
+      "term": "modbus.pdu"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus starting address",
+      "enabled": true, 
+      "name": "starting_address", 
+      "term": "modbus.starting-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus quantity of coils",
+      "enabled": true, 
+      "name": "quantity_of_coils", 
+      "term": "modbus.quantity-of-coils"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus output address",
+      "enabled": true, 
+      "name": "output_address", 
+      "term": "modbus.output-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus output value",
+      "enabled": true, 
+      "name": "output_value", 
+      "term": "modbus.output-value"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus quantity of outputs",
+      "enabled": true, 
+      "name": "quantity_of_outputs", 
+      "term": "modbus.quantity-of-outputs"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus byte count",
+      "enabled": true, 
+      "name": "byte_count", 
+      "term": "modbus.byte-count"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus request data length",
+      "enabled": true, 
+      "name": "request_data_length", 
+      "term": "modbus.request-data-length"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus reference type",
+      "enabled": true, 
+      "name": "reference_type", 
+      "term": "modbus.reference-type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus file number",
+      "enabled": true, 
+      "name": "file_number", 
+      "term": "modbus.file-number"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus record number",
+      "enabled": true, 
+      "name": "record_number", 
+      "term": "modbus.record-number"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus record length",
+      "enabled": true, 
+      "name": "record_length", 
+      "term": "modbus.record-length"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus record data",
+      "enabled": true, 
+      "name": "record_data", 
+      "term": "modbus.record-data"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus reference address",
+      "enabled": true, 
+      "name": "reference_address", 
+      "term": "modbus.reference-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus and mask",
+      "enabled": true, 
+      "name": "and_mask", 
+      "term": "modbus.and-mask"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus or mask",
+      "enabled": true, 
+      "name": "or_mask", 
+      "term": "modbus.or-mask"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus write registers value",
+      "enabled": true, 
+      "name": "write_registers_value", 
+      "term": "modbus.write-registers-value"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus fifo pointer address",
+      "enabled": true, 
+      "name": "fifo_pointer_address", 
+      "term": "modbus.fifo-pointer-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus mei type",
+      "enabled": true, 
+      "name": "mei_type", 
+      "term": "modbus.mei-type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus resp data length",
+      "enabled": true, 
+      "name": "resp_data_length", 
+      "term": "modbus.resp-data-length"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus read registers value",
+      "enabled": true, 
+      "name": "read_registers_value", 
+      "term": "modbus.read-registers-value"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus fifo count",
+      "enabled": true, 
+      "name": "fifo_count", 
+      "term": "modbus.fifo-count"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus invalid codes",
+      "enabled": true, 
+      "name": "invalid_codes", 
+      "term": "modbus.invalid-codes"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus coil status",
+      "enabled": true, 
+      "name": "coil_status", 
+      "term": "modbus.coil-status"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus output data",
+      "enabled": true, 
+      "name": "output_data", 
+      "term": "modbus.output-data"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus status",
+      "enabled": true, 
+      "name": "status", 
+      "term": "modbus.status"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus event count",
+      "enabled": true, 
+      "name": "event_count", 
+      "term": "modbus.event-count"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus message count",
+      "enabled": true, 
+      "name": "message_count", 
+      "term": "modbus.message-count"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus events",
+      "enabled": true, 
+      "name": "events", 
+      "term": "modbus.events"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus outputs value",
+      "enabled": true, 
+      "name": "outputs_value", 
+      "term": "modbus.outputs-value"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus file resp length",
+      "enabled": true, 
+      "name": "file_resp_length", 
+      "term": "modbus.file-resp-length"
+    },
+    {
+      "aggType": "value", 
+      "desc": "modbus error code",
+      "enabled": true, 
+      "name": "error_code", 
+      "term": "modbus.error-code"
+    },
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport level protocol", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "modbus", 
+  "isReferenceStream": true,  
+  "name": "MODBUS Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "MODBUS", 
+  "sourcetype": "stream:modbus", 
+  "streamType": "event"
+}

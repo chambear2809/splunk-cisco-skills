@@ -1,0 +1,120 @@
+<form version="1.1">
+    <label>Stream Data Volumes</label>
+    <!-- removing for now b/c of bug that causes it to only flash and disappear -->
+    <!-- <description>Index and traffic volume data for enabled streams.</description> -->
+    <fieldset submitButton="false" autoRun="true">
+        <input type="time" token="time" searchWhenChanged="true">
+            <label></label>
+            <default>
+                <earliest>-60m@m</earliest>
+                <latest>now</latest>
+            </default>
+        </input>
+        <input type="dropdown" token="host" searchWhenChanged="true">
+            <label>Host</label>
+            <choice value="*">all</choice>
+            <search>
+                <query>`stream_stats` | stats estdc(host) as count by host | fields host</query>
+                <earliest>$time.earliest$</earliest>
+                <latest>$time.latest$</latest>
+            </search>
+            <fieldForLabel>host</fieldForLabel>
+            <fieldForValue>host</fieldForValue>
+            <default>*</default>
+        </input>
+    </fieldset>
+    <search id="baseSearch">
+        <query>
+            host=$host$ `stream_stats_estimate`
+            | search statsOnly=0
+            | stats sum(rawBytes) as sumRawBytes sum(events) as sumEvents sum(bytesIn) as sumBytesIn sum(bytesOut) as sumBytesOut sum(totalBytes) as sumTotalBytes by host, _time, streamId
+            | addinfo
+            | eval rangeSecs = info_max_time - info_min_time
+        </query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+    </search>
+    <row>
+        <chart>
+            <title>Splunk Index Volume by Stream (MB)</title>
+            <search base="baseSearch">
+                <query>
+                    timechart sum(eval(sumRawBytes/1024/1024)) by streamId useother=f
+                </query>
+            </search>
+            <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+            <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+            <option name="charting.axisTitleX.visibility">visible</option>
+            <option name="charting.axisTitleX.text">Time</option>
+            <option name="charting.axisTitleY.visibility">visible</option>
+            <option name="charting.axisTitleY.text">Size</option>
+            <option name="charting.axisTitleY2.visibility">visible</option>
+            <option name="charting.axisX.scale">linear</option>
+            <option name="charting.axisY.scale">linear</option>
+            <option name="charting.axisY2.enabled">0</option>
+            <option name="charting.axisY2.scale">inherit</option>
+            <option name="charting.chart">column</option>
+            <option name="charting.chart.bubbleMaximumSize">50</option>
+            <option name="charting.chart.bubbleMinimumSize">10</option>
+            <option name="charting.chart.bubbleSizeBy">area</option>
+            <option name="charting.chart.nullValueMode">connect</option>
+            <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+            <option name="charting.chart.stackMode">stacked</option>
+            <option name="charting.chart.style">shiny</option>
+            <option name="charting.drilldown">all</option>
+            <option name="charting.layout.splitSeries">0</option>
+            <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+            <option name="charting.legend.placement">right</option>
+        </chart>
+        <chart>
+            <title>Daily Splunk Index Volume (based on time range selected)</title>
+            <search base="baseSearch">
+                <query>
+                    eval dailyRawTraffic = round(((sumRawBytes/rangeSecs/1024/1024)* 86400),3)
+                    | chart sum(dailyRawTraffic) as "Splunk Index Volume (MB)" by streamId
+                    | search "Splunk Index Volume (MB)" > 0
+                    | rename streamId as "Stream Id"
+                </query>
+            </search>
+            <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+            <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+            <option name="charting.axisTitleX.visibility">visible</option>
+            <option name="charting.axisTitleY.visibility">visible</option>
+            <option name="charting.axisTitleY2.visibility">visible</option>
+            <option name="charting.axisX.scale">linear</option>
+            <option name="charting.axisY.scale">linear</option>
+            <option name="charting.axisY2.enabled">0</option>
+            <option name="charting.axisY2.scale">inherit</option>
+            <option name="charting.chart">pie</option>
+            <option name="charting.chart.sliceCollapsingThreshold">0</option>
+            <option name="charting.chart.bubbleMaximumSize">50</option>
+            <option name="charting.chart.bubbleMinimumSize">10</option>
+            <option name="charting.chart.bubbleSizeBy">area</option>
+            <option name="charting.chart.nullValueMode">connect</option>
+            <option name="charting.chart.sliceCollapsingThreshold">0</option>
+            <option name="charting.chart.stackMode">default</option>
+            <option name="charting.chart.style">shiny</option>
+            <option name="charting.drilldown">all</option>
+            <option name="charting.layout.splitSeries">0</option>
+            <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+            <option name="charting.legend.placement">right</option>
+        </chart>
+    </row>
+    <row>
+        <table>
+            <title>Traffic and Index Stats by Stream</title>
+            <search base="baseSearch">
+                <query>
+                    eval rawTraffic = round((sumRawBytes/1024/1024),3)
+                    | eval events = round(sumEvents,0)
+                    | eval trafficIn=round((sumBytesIn/1024/1024),3)
+                    | eval trafficOut=round((sumBytesOut/1024/1024),3)
+                    | eval totalTraffic=round((trafficIn + trafficOut),3)
+                    | stats sum(events) as "Total Events" sum(trafficIn) as "Total Incoming Traffic (MB)" sum(trafficOut) as "Total Outgoing Traffic (MB)" sum(totalTraffic) as "Total Traffic (MB)" sum(rawTraffic) as "Splunk Index Volume (MB)" by streamId
+                    | sort - "Splunk Index Volume (MB)" | addcoltotals labelfield=streamId label=ALL | rename streamId as "Stream Id"
+                </query>
+            </search>
+            <option name="count">50</option>
+        </table>
+    </row>
+</form>

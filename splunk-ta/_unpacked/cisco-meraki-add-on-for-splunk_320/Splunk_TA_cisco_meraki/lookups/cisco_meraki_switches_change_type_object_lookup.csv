@@ -1,0 +1,6 @@
+meraki_event_type,change_type,object
+poe_budget_change,update,poe
+psu_insert,update,psu
+port_status,update,port
+stp_port_role_change,start,port
+port_bounce,update,port

@@ -1,0 +1,81 @@
+<form version="1.1">
+  <label>App Analytics</label>
+  <search id="rare_apps">
+    <query>index=* source="stream:Splunk_Tcp" OR source="stream:Splunk_Udp" | rare app limit=20 | rename app as Application, count as Count, percent as Percent</query>
+    <earliest>$time_picker.earliest$</earliest>
+    <latest>$time_picker.latest$</latest>
+  </search>
+        <search id="top_apps">
+          <query>index=* source="stream:Splunk_Tcp" OR source="stream:Splunk_Udp" | stats sum(sum(bytes)) as Bytes by app | search Bytes > 0 | sort - Bytes | head 20 | rename app AS "Application" | table Application, Bytes</query>
+          <earliest>$time_picker.earliest$</earliest>
+          <latest>$time_picker.latest$</latest>
+        </search>
+
+  <fieldset submitButton="false">
+    <input type="time" token="time_picker">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>Top Applications by Volume (Bytes)</title>
+        <search base="top_apps">
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0</option>
+      </chart>
+      <table>
+        <search base="top_apps">
+           <query>eval Volume=`format_bytes(Bytes)` | search Volume > 0 | table Application, Volume</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="drilldown">cell</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+    <panel>
+      <chart>
+        <title>Rare Applications</title>
+        <search base="rare_apps"></search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+      <table>
+        <search base="rare_apps"></search>
+        <option name="wrap">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="drilldown">row</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+
+</form>

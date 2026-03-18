@@ -1,0 +1,10 @@
+meraki_event_type,action
+auto_rf_channel_change,modified
+auto_tx_power_change,modified
+dfs_event,created
+wpa_auth,success
+wpa_deauth,logoff
+splash_auth,success
+8021x_auth,success
+8021x_eap_success,success
+8021x_eap_failure,failure

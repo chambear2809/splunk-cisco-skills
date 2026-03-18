@@ -54,10 +54,13 @@ log_live_input_summary() {
     log "Live input status: total=${total}, enabled=${enabled}, disabled=${disabled}"
 }
 
-load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
-SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
+ensure_search_api_session() {
+    load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+    SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
+}
 
 check_prereqs() {
+    ensure_search_api_session
     if ! rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME"; then
         log "ERROR: Cisco DC Networking app not found. Install it first."
         exit 1
@@ -68,8 +71,12 @@ create_indexes() {
     log "Creating indexes..."
     local failed=0 idx
 
+    if ! is_splunk_cloud; then
+        ensure_search_api_session
+    fi
+
     for idx in cisco_aci cisco_nd cisco_nexus_9k; do
-        if rest_create_index "$SK" "$SPLUNK_URI" "${idx}" "512000"; then
+        if platform_create_index "$SK" "$SPLUNK_URI" "${idx}" "512000"; then
             log "  Index '${idx}' created or already exists."
         else
             log "  ERROR: Failed to create index '${idx}'."
@@ -236,9 +243,8 @@ enable_nexus9k_inputs() {
 }
 
 main() {
-    check_prereqs
-
     if $ENABLE_INPUTS; then
+        check_prereqs
         if [[ -z "${ACCOUNT}" || -z "${INDEX}" || -z "${INPUT_TYPE}" ]]; then
             log "ERROR: --enable-inputs requires --account, --index, and --input-type"
             exit 1
@@ -250,7 +256,7 @@ main() {
             *) log "ERROR: Unknown input type '${INPUT_TYPE}'. Use: aci, nd, nexus9k"; exit 1 ;;
         esac
         log_live_input_summary
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "input changes")"
         exit 0
     fi
 
@@ -260,13 +266,16 @@ main() {
     fi
 
     if $MACROS_ONLY; then
+        check_prereqs
         update_macros
         exit 0
     fi
 
+    check_prereqs
     create_indexes
     update_macros
-    log "Setup complete. Restart Splunk to apply all changes."
+    log "Setup complete."
+    log "$(log_platform_restart_guidance "index or macro changes")"
 }
 
 main

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="pop3">
+    <Name>POP3 Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="pop3.event">
+      <Type>object</Type>
+      <Comment>Event representing POP3 e-mail message</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

@@ -1,0 +1,56 @@
+
+
+#ephemeral-streams-table .stream-groups{
+	margin-top: 8px;
+	margin-left: 22px;
+	font-weight: 100;
+	margin-bottom:10px;
+}
+
+#ephemeral-streams-table .action-dropdown{
+	margin-bottom: 0px;
+	height: 23px;
+}
+
+#ephemeral-streams-table .icon-chevron-right{
+	cursor:pointer;
+}
+
+.ephemeral-bulk-edit .dropdown-menu{
+	margin-left: -40px !important;
+}
+
+.ephemeral-bulk-edit .arrow{
+	margin-left:-22px !important;
+}
+
+.stream-search .subtitle-bar{
+	margin-top:20px;
+}
+
+#ephemeral-streams-table td:first-child{
+	border-right: solid 1px #ccc;
+	-moz-user-select: none; 
+  -khtml-user-select: none; 
+  -webkit-user-select: none; 
+  -o-user-select: none; 
+}
+
+.ephem-stream-search{
+	margin: 15px 10px 10px 10px;
+	font-size: 20px;
+}
+
+.ephem-stream-search .title{
+	margin: 0px 0px 0px 9px;
+}
+
+.ephem-stream-search .subtitle-bar{
+	margin-top:10px;
+}
+
+.ephem-stream-docs {
+	font-size: 12px;
+	margin: 9px 0px 11px 9px;
+	color: #8B8B8B;
+}

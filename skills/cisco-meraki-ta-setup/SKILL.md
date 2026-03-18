@@ -12,6 +12,17 @@ description: >-
 
 Automates the **Splunk Add-on for Cisco Meraki** (`Splunk_TA_cisco_meraki` v3.2.0).
 
+## Package Model
+
+Install the original vendor archive from `splunk-ta/` as-is:
+
+- `cisco-meraki-add-on-for-splunk_320.tgz`
+
+For Splunk Cloud, install that archive with ACS and then use this skill to
+configure the account, inputs, dashboard macro, and validation over search-tier
+REST. Any `splunk-ta/_unpacked/` copy is review-only and not part of the normal
+workflow.
+
 ## Agent Behavior — Credentials
 
 **The agent must NEVER ask for passwords, API keys, or secrets in chat.**
@@ -37,13 +48,15 @@ The agent may freely ask for non-secret values: account names, org IDs, regions,
 
 ## Environment
 
-All scripts operate entirely via the Splunk REST API and can run from any host with
-network access to the Splunk management port (8089). No local Splunk installation is
-required.
+Setup and validation use the Splunk search-tier REST API and can run from any
+host with network access to the Splunk management port (`8089`). In Splunk
+Cloud, app installation, index creation, and restarts are handled through ACS
+instead of the search-tier REST endpoints.
 
 | Item | Value |
 |------|-------|
-| Management API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Search-tier API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs (`SPLUNK_PLATFORM` is only an override for hybrid runs) |
 | TA app name | `Splunk_TA_cisco_meraki` |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/cisco-meraki-ta-setup/scripts/` (relative to repo root) |
@@ -80,6 +93,7 @@ bash skills/cisco-meraki-ta-setup/scripts/setup.sh
 ```
 
 Creates one index. No `sudo` required when running as the `splunk` user.
+In Splunk Cloud, the setup script creates this index through ACS.
 
 | Index | Purpose | Max Size |
 |-------|---------|----------|
@@ -166,9 +180,8 @@ Or with a custom index name:
 bash scripts/setup_dashboards.sh my_custom_index
 ```
 
-This updates `meraki_index` in `local/macros.conf` so all 32 dashboards query
-the correct index. No Splunk credentials needed — it writes directly to the
-TA's local config.
+This updates `meraki_index` via the TA's REST configuration endpoint so all 32
+dashboards query the correct index. Search-tier Splunk credentials are required.
 
 Built-in dashboards include:
 
@@ -186,10 +199,11 @@ Built-in dashboards include:
 | Assurance | Assurance Alerts |
 | Organization | Organizations, Organization Networks |
 
-### Step 5: Restart Splunk
+### Step 5: Restart If Required
 
-New indexes require a restart to activate. Restart via the Splunk UI, CLI on the
-server, or REST API.
+On Splunk Enterprise, restart Splunk after new index creation.
+On Splunk Cloud, check `acs status current-stack` and only run
+`acs restart current-stack` when ACS reports `restartRequired=true`.
 
 ### Step 6: Validate
 
@@ -235,7 +249,8 @@ bash scripts/load_mcp_tools.sh
    encrypt the API key automatically.
 2. **Auto-create inputs**: Setting `automatic_input_creation=1` creates all
    inputs at account creation time. This is the recommended approach.
-3. **Splunk restart required**: New indexes are not available until after restart.
+3. **Restart behavior differs by platform**: Enterprise requires a Splunk
+   restart after new index creation. Splunk Cloud uses ACS restart checks.
 4. **No sudo needed**: Scripts run fine as the `splunk` OS user.
 5. **Region determines base URL**: `global`→`api.meraki.com`,
    `india`→`api.meraki.in`, `canada`→`api.meraki.ca`, `china`→`api.meraki.cn`,

@@ -51,10 +51,13 @@ log_live_input_summary() {
     log "Live input status: total=${total}, enabled=${enabled}, disabled=${disabled}"
 }
 
-load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
-SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
+ensure_search_api_session() {
+    load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+    SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
+}
 
 check_prereqs() {
+    ensure_search_api_session
     if ! rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME"; then
         log "ERROR: Cisco Catalyst TA not found. Install it first."
         exit 1
@@ -65,8 +68,12 @@ create_indexes() {
     log "Creating indexes..."
     local failed=0 idx
 
+    if ! is_splunk_cloud; then
+        ensure_search_api_session
+    fi
+
     for idx in catalyst ise sdwan cybervision; do
-        if rest_create_index "$SK" "$SPLUNK_URI" "${idx}" "512000"; then
+        if platform_create_index "$SK" "$SPLUNK_URI" "${idx}" "512000"; then
             log "  Index '${idx}' created or already exists."
         else
             log "  ERROR: Failed to create index '${idx}'."
@@ -237,12 +244,13 @@ main() {
             *) log "ERROR: Unknown input type '${INPUT_TYPE}'. Use: catalyst_center, ise, sdwan, cybervision"; exit 1 ;;
         esac
         log_live_input_summary
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "input changes")"
         exit 0
     fi
 
     create_indexes
-    log "Setup complete. Restart Splunk to apply all changes."
+    log "Setup complete."
+    log "$(log_platform_restart_guidance "index changes")"
 }
 
 main

@@ -1,0 +1,41 @@
+<script type="text/template">
+    <div id="confirm-dialog-template" class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Please Confirm</h4>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to
+                        <span class="action btn-pill active">
+                            <%-action%>
+                        </span>
+                        <% if (!model.streams) { %>
+                            <%- model.text %>?
+                        <% } else { %>
+                            <div class='bulk-selections-table-container'>
+                                <table class='bulk-selected-streams-container table'>
+                                    <thead>
+                                        <tr>
+                                            <th>Stream ID</th>
+                                            <th>Stream Description</th>
+                                        <t>
+                                    </thead>
+                                    <% for (var i=0; i<model.streams.length; i++) { %>
+                                        <tr>
+                                            <td><%- model.streams[i].id %></td>
+                                            <td><%- model.streams[i].name %></td>
+                                        </tr>
+                                    <% } %>
+                                </table>
+                            </div><br>
+                        <% } %>
+                </p>
+                <p style="color: #d85d3c"> <%- warning %></p>
+            </div>
+            <div class="modal-footer">
+              <a href="#" id="btnYes" class="btn btn-primary yes">Yes</a>
+              <a href="" data-dismiss="modal" aria-hidden="true" class="btn secondary">No</a>
+            </div>
+        </div>
+    </div>
+</script>

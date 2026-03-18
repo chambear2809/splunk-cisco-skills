@@ -1,0 +1,51 @@
+<?xml version="1.0" ?>
+<nav>
+    <view name="inputs"/>
+    <view default="true" name="configuration"/>
+    <view name="search"/>
+    <collection label="API Data">
+    <view name="request_overview"/>
+    <view name="api_request_history"/>
+    <view name="request_response_code"/>
+    </collection>
+    <collection label="Appliance Data">
+    <view name="appliance_vpn_stats"/>
+    <view name="appliance_vpn_statuses"/>
+    <view name="security_appliances"/>
+    </collection>
+    <view name="assurance_alerts"/>
+    <view name="cameras"/>
+    <collection label="Licensing Data">
+    <view name="licenses_coterm_licenses"/>
+    <view name="licenses_subscription_entitlements"/>
+    <view name="licenses_subscriptions"/>
+    </collection>
+    <collection label="Organization data">
+    <view name="audit"/>
+    <view name="firmware_upgrades"/>
+    <view name="organization_networks"/>
+    <view name="organizations"/>
+    <view name="organizations_security"/>
+    </collection>
+    <collection label="Devices data">
+    <view name="device_availabilities_change_history"/>
+    <view name="device_uplink_addresses_by_device"/>
+    </collection>
+    <view name="sensor_reading_history"/>
+    <collection label="Summary data">
+    <view name="summary_appliances_top_by_utilization"/>
+    <view name="summary_top_clients_by_usage"/>
+    <view name="summary_top_devices_by_usage"/>
+    <view name="summary_top_switches_by_energy_usage"/>
+    </collection>
+    <collection label="Switch data">
+    <view name="switches"/>
+    <view name="switch_port_overview"/>
+    </collection>
+    <collection label="Wireless data">
+    <view name="access_points"/>
+    <view name="air_marshal"/>
+    <view name="wireless_devices_ethernet_statuses"/>
+    <view name="wireless_packet_loss_by_device"/>
+    </collection>
+</nav>

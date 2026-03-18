@@ -1,0 +1,689 @@
+<form script="set_apic_token.js" stylesheet="table_decorations.css" version="1.1">
+  <label>Multi Pod</label>
+  
+  <search id="baseSearch">
+    <query>| `home_page_details`</query>
+    <earliest>$timetoken.earliest$</earliest>
+    <latest>$timetoken.latest$</latest>
+  </search>
+  <search id="baseSearch2">
+    <query>| `apic-fabric-overview`</query>
+    <earliest>$timetoken.earliest$</earliest>
+    <latest>$timetoken.latest$</latest>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" token="timetoken" searchWhenChanged="true">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$timetoken.earliest$</earliest>
+        <latest>$timetoken.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+          <unset token="form.Pod"></unset>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+          <unset token="form.Pod"></unset>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+          <unset token="form.Pod"></unset>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+          <unset token="form.Pod"></unset>
+        </condition>
+      </change>
+    </input>
+    
+    <input type="text" token="healthRange" searchWhenChanged="true">
+      <label>Enter Max required Health score: 1-100</label>
+      <default>100</default>
+    </input>
+    <input type="dropdown" token="Pod" id="field1" searchWhenChanged="true">
+      <label>PodName :</label>
+      <default>*</default>
+      <choice value="*">All</choice>
+      <search>
+        <query>eventtype=cisco_dc_aci_health $formed_apic_host$ component = "fabricNode"  | rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | dedup Pod | fields Pod</query>
+        <earliest>$timetoken.earliest$</earliest>
+        <latest>$timetoken.latest$</latest>
+      </search>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>Pod</fieldForLabel>
+      <fieldForValue>Pod</fieldForValue>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <html id="overview">
+        <style>
+          #overview{
+            height:25% !important;
+          }
+        </style>
+      <h1>Dashboard Overview</h1>
+     <p>This dashboard provides details for fabric components on a Multi-Pod level.<br/> Following drilldown capabilities are provided:<br/>
+          <ul>
+            <li>Drilldown on Leaf and Spines of a Pod - Provide Health details of each node on a Pod.</li>
+            <li>Further drilldown on Node Name - Provide details of chasis, linecards, supevisor, power supply, fan tray and interfaces including their health.</li>
+            <li>Drilldown on critical faults of a Pod - Provide critical faults over time for respective Pod.</li>
+            <li>Further drilldown on to System Faults dashboard to view critical faults for a given Pod</li>
+            <li>Details on EPGs bound to each Pod: Drilldown on a Pod for EPGs per Tenant per Pod view - Further drilldown to get specific Port details of each EPG bound to a Pod along with their Health scores<br/>
+            </li>
+          </ul>
+        </p>
+     </html>
+    </panel>
+    <panel>
+      <table>
+        <title>APICs</title>
+        <search>
+          <query>| `apic_details` | search $formed_apic_host$ | fields - "apic_host"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+    <panel>
+      <chart>
+        <title>Fabric Health - History</title>
+        <search base="baseSearch">
+          <query>| search component = "fabricHealthTotal" dn = "topology/pod-*" $formed_apic_host$ | rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | chart latest(cur) As "Health" by _time, Pod</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart id="master10">
+        <title>Leafs</title>
+        <search base="baseSearch">
+          <query>| search component=fabricNode role=leaf $formed_apic_host$ | rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | search Pod = "$Pod$" | dedup name,apic_host | stats count(name) AS "Count" by Pod</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleX.text">Pod</option>
+        <option name="charting.axisTitleY.text">No. of leafs</option>
+        <option name="charting.seriesColors">[0x1E93C6,0xE8B025]</option>
+        <drilldown>
+          <set token="PodName">$click.value$</set>
+          <unset token="criticalToken"></unset>
+          <unset token="epgToken"></unset>
+          <unset token="healthDetail"></unset>
+          <unset token="staticPort"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart id="master20">
+        <title>Spines</title>
+        <search base="baseSearch">
+          <query>| search component=fabricNode role=spine $formed_apic_host$ | rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | search Pod = "$Pod$" | dedup name,apic_host | stats count(name) AS "Count" by Pod</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleX.text">Pod</option>
+        <option name="charting.axisTitleY.text">No. of Spines</option>
+        <option name="charting.seriesColors">[0xE8B025,0x1E93C6]</option>
+        <drilldown>
+          <set token="PodName2">$click.value$</set>
+          <unset token="criticalToken"></unset>
+          <unset token="epgToken"></unset>
+          <unset token="healthDetail"></unset>
+          <unset token="staticPort"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Critical Faults</title>
+        <search>
+          <query>eventtype="cisco_dc_aci_class" $formed_apic_host$ component="faultInst" severity=critical | dedup dn,apic_host  | rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | search Pod = "$Pod$" |stats count by Pod</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleX.text">Pod</option>
+        <option name="charting.axisTitleY.text">No. of Critical Faults</option>
+        <drilldown>
+          <set token="criticalToken">$click.value$</set>
+          <unset token="PodName2"></unset>
+          <unset token="PodName"></unset>
+          <unset token="epgToken"></unset>
+          <unset token="nodeName"></unset>
+          <unset token="healthDetail"></unset>
+          <unset token="staticPort"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>EPGs</title>
+        <search>
+          <query>eventtype="cisco_dc_aci_class" $formed_apic_host$ component=fvRsPathAtt tDn dn | rex field=dn "epg-(?&lt;Epg&gt;[^\/]+)" | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=dn "rspathAtt-\[topology\/(?&lt;Pod&gt;[^\/]+)"| table apic_host, Epg, Tenant, Pod, tDn, dn|fillnull value="Unassigned" Pod | mvcombine delim="," Pod | dedup apic_host, Tenant, Epg, Pod | table apic_host,Epg, Tenant, Pod| eval Pod=mvdedup(Pod) | mvcombine delim="," Pod| eval Pod=mvdedup(Pod) | eval Pod=mvfilter(NOT match(Pod, "Unassigned")) |fillnull value="Unassigned" Pod | search Pod = "*" | stats count by Pod | sort 0 Pod | append [search eventtype=cisco_dc_aci_health component=fvAEPg $formed_apic_host$ | dedup apic_host, dn  | rex field=dn "epg-(?&lt;Epg&gt;[^\/]+)" | rex field=dn "ap-(?&lt;App&gt;[^\/]+)" | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=dn "rspathAtt-\[topology\/(?&lt;Pod&gt;[^\/]+)" | table apic_host, Epg, App,Tenant | dedup apic_host, Tenant, App,Epg | join type=Outer Tenant, App [search eventtype=cisco_dc_aci_class component=fvRsPathAtt $formed_apic_host$ | dedup apic_host, dn | search dn = "*rspathAtt*" | rex field=dn "epg-(?&lt;EPG&gt;[^\/]+)" | rex field=dn "ap-(?&lt;App&gt;[^\/]+)" | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=dn "rspathAtt-\[topology\/(?&lt;Pod&gt;[^\/]+)"|search Pod = "pod-*" | table apic_host,Tenant, App, EPG | dedup apic_host, Tenant, App, EPG] | fillnull value="Unassigned" EPG | eval Pod=EPG | search Pod="Unassigned" | fields - EPG | stats count by Pod]</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleX.text">Pod</option>
+        <option name="charting.axisTitleY.text">No. of Critical Faults</option>
+        <drilldown>
+          <set token="epgToken">$click.value$</set>
+          <unset token="criticalToken"></unset>
+          <unset token="PodName2"></unset>
+          <unset token="PodName"></unset>
+          <unset token="nodeName"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart depends="$PodName$">
+        <title>Top Affected Leafs of $PodName$</title>
+        <search base="baseSearch2">
+          <query>| rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | search component=fabricNode node="*leaf*" Pod = "$PodName$" $formed_apic_host$| stats  latest(CurrentHealth) AS "Health" by node, apic_host | eval "Health &lt; 60" = case(Health &lt; 60, Health) | eval "Health &lt; 80" = case(Health &gt;= 60 AND Health &lt;80, Health) | eval "Health &lt; 100" = case(Health &gt;=80 AND Health &lt;=100, Health) | eval Node= node.":".apic_host | table Node,"Health &lt; 60","Health &lt; 80","Health &lt; 100",Health | sort 0 Health | fields - Health | head 10</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">all</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.fieldColors">{"Health &lt; 60":0xFF3333,"Health &lt; 80":0xFFA500, "Health &lt; 100":0x088A08}</option>
+        <drilldown>
+          <set token="nodeName">$click.value$</set>
+          <eval token="apicHost">mvindex(split(tostring($click.value$),":"),1)</eval>
+          <eval token="apicNode">mvindex(split(tostring($click.value$),":"),0)</eval>
+          <unset token="epgToken"></unset>
+          <unset token="criticalToken"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart depends="$PodName2$">
+        <title>Top Affected Spines of $PodName2$</title>
+        <search base="baseSearch2">
+          <query>| rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | search component=fabricNode node="*spine*" Pod = "$PodName2$" $formed_apic_host$ | stats  latest(CurrentHealth) AS "Health" by node, apic_host | eval "Health &lt; 60" = case(Health &lt; 60, Health) | eval "Health &lt; 80" = case(Health &gt;= 60 AND Health &lt;80, Health) | eval "Health &lt; 100" = case(Health &gt;=80 AND Health &lt;=100, Health)  | eval Node= node.":".apic_host | table Node, "Health &lt; 60","Health &lt; 80","Health &lt; 100",Health | sort 0 Health | fields - Health | head 10</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.fieldColors">{"Health &lt; 60":0xFF3333,"Health &lt; 80":0xFFA500, "Health &lt; 100":0x088A08}</option>
+        <drilldown>
+          <set token="nodeName">$click.value$</set>
+          <eval token="apicHost">mvindex(split(tostring($click.value$),":"),1)</eval>
+          <eval token="apicNode">mvindex(split(tostring($click.value$),":"),0)</eval>
+          <unset token="epgToken"></unset>
+          <unset token="criticalToken"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$nodeName$" rejects="$epgToken$,$criticalToken$">
+        <title>$nodeName$ - Chassis</title>
+        <search base="baseSearch2">
+          <query>| search component="eqptCh"  node=$apicNode$ apic_host=$apicHost$ | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(Role) AS Role latest(state) AS State latest(Revision) AS Revision latest(Type) AS Type latest(ser) AS "Serial Number" by id,node | strcat "Chassis" id Name | table Name,Health,Faults,Role,State,Type,Revision,"Serial Number" | sort 0 Health</query>
+        </search>
+        <option name="count">5</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$nodeName$" rejects="$epgToken$,$criticalToken$">
+        <title>$nodeName$ - Supervisor Card</title>
+        <search base="baseSearch2">
+          <query>| search component="eqptSupC"  node=$apicNode$ apic_host=$apicHost$ | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(state) AS State latest(numP) AS "Total Ports" latest(model) AS Model by id,node | strcat "SupC" id Name | table Name,Health,Faults,State,"Total Ports",Model | sort 0 Health</query>
+        </search>
+        <option name="count">5</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$nodeName$" rejects="$epgToken$,$criticalToken$">
+        <title>$nodeName$ - Affected Interfaces</title>
+        <search base="baseSearch2">
+          <query>| search  (component="eqptFabP" OR component=eqptLeafP )  node=$apicNode$ apic_host=$apicHost$ |strcat "eth" lcSlot "/" id Interface | stats dc(Fault Creation Time) AS "Access-Faults"  latest(CurrentHealth) AS "Health"  latest(speed) AS Speed latest(nodeID) AS "nodeID"  by Interface | join type=inner max=0 nodeID,Interface [ search `cisco_dc_aci_index` sourcetype="cisco:dc:aci:health" component=ethpmPhysIf code=* |dedup dn | rex field=dn "node-(?&lt;nodeID&gt;\d+)\/sys\/phys-\[(?&lt;Interface&gt;.*?)\]" |stats count(code) AS "Layer1-Faults" by Interface,nodeID ]  | table Interface,Health,"Access-Faults","Layer1-Faults",Speed | rename Interface AS Name | sort 0 Health</query>
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$nodeName$" rejects="$epgToken$,$criticalToken$">
+        <title>$nodeName$ - Line Card</title>
+        <search base="baseSearch2">
+          <query>| search component="eqptLC"  node=$apicNode$ apic_host=$apicHost$ | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(state) AS State latest(numP) AS "Total Ports" latest(model) AS Model latest(ser) AS "Serial Number" latest(macB) AS "mac" by id,node | strcat "LC" id Name | table Name,Health,Faults,State,Model,"Serial Number","Total Ports",mac |  sort 0 Health</query>
+        </search>
+        <option name="count">5</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$nodeName$" rejects="$epgToken$,$criticalToken$">
+        <title>$nodeName$ - Power Supply</title>
+        <search base="baseSearch2">
+          <query>| search component="eqptPsu"  node=$apicNode$ apic_host=$apicHost$ | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(state) AS State latest(model) AS Model latest(ser) AS "Serial Number" latest(volt) AS Volt by id,node | strcat  "Psu" id Name| table Name,Health,Faults,State,Volt,Model,"Serial Number"| sort 0 Health</query>
+        </search>
+        <option name="count">5</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$nodeName$" rejects="$epgToken$,$criticalToken$">
+        <title>$nodeName$ - Fan Tray</title>
+        <search base="baseSearch2">
+          <query>| search component="eqptFt"  node=$apicNode$ apic_host=$apicHost$ | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(state) AS State latest(model) AS Model latest(ser) AS "Serial Number" by id,node | strcat "Ft" id Name| table Name,Health,Faults,State,Model,"Serial Number" | sort 0 Health</query>
+        </search>
+        <option name="count">5</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart depends="$criticalToken$">
+        <title>Time Chart: Critical Fault (30-day period) for $criticalToken$</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_class component="faultInst" severity=critical $formed_apic_host$ | dedup dn  | rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | search  Pod="$criticalToken$" | timechart span=1d dc(dn) by Pod</query>
+          <earliest>-30d</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown target="System Faults">
+          <unset token="PodName2"></unset>
+          <unset token="PodName"></unset>
+          <unset token="epgToken"></unset>
+          <link>
+            <![CDATA[
+          help_desk?form.time_token.earliest=$timetoken.earliest$&form.time_token.latest=$timetoken.latest$&form.multiTokenQuery=critical&form.apic_host=$apic_host$&form.mso_host=$mso_host$
+                        ]]>
+          </link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart depends="$epgToken$">
+        <title>EPGs with Static Ports for $epgToken$</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_class component=fvRsPathAtt $formed_apic_host$ | dedup dn, apic_host | search dn = "*rspathAtt*" | rex field=dn "epg-(?&lt;Epg&gt;[^\/]+)" | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=dn "rspathAtt-\[topology\/(?&lt;Pod&gt;[^\/]+)"|search Pod = "pod-*"| search Pod = "$epgToken$" | dedup Tenant, Epg ,apic_host | stats count(Epg) As "No. of EPG's" by Tenant | sort 0 -"No. of EPG's"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <set token="staticPort">$click.value$</set>
+          <set token="healthDetail">$click.value$</set>
+          <unset token="PodName2"></unset>
+          <unset token="PodName"></unset>
+          <unset token="criticalToken"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart depends="$epgToken$">
+        <title>EPGs Unassigned to any Pod</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_health component=fvAEPg $formed_apic_host$ | dedup dn,apic_host  | rex field=dn "epg-(?&lt;Epg&gt;[^\/]+)" | rex field=dn "ap-(?&lt;App&gt;[^\/]+)" | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=dn "rspathAtt-\[topology\/(?&lt;Pod&gt;[^\/]+)" | table apic_host, Epg, App,Tenant | dedup apic_host, Tenant, App,Epg | join type=Outer Tenant, App [search eventtype=cisco_dc_aci_class component=fvRsPathAtt $formed_apic_host$ | dedup dn, apic_host | search dn = "*rspathAtt*" | rex field=dn "epg-(?&lt;EPG&gt;[^\/]+)" | rex field=dn "ap-(?&lt;App&gt;[^\/]+)" | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=dn "rspathAtt-\[topology\/(?&lt;Pod&gt;[^\/]+)"|search Pod = "pod-*" | table apic_host, Tenant, App, EPG | dedup apic_host, Tenant, App, EPG] | fillnull value="null" EPG | search EPG="null" | fields - EPG, App | stats count by Tenant | sort 0 -count | head 15</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <unset token="PodName2"></unset>
+          <unset token="PodName"></unset>
+          <unset token="criticalToken"></unset>
+          <unset token="staticPort"></unset>
+          <set token="healthDetail">$click.value$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$staticPort$" rejects="$PodName$,$PodName2$,$criticalToken$">
+        <title>EPG Static Port Details for Tenant: $staticPort$</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_class component=fvRsPathAtt $formed_apic_host$| dedup dn, apic_host | search dn = "*rspathAtt*" | rex field=dn "epg-(?&lt;Epg&gt;[^\/]+)"| rex field=dn "ap-(?&lt;App&gt;[^\/]+)" | rex field=dn "uni\/tn-(?&lt;Tenant&gt;[^\/]+)" | rex field=dn "rspathAtt-\[topology\/(?&lt;Pod&gt;[^\/]+)" | rex field=dn "paths-(?&lt;Node&gt;[^\/]+)" | rex field=dn "pathep-\[(?&lt;Interface&gt;[^\]]+)" | search Pod = "pod-*" | search Pod = "$Pod$" Tenant="$staticPort$" | eval Node= "Leaf-"+Node, "APIC Site/Cluster" = apic_host | table "APIC Site/Cluster", Tenant,App, Epg Pod, Node, Interface, encap | dedup "APIC Site/Cluster", Tenant,App, Epg, Pod, Node, Interface | search Tenant=* | sort 0 Tenant, App, Epg, Node | rename encap AS "Vlan port" | fields - Tenant</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$healthDetail$" rejects="$PodName$,$PodName2$,$criticalToken$">
+        <title>EPG Health Details for Tenant: $healthDetail$</title>
+        <search>
+          <query>| `apic-tenant-overview`| search component = "fvEpg" dn = "uni*tn-*ap-*epg-*nodehealth*" $formed_apic_host$ | stats latest(TenantName) AS "Tenant" latest(ApplicationName) AS "App" latest(EndPointGroupName) AS "EPG" latest(health) AS "Health Score" sparkline(avg(health),10m) AS "Health Trend" by dn,apic_host | rex field=dn "nodehealth-(?&lt;Node&gt;.*)"| search Tenant="$healthDetail$" | rename apic_host AS "APIC Site/Cluster" |table "APIC Site/Cluster", Tenant, App, EPG, Node, "Health Score", "Health Trend" | dedup "APIC Site/Cluster", Tenant, App, EPG, Node, "Health Score", "Health Trend" | eval Node="Leaf-"+Node | fields - Tenant</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+</form>

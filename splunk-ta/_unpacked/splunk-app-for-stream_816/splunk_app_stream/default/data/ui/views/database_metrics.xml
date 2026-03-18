@@ -1,0 +1,292 @@
+<form version="1.1">
+  <label>Database Activity</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Select a Time</label>
+      <default>
+        <earliest>-4h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="db_tok" searchWhenChanged="true">
+      <label>Select a DB Source:</label>
+      <!-- Define the default value -->
+      <default>*</default>
+      <!-- Hard-code the choice for "All" -->
+      <choice value="*">All</choice>
+
+      <!-- Define the other choices with a populating search -->
+      <search>
+      <query> index=* eventtype=stream_agg_databases | stats estdc(sourcetype) by sourcetype</query>
+       <earliest>$time.earliest$</earliest>
+       <latest>$time.latest$</latest>
+      </search>
+      <fieldForLabel>sourcetype</fieldForLabel>
+      <fieldForValue>sourcetype</fieldForValue>
+    </input>
+    <input type="dropdown" token="server" searchWhenChanged="true" depends="$db_tok$">
+      <label>Select a DB Server</label>
+      <default>*</default>
+      <choice value="*">All</choice>
+      <search>
+        <query>index=* eventtype=stream_agg_databases sourcetype=$db_tok$
+          | stats estdc(dest_ip) as count by dest_ip
+          | fields dest_ip</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+      <fieldForLabel>dest_ip</fieldForLabel>
+      <fieldForValue>dest_ip</fieldForValue>
+    </input>
+    <input type="dropdown" token="user" searchWhenChanged="true" depends="$server$, $db_tok$">
+      <label>Select a User</label>
+      <default>.*</default>
+      <choice value=".*">All</choice>
+      <search>
+        <query>index=* eventtype=stream_agg_databases sourcetype=$db_tok$ dest_ip=$server$ login!=""
+          | stats estdc(login) as count by login | fields login</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+      <fieldForLabel>login</fieldForLabel>
+      <fieldForValue>login</fieldForValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>Hourly Average Response Time (seconds)</title>
+        <search>
+          <query>index=* eventtype=stream_agg_databases sourcetype=$db_tok$ dest_ip=$server$
+            | rename count as countq, sum(time_taken) as time_taken
+            | bin _time span=1h
+            | stats sum(countq) as TotalCount sum(time_taken) as TotalTimeTaken by _time
+            | eval AvgResponseTime = TotalTimeTaken/(TotalCount*1000000)
+            | timechart span=1h first(AvgResponseTime) as AvgResponseTime</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">Hours</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">AvgResponseTime</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Hourly Maximum Response Time (seconds)</title>
+        <search>
+          <query>index=* eventtype=stream_databases eventtype!=stream_agg_databases source=$db_tok$ dest_ip=$server$
+            | timechart span=1h eval(max(time_taken)/1000000) as MaxResponseTime</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.text">Hours</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">MaxResponseTime</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Top 10 Longest Running Queries</title>
+        <search>
+          <query>index=* eventtype=stream_databases eventtype!=stream_agg_databases source=$db_tok$ dest_ip=$server$ query!=""
+            | stats p95(eval(time_taken/1000000)) as ResponseTime by query
+            | sort 10 - ResponseTime | rename query as Query ResponseTime as "ResponseTime (seconds)"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>10 Most Frequent Queries</title>
+        <search>
+          <query>index=* eventtype=stream_agg_databases sourcetype=$db_tok$ dest_ip=$server$
+            | rename count as countq
+            | stats sum(countq) as TotalCount sum(sum(time_taken)) as TotalTimeTaken max(max(time_taken)) as MaxResponseTime by query
+            | eval AvgResponseTime = TotalTimeTaken/(TotalCount*1000000)
+            | table query, TotalCount, AvgResponseTime, TotalTimeTaken
+            | sort 10 - TotalCount | rename query as Query
+          </query>
+         <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+      <table>
+        <search>
+          <query>
+           index=* eventtype=stream_agg_databases sourcetype=$db_tok$ dest_ip=$server$
+            | rename count as countq
+            | stats sum(countq) as TotalCount sum(sum(time_taken)) as TotalTimeTaken max(max(time_taken)) as MaxResponseTime by query
+            | eval AvgResponseTime = TotalTimeTaken/(TotalCount*1000000)
+            | eval MaxResponseTime = MaxResponseTime/1000000
+            | sort 10 -TotalCount, -MaxResponseTime
+            | rename query as Query
+            | table Query, TotalCount, AvgResponseTime, MaxResponseTime
+            | rename AvgResponseTime as "AvgResponseTime (seconds)", MaxResponseTime as "MaxResponseTime (seconds)"
+          </query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>10 Most Active Users</title>
+        <search>
+          <query>index=* eventtype=stream_agg_databases sourcetype=$db_tok$ dest_ip=$server$
+            |  fields - _raw
+            | fields login, src_ip, dest_ip, src_port, dest_port, source, count
+            | rename count as Count
+            | stats values(login) as User sum(Count) as DatabaseRequests by src_ip, dest_ip, src_port, dest_port
+            | mvexpand User
+            | stats sum(DatabaseRequests) as DatabaseRequests by User
+            | where User!=""
+            | sort 10 - DatabaseRequests</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+      <table>
+        <title>Query Activity</title>
+        <search>
+          <query>index=* eventtype=stream_databases eventtype!=stream_agg_databases source=$db_tok$ dest_ip=$server$
+            |  fields - _raw
+            | fields _time, login, query, instance_name, src_ip, dest_ip, src_port, dest_port, source, time_taken
+            | stats  values(login) as User values(query) as Query values(instance_name) as Database values(eval(time_taken/1000000)) as ResponseTime by src_ip, dest_ip, src_port, dest_port, source, _time
+            | streamstats current=f  last(User) as prevUser last(Database) as prevDb by src_ip, dest_ip, src_port, dest_port, source
+            | eval User = coalesce(prevUser, User)
+            | eval Database = coalesce(prevDb, Database)
+            | fields - prevUser - prevDb
+            | eval u = mvfilter(match(User, "$user$"))
+            | rename dest_ip as Server src_ip as UserIpAddress
+            | search Query="*"
+            | table _time, User, UserIpAddress, Server, source, Database, Query, ResponseTime, u
+            | where u=User | fields - u
+            | sort -_time </query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+</form>

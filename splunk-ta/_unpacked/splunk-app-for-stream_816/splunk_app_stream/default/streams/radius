@@ -1,0 +1,361 @@
+{
+  "app": "Stream", 
+  "category": "Authentication", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "radius.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+      "enabled": true, 
+      "name": "time_taken", 
+      "term": "flow.time-taken"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport level protocol", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the accounting session id", 
+      "enabled": true, 
+      "name": "acct_session_id", 
+      "term": "radius.account-session-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the dialing string to be used for callback", 
+      "enabled": true, 
+      "name": "callback_number", 
+      "term": "radius.callback-number"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the phone number that the user called", 
+      "enabled": true, 
+      "name": "called_station_id", 
+      "term": "radius.called-station-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client id", 
+      "enabled": true, 
+      "name": "calling_station_id", 
+      "term": "radius.calling-station-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Radius message code", 
+      "enabled": true, 
+      "name": "code", 
+      "term": "radius.code"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the IP address to be configured for the user", 
+      "enabled": true, 
+      "name": "framed_ip", 
+      "term": "radius.framed-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the name of an assigned pool that should be used to assign an IPv6 prefix for the user", 
+      "enabled": true, 
+      "name": "framed_ipv6_pool", 
+      "term": "radius.framed-ipv6-pool"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the routing information to be configured for the user on the NAS", 
+      "enabled": true, 
+      "name": "framed_ipv6_route", 
+      "term": "radius.framed-ipv6-route"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Packet Identifier", 
+      "enabled": true, 
+      "name": "id", 
+      "term": "radius.id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Maximum idle duration of session in seconds", 
+      "enabled": true, 
+      "name": "idle_timeout", 
+      "term": "radius.idle-timeout"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "User login string", 
+      "enabled": true, 
+      "name": "login", 
+      "term": "radius.login"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the system with which to connect the user", 
+      "enabled": true, 
+      "name": "login_ipv6_host", 
+      "term": "radius.login-ipv6-host"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Unique identifier of NAS originating access request", 
+      "enabled": true, 
+      "name": "nas_id", 
+      "term": "radius.nas-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of of NAS originating access request", 
+      "enabled": true, 
+      "name": "nas_ip", 
+      "term": "radius.nas-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IPV6 address of of NAS originating access request", 
+      "enabled": true, 
+      "name": "nas_ipv6", 
+      "term": "radius.nas-ipv6"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Physical port number of the user on the NAS", 
+      "enabled": true, 
+      "name": "nas_port", 
+      "term": "radius.nas-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifies the NAS", 
+      "enabled": true, 
+      "name": "nas_port_id", 
+      "term": "radius.nas-port-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the type of physical port NAS is using to authenticate the user", 
+      "enabled": true, 
+      "name": "nas_port_type", 
+      "term": "radius.nas-port-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Maximum duration of session in seconds", 
+      "enabled": true, 
+      "name": "session_timeout", 
+      "term": "radius.session-timeout"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the IP address of the SGSN", 
+      "enabled": true, 
+      "name": "sgsn_address", 
+      "term": "radius.sgsn-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the SGSN MCC and MNC", 
+      "enabled": true, 
+      "name": "sgsn_mcc_mnc", 
+      "term": "radius.sgsn-mcc"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the beginning of the user service", 
+      "enabled": true, 
+      "name": "start_time", 
+      "term": "radius.start-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Status", 
+      "enabled": true, 
+      "name": "status", 
+      "term": "radius.status"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the end of the user service", 
+      "enabled": true, 
+      "name": "stop_time", 
+      "term": "radius.stop-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates how the session was terminated", 
+      "enabled": true, 
+      "name": "terminate_cause", 
+      "term": "radius.terminate-cause"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the SMI Network Management Private Enterprise Code of the Vendor", 
+      "enabled": true, 
+      "name": "vendor_id", 
+      "term": "radius.vendor-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Radius Attribute Value Pairs (AVP)", 
+      "enabled": false, 
+      "name": "avp", 
+      "term": "radius.avp"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Indicates how many octets have been received from the port over the course of this service being provided", 
+      "enabled": false, 
+      "name": "acct_input_octets", 
+      "term": "radius.acct-input-octets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Indicates how many octets have been sent to the port in the course of delivering this service", 
+      "enabled": false, 
+      "name": "acct_output_octets", 
+      "term": "radius.acct-output-octets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "radius", 
+  "isReferenceStream": true,  
+  "name": "Radius Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "Radius", 
+  "sourcetype": "stream:radius", 
+  "streamType": "event"
+}

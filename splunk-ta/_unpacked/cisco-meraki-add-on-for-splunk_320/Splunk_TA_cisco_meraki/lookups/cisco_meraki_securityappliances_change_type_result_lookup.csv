@@ -1,0 +1,5 @@
+meraki_event_type,change_type,result
+ids_start,start,started
+ids_update,update,modified
+web_cache_started,start,started
+web_cache_stopped,stop,stopped

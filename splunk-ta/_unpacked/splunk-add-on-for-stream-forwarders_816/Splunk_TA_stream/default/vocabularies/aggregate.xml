@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="aggregate">
+    <Name>Aggregate</Name>
+    <Comment>Vocabulary for describing AggregateReactor (statistical) events.</Comment>
+    <Locked>true</Locked>
+    <Term id="aggregate.update-event">
+      <Type>object</Type>
+      <Comment>Event for a statistical (partial) update</Comment>
+    </Term>
+    <Term id="aggregate.stat-event">
+      <Type>object</Type>
+      <Comment>Event for a statistical (complete) event</Comment>
+    </Term>
+    <Term id="aggregate.date-time">
+      <Type format="%Y-%m-%d %H:%M:%S">datetime</Type>
+      <Comment>DateTime of the statistical bucket started</Comment>
+    </Term>
+    <Term id="aggregate.n">
+      <Type>uint32</Type>
+      <Comment>Number of events that matched within the time interval</Comment>
+    </Term>
+    <Term id="aggregate.complete">
+      <Type>uint8</Type>
+      <Comment>True/false whether the time interval was complete</Comment>
+    </Term>
+    <Term id="aggregate.ident">
+      <Type>shortstring</Type>
+      <Comment>Identity of the statistical element</Comment>
+    </Term>
+    <Term id="aggregate.sum">
+      <Type>double</Type>
+      <Comment>Sum of (numeric) parameters within the interval</Comment>
+    </Term>
+    <Term id="aggregate.min">
+      <Type>double</Type>
+      <Comment>Smallest numeric parameter within the interval</Comment>
+    </Term>
+    <Term id="aggregate.max">
+      <Type>double</Type>
+      <Comment>Largest numeric parameter within the interval</Comment>
+    </Term>
+    <Term id="aggregate.unique">
+      <Type>shortstring</Type>
+      <Comment>Unique text instance</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

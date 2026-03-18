@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="mysql">
+    <Locked>true</Locked>
+    <Name>mySQL Protocol Vocabulary</Name>
+    <Term id="mysql.event">
+      <Type>object</Type>
+      <Comment>Event representing a mySQL command</Comment>
+    </Term>
+    <Term id="mysql.dbname">
+      <Type>string</Type>
+      <Comment>Database name</Comment>
+    </Term>
+    <Term id="mysql.login">
+      <Type>shortstring</Type>
+      <Comment>User's login string</Comment>
+    </Term>
+    <Term id="mysql.query">
+      <Type>longstring</Type>
+      <Comment>Query String</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

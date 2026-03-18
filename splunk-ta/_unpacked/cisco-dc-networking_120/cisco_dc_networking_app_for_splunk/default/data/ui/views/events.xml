@@ -1,0 +1,307 @@
+<form script="set_apic_token.js" stylesheet="table_decorations.css" version="1.1">
+  <label>Events</label>
+  <search id="baseSearch_tstats">
+    <query>| tstats `summariesonly` latest(Event.cause) AS "cause" latest(Event.severity) AS "severity" latest(Event.ind) AS "ind" latest(Event.user) AS "user" from datamodel=Cisco_DCN_Events groupby _time, Event.dn,Event.apic_host | rename Event.dn AS dn, Event.apic_host AS apic_host | reverse | dedup dn</query>
+    <earliest>$timetoken.earliest$</earliest>
+    <latest>$timetoken.latest$</latest>
+  </search>
+  <search id="baseSearch">
+    <query>|`event-logs-overview` | dedup dn</query>
+    <earliest>$timetoken.earliest$</earliest>
+    <latest>$timetoken.latest$</latest>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" searchWhenChanged="true" token="timetoken">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-4h@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Site/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$timetoken.earliest$</earliest>
+        <latest>$timetoken.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html id="overview">
+       <h1>Dashboard Overview</h1>
+       <p>This dashboard summarizes all of the events generated by APIC over the time period specified using the time picker. The pie charts for events generated are shown based on severity, cause and user.</p>
+     </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Events by Severity</title>
+        <search base="baseSearch">
+          <query>| search severity=* $formed_apic_host$ | stats count by severity</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <set token="eventsSeverity">$click.value$</set>
+          <unset token="eventsUser"></unset>
+          <unset token="eventsCause"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Events by Cause</title>
+        <search base="baseSearch">
+          <query>| search severity= * $formed_apic_host$  | stats count by cause</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <set token="eventsCause">$click.value$</set>
+          <unset token="eventsSeverity"></unset>
+          <unset token="eventsUser"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Events by User</title>
+        <search base="baseSearch">
+          <query>| search user= *  $formed_apic_host$ | stats count by user</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <set token="eventsUser">$click.value$</set>
+          <unset token="eventsSeverity"></unset>
+          <unset token="eventsCause"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$eventsSeverity$">
+        <title>Events by Severity Detail</title>
+        <search base="baseSearch_tstats">
+          <query>| search severity=$eventsSeverity$ $formed_apic_host$</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$eventsCause$">
+        <title>Events by Cause Detail</title>
+        <search base="baseSearch_tstats">
+          <query>| search severity= * $formed_apic_host$ cause=$eventsCause$</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$eventsUser$">
+        <title>Events by User Detail</title>
+        <search base="baseSearch_tstats">
+          <query>| search user=$eventsUser$  $formed_apic_host$</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Events Logs</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Event.created) AS "TimeStamp" values(Event.ind) AS Action values(Event.descr) AS Description latest(Event.id) AS "ID"  latest(Event.severity) AS Severity latest(Event.cause) AS "Cause" from datamodel=Cisco_DCN_Events groupby Event.dn, Event.user, Event.affected, Event.apic_host  | rename Event.user AS user, Event.affected AS "Affected Objects", Event.apic_host AS apic_host | search user=* $formed_apic_host$ | fields - Event.dn, apic_host | sort 0 TimeStamp | reverse | rename user AS User | table User, TimeStamp, "Affected Objects", Severity, Cause, Action, Description, ID</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Syslog Informational Event Details</title>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype="cisco:dc:aci:syslog" 
+| search code = "E*"
+| table event_time device_name_ip aci_node code lifecycle Severity DN Message
+| rename event_time AS "Event Time", lifecycle AS "Lifecycle State" DN as "Affected Object" device_name_ip as "Device IP/Name" code as "Event Code" aci_node as Node</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

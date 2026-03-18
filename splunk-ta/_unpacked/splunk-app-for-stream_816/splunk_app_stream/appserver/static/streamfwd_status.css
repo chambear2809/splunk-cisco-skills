@@ -1,0 +1,15 @@
+.icon-inline i {
+    font-size: 14px;
+}
+
+.icon-inline i.icon-alert-circle {
+    color: #ef392c;
+}
+
+.icon-inline i.icon-alert {
+    color: #ff9c1a;
+}
+
+.icon-inline i.icon-check {
+    color: #5fbb5e;
+}

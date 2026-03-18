@@ -1,0 +1,34 @@
+<script id="show-more-info-template" type="text/template">
+    <div class="modal-dialog modal-lg" id="show-more-info-modal">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h2><%- parentName %></h2>
+                <h4> Additional Info: <%- modalTitle %> (<%- additionalInfoList.length %>)</h4>
+            </div>
+
+            <div class="modal-body" id="show-info-modal-body">
+
+                <table class="table table-chrome table-hover">
+
+                    <tbody>
+                        <% for (var i = 0; i < additionalInfoList.length; i++) { %>
+                           <tr>
+                               <td>
+                                   <%- additionalInfoList[i] %>
+                               </td>
+                           </tr>
+                        <% } %>
+                    </tbody>
+
+                </table>
+
+            </div>
+
+            <div class="modal-footer">
+              <a href="#" id="ok" class="btn btn-primary">OK</a>
+            </div>
+
+        </div>
+    </div>
+</script>

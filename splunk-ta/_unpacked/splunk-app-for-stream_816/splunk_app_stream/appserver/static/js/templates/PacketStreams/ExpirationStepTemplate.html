@@ -1,0 +1,33 @@
+<% if (stepTitle !== '') { %>
+    <div class="step-subheading">
+        <%- stepTitle %>
+        <div class="step-subsubheading">
+            Stop capturing packets when any of the following happens.
+        </div>
+    </div>
+<% } else { %>
+    <div class="row search-wrapper">
+        <span>
+            Stop capturing packets when any of the following happens.
+        </span>
+    </div>
+    <br />
+<% } %>
+
+<div class="expiration-edit-controls">
+    <div class="expiration-form-controls form form-horizontal"></div>
+    <div class="expiration-dropdown btn-combo">
+        <a class="dropdown-toggle btn-pill" href="#">+ Add condition <span class="icon-chevron-down"></span></a>
+
+        <div class="dropdown-menu dropdown-menu-narrow">
+            <div class="arrow"></div>
+            <ul>
+                <li class="absolute-time"><a>Absolute Time</a></li>
+                <li class="elapsed-time"><a>Elapsed Time</a></li>
+                <li class="total-flows-captured"><a>Total Flows Captured</a></li>
+                <li class="total-packets-captured"><a>Total Packets Captured</a></li>
+                <li class="total-bytes-captured"><a>Total Bytes Captured</a></li>
+            </ul>
+        </div>
+    </div>
+</div>

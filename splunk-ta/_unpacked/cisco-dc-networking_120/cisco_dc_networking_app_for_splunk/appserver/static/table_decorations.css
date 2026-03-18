@@ -1,0 +1,334 @@
+
+#highlight tr.range-elevated td {
+    background-color: #ffc57a !important;
+}
+#highlight tr.range-severe td {
+    background-color: #ff3333 !important;
+}
+#highlight .table td {
+    border-top: 1px solid #fff;
+}
+#highlight td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#highlightone tr.range-elevated td {
+    background-color: #ffc57a !important;
+}
+#highlightone tr.range-severe td {
+    background-color: #ff3333 !important;
+}
+#highlightone .table td {
+    border-top: 1px solid #fff;
+}
+#highlightone td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#highlighttwo tr.range-elevated td {
+    background-color: #ffc57a !important;
+}
+#highlighttwo tr.range-severe td {
+    background-color: #ff3333 !important;
+}
+#highlighttwo .table td {
+    border-top: 1px solid #fff;
+}
+#highlighttwo td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#highlightthree tr.range-elevated td {
+    background-color: #ffc57a !important;
+}
+#highlightthree tr.range-severe td {
+    background-color: #ff3333 !important;
+}
+#highlightthree .table td {
+    border-top: 1px solid #fff;
+}
+#highlightthree td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#highlightfour tr.range-elevated td {
+    background-color: #ffc57d !important;
+}
+#highlightfour tr.range-severe td {
+    background-color: #ff3331 !important;
+}
+#highlightfour .table td {
+    border-top: 1px solid #fff;
+}
+#highlightfour td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+
+#highlightfive tr.range-elevated td {
+    background-color: #ffc57c !important;
+}
+#highlightfive tr.range-severe td {
+    background-color: #ff3332 !important;
+}
+#highlightfive .table td {
+    border-top: 1px solid #fff;
+}
+#highlightfive td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#highlightsix tr.range-elevated td {
+    background-color: #ffc57e !important;
+}
+#highlightsix tr.range-severe td {
+    background-color: #ff3335 !important;
+}
+#highlightsix .table td {
+    border-top: 1px solid #fff;
+}
+#highlightsix td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+
+
+
+.single-value .single-result {
+   font-weight: bold;
+}
+
+#overview {
+ height: 150px;
+}
+
+#tenant .single-result {
+  
+ position:relative;
+  top:5px;
+  left:-60px;
+}
+
+#application .single-result {
+  
+ position:relative;
+  top:5px;
+  left:-50px;
+}
+
+#VMs .single-result {
+
+ position:relative;
+  top:5px;
+  left:-70px;
+}
+
+#VMs {
+ position:relative;
+  left: 90px;
+}
+
+#leaf .single-result {
+  
+ position:relative;
+  top:5px;
+  left:-70px;
+}
+
+#spine .single-result {
+  
+ position:relative;
+  top:5px;
+  left:-60px;
+}
+
+#master1 tr.range-severe td {
+    background-color:  #ff3333  !important;
+}
+#master1 tr.range-elevated td {
+    
+    background-color: #ffc57a !important;
+}
+#master1 .table td {
+    border-top: 1px solid #fff;
+}
+#master1  td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#master1 tr td:first-child {
+    font-style: italic;
+    text-decoration: underline;
+}
+
+
+
+
+#master2 tr.range-severe td {
+    background-color: #ff3333  !important;
+}
+#master2 tr.range-elevated td {
+    
+    background-color: #ffc57a !important;
+}
+#master2 .table td {
+    border-top: 1px solid #fff;
+}
+#master2 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#master2 tr td:first-child {
+    font-style: italic;
+    text-decoration: underline;
+}
+
+
+
+#master99 tr.range-severe td {
+    background-color:  #ff3333  !important;
+}
+#master99 tr.range-elevated td {
+
+    background-color: #ffc57a !important;
+}
+#master99 .table td {
+    border-top: 1px solid #fff;
+}
+#master99  td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#master99 tr td:first-child {
+    font-style: italic;
+    text-decoration: underline;
+}
+
+
+
+
+
+
+
+#detail1 tr.range-severe td {
+    background-color:  #ff3332  !important;
+}
+#detail1 tr.range-elevated td { 
+    background-color: #ffc57c !important;
+}
+#detail1 .table td {
+    border-top: 1px solid #fff;
+}
+#detail1  td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#detail2 tr.range-severe td {
+    background-color:  #ff3334 !important;
+}
+#detail2 tr.range-elevated td { 
+    background-color: #ffc57b !important;
+}
+#detail2 .table td {
+    border-top: 1px solid #fff;
+}
+#detail2 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#detail3 tr.range-severe td {
+    background-color:  #ff3333  !important;
+}
+#detail3 tr.range-elevated td {
+    background-color: #ffc57a !important;
+}
+#detail3 .table td {
+    border-top: 1px solid #fff;
+}
+#detail3 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#detail4 tr.range-severe td {
+    background-color:  #ff3333  !important;
+}
+#detail4 tr.range-elevated td {
+    background-color: #ffc57a !important;
+}
+#detail4 .table td {
+    border-top: 1px solid #fff;
+}
+#detail4 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#detail5 tr.range-severe td {
+    background-color:  #ff3333 !important;
+}
+#detail5 tr.range-elevated td {
+    background-color: #ffc57a !important;
+}
+#detail5 .table td {
+    border-top: 1px solid #fff;
+}
+#detail5 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#detail6 tr.range-severe td {
+    background-color:  #ff3333  !important;
+}
+#detail6 tr.range-elevated td {
+    background-color: #ffc57a !important;
+}
+#detail6 .table td {
+    border-top: 1px solid #fff;
+}
+#detail6 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#detail7 tr.range-severe td {
+    background-color:  #ff3333 !important;
+}
+#detail7 tr.range-elevated td { 
+    background-color: #ffc57a !important;
+}
+#detail7 .table td {
+    border-top: 1px solid #fff;
+}
+#detail7 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#detail8 tr.range-severe td {
+    background-color:  #ff3333 !important;
+}
+#detail8 tr.range-elevated td { 
+    background-color: #ffc57a !important;
+}
+#detail8 .table td {
+    border-top: 1px solid #fff;
+}
+#detail8 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+#detail9 tr.range-severe td {
+    background-color:  #ff3333 !important;
+}
+#detail9 tr.range-elevated td { 
+    background-color: #ffc57a !important;
+}
+#detail9 .table td {
+    border-top: 1px solid #fff;
+}
+#detail9 td.range-severe, td.range-elevated {
+    font-weight: bold;
+}
+
+/*To hide real time from time picker */
+div[id^='realtime_view'] {
+     display: none;
+}
+

@@ -1,0 +1,25 @@
+[default]
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.skin = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.showConnectors = <boolean>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.showCheckbox = <boolean>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.showIcons = <boolean>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.selectMode = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.fontSize = <int>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.accordionMode = <boolean>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.accordionModeBgColor = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.accordionModeTextColor = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.autoCollapse = <boolean>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.accordionMinWidth = <int>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.showFoldersFirst = <boolean>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.sortBy = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.sortMethod = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.tokenLabel = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.tokenParentId = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.tokenId = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.tokenValuePrefix = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.tokenValueSuffix = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.tokenPrefix = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.tokenSuffix = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.tokenDelimiter = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.initialState = <string>
+display.visualizations.custom.Splunk_TA_Cisco_Intersight.treeview-viz.defaultSelection = <boolean>

@@ -1,0 +1,129 @@
+<script id="new-forwarder-modal-template" type="text/template">
+    <div id="modify-fwd-streams-modal">
+
+        <!-- ====== -->
+        <!-- Header -->
+        <!-- ====== -->
+        <div class="modal-header">
+            <h3 class="modal-tital">
+                Select/De-select Streams in Forwarder Group: <%- fwdGroup.id %>
+            </h3>
+        </div>
+
+        <!-- ==== -->
+        <!-- Body -->
+        <!-- ==== -->
+        <div class="modal-content">
+
+            <div class="modal-body">
+                <div class="container-fluid" id="modify-fwd-streams-modal-body">
+
+                     <div id="modify-fwd-streams-search">
+
+                        <!-- ============ -->
+                        <!-- All/Selected -->
+                        <!-- ============ -->
+                        <span class="btn-group btn-group-radio btn-toggle" id="all-selected-toggle">
+
+                            <button type="button"
+                                    class="btn btn-lg active"
+                                    value="all">
+                                    All
+                            </button>
+
+                            <button type="button"
+                                    class="btn btn-lg"
+                                    value="selected">
+                                    Selected (<span id="selected-count"><%- fwdGroupStreams.length %></span>)
+                            </button>
+
+                        </span>
+
+                         <!-- ====== -->
+                         <!-- Search -->
+                         <!-- ====== -->
+                         <span class="table-search">
+                             <input type="text"
+                                    placeholder="Search"
+                                    class="input-medium search-query"
+                                    id="modify-fwd-streams-input"
+                                    value=""/>
+                             <a class="clear"><i class="icon-x-circle"></i></a>
+                         </span>
+
+                     </div>
+
+
+                     <!-- ===== -->
+                     <!-- Table -->
+                     <!-- ===== -->
+                     <table class="table table-chrome table-hover" id="modify-fwd-streams-table">
+
+                         <thead>
+                             <tr>
+                                 <th style="width:1%">
+                                    <input class="field-status regular-checkbox check-all" type="checkbox"/>
+                                 </th>
+                                 <th style="width:15%">
+                                    ID
+                                 </th>
+                                 <th style="width:30%">
+                                    Description
+                                 </th>
+                                 <th style="width:44%">
+                                    Forwarder Groups
+                                 </th>
+                             </tr>
+                         </thead>
+
+                         <tbody>
+                            <% for (var i = 0; i < streams.length; i++) { %>
+                             <tr class="mod-fwd-group-stream" data-id="<%-streams[i].id%>">
+                                 <td>
+                                    <input class="stream-select regular-checkbox"
+                                           <% if (_.contains(fwdGroupStreams, streams[i].id)) { %>
+                                            checked
+                                           <% } %>
+                                           type="checkbox"/>
+                                 </td>
+                                 <td class='no-wrap'>
+                                    <a  target="_blank"
+                                        href="http://localhost:8000/en-US/app/splunk_app_stream/streams#streamConfig/<%- streams[i].id %>">
+                                            <%- streams[i].id %>
+                                    </a>
+                                 </td>
+                                 <td><%- streams[i].name %></td>
+                                 <td>
+                                     <% for (var j = 0; j < streams[i].fwdGroupsPresentIn.length; j++) { %>
+                                        <span>
+                                            <%- streams[i].fwdGroupsPresentIn[j] %>
+                                        </span>
+                                        <!-- conditional comma -->
+                                        <% if (j !== streams[i].fwdGroupsPresentIn.length-1) { %> , <% } %>
+                                     <% } %>
+                                 </td>
+                             </tr>
+                            <% } %>
+                         </tbody>
+
+                     </table>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== -->
+        <!-- Footer -->
+        <!-- ====== -->
+        <div class="modal-footer">
+            <a href="#" data-dismiss="modal" aria-hidden="true" class="btn secondary cancel">Cancel</a>
+            <% if (isWizard) { %>
+                <a href="#" id="btnYes" class="btn btn-primary back"> < Back </a>
+                <a href="#" id="btnSave" class="btn btn-primary finish">Finish</a>
+            <% } else { %>
+                <a href="#" id="btnSave" class="btn btn-primary save">Save</a>
+            <% } %>
+        </div>
+
+    </div>
+</script>

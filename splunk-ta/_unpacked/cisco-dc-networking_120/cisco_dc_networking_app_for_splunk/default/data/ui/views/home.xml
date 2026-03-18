@@ -1,0 +1,200 @@
+<form version="1.1">
+  <label>Home</label>
+  <search id="baseSearch">
+    <query>`home_page_details_nexus_9k`</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Range</label>
+      <default>
+        <earliest>-60m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="device" searchWhenChanged="true">
+      <label>Device</label>
+      <choice value="*">All</choice>
+      <search>
+        <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog | lookup cisco_dc_nexus_hostname_lookup device AS host OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as host OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | eval hostAndHostname = hostname."(".host.")" | stats count by host,hostAndHostname | rename hostAndHostname as hostname | table host hostname</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <default>*</default>
+      <fieldForLabel>hostname</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+    </input>
+    <input type="dropdown" token="severity" searchWhenChanged="true">
+      <label>Severity</label>
+      <choice value="*">All</choice>
+      <search>
+        <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog | lookup cisco_dc_nexus_hostname_lookup device AS host OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as host OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | lookup cisco_dc_nexus_severity_lookup severity_id AS severity_id OUTPUT severity_name AS severity_name |  stats count by host,severity_name   | rename severity_name as severity | search host=$device$| dedup severity | fields severity</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>severity</fieldForLabel>
+      <fieldForValue>severity</fieldForValue>
+      <default>*</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html id="overview">
+      <h1>Dashboard Overview</h1>
+      <p>This dashboard summarizes all syslogs coming from nexus Switches. The severity level and Device can be filtered such that less-important syslogs are not shown.<br/> It gives you visibility into most chatty hosts, critical events and Top/Rare mnemonics( reasons ) of syslogs.</p>
+    </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Device Info</title>
+        <search>
+          <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog 
+| lookup cisco_dc_nexus_severity_lookup severity_id as severity_id OUTPUT severity_name as severity_name 
+| search severity_name=$severity$ 
+| chart count by host,severity_name 
+| join type=inner host 
+    [ search `cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog
+    | lookup cisco_dc_nexus_hostname_lookup device AS host OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as host OUTPUT hostname as hostname2 | eval hostnameLookup = coalesce(hostname1, hostname2) 
+    | stats latest(hostnameLookup) AS Hostname by host] 
+| fields Hostname host * 
+| rename host as Host 
+| search Host=$device$ 
+| fields - NULL</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="count">5</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+    <panel>
+      <chart>
+        <title>Top reporting hosts by time</title>
+        <search>
+          <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog | lookup cisco_dc_nexus_severity_lookup severity_id as severity_id OUTPUT severity_name as severity_name | search severity_name=$severity$ | timechart count by host |  rename host as device | fields _time $device$</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleY.text">Count of Event</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisEnd</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Syslog severity distribution</title>
+        <search base="baseSearch">
+          <query>| search device=$device$  severity=$severity$| stats values(device) as host,sum(Count of Severity) AS "Count of Severity" by severity | fields  severity "Count of Severity"</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/severity_level_drilldown?severity=%22$click.value$%22&amp;earliest=$time_token.earliest$&amp;latest=$time_token.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Top mnemonics</title>
+        <search base="baseSearch">
+          <query>search device=$device$ severity=$severity$ | stats sum(Count of Severity) AS "Count of Events" by mnemonic | sort 0 "Count of Events" | reverse | head 10</query>
+        </search>
+        <option name="charting.axisLabelsY.majorUnit">1</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/mnemonics_drilldown?mnemonics=%22$click.value$%22&amp;earliest=$time_token.earliest$&amp;latest=$time_token.latest$</link>
+        </drilldown>
+      </chart>
+      <chart>
+        <title>Rare mnemonics</title>
+        <search base="baseSearch">
+          <query>search device=$device$ severity=$severity$ | stats sum(Count of Severity) AS "Count of Events" by mnemonic | sort 0 "Count of Events"| head 10</query>
+        </search>
+        <option name="charting.axisLabelsY.majorUnit">1</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/mnemonics_drilldown?mnemonics=%22$click.value$%22&amp;earliest=$time_token.earliest$&amp;latest=$time_token.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Top mnemonics by time</title>
+        <search base="baseSearch">
+          <query>search device=$device$ severity=$severity$| timechart count by mnemonic</query>
+        </search>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisTitleY.text">Count of Event</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+      </chart>
+    </panel>
+  </row>
+</form>

@@ -1,0 +1,473 @@
+code,description,Recommended Action
+F0884,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object
+F1429,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1259,This fault occurs when policy manager fails to activate a management rule due to software programming failure,"1.Look at any configuration issues 2.Verify the configuration is correct/complete  3.If the above are fine,remove unsued rules and retry"
+F1404,This fault occurs when policy manager fails to activate a prefix entry due to either hardware or software programming failure,"1.Look at any configuration issues  2.Verify the configuration is correct/complete  3.If the above are fine,remove unsued rules and retry"
+F0852,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1203,This fault occurs when policy manager fails to activate a rule due to hardware programming failure,"1.Look at any configuration issues  2.Verify the configuration is correct/complete  3.If the above are fine,remove unsued rules and retry"
+F1207,This fault occurs when the operational state of the arp adjacency is down,1.Look at any configuration issues 2.Verify the configuration is correct/complete.  3.Ensure the port is up on which ARP is configured
+F1213,This fault occurs when the bgp instance memory alert is critical,"1.Look at any configuration issues  2.Verify the configuration is correct/complete  3.Reduce the number of peers in bgp configuration  4.Reduce the number of prefixes exported into bgp  5.If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC"
+F1214,This fault occurs when a non-spine node is marked as a bgp route reflector,"If you see this fault,check remove the RRNodePEp policy and choose another node,which is a spine"
+F0853,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1332,Make sure that referenced object exists and the name is spelled correctly in the relation object.,"Verify destination information is correct. Ensure it is reachable (ping/ssh) from the fabric and DNS entries have been configured correctly. If the above action did not resolve the issue,contact Cisco TAC."
+F0856,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0855,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0854,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0857,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1388,This fault occurs when the native vlan mismatch happens with the value sent by the neighbor,"Look at native vlan configuration on the node and the peer for mismatch If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1389,This fault occurs when the native vlan is locally configured but the neighbor does not send native vlan info,"Look at native vlan configuration on the node and the make sure the peer matches it If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1390,This fault occurs when the native vlan mismatch happens with the value sent by the neighbor (host),"Look at native vlan configuration on the node and the peer for mismatch If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1391,This fault occurs when the native vlan mismatch happens with the value sent by the neighbor,"Look at native vlan configuration on the node and the peer for mismatch If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0104,This fault occurs when a bond interface is in link-down state,"Verify that the physical links in the bonds are properly connected between the physical interface and the peer component. If the above action did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0103,This fault occurs when a physical interface on a controller is in link-down state.,"Verify that the physical link is properly connected between the physical interface and the peer component. If the above action did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F1399,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0130,This fault is raised when the VMM Controller is marked offline. Recovery is in process,"Verify that there is network connectivity to VMM Controller. Verify that the user credentials to VMM Controller are correct. If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0132,This fault is raised when Remote or External disruptive operations on VMM Controller is detected.,"To restore,delete and re-Add the Controller. If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0133,This fault is raised when we failed to deploy the Controller with config supplied.,"Try to delete and re-Add the policy. If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F16438,This fault is raised when Get Controller Time Stage fails.,Please collect tech-support file and contact Cisco TAC
+F0135,This fault is raised when remote or external disruptive EPG operations are performed in VMM controller.,"restore EPG to the original state in the controller. If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1313,This fault is raised when remote or external disruptive operations are performed on Host Physical NIC in VMM controller.,"restore the NIC to the original state. If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1373,This fault is raised when the endpoint group cannot be deployed on a controller due to a missing or invalid configuration.,"Review the faults on the associated controller. Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0859,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0860,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0861,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0862,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0053,This fault occurs when a configuration backup/restore job fails,"If you see this fault,check the policy and remote path configuration"
+F0863,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0864,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0865,This fault occurs when a configuration backup/restore job fails,"If you see this fault,check the policy and remote path configuration"
+F1360,This fault occurs when the operational state of the coop adjacency is down,"Look at any configuration issues Look at any connectivity issues If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0256,This fault occurs when the coop domain has inconsistent configuration in the council,Look at any configuration issues Verify the configuration is correct/complete
+F0052,This fault occurs when too many excess packets are detected by atomic counters,"If you see this fault,check the network configuration for the tenant"
+F0051,This fault occurs when too many packet drops are detected by atomic counters,"If you see this fault,check the network configuration for the tenant"
+F1421,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0874,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0868,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1348,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1346,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0875,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0873,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0876,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0878,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0867,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0870,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1349,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1345,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1347,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0879,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0871,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0869,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0872,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0050,This fault occurs when export operation for techsupport or core files did not succeed.,"look at techsupport status and figure out which IFC/node is erroring out. Verify the destination it is trying to export data to is healthy/reachable If the above action did not resolve the issue,contact Cisco TAC."
+F0881,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0882,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0883,This fault occurs when export operation for techsupport or core files did not succeed.,"look at tech support status and figure out which IFC/node is erroring out. Verify the destination it is trying to export data to is healthy/reachable If the above action did not resolve the issue,contact Cisco TAC."
+F0880,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0341,This fault occurs when the operational state of the dhcp client interface changes to failed state,"Check the network connectivity between APIC controller and the node Try rebooting the switch using CLI or GUI. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0080,This fault is raised when Dhcp server runs out of IP address to allocate to client,"Create policy to increase Pool size . If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0885,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0887,This fault occurs when the operational state of the dhcp client interface changes to failed state,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0886,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0889,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0471,This fault occurs when a Asic on a card sees a fatal failure during runtime,"The fault indicates faulty Asic,so the card should be RMA'ed."
+F0414,This fault occurs when a card sees a fatal error during runtime. Th card is put in a fail state and cannot be put back in operation,"If a card is found in fail state,then the card has to be RMA'ed"
+F0415,This fault typically occurs when the SUP is inserted in the wrong slot,"Insert the SUP in the correct slot If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F0416,This fault typically occurs when a card with an unknown card id is inserted in the chassis,"Remove the card from the chassis Fix the software card index to one of the known types If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F1322,This fault occurs when a fan fails,"Check the fan tray to see if it is still fully operational; if not,replace it If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F1321,This fault occurs when a fan fails,"Check the fan tray to see if it is still fully operational; if not,replace it If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F1323,This fault occurs when a fan tray is missing,"Insert the fan tray If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F1317,This fault occurs when there is a single power supply in the chassis or there are mismatchd power supplies in the chassis,"Add more power supplies Remove mismatched power supplies If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F1318,This fault occurs when PSU are not detected correctly,"Properly seat the power supplies Remove mismatched power supplies If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F0411,This fault occurs when psu is failed,"Properly seat the power supplies Remove mismatched power supplies If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F0412,This fault occurs when psu is failed or shut down,"Replace the power supply unit If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F1319,This fault occurs when inputs to power supply are not pluggd in,"Connect the inputs to the power supplies Remove the power supply If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC"
+F0449,This fault usually occurs if sensor fails,"replace the card If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0440,This fault usually occurs if the backplane sprom is corrupted,"Fix the sprom contents If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0101,This fault occurs when a storage unit fails on a controller,"replace the storage unit that failed If the above action did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0102,This fault occurs when storage capacity utilization is greater than 85%,"replace the storage unit that is full cleanup the storage unit that has faulted If the above action did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0404,This fault occurs when a on-demand diagnostic test subject is not accessible.,
+F0403,This fault occurs when a on-demand diagnostic test is not supported.,
+F1222,This fault occurs when a diagnostic test fails,"The failed diagnostic test isolates the error to a port,card(FRU) or the entire switch. For port-level errors,the port are put in disabled state. For card or switch level errors,the component has to be RMA'ed."
+F0402,This fault occurs when a diagnostic test subject is not accessible.,
+F0401,This fault occurs when a diagnostic test is not supported.,
+F0687,This fault is raised when the node on which the diagnostics policy is configured to run is not found in the fabric.,"Verify that the policy for diagnostics is applied to the correct node. Check the node id in the target DN (tDn) property Review the fault message and add the missing node or fix the configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0890,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0686,This fault is raised when the node on which the diagnostics policy is configured to run is not found in the fabric.,"Verify that the policy for diagnostics is applied to the correct node. Check the node id in the target DN (tDn) property Review the fault message and add the missing node or fix the configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0891,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0682,This fault is raised when the node on which the diagnostics policy is configured to run is not found in the fabric,"Verify that the policy for diagnostics is applied to the correct node. Check the node id in the target DN (tDn) property Review the fault message and add the missing node or fix the configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0892,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0685,This fault is raised when the node on which the diagnostics policy is configured to run is not found in the fabric.,"Verify that the policy for diagnostics is applied to the correct node. Check the node id in the target DN (tDn) property Review the fault message and add the missing node or fix the configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0893,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0681,This fault is raised when the node on which the diagnostics policy is configured to run is not found in the fabric.,"Verify that the policy for diagnostics is applied to the correct node. Check the node id in the target DN (tDn) property Review the fault message and add the missing node or fix the configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0894,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0683,This fault is raised when the node on which the diagnostics policy is configured to run is not found in the fabric.,"Verify that the policy for diagnostics is applied to the correct node. Check the node id in the target DN (tDn) property Review the fault message and add the missing node or fix the configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0895,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0684,This fault is raised when the node on which the diagnostics policy is configured to run is not found in the fabric.,"Verify that the policy for diagnostics is applied to the correct node. Check the node id in the target DN (tDn) property Review the fault message and add the missing node or fix the configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0896,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1394,This fault occurs when a port is unconnected and is in use for fabric,Check the port connectivity Administratively shut the port if the port is not in use
+F0532,This fault occurs when a port is unconnected and is in use for infra and epg,Check the port connectivity Remove the configuration or administratively shut the port if the port is not in use
+F0543,This fault occurs when a port is unconnected and is in use for infra and no epg,Check the port connectivity Remove the configuration or administratively shut the port if the port is not in use
+F0546,This fault occurs when a port is unconnected and is not in use for infra,Check the port connectivity Remove the configuration or administratively shut the port if the port is not in use
+F1299,A selector has been created. All policies in the corresponding policy group should be deployed on all node in that selector. Fault has been raised because those level policies have not been pushed to one or more nodes.,"If you see this fault take the following actions - Verify that corresponding node is ready to recieve policies - Verify that corresponding node is capable of handling those selector level policies - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1239,This fault occurs when a link state is not ok,"check if connectivity between the nodes for the link is ok If the above action did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0111,This fault occurs when operational issues are detected on a LooseNode (Unmanaged switch),"check and reestablish LooseNode connectivity to Leaf Node If the above action did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0110,This fault occurs when a node is not reachable,"check connectivity for the node that is not reachable check if the node is powered up If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0749,This fault is raised when one VPc policy is created but it has not been deployed yet (user might be doing pre-config). and one of the following conditions is true: 1) At least one of the nodes that are part of the VPc is not ready 2) At least one of the nodes ip address is unknwon 3) One of the node that is part of the VPc is already paired with another node (each node can be part of one VPc only) 4) One of the node is not a leaf (VPc can be created only between two leafs) 5) Virtual Ip address has been not allocated yet 6) Logical Pair Id has not been allocated yet,"If you see this fault take the following actions: - Verify that corresponding nodes are ready - Verify that corresponding nodes are leaf - Verify that node is node already part of another protection group - Verify in case of fabricExplicitGEp that pair id is set - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0750,This fault is raised when one VPc policy has been pushed to the nodes and after that one of the following conditions is true: 1) One of the node that is part of the VPc is not ready 2) Node ip address is unknwon 3) One of the node re-appears in the fabric but it is not a leaf (VPc can be created only between two leafs),": If you see this fault take the following actions: - Verify that corresponding nodes are ready - Verify that corresponding nodes are leaf - Verify that node is node already part of another protection group - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0751,This fault is raised when: VPc was deployed but now both of the nodes that are part of the VPc are not ready to receive policies anymore,"If you see this fault take the following actions: - Verify that corresponding nodes are ready - Verify that corresponding nodes are leaf - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0904,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0905,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1241,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0906,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0898,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0919,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0907,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0908,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0916,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0913,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0918,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0917,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0909,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0903,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0899,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0897,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0900,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1300,fabricNodeGrp has been created. All policies target by policy group should be deployed on all node in that group. Fault has been raised because those policies have not been pushed to this node.,"If you see this fault take the following actions - Verify that corresponding node is ready to recieve policies - Verify that corresponding node is capable of handling those fabric node group level policies - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0901,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0925,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0921,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0922,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0923,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0902,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0924,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0943,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0940,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0945,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0944,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0927,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0920,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0926,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1353,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0058,This fault occurs when a firmware download fails,"check if the firmware source is reachable and firmware file is valid If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0946,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0523,This fault occurs when EPg is incompletely / incorrectly configured.,"Look at configIssues Verify the configuration is correct / complete If the above action did not resolve the issue,contact Cisco TAC."
+F1386,This fault occurs when the arp flood knob is not set and unknown mac unicast is flooded,"Set the arp flood knob for this BD If the above action did not resolve the issue,contact Cisco TAC"
+F1298,This fault occurs when deliverying EPg policies to a node failed,"If you see this fault,take the following actions: - Verify node is reachable; - Verify node can deploy this type of ATg (spine can deploy only mgmt EPg If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0954,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0957,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0958,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0959,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0976,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0977,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0947,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0948,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0949,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0955,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0950,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0951,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0960,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0967,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0970,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0952,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0962,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0965,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0963,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0971,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0956,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0966,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0953,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0964,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0973,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0974,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0979,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0978,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0980,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0524,This fault occurs when fvStCEp is incompletely configured.,"Specify on which path StCEp is present If the above action did not resolve the issue,contact Cisco TAC."
+F0721,This fault is raised when Namespace cannot be deployed due to a missing or invalid configuration.,"Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1340,This fault is raised when Multicast Address Namespace cannot be deployed due to a missing or invalid configuration.,"Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0134,This fault is raised when External unmanaged switch has Config issues susch as missing Management IP config.,"Configure Management IP address on the switch and ensure that LLDP is enabled to advertise it If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0345,This fault occurs when the igmp snooping fabric learning is disabled,"Reduce the number of multicast groups in the fabric If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0344,This fault occurs when the igmp snooping local learning is disabled,"Reduce the number of multicast groups in the network behind the leaf node If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0701,This fault is raised when the domain cannot be deployed due to a missing or invalid configuration.,"Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0700,This fault is raised when the Function cannot be deployed due to a missing or invalid configuration.,"Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1233,This fault is raised when both Cdp and Lldp policies are configured for the same AttachedEntityProfile.,"Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1410,This fault occurs when cluster operational size cannot reach its target size.,Consider the reasons as to why cluster geometry has stopped and take appropriate corrective actions
+F0699,Connectivity Selector has been created. All corresponding port/fex connectivity policies policies should get deployed on all node in that selector. Fault has been raised because those policies have not been pushed to this node.,"If you see this fault take the following actions - Verify that corresponding node is ready to recieve policies - Verify that corresponding node is capable of handling those connectivity selector policy - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC"
+F1370,This fault occurs when messages from an illegitimate controller arrive for periodically.,Consider the reasons as to why cluster perceives the source of the message as illegitimate controller and take appropriate corrective actions
+F0325,This fault occurs when controller reports lost connectivity to leader replica for some data subsets of a service. Service cannot process requests in this state.,"Check cluster connectivity. Are all expected controllers reported available in cluster? If not,is the reported cluster configuration stable or changes from query to query? Are there frequent brief interruptions of availability between controllers,or rarer prolonged unavailability periods? If controllers are available check if the service is running in all controllers. Report any process crash and cores."
+F0310,This fault occurs when controller reports a data subset for a given service to be corrupted.,Check for disk errors. Check error log files for additional information.
+F0317,This fault occurs when controller reports a data subset for a given service to be corrupted.,Check for disk errors. Check error log files for additional information.
+F0309,This fault occurs when controller reports a data subset for a given service to be dysfunctional.,"Check cluster connectivity. Are all expected controllers reported avaialable in cluster? If not,is the reported cluster configuration stable or changes from quiry to quiry? Are missing controllers(if any) sustainably reachable from controllers remaining available in the cluster by means of operating system? Are there reported statistical faults related to cluster availablitlity? What is the nature of these faults? Are there frequent brief interruptions of avaialability between controllers,or rarer prolonged unavailability periods?"
+F1011,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1015,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1013,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1012,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1014,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0989,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1007,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0990,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1008,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1009,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1003,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1258,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0982,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0991,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1010,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0698,Access Interface Selector has been created. All policies in the corresponding interface policy group should get deployed on all node in that selector. Fault has been raised because those node level policies have not been pushed to this node.,"If you see this fault take the following actions - Verify that corresponding node is ready to recieve policies - Verify that corresponding node is capable of handling those access interface level policies - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0992,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0984,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0983,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0993,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0697,Access Module Selector has been created. All policies in the corresponding module policy group should get deployed on all node in that selector. Fault has been raised because those node level policies have not been pushed to this node.,"If you see this fault take the following actions - Verify that corresponding node is ready to recieve policies - Verify that corresponding node is capable of handling those access module level policies - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1236,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0994,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0988,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0998,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0999,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0696,Access Node Selector has been created. All policies in the corresponding node policy group should get deployed on all node in that node selecotor. Fault has been raised because those node level policies have not been pushed to this node.,"If you see this fault take the following actions - Verify that corresponding node is ready to recieve policies - Verify that corresponding node is capable of handling those access node level policies - If the above conditions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1004,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1005,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1006,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0995,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0996,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0997,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1427,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0981,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0323,This fault occurs when controller reports lost connectivity to leader replica for some data subsets of specific service. Service cannot process request in this state.,"Check cluster connectivity. Are all expected controllers reported available in cluster? If not,is the reported cluster configuration stable or changes from query to query? Are there frequent brief interruptions of availability between controllers,or rarer prolonged unavailability periods? If controllers are available check if the service is running in all controllers. Report any process crash and cores."
+F1262,This fault occurs when controller reports some services do not have optimal leaders for some of the shards.,Check that you are running with atleast 3 IFCs and all the IFCs are reported available in cluster.
+F0321,This fault occurs when controller reports data layer to be out of fully functional state.,"Check cluster connectivity. Are all expected controllers reported avaialable in cluster? If not,is the reported cluster configuration stable or changes from quiry to quiry? Are missing controllers(if any) sustainably reachable from controllers remaining available in the cluster by means of operating system? Are there reported statistical faults related to cluster availablitlity? What is the nature of these faults? Are there frequent brief interruptions of avaialability between controllers,or rarer prolonged unavailability periods? Check if all services are up and check for process crash / cores."
+F1425,This fault occurs when the operational state of the ipv4 address state is changed to subnet-overlap/no primary/addr already confgd as next hop in a static route,Look at any configuration issues Verify the configuration is correct/complete
+F0381,This fault usually occurs when protocol bring up on a VRF fails.,"Try shutting down and restarting the ISIS instance. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0379,This fault usually occurs when process does not continue normally after a sequence number wrap.,"Try shutting down and restarting the ISIS instance. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0382,This fault usually occurs when route-updates to/from unicast-routing-info-base fails.,"Try shutting down and restarting the ISIS instance. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0360,This event occurs when the oper state of a Mcast tree changes to inactive.,
+F0361,This event occurs when the tree diameter of a Mcast tree is deemed large.,
+F0391,This fault usually occurs when ISIS interface specific initaliztion fails.,"Try shutting down and restarting the ISIS instance. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0394,This fault usually occurs when ISIS interface specific protocol handling fails,"Try shutting down and restarting the ISIS instance. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0396,This fault usually occurs when ISIS detects duplicate system Id in the network.,"Please change the""net""configured for this ISIS instance or on the peer-system."
+F0395,This fault usually occurs when ISIS High-Availability recovery fails.,System will continue in grace-ful switchover or cold-start mode as fallback mode. Please generate the show tech-support file and contact Cisco TAC if the condition persists.
+F0378,,"Try shutting down and restarting the ISIS instance. If the above does not work try rebooting the switch. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0377,This fault occurs when the isis instance memory alert is critical,
+F0387,This fault usually occurs when inter-process communication error happens.,"Try shutting down and restarting the ISIS instance. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1016,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1197,This fault occurs when the ep learning is disabled,"Check network connectivity for stp flaps If the network connectivity is fine,generate the show tech-support file and contact Cisco TAC."
+F1364,This fault occurs when the arp flood knob is not set in bridge only mode,"Set the arp flood knob for this BD If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1342,This fault occurs when configuration on vlan fails,Please verify the configuration.
+F1017,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1018,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1020,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1021,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1019,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1022,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0350,This fault occurs when multiple neighbors are discovered on the interface,
+F0351,This fault occurs when the port vlan mismatch happens with the value sent by the neighbor,"Look at native vlan configuration on the node and the peer for mismatch If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1372,This fault occurs when the port vlan is locally configured but the neighbor does not send port vlan info,"Look at native vlan configuration on the node and the make sure the peer matches it If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1392,This fault occurs when the port vlan mismatch happens with the value sent by the neighbor (host),"Look at native vlan configuration on the node and the peer for mismatch If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1393,This fault occurs when the port vlan is locally configured but the neighbor (host) does not send port vlan info,"Look at native vlan configuration on the node and the make sure the peer matches it If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1023,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1024,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1025,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1026,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1434,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0131,This fault occurs when software upgrade fails on a fabric node,"Reboot node and retry installation via policy Reboot node and retry installation via command line interface If above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F0105,This fault occurs when software upgrade fails on a controller,"Reboot node and retry installation via policy Reboot node and retry installation via command line interface If above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F1433,This fault occurs when upgrade is paused due to cluster not being healthy,"Debug why the cluster is not healthy. Once you have fixed the reason,then the fault will clear automatically upon next upgrade If the above action did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F1432,This fault occurs when upgrade is paused on a group due to one or more members of the group fail to be upgraded and the maintenance policy specifies pauseOnFailure,"Debug why the upgrade failed. Once you have fixed the reason,then unpause the scheduler on this maintenance group using UI/API If the above action did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F1027,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1031,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1029,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1400,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1028,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1030,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1397,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1032,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1033,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1297,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0214,This fault is raised when there is an issue with respect to the openflex device,"To restore,delete and re-Add the openflex device. If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1385,This fault occurs when the adjacency state is not up,"Look at any configuration issues Verify the configuration is correct/complete Check network connectivity to the peer If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0338,This fault occurs when the ospf instance memory alert is critical,"Look at any configuration issues Verify the configuration is correct/complete Reduce the number of ospf enabled interfaces Reduce the number of routes into ospf If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1034,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0601,This fault occurs when port goes to hot standby.,
+F0602,This fault occurs when hot standby port goes down.,
+F0603,This fault occurs when port becomes operationally individual.,Please verify the configuration on both ends of the port-channel.
+F0604,This fault occurs when individual port goes down.,
+F0600,This fault occurs when port has been suspended by LACP.,Please verify the configuration on both ends of the port-channel.
+F1371,This fault occurs when deployment of policy fails.,Check network connectivity
+F0756,This fault occurs when a named relation cannot be resolved to the specified target.,"Verify the configuration is correct / complete and that a target with the specified name exists If the above action did not resolve the issue,contact Cisco TAC."
+F0888,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1419,This fault occurs when a DME dies on a IFC,"If the above actions did not resolve the issue,create a show tech-support file and contact Cisco TAC."
+F1194,This fault occurs when qos manager fails to activate a class due to hardware programming failure,"Look at any configuration issues Verify the configuration is correct/complete Delete the qos class and add it back If the above actions did not resolve the issue,try rebooting the switch using CLI or GUI. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1196,This fault occurs when qos manager fails to activate a dot1p rule due to hardware programming failure,Look at any configuration issues Verify the configuration is correct/complete Reduce the number of rules and retry
+F1195,This fault occurs when qos manager fails to activate a dscp rule due to hardware programming failure,Look at any configuration issues Verify the configuration is correct/complete Reduce the number of rules and retry
+F1035,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1036,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1037,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1038,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1362,This fault occurs when there is an incompatibility between the leaf and the attached FEX,
+F1368,This fault occurs when snmp client security programming fails,"Look at any configuration issues Verify the configuration is correct/complete If the above are fine,please retry"
+F1301,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1040,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1369,This fault occurs when snmp user programming fails,"Look at any configuration issues Verify the configuration is correct/complete If the above are fine,please retry"
+F1411,This fault is raised when the an individual src related configuration issues.,"Verify that thedest related configuration is correct. Review the fault message and add missing configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1328,This fault is raised when the a src related configuration issues.,"Verify that thedest related configuration is correct. Review the fault message and add missing configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0571,This fault is raised when the number of span sessions deployed exceeds the maximum number allowed .,"Verify that the number of span sessions deployed is less than the maximum number allowed Review the fault message and add missing configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1316,This fault is raised when the a dest related configuration issues.,"Verify that thedest related configuration is correct. Review the fault message and add missing configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1201,This fault occurs when span destination goes to failed state,Look at any configuration issues Verify the configuration is correct/complete Reduce the number of span sessions and retry
+F0671,This fault is raised when the span policy failed to get deployed.,"Verify that the Epg in the relation's target DN is valid and presen. Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1041,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0569,This fault is raised when the span policy failed to get deployed,"Verify that the PathEp in the relation's target DN contains local ports in the node where SrcGroup resides Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1042,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1048,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1435,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0570,This fault is raised when the span policy failed to get deployed.,"Verify that the destionation group in the relation's target DN is present in the fabric. Review the fault message and add missing configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1199,This fault occurs when span source on a port goes to failed state,Look at any configuration issues Verify the configuration is correct/complete Check network connectivity and ensure the port is up
+F1200,This fault occurs when span source on a circuit goes to failed state,Look at any configuration issues Verify the configuration is correct/complete Check network connectivity and ensure the circuit is up
+F1050,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1051,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0567,This fault is raised when the span policy failed to get deployed.,"Verify that the EpP in the relation's target DN is valid and present. Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0670,This fault is raised when the span policy failed to get deployed.,"Verify that the Epg in the relation's target DN is valid and present. Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1045,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1046,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1049,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1436,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1052,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0048,This fault occurs due to an observer stats export session failure.,"If you see this fault,please check stats export parameters and health of the destination export server."
+F1329,This fault occurs due to an observer stats export session failure.,"If you see this fault,please check stats export parameters and health of the destination export server."
+F0098,This fault occurs due to an observer stats export session failure.,"If you see this fault,please check stats export parameters and health of the destination export server."
+F1330,This fault occurs due to an observer stats export session failure.,"If you see this fault,please check stats export parameters and health of the destination export server."
+F1418,This fault occurs whenever a service cores,"If you see this fault,report that to tech support"
+F1224,This fault occurs when the svi bring up failed because of hardware programming failure,"Try reconfiguring the svi. If the above action did not resolve the issue,try rebooting the switch using CLI or GUI. If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F1053,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1054,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1055,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1414,This fault occurs when a configured syslog server is not reachable.,"Verify destination information is correct. Ensure it is reachable (ping/ssh) from the fabric and DNS entries have been configured correctly. If the above action did not resolve the issue,contact Cisco TAC."
+F1056,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1058,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1059,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1350,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1351,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0648,This fault is raised when the node on which the traceroute policy is configured to run is not found in the fabric.,"Verify that the policy for traceroute is applied to the correct node. Check the node id in the target DN (tDn) property Review the fault message and add the missing node or fix the configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1060,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1286,This fault is raised when a spine node is used as a source or destination.,"Verify that the policy for traceroute is applied to the correct node. Check the node id in the target DN (tDn) property. Verify that the correct nodes have been chosen as sources and destinations. If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1062,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0482,This fault occurs when destination IP address is unresolved.,"To correct this fault,please ensure that the destination IP address is resolved./>"
+F0475,This fault occurs when destination becomes unreachanble.,"To correct this fault,please ensure that the destination is reachabe."
+F0474,This fault occurs when tunnel manager fails to create a tunnel due to hardware failure.,"To correct this fault,please attempt to create the tunnel again."
+F0564,This fault is raised when the controller cannot be deployed due to a missing or invalid configuration.,"Verify that the policy for the controller is complete. Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F0565,This fault is raised when the endpoint group cannot be deployed due to a missing or invalid configuration.,"Verify that the namespace for the domain is associated. Review the fault message and add missing or remove invalid configuration If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F1063,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1064,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1068,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1069,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1284,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1070,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1071,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1237,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1065,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1066,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1067,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1315,This fault occurs when the L4-L7 service returns a critical fault,
+F0324,This fault occurs when the L4-L7 service returns a major fault,
+F0320,This fault occurs when the L4-L7 service returns a minor fault,
+F1314,This fault occurs when the L4-L7 service returns a warning fault,
+F0764,This fault occurs when a logical device is being configured in a way which is not compatible with the meta device information supplied by the device package.,"If you see this fault,please modify LDev configuration to resolve cause of fault."
+F0772,This fault occurs when a Logical Interface configuration is invalid.The config issues the exact reason for the error.,"If you see this fault,please modify configuration to resolve the cause of fault."
+F1361,This fault occurs when the there is a failure in starting the service script,
+F0762,This fault occurs when a cfg parameter has an error..,"If you see this fault,please modify your configuration to update service graph config parameters and folders."
+F1416,This fault occurs when an Abstract Function Connector (AbsFuncConn) has an error.The config issues the exact reason for the error.,"If you see this fault,please modify configuration to resolve the cause of fault."
+F1336,This fault occurs due to an invalid abstract function profile.,"If you see this fault,please ensure that the abstract function profile is valid"
+F0757,This fault occurs due to an invalid service graph configuration,"If you see this fault,please modify service graph configuration to fix validation errors."
+F0763,This fault occurs when a cfg parameter has an error..,"If you see this fault,please modify your configuration to update service graph config parameters and folders."
+F0765,This fault occurs when a user provided Concrete device configuration is invalid. The config issues the exact reason for the error,"If you see this fault,please modify CDev configuration to resolve cause of fault."
+F0326,This fault occurs when the L4-L7 service node configuration fails,
+F1324,This fault occurs when the there is a failure in setting up the management interface to a service node,
+F1379,This fault occurs when a Relation configuration is invalid.The config issues the exact reason for the error.,"If you see this fault,please modify configuration to resolve the cause of fault."
+F0771,This fault occurs when a Connection Inst (ConnectionInst) has an error.The config issues the exact reason for the error.,"If you see this fault,please modify your configuration to resolve the cause of fault."
+F1325,This fault occurs when the there is a failure in setting up the management interface on the controller which is used to communicate to the service node,
+F1377,This fault occurs when a Folder configuration is invalid.The config issues the exact reason for the error.,"If you see this fault,please modify configuration to resolve the cause of fault."
+F0769,This fault occurs when a Function Connector (FuncConnInst) has an error.The config issues the exact reason for the error.,"If you see this fault,please modify configuration to resolve the cause of fault."
+F0766,This fault occurs when a config folder has an error. The config issues indicate the exact reason for the error.,"If you see this fault,please modify configuration of the folder to resolve the cause of fault."
+F0761,This fault occurs when a cfg parameter has an error..,"If you see this fault,please modify your configuration to provide all needed parameters and folders."
+F0768,This fault occurs when a config GRel has an an error. The config issues indicate the exact reason for the error.,"If you see this fault,please modify configuration of the GRel to resolve the cause of fault."
+F0758,This fault occurs when a service graph could not be rendered.,"If you see this fault,please modify graph configuration to resolve cause of fault."
+F0759,This fault occurs when a service graph could not be rendered.,"If you see this fault,please modify graph configuration to resolve cause of fault."
+F1378,This fault occurs when a Parameter configuration is invalid.The config issues the exact reason for the error.,"If you see this fault,please modify configuration to resolve the cause of fault."
+F1081,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1082,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1083,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1089,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1086,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1093,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1073,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1074,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1076,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1098,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1077,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1099,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1100,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1088,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1080,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1084,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1095,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1096,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1105,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1375,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1097,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1104,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1101,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1374,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1103,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1102,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1079,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1307,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1085,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1087,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1094,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1107,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1091,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1092,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1090,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1075,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1334,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1106,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1310,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F0770,This fault occurs when a Terminal Connector (TermConnInst) has an error.The config issues the exact reason for the error.,"If you see this fault,please modify configuration to resolve the cause of fault."
+F0760,This fault occurs when a service graph could not be rendered.,"If you see this fault,please modify graph configuration to resolve cause of fault."
+F0510,This fault occurs when vpc domain bringup fails due to domain compatibility failure.,Please verify domain configuration on both the peers.
+F0511,This fault occurs when vpc domain bringup fails due to election error,Please make sure that domain configuration is consistent with the peer.
+F0507,This fault occurs when vpc domain bringup fails due to all fabric links being down.,Please verify fabric connectivity of the switch.
+F0513,This fault occurs when global configuration on the peers is not consistent.,Please make sure that global configuration is consistent with the peer.
+F0512,This fault occurs when vpc domain bringup fails due to keepalive being inoperational.,Please verify keepalive configuration on both the peers.
+F0508,This fault occurs when vpc domain bringup fails because there is no route to peer.,Please verify peer configuration and fabric connectivity.
+F0509,This fault occurs when vpc domain bringup fails due to peer being unreachable.,
+F0518,This fault occurs when vPC configuration on the peers is not consistent.,Please make sure that the vPC configuration is consistent with the peer.
+F1296,This fault occurs when vpc interface goes down.,Please verify the port connectivity.
+F0522,This event occurs when peer keep-alive receive has failed.,
+F0520,This event occurs when peer keep-alive send has failed,
+F1228,This fault occurs when Contract is incompletely / incorrectly configured.,"Look at configIssues Verify the configuration is correct / complete If the above action did not resolve the issue,contact Cisco TAC."
+F0418,This fault occurs when the vzAny is associated to a vzBrCP of scope != context,"Look at BrCPs associated to this contract Verify that all BrCPs have scope of context."
+F1112,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1115,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1117,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1129,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1111,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1110,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1121,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1123,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1125,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1126,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1127,The object refers to an object that was not found,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1128,The object refers to an object that was not found.,Make sure that referenced object exists and the name is spelled correctly in the relation object.
+F1339,This fault occurs when Subject has a label but no EPg associating to a contract uses a label.,"Look at configIssues Verify the configuration is correct / complete If the above action did not resolve the issue,contact Cisco TAC."
+F1240,This fault occurs when vzTaboo is incompletely / incorrectly configured.,"Look at configIssues Verify the configuration is correct / complete If the above action did not resolve the issue,contact Cisco TAC."
+F0188,This fault occurs when a non-spine node is marked as a bgp route reflector,"If you see this fault,check remove the RRNodePEp policy and choose another node,which is a spine"
+F1215,This fault occurs when the accepted prefixes from the peer is greater than the configured limit,"Look at any configuration issues Verify the configuration is correct/complete Reduce the number of prefixes exported into bgp If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0299,This fault occurs when the peer state is not established,"Look at any configuration issues Verify the configuration is correct/complete Check network connectivity to the peer If the above actions did not resolve the issue,generate the show tech-support file and contact Cisco TAC."
+F0106,,Check the cable and make sure it is connected to the correct neighbor switch
+F671798,This fault is raised FSM for Controller Add operation fails,"Check if there are repeated failures of any FSM stage Perform the suggested Actions to correct stage failures If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F671803,This fault is raised FSM for Controller Remove operation fails.,"Check if there are any FSM stage failures Perform the suggested Actions to correct stage failures If the above actions did not resolve the issue,collect tech-support file and contact Cisco TAC."
+F16438,This fault is raised when Get Controller Time Stage fails,Please collect tech-support file and contact Cisco TAC
+F1445,This fault occurs when significant number of packet drops are detected by atomic counters,"If you see this fault,check the network configuration in the packet path where this Atomic counter policy is configured"
+F1446,This fault occurs when small number of packet drops are detected by atomic counters,"If you see this fault,check the network configuration in the packet path where this Atomic counter policy is configured"
+F1447,This fault occurs when significant number of excess packets are detected by atomic counters,"If you see this fault,check the network configuration in the packet path where this Atomic counter policy is configured"
+F1448,This fault occurs when small number of excess packets are detected by atomic counters,"If you see this fault,check the network configuration in the packet path where this Atomic counter policy is configured"

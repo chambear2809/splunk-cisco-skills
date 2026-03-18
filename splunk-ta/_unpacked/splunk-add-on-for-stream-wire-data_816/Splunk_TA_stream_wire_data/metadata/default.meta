@@ -1,0 +1,18 @@
+[]
+access = read : [ * ], write : [ admin, sc_admin ]
+export = none
+
+[props]
+export = system
+
+[transforms]
+export = system
+
+[eventtypes]
+export = system
+
+[tags]
+export = system
+
+[lookups]
+export = system

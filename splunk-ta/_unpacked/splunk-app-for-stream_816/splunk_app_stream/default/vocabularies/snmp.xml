@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="snmp">
+    <Name>SNMP Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+      <Term id="snmp.event">
+          <Type>object</Type>
+          <Comment>Event representing SNMP</Comment>
+      </Term>
+      <Term id="snmp.version">
+          <Type>shortstring</Type>
+          <Comment>SNMP Version</Comment>
+      </Term>
+      <Term id="snmp.community">
+          <Type>string</Type>
+          <Comment>Community name</Comment>
+      </Term>
+      <Term id="snmp.method">
+          <Type>string</Type>
+          <Comment>SNMP request type</Comment>
+      </Term>
+      <Term id="snmp.request-id">
+          <Type>uint32</Type>
+          <Comment>Request Identifier</Comment>
+      </Term>
+      <Term id="snmp.name">
+          <Type>string</Type>
+          <Comment>Name of the user</Comment>
+      </Term>
+      <Term id="snmp.oid">
+          <Type>string</Type>
+          <Comment>Object Identifier (deprecated since 6.2.2 by snmp.varbind-list)</Comment>
+      </Term>
+      <Term id="snmp.value-raw">
+          <Type>blob</Type>
+          <Comment>OID raw Value (deprecated since 6.2.2 by snmp.varbind-list)</Comment>
+      </Term>
+      <Term id="snmp.value-type">
+          <Type>string</Type>
+          <Comment>Object type (deprecated since 6.2.2 by snmp.varbind-list)</Comment>
+      </Term>
+      <Term id="snmp.value-len">
+          <Type>uint32</Type>
+          <Comment>Size of raw value in bytes (deprecated since 6.2.2 by snmp.varbind-list)</Comment>
+      </Term>
+      <Term id="snmp.varbind-list">
+          <Type>string</Type>
+          <Comment>List of OID variable bindings</Comment>
+      </Term>
+  </Vocabulary>
+</CmConfig>

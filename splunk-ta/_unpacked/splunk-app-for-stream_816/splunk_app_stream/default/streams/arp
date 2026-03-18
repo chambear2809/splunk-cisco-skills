@@ -1,0 +1,159 @@
+{
+  "app": "Stream", 
+  "category": "Networking", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "arp.event"
+  },
+  "fields": [
+   
+    {
+      "aggType": "value", 
+      "desc": "Source IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    },  
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Destination IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Operation code, Request = 1, Response = 2", 
+      "enabled": true, 
+      "name": "opcode", 
+      "term": "arp.opcode"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol number in the ARP message", 
+      "enabled": true, 
+      "name": "protocol_type", 
+      "term": "arp.protocol-type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Size in bytes of the logical address requested", 
+      "enabled": true, 
+      "name": "protocol_size", 
+      "term": "arp.protocol-size"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Hardware type for which the request is sent", 
+      "enabled": true, 
+      "name": "hardware_type", 
+      "term": "arp.hardware-type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Hardware (Mac) address length", 
+      "enabled": true, 
+      "name": "hardware_size", 
+      "term": "arp.hardware-size"
+    },
+    {
+      "aggType": "value", 
+      "desc": "ARP sender MAC address in hexadecimal format in ARP packet header", 
+      "enabled": true, 
+      "name": "arp_src_mac", 
+      "term": "arp.src-mac"
+    },
+    {
+      "aggType": "value", 
+      "desc": "ARP destination MAC address in hexadecimal format in ARP packet header", 
+      "enabled": true, 
+      "name": "arp_dest_mac", 
+      "term": "arp.dest-mac"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "arp", 
+  "isReferenceStream": true, 
+  "name": "ARP protocol events", 
+  "statsOnly": true,
+  "protocolName": "ARP", 
+  "sourcetype": "stream:arp", 
+  "streamType": "event"
+}

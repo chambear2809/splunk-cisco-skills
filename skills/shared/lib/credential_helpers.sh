@@ -5,6 +5,8 @@
 # helpers for remote Splunk management.
 
 _CRED_HELPERS_LOADED=true
+_ACS_CONTEXT_PREPARED=false
+_RESOLVED_SPLUNK_PLATFORM=""
 
 # Resolve SCRIPT_DIR for the sourcing script if not already set.
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
@@ -32,6 +34,7 @@ import sys
 
 path = sys.argv[1]
 allowed_keys = [
+    "SPLUNK_PLATFORM",
     "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT",
     "SPLUNK_URI",
@@ -41,6 +44,16 @@ allowed_keys = [
     "SPLUNK_SSH_PASS",
     "SPLUNK_USER",
     "SPLUNK_PASS",
+    "SPLUNK_CLOUD_STACK",
+    "SPLUNK_CLOUD_SEARCH_HEAD",
+    "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS",
+    "ACS_SERVER",
+    "STACK_USERNAME",
+    "STACK_PASSWORD",
+    "STACK_TOKEN",
+    "STACK_TOKEN_USER",
+    "SPLUNK_USERNAME",
+    "SPLUNK_PASSWORD",
     "SB_USER",
     "SB_PASS",
 ]
@@ -125,6 +138,254 @@ splunk_host_from_uri() {
 }
 
 load_splunk_connection_settings
+
+_is_default_local_splunk_uri() {
+    [[ "${SPLUNK_URI:-}" == "https://localhost:8089" && -z "${SPLUNK_HOST:-}" ]]
+}
+
+_has_cloud_target_config() {
+    [[ -n "${SPLUNK_CLOUD_STACK:-}" || -n "${STACK_TOKEN:-}" || -n "${STACK_USERNAME:-}" || -n "${STACK_TOKEN_USER:-}" ]]
+}
+
+_is_hybrid_target_config() {
+    _has_cloud_target_config && [[ -n "${SPLUNK_URI:-}" ]] && ! _is_default_local_splunk_uri && [[ "${SPLUNK_URI:-}" != *".splunkcloud.com"* ]]
+}
+
+_prompt_for_splunk_platform() {
+    local choice
+
+    [[ -t 0 ]] || return 1
+
+    echo ""
+    echo "Hybrid deployment configuration detected."
+    echo "  1) Enterprise / forwarder target (${SPLUNK_URI})"
+    echo "  2) Splunk Cloud stack (${SPLUNK_CLOUD_STACK})"
+    while true; do
+        read -rp "Choose the target for this run [1/2]: " choice
+        case "${choice}" in
+            1|enterprise|Enterprise)
+                _RESOLVED_SPLUNK_PLATFORM="enterprise"
+                return 0
+                ;;
+            2|cloud|Cloud)
+                _RESOLVED_SPLUNK_PLATFORM="cloud"
+                return 0
+                ;;
+        esac
+    done
+}
+
+resolve_splunk_platform() {
+    load_splunk_platform_settings
+
+    if [[ -n "${_RESOLVED_SPLUNK_PLATFORM:-}" ]]; then
+        printf '%s' "${_RESOLVED_SPLUNK_PLATFORM}"
+        return 0
+    fi
+
+    if [[ -n "${SPLUNK_PLATFORM:-}" ]]; then
+        _RESOLVED_SPLUNK_PLATFORM="${SPLUNK_PLATFORM}"
+    elif [[ "${SPLUNK_URI:-}" == *".splunkcloud.com"* ]]; then
+        _RESOLVED_SPLUNK_PLATFORM="cloud"
+    elif _has_cloud_target_config && _is_default_local_splunk_uri; then
+        _RESOLVED_SPLUNK_PLATFORM="cloud"
+    elif _is_hybrid_target_config; then
+        if ! _prompt_for_splunk_platform; then
+            echo "ERROR: Hybrid deployment configuration is ambiguous in non-interactive mode." >&2
+            echo "Set SPLUNK_PLATFORM=cloud or SPLUNK_PLATFORM=enterprise for this run." >&2
+            return 1
+        fi
+    else
+        _RESOLVED_SPLUNK_PLATFORM="enterprise"
+    fi
+
+    printf '%s' "${_RESOLVED_SPLUNK_PLATFORM}"
+}
+
+load_splunk_platform_settings() {
+    _load_credential_values_from_file "${_CRED_FILE}"
+
+    ACS_SERVER="${ACS_SERVER:-https://admin.splunk.com}"
+    SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS="${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}"
+}
+
+load_splunk_platform_settings
+
+is_splunk_cloud() {
+    [[ "$(resolve_splunk_platform)" == "cloud" ]]
+}
+
+acs_cli_available() {
+    command -v acs >/dev/null 2>&1
+}
+
+acs_command() {
+    load_splunk_platform_settings
+    local -a cmd=(acs --format structured)
+    [[ -n "${ACS_SERVER:-}" ]] && cmd+=(--server "${ACS_SERVER}")
+    cmd+=("$@")
+    "${cmd[@]}"
+}
+
+acs_prepare_context() {
+    if [[ "${_ACS_CONTEXT_PREPARED}" == "true" ]]; then
+        return 0
+    fi
+
+    load_splunk_platform_settings
+    _load_credential_values_from_file "${_CRED_FILE}"
+
+    if ! acs_cli_available; then
+        echo "ERROR: ACS CLI is required for Splunk Cloud operations. Install it with Homebrew: brew install acs" >&2
+        return 1
+    fi
+
+    export ACS_SERVER
+
+    # ACS uses splunk.com credentials for app operations. Reuse SB_* when explicit
+    # ACS values are not provided.
+    if [[ -z "${SPLUNK_USERNAME:-}" && -n "${SB_USER:-}" ]]; then
+        export SPLUNK_USERNAME="${SB_USER}"
+    fi
+    if [[ -z "${SPLUNK_PASSWORD:-}" && -n "${SB_PASS:-}" ]]; then
+        export SPLUNK_PASSWORD="${SB_PASS}"
+    fi
+    [[ -n "${SPLUNK_USERNAME:-}" ]] && export SPLUNK_USERNAME
+    [[ -n "${SPLUNK_PASSWORD:-}" ]] && export SPLUNK_PASSWORD
+
+    [[ -n "${STACK_USERNAME:-}" ]] && export STACK_USERNAME
+    [[ -n "${STACK_PASSWORD:-}" ]] && export STACK_PASSWORD
+    [[ -n "${STACK_TOKEN:-}" ]] && export STACK_TOKEN
+    [[ -n "${STACK_TOKEN_USER:-}" ]] && export STACK_TOKEN_USER
+
+    if [[ -n "${SPLUNK_CLOUD_STACK:-}" ]]; then
+        if [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]; then
+            acs_command config add-stack "${SPLUNK_CLOUD_STACK}" --target-sh "${SPLUNK_CLOUD_SEARCH_HEAD}" >/dev/null 2>&1 || true
+            acs_command config use-stack "${SPLUNK_CLOUD_STACK}" --target-sh "${SPLUNK_CLOUD_SEARCH_HEAD}" >/dev/null
+        else
+            acs_command config add-stack "${SPLUNK_CLOUD_STACK}" >/dev/null 2>&1 || true
+            acs_command config use-stack "${SPLUNK_CLOUD_STACK}" >/dev/null
+        fi
+    fi
+
+    if [[ -n "${STACK_TOKEN:-}" ]]; then
+        acs_command login >/dev/null
+    elif [[ -n "${STACK_USERNAME:-}" || -n "${STACK_PASSWORD:-}" || -n "${STACK_TOKEN_USER:-}" ]]; then
+        if [[ -z "${STACK_USERNAME:-}" || -z "${STACK_PASSWORD:-}" || -z "${STACK_TOKEN_USER:-}" ]]; then
+            echo "ERROR: STACK_USERNAME, STACK_PASSWORD, and STACK_TOKEN_USER are all required for ACS login without STACK_TOKEN." >&2
+            return 1
+        fi
+        acs_command login --token-user "${STACK_TOKEN_USER}" >/dev/null
+    fi
+
+    _ACS_CONTEXT_PREPARED=true
+}
+
+cloud_requires_local_scope() {
+    [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]
+}
+
+cloud_check_index() {
+    local idx="$1"
+    acs_prepare_context || return 1
+    acs_command indexes describe "${idx}" >/dev/null 2>&1
+}
+
+cloud_create_index() {
+    local idx="$1"
+    local searchable_days="${2:-${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}}"
+
+    acs_prepare_context || return 1
+    if acs_command indexes describe "${idx}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    acs_command indexes create --name "${idx}" --searchable-days "${searchable_days}" >/dev/null
+}
+
+acs_restart_required() {
+    acs_prepare_context || return 1
+    acs_command status current-stack 2>/dev/null \
+        | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    messages = data.get('messages', {}) or {}
+    print(str(messages.get('restartRequired', False)).lower())
+except Exception:
+    print('false')
+"
+}
+
+acs_wait_for_ready() {
+    local timeout_secs="${1:-900}" interval_secs="${2:-10}"
+    local waited=0 status_json readiness
+
+    while (( waited < timeout_secs )); do
+        status_json=$(acs_command status current-stack 2>/dev/null || true)
+        readiness=$(printf '%s' "${status_json}" \
+            | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    infra = ((data.get('status') or {}).get('infrastructure') or {}).get('status', '')
+    restart_required = ((data.get('messages') or {}).get('restartRequired', False))
+    if infra == 'Ready' and not restart_required:
+        print('ready')
+    else:
+        print('waiting')
+except Exception:
+    print('waiting')
+")
+        if [[ "${readiness}" == "ready" ]]; then
+            return 0
+        fi
+        sleep "${interval_secs}"
+        waited=$((waited + interval_secs))
+    done
+
+    return 1
+}
+
+cloud_restart_if_required() {
+    local timeout_secs="${1:-900}"
+
+    acs_prepare_context || return 1
+    if [[ "$(acs_restart_required)" != "true" ]]; then
+        return 0
+    fi
+
+    acs_command restart current-stack >/dev/null
+    acs_wait_for_ready "${timeout_secs}" 10
+}
+
+log_platform_restart_guidance() {
+    local prefix="${1:-changes}"
+    if is_splunk_cloud; then
+        echo "Splunk Cloud: check 'acs status current-stack' after ${prefix} and run 'acs restart current-stack' only if restartRequired=true."
+    else
+        echo "Restart Splunk to apply ${prefix}."
+    fi
+}
+
+platform_check_index() {
+    local sk="$1" uri="$2" idx="$3"
+    if is_splunk_cloud; then
+        cloud_check_index "${idx}"
+    else
+        rest_check_index "${sk}" "${uri}" "${idx}"
+    fi
+}
+
+platform_create_index() {
+    local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}"
+    if is_splunk_cloud; then
+        # ACS manages searchable retention rather than the on-prem maxTotalDataSizeMB value.
+        cloud_create_index "${idx}" "${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}"
+    else
+        rest_create_index "${sk}" "${uri}" "${idx}" "${max_size}"
+    fi
+}
 
 load_splunk_credentials() {
     _load_credential_values_from_file "${_CRED_FILE}"

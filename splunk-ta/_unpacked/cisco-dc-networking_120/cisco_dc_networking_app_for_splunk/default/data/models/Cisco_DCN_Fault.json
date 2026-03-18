@@ -1,0 +1,680 @@
+{
+    "modelName": "Cisco_DCN_Fault",
+    "displayName": "Cisco DCN Fault",
+    "description": "",
+    "objectSummary": {
+        "Event-Based": 1,
+        "Transaction-Based": 0,
+        "Search-Based": 0
+    },
+    "objects": [
+        {
+            "objectName": "Fault",
+            "displayName": "Fault",
+            "parentName": "BaseEvent",
+            "fields": [
+                {
+                    "fieldName": "ack",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "ack",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "cause",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "cause",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "changeSet",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "changeSet",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "code",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "code",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "component",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "component",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "created",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "created",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "date_hour",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "date_hour",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "date_mday",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "date_mday",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "date_minute",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "date_minute",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "date_month",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "date_month",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "date_second",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "date_second",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "date_wday",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "date_wday",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "date_year",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "date_year",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "date_zone",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "date_zone",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "descr",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "descr",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "dn",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "dn",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "domain",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "domain",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "eventtype",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "eventtype",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "highestSeverity",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "highestSeverity",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "index",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "index",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "lastTransition",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "lastTransition",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "lc",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "lc",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "linecount",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "linecount",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "modTs",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "modTs",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "occur",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "occur",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "origSeverity",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "origSeverity",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "prevSeverity",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "prevSeverity",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "punct",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "punct",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "rn",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "rn",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "rule",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "rule",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "severity",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "severity",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "splunk_server",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "splunk_server",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "subject",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "subject",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "tag",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "tag",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "tag::eventtype",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "tag::eventtype",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "timeendpos",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "timeendpos",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "timestartpos",
+                    "owner": "Fault",
+                    "type": "number",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "timestartpos",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "type",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "type",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "apic_host",
+                    "owner": "Fault",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "apic_host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "_time=*",
+                    "required": true,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "Tenant",
+                            "owner": "Fault",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "Tenant",
+                            "comment": ""
+                        }
+                    ],
+                    "inputField": "dn",
+                    "calculationID": "yfe0npwlh7b0ggb9",
+                    "owner": "Fault",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Rex",
+                    "expression": "uni/tn-(?<Tenant>[a-z A-Z 0-9 \\. \\_-]+)/"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "pod",
+                            "owner": "Fault",
+                            "type": "number",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "pod",
+                            "comment": ""
+                        },
+                        {
+                            "fieldName": "node",
+                            "owner": "Fault",
+                            "type": "number",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "node",
+                            "comment": ""
+                        }
+                    ],
+                    "inputField": "dn",
+                    "calculationID": "oylw4ec7qyskmx6r",
+                    "owner": "Fault",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Rex",
+                    "expression": "pod-(?<pod>[0-9]+)/node-(?<node>[0-9]+)/"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "nameofnode",
+                            "owner": "",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "nameofnode",
+                            "comment": "",
+                            "lookupOutputFieldName": "name"
+                        }
+                    ],
+                    "calculationType": "Lookup",
+                    "lookupName": "cisco_dc_APICNodeTable",
+                    "comment": "",
+                    "lookupInputs": [
+                        {
+                            "inputField": "node",
+                            "lookupField": "id"
+                        },
+                        {
+                            "inputField": "apic_host",
+                            "lookupField": "apic_host"
+                        }
+                    ],
+                    "owner": "Fault",
+                    "calculationID": "x2jtlcdn5t57b9",
+                    "editable": true
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "Explanation",
+                            "owner": "Fault",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "Explanation",
+                            "comment": "",
+                            "lookupOutputFieldName": "description"
+                        },
+                        {
+                            "fieldName": "Recommended_Action",
+                            "owner": "Fault",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "Recommended_Action",
+                            "comment": "",
+                            "lookupOutputFieldName": "Recommended Action"
+                        }
+                    ],
+                    "calculationType": "Lookup",
+                    "lookupName": "cisco_dc_APICFaultDetails",
+                    "comment": "",
+                    "lookupInputs": [
+                        {
+                            "inputField": "code",
+                            "lookupField": "code"
+                        }
+                    ],
+                    "owner": "Fault",
+                    "calculationID": "4yx8bs1rqt6e0zfr",
+                    "editable": true
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "eventtype=\"cisco_dc_aci_class\" AND (component=faultInst)",
+                    "owner": "Fault"
+                }
+            ],
+            "lineage": "Fault"
+        }
+    ],
+    "objectNameList": [
+        "Fault"
+    ]
+}

@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="modbus">
+    <Locked>true</Locked>      
+    <Name>MODBUS Protocol Vocabulary</Name>
+    <Term id="modbus.event">
+        <Type>object</Type>
+        <Comment>Event representing a MODBUS event</Comment>
+    </Term>
+    <Term id="modbus.transaction-id">
+        <Type>uint16</Type>
+        <Comment>Transaction ID to associate request and response for modbus TCP</Comment>
+    </Term>
+    <Term id="modbus.protocol-id">
+        <Type>uint16</Type>
+        <Comment>modbus protocol ID</Comment>
+    </Term>
+    <Term id="modbus.length">
+        <Type>uint16</Type>
+        <Comment>modbus length</Comment>
+    </Term>
+    <Term id="modbus.unit-identifier">
+        <Type>uint8</Type>
+        <Comment>modbus unit identifier</Comment>
+    </Term>
+    <Term id="modbus.function-code">
+        <Type>uint8</Type>
+        <Comment>modbus function code</Comment>
+    </Term>
+    <Term id="modbus.function-subcode">
+        <Type>uint16</Type>
+        <Comment>modbus function subcode</Comment>
+    </Term>
+    <Term id="modbus.exception-code">
+        <Type>uint8</Type>
+        <Comment>modbus exception code</Comment>
+    </Term>
+    <Term id="modbus.pdu">
+        <Type>blob</Type>
+        <Comment>modbus pdu</Comment>
+    </Term>
+    <Term id="modbus.starting-address">
+        <Type>uint16</Type>
+        <Comment>modbus starting address</Comment>
+    </Term>
+    <Term id="modbus.quantity-of-coils">
+        <Type>uint16</Type>
+        <Comment>modbus quantity of coils</Comment>
+    </Term>
+    <Term id="modbus.output-address">
+        <Type>uint16</Type>
+        <Comment>modbus output address</Comment>
+    </Term>
+    <Term id="modbus.output-value">
+        <Type>uint16</Type>
+        <Comment>modbus output value</Comment>
+    </Term>
+    <Term id="modbus.quantity-of-outputs">
+        <Type>uint16</Type>
+        <Comment>modbus quantity of outputs</Comment>
+    </Term>
+    <Term id="modbus.byte-count">
+        <Type>uint16</Type>
+        <Comment>modbus byte count</Comment>
+    </Term>
+    <Term id="modbus.request-data-length">
+        <Type>uint8</Type>
+        <Comment>modbus request data length</Comment>
+    </Term>
+    <Term id="modbus.reference-type">
+        <Type>uint8</Type>
+        <Comment>modbus reference type</Comment>
+    </Term>
+    <Term id="modbus.file-number">
+        <Type>uint16</Type>
+        <Comment>modbus file number</Comment>
+    </Term>
+    <Term id="modbus.record-number">
+        <Type>uint16</Type>
+        <Comment>modbus record number</Comment>
+    </Term>
+    <Term id="modbus.record-length">
+        <Type>uint16</Type>
+        <Comment>modbus record length</Comment>
+    </Term>
+    <Term id="modbus.record-data">
+        <Type>blob</Type>
+        <Comment>modbus record data</Comment>
+    </Term>
+    <Term id="modbus.reference-address">
+        <Type>uint16</Type>
+        <Comment>modbus reference address</Comment>
+    </Term>
+    <Term id="modbus.and-mask">
+        <Type>uint16</Type>
+        <Comment>modbus and mask</Comment>
+    </Term>
+    <Term id="modbus.or-mask">
+        <Type>uint16</Type>
+        <Comment>modbus or mask</Comment>
+    </Term>
+    <Term id="modbus.write-registers-value">
+        <Type>blob</Type>
+        <Comment>modbus write registers value</Comment>
+    </Term>
+    <Term id="modbus.fifo-pointer-address">
+        <Type>uint16</Type>
+        <Comment>modbus fifo pointer address</Comment>
+    </Term>
+    <Term id="modbus.mei-type">
+        <Type>uint8</Type>
+        <Comment>modbus mei type</Comment>
+    </Term>
+    <Term id="modbus.resp-data-length">
+        <Type>uint8</Type>
+        <Comment>modbus resp data length</Comment>
+    </Term>
+    <Term id="modbus.read-registers-value">
+        <Type>blob</Type>
+        <Comment>modbus read registers value</Comment>
+    </Term>
+    <Term id="modbus.fifo-count">
+        <Type>uint16</Type>
+        <Comment>modbus fifo count</Comment>
+    </Term>
+    <Term id="modbus.invalid-codes">
+        <Type>uint8</Type>
+        <Comment>modbus invalid codes</Comment>
+    </Term>
+    <Term id="modbus.coil-status">
+        <Type>blob</Type>
+        <Comment>modbus coil status</Comment>
+    </Term>
+    <Term id="modbus.output-data">
+        <Type>uint8</Type>
+        <Comment>modbus output data</Comment>
+    </Term>
+    <Term id="modbus.status">
+        <Type>uint16</Type>
+        <Comment>modbus status</Comment>
+    </Term>
+    <Term id="modbus.event-count">
+        <Type>uint16</Type>
+        <Comment>modbus event count</Comment>
+    </Term>
+    <Term id="modbus.message-count">
+        <Type>uint16</Type>
+        <Comment>modbus message count</Comment>
+    </Term>
+    <Term id="modbus.events">
+        <Type>blob</Type>
+        <Comment>modbus events</Comment>
+    </Term>
+    <Term id="modbus.outputs-value">
+        <Type>blob</Type>
+        <Comment>modbus outputs value</Comment>
+    </Term>
+    <Term id="modbus.file-resp-length">
+        <Type>uint8</Type>
+        <Comment>modbus file resp length</Comment>
+    </Term>
+    <Term id="modbus.error-code">
+        <Type>uint8</Type>
+        <Comment>modbus error code</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

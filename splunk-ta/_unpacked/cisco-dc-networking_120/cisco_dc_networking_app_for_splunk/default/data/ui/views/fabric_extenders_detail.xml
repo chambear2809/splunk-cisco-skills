@@ -1,0 +1,313 @@
+<form script="set_apic_token.js" version="1.1">
+  <label>Fabric Extenders Detail</label>
+  <search id="baseSearch">
+    <query>| `apic-fabric-overview`</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+    
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_health" dn="*extch*"  | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+        </condition>
+      </change>
+    </input>
+    <input type="dropdown" token="nodeName">
+      <label>Leaf</label>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>name</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>eventtype="cisco_dc_aci_health" component=eqptExtCh $formed_apic_host$ | rex field=dn "node-(?&lt;extnode&gt;[^\/]+)" | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | stats latest(id) AS "FEX id", latest(ser) AS "Ser", latest(descr) AS Description,  latest(model) AS "Model",latest(macAddr) AS "MAC Address" latest(extChSt) AS "FEX State" by dn,extnode,pod, apic_host| fields - dn  | join  apic_host,extnode [search eventtype="cisco_dc_aci_health" component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;extnode&gt;[^\/]+)"  | dedup name, pod,apic_host,extnode | table name, dn,pod,extnode, apic_host] | search name=* | dedup name | fields name</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html id="overview">
+      <h1>Dashboard Overview</h1>
+     <p>This dashboard provides information about the Fabric Extenders for the Leaf nodes it is attached to. <br/> Following drilldown capabilities are provided:<br/>
+          <ul>
+            <li>Use the input dropdowns to views FEX's for a Leaf</li>
+            <li>Drilldown on FEX id - Provide details of chasis, linecards, supevisor, power supply, sensors ,fan tray and interfaces including their health.</li>
+          </ul>
+        </p>
+     </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>$nodeName$ - Fabric Extenders (FEX): Detail</title>
+        <search>
+          <query>eventtype="cisco_dc_aci_health" component=eqptExtCh $formed_apic_host$ dn="*extch*" | rex field=dn "node-(?&lt;extnode&gt;[^\/]+)" | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | stats latest(id) AS "FEX id", latest(ser) AS "Ser", latest(descr) AS Description,  latest(model) AS "Model",latest(macAddr) AS "MAC Address" latest(extChSt) AS "FEX State" by dn,extnode,pod| fields - dn  | join extnode,pod [search eventtype="cisco_dc_aci_health" component = fabricNode role=leaf $formed_apic_host$  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;extnode&gt;[^\/]+)"  | dedup name, pod,apic_host | table name, dn,pod,extnode,apic_host] | search name=$nodeName$ | fields - pod,extnode,name,dn,apic_host | dedup "FEX id"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+        <drilldown>
+          <set token="fexName">$click.value$</set>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <chart>
+        <title>$nodeName$ - Fabric Extenders (FEX): Health</title>
+        <search>
+          <query>eventtype="cisco_dc_aci_health" component=eqptExtCh dn="*extch*/health"| rex field=dn "node-(?&lt;extnode&gt;[^\/]+)"| rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | search  $formed_apic_host$ cur=*| table id, cur,extnode, pod, updTs | join type=outer extnode,pod [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:health $formed_apic_host$ component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;extnode&gt;[^\/]+)"  | dedup name, pod,apic_host | table name, dn,pod,extnode,apic_host]| eval _time=strptime(updTs,"%Y-%m-%dT%H:%M:%S.%3N") | search name=$nodeName$| sort 0 _time | chart latest(cur) AS Health by _time,id</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$fexName$">
+        <title>FEX id:$fexName$ - Extended Chassis Module</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_health component="eqptExtChCard" $formed_apic_host$ |rex field=dn "extch-(?&lt;FEXID&gt;[^\/]+)"| rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)" |rex field=dn "extchslot-(?&lt;ChassisSlotID&gt;[^\/]+)" | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)"| strcat " " id Name | table Name,nodeID, FEXID,ChassisSlotID, pod, ser, model, operSt,rdSt,macB,apic_host| join nodeID,apic_host,pod [search eventtype="cisco_dc_aci_health" component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | dedup name, pod,apic_host | table name,pod,nodeID, apic_host] | search $formed_apic_host$ name=$nodeName$ FEXID=$fexName$ | dedup Name,FEXID |fields - apic_host,name,nodeID,pod,FEXID| rename  ser AS "Serial Number" model AS "Model" operSt AS "Operational State" rdSt AS "Redundancy State" Name AS "Software Card Id"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$fexName$">
+        <title>FEX id:$fexName$ - Power Supply</title>
+        <search base="baseSearch">
+          <query>|  search component="eqptPsu" dn="*extch*"|rex field=dn "extch-(?&lt;FEXID&gt;[^\/]+)" | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(state) AS State latest(model) AS Model latest(ser) AS "Serial Number" latest(volt) AS Volt by id,nodeID,apic_host,pod,FEXID | strcat  "Psu" id Name| table Name,FEXID,Health,Faults,State,Volt,Model,"Serial Number",apic_host,pod,nodeID| join nodeID,apic_host,pod [search eventtype="cisco_dc_aci_health" component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | dedup name, pod ,apic_host| table name,pod,nodeID, apic_host] |search $formed_apic_host$ name=$nodeName$ FEXID=$fexName$| fields - nodeID, name,apic_host,FEXID | rename pod AS Pod | sort 0 Health| dedup Name</query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$fexName$">
+        <title>FEX id:$fexName$ - Fan Tray</title>
+        <search base="baseSearch">
+          <query>|  search component="eqptFt" dn = "*extch*"|rex field=dn "extch-(?&lt;FEXID&gt;[^\/]+)" | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(state) AS State latest(model) AS Model latest(ser) AS "Serial Number" by id,nodeID,apic_host,pod,FEXID | strcat "Ft" id Name| table Name,FEXID,Health,Faults,State,Model,"Serial Number", nodeID,apic_host,pod | sort 0 Health | join nodeID,apic_host,pod [search eventtype="cisco_dc_aci_health" component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | dedup name, pod ,apic_host| table name,pod,nodeID, apic_host] |search $formed_apic_host$ name=$nodeName$ FEXID=$fexName$| fields - nodeID, name,apic_host,FEXID | rename pod AS Pod | dedup Name</query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$fexName$">
+        <title>FEX id:$fexName$ - Sensors</title>
+        <search>
+          <query>eventtype="cisco_dc_aci_health" $formed_apic_host$ component=eqptSensor dn = "*extch*"| rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"| rex field=dn "extch-(?&lt;FEXID&gt;[^\/]+)"| rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | stats latest(cur) As "CurrentHealth"  sparkline(avg(cur),1h) AS "Health Trend" latest(operSt) AS "Operational State" by id,nodeID,apic_host,pod,FEXID| strcat "Sensor-" id SensorID | join nodeID,apic_host,pod [search eventtype="cisco_dc_aci_health" component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)"| rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | dedup name, pod,apic_host | table name,pod,nodeID, apic_host] | rename name As Name pod As Pod|search Name=$nodeName$ FEXID=$fexName$ | dedup SensorID, Name | table SensorID, "CurrentHealth","Health Trend", "Operational State", Pod | dedup SensorID</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$fexName$">
+        <title>FEX id:$fexName$ - Host Port</title>
+        <search>
+          <query>eventtype = "cisco_dc_aci_health" component = eqptExtChHP $formed_apic_host$ | rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | rex field=dn "extchslot-(?&lt;slot&gt;[^\/]+)"|rex field=dn "extch-(?&lt;FEXID&gt;[^\/]+)"|  rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | stats latest(cur) AS "CurrentHealth" sparkline(avg(cur),1h) AS "Health Trend" by id,pod, slot, nodeID,apic_host,FEXID | strcat "HostPort-" id hport | join nodeID,pod,apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:health component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | dedup name, pod,apic_host | table name, dn,pod,nodeID,apic_host]| search name=$nodeName$ FEXID=$fexName$ | table hport, slot, CurrentHealth, "Health Trend", pod| rename hport AS "Host Port" slot AS Slot pod AS Pod | dedup "Host Port"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$fexName$">
+        <title>FEX id:$fexName$ - Fabric Port</title>
+        <search>
+          <query>eventtype = "cisco_dc_aci_health" component = eqptExtChFP $formed_apic_host$ dn ="*/health"| rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)" |rex field=dn "extch-(?&lt;FEXID&gt;[^\/]+)" | rex field=dn "extchslot-(?&lt;slot&gt;[^\/]+)"| rex field=dn "pod-(?&lt;pod&gt;[^\/]+)"   | stats  latest(cur) AS "CurrentHealth" sparkline(avg(cur),1h) AS "Health Trend" by pod, slot, nodeID,apic_host, id,FEXID | strcat "FabricPort-" id fport | join nodeID,pod,apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:health component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | dedup name, pod,apic_host | table name, dn,pod,nodeID,apic_host]| search name=$nodeName$ FEXID=$fexName$ | table fport, slot, CurrentHealth, "Health Trend", pod| rename fport AS "Fabric Port" slot AS Slot pod AS Pod | dedup "Fabric Port"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$nodeName$">
+        <title>$nodeName$ - Supervisor Card</title>
+        <search base="baseSearch">
+          <query>| search component="eqptSupC" $formed_apic_host$ node=$nodeName$ | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(state) AS State latest(numP) AS "Total Ports" latest(model) AS Model by id,nodeID,apic_host,pod| strcat "SupC" id Name | table Name,Health,Faults,State,"Total Ports",Model, nodeID,apic_host, pod | sort 0 Health| join nodeID,pod [search eventtype="cisco_dc_aci_health" component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | dedup name, pod,apic_host | table name, dn,nodeID,pod] | search $formed_apic_host$ name=$nodeName$ | fields - nodeID,name,dn,apic_host| rename pod AS Pod | dedup Name</query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$nodeName$">
+        <title>$nodeName$ - Line Card</title>
+        <search base="baseSearch">
+          <query>|  search component="eqptLC" $formed_apic_host$ node=$nodeName$ dn="*/health" | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | stats dc(Fault Creation Time) AS "Faults" latest(CurrentHealth) AS "Health" latest(state) AS State latest(numP) AS "Total Ports" latest(model) AS Model latest(ser) AS "Serial Number" latest(macB) AS "mac" by id,nodeID,pod,apic_host| strcat "LC" id Name | table Name,Health,Faults,State,Model,"Serial Number","Total Ports",mac,apic_host,nodeID,pod |  sort 0 Health |  join nodeID,apic_host,pod [search eventtype="cisco_dc_aci_health" component = fabricNode role=leaf  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)" | rex field=dn "node-(?&lt;nodeID&gt;[^\/]+)"  | dedup name, pod ,apic_host| table name,pod,nodeID, apic_host] |search $formed_apic_host$ name=$nodeName$ | fields - nodeID, name,apic_host| rename pod AS Pod | dedup Name</query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <table depends="$nodeName$">
+        <title>$nodeName$ - Affected Interfaces</title>
+        <search base="baseSearch">
+          <query>| search  (component="eqptFabP" OR component=eqptLeafP ) $formed_apic_host$ node=$nodeName$  | rex field=dn "pod-(?&lt;pod&gt;[^\/]+)"|strcat "eth" lcSlot "/" id Interface  | stats dc(Fault Creation Time) AS "Access-Faults"  latest(CurrentHealth) AS "Health"  latest(speed) AS Speed latest(nodeID) AS "nodeID"  by Interface,apic_host,pod| join type=inner max=0 nodeID,Interface,apic_host [ search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:health component=ethpmPhysIf code=* |dedup dn,apic_host | rex field=dn "node-(?&lt;nodeID&gt;\d+)\/sys\/phys-\[(?&lt;Interface&gt;.*?)\]" |stats count(code) AS "Layer1-Faults" by Interface,nodeID,apic_host ]  | table Interface,Health,"Access-Faults","Layer1-Faults",Speed,apic_host,pod | rename Interface AS Name pod AS Pod| sort 0 Health | dedup apic_host,pod,Interface | fields - apic_host</query>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

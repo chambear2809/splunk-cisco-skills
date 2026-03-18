@@ -1,0 +1,161 @@
+<form version="1.1">
+  <label>HTTP Overview</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="server" searchWhenChanged="true">
+      <label>Servers</label>
+      <search>
+        <query>index=* source="stream:Splunk_HTTPURI" | rename dest_ip as server | stats count by server | fields - count</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <fieldForLabel>server</fieldForLabel>
+      <fieldForValue>server</fieldForValue>
+      <choice value="*">all</choice>
+      <default>*</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>Average HTTP Response Time</title>
+        <search>
+          <query>index=* source="stream:Splunk_HTTPResponseTime" dest_ip=$server$ | bin bins=100 _time
+              | rename sum(time_taken) as time_taken
+              | stats sum(time_taken) as response_time, sum(count) as total_cnt by _time
+              | eval response_time=response_time/total_cnt/(1000*1000)
+              | timechart bins=100 avg(response_time) as "Avg. Response Time"
+          </query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+    <panel>
+        <chart>
+          <title>HTTP Requests/sec</title>
+          <search>
+            <query>index=* source="stream:Splunk_HTTPResponseTime" dest_ip=$server$ | bin span=1s _time
+                | stats sum(count) as requests_sec by _time
+                | timechart avg(requests_sec) as "Requests/sec"
+            </query>
+            <earliest>$field1.earliest$</earliest>
+            <latest>$field1.latest$</latest>
+          </search>
+          <option name="charting.chart">line</option>
+          <option name="charting.axisY2.enabled">false</option>
+          <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+          <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+          <option name="charting.axisTitleX.visibility">visible</option>
+          <option name="charting.axisTitleY.visibility">visible</option>
+          <option name="charting.axisTitleY2.visibility">visible</option>
+          <option name="charting.axisX.scale">linear</option>
+          <option name="charting.axisY.scale">linear</option>
+          <option name="charting.axisY2.scale">inherit</option>
+          <option name="charting.chart.bubbleMaximumSize">50</option>
+          <option name="charting.chart.bubbleMinimumSize">10</option>
+          <option name="charting.chart.bubbleSizeBy">area</option>
+          <option name="charting.chart.nullValueMode">gaps</option>
+          <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+          <option name="charting.chart.stackMode">default</option>
+          <option name="charting.chart.style">shiny</option>
+          <option name="charting.drilldown">all</option>
+          <option name="charting.layout.splitSeries">0</option>
+          <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+          <option name="charting.legend.placement">right</option>
+        </chart>
+    </panel>
+  </row>
+  <search id="baseSearch">
+      <query>index=* source="stream:Splunk_HTTPStatus" dest_ip=$server$ | fields _time,status,count</query>
+      <earliest>$field1.earliest$</earliest>
+      <latest>$field1.latest$</latest>
+  </search>
+  <row>
+    <panel>
+      <chart>
+        <title>HTTP Errors (HTTP Status Code &gt;=400)</title>
+        <search base = "baseSearch">
+          <query>search status >= 400 | timechart sum(count) as "Error Count"</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+</chart>
+    </panel>
+    <panel>
+      <chart>
+          <title>HTTP Requests Count by Status Code</title>
+        <search base="baseSearch">
+          <query>stats sum(count) as "Count" by  status</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">gaps</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+  </row>
+</form>

@@ -1,0 +1,722 @@
+<form script="set_apic_token.js" version="1.1">
+  <label>ACL Logs</label>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset submitButton="false">
+    <input type="time" token="timetoken">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+     <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$timetoken.earliest$</earliest>
+        <latest>$timetoken.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+    <row>
+    <panel>
+      <html id="overview">
+      <h1>Dashboard Overview</h1>
+        <p>This dashboard provides ACL L2 and L3 Packet Permit and Drop Statistics.
+          <ul>
+            <li>Analyze the trends of Permits/Drops on L2/L3 over time.</li>
+            <li>Statistical dashboard panels will show up any packet information  per node and per tenant basis. Drilldown on the trellis charts further to view each packet data</li>
+          </ul>
+        </p>
+     </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>L3 Permit</title>
+      <single>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogPermitL3Pkt  | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)" | eval NewTime=strptime(timeStamp,"%Y-%m-%dT%H:%M:%S") | eval _time=NewTime | timechart cont=FALSE span=1m avg(pktLen)</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>L3 Drop</title>
+      <single>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogDropL3Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)" | eval NewTime=strptime(timeStamp,"%Y-%m-%dT%H:%M:%S") | eval _time=NewTime | timechart cont=FALSE span=1m avg(pktLen)</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>L2 Permit</title>
+      <single>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogPermitL2Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)" | eval NewTime=strptime(timeStamp,"%Y-%m-%dT%H:%M:%S") | eval _time=NewTime | timechart cont=FALSE span=1m avg(pktLen)</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>L2 Drop</title>
+      <single>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogDropL2Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)" | eval NewTime=strptime(timeStamp,"%Y-%m-%dT%H:%M:%S") | eval _time=NewTime | timechart cont=FALSE span=1m avg(pktLen)</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="rangeColors">["0x53a051","0x0877a6","0xf8be34","0xf1813f","0xdc4e41"]</option>
+        <option name="rangeValues">[0,30,70,100]</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$panel_show1_0$">
+      <title>L3 Permit Packets by Node</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogPermitL3Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)"| eval Node = "Leaf-".Node |rename pktLen AS "Pkt Len"| xyseries timeStamp, Node, "Pkt Len"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="panel_show1_0">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="l3permit">$trellis.split.Node$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel depends="$panel_show1_1$">
+      <title>L3 Permit Packets by Tenant</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogPermitL3Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)" |rename pktLen AS "Pkt Len"| xyseries timeStamp, Tenant, "Pkt Len"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="panel_show1_1">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="l3permit">$trellis.split.Tenant$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>ACL L3 Permit Pkts</title>
+      <table depends="$l3permit$">
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogPermitL3Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)"| table timeStamp, pktLen, dstIp,dstPort, srcIp, srcPort, vrfEncap,protocol,Tenant,Pod,Node,VRF,srcMacAddr,dstMacAddr, vrfEncap| eval Pod = "Pod-".Pod | eval Node = "Leaf-".Node| search Node=$l3permit$ OR Tenant=$l3permit$</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$panel_show2_0$">
+      <title>L3 Drop Packets by Node</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogDropL3Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)"| eval Node = "Leaf-".Node |rename pktLen AS "Pkt Len"| xyseries timeStamp, Node, "Pkt Len"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="panel_show2_0">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="l3drop">$trellis.split.Node$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel depends="$panel_show2_1$">
+      <title>L3 Drop Packets by Tenant</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogDropL3Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)" |rename pktLen AS "Pkt Len"| xyseries timeStamp, Tenant, "Pkt Len"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="panel_show2_1">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="l3drop">$trellis.split.Tenant$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>ACL L3 Drop Pkts</title>
+      <table depends="$l3drop$">
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogDropL3Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)"| table timeStamp, pktLen, dstIp,dstPort, srcIp, srcPort, vrfEncap,protocol,Tenant,Pod,Node,VRF,srcMacAddr,dstMacAddr, vrfEncap| eval Pod = "Pod-".Pod | eval Node = "Leaf-".Node| search Node=$l3drop$ OR Tenant=$l3drop$</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$panel_show3_0$">
+      <title>L2 Permit Packets by Node</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogPermitL2Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)"| eval Node = "Leaf-".Node |rename pktLen AS "Pkt Len"| xyseries timeStamp, Node, "Pkt Len"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="panel_show3_0">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="l2permit">$trellis.split.Node$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel depends="$panel_show3_1$">
+      <title>L2 Permit Packets by Tenant</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogPermitL2Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)" |rename pktLen AS "Pkt Len"| xyseries timeStamp, Tenant, "Pkt Len"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="panel_show3_1">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="l2permit">$trellis.split.Tenant$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>ACL L2 Permit Pkts</title>
+      <table depends="$l2permit$">
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogPermitL2Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)"| table timeStamp, pktLen, dstIp,dstPort, srcIp, srcPort, vrfEncap,protocol,Tenant,Pod,Node,VRF,srcMacAddr,dstMacAddr, vrfEncap| eval Pod = "Pod-".Pod | eval Node = "Leaf-".Node| search Node=$l2permit$ OR Tenant=$l2permit$</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$panel_show4_0$">
+      <title>L2 Drop Packets by Node</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogDropL2Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)"| eval Node = "Leaf-".Node |rename pktLen AS "Pkt Len"| xyseries timeStamp, Node, "Pkt Len"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="panel_show4_0">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="l2drop">$trellis.split.Node$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel depends="$panel_show4_1$">
+      <title>L2 Drop Packets by Tenant</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogDropL2Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)" |rename pktLen AS "Pkt Len"| xyseries timeStamp, Tenant, "Pkt Len"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="panel_show4_1">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">collapsed</option>
+        <option name="charting.axisTitleY.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">1</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="l2drop">$trellis.split.Tenant$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>ACL L2 Drop Pkts</title>
+      <table depends="$l2drop$">
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=acllogDropL2Pkt | rex field=dn "topology\/pod-(?&lt;Pod&gt;[^\/]+)\/node-(?&lt;Node&gt;[^\/]+)\/ndbgs\/acllog\/tn-(?&lt;Tenant&gt;[^\/]+)\/ctx-(?&lt;VRF&gt;[^\/]+)"| table timeStamp, pktLen, dstIp,dstPort, srcIp, srcPort, vrfEncap,protocol,Tenant,Pod,Node,VRF,srcMacAddr,dstMacAddr, vrfEncap| eval Pod = "Pod-".Pod | eval Node = "Leaf-".Node| search Node=$l2drop$ OR Tenant=$l2drop$</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">5</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">row</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

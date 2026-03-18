@@ -1,0 +1,73 @@
+.wizard-head {
+    padding-left: 20px;
+    background-color: #F5F5F5;
+}
+
+.wizard-body {
+    padding-bottom: 20px;
+    background-color: white;
+}
+
+.wizard-head .alerts {
+    padding-left: 15px;
+/*
+    border: 1px dashed red;
+*/
+}
+
+.wizard-body .alerts {
+/*
+    border: 1px dashed blue;
+*/
+}
+
+.step-subheading {
+    padding-left: 20px;
+    padding-top: 30px;
+    padding-bottom: 30px;
+/*
+This is what ITSI uses, e.g. in the 'Create New Service' wizard.
+    border-bottom: 1px solid rgb(213,213,213);
+*/
+    font-size: 20px;
+}
+
+.step-subsubheading {
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+.step-subsubheading .name {
+    font-style: italic;
+}
+
+.step-wizard-step .field-explanation {
+    color: gray;
+}
+
+/*
+These rules are based on the table in the Data Models page in Splunk, but note
+that the Manage Apps page in Splunk has another sortable table that looks quite different.
+For now, these rules are specific to WizardSteps, but they should be used elsewhere, too,
+if this is what we want our tables to look like.
+*/
+.step-wizard-step th.header {
+    cursor: pointer;
+}
+
+.step-wizard-step th.header:after {
+    content: "\2195"; /* up and down arrows */
+    font-family: "Splunk Icons";
+    color: #bbb;
+    padding-left: 5px;
+}
+
+.step-wizard-step th.headerSortUp:after {
+    content: "\21A7"; /* down arrow */
+    color: black;
+}
+
+.step-wizard-step th.headerSortDown:after {
+    content: "\21A5"; /* up arrow */
+    color: black;
+}

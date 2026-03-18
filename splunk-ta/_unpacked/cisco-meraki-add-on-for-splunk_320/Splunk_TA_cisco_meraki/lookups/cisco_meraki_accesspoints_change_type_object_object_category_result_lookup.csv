@@ -1,0 +1,5 @@
+meraki_event_type,object,object_category,result,change_type
+auto_rf_channel_change,channel,accesspoint,modified,update
+auto_tx_power_change,power,accesspoint,modified,update
+dfs_event,channel,accesspoint,created,creation
+wpa_deauth,accesspoint,authentication,stopped,AAA

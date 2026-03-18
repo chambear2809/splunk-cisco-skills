@@ -1,0 +1,48 @@
+<form version="1.1">
+  <label>Coterm Licenses</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Licensing Coterm Licenses</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:licensescotermlicenses"$orgid$ 
+| dedup key, startedAt
+| rename claimedAt as "Claimed At", editions{}.edition as "Edition", editions{}.productType as "Product Type" , mode as "Mode", duration as "Duration (In Days)"
+| table "Claimed At","Edition","Product Type" ,"Mode", "Duration (In Days)"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:licensescotermlicenses" $orgid$ | dedup key, startedAt| search claimedAt="$row.Claimed At$" editions{}.edition="$row.Edition$" editions{}.productType="$row.Product Type$" mode="$row.Mode$" duration="$row.Duration (In Days)$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>

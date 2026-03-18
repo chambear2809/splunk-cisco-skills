@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="smtp">
+    <Name>Messaging Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="smtp.event">
+      <Type>object</Type>
+      <Comment>Event representing an (SMTP) e-mail message</Comment>
+    </Term>
+    <Term id="smtp.duration">
+      <Type>uint32</Type>
+      <Comment>Duration of the SMTP session in microseconds</Comment>
+    </Term>
+    <Term id="smtp.receiver-rcpt-to">
+      <Type>string</Type>
+      <Comment>Recipient's email address (used by RCPT TO method)</Comment>
+    </Term>
+    <Term id="smtp.receiver-domain">
+      <Type>string</Type>
+      <Comment>Domain of the recipient's email address</Comment>
+    </Term>
+    <Term id="smtp.response-code">
+      <Type>uint32</Type>
+      <Comment>Return code</Comment>
+    </Term>
+    <Term id="smtp.sender-mail-from">
+      <Type>string</Type>
+      <Comment>Sender's email address (used by MAIL FROM method)</Comment>
+    </Term>
+    <Term id="smtp.sender-domain">
+      <Type>string</Type>
+      <Comment>Domain of the sender's email address</Comment>
+    </Term>
+    <Term id="smtp.sender-server">
+      <Type>string</Type>
+      <Comment>Contains the name of the used smtp server</Comment>
+    </Term>
+    <Term id="smtp.server-agent">
+      <Type>string</Type>
+      <Comment>The software name used by the email server</Comment>
+    </Term>
+    <Term id="smtp.start-time">
+      <Type format="%H:%M:%S">time</Type>
+      <Comment>Starting time of SMTP session</Comment>
+    </Term>
+    <Term id="smtp.stop-time">
+      <Type format="%H:%M:%S">time</Type>
+      <Comment>Ending time of SMTP session</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

@@ -1,0 +1,4 @@
+meraki_event_type,object_attrs
+auto_rf_channel_change,channel
+auto_tx_power_change,power
+dfs_event,channel

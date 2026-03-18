@@ -1,0 +1,37 @@
+.expiration-edit-controls {
+    margin-bottom: 150px;
+}
+
+.expiration-form-controls {
+    padding-left: 20px;
+}
+
+.expiration-dropdown {
+    padding-left: 10px;
+}
+
+.expiration-form-controls .control-group {
+    padding-bottom: 10px;
+}
+
+.expiration-form-controls .control-label {
+    width: 150px;
+}
+
+.expiration-form-controls .shared-controls-textcontrol > input {
+    width: 50px;
+}
+
+.expiration-form-controls .shared-controls-datecontrol > input {
+    width: 69px;
+}
+
+.expiration-form-controls .field-explanation {
+    padding-left: 143px;
+    font-size: 9px;
+    color: #CCCCCC;
+}
+
+#remove-elapsed-time {
+    margin-left: 3px;
+}

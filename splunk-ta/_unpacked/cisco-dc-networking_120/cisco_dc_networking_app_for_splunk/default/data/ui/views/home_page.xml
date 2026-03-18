@@ -1,0 +1,479 @@
+<form script="set_apic_token.js" stylesheet="table_decorations.css" version="1.1">
+  <label>Home</label>
+  
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-4h@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+        </condition>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <table>
+        <title>APICs</title>
+        <search>
+          <query>| `apic_details`| search $formed_apic_host$|rename State AS "Admin State"| join apic_host,Name [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:health component=infraWiNode | stats latest(operSt) As "Operational State" latest(health) As "APIC Health" by apic_host,nodeName| rename nodeName As "Name"]| fields - apic_host, "In-band management Address" | table "Out-of-band Management Address", "Fabric Mac Address", Name, "APIC Health", "Operational State", "Admin State", "System Up Time", Mode</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+        <format type="color" field="APIC Health">
+          <colorPalette type="map"></colorPalette>
+        </format>
+        <format type="color" field="Operational State">
+          <colorPalette type="map">{"Available":#65A637,"Unavailable":#D93F3C,"available":#65A637,"unavailable":#D93F3C,"Unregistered":#F7BC38,"unregistered":#F7BC38}</colorPalette>
+        </format>
+      </table>
+    </panel>
+    <panel>
+      <chart>
+        <title>Fabric Health - History</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_health (component=fabricHealthTotal) dn="topology/health" $formed_apic_host$ NOT "code" | sort 0 _time | fields _time cur dn name component |  chart latest(cur) AS Health by _time</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$Tenant$">
+      <single>
+        <title>Tenants</title>
+        <search>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="Tenant">true</set>
+            </condition>
+            <condition>
+              <unset token="Tenant">true</unset>
+            </condition>
+          </progress>
+          <query>eventtype=cisco_dc_aci_health (component=fvTenant) $formed_apic_host$ NOT "code" | sort 0 _time | fields _time cur dn name role component twScore apic_host|dedup name,apic_host |stats count(name)</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/tenant_dashboard?form.mso_host=$mso_host$&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$Applications$">
+      <single>
+        <title>Applications</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_health (component=fvAp) dn="*/health" $formed_apic_host$ NOT "code" | sort 0 _time | fields _time cur dn name role component | stats dc(name) by dn | stats count(dc(name))</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="Applications">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <option name="unitPosition">after</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/application_details?form.timetoken.earliest=$time_token.earliest$&amp;form.timetoken.latest=$time_token.latest$&amp;form.mso_host=$mso_host$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$VMs$">
+      <single>
+        <title>VMs</title>
+        <search>
+          <query>| `vm_count` | search $formed_apic_host$ |  stats dc(classInfo.VM_Relation.VirtualMachine)</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="VMs">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/vmware?form.mso_host=$mso_host$&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$Leafs$">
+      <single>
+        <title>Leafs</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_health (component=fabricNode) $formed_apic_host$ | sort 0 _time | fields _time cur dn name role component | search role=leaf | stats dc(name)</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="Leafs">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/fabric_dashboard?form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.mso_host=$mso_host$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$Spines$">
+      <single>
+        <title>Spines</title>
+        <search>
+          <query>eventtype=cisco_dc_aci_health (component=fabricNode) $formed_apic_host$  | sort 0 _time | fields _time cur dn name role component | search role=spine | stats dc(name)</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="Spines">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/fabric_dashboard?form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.mso_host=$mso_host$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$Faults$">
+      <single>
+        <title>Critical Faults</title>
+        <search>
+          <query>| `apic-fault-overview` |  search $formed_apic_host$| dedup dn | search severity=critical | stats count</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="Faults">true</set>
+            </condition>
+          </progress>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="numberPrecision">0</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/help_desk?form.multiTokenQuery=critical&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.mso_host=$mso_host$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$EPG$">
+      <single>
+        <title>EPG</title>
+        <search>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="EPG">true</set>
+            </condition>
+          </progress>
+          <query>eventtype=cisco_dc_aci_health (component=fvAEPg) dn="*/health" $formed_apic_host$ NOT "code" | sort 0 _time | fields _time cur dn name role component apic_host| stats dc(name) by dn,apic_host | stats count(dc(name))</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/epg_details?form.mso_host=$mso_host$&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$BD$">
+      <single>
+        <title>Bridge Domain</title>
+        <search>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="BD">true</set>
+            </condition>
+          </progress>
+          <query>eventtype=cisco_dc_aci_health (component=fvBD) dn="*/health" $formed_apic_host$ NOT "code" | sort 0 _time | fields _time cur dn name role component apic_host| stats dc(name) by dn,apic_host | stats count(dc(name))</query>
+          <earliest>$earliest$</earliest>
+          <latest>$latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/bd_details?form.mso_host=$mso_host$&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$Filters$">
+      <single>
+        <title>Filters</title>
+        <search>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="Filters">true</set>
+            </condition>
+          </progress>
+          <query>eventtype=cisco_dc_aci_health (component=vzFilter ) $formed_apic_host$ NOT "code" | sort 0 _time | fields _time cur dn name role component apic_host| stats dc(name) by dn,apic_host | stats count(dc(name))</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/filters_details?form.mso_host=$mso_host$&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$Contracts$">
+      <single>
+        <title>Contracts</title>
+        <search>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="Contracts">true</set>
+            </condition>
+          </progress>
+          <query>eventtype=cisco_dc_aci_health (component=vzBrCP) $formed_apic_host$ NOT "code" | sort 0 _time | fields _time cur dn name role component apic_host| stats dc(name) by dn,apic_host | stats count(dc(name))</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/contracts_details?form.mso_host=$mso_host$&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel depends="$L3Out$">
+      <single>
+        <title>L3OUT Networks</title>
+        <search>
+          <progress>
+            <condition match="'job.resultCount' &gt; 0">
+              <set token="L3Out">true</set>
+            </condition>
+          </progress>
+          <query>eventtype=cisco_dc_aci_health (component=l3extOut) $formed_apic_host$ NOT "code" | sort 0 _time | fields _time cur dn name role component apic_host| stats dc(name) by dn,apic_host | stats count(dc(name))</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">none</option>
+        <option name="drilldown">all</option>
+        <option name="numberPrecision">0</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="showSparkline">1</option>
+        <option name="showTrendIndicator">1</option>
+        <option name="trendColorInterpretation">standard</option>
+        <option name="trendDisplayMode">absolute</option>
+        <option name="unitPosition">after</option>
+        <option name="useColors">0</option>
+        <option name="useThousandSeparators">1</option>
+        <drilldown>
+          <link target="_blank">/app/cisco_dc_networking_app_for_splunk/l3outnetworks_details?form.mso_host=$mso_host$&amp;form.time_token.earliest=$time_token.earliest$&amp;form.time_token.latest=$time_token.latest$&amp;form.apic_host=$apic_host$</link>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+</form>

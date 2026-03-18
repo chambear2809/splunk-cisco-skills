@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="dns">
+    <Name>DNS Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="dns.event">
+      <Type>object</Type>
+      <Comment>Event representing a DNS query</Comment>
+    </Term>
+    <Term id="dns.ancount">
+      <Type>uint32</Type>
+      <Comment>The number of resource records in the answer section</Comment>
+    </Term>
+    <Term id="dns.arcount">
+      <Type>uint32</Type>
+      <Comment>Number of additional answers</Comment>
+    </Term>
+    <Term id="dns.host">
+      <Type>shortstring</Type>
+      <Comment>Host name</Comment>
+    </Term>
+    <Term id="dns.host-addr">
+      <Type>shortstring</Type>
+      <Comment>Host IP address</Comment>
+    </Term>
+    <Term id="dns.host-type">
+      <Type>shortstring</Type>
+      <Comment>DNS Query sent</Comment>
+    </Term>
+    <Term id="dns.message-type">
+      <Type>shortstring</Type>
+      <Comment>Message type</Comment>
+    </Term>
+    <Term id="dns.name">
+      <Type>shortstring</Type>
+      <Comment>Name of the request</Comment>
+    </Term>
+    <Term id="dns.nscount">
+      <Type>uint32</Type>
+      <Comment>Number of answers in the 'authority' section.</Comment>
+    </Term>
+    <Term id="dns.qdcount">
+      <Type>uint32</Type>
+      <Comment>Number of queries</Comment>
+    </Term>
+    <Term id="dns.query">
+      <Type>shortstring</Type>
+      <Comment>DNS Query sent</Comment>
+    </Term>
+    <Term id="dns.query-type">
+      <Type>shortstring</Type>
+      <Comment>DNS Query type</Comment>
+    </Term>
+    <Term id="dns.reply-code">
+      <Type>shortstring</Type>
+      <Comment>Return message</Comment>
+    </Term>
+    <Term id="dns.reply-code-id">
+        <Type>uint32</Type>
+        <Comment>Return message code in numeric format</Comment>
+    </Term>
+    <Term id="dns.response-time">
+    <Type>uint32</Type>
+      <Comment>Elapsed time (in microseconds) between sending of the dns request and reception of its response</Comment>
+    </Term>
+    <Term id="dns.reverse-addr">
+      <Type>shortstring</Type>
+      <Comment>IP address returned to the PTR request</Comment>
+    </Term>
+    <Term id="dns.transaction-id">
+      <Type>uint32</Type>
+      <Comment></Comment>
+    </Term>
+    <Term id="dns.ttl">
+      <Type>uint32</Type>
+      <Comment>Time (in seconds) a DNS information returned by the server will be kept in cache</Comment>
+    </Term>
+    <Term id="dns.pktdata">
+        <Type>blob</Type>
+        <Comment>DNS packet data blob</Comment>
+    </Term>
+    <Term id="dns.txt-values">
+        <Type>blob</Type>
+        <Comment>DNS Text Value</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

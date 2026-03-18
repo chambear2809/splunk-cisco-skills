@@ -1,0 +1,375 @@
+{
+  "app": "Stream", 
+  "category": "Messaging", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "irc.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of the client in dot-quad notation", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates client terminated connection with RST flag",
+      "enabled": false, 
+      "name": "canceled", 
+      "term": "flow.canceled"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "TCP session server endpoint (IP address and TCP port)", 
+      "enabled": false, 
+      "name": "connection", 
+      "term": "flow.connection"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Average round trip time in microseconds from the client to the point of capture", 
+      "enabled": false, 
+      "name": "client_rtt", 
+      "term": "flow.cp-rtt"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of round trip measurements from the client to the point of capture", 
+      "enabled": false, 
+      "name": "client_rtt_packets", 
+      "term": "flow.cp-rtt-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sum of all round trip time measurements from the client to the point of capture", 
+      "enabled": false, 
+      "name": "client_rtt_sum", 
+      "term": "flow.cp-rtt-sum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of acknowledgement packets sent from client to server", 
+      "enabled": false, 
+      "name": "ack_packets_in", 
+      "term": "flow.cs-ack-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of data packets sent from client to server", 
+      "enabled": false, 
+      "name": "data_packets_in", 
+      "term": "flow.cs-data-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of duplicate packets sent from client to server", 
+      "enabled": false, 
+      "name": "duplicate_packets_in", 
+      "term": "flow.cs-duplicate-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of missing packet gaps detected within the request", 
+      "enabled": false, 
+      "name": "missing_packets_in", 
+      "term": "flow.cs-missing-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Average round trip time in microseconds from the server to the point of capture", 
+      "enabled": false, 
+      "name": "server_rtt", 
+      "term": "flow.ps-rtt"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of round trip measurements from the server to the point of capture", 
+      "enabled": false, 
+      "name": "server_rtt_packets", 
+      "term": "flow.ps-rtt-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sum of all round trip time measurements from the server to the point of capture", 
+      "enabled": false, 
+      "name": "server_rtt_sum", 
+      "term": "flow.ps-rtt-sum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates server terminated connection with RST flag",
+      "enabled": false, 
+      "name": "refused", 
+      "term": "flow.refused"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of the server in dot-quad notation", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of acknowledgement packets sent from server to client", 
+      "enabled": false, 
+      "name": "ack_packets_out", 
+      "term": "flow.sc-ack-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of data packets sent from server to client", 
+      "enabled": false, 
+      "name": "data_packets_out", 
+      "term": "flow.sc-data-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of duplicate packets sent from server to client", 
+      "enabled": false, 
+      "name": "duplicate_packets_out", 
+      "term": "flow.sc-duplicate-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of missing packet gaps detected within the response", 
+      "enabled": false, 
+      "name": "missing_packets_out", 
+      "term": "flow.sc-missing-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took to negotiate an SSL handshake", 
+      "enabled": false, 
+      "name": "ssl_time", 
+      "term": "flow.ssl-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SSL protocol version used for encryption, or undefined if not encrypted", 
+      "enabled": false, 
+      "name": "ssl_version", 
+      "term": "flow.ssl-version"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "TCP handshake status (0=OK, 1=RESET, 2=IGNORED)", 
+      "enabled": false, 
+      "name": "tcp_status", 
+      "term": "flow.tcp-status"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport layer protocol (udp or tcp)", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Chat room name", 
+      "enabled": true, 
+      "name": "chat_room_name", 
+      "term": "irc.channel"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of the irc channel", 
+      "enabled": true, 
+      "name": "channel_name", 
+      "term": "irc.channel-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "File correlation key", 
+      "enabled": true, 
+      "name": "file_identifier", 
+      "term": "irc.file-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of the transferred file", 
+      "enabled": true, 
+      "name": "filename", 
+      "term": "irc.filename"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "User's login string", 
+      "enabled": true, 
+      "name": "login", 
+      "term": "irc.login"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Concatenated login and server", 
+      "enabled": true, 
+      "name": "login_server", 
+      "term": "irc.login-server"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the chat message", 
+      "enabled": true, 
+      "name": "message", 
+      "term": "irc.message"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Status of the irc channel", 
+      "enabled": true, 
+      "name": "mode", 
+      "term": "irc.mode-status"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "User's alias", 
+      "enabled": true, 
+      "name": "nickname", 
+      "term": "irc.nick-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the identity of the receiver for a chat message or a file transfer", 
+      "enabled": true, 
+      "name": "receiver", 
+      "term": "irc.receiver"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the identity of the sender of a chat session or a file transfer", 
+      "enabled": true, 
+      "name": "sender", 
+      "term": "irc.sender"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server name to which the user is connected", 
+      "enabled": true, 
+      "name": "server", 
+      "term": "irc.server"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "irc", 
+  "isReferenceStream": true,  
+  "name": "IRC Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "IRC", 
+  "sourcetype": "stream:irc", 
+  "streamType": "event"
+}

@@ -1,0 +1,76 @@
+<script id="forwarder-management-table-inf-row-template" type="text/template">
+        <td></td>
+        <td colspan="7" class="detailed-info-td">
+            <div>
+                <div class="detailed-info-label">Contains Streams
+                    <span class="continuation-dots">............................</span>
+                </div>
+
+                <% if (streams.length === 0) { %>
+                    <span class="none-found">None</span>
+                <% } else { %>
+                    <% for (var i = 0; i < Math.min(streams.length,3); i++) { %>
+                        <span>
+                            <%- streams[i] %>
+                            <!-- comma -->
+                            <% if (i !== streams.length - 1) { %> , <% } %>
+                        </span>
+                    <% } %>
+
+                    <% if (streams.length > 3) { %>
+                        <span>
+                            ...... <span class="show-more stream-models"> and <%- streams.length - 3 %> more </span>
+                        </span>
+                    <% } %>
+                <% } %>
+            </div>
+
+            <div>
+                <div class="detailed-info-label">Matched Forwarders
+                    <span class="continuation-dots">.......................</span>
+                </div>
+
+                <% if (matchedFwdGroups.length === 0) { %>
+                    <span class="none-found">None</span>
+                <% } else { %>
+                    <% for (var i = 0; i < Math.min(matchedFwdGroups.length,3); i++) { %>
+                        <span>
+                            <%- matchedFwdGroups[i] %>
+                            <!-- comma -->
+                            <% if (i !== matchedFwdGroups.length - 1) { %> , <% } %>
+                        </span>
+                    <% } %>
+
+                    <% if (matchedFwdGroups.length > 3) { %>
+                        <span>
+                            ...... <span class="show-more matched-fwd-groups">and <%- matchedFwdGroups.length - 3 %> more </span>
+                        </span>
+                    <% } %>
+                <% } %>
+            </div>
+
+            <div>
+                <div class="detailed-info-label">HTTP Event Collectors
+                    <span class="continuation-dots">....................</span>
+                </div>
+
+                <% if (!endpointUrls || endpointUrls.length === 0) { %>
+                    <span class="none-found">None</span>
+                <% } else { %>
+                    <% for (var i = 0; i < Math.min(endpointUrls.length,3); i++) { %>
+                        <span>
+                            <%- endpointUrls[i] %>
+                            <!-- comma -->
+                            <% if (i !== endpointUrls.length - 1) { %> , <% } %>
+                        </span>
+                    <% } %>
+
+                    <% if (endpointUrls.length > 3) { %>
+                        <span>
+                            ...... <span class="show-more http-endpoint-urls"> and <%- endpointUrls.length - 3 %> more </span>
+                        </span>
+                    <% } %>
+                <% } %>
+            </div>
+        </td>
+</script>

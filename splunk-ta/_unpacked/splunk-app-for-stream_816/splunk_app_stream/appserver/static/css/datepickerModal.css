@@ -1,0 +1,15 @@
+#datepickerModal .dateTimeInput{
+	width: 80px;
+}
+
+#hhmmss-subtext{
+	font-size: 12px;
+	color: #888;
+	position: relative;
+	top: -5px;
+	left: 1px;
+}
+
+#datepickerModal .cancel{
+	float:left;
+}

@@ -1,0 +1,354 @@
+{
+  "app": "Stream", 
+  "category": "Telephony", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "rtcp.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "Packet type (such as SenderReport)",
+      "enabled": true, 
+      "name": "packet_type", 
+      "term": "rtcp.packet-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SSRC (Synchronization Source) identifier",
+      "enabled": true, 
+      "name": "ssrc", 
+      "term": "rtcp.ssrc"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Canonical end-point identifier SDES item",
+      "enabled": true, 
+      "name": "sdes_cname", 
+      "term": "rtcp.sdes-cname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "User name SDES item",
+      "enabled": true, 
+      "name": "sdes_name", 
+      "term": "rtcp.sdes-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Email address SDES item",
+      "enabled": true, 
+      "name": "sdes_email", 
+      "term": "rtcp.sdes-email"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Phone number SDES item",
+      "enabled": true, 
+      "name": "sdes_phone", 
+      "term": "rtcp.sdes-phone"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Geographic user location SDES item",
+      "enabled": true, 
+      "name": "sdes_loc", 
+      "term": "rtcp.sdes-loc"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Application or tool name SDES item",
+      "enabled": true, 
+      "name": "sdes_tool", 
+      "term": "rtcp.sdes-tool"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Notice/Status SDES item",
+      "enabled": true, 
+      "name": "sdes_note", 
+      "term": "rtcp.sdes-note"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SSRC of a report block (receiver report)",
+      "enabled": true, 
+      "name": "rr_block_ssrc", 
+      "term": "rtcp.rr-block-ssrc"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Fraction of packets lost (receiver report)",
+      "enabled": true, 
+      "name": "rr_fcnlost", 
+      "term": "rtcp.rr-fcnlost"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Cumulative number of packets lost (receiver report)",
+      "enabled": true, 
+      "name": "rr_cumlost", 
+      "term": "rtcp.rr-cumlost"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Extended highest sequence number received (receiver report)",
+      "enabled": true, 
+      "name": "rr_highestseqnum", 
+      "term": "rtcp.rr-highestseqnum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Interarrival jitter (receiver report)",
+      "enabled": true, 
+      "name": "rr_jitter", 
+      "term": "rtcp.rr-jitter"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Last SR timestamp (receiver report)",
+      "enabled": true, 
+      "name": "rr_lsr", 
+      "term": "rtcp.rr-lsr"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Delay since last SR (receiver report)",
+      "enabled": true, 
+      "name": "rr_dlsr", 
+      "term": "rtcp.rr-dlsr"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "NTP timestamp, most significant word",
+      "enabled": true, 
+      "name": "sr_ntp_ts_msw", 
+      "term": "rtcp.sr-ntp-ts-msw"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "NTP timestamp, least significant word",
+      "enabled": true, 
+      "name": "sr_ntp_ts_lsw", 
+      "term": "rtcp.sr-ntp-ts-lsw"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "NTP timestamp",
+      "enabled": true, 
+      "name": "sr_ntp_ts", 
+      "term": "rtcp.sr-ntp-ts"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "RTP timestamp",
+      "enabled": true, 
+      "name": "sr_rtp_ts", 
+      "term": "rtcp.sr-rtp-ts"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sender's packet count",
+      "enabled": true, 
+      "name": "sr_pkt_count", 
+      "term": "rtcp.sr-pkt-count"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sender's octet count",
+      "enabled": true, 
+      "name": "sr_octet_count", 
+      "term": "rtcp.sr-octet-count"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SSRC of a report block (sender report)",
+      "enabled": true, 
+      "name": "sr_block_ssrc", 
+      "term": "rtcp.sr-block-ssrc"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Fraction of packets lost (sender report)",
+      "enabled": true, 
+      "name": "sr_fcnlost", 
+      "term": "rtcp.sr-fcnlost"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Cumulative number of packets lost (sender report)",
+      "enabled": true, 
+      "name": "sr_cumlost", 
+      "term": "rtcp.sr-cumlost"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Extended highest sequence number received (sender report)",
+      "enabled": true, 
+      "name": "sr_highestseqnum", 
+      "term": "rtcp.sr-highestseqnum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Interarrival jitter (sender report)",
+      "enabled": true, 
+      "name": "sr_jitter", 
+      "term": "rtcp.sr-jitter"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Last SR timestamp (sender report)",
+      "enabled": true, 
+      "name": "sr_lsr", 
+      "term": "rtcp.sr-lsr"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Delay since last SR (sender report)",
+      "enabled": true, 
+      "name": "sr_dlsr", 
+      "term": "rtcp.sr-dlsr"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport level protocol", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "rtcp", 
+  "isReferenceStream": true,  
+  "name": "RTCP Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "RTCP", 
+  "sourcetype": "stream:rtcp", 
+  "streamType": "event"
+}

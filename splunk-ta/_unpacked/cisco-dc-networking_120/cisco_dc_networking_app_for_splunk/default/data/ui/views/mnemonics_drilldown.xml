@@ -1,0 +1,16 @@
+<dashboard version="1.1">
+  <label>Messages by mnemonics</label>
+  <description/>
+  <row>
+    <panel>
+      <table>
+        <title>Mnemonics: $mnemonics$</title>
+        <search>
+          <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog | lookup cisco_dc_nexus_hostname_lookup device AS host OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as host OUTPUT hostname as hostname2 | eval Hostname = coalesce(hostname1, hostname2) | lookup cisco_dc_nexus_severity_lookup severity_id AS severity_id OUTPUT severity_name AS severity_name | stats latest(syslog_msg) as syslog_msg values(Hostname) as Hostname values(severity_name) as Severity values(severity_description) AS Description by _time,host,category,mnemonics | rename syslog_msg as Message host as deviceIP mnemonics as Mnemonics category AS Facility | search Mnemonics=$mnemonics$ | fields _time Hostname deviceIP Facility Severity Message</query>
+          <earliest>$earliest$</earliest>
+          <latest>$latest$</latest>
+        </search>
+      </table>
+    </panel>
+  </row>
+</dashboard>

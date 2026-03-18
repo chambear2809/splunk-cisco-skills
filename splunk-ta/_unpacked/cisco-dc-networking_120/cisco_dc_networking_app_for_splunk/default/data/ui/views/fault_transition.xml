@@ -1,0 +1,329 @@
+<form script="set_apic_token.js, multiselect.js" stylesheet="table_decorations.css" version="1.1">
+  <label>Faults Transition</label>
+  
+  <search id="baseSearch">
+    <query>| `apic-fault-overview`</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+    <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="time_token" searchWhenChanged="true">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-15m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+        </condition>
+      </change>
+    </input>
+    <input type="multiselect" token="severity" searchWhenChanged="true">
+      <default>*</default>
+      <label>Severity</label>
+      <choice value="*">All</choice>
+      <choice value="critical">critical</choice>
+      <choice value="major">major</choice>
+      <choice value="minor">minor</choice>
+      <choice value="warning">warning</choice>
+      <choice value="cleared">cleared</choice>
+      <delimiter> OR severity=</delimiter>
+    </input>
+    
+  </fieldset>
+  <row>
+    <panel>
+      <html id="overview">
+        <style>
+          #overview{
+            height:25% !important;
+          }
+        </style>
+       <h1>Dashboard Overview</h1>
+       <p>This dashboard summarizes all of the faults generated by APIC over the time period specified using the time picker.Tacking all the unique faults, fault occurence more often, faults can be ignored etc.</p>
+       </html>
+    </panel>
+    <panel>
+      <html id="tracking">
+        <style>
+          #tracking{
+            height:25% !important;
+          }
+        </style>
+       <h1>Tracking Faults</h1>
+        <a href="help_desk_fault_detail" target="_blank"> View Full Unique Faults Report </a>
+        <br/>
+        <a href="help_desk_ack_fault_detail" target="_blank"> View Ack Faults Report </a>
+        <br/>
+        <a href="help_desk_unack_fault_detail" target="_blank"> View Unack Faults Report </a>
+     </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Faults Transition State (lifecycle)</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$  | dedup dn,apic_host | search severity=$severity$ | stats count(lifecycle) by lifecycle</query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <set token="faultState">$click.value$</set>
+          <unset token="faultAck"></unset>
+          <unset token="faultOften"></unset>
+        </drilldown>
+        <option name="charting.drilldown">all</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Faults Acknowledged</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$  | dedup dn,apic_host | search severity=$severity$ ack=* | stats count(ack) by ack</query>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <set token="faultAck">$click.value$</set>
+          <unset token="faultState"></unset>
+          <unset token="faultOften"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Faults Repeated Often</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$  | dedup dn,apic_host | rename Fault.dn AS dn | search severity=$severity$ ack=* | stats count(cause) by cause | rename count(cause) AS count | sort 0 - count | dedup cause</query>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown>
+          <set token="faultOften">$click.value$</set>
+          <unset token="faultAck"></unset>
+          <unset token="faultState"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$faultOften$">
+        <title>Faults Repeated Often Detail</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Fault.ack) AS "ack"  latest(Fault.nameofnode) AS "node" latest(Fault.rule) AS "rule" latest(Fault.severity) AS "severity" latest(Fault.type) AS "type" latest(Fault.cause) AS "cause" latest(Fault.domain) AS "domain" latest(Fault.Tenant) AS "tenant" latest(Fault.created) AS "creationTime" latest(Fault.lastTransition) AS "lastTransition" latest(Fault.lc) AS "lifecycle" from datamodel=Cisco_DCN_Fault groupby _time, Fault.dn, Fault.apic_host | rename Fault.dn AS dn, Fault.apic_host AS apic_host | reverse | search $formed_apic_host$  | dedup dn,apic_host | rename Fault.dn AS dn | search severity=$severity$ ack=*  cause="$faultOften$"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$faultState$">
+        <title>Fault Transition States</title>
+        <search>
+          <query>eventtype = cisco_dc_aci_class component=faultRecord $formed_apic_host$ | search affected=* code=* | eval transitionTime_Lifecycle=if((lc!="*"),created+" --- "+lc,created) | transaction affected,code startswith="soaking" endswith="raised-clearing" keepevicted=true  | eval affected=if(len(affected)&gt;50,substr(affected,1,140)+"...",affected) | table affected,code,transitionTime_Lifecycle</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="drilldown">none</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table depends="$faultAck$">
+        <title>Acknowledged Faults Detail</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$  | dedup dn,apic_host | search severity=$severity$ ack=$faultAck$ | eval it = strptime(creationTime, "%Y-%m-%dT%H:%M:%S.%3N") | eval ot = strptime(lastTransition, "%Y-%m-%dT%H:%M:%S.%3N") | eval faultDuration = tostring((ot - it), "duration") | table _time, dn, ack, creationTime, lastTransition, faultDuration, rule, severity, type, cause, lifecycle, domain, tenant</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Faults Duration</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$  | dedup dn,apic_host | search severity=$severity$ ack=* | eval it = strptime(creationTime, "%Y-%m-%dT%H:%M:%S.%3N") | eval ot = strptime(lastTransition, "%Y-%m-%dT%H:%M:%S.%3N") | eval faultDuration = tostring((ot - it), "duration") | table _time, dn, ack, creationTime, lastTransition, faultDuration, rule, severity, type, cause, domain, tenant | rex field=faultDuration "(?&lt;durationHours&gt;\d+):(?&lt;durationMinutes&gt;\d+):(?&lt;durationSeconds&gt;.*)" | eval duration=durationSeconds + 60 * (durationMinutes + 60 * (durationHours)) | stats avg(duration) AS avgDuration min(faultDuration) AS MinDuration max(faultDuration) AS MaxDuration | fieldformat avgDuration = tostring(avgDuration, "duration")</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="count">10</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <table>
+        <title>Faults Above or Below Average Duration</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ | dedup dn,apic_host | search severity=$severity$ ack=* | eval it = strptime(creationTime, "%Y-%m-%dT%H:%M:%S.%3N") | eval ot = strptime(lastTransition, "%Y-%m-%dT%H:%M:%S.%3N") | eval faultDuration = tostring((ot - it), "duration") | table _time, dn, ack, creationTime, lastTransition, faultDuration, rule, severity, type, cause, domain, tenant | rex field=faultDuration "(?&lt;durationHours&gt;\d+):(?&lt;durationMinutes&gt;\d+):(?&lt;durationSeconds&gt;.*)" | eval duration=durationSeconds + 60 * (durationMinutes + 60 * (durationHours)) | eventstats avg(duration) AS avgDuration | where duration > avgDuration | stats count(duration) AS Above | join [| tstats `summariesonly` latest(Fault.ack) AS "ack" latest(Fault.nameofnode) AS "node" latest(Fault.rule) AS "rule" latest(Fault.severity) AS "severity" latest(Fault.type) AS "type" latest(Fault.cause) AS "cause" latest(Fault.domain) AS "domain" latest(Fault.Tenant) AS "tenant" latest(Fault.created) AS "creationTime" latest(Fault.lastTransition) AS "lastTransition" latest(Fault.lc) AS "lifecycle" from datamodel=Cisco_DCN_Fault groupby _time,Fault.dn, Fault.apic_host| rename Fault.dn AS dn, Fault.apic_host AS apic_host | reverse | search $formed_apic_host$ | dedup dn | search severity=$severity$ ack=* | eval it = strptime(creationTime, "%Y-%m-%dT%H:%M:%S.%3N") | eval ot = strptime(lastTransition, "%Y-%m-%dT%H:%M:%S.%3N") | eval faultDuration = tostring((ot - it), "duration") | table _time, dn, ack, creationTime, lastTransition, faultDuration, rule, severity, type, cause, domain, tenant | rex field=faultDuration "(?&lt;durationHours&gt;\d+):(?&lt;durationMinutes&gt;\d+):(?&lt;durationSeconds&gt;.*)" | eval duration=durationSeconds + 60 * (durationMinutes + 60 * (durationHours)) | eventstats avg(duration) AS avgDuration | where duration &lt; avgDuration | stats count(duration) AS Below]</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="drilldown">none</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+</form>

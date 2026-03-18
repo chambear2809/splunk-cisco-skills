@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="messaging">
+    <Name>Messaging Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="messaging.smtp-event">
+      <Type>object</Type>
+      <Comment>Event representing an (SMTP) e-mail message</Comment>
+    </Term>
+    <Term id="messaging.content-type">
+      <Type>shortstring</Type>
+      <Comment>Content-type of the e-mail message</Comment>
+    </Term>
+    <Term id="messaging.content-transfer-encoding">
+      <Type>shortstring</Type>
+      <Comment>Transfer-encoding used on the e-mail message</Comment>
+    </Term>
+    <Term id="messaging.to">
+      <Type>string</Type>
+      <Comment>E-mail address of the message recipient</Comment>
+    </Term>
+    <Term id="messaging.from">
+      <Type>string</Type>
+      <Comment>E-mail address the message was sent from</Comment>
+    </Term>
+    <Term id="messaging.subject">
+      <Type>string</Type>
+      <Comment>Subject of the e-mail message</Comment>
+    </Term>
+    <Term id="messaging.user-agent">
+      <Type>shortstring</Type>
+      <Comment>Client software used to deliver the e-mail message</Comment>
+    </Term>
+    <Term id="messaging.message-bytes">
+      <Type>uint32</Type>
+      <Comment>The total message size in bytes</Comment>
+    </Term>
+    <Term id="messaging.message-body">
+      <Type>longstring</Type>
+      <Comment>Message body content</Comment>
+    </Term>
+    <Term id="messaging.sender">
+      <Type>string</Type>
+      <Comment>Sender of the e-mail message</Comment>
+    </Term>
+    <Term id="messaging.reply-to">
+      <Type>string</Type>
+      <Comment>E-mail address to which replies should be sent</Comment>
+    </Term>
+    <Term id="messaging.cc">
+      <Type>string</Type>
+      <Comment>Recipients sent copies of the e-mail message</Comment>
+    </Term>
+    <Term id="messaging.bcc">
+      <Type>string</Type>
+      <Comment>Recipients sent blind copies of the e-mail message</Comment>
+    </Term>
+    <Term id="messaging.message-id">
+      <Type>string</Type>
+      <Comment>Unique identifier for the e-mail message</Comment>
+    </Term>
+    <Term id="messaging.in-reply-to">
+      <Type>string</Type>
+      <Comment>Original mssage to which this one replies</Comment>
+    </Term>
+    <Term id="messaging.references">
+      <Type>string</Type>
+      <Comment>References</Comment>
+    </Term>
+    <Term id="messaging.comments">
+      <Type>string</Type>
+      <Comment>Comments</Comment>
+    </Term>
+    <Term id="messaging.keywords">
+      <Type>string</Type>
+      <Comment>Keywords</Comment>
+    </Term>
+    <Term id="messaging.resent-date">
+      <Type>string</Type>
+      <Comment>Resent Date</Comment>
+    </Term>
+    <Term id="messaging.resent-from">
+      <Type>string</Type>
+      <Comment>Resent From</Comment>
+    </Term>
+    <Term id="messaging.resent-sender">
+      <Type>string</Type>
+      <Comment>Resent Sender</Comment>
+    </Term>
+    <Term id="messaging.resent-to">
+      <Type>string</Type>
+      <Comment>Resent To</Comment>
+    </Term>
+    <Term id="messaging.resent-cc">
+      <Type>string</Type>
+      <Comment>Recent Cc</Comment>
+    </Term>
+    <Term id="messaging.resent-bcc">
+      <Type>string</Type>
+      <Comment>Resent Bcc</Comment>
+    </Term>
+    <Term id="messaging.resent-msg-id">
+      <Type>string</Type>
+      <Comment>Resent Message ID</Comment>
+    </Term>
+    <Term id="messaging.return">
+      <Type>string</Type>
+      <Comment>Return</Comment>
+    </Term>
+    <Term id="messaging.disposition-notification-to">
+      <Type>string</Type>
+      <Comment>Return Receipt</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

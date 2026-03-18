@@ -1,0 +1,293 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Networking", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "dns.event"
+    }, 
+    "fields": [
+        {
+            "aggType": "value", 
+            "desc": "The number of resource records in the answer section", 
+            "enabled": true, 
+            "name": "ancount", 
+            "term": "dns.ancount"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of additional answers", 
+            "enabled": true, 
+            "name": "arcount", 
+            "term": "dns.arcount"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server IP Address", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server port number", 
+            "enabled": true, 
+            "name": "dest_port", 
+            "term": "flow.s-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Flow Id", 
+            "enabled": true, 
+            "name": "flow_id", 
+            "term": "flow.flow-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Host IP address", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "host_addr", 
+            "term": "dns.host-addr"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "DNS host type", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "host_type", 
+            "term": "dns.host-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Host name", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "hostname", 
+            "term": "dns.host"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "DNS Message Type", 
+            "enabled": true, 
+            "name": "message_type", 
+            "term": "dns.message-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of the request", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "name", 
+            "term": "dns.name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of answers in the 'authority' section", 
+            "enabled": true, 
+            "name": "nscount", 
+            "term": "dns.nscount"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from client to server", 
+            "enabled": true, 
+            "name": "packets_in", 
+            "term": "flow.cs-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from server to client", 
+            "enabled": true, 
+            "name": "packets_out", 
+            "term": "flow.sc-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Protocol stack of flow", 
+            "enabled": true, 
+            "name": "protocol_stack", 
+            "term": "flow.protocol-stack"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of queries", 
+            "enabled": true, 
+            "name": "qdcount", 
+            "term": "dns.qdcount"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "DNS Query sent", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "query", 
+            "term": "dns.query"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "DNS Query type", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "query_type", 
+            "term": "dns.query-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Return message", 
+            "enabled": true, 
+            "name": "reply_code", 
+            "term": "dns.reply-code"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Return message in numeric format", 
+            "enabled": true, 
+            "name": "reply_code_id", 
+            "term": "dns.reply-code-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Elapsed time between sending of the dns request and reception of its response, in microseconds", 
+            "enabled": true, 
+            "name": "response_time", 
+            "term": "dns.response-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address returned to the PTR request", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "reverse_addr", 
+            "term": "dns.reverse-addr"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client IP Address", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client port number", 
+            "enabled": true, 
+            "name": "src_port", 
+            "term": "flow.c-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+            "enabled": true, 
+            "name": "time_taken", 
+            "term": "flow.time-taken"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "DNS transaction identifier", 
+            "enabled": true, 
+            "name": "transaction_id", 
+            "term": "dns.transaction-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Transport layer protocol (udp or tcp)", 
+            "enabled": true, 
+            "name": "transport", 
+            "term": "flow.transport"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Time (in seconds) a DNS information returned by the server will be kept in cache", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "ttl", 
+            "term": "dns.ttl"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+            "enabled": true, 
+            "name": "vlan_id", 
+            "term": "flow.vlan-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": false, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": false, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+    ], 
+    "filters": {
+        "comparisons": [], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ES_DNS_RAW", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "modifiedBy": "admin", 
+    "name": "Stream for ES Config Template - DNS Raw", 
+    "protocolName": "DNS", 
+    "sourcetype": "stream:dns", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

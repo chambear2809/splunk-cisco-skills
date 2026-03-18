@@ -1,0 +1,43 @@
+<form version="1.1">
+  <label>Licenses Subscriptions</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>License Subscriptions Information</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:licensessubscriptions"  $orgid$
+| rename subscriptionId as "Subscription Id", name as Name, description as Description status as "Status", renewalRequested as "Renewal Requested", startDate as "Start Date", endDate as "End Date" 
+| table "Subscription Id", Name, Description, Status, "Renewal Requested", "Start Date", "End Date"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</form>

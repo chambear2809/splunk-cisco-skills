@@ -1,0 +1,277 @@
+<form version="1.1">
+  <init>
+    <set token="set_severity_token">anomalies.severity="*"</set>
+  </init>
+  <label>Anomalies</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time_token">
+      <label>Time Range</label>
+      <default>
+        <earliest>-4h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="nd_host_token" searchWhenChanged="true">
+      <label>ND Cluster</label>
+      <fieldForLabel>nd_host</fieldForLabel>
+      <fieldForValue>nd_host</fieldForValue>
+      <search>
+        <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.anomalies by anomalies.nd_host | rename anomalies.nd_host as nd_host</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <change>
+        <unset token="form.site_token"></unset>
+        <set token="form.category_token">*</set>
+        <set token="form.nodes_token">*</set>
+        <set token="form.severity_token">*</set>
+        <set token="form.clear_token">*</set>
+        <set token="form.resourceType_token">*</set>
+      </change>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <initialValue>All</initialValue>
+    </input>
+    <input type="dropdown" token="site_token" searchWhenChanged="true">
+      <label>Sites</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <fieldForLabel>fabricName</fieldForLabel>
+      <fieldForValue>fabricName</fieldForValue>
+      <search>
+        <query>| tstats `summariesonly` values(anomalies.fabricName) as fabricName from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  | mvexpand fabricName</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <change>
+        <set token="form.category_token">*</set>
+        <set token="form.nodes_token">*</set>
+        <set token="form.severity_token">*</set>
+        <set token="form.clear_token">*</set>
+        <set token="form.resourceType_token">*</set>
+      </change>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <initialValue>All</initialValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <chart>
+        <title>Sites Anomaly Score over Time</title>
+        <search>
+          <query>| tstats `summariesonly` values(anomalies.anomalyScore) as score from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by _time, anomalies.fabricName | rename anomalies.fabricName as sites | timechart span=1h eval(round(avg(score),2)) by sites | fields - NULL</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.text">Anomaly Score</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Anomalies by Category</title>
+        <search>
+          <query>| tstats `summariesonly` dc(anomalies.anomalyId) as count from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by anomalies.category, anomalies.anomalyId, anomalies.nd_host, anomalies.fabricName | rename anomalies.category as category  | stats sum(count) by category</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.fieldColors">{"bug":"#CF2030","endpoint":"#FFCC00", "environmental":"#6EBE4A", "flows":"#64BBE3", "utilization":"#FBAB18", "statistics":"#613D7C"}</option>
+        <option name="height">420</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="form.category_token">$click.value$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Anomalies by Severity</title>
+        <search>&gt;<query>| tstats `summariesonly` dc(anomalies.anomalyId) as count from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by anomalies.calculated_severity, anomalies.anomalyId, anomalies.nd_host, anomalies.fabricName | rename anomalies.calculated_severity as severity  | stats sum(count) by severity</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.fieldColors">{"critical":"#CF2030","major":"#FBAB18","minor":"#FFCC00", "Other":#64BBE3}</option>
+        <option name="height">407</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="form.severity_token">$click.value$</set>
+          <set token="set_severity_token">anomalies.calculated_severity="$click.value$"</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <table>
+        <title>Top 10 nodes contributing to Anomalies</title>
+        <search>
+          <query>| tstats `summariesonly` latest(anomalies.anomalyScore) as anomalyScore values(anomalies.node_names) as "Node" latest(anomalies.severity) as "Severity" from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by anomalies.anomalyId, anomalies.nd_host, anomalies.fabricName | mvexpand "Node" | rename anomalies.nd_host as "Host" anomalies.fabricName as "Site" | sort 0 -anomalyScore, Node | dedup "Node" | head 10 | table "Node", "Severity", "Host", "Site"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <format type="color" field="Severity">
+          <colorPalette type="map">{"critical":"#CF2030","major":"#FBAB18","minor":"#FFCC00","warning":"#48D1CC","info":"#64BBE3","cleared":"#6EBE4A"}</colorPalette>
+        </format>
+        <drilldown>
+          <set token="form.nodes_token">$row.Node$</set>
+          <set token="form.severity_token">$row.Severity$</set>
+          <set token="set_severity_token">anomalies.severity="$row.Severity$"</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <input type="dropdown" token="category_token" searchWhenChanged="true">
+        <label>Category</label>
+        <choice value="*">All</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <fieldForLabel>category</fieldForLabel>
+        <fieldForValue>category</fieldForValue>
+        <search>
+          <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by anomalies.category | rename anomalies.category as category</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+      </input>
+      <input type="dropdown" token="severity_token" searchWhenChanged="true">
+        <label>Severity</label>
+        <fieldForLabel>severity</fieldForLabel>
+        <fieldForValue>severity</fieldForValue>
+        <search>
+          <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by anomalies.severity | rename anomalies.severity as severity</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <choice value="*">All</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <change>
+          <condition match="$severity_token$==&quot;*&quot;">
+            <set token="set_severity_token">anomalies.severity="*"</set>
+          </condition>
+          <condition match="$severity_token$==&quot;Other&quot;">
+            <set token="set_severity_token">anomalies.calculated_severity="Other"</set>
+          </condition>
+          <condition>
+            <set token="set_severity_token">anomalies.severity="$severity_token$"</set>
+          </condition>
+        </change>
+      </input>
+      <input type="dropdown" token="nodes_token">
+        <label>Nodes</label>
+        <choice value="*">All</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <fieldForLabel>node_names</fieldForLabel>
+        <fieldForValue>node_names</fieldForValue>
+        <search>
+          <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by anomalies.node_names | rename anomalies.node_names as node_names</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+      </input>
+      <input type="dropdown" token="clear_token">
+        <label>Cleared</label>
+        <choice value="*">All</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <fieldForLabel>cleared</fieldForLabel>
+        <fieldForValue>cleared</fieldForValue>
+        <search>
+          <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by anomalies.cleared | rename anomalies.cleared as cleared</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+      </input>
+      <input type="dropdown" token="resourceType_token">
+        <label>Resource Type</label>
+        <choice value="*">All</choice>
+        <default>*</default>
+        <initialValue>*</initialValue>
+        <fieldForLabel>resourceType</fieldForLabel>
+        <fieldForValue>resourceType</fieldForValue>
+        <search>
+          <query>| tstats `summariesonly` count from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" by anomalies.resourceType | rename anomalies.resourceType as resourceType</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+      </input>
+      <single depends="$never_show_this_row$">
+        <search>
+          <done>
+            <set token="anomalies_count">$result.count$</set>
+          </done>
+          <query>| tstats `summariesonly` dc(anomalies.anomalyId) as count from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" $set_severity_token$ anomalies.category="$category_token$" anomalies.node_names="$nodes_token$" anomalies.cleared="$clear_token$" anomalies.resourceType="$resourceType_token$" by anomalies.anomalyId, anomalies.nd_host, anomalies.fabricName | stats sum(count) as count | fillnull value=0 count | appendpipe [ stats count as count | where count==0 | eval count=0 ]</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>&gt;<option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+      <table>
+        <title>$anomalies_count$ Anomalies Details</title>
+        <search>
+          <query>| tstats `summariesonly` latest(anomalies.entityName) as _entity latest(anomalies.category) as _category latest(anomalies.nd_host) as "Host" latest(anomalies.fabricName) as "Site" latest(anomalies.severity) as "Severity" latest(anomalies.startTs) as "Detection Time (UTC)" latest(anomalies.endTs) as "Last Seen Time (UTC)" latest(anomalies.resourceType) as "Resource Type" latest(anomalies.anomalyStr) as "Description" values(anomalies.node_names) as "Nodes" latest(anomalies.cleared) as "Cleared" from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.nd_host="$nd_host_token$"  anomalies.fabricName="$site_token$" $set_severity_token$ anomalies.category="$category_token$" anomalies.node_names="$nodes_token$" anomalies.cleared="$clear_token$" anomalies.resourceType="$resourceType_token$" by anomalies.anomalyId, anomalies.nd_host, anomalies.fabricName | rename anomalies.anomalyId as _id | sort 0 "Severity", -"Last Seen Time (UTC)"  | table _id, _category, _entity, _group, "Host", "Site", "Severity","Detection Time (UTC)", "Last Seen Time (UTC)", "Resource Type", "Nodes", "Description", "Cleared"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+          <done>
+            <unset token="search_token"></unset>
+          </done>
+        </search>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <format type="color" field="Severity">
+          <colorPalette type="map">{"critical":"#CF2030","major":"#FBAB18","minor":"#FFCC00","warning":"#48D1CC","info":"#64BBE3","cleared":"#6EBE4A"}</colorPalette>
+        </format>
+        <drilldown>
+          <set token="entity_token">$row._entity$</set>
+          <set token="cleared_token">"$row.Cleared$"</set>
+          <set token="id_token">$row._id$</set>
+          <set token="insightsgrp_token">$row._group$</set>
+          <set token="startTs_token">$row.Detection Time (UTC)$</set>
+          <set token="endTs_token">$row.Last Seen Time (UTC)$</set>
+          <set token="ndHost_token">$row.Host$</set>
+          <set token="search_token">anomalies.nd_host="$ndHost_token$" anomalies.fabricName="$row.Site$" anomalies.anomalyId="$row._id$" anomalies.startTs="$row.Detection Time (UTC)$" anomalies.endTs="$row.Last Seen Time (UTC)$" anomalies.cleared=$row.Cleared$ anomalies.severity="$row.Severity$" anomalies.resourceType="$row.Resource Type$" anomalies.anomalyStr="$row.Description$" anomalies.category="$row._category$"</set>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row depends="$search_token$">
+    <panel>
+      <table>
+        <title>Anomaly $entity_token$</title>
+        <search>
+          <query>| tstats `summariesonly` values(anomalies.entityName) as "Affected Object" values(anomalies.node_names) as "Nodes" values(anomalies.startTs) as "Detection Time (UTC)" values(anomalies.endTs) as "End Time (UTC)" values(anomalies.clearTs) as cleared_time values(anomalies.anomalyStr) as "Description" values(anomalies.category) as "Category" values(anomalies.acknowledged) as "Acknowledged" values(anomalies.verificationStatus) as "Verification Status" values(anomalies.assignee) as "Assignee" values(anomalies.resourceType) as "Type" from datamodel=Cisco_DCN_nexus_dashboard.anomalies where anomalies.entityName="$entity_token$" $search_token$ | eval Status=if($cleared_token$ == "false", "Active", "Cleared"), "Cleared Time (UTC)"=if(cleared_time="null" OR isnull(cleared_time),"-",cleared_time) | eval "Explore Anomaly Details" = "Open on ND" | table "Status", "Affected Object", "Nodes", "Detection Time (UTC)", "End Time (UTC)", "Cleared Time (UTC)", "Description", "Category", "Type", "Verification Status", "Acknowledged", "Assignee", "Explore Anomaly Details"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">true</option>
+        <fields>["Status","Affected Object","Nodes","Cleared Time (UTC)","Category","Verification Status","Acknowledged","Assignee","Explore Anomaly Details"]</fields>
+        <drilldown>
+          <condition field="Explore Anomaly Details">
+            <link target="_blank">https://$ndHost_token$//appcenter/cisco/nir/ui/#/detailsScreen/analyze?insightsGroupName=$insightsgrp_token$&amp;endTs=$endTs_token|n$&amp;startTs=$startTs_token|n$&amp;filter=anomalyId:$id_token$</link>
+          </condition>
+          <condition field="*"></condition>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>

@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="radius">
+    <Name>Radius Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+      <Term id="radius.event">
+          <Type>object</Type>
+          <Comment>Event representing Radius</Comment>
+      </Term>
+      <Term id="radius.id">
+          <Type>uint8</Type>
+          <Comment>Indicates the packet identifier</Comment>
+      </Term>
+      <Term id="radius.code">
+          <Type>uint8</Type>
+          <Comment>Radius message code</Comment>
+      </Term>
+      <Term id="radius.status">
+          <Type>shortstring</Type>
+          <Comment>Status</Comment>
+      </Term>
+      <Term id="radius.login">
+          <Type>shortstring</Type>
+          <Comment>User login string</Comment>
+      </Term>
+      <Term id="radius.login-ipv6-host">
+          <Type>shortstring</Type>
+          <Comment>Indicates the system with which to connect the user</Comment>
+      </Term>
+      <Term id="radius.session-timeout">
+          <Type>uint32</Type>
+          <Comment>Maximum duration of session in seconds</Comment>
+      </Term>
+      <Term id="radius.idle-timeout">
+          <Type>uint32</Type>
+          <Comment>Maximum idle duration of session in seconds</Comment>
+      </Term>
+      <Term id="radius.nas-id">
+          <Type>string</Type>
+          <Comment>Unique identifier of NAS originating access request</Comment>
+      </Term>
+      <Term id="radius.nas-ip">
+          <Type>shortstring</Type>
+          <Comment>IP address of of NAS originating access request</Comment>
+      </Term>
+      <Term id="radius.nas-ipv6">
+          <Type>shortstring</Type>
+          <Comment>IPV6 address of of NAS originating access request</Comment>
+      </Term>
+      <Term id="radius.nas-port">
+          <Type>uint32</Type>
+          <Comment>Physical port number of the user on the NAS</Comment>
+      </Term>
+      <Term id="radius.nas-port-id">
+          <Type>string</Type>
+          <Comment>Identifies the NAS</Comment>
+      </Term>
+      <Term id="radius.nas-port-type">
+          <Type>uint32</Type>
+          <Comment>Indicates the type of physical port NAS is using to authenticate the user</Comment>
+      </Term>
+      <Term id="radius.start-time">
+          <Type format="%Y/%m/%d %H:%M:%S">datetime</Type>
+          <Comment>Indicates the beginning of the user service</Comment>
+      </Term>
+      <Term id="radius.stop-time">
+          <Type format="%Y/%m/%d %H:%M:%S">datetime</Type>
+          <Comment>Indicates the end of the user service</Comment>
+      </Term>
+      <Term id="radius.terminate-cause">
+          <Type>uint32</Type>
+          <Comment>Indicates how the session was terminated</Comment>
+      </Term>
+      <Term id="radius.framed-ip">
+          <Type>string</Type>
+          <Comment>Indicates the IP address to be configured for the user</Comment>
+      </Term>
+      <Term id="radius.framed-ipv6-route">
+          <Type>string</Type>
+          <Comment>Indicates the routing information to be configured for the user on the NAS</Comment>
+      </Term>
+      <Term id="radius.framed-ipv6-pool">
+          <Type>string</Type>
+          <Comment>Indicates the name of an assigned pool that should be used to assign an IPv6 prefix for the user</Comment>
+      </Term>
+      <Term id="radius.callback-number">
+          <Type>string</Type>
+          <Comment>Indicates the dialing string to be used for callback</Comment>
+      </Term>
+      <Term id="radius.calling-station-id">
+          <Type>string</Type>
+          <Comment>Indicates the phone number from which the packet came from</Comment>
+      </Term>
+      <Term id="radius.called-station-id">
+          <Type>string</Type>
+          <Comment>Indicates the phone number that the user called</Comment>
+      </Term>
+      <Term id="radius.vendor-id">
+          <Type>uint32</Type>
+          <Comment>Indicates the SMI Network Management Private Enterprise Code of the Vendor</Comment>
+      </Term>
+      <Term id="radius.account-session-id">
+          <Type>string</Type>
+          <Comment>Indicates the accounting session id</Comment>
+      </Term>
+      <Term id="radius.sgsn-ip">
+          <Type>string</Type>
+          <Comment>Indicates the IP address of the SGSN</Comment>
+      </Term>
+      <Term id="radius.sgsn-mcc">
+          <Type>uint32</Type>
+          <Comment>Indicates the SGSN MCC and MNC</Comment>
+      </Term>
+      <Term id="radius.avp">
+          <Type>string</Type>
+          <Comment>Radius AVP</Comment>
+      </Term>
+      <Term id="radius.acct-input-octets">
+          <Type>uint32</Type>
+          <Comment>Indicates how many octets have been received from the port over the course of this service being provided</Comment>
+      </Term>
+      <Term id="radius.acct-output-octets">
+          <Type>uint32</Type>
+          <Comment>Indicates how many octets have been sent to the port in the course of delivering this service</Comment>
+      </Term>
+  </Vocabulary>
+</CmConfig>

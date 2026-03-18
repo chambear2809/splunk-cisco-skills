@@ -1,0 +1,21 @@
+#highlight .table td {
+    border-top: 1px solid #fff;
+}
+#highlight td.range-elevated {
+    font-weight: bold;
+    background-color: #ffc57a !important;
+}
+
+#highlight td.range-severe {
+    font-weight: bold;
+    background-color: #ff3333 !important;
+}
+
+#overview {
+ height: 150px;
+}
+
+div[id^='realtime_view'] {
+     display: none;
+}
+

@@ -37,7 +37,7 @@ log ""
 log "--- Indexes ---"
 REQUIRED_INDEXES=("catalyst" "ise" "sdwan" "cybervision")
 for idx in "${REQUIRED_INDEXES[@]}"; do
-    if rest_check_index "$SK" "$SPLUNK_URI" "$idx" 2>/dev/null; then
+    if platform_check_index "$SK" "$SPLUNK_URI" "$idx" 2>/dev/null; then
         pass "Index '${idx}' exists"
     else
         warn "Index '${idx}' not found (may exist at system level)"

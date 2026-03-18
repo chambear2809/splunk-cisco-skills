@@ -1,0 +1,177 @@
+{
+    "category": "Networking",
+    "fields": [
+        {
+            "aggType": "key",
+            "term": "flow.protocol",
+            "name": "app",
+            "enabled": true,
+            "desc": "Level 7 protocol name (http, ftp, etc.)"
+        },
+        {
+        "aggType": [
+            "sum"
+        ],
+            "term": "flow.bytes",
+            "name": "bytes",
+            "enabled": true,
+            "desc": "The total number of bytes transferred"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.cs-bytes",
+            "name": "bytes_in",
+            "enabled": false,
+            "desc": "The number of bytes sent from client to server"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.sc-bytes",
+            "name": "bytes_out",
+            "enabled": false,
+            "desc": "The number of bytes sent from server to client"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.hostname",
+            "name": "capture_hostname",
+            "enabled": false,
+            "desc": "Hostname where flow was captured"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.sc-content",
+            "name": "dest_content",
+            "enabled": false,
+            "desc": "All raw payload content sent from server to client"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.s-ip",
+            "name": "dest_ip",
+            "enabled": false,
+            "desc": "Server IP Address"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.s-mac",
+            "name": "dest_mac",
+            "enabled": false,
+            "desc": "Server packets MAC address in hexadecimal format"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.s-port",
+            "name": "dest_port",
+            "enabled": false,
+            "desc": "Server port number"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.flow-id",
+            "name": "flow_id",
+            "enabled": false,
+            "desc": "Flow Id"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.interface-name",
+            "name": "network_interface",
+            "enabled": false,
+            "desc": "Name of network interface"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.cs-packets",
+            "name": "packets_in",
+            "enabled": false,
+            "desc": "The total number of packets sent from client to server"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.sc-packets",
+            "name": "packets_out",
+            "enabled": false,
+            "desc": "The total number of packets sent from server to client"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.protocol-stack",
+            "name": "protocol_stack",
+            "enabled": false,
+            "desc": "Protocol stack of flow"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.cs-content",
+            "name": "src_content",
+            "enabled": false,
+            "desc": "All raw payload content sent from client to server"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.c-ip",
+            "name": "src_ip",
+            "enabled": false,
+            "desc": "Client IP Address"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.c-mac",
+            "name": "src_mac",
+            "enabled": false,
+            "desc": "Client packets MAC address in hexadecimal format"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.c-port",
+            "name": "src_port",
+            "enabled": false,
+            "desc": "Client port number"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.time-taken",
+            "name": "time_taken",
+            "enabled": false,
+            "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.vlan-id",
+            "name": "vlan_id",
+            "enabled": false,
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag"
+        },
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+    ],
+    "aggregated": true,
+    "statsOnly": false,
+    "sourcetype": "stream:udp",
+    "filters": {
+        "comparisons": [],
+        "matchAllComparisons": true
+    },
+    "enabled": true,
+    "index": null,
+    "id": "Splunk_Udp",
+    "app": "Stream",
+    "name": "Built-in stream populating App Analytics dashboard",
+    "streamType": "agg_event",
+    "isReferenceStream": false,
+    "extras": {
+        "interval": 60,
+        "topLimit": 100,
+        "eventType": "flow.udp-event",
+        "topSortBy": "count"
+    },
+    "_user": "nobody",
+    "_key": "Splunk_Udp"
+}

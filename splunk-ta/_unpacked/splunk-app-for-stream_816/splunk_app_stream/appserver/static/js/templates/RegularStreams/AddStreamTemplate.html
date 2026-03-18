@@ -1,0 +1,51 @@
+<script id="add-stream-dialog-template" type="text/template">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title add-stream-title">Clone Stream: <%- selectedStream.id %></h4>
+            </div>
+            <div class="modal-body form-horizontal">
+                <form>
+                    <fieldset>
+
+                        <!-- ==== -->
+                        <!-- Name -->
+                        <!-- ==== -->
+                        <div class="control-group">
+                            <label class="control-label add-stream-label" for="id">Name</label>
+                            <div class="controls">
+                                <input type="text" class="input-xlarge" id="id" name="id" data-error-style="inline">
+                            </div>
+                        </div>
+
+                        <!-- =========== -->
+                        <!-- Description -->
+                        <!-- =========== -->
+                        <div class="control-group">
+                            <label class="control-label add-stream-label" for="name">Description</label>
+                            <div class="controls">
+                                <input type="text" class="input-xlarge" id="name" name="name" data-error-style="inline">
+                            </div>
+                        </div>
+
+                        <!-- ================== -->
+                        <!-- HasChanges Warning -->
+                        <!-- ================== -->
+                         <% if (userHasChanges) { %>
+                            <div class="caution-subtext">
+                                CAUTION: You have unsaved changes. The cloned stream will include these changes but
+                                the original stream will not have these changes automatically saved.
+                            </div>
+                        <% } %>
+
+                    </fieldset>
+                </form>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <a href="#" id="btnYes" class="btn btn-primary yes">OK</a>
+            <a href="#" data-dismiss="modal" aria-hidden="true" class="btn secondary cancel">Cancel</a>
+        </div>
+    </div>
+    </div>
+</script>

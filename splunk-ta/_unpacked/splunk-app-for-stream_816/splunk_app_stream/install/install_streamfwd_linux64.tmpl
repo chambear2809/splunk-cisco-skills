@@ -1,0 +1,591 @@
+#!/bin/bash
+
+ACCEPT_DEFAULTS="no"
+START_SERVICE_DEFAULT="yes"
+
+URL_BASE=[[URL_BASE]]
+
+STREAM_APP_LOCATION=$URL_BASE/en-us/custom/splunk_app_stream/
+
+FORCE_OVERWRITE=0
+
+PACKAGE_FILE_NAME=[[PACKAGE_FILE_NAME]]
+EXTRACTED_PACKAGE_DIR=splunkstreamfwd-[[APP_VERSION]]
+
+SERVICENAME=streamfwd
+PROG=streamfwd
+
+PROGDESC="Splunk Stream Forwarder [[APP_VERSION]]"
+STREAMFWDUSER=streamfwd
+
+AUTH_TOKEN=""
+
+#helper functions
+
+prompt() {
+  local VALUE
+
+  if [ "yes" = "$ACCEPT_DEFAULTS" ] ; then
+    # return the default
+    echo "$2"
+    return
+  fi
+
+  # Hack: We read from FD 3 because when reading the script from a pipe, FD 0 is the script, not
+  #   the terminal. We checked above that FD 1 (stdout) is in fact a terminal and then dup it to
+  #   FD 3, thus we can input from FD 3 here.
+
+  echo -n "$1 [$2]" >&3
+  read -u 3 VALUE
+  if [ -z "$VALUE" ]; then
+    VALUE=$2
+  fi
+  echo "$VALUE"
+}
+
+prompt_yesno() {
+  while true; do
+    local VALUE=$(prompt "$@")
+
+    case $VALUE in
+      y | Y | yes | YES | Yes )
+        return 0
+        ;;
+      n | N | no | NO | No )
+        return 1
+        ;;
+    esac
+
+    echo "Please answer \"yes\" or \"no\"."
+  done
+}
+
+fail() {
+    echo "$@"
+    exit 1
+}
+
+add_user() {
+    streamfwd_home=/var/run/$SERVICENAME
+    getent passwd $STREAMFWDUSER >/dev/null || \
+    useradd -r -d $streamfwd_home \
+        -s /sbin/nologin -c "$PROG daemon" $STREAMFWDUSER
+
+    if [ $? -ne 0 ]; then
+        fail "Failed to create $STREAMFWDUSER user; aborting."
+    fi
+
+    if [ ! -d $streamfwd_home ]; then
+        mkdir $streamfwd_home
+    fi
+}
+
+# writes the init.d/ script for LSB linux distros (Ubuntu, Debian)
+drop_initd_lsb() {
+cat > /etc/init.d/${PROG} <<_EOT
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          streamfwd
+# Required-Start:    \$remote_fs \$syslog
+# Required-Stop:     \$remote_fs \$syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Starts the $PROGDESC daemon
+# Description:       Captures wire data and sends it to Splunk
+#
+### END INIT INFO
+
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+DESC="$PROGDESC"
+NAME=$PROG
+DAEMON=/opt/streamfwd/bin/\$NAME
+DAEMON_ARGS=""
+PIDFILE=/var/run/\$NAME.pid
+SCRIPTNAME=/etc/init.d/\$NAME
+
+# Exit if the package is not installed
+[ -x "\$DAEMON" ] || exit 0
+
+# Load the VERBOSE setting and other rcS variables
+if [ -f /lib/init/vars.sh ]; then
+  . /lib/init/vars.sh
+fi
+
+# Define LSB log_* functions.
+# Depend on lsb-base (>= 3.2-14) to ensure that this file is present
+# and status_of_proc is working.
+. /lib/lsb/init-functions
+
+#
+# Function that starts the daemon/service
+#
+do_start()
+{
+    # Return
+    #   0 if daemon has been started
+    #   1 if daemon was already running
+    #   2 if daemon could not be started
+    start-stop-daemon --start --background --pidfile \$PIDFILE --exec \$DAEMON --test > /dev/null \
+        || return 1
+    start-stop-daemon --start --background --pidfile \$PIDFILE --make-pidfile --exec \$DAEMON -- \
+        \$DAEMON_ARGS \
+        || return 2
+    # Add code here, if necessary, that waits for the process to be ready
+    # to handle requests from services started subsequently which depend
+    # on this one.  As a last resort, sleep for some time.
+}
+
+#
+# Function that stops the daemon/service
+#
+do_stop()
+{
+    # Return
+    #   0 if daemon has been stopped
+    #   1 if daemon was already stopped
+    #   2 if daemon could not be stopped
+    #   other if a failure occurred
+    start-stop-daemon --stop --quiet --retry=TERM/30/KILL/5 --pidfile \$PIDFILE --name \$NAME
+    RETVAL="\$?"
+    [ "\$RETVAL" = 2 ] && return 2
+    # Wait for children to finish too if this is a daemon that forks
+    # and if the daemon is only ever run from this initscript.
+    # If the above conditions are not satisfied then add some other code
+    # that waits for the process to drop all resources that could be
+    # needed by services started subsequently.  A last resort is to
+    # sleep for some time.
+    start-stop-daemon --stop --quiet --oknodo --retry=0/30/KILL/5 --exec \$DAEMON
+    [ "\$?" = 2 ] && return 2
+    # Many daemons don't delete their pidfiles when they exit.
+    rm -f \$PIDFILE
+    return "\$RETVAL"
+}
+
+#
+# Function that sends a SIGHUP to the daemon/service
+#
+do_reload() {
+    #
+    # If the daemon can reload its configuration without
+    # restarting (for example, when it is sent a SIGHUP),
+    # then implement that here.
+    #
+    start-stop-daemon --stop --signal 1 --quiet --pidfile \$PIDFILE --name \$NAME
+    return 0
+}
+
+case "\$1" in
+  start)
+    [ "\$VERBOSE" != no ] && log_daemon_msg "Starting \$DESC" "\$NAME"
+    do_start
+    case "\$?" in
+        0|1) [ "\$VERBOSE" != no ] && log_end_msg 0 ;;
+        2) [ "\$VERBOSE" != no ] && log_end_msg 1 ;;
+    esac
+    ;;
+  stop)
+    [ "\$VERBOSE" != no ] && log_daemon_msg "Stopping \$DESC" "\$NAME"
+    do_stop
+    case "\$?" in
+        0|1) [ "\$VERBOSE" != no ] && log_end_msg 0 ;;
+        2) [ "\$VERBOSE" != no ] && log_end_msg 1 ;;
+    esac
+    ;;
+  status)
+    status_of_proc "\$DAEMON" "\$NAME" && exit 0 || exit \$?
+    ;;
+  #reload|force-reload)
+    #
+    # If do_reload() is not implemented then leave this commented out
+    # and leave 'force-reload' as an alias for 'restart'.
+    #
+    #log_daemon_msg "Reloading \$DESC" "\$NAME"
+    #do_reload
+    #log_end_msg \$?
+    #;;
+  restart|force-reload)
+    #
+    # If the "reload" option is implemented then remove the
+    # 'force-reload' alias
+    #
+    log_daemon_msg "Restarting \$DESC" "\$NAME"
+    do_stop
+    case "\$?" in
+      0|1)
+        do_start
+        case "\$?" in
+            0) log_end_msg 0 ;;
+            1) log_end_msg 1 ;; # Old process is still running
+            *) log_end_msg 1 ;; # Failed to start
+        esac
+        ;;
+      *)
+        # Failed to stop
+        log_end_msg 1
+        ;;
+    esac
+    ;;
+  *)
+    #echo "Usage: \$SCRIPTNAME {start|stop|restart|reload|force-reload}" >&2
+    echo "Usage: \$SCRIPTNAME {start|stop|status|restart|force-reload}" >&2
+    exit 3
+    ;;
+esac
+_EOT
+}
+
+
+#writes the systemd script
+drop_systemd_script() {
+
+program_file=/opt/$SERVICENAME/bin/$PROG
+
+cat > /etc/systemd/system/${PROG}.service << _EOT
+[Unit]
+Description=$PROGDESC
+After=network.target
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sh -c 'ulimit -s 512'
+ExecStart=$program_file -D
+User=$STREAMFWDUSER
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+_EOT
+}
+
+
+#writes the init.d/ script for centos/RH linux
+drop_initd_script_centos() {
+
+cat > /etc/init.d/${PROG} <<_EOT
+#!/bin/sh
+#
+# chkconfig: 345 90 10
+# description: $PROGDESC
+# processname: $PROG
+# config: /opt/$SERVICENAME/local/streamfwd.conf
+#
+
+# Source function library.
+. /etc/init.d/functions
+
+program_file=/opt/$SERVICENAME/bin/$PROG
+
+lockfile=/var/lock/subsys/$PROG
+RETVAL=0
+
+# Allow daemon to generate core files
+DAEMON_COREFILE_LIMIT='unlimited'
+
+start() {
+    echo -n \$"Starting \$program_file: "
+    ulimit -s 512
+    daemon --user=$STREAMFWDUSER \$program_file -D
+    RETVAL=\$?
+    echo
+    [ \$RETVAL -eq 0 ] && touch \$lockfile
+    return \$RETVAL
+}
+
+stop() {
+    echo -n \$"Stopping \$program_file: "
+    killproc -d 90 \$program_file
+    RETVAL=\$?
+    [ \$RETVAL -eq 0 ] && rm -f \$lockfile
+    echo
+    return \$RETVAL
+}
+
+dostatus() {
+    status \$program_file
+}
+
+restart() {
+    stop
+    start
+}
+
+condrestart() {
+    [ -e \$lockfile ] && restart || :
+}
+
+# See how we were called.
+case "\$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart|reload)
+    restart
+    RETVAL=\$?
+    ;;
+  condrestart)
+    condrestart
+    RETVAL=\$?
+    ;;
+  status)
+    dostatus
+    RETVAL=\$?
+    ;;
+  *)
+    echo "Usage: \$program_file {start|stop|restart|reload|condrestart|status}"
+    exit 1
+esac
+
+exit \$RETVAL
+_EOT
+
+}
+
+drop_initd_script() {
+
+    if [ -f /etc/init.d/functions ]; then
+        drop_initd_script_centos
+    elif [ -f /lib/lsb/init-functions ]; then
+        drop_initd_lsb
+    else
+        fail "Your Linux system has init.d/ script management logic this install script doesn't support; please install $PROGDESC manually"
+    fi
+
+    chmod +x /etc/init.d/${PROG}
+
+    if [ $? -ne 0 ]; then
+        fail "Failed to create $SERVICENAME init.d script; aborting."
+    fi
+}
+
+
+check_preconditions() {
+
+    if [ ! -t 1 ] && [ $ACCEPT_DEFAULTS != "yes" ]; then
+        fail "This script requires user input. Please run it on a terminal."
+    fi
+
+    #hack for stdin in pipe mode
+    exec 3<&1
+
+    if [ "$(uname)" != Linux ]; then
+        fail "Sorry, this script only runs on Linux."
+    fi
+
+    if [ "$(uname -m)" != x86_64 ]; then
+        fail "Sorry, this script only runs on x86_64 machines."
+    fi
+
+    if [ $(pgrep -f /opt/streamfwd/bin/streamfwd) ]; then
+     fail "$SERVICENAME process is running; please shut it down and rerun this script"
+    fi
+
+    command -v curl >/dev/null &2>&1 || fail "Please install curl(1). This script uses it to download $PROGDESC"
+    command -v tar >/dev/null  &2>&1 || fail "Please install tar(1). This script uses it to install $PROGDESC"
+
+    if [ $(id -u) != 0 ]; then
+        fail "This script requires root permissions; please rerun as root/sudo."
+    fi
+}
+
+
+#this is the main function
+run_install_script() {
+
+check_preconditions
+
+if prompt_yesno "This script will download and install $PROGDESC; do you want to continue (yes/no)?" "yes"; then
+
+    if [ -d /opt/$SERVICENAME ]; then
+        prompt_yesno "/opt/$SERVICENAME directory already exists, do you want to overwrite an existing installation (yes/no)?" "yes" || fail "$PROGDESC installation canceled."
+    fi
+
+    # download the package
+    url="$URL_BASE/en-us/custom/splunk_app_stream/install_streamfwd/linux64"
+    echo "downloading $PACKAGE_FILE_NAME package from $url .."
+    curl -f -k -L -o $PACKAGE_FILE_NAME $url
+
+    # check for download errors
+    if [ $? -ne 0 ]; then
+        # retry using https:// since splunkweb controllers are proxied
+        if [ ${url:0:5} == "http:" ] ; then
+            https_url=${url//http:/https:}
+            echo "downloading $PACKAGE_FILE_NAME package from $https_url .."
+            curl -f -k -L -o $PACKAGE_FILE_NAME $https_url
+        fi
+    fi
+
+    #check the download status
+    if [ $? -ne 0 ]; then
+        fail "Failed to extract $PACKAGE_FILE_NAME package; aborting."
+    fi
+
+    # extract downloaded package and
+    tar -xvf $PACKAGE_FILE_NAME -C /tmp/
+    if [ $? -ne 0 ]; then
+        fail "Failed to extract $PACKAGE_FILE_NAME package; aborting."
+    fi
+
+    if [ -d /opt/$SERVICENAME ]; then
+        if [ -d /opt/$SERVICENAME/local ]; then
+            echo "Copying local/ content to temp location"
+            temp_local=$(mktemp -d -p /opt/)
+            cp -r /opt/$SERVICENAME/local/* $temp_local
+        fi
+        echo "Removing previous installation..."
+        find /opt/$SERVICENAME/ -name "*" -delete 2>/dev/null
+        find /opt/$SERVICENAME/ -type d -delete 2>/dev/null
+    fi
+
+    echo "Copying package files to /opt/$SERVICENAME directory..."
+    EXTRACTED_PACKAGE_DIR="/tmp/$EXTRACTED_PACKAGE_DIR"
+
+    cp -r $EXTRACTED_PACKAGE_DIR /opt/$SERVICENAME
+    status_code=$?
+
+    if [ "$temp_local" ]; then
+        echo "Restoring local/ content"
+        cp -r $temp_local/* /opt/$SERVICENAME/local
+        find $temp_local -name "*" -delete 2>/dev/null
+        find $temp_local -type d  -delete 2>/dev/null
+    fi
+
+    echo "Removing temp files..."
+    find $EXTRACTED_PACKAGE_DIR -name "*" -delete 2>/dev/null
+    find $EXTRACTED_PACKAGE_DIR -type d -delete 2>/dev/null
+    find $PACKAGE_FILE_NAME -name "*" -delete 2>/dev/null
+    find $PACKAGE_FILE_NAME -type d -delete 2>/dev/null
+
+    if [ $status_code -ne 0 ]; then
+        fail "Failed to copy $EXTRACTED_PACKAGE_DIR to /opt/$SERVICENAME; aborting."
+    fi
+
+    #create local inputs.conf file if needed
+    echo "Setting up $PROGDESC config..."
+    if [ -f /opt/$SERVICENAME/local/inputs.conf ]; then
+        echo "/opt/$SERVICENAME/local/inputs.conf already exists, will use existing configuration"
+    else
+        echo "Creating /opt/$SERVICENAME/local/inputs.conf"
+        cat > /opt/$SERVICENAME/local/inputs.conf<<EOF
+[streamfwd://streamfwd]
+splunk_stream_app_location = $STREAM_APP_LOCATION
+EOF
+        if [ $? -ne 0 ]; then
+            fail "Failed to initialize $PROGDESC config file; aborting."
+        fi
+    fi
+
+    if [ -n "$AUTH_TOKEN" ]; then
+        if [ -f /opt/$SERVICENAME/local/streamfwd.conf ]; then
+            echo "/opt/$SERVICENAME/local/streamfwd.conf already exists, will use existing configuration"
+        else
+            echo "Setting Stream Forwarder auth token in /opt/$SERVICENAME/local/streamfwd.conf"
+            cat > /opt/$SERVICENAME/local/streamfwd.conf<<EOF
+[streamfwd://streamfwd]
+authToken = $AUTH_TOKEN
+EOF
+            if [ $? -ne 0 ]; then
+                fail "Failed to initialize $PROGDESC config file; aborting."
+            fi
+        fi
+    fi
+
+    echo "Configuring $SERVICENAME service"
+    chmod +x /opt/$SERVICENAME/bin/$PROG
+    if [ $? -ne 0 ]; then
+        fail "Failed to configure $PROGDESC binary file; aborting."
+    fi
+
+    # create a user for the service and make it the owner
+    add_user
+    chown -R $STREAMFWDUSER: /opt/$SERVICENAME
+
+    # set permissions for packet capture
+    bash /opt/$SERVICENAME/scripts/set_permissions.sh
+    if [ $? -ne 0 ]; then
+        fail "Failed to set packet capture permissions for $PROGDESC; aborting."
+    fi
+    # make sure only only user and group has execute permissions
+    chmod -R o-rwx /opt/$SERVICENAME
+    #is this systemd?
+    initsystem="$(ps --no-headers -o comm 1)"
+    echo "initsystem = ${initsystem}"
+
+    if [ "$initsystem" == "systemd" ]; then
+
+        #create service for systemd
+        drop_systemd_script
+
+        # enable coredump
+        mkdir -p /opt/corefiles/
+        chmod 0777 /opt/corefiles
+        sysctl -w kernel.core_pattern=/opt/corefiles/core.%e.%t.%p
+        sysctl -w kernel.core_pipe_limit=0
+        sysctl -w kernel.core_uses_pid=0
+        sysctl -w fs.suid_dumpable=1
+
+        if prompt_yesno "Do you want to start $PROGDESC service ($SERVICENAME) (yes/no)?" $START_SERVICE_DEFAULT; then
+            echo "Starting $SERVICENAME service.."
+
+            #start service + enable start on reboot
+            systemctl daemon-reload
+            systemctl start $PROG
+            systemctl enable $PROG
+        else
+            echo "Skipped starting $SERVICENAME service; use <systemctl> command to start/stop $SERVICENAME service"
+        fi        
+    else
+        #set up init.d daemon
+        drop_initd_script
+
+        if [ -f /sbin/chkconfig ]; then
+            /sbin/chkconfig ${PROG} on
+        else
+            update-rc.d ${PROG} defaults
+        fi
+
+        if [ $? -ne 0 ]; then
+            fail "Failed to setup $PROGDESC startup daemon; aborting."
+        fi
+
+        if prompt_yesno "Do you want to start $PROGDESC service ($SERVICENAME) (yes/no)?" $START_SERVICE_DEFAULT; then
+            echo "Starting $SERVICENAME service.."
+            service $SERVICENAME start
+        else
+            echo "Skipped starting $SERVICENAME service; use <service> command to start/stop $SERVICENAME service"
+        fi
+    fi
+
+    echo "$PROGDESC installation complete."
+else
+    echo "$PROGDESC installation canceled."
+fi
+}
+
+while [[ $# > 0 ]]
+do
+    cmd_param="$1"
+    case $cmd_param in
+        -a|--accept-defaults)
+        echo "accepting defaults"
+        ACCEPT_DEFAULTS="yes"
+        START_SERVICE_DEFAULT="no"
+        ;;
+        -t|--auth-token)
+        AUTH_TOKEN="$2"
+        shift
+        ;;
+        *)
+        # unknown option
+        echo "unknown command line argument: $cmd_param ignored"
+        ;;
+    esac
+    shift # past argument or value
+done
+
+#make sure the whole script is downloaded before running any code
+run_install_script

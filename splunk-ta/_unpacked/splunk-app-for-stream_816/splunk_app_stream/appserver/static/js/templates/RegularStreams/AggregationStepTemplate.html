@@ -1,0 +1,47 @@
+<div class="aggregation-step">
+    <div class="step-subheading">
+        <%- stepTitle %>
+        <div class="step-subsubheading">
+            Is this an aggregated stream?
+        </div>
+    </div>
+    <div class="controls">
+        <label class="aggregation-toggle">Aggregation</label>
+        <div class="btn-group btn-toggle btn-group-radio">
+            <button type="button"
+                    class="aggregation-off btn btn-lg <% if (! isAggregated) { %> active <% } %>">
+                No
+            </button>
+            <button type="button"
+                    class="aggregation-on btn btn-lg <% if (isAggregated) { %> active <% } %>">
+                Yes, Every
+            </button>
+        </div>
+        <span class="control-group">
+            <input type="text" class="time-interval" value="<%- timeInterval %>" <% if (! isAggregated) { %> disabled <% } %> />
+        </span>
+        <label class="trailing-label aggregation-interval <% if (! isAggregated) { %> disabled <% } %>">seconds</label>
+    </div>
+    <div class="expandable <% if (expanded) { %> expanded <% } %>">
+        <div class="icon-chevron expansion-trigger">What is Aggregation?</div>
+        <div class="content">
+            <div>
+                Aggregated streams group events into aggregation buckets, with one bucket allocated for each unique collection of
+                <b>Key</b> fields.  At the end of the time interval, the app emits an object that represents each bucket.
+            </div>
+            <br />
+            <div>
+                For example, if you apply the <b>mean</b> and <b>values</b> aggregation functions to the <b>bytes_in</b> field over a 60 second interval and select <b>src_ip</b> as the only <b>Key</b> field, Stream aggregates the <b>mean</b> and <b>values</b> of <b>bytes_in</b> into a separate bucket for each <b>src_ip</b> seen in the selected interval.
+            </div>
+            <br />
+            <div class="left-label">
+                No aggregation:
+            </div>
+            <div class="right-label">
+                Based on <b>src_ip</b> as <b>Key</b> field, aggregate <b>bytes_in</b> using <b>mean</b> and <b>values</b> functions:
+            </div>
+            <br />
+            <img src="/en-US/splunkd/__raw/servicesNS/admin/splunk_app_stream/static/agg_example.png" />
+        </div>
+    </div>
+</div>

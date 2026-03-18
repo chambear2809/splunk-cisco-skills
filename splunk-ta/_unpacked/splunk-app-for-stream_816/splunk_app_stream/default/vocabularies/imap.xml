@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="imap">
+    <Name>IMAP Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="imap.event">
+      <Type>object</Type>
+      <Comment>Event representing IMAP</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

@@ -1,0 +1,57 @@
+<script id="mount-points-template" type="text/template">
+<div id="mount-points-page">
+    <div class="container-fluid" id="mount-points-main-body">
+
+        <!-- ===== -->
+        <!-- Title -->
+        <!-- ===== -->
+        <div class="row-fluid top-header">
+            <div class="header-wrapper">
+              <h1 class="top-wrapper">
+                  File Server Mount Points
+                  <span id="mount-points-config-button-panel">
+                      <button id="add-file-server-mount-point" class="btn btn-primary">Add File Server</button>
+                  </span>
+              </h1>
+              <h3 class="page-subtitle">
+                   Edit mount points for known file servers or add a new one.
+              </h3>
+            </div>
+        </div>
+
+        <!-- ============ -->
+        <!-- Search Input -->
+        <!-- ============ -->
+        <div class="row-fluid">
+
+          <span id="mount-point-count"> <span> <%- mountPointCount %> </span> file servers </span>
+
+          <span class="table-search">
+             <input type="text" class="input-medium search-query" placeholder="Search" id="mount-point-search-input" value=""/>
+             <a class="clear"><i class="icon-x-circle"></i></a>
+          </span>
+
+        </div>
+
+        <!-- ===== -->
+        <!-- Table -->
+        <!-- ===== -->
+        <div class="row-fluid">
+
+           <table class="table table-chrome table-hover" id="mount-point-table">
+
+             <thead>
+                 <tr>
+                     <th style="width:45%">File Server</th>
+                     <th style="width:50%">Mount Point</th>
+                     <th style="width:5%">Actions</th>
+                 </tr>
+             </thead>
+
+             <tbody id="mount-point-table-body"></tbody>
+
+           </table>
+        </div>
+    </div>
+</div>
+</script>

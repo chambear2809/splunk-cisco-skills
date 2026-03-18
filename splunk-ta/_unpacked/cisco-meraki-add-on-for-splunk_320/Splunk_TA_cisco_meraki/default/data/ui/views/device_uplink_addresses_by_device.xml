@@ -1,0 +1,184 @@
+<form version="1.1">
+  <label>Device Uplink Addresses</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Devices Uplinks History</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ 
+| dedup serial
+| rename name as "Device Name", uplinks{}.interface as "Interface", uplinks{}.addresses{}.address as "Uplink Address", uplinks{}.addresses{}.assignmentMode as "Assignment Mode", uplinks{}.addresses{}.gateway as "Address Gateway", uplinks{}.addresses{}.protocol as "Address Protocol", serial as "Device Serial"
+| table "Device Name", "Device Serial", "Interface", "Uplink Address", "Assignment Mode", "Address Gateway", "Address Protocol"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Uplink Interface Distribution</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ 
+| dedup serial
+| rename uplinks{}.interface as "Uplink Interface" 
+| stats count as Count by "Uplink Interface"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ | dedup serial | search uplinks{}.interface="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Address Assignment Modes</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ 
+| dedup serial
+| rename uplinks{}.addresses{}.assignmentMode as "Assignment Mode" 
+| stats count as Count by "Assignment Mode"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ | dedup serial | search uplinks{}.addresses{}.assignmentMode="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Protocol Distribution</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ 
+| dedup serial
+| rename uplinks{}.addresses{}.protocol as "Address Protocol" 
+| stats count as Count by "Address Protocol"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ | dedup serial | search uplinks{}.addresses{}.protocol="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Most Frequent Public Addresses</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$
+| dedup serial
+| rename uplinks{}.addresses{}.public.address as "Public Address"
+| stats count as "Count" by "Public Address"
+| sort - 0 Count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ | dedup serial | search uplinks{}.addresses{}.public.address="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+    <panel>
+      <title>Most Frequent Gateway IPs</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ 
+| dedup serial
+| rename uplinks{}.addresses{}.gateway as "Gateway" 
+| stats count as Count by "Gateway" 
+| sort - 0 "Count"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ | dedup serial | search uplinks{}.addresses{}.gateway="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Top 10 DNS Servers</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$
+| dedup serial
+| rename uplinks{}.addresses{}.nameservers.addresses{} as "DNS Server"
+| stats count as Count by "DNS Server"
+| sort 10 - Count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ | dedup serial | search uplinks{}.addresses{}.nameservers.addresses{}="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Top 10 Network Uplinks</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ 
+| dedup serial
+| rename network.id as "Network Id"
+| stats count as Count by  "Network Id" 
+| sort 10 - Count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:devicesuplinksaddressesbydevice" $orgid$ | dedup serial | search network.id="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+</form>

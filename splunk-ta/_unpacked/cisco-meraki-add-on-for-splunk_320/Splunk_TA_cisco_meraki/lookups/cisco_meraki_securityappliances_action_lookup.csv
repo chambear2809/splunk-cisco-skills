@@ -1,0 +1,7 @@
+meraki_event_type,action
+splash_auth,success
+dhcp_lease,added
+ids_start,started
+ids_update,modified
+web_cache_started,started
+web_cache_stopped,stopped

@@ -1,0 +1,88 @@
+<form version="1.1">
+    <label>SSL Activity</label>
+    <fieldset submitButton="false">
+        <input type="time" token="time_picker">
+            <label>Time Range</label>
+            <default>
+                <earliest>-7d@h</earliest>
+                <latest>now</latest>
+            </default>
+        </input>
+    </fieldset>
+    <row>
+            <chart>
+                <title>SSL Activity by Common-name/Domain</title>
+                <search>
+                    <query>
+                        index=* source=stream:Splunk_SSLActivity ssl_subject_common_name!=NULL
+                    | fields ssl_subject_common_name, count
+                    | stats sum(count) as Count by ssl_subject_common_name
+                    | search Count > 0
+                    | head 999
+                    </query>
+                    <earliest>$time_picker.earliest$</earliest>
+                    <latest>$time_picker.latest$</latest>
+                </search>
+                <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+                <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+                <option name="charting.axisTitleX.visibility">visible</option>
+                <option name="charting.axisTitleY.visibility">visible</option>
+                <option name="charting.axisTitleY2.visibility">visible</option>
+                <option name="charting.axisX.scale">linear</option>
+                <option name="charting.axisY.scale">linear</option>
+                <option name="charting.axisY2.enabled">false</option>
+                <option name="charting.axisY2.scale">inherit</option>
+                <option name="charting.chart">pie</option>
+                <option name="charting.chart.nullValueMode">connect</option>
+                <option name="charting.chart.sliceCollapsingThreshold">0</option>
+                <option name="charting.chart.stackMode">default</option>
+                <option name="charting.chart.style">shiny</option>
+                <option name="charting.drilldown">all</option>
+                <option name="charting.layout.splitSeries">0</option>
+                <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+                <option name="charting.legend.placement">right</option>
+                <option name="charting.chart.bubbleMaximumSize">50</option>
+                <option name="charting.chart.bubbleMinimumSize">10</option>
+                <option name="charting.chart.bubbleSizeBy">area</option>
+            </chart>
+            <table>
+              <title>Certificates Closest to Expiry</title>
+              <search>
+                  <query>
+                      index=* source=stream:Splunk_SSLActivity
+                      | eval ssl_end_time=strptime(ssl_validity_end, "%b %d %H:%M:%S %Y")
+                      | dedup ssl_subject_common_name, ssl_end_time
+                      | sort 10 ssl_end_time
+                      | convert ctime(ssl_end_time) as certificate_expiry_time
+                      | table ssl_subject_common_name, certificate_expiry_time
+                  </query>
+                  <earliest>$time_picker.earliest$</earliest>
+                  <latest>$time_picker.latest$</latest>
+              </search>
+              <option name="wrap">false</option>
+              <option name="rowNumbers">false</option>
+              <option name="drilldown">cell</option>
+            </table>
+    </row>
+    <row>
+            <table>
+                <title>SSL Sessions</title>
+                <search>
+                    <query>
+                        index=* source=stream:tcp ssl_subject_common_name!=NULL
+                        | stats values(ssl_subject_email) as ssl_subject_email values(ssl_subject_organization) as ssl_subject_organization values(ssl_issuer_common_name) as ssl_issuer_common_name values(ssl_issuer_organization) as ssl_issuer_organization values(ssl_serial) as ssl_serial values(ssl_validity_start) as ssl_validity_start values(ssl_validity_end) as ssl_validity_end  count as count by src_ip, ssl_subject_common_name, ssl_hash
+                        | search ssl_subject_common_name!=NULL
+                        | appendpipe [stats count | eval ssl_subject_common_name =if(count=0, "No results found",  ssl_subject_common_name)
+                        | eval ssl_subject_email=if(count=0,"This table requires &lt;tcp&gt; stream to be enabled in Streams Config", ssl_subject_email)| fields - count]
+                    </query>
+                    <earliest>$time_picker.earliest$</earliest>
+                    <latest>$time_picker.latest$</latest>
+                </search>
+                <option name="wrap">true</option>
+                <option name="rowNumbers">false</option>
+                <option name="dataOverlayMode">none</option>
+                <option name="drilldown">cell</option>
+                <option name="count">15</option>
+            </table>
+    </row>
+</form>

@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="xmpp">
+    <Name>XMPP Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+      <Term id="xmpp.event">
+          <Type>object</Type>
+          <Comment>Event representing xmpp</Comment>
+      </Term>
+      <Term id="xmpp.login">
+          <Type>shortstring</Type>
+          <Comment>User's login string</Comment>
+      </Term>
+      <Term id="xmpp.nickname">
+          <Type>shortstring</Type>
+          <Comment>Contains the used username</Comment>
+      </Term>
+      <Term id="xmpp.client-os">
+          <Type>shortstring</Type>
+          <Comment>Contains the client operating system</Comment>
+      </Term>
+      <Term id="xmpp.version">
+          <Type>shortstring</Type>
+          <Comment>JABBER software version</Comment>
+      </Term>
+      <Term id="xmpp.user-agent">
+          <Type>shortstring</Type>
+          <Comment>Name of the software used</Comment>
+      </Term>
+      <Term id="xmpp.message">
+          <Type>string</Type>
+          <Comment>Contains the chat message</Comment>
+      </Term>
+      <Term id="xmpp.message-encoding">
+          <Type>string</Type>
+          <Comment>Message encoding</Comment>
+      </Term>
+      <Term id="xmpp.contact-login">
+          <Type>shortstring</Type>
+          <Comment>Contains contact login</Comment>
+      </Term>
+      <Term id="xmpp.contact-name">
+          <Type>string</Type>
+          <Comment>Contains contact name</Comment>
+      </Term>
+      <Term id="xmpp.contact-status">
+          <Type>string</Type>
+          <Comment>Contains contact status</Comment>
+      </Term>
+      <Term id="xmpp.receiver">
+          <Type>string</Type>
+          <Comment>Contains the identity of the receiver for a chat message or a file transfer</Comment>
+      </Term>
+      <Term id="xmpp.sender">
+          <Type>shortstring</Type>
+          <Comment>Contains the identity of the sender of a chat session or a file transfer</Comment>
+      </Term>
+      <Term id="xmpp.filename">
+          <Type>shortstring</Type>
+          <Comment>Contains the name of the transferred file</Comment>
+      </Term>
+      <Term id="xmpp.file-sid">
+          <Type>string</Type>
+          <Comment>Contains transferred file identifier</Comment>
+      </Term>
+      <Term id="xmpp.file-size">
+          <Type>uint32</Type>
+          <Comment>Contains size (byte) of the transferred file</Comment>
+      </Term>
+      <Term id="xmpp.file-sender">
+          <Type>string</Type>
+          <Comment>Contains the identity of the sender of a file transfer</Comment>
+      </Term>
+      <Term id="xmpp.file-receiver">
+          <Type>string</Type>
+          <Comment>Contains the identity of the receiver for a file transfer</Comment>
+      </Term>
+      <Term id="xmpp.file-chunk-sid">
+          <Type>string</Type>
+          <Comment>Transferred file identifier</Comment>
+      </Term>
+      <Term id="xmpp.file-chunk-number">
+          <Type>uint32</Type>
+          <Comment>Transferred file identifier</Comment>
+      </Term>
+      <Term id="xmpp.file-chunk-length">
+          <Type>uint32</Type>
+          <Comment>Contains size of the transferred piece</Comment>
+      </Term>
+      <Term id="xmpp.file-chunk-content">
+          <Type>blob</Type>
+          <Comment>Contains content of the transferred data</Comment>
+      </Term>
+      <Term id="xmpp.call-id">
+          <Type>string</Type>
+          <Comment>Contains call id, extracted for each call</Comment>
+      </Term>
+      <Term id="xmpp.start-time">
+          <Type>datetime</Type>
+          <Comment>Contains start date of the call</Comment>
+      </Term>
+      <Term id="xmpp.call-duration">
+          <Type>uint32</Type>
+          <Comment>Contains call duration in microseconds</Comment>
+      </Term>
+      <Term id="xmpp.caller">
+          <Type>string</Type>
+          <Comment>Contains the identity (or the phone number) of the initiator of the call</Comment>
+      </Term>
+      <Term id="xmpp.caller-address">
+          <Type>shortstring</Type>
+          <Comment>Contains address which could be used by the initiator of the call</Comment>
+      </Term>
+      <Term id="xmpp.caller-port">
+          <Type>uint16</Type>
+          <Comment>Contains port on which the caller could start the call</Comment>
+      </Term>
+      <Term id="xmpp.callee">
+          <Type>string</Type>
+          <Comment>Contains the identity (or the phone number) of the called party for a call</Comment>
+      </Term>
+      <Term id="xmpp.callee-address">
+          <Type>shortstring</Type>
+          <Comment>Contains address which could be used by the called party</Comment>
+      </Term>
+      <Term id="xmpp.callee-port">
+          <Type>uint16</Type>
+          <Comment>Contains port on which the callee could receive a call</Comment>
+      </Term>
+  </Vocabulary>
+</CmConfig>

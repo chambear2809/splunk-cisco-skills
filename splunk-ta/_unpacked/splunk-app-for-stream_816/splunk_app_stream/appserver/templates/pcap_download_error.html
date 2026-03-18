@@ -1,0 +1,59 @@
+<%inherit file="//layout/base.html" />
+<%namespace name="lib" file="//lib.html" import="*" />
+<%!
+from splunk.appserver.mrsparkle.lib import util
+isLite = util.isLite()
+colorClass = ''
+if not isLite:
+  colorClass = 'green'
+%>
+
+<%!
+title = 'PCAP download error'
+%>
+
+<%def name="js()">
+
+<%
+nav_file = "/static/build/modules_nav/lite/index.js" if isLite else "/static/build/modules_nav/enterprise/index.js"
+%>
+${lib.script_tags(files=[
+    nav_file
+])}
+<%lib:generate_splunk_header />
+</%def>
+
+<%def name="css()">
+    <%coreCSSFiles = ["/static/css/view.css", "/static/css/skins/default/default.css", '/modules/nav/AccountBar.css', '/static/css/print.css', '/static/css/etb.css'] %>
+    <%
+        if isLite:
+            coreCSSFiles.append('/static/build/css/splunk-components-lite.css')
+        else:
+    	    coreCSSFiles.append('/static/build/css/splunk-components-enterprise.css')
+    	    coreCSSFiles.append('/static/build/css/bootstrap-enterprise.css')
+        endif
+    %>
+    <%lib:stylesheet_tags files="${coreCSSFiles}" />
+    <%lib:get_application_css app="${namespace}" />
+</%def>
+
+<%def name="body_element_open()">
+    <body>
+</%def>
+
+<div class="appHeaderWrapper" id="header">
+    <div class="layoutRow oneColRow splClearfix appHeader">
+        <div class="SplunkModule AccountBar">
+
+        </div>
+    </div>
+</div>
+
+${banner_msg}
+
+<div class="alert alert-error" style="margin: 30px">
+    <i class="icon-alert"></i>
+        ${text}
+    <br>
+    <a class="external" href="https://docs.splunk.com/Documentation/StreamApp/latest/DeployStreamApp/Configuretargetedpacketcapture#4._Configure_mount_point_for_file_server">Read more about Targeted Packet Capture</a>
+</div>

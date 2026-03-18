@@ -1,0 +1,13 @@
+#master tr td:first-child {
+    font-style: italic;
+    text-decoration: underline;
+}
+#master_power tr td:first-child + td + td +td +td {
+    font-style: italic;
+    text-decoration: underline;
+}
+
+#master_interface tr td:first-child + td +td {
+    font-style: italic;
+    text-decoration: underline;
+}

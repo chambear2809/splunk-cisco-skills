@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="atom">
+    <Name>Atom Feeds</Name>
+    <Comment>Vocabulary for describing Atom feeds</Comment>
+    <Locked>true</Locked>
+    <Term id="atom.feed-event">
+      <Type>object</Type>
+      <Comment>Atom feed request</Comment>
+    </Term>
+    <Term id="atom.feed-id">
+      <Type>string</Type>
+      <Comment>Universally unique identifier for a feed</Comment>
+    </Term>
+    <Term id="atom.feed-link">
+      <Type>string</Type>
+      <Comment>Reference to a Web resource for the feed</Comment>
+    </Term>
+    <Term id="atom.feed-title">
+      <Type>string</Type>
+      <Comment>Human-readable title for the feed</Comment>
+    </Term>
+    <Term id="atom.feed-subtitle">
+      <Type>string</Type>
+      <Comment>Human-readable description or subtitle for the feed</Comment>
+    </Term>
+    <Term id="atom.feed-summary">
+      <Type>string</Type>
+      <Comment>Summary of the Atom feed</Comment>
+    </Term>
+    <Term id="atom.feed-category">
+      <Type>string</Type>
+      <Comment>Category associated with the feed</Comment>
+    </Term>
+    <Term id="atom.feed-author">
+      <Type>string</Type>
+      <Comment>Author of the Atom feed</Comment>
+    </Term>
+    <Term id="atom.feed-contributor">
+      <Type>string</Type>
+      <Comment>Person or other entity who contributed to the feed</Comment>
+    </Term>
+    <Term id="atom.feed-rights">
+      <Type>string</Type>
+      <Comment>Conveys information about rights held in and over the feed</Comment>
+    </Term>
+    <Term id="atom.feed-updated">
+      <Type format="%Y%m%dT%H%M%S%F%q">datetime</Type>
+      <Comment>The most recent instant in time when the feed was modified in a way the publisher considers significant</Comment>
+    </Term>
+    <Term id="atom.icon">
+      <Type>string</Type>
+      <Comment>IRI that identifies an image that provides iconic visual identification for a feed</Comment>
+    </Term>
+    <Term id="atom.logo">
+      <Type>string</Type>
+      <Comment>IRI reference that identifies an image that provides visual identification for a feed</Comment>
+    </Term>
+    <Term id="atom.generator">
+      <Type>shortstring</Type>
+      <Comment>Agent used to generate a feed</Comment>
+    </Term>
+    <Term id="atom.entry-event">
+      <Type>object</Type>
+      <Comment>Entry within an Atom feed</Comment>
+    </Term>
+    <Term id="atom.entry-id">
+      <Type>string</Type>
+      <Comment>Universally unique identifier for an entry</Comment>
+    </Term>
+    <Term id="atom.entry-link">
+      <Type>string</Type>
+      <Comment>Reference to a Web resource for the entry</Comment>
+    </Term>
+    <Term id="atom.entry-title">
+      <Type>string</Type>
+      <Comment>Human-readable title for the entry</Comment>
+    </Term>
+    <Term id="atom.entry-summary">
+      <Type>string</Type>
+      <Comment>Summary of the entry</Comment>
+    </Term>
+    <Term id="atom.entry-category">
+      <Type>string</Type>
+      <Comment>Category associated with the entry</Comment>
+    </Term>
+    <Term id="atom.entry-author">
+      <Type>string</Type>
+      <Comment>Author of the entry</Comment>
+    </Term>
+    <Term id="atom.entry-contributor">
+      <Type>string</Type>
+      <Comment>Person or other entity who contributed to the entry</Comment>
+    </Term>
+    <Term id="atom.entry-rights">
+      <Type>string</Type>
+      <Comment>Conveys information about rights held in and over the entry</Comment>
+    </Term>
+    <Term id="atom.entry-updated">
+      <Type format="%Y%m%dT%H%M%S%F%q">datetime</Type>
+      <Comment>The most recent instant in time when the entry was modified in a way the publisher considers significant</Comment>
+    </Term>
+    <Term id="atom.entry-source">
+      <Type>string</Type>
+      <Comment>Metadata for the feed source that the entry was copied from</Comment>
+    </Term>
+    <Term id="atom.entry-published">
+      <Type format="%Y%m%dT%H%M%S%F%q">datetime</Type>
+      <Comment>Instant in time associated with an event early in the life cycle of the entry</Comment>
+    </Term>
+    <Term id="atom.entry-content">
+      <Type>string</Type>
+      <Comment>Contains or links to the content of the entry</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

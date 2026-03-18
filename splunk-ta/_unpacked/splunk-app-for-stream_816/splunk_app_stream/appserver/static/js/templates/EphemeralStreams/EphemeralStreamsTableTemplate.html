@@ -1,0 +1,118 @@
+<script id="streams-list-template" type="text/template">
+   
+            <thead>
+                <tr>
+                    <th class="streams-info-column"><span class="icon-info"></th>
+                    <th><span><input type="checkbox" class='ephemeral-streams-select-all regular-checkbox'></span></th>
+                    <th> 
+                      Name 
+                    </th>
+                    <th>
+                      # of Streams
+                    </th>
+                    <th>
+                      Application
+                    </th>
+                    <th>
+                      Start Time
+                    </th>
+                    <th>
+                      End Time
+                    </th>
+                    <th>
+                      Time Remaining
+                    </th>
+                    <th>
+                      Status
+                    </th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% var regex = new RegExp(searchString, "i"); %>
+                <% for (var i = 0; i < streamGroups.length; i++) { %>
+
+                    <% var group = streamGroups[i]; %>
+                    <% if (regex.test(group.name) || regex.test(group.application)) { %> 
+
+                        <tr class="ephemeral-stream-row" data-id="<%-group.name%>">
+
+                          <!-- Info Icon -->
+                          <td class="more-info-td">
+                            <span class="icon-chevron-right more-info-toggle"></span>
+                          </td>
+
+                          <!-- Select all checkbox -->
+                          <td> <span><input type="checkbox" class='ephemeral-stream-select regular-checkbox'></span>  </td>
+
+                          <!-- Name (category) -->
+                          <td>
+                            <span>
+                              <%- group.name %>
+                              <div class="stream-groups" style="display:none">
+                                  <% for (var j = 0; j < group.models.length; j++) { %>
+                                      <% var stream = group.models[j]; %>
+                                      <div><%- stream.id %></div>
+                                  <% } %>
+                              </div>
+                            </span>
+                         </td>
+
+                          <!-- # of Apps -->
+                          <td><p><%- group.numStreams %></p></td>
+
+                          <!-- Application -->
+                          <td><p><%- group.application %></p></td>
+
+                          <!-- Start Time -->
+                          <td><p><%- group.earliestTime %></p></td>
+
+                          <!-- End Time -->
+                          <td><p><%- group.latestTime %></p></td>
+
+                          <!-- Time Remaining -->
+                          <td><p><%- group.timeRemaining %></p></td>
+
+                           <!-- Status -->
+                          <td><p>
+                            <% if (group.status === "Enabled") { %>
+                              All Enabled
+                            <% } else if ((group.status === "Disabled")){ %>
+                              All Disabled
+                            <% } else if ((group.status === "Mixed")){ %>
+                              Mixed
+                            <% } %>
+                          </p></td>
+
+                          <!-- Actions -->
+                          <td class="ephemeral-streams-action-column">
+                              <div class="ephemeral-stream-edit btn-combo">
+                                  <a class="dropdown-toggle btn-pill" href="#">
+                                    <span class="icon-chevron-down"></span>
+                                  </a>
+                                  <div class="dropdown-menu dropdown-menu-narrow">
+                                      <div class="arrow"></div>
+                                      <ul>
+                                          <% if (group.status === "Enabled") { %>
+                                            <li><a href="#" class="stream-enable" id="disableGroup">Disable All</a></li>
+                                          <% } else if ((group.status === "Disabled")){ %>
+                                            <li><a href="#" class="stream-enable" id="enableGroup">Enable All</a></li>
+                                          <% } else if ((group.status === "Mixed")){ %>
+                                            <li><a href="#" class="stream-enable" id="enableGroup">Enable All</a></li>
+                                            <li><a href="#" class="stream-enable" id="disableGroup">Disable All</a></li>
+                                          <% } %>
+                                          <li><a href="#" class="stream-enable" id="editEndTime">Edit End Time</a></li>
+                                      </ul>
+                                  </div>
+                              </div>
+                          </td>
+
+                        </tr>
+
+                    <% } %> <!-- end if -->   
+
+                <% } %> <!-- end for loop -->
+            </tbody>
+
+</script>
+

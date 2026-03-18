@@ -1,0 +1,97 @@
+<form version="1.1">
+  <label>Appliance VPN Stats</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Average Latency</title>
+      <single>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:appliancesdwanstatistics" $orgid$ 
+| stats avg(merakiVpnPeers{}.latencySummaries{}.avgLatencyMs) as Average_Latency 
+| eval "Average Latency" = round(Average_Latency, 3)." ms" 
+| table "Average Latency"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Average Loss</title>
+      <single>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:appliancesdwanstatistics" $orgid$ 
+| stats avg(merakiVpnPeers{}.lossPercentageSummaries{}.avgLossPercentage) as Average_Loss 
+| eval "Average Loss" = round(Average_Loss, 3)." %" 
+| table "Average Loss"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>VPN Metrics</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:appliancesdwanstatistics" $orgid$
+| rename networkId as "Network ID", networkName as "Network Name", merakiVpnPeers{}.networkId as "Peer VPN Network ID" , merakiVpnPeers{}.networkName as "Peer VPN Network Name", merakiVpnPeers{}.usageSummary.receivedInKilobytes as "Received Kilobytes", merakiVpnPeers{}.usageSummary.sentInKilobytes as "Sent Kilobytes" 
+| table "Network ID", "Network Name","Peer VPN Network ID" ,"Peer VPN Network Name","Received Kilobytes", "Sent Kilobytes"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Average Jitter</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:appliancesdwanstatistics" $orgid$ 
+| rename merakiVpnPeers{}.jitterSummaries{}.senderUplink as "Sender Uplink", merakiVpnPeers{}.jitterSummaries{}.receiverUplink as "Receiver Uplink" 
+| stats avg(merakiVpnPeers{}.jitterSummaries{}.avgJitter) as Average_Jitter by "Sender Uplink", "Receiver Uplink" 
+| eval "Average Jitter"=round(Average_Jitter,2) 
+| table "Sender Uplink", "Receiver Uplink", "Average Jitter"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:appliancesdwanstatistics" $orgid$
+merakiVpnPeers{}.jitterSummaries{}.senderUplink="$row.Sender Uplink$" merakiVpnPeers{}.jitterSummaries{}.receiverUplink="$row.Receiver Uplink$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+</form>

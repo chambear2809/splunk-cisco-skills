@@ -1,0 +1,125 @@
+<script type="text/template">
+<div>
+    <div id="app-main-layout">
+        <div class="dashboard-body container-fluid main-section-body" data-role="main">
+
+            <!-- ================ -->
+            <!--      Header      -->
+            <!-- ================ -->
+
+            <div class="dashboard-header clearfix">
+                <h2>Flow Visualization</h2>
+            </div>
+
+            <!-- ================ -->
+            <!--      Inputs      -->
+            <!-- ================ -->
+
+            <div class="fieldset">
+                <span id="time-inputs">
+                    <span>Time</span>
+                    <div class="input input-timerangepicker" id="time-input"></div>
+                </span>
+
+                <span id="metric-inputs">
+                    <span>Metric</span>
+                    <div class="input input-dropdown" id="metric-dropdown"></div>
+                </span>
+
+                <span id="playback-controls">
+                    <div class="input input-playback">
+                        <a><i class="icon-play"></i></a>
+                    </div>
+                    <div class="input input-playback">
+                        <a><i class="icon-pause"></i></a>
+                    </div>
+                    <div class="input input-playback">
+                        <a><i class="icon-stop"></i></a>
+                    </div>
+                </span>
+
+                <span id="playback-timestamps"></span>
+            </div>
+
+            <!-- ================ -->
+            <!--      Charts      -->
+            <!-- ================ -->
+
+            <div class="dashboard-row">
+                <div class="dashboard-cell" style="width: 100%;">
+
+                    <!-- ================ -->
+                    <!--     Timeline     -->
+                    <!-- ================ -->
+
+                    <div class="dashboard-panel">
+                        <div class="panel-element">
+                            <div id="timeline" class="dashboard-element chart"></div>
+                        </div>
+                    </div>
+
+                    <!-- ================ -->
+                    <!--      Heatmap     -->
+                    <!-- ================ -->
+
+                    <div class="dashboard-panel">
+                        <div class="panel-element">
+                            <div id="heatmap-container-wrapper">
+                                <div id="heatmap-container">
+
+                                    <div class="heatmap-labels">
+                                        <span id="axis-label-y">Destination IP</span>
+                                        <span id="axis-label-x">Source IP</span>
+
+                                        <div class="heatmap-hline" style="top:100%;"></div>
+                                        <div class="heatmap-hline" style="top:80%;"></div>
+                                        <div class="heatmap-hline" style="top:60%;"></div>
+                                        <div class="heatmap-hline" style="top:40%;"></div>
+                                        <div class="heatmap-hline" style="top:20%;"></div>
+                                        <div class="heatmap-hline" style="top:0%;"></div>
+
+                                        <div id='heatmap-crosshair'>
+                                            <div id="heatmap-crosshair-vertical"></div>
+                                            <div id="heatmap-crosshair-horizontal"></div>
+                                            <div id="heatmap-crosshair-circle"></div>
+                                        </div>
+                                    </div>
+
+                                    <div id="heatmap-tooltips-container"></div>
+
+                                    <div id="heatmap-waiting-container">
+                                        <div id="heatmap-waiting-message">Waiting for data...</div>
+                                    </div>
+
+                                    <div id="heatmap-not-found-container">
+                                        <div id="heatmap-not-found-message">No results found.</div>
+                                    </div>
+                                </div>
+
+                                <div class="heatmap-labels">
+                                    <span id="origin-label">0.0.0.0</span>
+                                    <span id="upper-label-x">255.255.255.255</span>
+                                    <span id="upper-label-y">255.255.255.255</span>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ================ -->
+                    <!--       Table      -->
+                    <!-- ================ -->
+
+                    <div class="dashboard-panel">
+                        <div class="panel-element">
+                            <div id="ipInfoTable" class="dashboard-element chart"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+</script>

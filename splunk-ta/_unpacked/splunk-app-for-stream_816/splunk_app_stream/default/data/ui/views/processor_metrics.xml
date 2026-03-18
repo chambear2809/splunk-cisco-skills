@@ -1,0 +1,390 @@
+<form script="metrics.js" version="1.1">
+  <label>Stream Forwarder Metrics &amp; Logs</label>
+  <fieldset submitButton="false" autoRun="true">
+    <!--<input type="dropdown" token="processorId" searchWhenChanged="true">
+      <label>Processor Id</label>
+      <choice value="*">all</choice>
+      <search>
+        <query> `stream_stats` host=$host$ | spath output=ProcessorId path=sniffer{}.processors{}.id |  stats estdc(ProcessorId) by ProcessorId | fields ProcessorId
+        </query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+      <fieldForLabel>ProcessorId</fieldForLabel>
+      <fieldForValue>ProcessorId</fieldForValue>
+      <default>*</default>
+    </input>
+    <input type="radio" token="groupby" searchWhenChanged="true">
+      <label>Group By</label>
+      <choice value="host">Host</choice>
+      <choice value="ProcessorId">Processor ID</choice>
+      <default>host</default>
+    </input>-->
+    <input type="time" token="time" searchWhenChanged="true">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="host" searchWhenChanged="true">
+      <label>Host</label>
+      <choice value="*">all</choice>
+      <search>
+          <query>`stream_stats` | stats estdc(host) as count by host | fields host</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+      </search>
+      <fieldForLabel>host</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <default>*</default>
+    </input>
+  </fieldset>
+  <row>
+      <chart>
+        <title>Total Events</title>
+        <search>
+            <query>
+                `stream_stats` host=$host$ | spath Output=events path=senders{}.streams{}.delta_events |   fields - _raw | fields _time ,host, events | stats sum(events) as deltaEvents by _time, host | timechart sum(deltaEvents) as delta by host
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Num Events</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+      <chart>
+        <title>Event Queue Size</title>
+        <search>
+            <query>
+                `stream_stats` host=$host$ | timechart avg(eventQueueCeiling) as "Event Queue Size" by host
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Event Queue Size</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+  </row>
+  <row>
+      <chart>
+        <title>Packet Queue Size</title>
+        <search>
+            <query>
+                `stream_stats` host=$host$ | spath Output=PacketQueueSize path=sniffer{}.processors{}.packetQueueSize |
+                       stats sum(PacketQueueSize) as TotalPacketQueueSize by host, _time |
+                       timechart avg(TotalPacketQueueSize) as PacketQueueSize by host
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Packet Queue Size</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+      </chart>
+      <chart>
+        <title>SSL Session Keys</title>
+        <search>
+            <query>
+                `stream_stats` host=$host$ | spath Output=SslSessionKeyCount path=sniffer{}.processors{}.sslSessionKeyCount |
+                           stats sum(SslSessionKeyCount) as TotalSslSessionKeyCount by host,_time |
+                           timechart avg(TotalSslSessionKeyCount) as SslSessionKeyCount by host
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="count">10</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Count</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+      </chart>
+  </row>
+  <row>
+      <chart>
+        <title>TCP Reassembly Packet Count</title>
+        <search>
+            <query>
+                `stream_stats` host=$host$ | spath Output=TcpReassemblyPacketCount path=sniffer{}.processors{}.tcpReassemblyPacketCount |
+                  stats sum(TcpReassemblyPacketCount) as TotalTcpReassemblyPacketCount by host,_time |
+                  timechart avg(TotalTcpReassemblyPacketCount) as TcpReassemblyPacketCount by host
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Packets</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+      </chart>
+      <chart>
+        <title>TCP Reassembly Payload Size</title>
+        <search>
+            <query>
+                `stream_stats` host=$host$ | spath Output=TcpReassemblyPayloadSize path=sniffer{}.processors{}.tcpReassemblyPayloadSize |
+                  stats sum(TcpReassemblyPayloadSize) as TotalTcpRPS by host,_time | eval MBTcpRPS=TotalTcpRPS/1024/1024 |
+                  timechart avg(MBTcpRPS) as TcpReassemblyPayloadSize(MB) by host
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Payload Size</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleY.text">MB</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+      </chart>
+    </row>
+    <row>
+      <panel>
+        <chart>
+          <title>Event Attributes</title>
+            <search>
+                  <query>
+                      `stream_stats` host=$host$ |
+                      spath Output=EventAttributes path=sniffer{}.processors{}.eventAttributeCount |
+                      stats sum(EventAttributes) AS TotalEventAttributes by host,_time |
+                      timechart avg(TotalEventAttributes) AS AvgEventAttributes by host
+                  </query>
+                  <earliest>$time.earliest$</earliest>
+                  <latest>$time.latest$</latest>
+            </search>
+            <option name="charting.chart">line</option>
+            <option name="charting.axisY2.enabled">false</option>
+            <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+            <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+            <option name="charting.axisTitleX.visibility">visible</option>
+            <option name="charting.axisTitleX.text">Time</option>
+            <option name="charting.axisTitleY.visibility">visible</option>
+            <option name="charting.axisTitleY.text">Num Attributes</option>
+            <option name="charting.axisTitleY2.visibility">visible</option>
+            <option name="charting.axisX.scale">linear</option>
+            <option name="charting.axisY.scale">linear</option>
+            <option name="charting.axisY2.scale">inherit</option>
+            <option name="charting.chart.bubbleMaximumSize">50</option>
+            <option name="charting.chart.bubbleMinimumSize">10</option>
+            <option name="charting.chart.bubbleSizeBy">area</option>
+            <option name="charting.chart.nullValueMode">connect</option>
+            <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+            <option name="charting.chart.stackMode">default</option>
+            <option name="charting.chart.style">shiny</option>
+            <option name="charting.drilldown">all</option>
+            <option name="charting.layout.splitSeries">0</option>
+            <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+            <option name="charting.legend.placement">none</option>
+        </chart>
+      </panel>
+    </row>
+    <!--
+        <fieldset submitButton="false" autoRun="true">
+        <input type="time" token="time_picker" searchWhenChanged="true">
+          <label>Time</label>
+          <default>
+            <earliest>-60m@m</earliest>
+            <latest>now</latest>
+          </default>
+        </input>
+        <input type="checkbox" token="level" searchWhenChanged="true">
+          <label>Log Level</label>
+          <choice value="DEBUG">DEBUG</choice>
+          <choice value="INFO">INFO</choice>
+          <choice value="WARN">WARN</choice>
+          <choice value="ERROR">ERROR</choice>
+          <default>WARN,ERROR,INFO</default>
+          <valuePrefix>level=</valuePrefix>
+          <delimiter> OR </delimiter>
+        </input>
+        <input type="text" token="search" searchWhenChanged="true">
+          <label>Search</label>
+          <default>*</default>
+        </input>
+      </fieldset>
+    -->
+    <row>
+      <chart>
+        <title>Top Messages</title>
+        <search>
+            <query>
+                `stream_logs` host=$host$ | top limit=5 message
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.enabled">false</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+      <chart>
+        <title>Errors by Host</title>
+        <search>
+            <query>
+                `stream_logs` host=$host$ | stats count by host
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+      </chart>
+    </row>
+    <row>
+      <table>
+        <title>Stream Forwarder Logs</title>
+        <search>
+            <query>
+                `stream_logs` host=$host$ | table _time, level, message
+            </query>
+            <earliest>$time.earliest$</earliest>
+            <latest>$time.latest$</latest>
+        </search>
+        <option name="showPager">true</option>
+        <option name="list.drilldown">full</option>
+        <option name="list.wrap">1</option>
+        <option name="maxLines">5</option>
+        <option name="raw.drilldown">full</option>
+        <option name="rowNumbers">false</option>
+        <option name="table.drilldown">all</option>
+        <option name="table.wrap">1</option>
+        <option name="type">list</option>
+        <option name="wrap">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="count">10</option>
+      </table>
+    </row>
+</form>

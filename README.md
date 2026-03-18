@@ -2,7 +2,7 @@
 
 This repository is a working library of Cursor agent skills and shell scripts for
 installing, configuring, and validating Splunk apps and Technology Add-ons on
-self-managed Splunk Enterprise deployments.
+self-managed Splunk Enterprise and Splunk Cloud deployments.
 
 The repo is designed for two use cases:
 
@@ -11,17 +11,28 @@ The repo is designed for two use cases:
 - **Direct shell use**: you can run the scripts under each skill manually if you
   prefer to operate outside the agent.
 
-The automation is built around the Splunk REST API on port `8089`, so it can run
-from any machine that can reach the target Splunk management endpoint.
+The automation now supports two administration paths:
+
+- **Splunk Enterprise**: direct Splunk REST API access on port `8089`, with SSH
+  staging as a fallback for remote app package installs.
+- **Splunk Cloud**: Admin Config Service (ACS) for app installs, index
+  management, and restarts, plus search-tier REST API access on port `8089` for
+  TA-specific account/input configuration after the app is installed.
+
+For Splunk Cloud, the search-tier REST API requires the `search-api` allow list
+to include your source IP. App installation, index creation, and restart
+operations do **not** use the search-tier REST API in cloud mode.
 
 ## What This Repository Covers
 
 At a high level, the repo gives you three layers of automation:
 
 1. **Package delivery**: download apps from Splunkbase, fetch them from a URL,
-   or install them from local `.tgz` or `.spl` files.
+   or install them from local `.tgz` or `.spl` files. In Splunk Cloud, installs
+   are executed through ACS instead of direct `/services/apps/local` calls.
 2. **App-specific setup**: create indexes, configure accounts, enable inputs,
-   update macros, and apply dashboard settings.
+   update macros, and apply dashboard settings. In Splunk Cloud, index creation
+   uses ACS and the app-specific REST configuration uses the search tier.
 3. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
@@ -49,6 +60,26 @@ skill-specific details.
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
 
+## Vendor Package Policy
+
+This repo now treats the vendor-provided app archives in `splunk-ta/` as the
+deployment source of truth.
+
+- **Install as-is**: for both Splunk Enterprise and Splunk Cloud, the normal
+  workflow installs the original `.tgz`, `.tar.gz`, or `.spl` archive from
+  `splunk-ta/`.
+- **Cloud install path**: use ACS to install the original package, then use the
+  skill-specific REST/API automation to configure the installed app.
+- **No extract/repack required**: unpacked app trees are not part of the normal
+  deployment workflow.
+- **Review-only unpacked copies**: anything under `splunk-ta/_unpacked/` is for
+  static review and risk analysis only.
+- **Vendor package constraints**: if a package is not Splunk Cloud-compatible as
+  shipped, that is treated as a vendor/package limitation rather than something
+  this repo silently fixes at install time.
+
+See `CLOUD_DEPLOYMENT_MATRIX.md` for the per-TA deployment model.
+
 ## How To Use This Repo
 
 The normal workflow is:
@@ -63,8 +94,9 @@ The normal workflow is:
 
 ### 1. Configure Credentials
 
-All scripts load Splunk credentials from a project-root `credentials` file first,
-and fall back to `~/.splunk/credentials` if the project file does not exist.
+All scripts load deployment settings from a project-root `credentials` file
+first, and fall back to `~/.splunk/credentials` if the project file does not
+exist.
 
 The simplest setup path is:
 
@@ -82,7 +114,7 @@ chmod 600 credentials
 The project-level `credentials` file is gitignored and intended only for local
 use.
 
-For remote Splunk targets, that same file can also include connection and SSH
+For Enterprise targets, that same file can also include connection and SSH
 staging settings:
 
 ```bash
@@ -95,6 +127,25 @@ SPLUNK_SSH_USER="splunk"
 SPLUNK_SSH_PASS=""
 ```
 
+For Splunk Cloud, the credentials file can also include:
+
+```bash
+SPLUNK_CLOUD_STACK="your-stack-name"
+SPLUNK_CLOUD_SEARCH_HEAD=""
+ACS_SERVER="https://admin.splunk.com"
+STACK_TOKEN=""
+STACK_USERNAME=""
+STACK_PASSWORD=""
+STACK_TOKEN_USER=""
+```
+
+`SPLUNK_PLATFORM` is optional. In normal use, scripts infer the target from the
+current operation plus your Cloud/REST settings. If one credentials file
+contains both Cloud and Enterprise/HF targets, interactive runs will prompt
+when a command is ambiguous.
+
+Use `SPLUNK_URI="https://<deployment>.splunkcloud.com:8089"` only when you also
+need search-tier REST API access for app-specific configuration or validation.
 These values are stored as literal strings in the `credentials` file. Do not use
 shell expressions there.
 
@@ -148,15 +199,21 @@ bash skills/splunk-app-install/scripts/install_app.sh \
   --url https://example.com/path/to/app.tgz
 ```
 
-When the target Splunk host is remote, the installer will:
+When the target platform is **Splunk Enterprise**, the installer will:
 
 1. try a direct REST upload first
 2. fall back to SSH staging when the target does not support that upload path
 
+When the target platform is **Splunk Cloud**, the installer uses ACS:
+
+1. private apps are vetted and installed with `acs apps install private`
+2. Splunkbase apps are installed or updated with ACS app-management commands
+3. restart requirements are checked through `acs status current-stack`
+
 After a successful install or uninstall, the generic app-management scripts
-restart Splunk automatically and wait for the management API on `8089` to come
-back. Use `--no-restart` only when batching multiple changes before a single
-final restart.
+restart Splunk automatically on Enterprise or trigger an ACS restart only when
+Splunk Cloud reports `restartRequired=true`. Use `--no-restart` only when
+batching multiple changes before a single final restart.
 
 ### 4. Run A Skill-Specific Setup
 
@@ -215,6 +272,22 @@ The validation scripts generally check:
 - account or input configuration
 - data presence in the expected indexes
 
+## Splunk Cloud Notes
+
+Splunk Cloud support in this repo follows the documented platform split:
+
+- **ACS-managed actions**: app install, app uninstall, index creation, and
+  restarts.
+- **Search-tier REST actions**: TA-specific account setup, input enablement,
+  macro updates, saved search toggles, KV Store access, and validation.
+- **Forwarder-managed actions**: on Splunk Cloud, data inputs still run on
+  forwarders or infrastructure under your control. The repo does not attempt to
+  turn the cloud search tier into a local collector.
+
+For example, the Cisco TA skills can configure their app objects on the Cloud
+search tier over REST once the app is installed, while the generic installer and
+index creation logic use ACS.
+
 ## Working With Remote Splunk Hosts
 
 To target a remote Splunk instance instead of localhost:
@@ -228,9 +301,10 @@ export it each session.
 
 Remote workflows matter most in two places:
 
-- **app installation**: local files may need SSH staging
-- **validation/setup**: all REST operations must be able to reach the remote
-  management port
+- **app installation**: Enterprise local files may need SSH staging, while
+  Splunk Cloud installs use ACS
+- **validation/setup**: all search-tier REST operations must be able to reach
+  the remote management port
 
 ## Secure Credential Handling
 
@@ -311,20 +385,33 @@ That is where the real behavior lives.
 
 Minimum expected environment:
 
-- Splunk Enterprise with REST API access on `8089`
+- Splunk Enterprise with REST API access on `8089`, or Splunk Cloud with ACS
+  access and optional search-tier REST API access on `8089`
 - `bash`
 - `curl`
 - `python3`
 - Cursor IDE if you want the agent-driven workflow
 - a `splunk.com` account for Splunkbase downloads
 
+For Splunk Cloud workflows, you should also install the ACS CLI:
+
+```bash
+brew install acs
+```
+
 Depending on the workflow, you may also need:
 
 - SSH access to the target Splunk host for remote local-package installs
 - vendor credentials or tokens supplied through files for account setup scripts
+- `search-api` allow-list access for Cloud search-tier REST operations
 
 ## Current Scope
 
-This repo focuses on **self-managed Splunk Enterprise** and vendor TAs/apps that
-can be configured through REST and shell automation. It is primarily aimed at
-repeatable setup and validation, not at packaging or publishing apps.
+This repo focuses on vendor TAs/apps that can be configured through REST and
+shell automation on **self-managed Splunk Enterprise** and on **Splunk Cloud
+search tiers with ACS plus allowlisted REST API access**.
+
+The biggest Cloud-specific limitation is hybrid collection architectures. For
+example, Splunk Stream on Splunk Cloud uses a cloud-hosted `splunk_app_stream`
+plus forwarders you control; this repo therefore treats Stream as a special
+case rather than a pure single-target install.

@@ -1,0 +1,96 @@
+<script id="streams-list-template" type="text/template">
+
+    <!-- =============== -->
+    <!-- Top Control Bar -->
+    <!-- =============== -->
+    <div id="permanent-streams-top-controls" class="row-fluid">
+
+        <!-- Bulk Edit -->
+        <span id="regular-streams-bulk-edit-controls" class="span4">
+            <span id="num-streams-selected"><span class="num">0</span> Streams Selected</span>
+            <a href="#" id="bulkEnable" class="bulk-selections">Enable</a>
+            <% if (!isPacket) { %>
+            <a href="#" id="bulkStatsOnly" class="bulk-selections">Estimate</a>
+            <% } %>
+            <a href="#" id="bulkDisable" class="bulk-selections">Disable</a>
+            <a href="#" id="bulkDelete" class="bulk-selections">Delete</a>
+        </span>
+
+        <!-- Search -->
+        <span class="span4">
+            <div class="table-search main-page-search">
+                <input type="text" class="input-medium search-query" id="reg-stream-search" placeholder="Search" />
+                <a class="clear"><i class="icon-x-circle"></i></a>
+            </div>
+        </span>
+
+        <!-- Sparkline -->
+        <span class="span4">
+            <div id="totalSparklineContainer">
+                <span class="loadingMsg">Loading....</span>
+                <span id="totalSparklineTitleContainer">
+                    <div id="totalSparklineTitle">Avg. Traffic(15m)</div>
+                    <div id="avgTraffic"></div>
+                </span>
+                <span id="totalSparkline"></span>
+            </div>
+        </span>
+
+    </div>
+
+    <div class="panel-body">
+
+        <!-- Table -->
+        <table class="table table-chrome table-hover streams-list-table" id="config-page-streams-table">
+
+           <thead>
+                <tr>
+                    <th>
+                        <span><input type="checkbox" class='streams-select-all regular-checkbox'></span>
+                    </th>
+                    <th class="th-center" style="width:15%">
+                        Name
+                    </th>
+                    <th class="streams-action-column th-center" >
+                        Actions
+                    </th>
+                    <th class="th-center">
+                        Mode
+                        <span class="stream-mode-help">
+                            <a target="_blank" href="http://docs.splunk.com/Documentation/StreamApp/latest/User/ConfigureStreams#Set_stream_mode">?</a>
+                        </span>
+                    </th>
+                    <th class="th-center">
+                        Protocol
+                    </th>
+                    <th class="th-center" style="width:35%">
+                        Description
+                    </th>
+                    <th class="th-center">
+                        App
+                    </th>
+                    <th class="th-center" style="min-width:80px">
+                        Created By
+                    </th>
+                    <!-- width of sparkline static, also specified in StreamsListView -->
+                    <th style="min-width: 200px" class="th-center">
+                        Recent Traffic(15m)
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody id="permanent-streams-tbody">
+
+                <!-- ~~~~~~~~~~~~~~~~~~~~ -->
+
+                <!-- Template goes here   -->
+
+                <!-- ~~~~~~~~~~~~~~~~~~~~ -->
+
+            </tbody>
+
+        </table>
+    </div>
+
+</script>
+

@@ -1,0 +1,1924 @@
+{
+    "pages": {
+        "configuration": {
+            "tabs": [
+                {
+                    "name": "nd_account",
+                    "title": "ND Accounts",
+                    "options": {
+                        "saveValidator": "function(formData) { if(formData.name === 'proxy' || formData.name === 'logging' || formData.name === 'true' || formData.name === 'false' || formData.name === 'additional_parameters' || formData.name === 'additional_settings') { return 'Can not create account named anyone of [proxy, logging, true, false, additional_parameters, additional_settings]. These are reserved keywords in Splunk.' ; } return true; }"
+                    },
+                    "hook": {
+                        "type": "external",
+                        "src": "account_hook_nd"
+                    },
+                    "table": {
+                        "header": [
+                            {
+                                "field": "name",
+                                "label": "Account Name"
+                            },
+                            {
+                                "field": "nd_hostname",
+                                "label": "Hostname(s)/IP Address(es)"
+                            },
+                            {
+                                "field": "nd_port",
+                                "label": "Port"
+                            },
+                            {
+                                "field": "nd_authentication_type",
+                                "label": "Authentication Type",
+                                "mapping": {
+                                    "local_user_authentication": "Local User Authentication",
+                                    "remote_user_authentication": "Remote User Authentication"
+                                }
+                            },
+                            {
+                                "field": "nd_username",
+                                "label": "Username"
+                            }
+                        ],
+                        "actions": [
+                            "edit",
+                            "delete",
+                            "clone"
+                        ]
+                    },
+                    "entity": [
+                        {
+                            "field": "name",
+                            "label": "Account Name",
+                            "type": "text",
+                            "required": true,
+                            "help": "Enter a unique name for this account.",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 50,
+                                    "errorMsg": "Length of Account Name should be between 1 and 50"
+                                },
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[a-zA-Z]\\w*$",
+                                    "errorMsg": "Account Name must start with a letter and followed by alphabetic letters, digits or underscores."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_hostname",
+                            "label": "Hostname(s)/IP Address(es)",
+                            "type": "text",
+                            "help": "To configure one or more Nexus Dashboard hosts as a cluster, provide them as comma-separated values. For example: www.abc.com,10.0.1.1,www.xyz.com",
+                            "required": true,
+                            "defaultValue": "",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                },
+                                {
+                                    "type": "regex",
+                                    "pattern": "^(?!.*(http://|https://))([^,\\s]+(?:\\s*,\\s*[^,\\s]+)*)$",
+                                    "errorMsg": "Enter the Hostname(s)/IP Address(es) without scheme."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_port",
+                            "label": "ND Port",
+                            "help": "Enter the Nexus Dashboard port",
+                            "type": "text",
+                            "encrypted": false,
+                            "defaultValue": "443",
+                            "required": true,
+                            "validators": [
+                                {
+                                    "type": "number",
+                                    "range": [
+                                        1,
+                                        65535
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_authentication_type",
+                            "label": "ND Authentication Type",
+                            "type": "singleSelect",
+                            "required": true,
+                            "help": "Select Authentication Type for Nexus Dashboard.",
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "label": "Local User Authentication",
+                                        "value": "local_user_authentication"
+                                    },
+                                    {
+                                        "label": "Remote User Authentication",
+                                        "value": "remote_user_authentication"
+                                    }
+                                ]
+                            },
+                            "defaultValue": "local_user_authentication"
+                        },
+                        {
+                            "field": "nd_username",
+                            "label": "ND Username",
+                            "type": "text",
+                            "required": true,
+                            "help": "Enter the Nexus Dashboard username.",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200,
+                                    "errorMsg": "Length of username should be between 1 and 200"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_password",
+                            "label": "ND Password",
+                            "type": "text",
+                            "encrypted": true,
+                            "required": true,
+                            "help": "Enter the Nexus Dashboard password.",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Length of password should be between 1 and 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_login_domain",
+                            "label": "ND Login Domain",
+                            "type": "text",
+                            "help": "Enter the Nexus Dashboard login domain.",
+                            "required": false,
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_enable_proxy",
+                            "label": "Enable Proxy",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": 0
+                        },
+                        {
+                            "field": "nd_proxy_type",
+                            "label": "Proxy Type",
+                            "type": "singleSelect",
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "label": "http",
+                                        "value": "http"
+                                    },
+                                    {
+                                        "label": "socks5",
+                                        "value": "socks5"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "field": "nd_proxy_url",
+                            "label": "Proxy URL",
+                            "type": "text",
+                            "required": false,
+                            "defaultValue": "",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_proxy_port",
+                            "label": "Proxy Port",
+                            "type": "text",
+                            "required": false,
+                            "defaultValue": "",
+                            "validators": [
+                                {
+                                    "type": "number",
+                                    "range": [
+                                        1,
+                                        65535
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_proxy_username",
+                            "label": "Proxy Username",
+                            "type": "text",
+                            "required": false,
+                            "defaultValue": "",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_proxy_password",
+                            "label": "Proxy Password",
+                            "type": "text",
+                            "required": false,
+                            "defaultValue": "",
+                            "encrypted": true,
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "aci_account",
+                    "title": "ACI Accounts",
+                    "table": {
+                        "header": [
+                            {
+                                "field": "name",
+                                "label": "Account Name"
+                            },
+                            {
+                                "field": "apic_hostname",
+                                "label": "Hostname(s)/IP Address(es)"
+                            },
+                            {
+                                "field": "apic_port",
+                                "label": "Port"
+                            },
+                            {
+                                "field": "apic_authentication_type",
+                                "label": "Authentication Type",
+                                "mapping": {
+                                    "certificate_authentication": "Certificate Based Authentication",
+                                    "password_authentication": "Password Based Authentication",
+                                    "remote_user_authentication": "Remote User Based Authentication"
+                                }
+                            },
+                            {
+                                "field": "apic_username",
+                                "label": "Username",
+                                "customCell": {
+                                    "src": "custom_account_cell",
+                                    "type": "external"
+                                }
+                            }
+                        ],
+                        "actions": [
+                            "edit",
+                            "delete",
+                            "clone"
+                        ]
+                    },
+                    "hook": {
+                        "src": "account_hook_aci",
+                        "type": "external"
+                    },
+                    "entity": [
+                        {
+                            "field": "name",
+                            "label": "Account Name",
+                            "type": "text",
+                            "required": true,
+                            "help": "Enter a unique name for this account.",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 50,
+                                    "errorMsg": "Length of Account Name should be between 1 and 50"
+                                },
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[a-zA-Z]\\w*$",
+                                    "errorMsg": "Account Name must start with a letter and followed by alphabetic letters, digits or underscores."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_hostname",
+                            "label": "Hostname(s)/IP Address(es)",
+                            "help": "To configure one or more APIC hosts, provide them as comma-separated values. For example: www.abc.com,10.0.1.1,www.xyz.com",
+                            "type": "text",
+                            "required": true,
+                            "options": {
+                                "placeholder": ""
+                            },
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                },
+                                {
+                                    "type": "regex",
+                                    "pattern": "^(?!.*(http://|https://))([^,\\s]+(?:\\s*,\\s*[^,\\s]+)*)$",
+                                    "errorMsg": "Enter the Hostname(s)/IP Address(es) without scheme."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_port",
+                            "label": "APIC Port",
+                            "help": "Enter the APIC port",
+                            "type": "text",
+                            "encrypted": false,
+                            "required": true,
+                            "defaultValue": 443,
+                            "validators": [
+                                {
+                                    "type": "number",
+                                    "range": [
+                                        1,
+                                        65535
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "label": "APIC Authentication Type",
+                            "type": "singleSelect",
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "label": "Password Based Authentication",
+                                        "value": "password_authentication"
+                                    },
+                                    {
+                                        "label": "Remote User Based Authentication",
+                                        "value": "remote_user_authentication"
+                                    },
+                                    {
+                                        "label": "Certificate Based Authentication",
+                                        "value": "certificate_authentication"
+                                    }
+                                ]
+                            },
+                            "field": "apic_authentication_type",
+                            "defaultValue": "password_authentication",
+                            "help": "Select Authentication Type for APIC",
+                            "required": true
+                        },
+                        {
+                            "field": "apic_username",
+                            "label": "APIC Username",
+                            "help": "Enter the APIC username",
+                            "type": "text",
+                            "encrypted": false,
+                            "required": false,
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200,
+                                    "errorMsg": "Length of 'APIC Username' should be between 1 and 200"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_password",
+                            "label": "APIC Password",
+                            "help": "Enter the APIC password",
+                            "type": "text",
+                            "encrypted": true,
+                            "required": false,
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Length of 'APIC password' should be between 1 and 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_login_domain",
+                            "label": "APIC Login Domain",
+                            "help": "Enter the APIC login domain",
+                            "type": "text",
+                            "required": false,
+                            "options": {
+                                "placeholder": ""
+                            },
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200,
+                                    "errorMsg": "Length of 'APIC Login Domain' should be between 1 and 200"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_certificate_name",
+                            "label": "Certificate Name",
+                            "help": "Enter the certificate name",
+                            "type": "text",
+                            "required": false,
+                            "options": {
+                                "placeholder": ""
+                            },
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200,
+                                    "errorMsg": "Length of 'Certificate Name' should be between 1 and 200"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_certificate_path",
+                            "label": "Path of Private Key",
+                            "help": "Enter the path of private key",
+                            "type": "text",
+                            "required": false,
+                            "options": {
+                                "placeholder": ""
+                            },
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 200,
+                                    "errorMsg": "Length of 'Path of Private Key' should be between 1 and 200"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_proxy_enabled",
+                            "label": "Enable Proxy",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": 0
+                        },
+                        {
+                            "field": "apic_proxy_type",
+                            "label": "Proxy Type",
+                            "type": "singleSelect",
+                            "required": false,
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "label": "http",
+                                        "value": "http"
+                                    },
+                                    {
+                                        "label": "socks5",
+                                        "value": "socks5"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "field": "apic_proxy_url",
+                            "label": "Proxy Host",
+                            "type": "text",
+                            "options": {
+                                "placeholder": "Enter the proxy host here"
+                            },
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_proxy_port",
+                            "label": "Proxy Port",
+                            "type": "text",
+                            "options": {
+                                "placeholder": "Enter the proxy port here"
+                            },
+                            "required": false,
+                            "defaultValue": "",
+                            "validators": [
+                                {
+                                    "type": "number",
+                                    "range": [
+                                        1,
+                                        65535
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_proxy_username",
+                            "label": "Proxy Username",
+                            "type": "text",
+                            "options": {
+                                "placeholder": "Enter the proxy username here (optional)"
+                            },
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_proxy_password",
+                            "label": "Proxy Password",
+                            "type": "text",
+                            "options": {
+                                "placeholder": "Enter the proxy password here (optional)"
+                            },
+                            "encrypted": true,
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        }
+                    ],
+                    "options": {
+                        "saveValidator": "function(formData) { if(formData.name === 'proxy' || formData.name === 'logging' || formData.name === 'true' || formData.name === 'false' || formData.name === 'additional_parameters' || formData.name === 'additional_settings') { return 'Can not create account named anyone of [proxy, logging, true, false, additional_parameters, additional_settings]. These are reserved keywords in Splunk.' ; } return true; }"
+                    }
+                },
+                {
+                    "name": "nexus_9k_account",
+                    "hook": {
+                        "type": "external",
+                        "src": "account_hook_nexus_9k"
+                    },
+                    "table": {
+                        "actions": [
+                            "edit",
+                            "delete",
+                            "clone"
+                        ],
+                        "header": [
+                            {
+                                "label": "Account Name",
+                                "field": "name"
+                            },
+                            {
+                                "label": "Hostname/IP Address",
+                                "field": "nexus_9k_device_ip"
+                            },
+                            {
+                                "label": "Port",
+                                "field": "nexus_9k_port"
+                            },
+                            {
+                                "label": "Username",
+                                "field": "nexus_9k_username"
+                            }
+                        ]
+                    },
+                    "entity": [
+                        {
+                            "type": "text",
+                            "label": "Account Name",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Account Name must start with a letter and followed by alphabetic letters, digits or underscores.",
+                                    "pattern": "^[a-zA-Z]\\w*$"
+                                },
+                                {
+                                    "type": "string",
+                                    "errorMsg": "Length of Account Name should be between 1 and 50",
+                                    "minLength": 1,
+                                    "maxLength": 50
+                                }
+                            ],
+                            "field": "name",
+                            "help": "Enter a unique name for this account.",
+                            "required": true
+                        },
+                        {
+                            "type": "text",
+                            "label": "Hostname/IP Address",
+                            "field": "nexus_9k_device_ip",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                },
+                                {
+                                    "type": "regex",
+                                    "pattern": "^(?!http://|https://).*",
+                                    "errorMsg": "Enter the Hostname/IP Address without the scheme."
+                                },
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[^,]+$",
+                                    "errorMsg": "Enter a single Hostname or IP Address without the scheme."
+                                }
+                            ],
+                            "help": "Enter the Nexus 9K Hostname or IP Address",
+                            "required": true,
+                            "encrypted": false
+                        },
+                        {
+                            "type": "text",
+                            "label": "Nexus 9K Port",
+                            "field": "nexus_9k_port",
+                            "help": "Enter the Nexus 9K Port",
+                            "defaultValue": 443,
+                            "validators": [
+                                {
+                                    "type": "number",
+                                    "range": [
+                                        1,
+                                        65535
+                                    ]
+                                }
+                            ],
+                            "required": true,
+                            "encrypted": false
+                        },
+                        {
+                            "type": "text",
+                            "label": "Nexus 9K Username",
+                            "field": "nexus_9k_username",
+                            "help": "Enter the Nexus 9K Username",
+                            "required": true,
+                            "encrypted": false
+                        },
+                        {
+                            "type": "text",
+                            "label": "Nexus 9K Password",
+                            "field": "nexus_9k_password",
+                            "help": "Enter the Nexus 9K Password",
+                            "required": true,
+                            "encrypted": true
+                        },
+                        {
+                            "field": "nexus_9k_enable_proxy",
+                            "label": "Enable Proxy",
+                            "type": "checkbox",
+                            "required": false,
+                            "defaultValue": 0
+                        },
+                        {
+                            "field": "nexus_9k_proxy_type",
+                            "label": "Proxy Type",
+                            "type": "singleSelect",
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "label": "http",
+                                        "value": "http"
+                                    },
+                                    {
+                                        "label": "socks5",
+                                        "value": "socks5"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "field": "nexus_9k_proxy_url",
+                            "label": "Proxy URL",
+                            "type": "text",
+                            "required": false,
+                            "defaultValue": "",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nexus_9k_proxy_port",
+                            "label": "Proxy Port",
+                            "type": "text",
+                            "required": false,
+                            "defaultValue": "",
+                            "validators": [
+                                {
+                                    "type": "number",
+                                    "range": [
+                                        1,
+                                        65535
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nexus_9k_proxy_username",
+                            "label": "Proxy Username",
+                            "type": "text",
+                            "required": false,
+                            "defaultValue": "",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nexus_9k_proxy_password",
+                            "label": "Proxy Password",
+                            "type": "text",
+                            "required": false,
+                            "defaultValue": "",
+                            "encrypted": true,
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 0,
+                                    "maxLength": 8192,
+                                    "errorMsg": "Max length of text input is 8192"
+                                }
+                            ]
+                        }
+                    ],
+                    "options": {
+                        "saveValidator": "function(formData) { if(formData.name === 'proxy' || formData.name === 'logging' || formData.name === 'true' || formData.name === 'false' || formData.name === 'additional_parameters' || formData.name === 'additional_settings') { return 'Can not create account named anyone of [proxy, logging, true, false, additional_parameters, additional_settings]. These are reserved keywords in Splunk.' ; } return true; }"
+                    },
+                    "title": "Nexus 9K Accounts"
+                },
+                {
+                    "name": "logging",
+                    "title": "Logging",
+                    "entity": [
+                        {
+                            "type": "singleSelect",
+                            "label": "Log level",
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "value": "DEBUG",
+                                        "label": "DEBUG"
+                                    },
+                                    {
+                                        "value": "INFO",
+                                        "label": "INFO"
+                                    },
+                                    {
+                                        "value": "WARNING",
+                                        "label": "WARNING"
+                                    },
+                                    {
+                                        "value": "ERROR",
+                                        "label": "ERROR"
+                                    },
+                                    {
+                                        "value": "CRITICAL",
+                                        "label": "CRITICAL"
+                                    }
+                                ]
+                            },
+                            "defaultValue": "INFO",
+                            "field": "loglevel",
+                            "required": true,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Log level must be one of: DEBUG, INFO, WARNING, ERROR, CRITICAL",
+                                    "pattern": "^DEBUG|INFO|WARNING|ERROR|CRITICAL$"
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "title": "Configuration",
+            "description": "Set up your add-on"
+        },
+        "inputs": {
+            "services": [
+                {
+                    "name": "cisco_nexus_dashboard",
+                    "title": "ND",
+                    "inputHelperModule": "cisco_nd_helper",
+                    "hook": {
+                        "src": "inputs_hook_nd",
+                        "type": "external"
+                    },
+                    "entity": [
+                        {
+                            "field": "name",
+                            "label": "Name",
+                            "type": "text",
+                            "help": "Enter a unique name for the data input",
+                            "required": true,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[a-zA-Z]\\w*$",
+                                    "errorMsg": "Input Name must start with a letter and followed by alphabetic letters, digits or underscores."
+                                },
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "errorMsg": "Length of input name should be between 1 and 100"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_account",
+                            "label": "ND account",
+                            "help": "Nexus Dashboard Account to use for this input.",
+                            "required": true,
+                            "type": "multipleSelect",
+                            "options": {
+                                "disableSearch": true,
+                                "endpointUrl": "cisco_dc_nd_account_list",
+                                "delimiter": ","
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "field": "interval",
+                            "label": "Interval",
+                            "help": "Data collection interval in seconds.",
+                            "required": true,
+                            "defaultValue": 300,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^\\[1-9]\\d*$|^\\d*$",
+                                    "errorMsg": "Interval must be a positive integer."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "index",
+                            "label": "Index",
+                            "type": "singleSelect",
+                            "defaultValue": "default",
+                            "options": {
+                                "endpointUrl": "data/indexes",
+                                "denyList": "^_.*$",
+                                "createSearchChoice": true
+                            },
+                            "required": true,
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 80,
+                                    "errorMsg": "Length of index name should be between 1 and 80."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_alert_type",
+                            "label": "Input Type",
+                            "help": "Select the type of input.",
+                            "required": true,
+                            "type": "singleSelect",
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "value": "advisories",
+                                        "label": "Advisories"
+                                    },
+                                    {
+                                        "value": "anomalies",
+                                        "label": "Anomalies"
+                                    },
+                                    {
+                                        "label": "Orchestrator",
+                                        "value": "Orchestrator"
+                                    },
+                                    {
+                                        "label": "Congestion",
+                                        "value": "congestion"
+                                    },
+                                    {
+                                        "label": "Endpoints",
+                                        "value": "endpoints"
+                                    },
+                                    {
+                                        "label": "Flows",
+                                        "value": "flows"
+                                    },
+                                    {
+                                        "label": "Protocols",
+                                        "value": "protocols"
+                                    },
+                                    {
+                                        "label": "Fabrics",
+                                        "value": "fabrics"
+                                    },
+                                    {
+                                        "label": "Switches",
+                                        "value": "switches"
+                                    },
+                                    {
+                                        "label": "Custom",
+                                        "value": "custom"
+                                    }
+                                ]
+                            },
+                            "defaultValue": "advisories"
+                        },
+                        {
+                            "field": "nd_protocol_site_name",
+                            "label": "Fabric Name",
+                            "help": "Name of the Fabric - limit the records pertaining to the fabric.",
+                            "required": false,
+                            "type": "text"
+                        },
+                        {
+                            "field": "nd_node_name",
+                            "label": "Node Name",
+                            "help": "Node Name - limit the records pertaining to given node name. Supports multiple values separated by commas. Example: LEAF_2201, LEAF_2202",
+                            "required": false,
+                            "type": "text"
+                        },
+                        {
+                            "field": "nd_interface_name",
+                            "label": "Interface Name",
+                            "help": "Interface Name - limit the records pertaining to the given interface name. Supports multiple values separated by commas. Example: eth1/1, eth1/2",
+                            "required": false,
+                            "type": "text"
+                        },
+                        {
+                            "field": "nd_scope",
+                            "type": "singleSelect",
+                            "label": "Scope",
+                            "help": "Choose a Scope from the list.",
+                            "required": false,
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "value": "interface",
+                                        "label": "Interface"
+                                    },
+                                    {
+                                        "value": "queue",
+                                        "label": "Queue"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "field": "nd_anomalies_category",
+                            "label": " Category",
+                            "help": "Select the Category to filter anomalies data.",
+                            "required": false,
+                            "type": "multipleSelect",
+                            "defaultValue": "*",
+                            "options": {
+                                "delimiter": "~",
+                                "items": [
+                                    {
+                                        "value": "category:forwarding",
+                                        "label": "Forwarding"
+                                    },
+                                    {
+                                        "value": "category:changeAnalysis",
+                                        "label": "Change Analysis"
+                                    },
+                                    {
+                                        "value": "category:endpoint",
+                                        "label": "Endpoint"
+                                    },
+                                    {
+                                        "value": "category:system",
+                                        "label": "System"
+                                    },
+                                    {
+                                        "value": "category:statistics",
+                                        "label": "Statistics"
+                                    },
+                                    {
+                                        "value": "category:security",
+                                        "label": "Security"
+                                    },
+                                    {
+                                        "value": "category:Compliance",
+                                        "label": "Compliance"
+                                    },
+                                    {
+                                        "value": "category:utilization",
+                                        "label": "Resources"
+                                    },
+                                    {
+                                        "value": "category:environmental",
+                                        "label": "Environmental"
+                                    },
+                                    {
+                                        "value": "category:flows",
+                                        "label": "Flows"
+                                    },
+                                    {
+                                        "value": "category:staticAnalysis",
+                                        "label": "Static Analysis"
+                                    },
+                                    {
+                                        "value": "category:adc",
+                                        "label": "Application Delivery Controller"
+                                    },
+                                    {
+                                        "value": "category:infrastructure",
+                                        "label": "Infrastructure"
+                                    },
+                                    {
+                                        "value": "category:operator",
+                                        "label": "Operator"
+                                    },
+                                    {
+                                        "value": "category:vmm",
+                                        "label": "Vmm"
+                                    },
+                                    {
+                                        "value": "category:unknown",
+                                        "label": "Unknown"
+                                    },
+                                    {
+                                        "value": "category:bug",
+                                        "label": "Bug"
+                                    },
+                                    {
+                                        "value": "*",
+                                        "label": "All"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "field": "nd_advisories_category",
+                            "label": "Category",
+                            "help": "Select the Category to filter advisories data.",
+                            "required": false,
+                            "type": "multipleSelect",
+                            "defaultValue": "*",
+                            "options": {
+                                "delimiter": "~",
+                                "items": [
+                                    {
+                                        "value": "category:PSIRT",
+                                        "label": "PSIRT"
+                                    },
+                                    {
+                                        "value": "category:Field\\ Notice",
+                                        "label": "Field Notice"
+                                    },
+                                    {
+                                        "value": "category:HWEOL",
+                                        "label": "HWEOL"
+                                    },
+                                    {
+                                        "value": "category:SWEOL",
+                                        "label": "SWEOL"
+                                    },
+                                    {
+                                        "value": "category:Compliance",
+                                        "label": "Compliance"
+                                    },
+                                    {
+                                        "value": "*",
+                                        "label": "All"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "field": "nd_severity",
+                            "label": "Severity",
+                            "help": "Select the Severity to filter data.",
+                            "required": false,
+                            "type": "multipleSelect",
+                            "defaultValue": "*",
+                            "options": {
+                                "delimiter": "~",
+                                "items": [
+                                    {
+                                        "value": "severity:critical",
+                                        "label": "Critical"
+                                    },
+                                    {
+                                        "value": "severity:major",
+                                        "label": "Major"
+                                    },
+                                    {
+                                        "value": "severity:minor",
+                                        "label": "Minor"
+                                    },
+                                    {
+                                        "value": "severity:info",
+                                        "label": "Info"
+                                    },
+                                    {
+                                        "value": "severity:warning",
+                                        "label": "Warning"
+                                    },
+                                    {
+                                        "value": "*",
+                                        "label": "All"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "field": "nd_additional_filter",
+                            "label": "Additional Query Parameters",
+                            "help": "Lucene format Filter - filter the response based on this filter field. Example: nodeName:scalespine-602 OR nodeName:scalespine-601.",
+                            "required": false,
+                            "type": "textarea"
+                        },
+                        {
+                            "field": "nd_time_slice",
+                            "label": "Time Slice",
+                            "help": "The time interval (in seconds) for collecting flow data. If no interval is specified, data for all events within a 5-second interval will be collected, starting from the specified Time Range up to the current time.",
+                            "required": false,
+                            "type": "text",
+                            "defaultValue": 5,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^\\[1-9]\\d*$|^\\d*$",
+                                    "errorMsg": "Time Slice must be a positive integer."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_start_date",
+                            "label": "Time Range",
+                            "help": "Specify the Time Range for data collection starting from N seconds, minutes, hours or days ago until now. The value must be a positive number followed by 's' for seconds, 'm' for minutes, 'h' for hours, or 'd' for days. Example: 5h, 30m, or 1d.",
+                            "required": false,
+                            "type": "text",
+                            "defaultValue": "1h",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[1-9]\\d*[shmdSHMD]$",
+                                    "errorMsg": "Time Range must be a positive number followed by 's/S', 'm/M', 'h/H', or 'd/D'."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_time_range",
+                            "label": "Time Range",
+                            "help": "The Time Range for last N hours and must be greater than or equal to 0. If 0 is specified, all events (from the start of time) would be collected.",
+                            "required": false,
+                            "type": "text",
+                            "defaultValue": 4,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^\\[1-9]\\d*$|^\\d*$",
+                                    "errorMsg": "Time Range must be a positive integer."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_flow_start_date",
+                            "label": "Time Range",
+                            "help": "Specify the Time Range for data collection starting from N seconds, minutes, hours or days ago until now. The value must be a positive number followed by 's' for seconds, 'm' for minutes, 'h' for hours, or 'd' for days. Example: 5h, 30m, or 1d.",
+                            "required": false,
+                            "type": "text",
+                            "defaultValue": "1m",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[1-9]\\d*[shmdSHMD]$",
+                                    "errorMsg": "Time Range must be a positive number followed by 's/S', 'm/M', 'h/H', or 'd/D'."
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nd_granularity",
+                            "label": "Granularity",
+                            "help": "Specify the Granularity for data collection starting from N seconds, minutes, or hours ago. The value must be a positive number followed by 'h' for hours, 'm' for minutes, or 's' for seconds. Example: 5h, 30m, or 30s. If nothing is specified, 5 minutes will be default granularity.",
+                            "required": false,
+                            "type": "text",
+                            "defaultValue": "5m",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[1-9]\\d*[shmdSHMD]$",
+                                    "errorMsg": "Granularity must be a positive number followed by 's/S', 'm/M', 'h/H', or 'd/D'."
+                                }
+                            ]
+                        },
+                        {
+                            "type": "text",
+                            "label": "Class Name(s)",
+                            "field": "orchestrator_arguments",
+                            "help": "Enter space separated Class Name(s).",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Enter valid Class Name(s). Class Name(s) can only include letters, numbers, spaces, hyphens, and underscores.",
+                                    "pattern": "^[\\w\\s-]+$"
+                                }
+                            ],
+                            "required": false
+                        },
+                        {
+                            "type": "text",
+                            "field": "custom_endpoint",
+                            "label": "Custom Endpoint",
+                            "help": "Enter the custom endpoint. Example: sedgeapi/v1/cisco-nir/api/api/v1/anomalies/details",
+                            "required": false
+                        },
+                        {
+                            "field": "nd_additional_parameters",
+                            "label": "Additional Query Parameters",
+                            "required": false,
+                            "type": "textarea",
+                            "help": "Enter the additional query parameters for this custom endpoint. Example: siteGroupName=default&siteName=DC-WEST",
+                            "options": {
+                                "rowsMin": 0,
+                                "rowsMax": 12
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "field": "custom_sourcetype",
+                            "label": "Sourcetype",
+                            "help": "Enter the sourcetype for the data to be collected.",
+                            "required": false,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[a-zA-Z][a-zA-Z0-9_.:-]*$",
+                                    "errorMsg": "Sourcetype must start with a letter and can only include letters, numbers, underscores (_), periods (.), colons (:), and hyphens (-)."
+                                }
+                            ]
+                        },
+                        {
+                            "type": "text",
+                            "field": "custom_resp_key",
+                            "label": "Ingestion Key",
+                            "help": "Enter the key from the JSON response that should be used for data ingestion into Splunk. This key will identify the specific data field to be extracted and indexed by Splunk. If not provided, the 'entries' key will be used by default.",
+                            "required": false,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^\\S*$",
+                                    "errorMsg": "Space is not allowed for Ingestion Key."
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "cisco_nexus_aci",
+                    "hook": {
+                        "src": "inputs_hook_aci",
+                        "type": "external"
+                    },
+                    "entity": [
+                        {
+                            "field": "name",
+                            "label": "Name",
+                            "type": "text",
+                            "help": "Enter a unique name for the data input",
+                            "required": true,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^[a-zA-Z]\\w*$",
+                                    "errorMsg": "Input Name must start with a letter and followed by alphabetic letters, digits or underscores."
+                                },
+                                {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100,
+                                    "errorMsg": "Length of input name should be between 1 and 100"
+                                }
+                            ]
+                        },
+                        {
+                            "field": "apic_account",
+                            "label": "APIC account",
+                            "help": "APIC Account to use for this input.",
+                            "required": true,
+                            "type": "multipleSelect",
+                            "options": {
+                                "disableSearch": true,
+                                "endpointUrl": "cisco_dc_aci_account_list",
+                                "delimiter": ","
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "field": "interval",
+                            "label": "Interval",
+                            "help": "Data collection interval in seconds.",
+                            "required": true,
+                            "defaultValue": "300",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^\\[1-9]\\d*$|^\\d*$",
+                                    "errorMsg": "Interval must be a positive integer."
+                                }
+                            ]
+                        },
+                        {
+                            "type": "singleSelect",
+                            "field": "index",
+                            "label": "Index",
+                            "required": true,
+                            "defaultValue": "default",
+                            "options": {
+                                "endpointUrl": "data/indexes?search=isInternal=0+disabled=0",
+                                "denyList": "^_.*$",
+                                "createSearchChoice": true
+                            },
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Index names must begin with a letter or a number and must contain only letters, numbers, underscores or hyphens.",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9\\\\_\\\\-]*$"
+                                },
+                                {
+                                    "type": "string",
+                                    "errorMsg": "Length of index name should be between 1 and 80.",
+                                    "minLength": 1,
+                                    "maxLength": 80
+                                }
+                            ]
+                        },
+                        {
+                            "type": "singleSelect",
+                            "label": "Input Type",
+                            "field": "apic_input_type",
+                            "help": "Select/Enter the Input Type",
+                            "required": true,
+                            "options": {
+                                "disableSearch": false,
+                                "createSearchChoice": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "label": "stats",
+                                        "value": "stats"
+                                    },
+                                    {
+                                        "label": "microsegment",
+                                        "value": "microsegment"
+                                    },
+                                    {
+                                        "label": "health",
+                                        "value": "health"
+                                    },
+                                    {
+                                        "label": "fex",
+                                        "value": "fex"
+                                    },
+                                    {
+                                        "label": "authentication",
+                                        "value": "authentication"
+                                    },
+                                    {
+                                        "label": "classInfo",
+                                        "value": "classInfo"
+                                    },
+                                    {
+                                        "label": "managed objects",
+                                        "value": "managed_objects"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "label": "Class Name(s)",
+                            "field": "apic_arguments",
+                            "help": "Enter space separated Class Name(s).",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Enter valid Class Name(s). Class Name(s) can only include letters, numbers, spaces, hyphens, and underscores.",
+                                    "pattern": "^[\\w\\s-]+$"
+                                }
+                            ],
+                            "required": false
+                        },
+                        {
+                            "type": "text",
+                            "label": "Distinguished Name(s)",
+                            "field": "mo_support_object",
+                            "help": "Enter space separated Distinguished Name(s).",
+                            "required": false,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Enter valid Distinguished Name(s). Distinguished Name(s) must not contain commas or end with '.json'",
+                                    "pattern": "^(?!.*(?:,|\\.json)).*$"
+                                }
+                            ],
+                            "tooltip": "Each value provided here will be used to make an API request to the following endpoint, formatted as: /api/mo/{provided_value}.json."
+                        },
+                        {
+                            "field": "aci_additional_parameters",
+                            "label": "Additional Query Parameters",
+                            "required": false,
+                            "type": "textarea",
+                            "help": "Enter the additional parameters for this input. Example: rsp-subtree-include=faults&query-target=subtree",
+                            "options": {
+                                "rowsMin": 0,
+                                "rowsMax": 12
+                            }
+                        }
+                    ],
+                    "inputHelperModule": "nexus_aci_helper",
+                    "title": "ACI"
+                },
+                {
+                    "name": "cisco_nexus_9k",
+                    "hook": {
+                        "src": "inputs_hook_n9k",
+                        "type": "external"
+                    },
+                    "entity": [
+                        {
+                            "type": "text",
+                            "label": "Name",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Input Name must begin with a letter and consist exclusively of alphanumeric characters and underscores.",
+                                    "pattern": "^[a-zA-Z]\\w*$"
+                                },
+                                {
+                                    "type": "string",
+                                    "errorMsg": "Length of input name should be between 1 and 100",
+                                    "minLength": 1,
+                                    "maxLength": 100
+                                }
+                            ],
+                            "field": "name",
+                            "help": "A unique name for the data input.",
+                            "required": true
+                        },
+                        {
+                            "type": "multipleSelect",
+                            "label": "Nexus 9k Account",
+                            "options": {
+                                "disableSearch": true,
+                                "endpointUrl": "cisco_dc_nexus9k_account_list",
+                                "delimiter": ","
+                            },
+                            "help": "Nexus 9K Account to use for this input.",
+                            "field": "nexus_9k_account",
+                            "required": true
+                        },
+                        {
+                            "type": "text",
+                            "field": "interval",
+                            "label": "Interval",
+                            "help": "Time interval of input in seconds and must be greater than or equal to 60.",
+                            "required": true,
+                            "defaultValue": "300",
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "pattern": "^\\[1-9]\\d*$|^\\d*$",
+                                    "errorMsg": "Interval must be a positive integer."
+                                }
+                            ]
+                        },
+                        {
+                            "type": "singleSelect",
+                            "field": "index",
+                            "label": "Index",
+                            "defaultValue": "default",
+                            "options": {
+                                "endpointUrl": "data/indexes?search=isInternal=0+disabled=0",
+                                "denyList": "^_.*$",
+                                "createSearchChoice": true
+                            },
+                            "required": true,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Index names must begin with a letter or a number and must contain only letters, numbers, underscores or hyphens.",
+                                    "pattern": "^[a-zA-Z0-9][a-zA-Z0-9\\\\_\\\\-]*$"
+                                },
+                                {
+                                    "type": "string",
+                                    "errorMsg": "Length of index name should be between 1 and 80.",
+                                    "minLength": 1,
+                                    "maxLength": 80
+                                }
+                            ]
+                        },
+                        {
+                            "field": "nexus_9k_input_type",
+                            "label": "Input Type",
+                            "type": "singleSelect",
+                            "required": true,
+                            "help": "Select Input Type for Nexus 9K.",
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "label": "DME",
+                                        "value": "nexus_9k_dme"
+                                    },
+                                    {
+                                        "label": "CLI",
+                                        "value": "nexus_9k_cli"
+                                    }
+                                ]
+                            },
+                            "defaultValue": "nexus_9k_cli"
+                        },
+                        {
+                            "field": "nexus_9k_dme_query_type",
+                            "label": "DME Query Type",
+                            "type": "singleSelect",
+                            "required": false,
+                            "help": "Select DME Query Type for DME Class.",
+                            "options": {
+                                "disableSearch": true,
+                                "autoCompleteFields": [
+                                    {
+                                        "label": "Managed Object",
+                                        "value": "nexus_9k_managed_object"
+                                    },
+                                    {
+                                        "label": "Class",
+                                        "value": "nexus_9k_class"
+                                    }
+                                ]
+                            },
+                            "defaultValue": "nexus_9k_class"
+                        },
+                        {
+                            "type": "text",
+                            "label": "Component",
+                            "validators": [
+                                {
+                                    "type": "string",
+                                    "errorMsg": "Length of Component should be between 1 to 50 characters.",
+                                    "minLength": 1,
+                                    "maxLength": 50
+                                },
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Component must begin with a letter and consist exclusively of alphanumeric characters and underscores.",
+                                    "pattern": "^[a-zA-Z]\\w*$"
+                                }
+                            ],
+                            "field": "nexus_9k_component",
+                            "help": "Enter a unique component for this account.",
+                            "required": false
+                        },
+                        {
+                            "type": "multipleSelect",
+                            "field": "nexus_9k_cmd",
+                            "label": "Command",
+                            "required": false,
+                            "help": "Select the Command to collect Nexus 9K data.",
+                            "options": {
+                                "delimiter": "|",
+                                "createSearchChoice": true,
+                                "items": [
+                                    {
+                                        "value": "*",
+                                        "label": "All"
+                                    },
+                                    {
+                                        "value": "show hostname",
+                                        "label": "show hostname"
+                                    },
+                                    {
+                                        "value": "show module",
+                                        "label": "show module"
+                                    },
+                                    {
+                                        "value": "show inventory",
+                                        "label": "show inventory"
+                                    },
+                                    {
+                                        "value": "show interface",
+                                        "label": "show interface"
+                                    },
+                                    {
+                                        "value": "show environment temperature",
+                                        "label": "show environment temperature"
+                                    },
+                                    {
+                                        "value": "show cdp neighbors detail",
+                                        "label": "show cdp neighbors detail"
+                                    },
+                                    {
+                                        "value": "show interface transceiver details",
+                                        "label": "show interface transceiver details"
+                                    },
+                                    {
+                                        "value": "show environment power",
+                                        "label": "show environment power"
+                                    },
+                                    {
+                                        "value": "show system resource",
+                                        "label": "show system resource"
+                                    },
+                                    {
+                                        "value": "show version",
+                                        "label": "show version"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "field": "nexus_9k_class_names",
+                            "label": "Class Name(s)",
+                            "help": "Enter space separated Class Name(s).",
+                            "required": false,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Enter valid Class Name(s). Class Name(s) must not contain commas or end with '.json'",
+                                    "pattern": "^(?!.*(?:,|\\.json)).*$"
+                                }
+                            ],
+                            "tooltip": "Each value provided here will be used to make an API request to the following endpoint, formatted as: /api/class/{provided_value}.json."
+                        },
+                        {
+                            "type": "text",
+                            "field": "nexus_9k_distinguished_names",
+                            "label": "Distinguished Name(s)",
+                            "help": "Enter space separated Distinguished Name(s).",
+                            "required": false,
+                            "validators": [
+                                {
+                                    "type": "regex",
+                                    "errorMsg": "Enter valid Distinguished Name(s). Distinguished Name(s) must not contain commas or end with '.json'",
+                                    "pattern": "^(?!.*(?:,|\\.json)).*$"
+                                }
+                            ],
+                            "tooltip": "Each value provided here will be used to make an API request to the following endpoint, formatted as: /api/mo/{provided_value}.json."
+                        },
+                        {
+                            "field": "nexus_9k_additional_parameters",
+                            "label": "Additional Query Parameters",
+                            "required": false,
+                            "type": "textarea",
+                            "help": "Enter the additional query parameters for this input. Example: query-target=children&page-size=2000",
+                            "options": {
+                                "rowsMin": 0,
+                                "rowsMax": 12
+                            }
+                        }
+                    ],
+                    "inputHelperModule": "nexus_9K_helper",
+                    "title": "Nexus 9K"
+                }
+            ],
+            "title": "Inputs",
+            "description": "Manage your data inputs",
+            "table": {
+                "actions": [
+                    "edit",
+                    "delete",
+                    "clone"
+                ],
+                "header": [
+                    {
+                        "label": "Name",
+                        "field": "name"
+                    },
+                    {
+                        "label": "Account Name",
+                        "field": "account",
+                        "customCell": {
+                            "src": "custom_input_account_cell",
+                            "type": "external"
+                        }
+                    },
+                    {
+                        "label": "Interval",
+                        "field": "interval"
+                    },
+                    {
+                        "label": "Index",
+                        "field": "index"
+                    },
+                    {
+                        "label": "Status",
+                        "field": "disabled"
+                    }
+                ],
+                "moreInfo": [
+                    {
+                        "label": "Name",
+                        "field": "name"
+                    },
+                    {
+                        "label": "Interval",
+                        "field": "interval"
+                    },
+                    {
+                        "label": "Index",
+                        "field": "index"
+                    },
+                    {
+                        "field": "nd_account",
+                        "label": "ND account"
+                    },
+                    {
+                        "field": "nd_alert_type",
+                        "label": "Input Type"
+                    },
+                    {
+                        "field": "nd_anomalies_category",
+                        "label": " Category"
+                    },
+                    {
+                        "field": "nd_advisories_category",
+                        "label": "Category"
+                    },
+                    {
+                        "field": "nd_severity",
+                        "label": "Severity"
+                    },
+                    {
+                        "field": "nd_time_range",
+                        "label": "Time Range"
+                    },
+                    {
+                        "field": "nd_time_slice",
+                        "label": "Time Slice"
+                    },
+                    {
+                        "field": "nd_protocol_site_name",
+                        "label": "Fabric Name"
+                    },
+                    {
+                        "field": "nd_node_name",
+                        "label": "Node Name"
+                    },
+                    {
+                        "field": "nd_interface_name",
+                        "label": "Interface Name"
+                    },
+                    {
+                        "field": "nd_additional_filter",
+                        "label": "Additional Query Parameters"
+                    },
+                    {
+                        "field": "nd_scope",
+                        "label": "Scope"
+                    },
+                    {
+                        "field": "nd_start_date",
+                        "label": "Time Range"
+                    },
+                    {
+                        "label": "Custom Endpoint",
+                        "field": "custom_endpoint"
+                    },
+                    {
+                        "field": "nd_additional_parameters",
+                        "label": "Additional Query Parameters"
+                    },
+                    {
+                        "label": "Sourcetype",
+                        "field": "custom_sourcetype"
+                    },
+                    {
+                        "label": "Ingestion Key",
+                        "field": "custom_resp_key"
+                    },
+                    {
+                        "label": "Class Name(s)",
+                        "field": "orchestrator_arguments"
+                    },
+                    {
+                        "field": "apic_account",
+                        "label": "APIC account"
+                    },
+                    {
+                        "label": "Input Type",
+                        "field": "apic_input_type"
+                    },
+                    {
+                        "label": "Class Name(s)",
+                        "field": "apic_arguments"
+                    },
+                    {
+                        "label": "Distinguished Name(s)",
+                        "field": "mo_support_object"
+                    },
+                    {
+                        "field": "aci_additional_parameters",
+                        "label": "Additional Query Parameters"
+                    },
+                    {
+                        "label": "Nexus 9k Account",
+                        "field": "nexus_9k_account"
+                    },
+                    {
+                        "field": "nexus_9k_input_type",
+                        "label": "Input Type"
+                    },
+                    {
+                        "field": "nexus_9k_dme_query_type",
+                        "label": "DME Query Type"
+                    },
+                    {
+                        "label": "Component",
+                        "field": "nexus_9k_component"
+                    },
+                    {
+                        "field": "nexus_9k_cmd",
+                        "label": "Command"
+                    },
+                    {
+                        "field": "nexus_9k_class_names",
+                        "label": "Class Name(s)"
+                    },
+                    {
+                        "field": "nexus_9k_distinguished_names",
+                        "label": "Distinguished Name(s)"
+                    },
+                    {
+                        "field": "nexus_9k_additional_parameters",
+                        "label": "Additional Query Parameters"
+                    },
+                    {
+                        "field": "nd_granularity",
+                        "label": "Granularity"
+                    },
+                    {
+                        "label": "Status",
+                        "field": "disabled",
+                        "mapping": {
+                            "true": "Inactive",
+                            "false": "Active"
+                        }
+                    }
+                ]
+            }
+        },
+        "dashboard": {
+            "panels": [
+                {
+                    "name": "default"
+                }
+            ]
+        }
+    },
+    "meta": {
+        "name": "cisco_dc_networking_app_for_splunk",
+        "restRoot": "cisco_dc_networking_app_for_splunk",
+        "version": "1.2.0",
+        "displayName": "Cisco DC Networking App for Splunk",
+        "schemaVersion": "0.0.9",
+        "supportedThemes": [
+            "light",
+            "dark"
+        ],
+        "_uccVersion": "5.55.0"
+    }
+}

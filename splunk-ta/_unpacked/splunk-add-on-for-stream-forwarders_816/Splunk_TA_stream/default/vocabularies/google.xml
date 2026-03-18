@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="google">
+    <Name>Google Analytics</Name>
+    <Comment>Terms specific to users of Google Analytics</Comment>
+    <Locked>true</Locked>
+    <Term id="google.custom-event">
+      <Type>object</Type>
+      <Comment>Custom Google Analytics event</Comment>
+    </Term>
+    <Term id="google.item-event">
+      <Type>object</Type>
+      <Comment>Google Ecommerce item event</Comment>
+    </Term>
+    <Term id="google.trans-event">
+      <Type>object</Type>
+      <Comment>Google Ecommerce transaction event</Comment>
+    </Term>
+    <Term id="google.custom-category">
+      <Type>shortstring</Type>
+      <Comment>The name you supply for the group of objects you want to track.</Comment>
+    </Term>
+    <Term id="google.custom-action">
+      <Type>shortstring</Type>
+      <Comment>A string that is uniquely paired with each category, and commonly used to define the type of user interaction for the web object.</Comment>
+    </Term>
+    <Term id="google.custom-label">
+      <Type>shortstring</Type>
+      <Comment>An optional string to provide additional dimensions to the event data. </Comment>
+    </Term>
+    <Term id="google.custom-value">
+      <Type>uint32</Type>
+      <Comment>An integer that you can use to provide numerical data about the user event.</Comment>
+    </Term>
+    <Term id="google.order-id">
+      <Type>shortstring</Type>
+      <Comment>Internal unique order id number for this transaction.</Comment>
+    </Term>
+    <Term id="google.item-sku">
+      <Type>shortstring</Type>
+      <Comment>Item's SKU code. </Comment>
+    </Term>
+    <Term id="google.item-name">
+      <Type>shortstring</Type>
+      <Comment>Product name.</Comment>
+    </Term>
+    <Term id="google.item-category">
+      <Type>shortstring</Type>
+      <Comment>Product category.</Comment>
+    </Term>
+    <Term id="google.item-price">
+      <Type>longdouble</Type>
+      <Comment>Product price.</Comment>
+    </Term>
+    <Term id="google.item-quantity">
+      <Type>uint64</Type>
+      <Comment>Purchase quantity.</Comment>
+    </Term>
+    <Term id="google.trans-affiliation">
+      <Type>shortstring</Type>
+      <Comment>Partner or store affiliation (undefined if absent).</Comment>
+    </Term>
+    <Term id="google.trans-total">
+      <Type>longdouble</Type>
+      <Comment>Total dollar amount of the transaction. </Comment>
+    </Term>
+    <Term id="google.trans-tax">
+      <Type>longdouble</Type>
+      <Comment>Tax amount of the transaction. </Comment>
+    </Term>
+    <Term id="google.trans-shipping">
+      <Type>longdouble</Type>
+      <Comment>Shipping charge for the transaction. </Comment>
+    </Term>
+    <Term id="google.trans-city">
+      <Type>shortstring</Type>
+      <Comment>City to associate with transaction. </Comment>
+    </Term>
+    <Term id="google.trans-state">
+      <Type>shortstring</Type>
+      <Comment>State to associate with transaction. </Comment>
+    </Term>
+    <Term id="google.trans-country">
+      <Type>shortstring</Type>
+      <Comment>Country to associate with transaction. </Comment>
+    </Term>
+    <Term id="google.campaign-name">
+      <Type>shortstring</Type>
+      <Comment>The name identifying a campaign. </Comment>
+    </Term>
+    <Term id="google.campaign-source">
+      <Type>shortstring</Type>
+      <Comment>The source of a campaign referral. </Comment>
+    </Term>
+    <Term id="google.campaign-medium">
+      <Type>shortstring</Type>
+      <Comment>The type of a campaign referral. </Comment>
+    </Term>
+    <Term id="google.campaign-term">
+      <Type>shortstring</Type>
+      <Comment>Keyword(s); e.g. from a search engine. </Comment>
+    </Term>
+    <Term id="google.campaign-content">
+      <Type>shortstring</Type>
+      <Comment>Identifies the version of an ad that was clicked. </Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

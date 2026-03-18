@@ -1,0 +1,185 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Networking", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "flow.ip-event"
+    }, 
+    "fields": [
+        {
+            "aggType": "value", 
+            "desc": "Layer 4 protocol name", 
+            "enabled": true, 
+            "name": "app", 
+            "term": "flow.protocol"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": true, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server IP Address", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Count of IP datagrams that are fragmented", 
+            "enabled": true, 
+            "name": "fragment_count", 
+            "term": "ip.fragment-count"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": true, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from client to server", 
+            "enabled": true, 
+            "name": "packets_in", 
+            "term": "flow.cs-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from server to client", 
+            "enabled": true, 
+            "name": "packets_out", 
+            "term": "flow.sc-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Upper layer protocol", 
+            "enabled": true, 
+            "name": "protoid", 
+            "term": "ip.protoid"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client IP Address", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Type of Service", 
+            "enabled": true, 
+            "name": "tos", 
+            "term": "ip.tos"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP version", 
+            "enabled": true, 
+            "name": "version", 
+            "term": "ip.version"
+        }, 
+        {
+            "aggType": "key", 
+            "desc": "All raw payload content sent from server to client", 
+            "enabled": false, 
+            "name": "dest_content", 
+            "term": "flow.sc-content"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "All raw payload content sent from client to server", 
+            "enabled": false, 
+            "name": "src_content", 
+            "term": "flow.cs-content"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+    ], 
+    "filters": {
+        "comparisons": [
+            {
+                "matchAllValues": false, 
+                "term": "ip.protoid", 
+                "type": "not-equals", 
+                "value": "6"
+            }, 
+            {
+                "matchAllValues": false, 
+                "term": "ip.protoid", 
+                "type": "not-equals", 
+                "value": "17"
+            }, 
+            {
+                "matchAllValues": false, 
+                "term": "ip.protoid", 
+                "type": "not-equals", 
+                "value": "1"
+            }
+        ], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ITSI_IP_Raw", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "modifiedBy": "admin", 
+    "name": "Stream for ITSI Config Template - IP Raw", 
+    "protocolName": "IP", 
+    "sourcetype": "stream:ip", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

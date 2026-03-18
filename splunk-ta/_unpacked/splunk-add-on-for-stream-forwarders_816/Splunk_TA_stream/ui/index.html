@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Splunk Stream Forwarder</title>
+	<link rel="stylesheet" href="/css/jquery-ui.css" type="text/css"/>
+	<link rel="stylesheet" href="/css/common.css" type="text/css"/>
+	<script src="/js/jquery.min.js"></script>
+	<script src="/js/jquery-ui.min.js"></script>
+	<script src="/js/underscore.min.js"></script>
+	<script>
+    	// update version info
+		function updateVersion(data) {
+			$('#version').html(data.version);
+			$('#build').html(data.build);
+	    }
+
+		// update sniffer statistics
+		function updateSnifferStats(data) {
+			$('#sniffer-events').html($(data).find('EventsIn').text());
+			var bps = 0;
+			$(data).find('Capture').each(function() {
+				bps += parseInt($(this).find('BitsPerSecond').text());
+			});
+			var bpsString;
+			if (bps >= 1000000000) {
+				bpsString = Math.round(bps /= 1000000000).toString() + ' Gbps';
+			} else if (bps >= 1000000) {
+				bpsString = Math.round(bps /= 1000000).toString() + ' Mbps';
+			} else if (bps >= 1000) {
+				bpsString = Math.round(bps /= 1000).toString() + ' Kbps';
+			} else {
+				bpsString = bps.toString() + ' bps';
+			}
+			$('#sniffer-bps').html(bpsString);
+		}
+
+		// update sender statistics
+		function updateSenderStats(data) {
+			$('.sender').remove();
+			$.each(data, function(key, sender) {
+				// prepare div element that represents the stream sender
+				var $div = $('<div id="' + sender.id + '" class="sender" />');
+
+				var $header_div = $('<div class="header" />');
+				var $stats_div = $('<div class="stats" />');
+				var $links_div = $('<div class="links" />');
+
+				// append type of server as header
+				var title = sender.name;
+				if (!title) title = sender.type;
+				if (!sender.running) title += ' (Stopped)';
+				$header_div.append('<div class="title">' + title + '</div>');
+
+				// append url string
+				var url = sender.host + ':' + sender.port.toString();
+				if (sender.encrypted)
+					url = 'https://' + url;
+				else
+					url = 'http://' + url;
+				$header_div.append('<div class="url">' + url + ' (' + sender.type + ')</div>');
+				$div.append($header_div);
+
+				// append basic stats
+				$stats_div.append('<table style="width: 100%">'
+					+ '<tr><td>Streams:</td><td>' + sender.numStreams + '</td></tr>'
+					+ '<tr><td>Bytes Out:</td><td>' + sender.numBytes + '</td></tr>'
+					+ '</table>');
+				$div.append($stats_div);
+				
+				// append links for insight sender
+				if (sender.type == "insight") {
+					$links_div.append('<div class="insight">[ '
+						+ '<a href="/senders/' + sender.id + '/apps">Apps</a> | '
+						+ '<a href="/senders/' + sender.id + '/clickstream">Session Stats</a> ]</div>');
+				}
+
+				var modInputPromise = checkIsModularInputMode();
+                $("#addServerBtn").hide();
+
+				$links_div.append('<div>[ '
+					+ '<a href="/senders/' + sender.id + '">Stats</a> | '
+					+ '<a href="/senders/' + sender.id + '/connections">Connections</a> | '
+					+ '<a href="/senders/' + sender.id + '/streams">Streams</a> ]</div>');
+				$div.append($links_div);
+
+				$div.append('<div class="clear" />');
+
+				// append div element to page
+				$('#page-bottom').append($div);
+			});
+
+			// if no senders, open dialog to add the first one
+			if (data.length == 0) {
+				$('#add-dialog').dialog('open');
+			}
+		}
+
+		// trigger AJAX requests to update statistics
+		function update() {
+			$.ajax({
+				url: '/query/sniffer',
+				dataType: 'xml',
+				cache: false,
+				success: updateSnifferStats,
+				error: function(jqXHR) {
+					$('#body-flash').show().html(jqXHR.responseText);
+				}
+			});
+			$.ajax({
+				url: '/senders',
+				dataType: 'json',
+				cache: false,
+				success: updateSenderStats,
+				error: function(jqXHR) {
+					$('#body-flash').show().html(jqXHR.responseText);
+				}
+			});
+		}
+
+		// perform a PUT action on a stream sender
+		function performSenderAction(id, action, success_msg, fail_msg) {
+			$.ajax({
+				url: '/senders/' + id + '/' + action,
+				type: 'PUT',
+				cache: false,
+				success: function() {
+					update();
+					$('#body-flash').show().html(success_msg);
+				},
+				error: function(jqXHR) {
+					$('#body-flash').show().html(fail_msg + ': ' + jqXHR.responseText);
+				}
+			});
+		}
+
+		// delete a stream sender
+		function deleteSender(id) {
+			$.ajax({
+				url: '/senders/' + id,
+				type: 'DELETE',
+				cache: false,
+				success: function() {
+					$('#body-flash').show().html('Deleted server');
+					$('#' + id).remove();
+				},
+				error: function(jqXHR) {
+					$('#body-flash').show().html('Failed to delete server: ' + jqXHR.responseText);
+				}
+			});
+		}
+
+		// called when insight is selected in add server dialog
+		function addDialogSelectInsight() {
+			$('#add-dialog-form').find('input[name="name"]').val('Insight');
+			$('#add-dialog-insight').show();
+			$('#add-dialog-stream').hide();
+			$('#add-dialog-splunk').hide();
+		}
+
+
+		// called when stream is selected in add server dialog
+		function addDialogSelectStream() {
+			$('#add-dialog-form').find('input[name="name"]').val('Stream');
+			$('#add-dialog-insight').hide();
+			$('#add-dialog-stream').show();
+			$('#add-dialog-splunk').hide();
+		}
+
+		// called when splunk is selected in add server dialog
+		function addDialogSelectSplunk() {
+			$('#add-dialog-form').find('input[name="name"]').val('Splunk');
+			$('#add-dialog-insight').hide();
+			$('#add-dialog-stream').hide();
+			$('#add-dialog-splunk').show();
+		}
+
+		// add a new stream server
+		function addServer() {
+			// disable button and show spinner
+			$('.ui-dialog button:nth-child(1)').button('disable');
+			$('#add-dialog-loading').show();
+
+			// get some params from add dialog form
+			var form = $('#add-dialog-form');
+			var name = form.find('input[name="name"]').val();
+			//var type = form.find('input[name="type"]:checked').val();
+			var type = 'stream';
+
+			// get POST data shared by all server types
+			var post_data = { name: name, type: type };
+
+			if (type == "insight") {
+				// get additional POST data for insight registration
+				post_data.agentname = form.find('input[name="agentname"]').val();
+				post_data.email = form.find('input[name="email"]').val();
+				post_data.password = form.find('input[name="password"]').val();
+
+				// send REST request to register agent
+				$.ajax({
+					url: '/senders/register',
+					data: post_data,
+					type: 'POST',
+					cache: false,
+					success: function() {
+						$('#body-flash').show().html('Successfully registered agent with ' + _.escape(name));
+						$('#add-dialog-flash').hide().html('');
+						$('#add-dialog-loading').hide();
+						$('#add-dialog').dialog('close');
+						$('.ui-dialog button:nth-child(1)').button('enable');
+						update();
+					},
+					error: function(jqXHR) {
+						$('#add-dialog-flash').show().html(jqXHR.responseText);
+						$('#add-dialog-loading').hide();
+						$('#add-dialog').parent().effect('shake', {}, 50);
+						$('.ui-dialog button:nth-child(1)').button('enable');
+					}
+				});
+			} else if (type == "stream") {
+				// get additional POST data for stream server config
+				post_data.host = form.find('input[name="host"]').val();
+				post_data.port = form.find('input[name="port"]').val();
+				post_data.encrypted = $('input[name="encrypted"]').is(':checked').toString();
+
+				// send REST request to add stream server
+				$.ajax({
+					url: '/senders',
+					data: post_data,
+					type: 'POST',
+					cache: false,
+					success: function() {
+						$('#body-flash').show().html('Successfully added server ' + _.escape(name));
+						$('#add-dialog-flash').hide().html('');
+						$('#add-dialog-loading').hide();
+						$('#add-dialog').dialog('close');
+						$('.ui-dialog button:nth-child(1)').button('enable');
+						update();
+					},
+					error: function(jqXHR) {
+						$('#add-dialog-flash').show().html(jqXHR.responseText);
+						$('#add-dialog-loading').hide();
+						$('#add-dialog').parent().effect('shake', {}, 50);
+						$('.ui-dialog button:nth-child(1)').button('enable');
+					}
+				});
+			} else if (type == "splunk") {
+				// get additional POST data for splunk server config
+				post_data.host = form.find('input[name="splunk_host"]').val();
+				post_data.port = form.find('input[name="splunk_port"]').val();
+				post_data.encrypted = $('input[name="splunk_encrypted"]').is(':checked').toString();
+				post_data.user = form.find('input[name="splunk_user"]').val();
+				post_data.password = form.find('input[name="splunk_password"]').val();
+
+				// send REST request to add splunk server
+				$.ajax({
+					url: '/senders',
+					data: post_data,
+					type: 'POST',
+					cache: false,
+					success: function() {
+						$('#body-flash').show().html('Successfully added Splunk server ' + _.escape(name));
+						$('#add-dialog-flash').hide().html('');
+						$('#add-dialog-loading').hide();
+						$('#add-dialog').dialog('close');
+						$('.ui-dialog button:nth-child(1)').button('enable');
+						update();
+					},
+					error: function(jqXHR) {
+						$('#add-dialog-flash').show().html(jqXHR.responseText);
+						$('#add-dialog-loading').hide();
+						$('#add-dialog').parent().effect('shake', {}, 50);
+						$('.ui-dialog button:nth-child(1)').button('enable');
+					}
+				});
+			} else {
+				console.info('Unknown sender type: ', type);
+			}
+		}
+
+		// add a new SSL key
+		function addKey() {
+			var form = $('#ssl-keys-dialog-form');
+			var name = form.find('input[name="name"]').val();
+			var password = form.find('input[name="password"]').val();
+			var pem = form.find('textarea[name="pem"]').val();
+			var post_data = '<CmConfig><Key>';
+
+			if (! name) {
+				$('#ssl-keys-dialog-flash').show().html('Please enter a name for the key.');
+				$('#ssl-keys-dialog').parent().effect('shake', {}, 50);
+				return;
+			}
+			if (! pem) {
+				$('#ssl-keys-dialog-flash').show().html('Please enter PEM data.');
+				$('#ssl-keys-dialog').parent().effect('shake', {}, 50);
+				return;
+			}
+
+			post_data += '<Name>' + name + '</Name>';
+			post_data += '<Password>' + password + '</Password>';
+			post_data += '<PEM>' + pem + '</PEM>';
+			post_data += '</Key></CmConfig>';
+
+			// send REST request to add new key
+			$.ajax({
+				url: '/keystore',
+				type: 'POST',
+				data: post_data,
+				contentType: 'text/xml',
+				cache: false,
+				success: function(data) {
+					var key = $(data).find('Key');
+					var id = key[0].id;
+					var key_name = key.find('Name').text();
+					var select = $('#ssl-keys-dialog').find('select')[0];
+
+					// Add a new select option corresponding to the newly added key.
+					select.add(new Option(key_name, id));
+
+					$('#ssl-keys-dialog-flash').show().html('Successfully added SSL key.');
+
+					// Clear the form.
+					form.find('input[name="name"]').val('');
+					form.find('input[name="password"]').val('');
+					form.find('textarea[name="pem"]').val('');
+				},
+				error: function(jqXHR) {
+					$('#ssl-keys-dialog-flash').show().html(jqXHR.responseText);
+					$('#ssl-keys-dialog').parent().effect('shake', {}, 50);
+				}
+			});
+		}
+
+		// delete selected SSL key
+		function deleteKey() {
+			var select = $('#ssl-keys-dialog').find('select')[0];
+			var index_of_selected_key = select.selectedIndex;
+			var selected_key;
+
+			if (index_of_selected_key == -1) {
+				$('#ssl-keys-dialog-flash').show().html('No key is selected.');
+				$('#ssl-keys-dialog').parent().effect('shake', {}, 50);
+			} else {
+				selected_key = select.options[index_of_selected_key];
+				$.ajax({
+					url: '/keystore/' + selected_key.value,
+					type: 'DELETE',
+					statusCode: {
+						204: function() {
+							var msg = 'Successfully deleted SSL key "' + selected_key.text + '".';
+
+							select.remove(index_of_selected_key);
+							$('#ssl-keys-dialog-flash').show().text(msg);
+						}
+					},
+					error: function(jqXHR) {
+						if (jqXHR.status != 204)
+							$('#ssl-keys-dialog-flash').show().html('Failed to delete SSL key: ' + jqXHR.responseText );
+					}
+				});
+			}
+		}
+
+		//If used in splunk_app_stream then modular_input_mode will be true
+		//If so, disable Add Server, Refresh, Start, Stop, Delete
+		function checkIsModularInputMode() {
+			var promise = $.ajax({
+					url      : 'config',
+					dataType : 'xml',
+					cache    : false,
+					error    : function(jqXHR) {
+						console.log("Unable to determine modular input mode.")
+					}
+			});
+			return promise;
+		}
+
+		// function to run when document is ready
+		$(document).ready(function(){
+			// setup add server dialog
+			$('#add-dialog').dialog({
+				width: 400,
+				modal: true,
+				autoOpen: false,
+				buttons: { "Add Server": addServer }
+			});
+			$('#add-dialog-loading').hide();
+
+			// setup Edit SSL Keys dialog
+			$('#ssl-keys-dialog').dialog({
+				width: 800,
+				modal: true,
+				autoOpen: false,
+				open: function(event, ui) {
+					var select = $('#ssl-keys-dialog').find('select')[0];
+
+					// Hide and clear message box.
+					$('#ssl-keys-dialog-flash').hide().html('');
+
+					// Remove any existing options (i.e. SSL keys) from the <select> element.
+					while (select.childElementCount) {
+						select.remove(0);
+					}
+
+					// send REST request to get existing SSL keys
+					$.ajax({
+						url: '/keystore',
+						dataType: 'xml',
+						cache: false,
+						success: function(data) {
+							// Repopulate the <select> element with the retrieved list of SSL keys.
+							$(data).find('Key').each(function() {
+								var id = $(this)[0].id;
+								var key_name = $(this).find('Name').text();
+
+								select.add(new Option(key_name, id));
+							});
+						},
+						error: function(jqXHR) {
+							$('#ssl-keys-dialog-flash').show().html(jqXHR.responseText);
+						}
+					});
+				}
+			});
+
+			// call update() every 1 second
+			update();
+			window.setInterval(function() { update(); }, 1000);
+			
+			// update version and build number
+			$.ajax({
+				url: '/ping',
+				dataType: 'json',
+				cache: false,
+				success: updateVersion,
+				error: function(jqXHR) {
+					$('#body-flash').show().html(jqXHR.responseText);
+				}
+			});
+
+		});
+	</script>
+</head>
+<body>
+	<div id="page-top">
+		<div class="page-logo">
+            <div id="brand">
+                splunk<span class="prompt">></span><span class="product">stream forwarder</span>
+            </div>
+		</div>
+		<!--
+		<div class="page-header">
+			<h1>Stream Forwarder</h1>
+		</div>
+		-->
+	</div>
+	<div id="page-bottom">
+		<div id="body-flash" class="flash-message"></div>
+		<div class="data-capture">
+			<div class="header">
+				<div class="title">Data Capture</div>
+			</div>
+			<div class="stats">
+				<table style="width: 100%">
+					<tr><td>Events:</td><td id="sniffer-events"></td></tr>
+					<tr><td>Bandwidth:</td><td id="sniffer-bps"></td></tr>
+				</table>
+			</div>
+			<div class="links">
+				<div>[
+					<a href="/query/sniffer">Stats</a> |
+					<a href="/config/sniffer/protocol">Protocol</a> |
+					<a href="/config/sniffer">Config</a>
+				]</div>
+				<div class="button-bar">
+					<a href="#" onclick="$('#add-dialog').dialog('open'); return false;" id="addServerBtn">Add Server</a>
+					<a href="#" onclick="$('#ssl-keys-dialog').dialog('open'); return false;">Edit SSL Keys</a>
+				</div>
+			</div>
+			<div class="clear"></div>
+		</div>
+        <div id="page-footer">
+            &copy; 2013-2014 Splunk Inc. Splunk Stream Forwarder <span id="version"></span> build <span id="build"></span>.
+        </div>
+	</div>
+	<div id="add-dialog" title="Add A Server">
+		<div id="add-dialog-flash" class="flash-message"></div>
+		<form id="add-dialog-form" onsubmit="addServer(); return false;">
+		    <!--
+			<p>Please select the type of server to add.</p>
+			<input type="radio" name="type" value="insight" onclick="addDialogSelectInsight();" checked> Cloudmeter Insight<br/>
+			<input type="radio" name="type" value="stream" onclick="addDialogSelectStream();" checked> Stream Server<br/>
+			<input type="radio" name="type" value="splunk" onclick="addDialogSelectSplunk();"> Splunk Indexer
+			-->
+			<input type="hidden" name="type" value="stream" />
+			<p>
+				<label for="name">Please provide a name to describe this server.</label><br/>
+				<input type="text" name="name" style="width: 100%" value="Stream"/>
+			</p>
+			<div id="add-dialog-insight">
+				<p>To register this agent, please enter the email address and password
+				that you use to log into your Cloudmeter Insight account.</p>
+				<table class="login"><tr>
+					<td class="label"><label for="email">Email</label></td>
+					<td><input type="text" name="email"/></td>
+				</tr><tr>
+					<td class="label"><label for="password">Password</label></td>
+					<td><input type="password" name="password"/></td>
+				</tr></table>
+				<p>
+					<label for="name">Please also provide a name to describe this agent.</label><br/>
+					<input type="text" name="agentname" style="width: 100%"/>
+				</p>
+			</div>
+			<div id="add-dialog-stream">
+				<p>Please specify how to connect to your Stream server.</p>
+				<table class="login"><tr>
+					<td class="label"><label for="host">Host</label></td>
+					<td><input type="text" name="host" value="localhost"/></td>
+				</tr><tr>
+					<td class="label"><label for="port">Port</label></td>
+					<td><input type="text" name="port" value="8888"/></td>
+				</tr><tr>
+					<td class="label"><label for="encrypted">Encrypted</label></td>
+					<td><input type="checkbox" name="encrypted" value="true"/></td>
+				</tr></table>
+			</div>
+			<div id="add-dialog-splunk">
+				<p>Please specify how to connect to your Splunk indexer.</p>
+				<table class="login"><tr>
+					<td class="label"><label for="splunk_user">User</label></td>
+					<td><input type="text" name="splunk_user" /></td>
+				</tr><tr>
+					<td class="label"><label for="splunk_password">Password</label></td>
+					<td><input type="password" name="splunk_password" /></td>
+				</tr><tr>
+					<td class="label"><label for="splunk_host">Host</label></td>
+					<td><input type="text" name="splunk_host" value="localhost" /></td>
+				</tr><tr>
+					<td class="label"><label for="splunk_port">Port</label></td>
+					<td><input type="text" name="splunk_port" value="8000" /></td>
+				</tr><tr>
+					<td class="label"><label for="splunk_encrypted">Encrypted</label></td>
+					<td><input type="checkbox" name="splunk_encrypted" value="false"/></td>
+				</tr></table>
+			</div>
+			<div id="add-dialog-loading">
+				Connecting <img src="/images/ajax-loader.gif" width="16" height="16" alt=""/>
+			</div>
+		</form>
+	</div>
+	<div id="ssl-keys-dialog" title="Edit SSL Keys">
+		<div id="ssl-keys-dialog-flash" class="flash-message"></div>
+		<form id="ssl-keys-dialog-form">
+			<p>Please enter one key at a time.</p>
+			<table><tr>
+				<td class="label"><label for="name">Name</label></td>
+				<td><input type="text" name="name" /></td>
+			</tr><tr>
+				<td class="label"><label for="password">Password</label></td>
+				<td><input type="password" name="password" /></td>
+			</tr><tr>
+				<td class="label"><label for="pem">PEM</label></td>
+				<td><textarea cols="40" rows="5" name="pem"></textarea></td>
+			</tr></table>
+			<br>
+			<button onclick='addKey(); return false;'>Save key</button>
+			<div class="saved-keys">
+				<label class="title-of-select">Saved Keys</label>
+				<br>
+				<select size=8 style="width: 300px"></select>
+				<br>
+				<button onclick='deleteKey(); return false;'>Delete selected key</button>
+			</div>
+		</form>
+	</div>
+</body>
+</html>

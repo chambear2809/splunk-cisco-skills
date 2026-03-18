@@ -1,0 +1,369 @@
+/*
+
+ #   #                    #
+ #   #                    #
+ #   #   ###    ###    ## #   ###   # ##
+ #####  #   #      #  #  ##  #   #  ##  #
+ #   #  #####   ####  #   #  #####  #
+ #   #  #      #   #  #  ##  #      #
+ #   #   ###    ####   ## #   ###   #
+
+
+*/
+
+#forwarder-groups-page > .container-fluid{
+  padding: 0px;
+}
+
+#forwarder-groups-page .top-wrapper {
+  font-weight:100;
+  font-size:24px;
+}
+
+#forwarder-groups-page .top-header {
+  border-bottom: 1px solid #ccc;
+  /*padding:20px;*/
+}
+
+#forwarder-groups-page .header-wrapper{
+  margin: 10px 20px 20px 20px;
+}
+
+#streamfwd-config-button-panel {
+  float: right;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+#forwarder-group-count {
+  height: 50px;
+  line-height: 50px;
+  margin-left: 20px;
+}
+
+#forwarder-groups-page .table-search{
+  margin-left:10px;
+}
+
+/*
+
+ #####         #       ##
+   #           #        #
+   #     ###   # ##     #     ###
+   #        #  ##  #    #    #   #
+   #     ####  #   #    #    #####
+   #    #   #  ##  #    #    #
+   #     ####  # ##    ###    ###
+
+*/
+
+#forwarder-management-table {
+  background-color: white;
+}
+
+#forwarder-management-table .more-info-toggle{
+  position:relative;
+  top:2px;
+}
+
+#forwarder-management-table-body .fwd-table-row td:nth-child(2),
+#forwarder-management-table-body .fwd-table-row td:nth-child(3),
+#forwarder-management-table-body .fwd-table-row td:nth-child(4),
+#forwarder-management-table-body .fwd-table-row td:nth-child(5),
+#forwarder-management-table-body .fwd-table-row td:nth-child(6),
+#forwarder-management-table-body .fwd-table-row td:nth-child(7) {
+  padding: 7px 3px 2px 4px;
+}
+
+.more-info-td {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.more-info-toggle {
+  pointer-events: none;
+}
+
+tr.detailed-info-row > td {
+  font-size: 12px;
+  color: #909090;
+  border-collapse: collapse;
+  border-top:0px;
+}
+
+tr.detailed-info-tr {
+  /* by default should be hidden */
+  display: none;
+}
+
+td.detailed-info-td {
+  padding-left: 30px;
+  padding-bottom: 10px;
+  padding-top: 9px;
+}
+
+div.detailed-info-label {
+  position: relative;
+  width: 197px;
+  height: 14px;
+  float: left;
+}
+
+.detailed-info-td .show-more {
+  color: #4A7FB1;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.forwarder-group-action-popdown {
+  height: 16px;
+  padding-bottom: 1px;
+  padding-top: 1px;
+}
+
+.default-group-text {
+  color: #6E6E6E;
+  margin-right: 5px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+tr.detailed-info-tr {
+  background-color: #FCFCFC;
+}
+
+.none-found {
+  color: #9E9E9E;
+}
+
+span.continuation-dots {
+  position: relative;
+  right: 6px;
+  float: right;
+}
+
+/*
+
+ #   #             #          ##
+ #   #             #           #
+ ## ##   ###    ## #   ###     #
+ # # #  #   #  #  ##      #    #
+ #   #  #   #  #   #   ####    #
+ #   #  #   #  #  ##  #   #    #
+ #   #   ###    ## #   ####   ###
+
+*/
+
+/* Stream Forwarder Auth Modal */
+
+#streamfwd-auth-modal {
+  width: 500px;
+  margin-left: -250px;
+}
+
+#auth-check-icon, #auth-warning-icon {
+  font-size: 14px;
+  position: absolute;
+  top: 19px;
+  left: 25px;
+}
+
+#auth-warning-icon {
+  color: #ff9c1a;
+}
+
+#auth-check-icon {
+  color: #65a637;
+}
+
+#auth-enable-text {
+  padding-left: 3px;
+}
+
+#auth-textarea {
+  margin-top: 12px;
+  width: 330px;
+  height: 60px;
+}
+
+/* Install Stream Forwarders Modal */
+
+#install-stream-forwarders-modal {
+  width: 690px;
+  margin-left: -340px;
+}
+
+#host-error-message {
+  padding-top: 5px;
+  padding-bottom: 20px;
+}
+
+#host-error-message .icon-alert {
+  top: 50px;
+}
+
+#hec-token-configuration-blocks .icon-check, #hec-token-configuration-blocks .icon-alert {
+  font-size: 14px;
+  color: #65a637;
+  position: absolute;
+  top: 23px;
+  left: 25px;
+}
+
+#hec-token-configuration-blocks .icon-check {
+  color: #65a637;
+}
+
+#hec-token-configuration-blocks .icon-alert {
+  color: #d6563c;
+}
+
+.redetect {
+  margin-left: 5px;
+}
+
+.quote-well {
+  margin-top: 10px;
+  width: 550px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  -webkit-box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
+  box-shadow: inset 0 1px 1px rgba(0,0,0,.05);
+  padding: 10px;
+}
+
+/* Create/Edit Group Modal */
+
+#fwd-group-description, #hec-endpoint-urls {
+  height: 100px;
+}
+
+#fwd-group-rule-explanation {
+  margin-left: 11px;
+  margin-top: -6px;
+  font-size: 10px;
+  color: #818181;
+  margin-bottom: 7px;
+}
+
+#include-ephemeral-toggle .btn, #hec-autoconfig-toggle .btn {
+  outline: 0px;
+}
+
+#include-ephemeral-toggle .btn:focus, #hec-autoconfig-toggle .btn:focus {
+  border-color: #c5c5c5;
+  box-shadow: inset 0 2px 2px rgba(0,0,0,0.125);
+}
+
+/* Streams Modal */
+
+.xl-modal {
+  width: 700px;
+  margin-left: -350px;
+}
+
+.xxl-modal {
+  width: 900px;
+  margin-left: -450px;
+}
+
+#modify-fwd-streams-modal-body {
+  max-height: 400px;
+  overflow-y: scroll;
+  padding: 0px;
+}
+
+#modify-fwd-streams-modal .table {
+  margin-top:10px;
+}
+
+#modify-fwd-streams-modal .modal-header {
+  box-shadow: 0px 1px 1px #E7E7E7;
+}
+
+#modify-fwd-streams-modal .modal-footer {
+  box-shadow: 0px -1px 1px #E7E7E7;
+}
+
+#modify-fwd-streams-modal .modal-body {
+  padding: 0px;
+}
+
+#modify-fwd-streams-modal .cancel {
+  float: left;
+}
+
+#modify-fwd-streams-search {
+  margin-left: 10px;
+  margin-top: 10px;
+}
+
+#all-selected-toggle {
+  margin-right: 20px;
+}
+
+#all-selected-toggle .btn{
+  outline: 0px;
+}
+
+#all-selected-toggle .btn.active{
+  box-shadow: inset 0 2px 2px rgba(0,0,0,0.250);
+}
+
+#all-selected-toggle .btn:focus {
+  border-color: #c5c5c5;
+  box-shadow: inset 0 2px 2px rgba(0,0,0,0.125);
+}
+
+/* Show Info Modal */
+
+#show-info-modal-body {
+  max-height: 400px;
+  overflow-y: scroll;
+}
+
+#show-more-info-modal .modal-header h2{
+  font-size: 22px;
+  margin: 0px;
+  font-weight: 300;
+  margin-bottom: 2px
+}
+
+#show-more-info-modal .modal-header h4{
+  font-size: 13px;
+  margin: 0px;
+  font-weight: 100;
+}
+
+/* Edit rule modal */
+
+#edit-rule-modal .modal-body{
+  padding: 0px;
+}
+
+#edit-rule-modal .modal-header .subtext{
+  color: #808080;
+  font-size: 16px;
+}
+
+.modal-secondary-header {
+  padding: 10px 0px 5px 13px;
+  box-shadow: 0px 1px 1px #E8E8E8;
+}
+
+.modal-secondary-header #fwd-group-rule-search {
+  padding-bottom: 5px;
+}
+
+.modal-secondary-header #fwd-group-rule-search .desc {
+  margin-right: 10px;
+}
+
+#edit-rule-modal-body {
+  max-height: 400px;
+  overflow-y: scroll;
+  padding: 0px;
+}

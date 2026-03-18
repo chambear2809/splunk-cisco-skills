@@ -1,0 +1,64 @@
+<script id="forwarder-management-template" type="text/template">
+<div id="forwarder-groups-page">
+    <div class="container-fluid" id="fwd-groups-main-body">
+
+        <!-- ===== -->
+        <!-- Title -->
+        <!-- ===== -->
+        <div class="row-fluid top-header">
+            <div class="header-wrapper">
+              <h1 class="top-wrapper">
+                  Distributed Forwarder Management
+                  <span id="streamfwd-config-button-panel">
+                      <button id="setup-streamfwd-auth" class="btn">Stream Forwarder Auth</button>
+                      <button id="install-stream-forwarders" class="btn">Install Stream Forwarders</button>
+                      <button id="create-new-forwarder-group" class="btn btn-primary">Create New Group</button>
+                  </span>
+              </h1>
+              <h3 class="page-subtitle">
+                   Create Stream Forwarder groups using pattern match.
+              </h3>
+            </div>
+        </div>
+
+        <!-- ============ -->
+        <!-- Search Input -->
+        <!-- ============ -->
+        <div class="row-fluid">
+
+          <span id="forwarder-group-count"> <span> <%- fwdGroupCount %> </span> groups </span>
+
+          <span class="table-search">
+             <input type="text" class="input-medium search-query" placeholder="Search" id="fwd-group-search-input" value=""/>
+             <a class="clear"><i class="icon-x-circle"></i></a>
+          </span>
+
+        </div>
+
+        <!-- ===== -->
+        <!-- Table -->
+        <!-- ===== -->
+        <div class="row-fluid">
+
+           <table class="table table-chrome table-hover" id="forwarder-management-table">
+
+             <thead>
+                 <tr>
+                     <th style="width:2%"><span class="icon-info"></th>
+                     <th style="width:12%">Name</th>
+                     <th style="width:32%">Description</th>
+                     <th style="width:18%">Rule</th>
+                     <th style="width:12%">Include Ephemeral Streams?</th>
+                     <th style="width:9%">Contains Streams</th>
+                     <th style="width:10%">Endpoint Autoconfig</th>
+                     <th style="width:5%">Actions</th>
+                 </tr>
+             </thead>
+
+             <tbody id="forwarder-management-table-body"></tbody>
+
+           </table>
+        </div>
+    </div>
+</div>
+</script>

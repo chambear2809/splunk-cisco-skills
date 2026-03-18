@@ -1,0 +1,666 @@
+<form script="table_row_highlighting.js" stylesheet="table_decorations.css" version="1.1">
+  <label>System Faults</label>
+  <search id="baseSearch">
+    <query>| `apic-fault-overview`</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-4h@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+        </condition>
+      </change>
+    </input>
+    <input type="multiselect" token="multiTokenQuery" searchWhenChanged="true">
+      <default>*</default>
+      <label>Severity</label>
+      <choice value="*">All</choice>
+      <choice value="critical">critical</choice>
+      <choice value="major">major</choice>
+      <choice value="minor">minor</choice>
+      <choice value="warning">warning</choice>
+      <choice value="cleared">cleared</choice>
+      <delimiter> OR severity=</delimiter>
+      <change>
+        <eval token="severity_value_token">"form.severity=" . replace(mvjoin($form.multiTokenQuery$,","),",","&amp;form.severity=")</eval>
+      </change>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Dashboard Overview</title>
+      <html id="overview">
+        <style>
+          #overview{
+            height:25% !important;
+          }
+        </style>
+       <p>This dashboard summarizes all of the faults generated by APIC over the time period specified using the time picker. The severity level can also be filtered such that less-important events are not shown.</p>
+       <a href="fault_report" target="_blank"> view full report </a>
+         <br/>
+       <a href="fault_transition" target="_blank"> view fault transition report </a> 
+     </html>
+    </panel>
+    <panel>
+      <single id="faults">
+        <title>Faults</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$  | search severity=$multiTokenQuery$ | dedup dn,apic_host | stats count(dn)</query>
+        </search>
+        <option name="field">count</option>
+        <drilldown target="Help Desk Fault Detail">
+          <condition match="$multiTokenQuery$==&quot;*&quot; OR $multiTokenQuery$==&quot;critical&quot; OR $multiTokenQuery$==&quot;major&quot; OR $multiTokenQuery$==&quot;minor&quot; OR $multiTokenQuery$==&quot;warning&quot; OR $multiTokenQuery$==&quot;cleared&quot;">
+            <link target="_blank">
+              <![CDATA[
+              help_desk_fault_detail?form.mso_host=$mso_host$&form.apic_host=$apic_host$&form.severity=$multiTokenQuery$&form.ack=*&form.time_token.earliest=$time_token.earliest$&form.time_token.latest=$time_token.latest$
+              ]]>
+            </link>
+          </condition>
+          <condition>
+            <link target="_blank">
+              <![CDATA[
+              help_desk_fault_detail?form.mso_host=$mso_host$&form.apic_host=$apic_host$&$severity_value_token|n$&form.ack=*&form.time_token.earliest=$time_token.earliest$&form.time_token.latest=$time_token.latest$
+              ]]>
+            </link>
+          </condition>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single id="ack">
+        <title>Acknowledged Faults</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ ack=yes | dedup dn,apic_host | stats count(dn)</query>
+        </search>
+        <option name="field">count</option>
+        <drilldown target="Help Desk Fault Detail">
+          <condition match="$multiTokenQuery$==&quot;*&quot; OR $multiTokenQuery$==&quot;critical&quot; OR $multiTokenQuery$==&quot;major&quot; OR $multiTokenQuery$==&quot;minor&quot; OR $multiTokenQuery$==&quot;warning&quot; OR $multiTokenQuery$==&quot;cleared&quot;">
+            <link target="_blank">
+              <![CDATA[
+                 help_desk_ack_fault_detail?form.mso_host=$mso_host$&form.apic_host=$apic_host$&form.severity=$multiTokenQuery$&form.ack=yes&form.name=Acknowledged&form.time_token.earliest=$time_token.earliest$&form.time_token.latest=$time_token.latest$
+                ]]>
+            </link>
+          </condition>
+          <condition>
+            <link target="_blank">
+              <![CDATA[
+              help_desk_ack_fault_detail?form.mso_host=$mso_host$&form.apic_host=$apic_host$&$severity_value_token|n$&form.ack=yes&form.name=Acknowledged&form.time_token.earliest=$time_token.earliest$&form.time_token.latest=$time_token.latest$
+            ]]>
+            </link>
+          </condition>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single id="Unack">
+        <title>Unacknowledged Faults</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ ack=no | dedup dn,apic_host | stats count(dn)</query>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="field">count</option>
+        <drilldown target="Help Desk Fault Detail">
+          <condition match="$multiTokenQuery$==&quot;*&quot; OR $multiTokenQuery$==&quot;critical&quot; OR $multiTokenQuery$==&quot;major&quot; OR $multiTokenQuery$==&quot;minor&quot; OR $multiTokenQuery$==&quot;warning&quot; OR $multiTokenQuery$==&quot;cleared&quot;">
+            <link target="_blank">
+              <![CDATA[
+                help_desk_unack_fault_detail?form.mso_host=$mso_host$&form.apic_host=$apic_host$&form.severity=$multiTokenQuery$&form.ack=no&form.name=Unacknowledged&form.time_token.earliest=$time_token.earliest$&form.time_token.latest=$time_token.latest$
+                ]]>
+            </link>
+          </condition>
+          <condition>
+            <link target="_blank">
+              <![CDATA[
+                help_desk_unack_fault_detail?form.mso_host=$mso_host$&form.apic_host=$apic_host$&$severity_value_token|n$&form.ack=no&form.name=Unacknowledged&form.time_token.earliest=$time_token.earliest$&form.time_token.latest=$time_token.latest$
+              ]]>
+            </link>
+          </condition>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Faults by Node</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ | dedup dn,apic_host | stats count(dn) by node</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <drilldown target="Help Desk Fault Detail">
+          <set token="faultsbyNode">$click.value$</set>
+          <unset token="faultsbyTenant"></unset>
+          <unset token="faultsbySeverity"></unset>
+          <unset token="faultsbyDomain"></unset>
+          <unset token="faultsbyCause"></unset>
+          <unset token="faultsbyType"></unset>
+          <unset token="faultsbyRule"></unset>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Faults by Tenant</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ | dedup dn,apic_host | stats count(dn) by tenant</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown target="Help Desk Fault Detail">
+          <set token="faultsbyTenant">$click.value$</set>
+          <unset token="faultsbyNode"></unset>
+          <unset token="faultsbySeverity"></unset>
+          <unset token="faultsbyDomain"></unset>
+          <unset token="faultsbyCause"></unset>
+          <unset token="faultsbyType"></unset>
+          <unset token="faultsbyRule"></unset>
+        </drilldown>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Faults by Severity</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ | dedup dn,apic_host | stats count(dn) by severity</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown target="Help Desk Fault Detail">
+          <set token="faultsbySeverity">$click.value$</set>
+          <unset token="faultsbyNode"></unset>
+          <unset token="faultsbyTenant"></unset>
+          <unset token="faultsbyDomain"></unset>
+          <unset token="faultsbyCause"></unset>
+          <unset token="faultsbyType"></unset>
+          <unset token="faultsbyRule"></unset>
+        </drilldown>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Faults by Domain</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ | dedup dn,apic_host | stats count(dn) by domain</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown target="Help Desk Fault Detail">
+          <set token="faultsbyDomain">$click.value$</set>
+          <unset token="faultsbyNode"></unset>
+          <unset token="faultsbyTenant"></unset>
+          <unset token="faultsbySeverity"></unset>
+          <unset token="faultsbyCause"></unset>
+          <unset token="faultsbyType"></unset>
+          <unset token="faultsbyRule"></unset>
+        </drilldown>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table id="highlight" depends="$faultsbyNode$">
+        <title>Faults by Node Detail</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Fault.ack) as Acknowledged latest(Fault.severity) AS severity latest(Fault.cause) AS Cause latest(Fault.node) AS node latest(Fault.Tenant) AS Tenant  latest(Fault.descr) AS Descr latest(Fault.domain) AS Domain latest(Fault.rule) AS Rule latest(Fault.type) AS Type  latest(Fault.created) AS Created latest(Fault.code) AS Code latest(Fault.changeSet) AS ChangeSet latest(Fault.nameofnode) AS nameofnode latest(Fault.Explanation) AS Explanation latest(Fault.Recommended_Action) AS "Recommended Action" from datamodel=Cisco_DCN_Fault groupby Fault.dn, Fault.apic_host | search severity=$multiTokenQuery$ | rename Fault.apic_host as apic_host | search $formed_apic_host$ | search nameofnode=$faultsbyNode$ | rename nameofnode as Node Fault.dn AS FQDN | table FQDN Node Acknowledged Cause ChangeSet Code Created  Explanation "Recommended Action" severity Descr  Domain  Rule Type</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table id="highlightone" depends="$faultsbyTenant$">
+        <title>Faults by Tenant Detail</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Fault.ack) as Acknowledged latest(Fault.severity) AS severity latest(Fault.cause) AS Cause latest(Fault.node) AS node latest(Fault.Tenant) AS Tenant  latest(Fault.descr) AS Descr latest(Fault.domain) AS Domain latest(Fault.rule) AS Rule latest(Fault.type) AS Type  latest(Fault.created) AS Created latest(Fault.code) AS Code latest(Fault.changeSet) AS ChangeSet latest(Fault.nameofnode) AS nameofnode latest(Fault.Explanation) AS Explanation latest(Fault.Recommended_Action) AS "Recommended Action" from datamodel=Cisco_DCN_Fault groupby Fault.dn, Fault.apic_host | rename Fault.apic_host as apic_host | search $formed_apic_host$ | search severity=$multiTokenQuery$ | search Tenant=$faultsbyTenant$ | rename nameofnode as Node Fault.dn AS FQDN | table FQDN Node Acknowledged Cause ChangeSet Code Created  Explanation "Recommended Action" severity Descr  Domain  Rule Type</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table id="highlighttwo" depends="$faultsbySeverity$">
+        <title>Faults by Severity Detail</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Fault.ack) as Acknowledged latest(Fault.severity) AS severity latest(Fault.cause) AS Cause latest(Fault.node) AS node latest(Fault.Tenant) AS Tenant  latest(Fault.descr) AS Descr latest(Fault.domain) AS Domain latest(Fault.rule) AS Rule latest(Fault.type) AS Type  latest(Fault.created) AS Created latest(Fault.code) AS Code latest(Fault.changeSet) AS ChangeSet latest(Fault.nameofnode) AS nameofnode latest(Fault.Explanation) AS Explanation latest(Fault.Recommended_Action) AS "Recommended Action" from datamodel=Cisco_DCN_Fault groupby Fault.dn, Fault.apic_host | rename Fault.apic_host as apic_host | search $formed_apic_host$ | search severity=$multiTokenQuery$ | search severity=$faultsbySeverity$ | rename nameofnode as Node Fault.dn AS FQDN | table FQDN Node Acknowledged Cause ChangeSet Code Created  Explanation "Recommended Action" severity Descr  Domain  Rule Type</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table id="highlightthree" depends="$faultsbyDomain$">
+        <title>Faults by Domain Detail</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Fault.ack) as Acknowledged latest(Fault.severity) AS severity latest(Fault.cause) AS Cause latest(Fault.node) AS node latest(Fault.Tenant) AS Tenant  latest(Fault.descr) AS Descr latest(Fault.domain) AS Domain latest(Fault.rule) AS Rule latest(Fault.type) AS Type  latest(Fault.created) AS Created latest(Fault.code) AS Code latest(Fault.changeSet) AS ChangeSet latest(Fault.nameofnode) AS nameofnode latest(Fault.Explanation) AS Explanation latest(Fault.Recommended_Action) AS "Recommended Action" from datamodel=Cisco_DCN_Fault groupby Fault.dn, Fault.apic_host | rename Fault.apic_host as apic_host | search $formed_apic_host$ | search severity=$multiTokenQuery$ | search Domain=$faultsbyDomain$ | rename nameofnode as Node Fault.dn AS FQDN | table FQDN Node Acknowledged Cause ChangeSet Code Created  Explanation "Recommended Action" severity Descr  Domain  Rule Type</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Faults by Severity Over Time</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ | timechart count by severity</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <chart>
+        <title>Faults by Type</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ | dedup dn,apic_host | stats count(dn) by type | rename count as "Faults"</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">bar</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.axisTitleY.text">Faults</option>
+        <drilldown>
+          <set token="faultsbyType">$click.value$</set>
+          <unset token="faultsbyNode"></unset>
+          <unset token="faultsbyTenant"></unset>
+          <unset token="faultsbySeverity"></unset>
+          <unset token="faultsbyDomain"></unset>
+          <unset token="faultsbyCause"></unset>
+          <unset token="faultsbyRule"></unset>
+        </drilldown>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Top Faults by Rule</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ | dedup dn,apic_host | stats count(dn) by rule | head 10</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown target="Help Desk Fault Detail">
+          <set token="faultsbyRule">$click.value$</set>
+          <unset token="faultsbyNode"></unset>
+          <unset token="faultsbyTenant"></unset>
+          <unset token="faultsbySeverity"></unset>
+          <unset token="faultsbyDomain"></unset>
+          <unset token="faultsbyCause"></unset>
+          <unset token="faultsbyType"></unset>
+        </drilldown>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+    <panel>
+      <chart>
+        <title>Top Faults by Cause</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ severity=$multiTokenQuery$ | dedup dn,apic_host | stats count(dn) by cause | head 10</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <drilldown target="Help Desk Fault Detail">
+          <set token="faultsbyCause">$click.value$</set>
+          <unset token="faultsbyNode"></unset>
+          <unset token="faultsbyTenant"></unset>
+          <unset token="faultsbySeverity"></unset>
+          <unset token="faultsbyDomain"></unset>
+          <unset token="faultsbyType"></unset>
+          <unset token="faultsbyRule"></unset>
+        </drilldown>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table id="highlightfour" depends="$faultsbyType$">
+        <title>Faults by Type Detail</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Fault.ack) as Acknowledged latest(Fault.severity) AS severity latest(Fault.cause) AS Cause latest(Fault.node) AS node latest(Fault.Tenant) AS Tenant  latest(Fault.descr) AS Descr latest(Fault.domain) AS Domain latest(Fault.rule) AS Rule latest(Fault.type) AS Type  latest(Fault.created) AS Created latest(Fault.code) AS Code latest(Fault.changeSet) AS ChangeSet latest(Fault.nameofnode) AS nameofnode latest(Fault.Explanation) AS Explanation latest(Fault.Recommended_Action) AS "Recommended Action" from datamodel=Cisco_DCN_Fault groupby Fault.dn, Fault.apic_host | rename Fault.apic_host as apic_host | search $formed_apic_host$ | search severity=$multiTokenQuery$ | search Type=$faultsbyType$ | rename nameofnode as Node Fault.dn AS FQDN | table FQDN Node Acknowledged Cause ChangeSet Code Created  Explanation "Recommended Action" severity Descr  Domain  Rule Type</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table id="highlightfive" depends="$faultsbyRule$">
+        <title>Faults by Rule Detail</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Fault.ack) as Acknowledged latest(Fault.severity) AS severity latest(Fault.cause) AS Cause latest(Fault.node) AS node latest(Fault.Tenant) AS Tenant  latest(Fault.descr) AS Descr latest(Fault.domain) AS Domain latest(Fault.rule) AS Rule latest(Fault.type) AS Type  latest(Fault.created) AS Created latest(Fault.code) AS Code latest(Fault.changeSet) AS ChangeSet latest(Fault.nameofnode) AS nameofnode latest(Fault.Explanation) AS Explanation latest(Fault.Recommended_Action) AS "Recommended Action" from datamodel=Cisco_DCN_Fault groupby Fault.dn, Fault.apic_host | rename Fault.apic_host as apic_host | search $formed_apic_host$ | search severity=$multiTokenQuery$ | search Rule=$faultsbyRule$ | rename nameofnode as Node Fault.dn AS FQDN | table FQDN Node Acknowledged Cause ChangeSet Code Created  Explanation "Recommended Action" severity Descr  Domain  Rule Type</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table id="highlightsix" depends="$faultsbyCause$">
+        <title>Faults by Cause Detail</title>
+        <search>
+          <query>| tstats `summariesonly` latest(Fault.ack) as Acknowledged latest(Fault.severity) AS severity latest(Fault.cause) AS Cause latest(Fault.node) AS node latest(Fault.Tenant) AS Tenant  latest(Fault.descr) AS Descr latest(Fault.domain) AS Domain latest(Fault.rule) AS Rule latest(Fault.type) AS Type  latest(Fault.created) AS Created latest(Fault.code) AS Code latest(Fault.changeSet) AS ChangeSet latest(Fault.nameofnode) AS nameofnode latest(Fault.Explanation) AS Explanation latest(Fault.Recommended_Action) AS "Recommended Action" from datamodel=Cisco_DCN_Fault groupby Fault.dn, Fault.apic_host | rename Fault.apic_host as apic_host | search $formed_apic_host$ | search severity=$multiTokenQuery$ | search Cause=$faultsbyCause$ | rename nameofnode as Node Fault.dn AS FQDN | table FQDN Node Acknowledged Cause ChangeSet Code Created  Explanation "Recommended Action" severity Descr  Domain  Rule Type</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Latest Affected Objects</title>
+        <search base="baseSearch">
+          <query>|dedup dn | search severity=$multiTokenQuery$ | stats count by _time dn severity rule | head 100 | rename dn AS FQDN, count AS Count,severity AS Severity,rule AS Rule | convert ctime(_time) | rename _time AS "Timestamp"</query>
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="rowNumbers">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>Syslog Fault Event Details</title>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype="cisco:dc:aci:syslog" 
+| search code = "F*"
+| table event_time device_name_ip aci_node code lifecycle Rule Severity DN Message
+| rename lifecycle AS "Lifecycle State", DN AS "Affected Object" device_name_ip as "Device IP/Name" aci_node as Node code as "Fault Code"</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="count">20</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

@@ -1,0 +1,172 @@
+<form script="set_apic_token.js" stylesheet="table_decorations.css" version="1.1">
+  <label>Atomic Counters</label>
+  
+  <search id="baseSearch">
+    <query>|`atomic_counter_details`</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" token="time_token" searchWhenChanged="true">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-15m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    
+    <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Site/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+          <unset token="form.tn"></unset>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+          <unset token="form.tn"></unset>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+          <unset token="form.tn"></unset>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+          <unset token="form.tn"></unset>
+        </condition>
+      </change>
+    </input>
+    
+    <input type="dropdown" token="tn" searchWhenChanged="true">
+      <label>Tenants</label>
+      <choice value="%">All</choice>
+      <search>
+        <query>| tstats `summariesonly` dc(apic.dn) AS dn from datamodel=Cisco_DCN_Health  where apic.component=fvTenant groupby apic.name,apic.apic_host | rename apic.apic_host as apic_host, apic.name AS Tenant | search $formed_apic_host$ | dedup Tenant | table Tenant</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <change>
+        <unset token="form.app"></unset>
+      </change>
+      <fieldForLabel>Tenant</fieldForLabel>
+      <fieldForValue>Tenant</fieldForValue>
+      <default>%</default>
+    </input>
+    <input type="dropdown" token="app" searchWhenChanged="true">
+      <label>Applications</label>
+      <choice value="%">All</choice>
+      <search>
+        <query>| tstats `summariesonly` latest(apic.dn)  AS dn  from datamodel=Cisco_DCN_Health where apic.component=fvAp groupby apic.name,apic.apic_host | rename apic.apic_host as apic_host, apic.name AS Application | search $formed_apic_host$ | where dn like "uni/tn-$tn$/%" | dedup Application | table Application</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>Application</fieldForLabel>
+      <fieldForValue>Application</fieldForValue>
+      <default>%</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <html id="overview">
+      <h1>Dashboard Overview</h1>
+     <p>This dashboard provides information on Atomic Counters from EPG To EPG, EndPoint To EndPoint, and<br/> Application statistics for particular/all Tenants</p>
+    </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>EP To EP counters</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ | where dn like "%[uni/tn-$tn$/ap-$app$/%" | search component = dbgEpToEpRslt | table apic_host, _time,src,"Source VM",dst,"Destination VM","Total Transmitted Packets","Total Received Packets","Total Dropped Packets","Total Excess Packets" | rename src AS "SOURCE EP" dst AS "Destination EP" apic_host AS "APIC Site/Cluster" | sort 0 - "Total Dropped Packets", "Total Excess Packets" | reverse</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <table>
+        <title>EPG To EPG counters</title>
+        <search base="baseSearch">
+          <query>| search $formed_apic_host$ | where dn like "%[uni/tn-$tn$/ap-$app$/%" | search component = dbgEpgToEpgRslt | dedup apic_host,src,dst |table apic_host, _time,src,dst,"Total Transmitted Packets","Total Received Packets","Total Dropped Packets","Total Excess Packets" | rename src AS "SOURCE EPG" dst AS "Destination EPG" apic_host AS "APIC Site/Cluster" | sort 0 - "Total Dropped Packets", "Total Excess Packets" | reverse</query>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+</form>

@@ -1,0 +1,1005 @@
+{
+  "app": "Stream", 
+  "category": "Networking", 
+  "enabled": false, 
+  "extras": {
+    "eventType": "sflow.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "sFlow Version",
+      "enabled": true, 
+      "name": "sflow_version",
+      "term": "sflow.version"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "sFlow sequence number",
+      "enabled": true, 
+      "name": "seqnumber",
+      "term": "sflow.flow-sequence"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IP address of device that generated flow",
+      "enabled": true, 
+      "name": "exporter_ip",
+      "term": "netflow.exporterIPAddress"
+    },
+    {
+      "aggType": "value",
+      "desc": "Source address of flow",
+      "enabled": true,
+      "name": "src_ip",
+      "term": "flow.c-ip"
+    },
+    {
+      "aggType": "value",
+      "desc": "Destination address of flow",
+      "enabled": true,
+      "name": "dest_ip",
+      "term": "flow.s-ip"
+    },
+    {
+      "aggType": "value",
+      "desc": "Source port number of flow",
+      "enabled": true,
+      "name": "src_port",
+      "term": "flow.c-port"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Destination port number of flow",
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP protocol type",
+      "enabled": true, 
+      "name": "protoid",
+      "term": "ip.protoid"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Length of the IP packet",
+      "enabled": true, 
+      "name": "ip_len",
+      "term": "ip.packet-len"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Cumulative OR of TCP flags for this flow",
+      "enabled": true, 
+      "name": "tcp_flags",
+      "term": "netflow.tcp-flags"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Type of Service", 
+      "enabled": true, 
+      "name": "tos", 
+      "term": "ip.tos"
+    },
+    {
+      "aggType": "value", 
+      "desc": "ICMP message type",
+      "enabled": true, 
+      "name": "type",
+      "term": "icmp.type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "ICMP message code",
+      "enabled": true, 
+      "name": "code",
+      "term": "icmp.code"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Total number of packets in the flow",
+      "enabled": true, 
+      "name": "packets",
+      "term": "flow.packets"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Duration of flow",
+      "enabled": true, 
+      "name": "time_taken", 
+      "term": "flow.time-taken"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "System number of source for this flow",
+      "enabled": true, 
+      "name": "src_sysnum",
+      "term": "netflow.c-sysnum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "System number of destination for this flow",
+      "enabled": true, 
+      "name": "dest_sysnum",
+      "term": "netflow.s-sysnum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SNMP index of input interface for this flow",
+      "enabled": true, 
+      "name": "input_snmpidx",
+      "term": "netflow.input-snmpidx"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SNMP index of output interface for this flow",
+      "enabled": true, 
+      "name": "output_snmpidx",
+      "term": "netflow.output-snmpidx"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "sFlow sampling rate",
+      "enabled": true, 
+      "name": "sflow_sampling_rate",
+      "term": "sflow.sampling-rate"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Number of packets sampled",
+      "enabled": true, 
+      "name": "sflow_sample_pool",
+      "term": "sflow.sample-pool"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Dropped packets",
+      "enabled": true, 
+      "name": "sflow_dropped_pkts",
+      "term": "sflow.dropped-pkts"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Interface packet was received on",
+      "enabled": true, 
+      "name": "sflow_input_itf_index",
+      "term": "sflow.input-interface-index"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Interface packet was sent on",
+      "enabled": true, 
+      "name": "sflow_output_itf_index",
+      "term": "sflow.output-interface-index"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "sFlow raw packet header protocol",
+      "enabled": true, 
+      "name": "sflow_header_protocol",
+      "term": "sflow.header-protocol"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "sFlow Original length of packet before sampling",
+      "enabled": true, 
+      "name": "orig_frame_len",
+      "term": "sflow.frame-length"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Number of octets removed",
+      "enabled": true, 
+      "name": "stripped_octets",
+      "term": "sflow.stripped-octets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Ethernet packet type",
+      "enabled": true, 
+      "name": "ethernet_pkt_type",
+      "term": "sflow.ethernet-packet-type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface",
+      "enabled": true, 
+      "name": "interface_name",
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Network interface index",
+      "enabled": true, 
+      "name": "interface_index",
+      "term": "flow.interface-index"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Network interface type",
+      "enabled": true, 
+      "name": "interface_type",
+      "term": "flow.interface-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Network interface speed",
+      "enabled": true, 
+      "name": "interface_speed",
+      "term": "flow.interface-speed"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Interface Direction",
+      "enabled": true, 
+      "name": "interface_direction",
+      "term": "flow.interface-direction"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Interface status",
+      "enabled": true, 
+      "name": "interface_status",
+      "term": "flow.interface-status"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Interface input octets",
+      "enabled": true, 
+      "name": "interface_input_octets",
+      "term": "flow.interface-input-octets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Interface input packets",
+      "enabled": true, 
+      "name": "interface_input_pkts",
+      "term": "flow.interface-input-pkts"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Interface multicast packets",
+      "enabled": true, 
+      "name": "interface_input_multi_pkts",
+      "term": "flow.interface-input-multi-pkts"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Interface broadcast packets",
+      "enabled": true, 
+      "name": "interface_input_broad_pkts",
+      "term": "flow.interface-input-broad-pkts"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Interface discarded packets",
+      "enabled": true, 
+      "name": "interface_input_discard_pkts",
+      "term": "flow.interface-input-discard-pkts"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Interface input errors",
+      "enabled": true, 
+      "name": "interface_input_errors",
+      "term": "flow.interface-input-errors"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Interface input unknown protocol packets",
+      "enabled": true, 
+      "name": "interface_input_unk_proto_pkts",
+      "term": "flow.interface-input-unk-protos"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Interface output octets",
+      "enabled": true, 
+      "name": "interface_output_octets",
+      "term": "flow.interface-output-octets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Interface output packets",
+      "enabled": true, 
+      "name": "interface_output_pkts",
+      "term": "flow.interface-output-pkts"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Interface multicast packets",
+      "enabled": true, 
+      "name": "interface_output_multi_pkts",
+      "term": "flow.interface-output-multi-pkts"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Interface broadcast packets",
+      "enabled": true, 
+      "name": "interface_output_broad_pkts",
+      "term": "flow.interface-output-broad-pkts"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Interface discarded packets",
+      "enabled": true, 
+      "name": "interface_output_discard_pkts",
+      "term": "flow.interface-output-discard-pkts"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Interface output errors",
+      "enabled": true, 
+      "name": "interface_output_errors",
+      "term": "flow.interface-output-errors"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Interface promiscuous mode",
+      "enabled": true, 
+      "name": "interface_promiscuous_mode",
+      "term": "flow.interface-promiscuous"
+    }, 
+
+    {
+      "aggType": "value", 
+      "desc": "Frames received that are not an integral number of octets in length and do not pass the FCS check",
+      "enabled": true, 
+      "name": "dot3_stats_alignment_errs",
+      "term": "sflow.dot3StatsAlignmentErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Frames received that are an integral number of octets in length but do not pass the FCS check",
+      "enabled": true, 
+      "name": "dot3_stats_fcs_errs",
+      "term": "sflow.dot3StatsFCSErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of transmitted frames on a particular interface for which transmission is inhibited by exactly one collision",
+      "enabled": true, 
+      "name": "dot3_stats_single_collision_frames",
+      "term": "sflow.dot3StatsSingleCollisionFrames"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of transmitted frames on a particular interface for which transmission is inhibited by more than one collision",
+      "enabled": true, 
+      "name": "dot3_stats_multi_collision_frames",
+      "term": "sflow.dot3StatsMultipleCollisionFrames"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of times that the SQE TEST ERROR message is generated by the PLS sublayer for a particular interface",
+      "enabled": true, 
+      "name": "dot3_stats_sqe_test_errors",
+      "term": "sflow.dot3StatsSQETestErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of frames for which the first transmission attempt on a particular interface is delayed because the medium is busy",
+      "enabled": true, 
+      "name": "dot3_stats_deferred_transmissions",
+      "term": "sflow.dot3StatsDeferredTransmissions"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times that a collision is detected on a particular interface later than 512 bit-times into the transmission of a packet",
+      "enabled": true, 
+      "name": "dot3_stats_late_collisions",
+      "term": "sflow.dot3StatsLateCollisions"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of frames for which transmission on a particular interface fails due to excessive collisions",
+      "enabled": true, 
+      "name": "dot3_stats_excessive_collisions",
+      "term": "sflow.dot3StatsExcessiveCollisions"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of frames for which transmission on a particular interface fails due to an internal MAC sublayer transmit error",
+      "enabled": true, 
+      "name": "dot3_stats_internal_mac_tranmit_errors",
+      "term": "sflow.dot3StatsInternalMacTransmitErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times that the carrier sense condition was lost or never asserted when attempting to transmit a frame",
+      "enabled": true, 
+      "name": "dot3_stats_carrier_sense_errors",
+      "term": "sflow.dot3StatsCarrierSenseErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of frames received on a particular interface that exceed the maximum permitted frame size",
+      "enabled": true, 
+      "name": "dot3_stats_frame_too_longs",
+      "term": "sflow.dot3StatsFrameTooLongs"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of frames for which reception on a particular interface fails due to an internal MAC sublayer receive error",
+      "enabled": true, 
+      "name": "dot3_stats_internal_mac_receive_errors",
+      "term": "sflow.dot3StatsInternalMacReceiveErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times there was an invalid data symbol when a valid carrier was present on a particular interface",
+      "enabled": true, 
+      "name": "dot3_stats_symbol_errors",
+      "term": "sflow.dot3StatsSymbolErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of tokens or frames with E bit set to zero and there is J or K bit between the SD and the ED or there is an FCS error",
+      "enabled": true, 
+      "name": "dot5_stats_line_errors",
+      "term": "sflow.dot5StatsLineErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of absence of transitions for five half-bit timers",
+      "enabled": true, 
+      "name": "dot5_stats_burst_errors",
+      "term": "sflow.dot5StatsBurstErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of errors resulted by station that cannot set the AC bits properly",
+      "enabled": true, 
+      "name": "dot5_stats_ac_errors",
+      "term": "sflow.dot5StatsACErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of errors resulting from an abort delimiter while transmitting",
+      "enabled": true, 
+      "name": "dot5_stats_abort_trans_errors",
+      "term": "sflow.dot5StatsAbortTransErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of internal errors",
+      "enabled": true, 
+      "name": "dot5_stats_internal_errors",
+      "term": "sflow.dot5StatsInternalErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of errors resulting from TRR timer expiry",
+      "enabled": true, 
+      "name": "dot5_stats_lost_frame_errors",
+      "term": "sflow.dot5StatsLostFrameErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of errors resulting from no available buffer space or congestion",
+      "enabled": true, 
+      "name": "dot5_stats_recv_congestion",
+      "term": "sflow.dot5StatsReceiveCongestions"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of errors resulting from FS field A bits set to 1",
+      "enabled": true, 
+      "name": "dot5_stats_frame_copy_errs",
+      "term": "sflow.dot5StatsFrameCopiedErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of errors resulting from a condition that needs a token transmitted",
+      "enabled": true, 
+      "name": "dot5_stats_token_errs",
+      "term": "sflow.dot5StatsTokenErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Count of Soft Errors the interface has detected",
+      "enabled": true, 
+      "name": "dot5_stats_soft_errs",
+      "term": "sflow.dot5StatsSoftErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times this interface has detected an immediately recoverable fatal error",
+      "enabled": true, 
+      "name": "dot5_stats_hard_errs",
+      "term": "sflow.dot5StatsHardErrors"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times this interface has detected the loss of signal condition from the ring",
+      "enabled": true, 
+      "name": "dot5_stats_signal_loss",
+      "term": "sflow.dot5StatsSignalLoss"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times this interface has transmitted a beacon frame",
+      "enabled": true, 
+      "name": "dot5_stats_transmit_beacons",
+      "term": "sflow.dot5StatsTransmitBeacons"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of Claim Token MAC frames received or transmitted after the interface has received a Ring Purge MAC frame",
+      "enabled": true, 
+      "name": "dot5_stats_recoverys",
+      "term": "sflow.dot5StatsRecoverys"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times times the interface has detected an open or short circuit in the lobe data path",
+      "enabled": true, 
+      "name": "dot5_stats_lobe_wires",
+      "term": "sflow.dot5StatsLobeWires"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times the interface has received a Remove Ring Station MAC frame request",
+      "enabled": true, 
+      "name": "dot5_stats_removes",
+      "term": "sflow.dot5StatsRemoves"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times the interface has sensed that it is the only station on the ring",
+      "enabled": true, 
+      "name": "dot5_stats_singles",
+      "term": "sflow.dot5StatsSingles"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of times the interface has detected that the frequency of the incoming signal differs from the expected frequency by more than that specified by the IEEE 802.5 standard",
+      "enabled": true, 
+      "name": "dot5_stats_freq_errs",
+      "term": "sflow.dot5StatsFreqErrors"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of high priority frames that have been received on this interface",
+      "enabled": true, 
+      "name": "dot12_in_high_priority_frames",
+      "term": "sflow.dot12InHighPriorityFrames"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of number of octets contained in high priority frames that have been received on this interface",
+      "enabled": true, 
+      "name": "dot12_in_high_priority_octets",
+      "term": "sflow.dot12InHighPriorityOctets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of normal priority frames that have been received on this interface",
+      "enabled": true, 
+      "name": "dot12_in_norm_priority_frames",
+      "term": "sflow.dot12InNormPriorityFrames"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of number of octets contained in normal priority frames that have been received on this interface",
+      "enabled": true, 
+      "name": "dot12_in_norm_priority_octets",
+      "term": "sflow.dot12InNormPriorityOctets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of number of frames that have been received on this interface with an invalid packet marker and no PMI errors",
+      "enabled": true, 
+      "name": "dot12_in_ipm_errs",
+      "term": "sflow.dot12InIPMErrors"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of oversize frames received on this interface",
+      "enabled": true, 
+      "name": "dot12_in_oversize_frames_errs",
+      "term": "sflow.dot12InOversizeFrameErrors"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of oversize frames received on this interface",
+      "enabled": true, 
+      "name": "dot12_in_data_errs",
+      "term": "sflow.dot12InDataErrors"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of null addressed frames received on this interface",
+      "enabled": true, 
+      "name": "dot12_in_null_address_frames",
+      "term": "sflow.dot12InNullAddressedFrames"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of high priority frames successfully transmitted out",
+      "enabled": true, 
+      "name": "dot12_out_high_priority_frames",
+      "term": "sflow.dot12OutHighPriorityFrames"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of octets of high priority frames successfully transmitted out",
+      "enabled": true, 
+      "name": "dot12_out_high_priority_octets",
+      "term": "sflow.dot12OutHighPriorityOctetss"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of the number of times this interface has entered the training state",
+      "enabled": true, 
+      "name": "dot12_transition_trainings",
+      "term": "sflow.dot12TransitionIntoTrainings"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of the number of octets contained in high priority frames that have been received on this interface",
+      "enabled": true, 
+      "name": "dot12_hc_in_high_priority_octets",
+      "term": "sflow.dot12HCInHighPriorityOctets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of the number of octets contained in normal priority frames that have been received on this interface",
+      "enabled": true, 
+      "name": "dot12_hc_in_norm_priority_octets",
+      "term": "sflow.dot12HCInNormPriorityOctets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of the number of octets contained in high priority frames that have been send out of this interface",
+      "enabled": true, 
+      "name": "dot12_hc_out_high_priority_octets",
+      "term": "sflow.dot12HCOutHighPriorityOctets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Vlan Id",
+      "enabled": true, 
+      "name": "vlan_id",
+      "term": "flow.vlan-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of octets",
+      "enabled": true, 
+      "name": "vlan_octets",
+      "term": "sflow.vlanOctets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of uni-cast packets",
+      "enabled": true, 
+      "name": "vlan_ucast_pkts",
+      "term": "sflow.vlan-ucast-packets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of multi-cast packets",
+      "enabled": true, 
+      "name": "vlan_multi_cast_pkts",
+      "term": "sflow.vlan-multicast-packets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of broadcast packets",
+      "enabled": true, 
+      "name": "vlan_broad_cast_pkts",
+      "term": "sflow.vlan-broadcast-packets"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Count of discards",
+      "enabled": true, 
+      "name": "vlan_discards",
+      "term": "sflow.vlanDiscards"
+    },
+    {
+      "aggType": "value", 
+      "desc": "5 second average CPU utilization",
+      "enabled": true, 
+      "name": "cpu_util_5s",
+      "term": "sflow.cpu_percent_5s"
+    },
+    {
+      "aggType": "value", 
+      "desc": "1 minute average CPU utilization",
+      "enabled": true, 
+      "name": "cpu_util_1m",
+      "term": "sflow.cpu_percent_1m"
+    },
+    {
+      "aggType": "value", 
+      "desc": "5 minute average CPU utilization",
+      "enabled": true, 
+      "name": "cpu_util_5m",
+      "term": "sflow.cpu_percent_5m"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Total memory(in bytes)",
+      "enabled": true, 
+      "name": "total_mem",
+      "term": "sflow.total-mem"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Free memory(in bytes)",
+      "enabled": true, 
+      "name": "free_mem",
+      "term": "sflow.free-mem"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VLAN identifier of outgoing frame",
+      "enabled": true, 
+      "name": "dest_vlan",
+      "term": "netflow.dest-vlan"
+    },
+    {
+      "aggType": "value", 
+      "desc": "802.ip priority of outgoing frame",
+      "enabled": true, 
+      "name": "dest_vlan_priority",
+      "term": "netflow.dest-vlan_priority"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VLAN identifier of incoming frame",
+      "enabled": true, 
+      "name": "src_vlan",
+      "term": "netflow.src-vlan"
+    },
+    {
+      "aggType": "value", 
+      "desc": "802.ip priority of incoming frame",
+      "enabled": true, 
+      "name": "src_vlan_priority",
+      "term": "netflow.src-vlan_priority"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IP address of the next hop router",
+      "enabled": true, 
+      "name": "next_hop_address",
+      "term": "netflow.nexthop-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Autonomous system (AS) number of the Router",
+      "enabled": true, 
+      "name": "router_as_num",
+      "term": "sflow.router-as-num"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Autonomous system (AS) number of source peer",
+      "enabled": true, 
+      "name": "peer_as_num",
+      "term": "sflow.peer-as-num"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Destination path AS numbers",
+      "enabled": true, 
+      "name": "dest_path_as_nums",
+      "term": "sflow.dest-path-as-nums"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Gateway communities",
+      "enabled": true, 
+      "name": "gateway_communities",
+      "term": "sflow.gateway-communities"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Local Pref",
+      "enabled": true, 
+      "name": "route_local_pref",
+      "term": "sflow.route-localpref"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Source character set",
+      "enabled": true, 
+      "name": "src_charset",
+      "term": "sflow.src-charset"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Source User",
+      "enabled": true, 
+      "name": "src_user",
+      "term": "sflow.src-user"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Destination character set",
+      "enabled": true, 
+      "name": "dest_charset",
+      "term": "sflow.dest-charset"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Destination User",
+      "enabled": true, 
+      "name": "dest_user",
+      "term": "sflow.dest-user"
+    },
+    {
+      "aggType": "value", 
+      "desc": "URL associated with the flow",
+      "enabled": true, 
+      "name": "http_url",
+      "term": "http.uri"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Direction associated with the URL 0 - source / 1 - destination",
+      "enabled": true, 
+      "name": "url_direction",
+      "term": "flow.direction"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Host field for HTTP",
+      "enabled": true, 
+      "name": "http_host",
+      "term": "http.host"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Entries for MPLS label stack",
+      "enabled": true, 
+      "name": "mpls_in_label",
+      "term": "sflow.in-mpls-label"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Entries for MPLS label stack",
+      "enabled": true, 
+      "name": "mpls_out_label",
+      "term": "sflow.out-mpls-label"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Modified ip address value caused by NAT",
+      "enabled": true, 
+      "name": "nat_src_ip",
+      "term": "netflow.postNATSourceIPAddress"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Modified ip address value caused by NAT",
+      "enabled": true, 
+      "name": "nat_dest_ip",
+      "term": "netflow.postNATDestinationIPAddress"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Tunnel name",
+      "enabled": true, 
+      "name": "tunnel_name",
+      "term": "sflow.tunnel-name"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Tunnel Identifier",
+      "enabled": true, 
+      "name": "tunnel_id",
+      "term": "sflow.tunnel-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Tunnel COS value",
+      "enabled": true, 
+      "name": "tunnel_cos",
+      "term": "sflow.tunnel-cos"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VC instance name",
+      "enabled": true, 
+      "name": "vc_inst_name",
+      "term": "sflow.vc-instance-name"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VC instance identifier",
+      "enabled": true, 
+      "name": "vc_inst_id",
+      "term": "sflow.vc-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VC label COS value",
+      "enabled": true, 
+      "name": "vc_label_cos",
+      "term": "sflow.vc-label-cos"
+    },
+    {
+      "aggType": "value", 
+      "desc": "MPLS FTN description",
+      "enabled": true, 
+      "name": "mpls_ftn_desc",
+      "term": "sflow.mpls-ftn-desc"
+    },
+    {
+      "aggType": "value", 
+      "desc": "MPLS FTN mask",
+      "enabled": true, 
+      "name": "mpls_ftn_mask",
+      "term": "sflow.mpls-ftn-mask"
+    },
+    {
+      "aggType": "value", 
+      "desc": "List of stripped 802.1Q TPID/TCI layers",
+      "enabled": true, 
+      "name": "stripped_vlan_tags",
+      "term": "sflow.vlan-tags"
+    },
+
+    {
+      "aggType": "value", 
+      "desc": "Key Value pairs",
+      "enabled": true, 
+      "name": "sflow_elements",
+      "term": "sflow.elements"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Name of event",
+      "enabled": true, 
+      "name": "event_name",
+      "term": "flow.event-name"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ],
+  "id": "sflow",
+  "isReferenceStream": true,
+  "name": "sFlow Protocol Events",
+  "statsOnly": true,
+  "protocolName": "sflow",
+  "sourcetype": "stream:sflow",
+  "streamType": "event"
+}

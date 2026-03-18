@@ -1,0 +1,185 @@
+
+div.win8 ul.fancytree-connectors.fancytree-container li {
+  background-image: url("../skin-win8/vline.gif");
+  background-position: 0 0;
+}
+ul.fancytree-container li.fancytree-lastsib,
+ul.fancytree-no-connector > li {
+  background-image: none;
+}
+li.fancytree-animating {
+  position: relative;
+}
+/*------------------------------------------------------------------------------
+ * Common icon definitions
+ *----------------------------------------------------------------------------*/
+div.win8 span.fancytree-empty,
+div.win8 span.fancytree-vline,
+div.win8 span.fancytree-expander,
+div.win8 span.fancytree-icon,
+div.win8 span.fancytree-checkbox,
+div.win8 span.fancytree-drag-helper-img,
+div.win8 #fancytree-drop-marker {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  vertical-align: top;
+  background-repeat: no-repeat;
+  background-image: url("../skin-win8/icons.gif");
+  background-position: 0px 0px;
+}
+div.win8 span.fancytree-icon,
+div.win8 span.fancytree-checkbox,
+div.win8 span.fancytree-expander,
+div.win8 span.fancytree-custom-icon {
+  margin-top: 2px;
+}
+
+/* Used by 'icon' node option: */
+div.win8 img.fancytree-icon {
+  width: 16px;
+  height: 16px;
+  margin-left: 3px;
+  margin-top: 2px;
+  vertical-align: top;
+  border-style: none;
+}
+/*------------------------------------------------------------------------------
+ * Expander icon
+ *
+ * Note: IE6 doesn't correctly evaluate multiples class names,
+ *		 so we create combined class names that can be used in the CSS.
+ *
+ * Prefix: fancytree-exp-
+ * 1st character: 'e': expanded, 'c': collapsed, 'n': no children
+ * 2nd character (optional): 'd': lazy (Delayed)
+ * 3rd character (optional): 'l': Last sibling
+ *----------------------------------------------------------------------------*/
+
+div.win8 .fancytree-connectors .fancytree-exp-n span.fancytree-expander,
+div.win8 .fancytree-connectors .fancytree-exp-nl span.fancytree-expander {
+  background-image: url("../skin-win8/icons.gif");
+  margin-top: 0;
+}
+div.win8 .fancytree-loading span.fancytree-expander,
+div.win8 .fancytree-loading span.fancytree-expander:hover,
+div.win8 .fancytree-statusnode-loading span.fancytree-icon,
+div.win8 .fancytree-statusnode-loading span.fancytree-icon:hover,
+div.win8 span.fancytree-icon.fancytree-icon-loading {
+  background-image: url("../skin-win8/loading.gif");
+  background-position: 0px 0px;
+}
+
+/*------------------------------------------------------------------------------
+ * Node titles and highlighting
+ *----------------------------------------------------------------------------*/
+span.fancytree-node {
+  /* See #117 */
+  display: inherit;
+  width: 100%;
+  margin-top: 0px;
+  min-height: 20px;
+}
+span.fancytree-title {
+  color: black;
+  cursor: pointer;
+  display: inline-block;
+  vertical-align: top;
+  min-height: 20px;
+  padding: 0 3px 0 3px;
+  margin: 0px 0 0 3px;
+  border: 1px solid transparent;
+  -webkit-border-radius: 0px;
+  -moz-border-radius: 0px;
+  -ms-border-radius: 0px;
+  -o-border-radius: 0px;
+  border-radius: 0px;
+}
+
+div.win8 .fancytree-container.fancytree-rtl span.fancytree-connector,
+div.win8 .fancytree-container.fancytree-rtl span.fancytree-expander,
+div.win8 .fancytree-container.fancytree-rtl span.fancytree-icon,
+div.win8 .fancytree-container.fancytree-rtl span.fancytree-drag-helper-img {
+  background-image: url("../skin-win8/icons-rtl.gif");
+}
+div.win8 .fancytree-container.fancytree-rtl.fancytree-connectors .fancytree-exp-n span.fancytree-expander,
+div.win8 .fancytree-container.fancytree-rtl.fancytree-connectors .fancytree-exp-nl span.fancytree-expander {
+  background-image: url("../skin-win8/icons-rtl.gif");
+}
+div.win8 ul.fancytree-container.fancytree-rtl.fancytree-connectors li {
+  background-position: right 0;
+  background-image: url("../skin-win8/vline-rtl.gif");
+}
+
+#fancytree-drop-marker.fancytree-rtl {
+  background-image: url("../skin-win8/icons-rtl.gif");
+}
+
+/*******************************************************************************
+ * Styles specific to this skin.
+ *
+ * This section is automatically generated from the `ui-fancytree.less` template.
+ ******************************************************************************/
+/*******************************************************************************
+ * Node titles
+ */
+.fancytree-plain span.fancytree-title {
+  border: 1px solid transparent;
+}
+.fancytree-plain.fancytree-container.fancytree-treefocus span.fancytree-focused span.fancytree-title {
+  border-color: #3399ff;
+}
+.fancytree-plain span.fancytree-active span.fancytree-title,
+.fancytree-plain span.fancytree-selected span.fancytree-title {
+  background-color: #f7f7f7;
+  border-color: #dedede;
+}
+.fancytree-plain span.fancytree-node span.fancytree-selected span.fancytree-title {
+  font-style: italic;
+}
+.fancytree-plain span.fancytree-node:hover span.fancytree-title {
+  background-color: #eff9fe;
+  border-color: #70c0e7;
+}
+div.win8 .fancytree-plain.fancytree-container.fancytree-treefocus span.fancytree-active span.fancytree-title,
+div.win8 .fancytree-plain.fancytree-container.fancytree-treefocus span.fancytree-selected span.fancytree-title {
+  background-color: #cbe8f6;
+  border-color: #26a0da;
+}
+/*******************************************************************************
+ * 'table' extension
+ */
+div.win8 table.fancytree-ext-table tbody tr td {
+  border: 1px solid #EDEDED;
+}
+div.win8 table.fancytree-ext-table tbody span.fancytree-node,
+div.win8 table.fancytree-ext-table tbody span.fancytree-node:hover {
+  border: none;
+  background: none;
+}
+div.win8 table.fancytree-ext-table tbody tr:hover {
+  background-color: #E5F3FB;
+  outline: 1px solid #70C0E7;
+}
+div.win8 table.fancytree-ext-table tbody tr.fancytree-focused span.fancytree-title {
+  outline: 1px dotted black;
+}
+div.win8 table.fancytree-ext-table tbody tr.fancytree-active:hover,
+div.win8 table.fancytree-ext-table tbody tr.fancytree-selected:hover {
+  background-color: #CBE8F6;
+  outline: 1px solid #26A0DA;
+}
+div.win8 table.fancytree-ext-table tbody tr.fancytree-active {
+  background-color: #F7F7F7;
+  outline: 1px solid #DEDEDE;
+}
+div.win8 table.fancytree-ext-table tbody tr.fancytree-selected {
+  background-color: #F7F7F7;
+}
+div.win8 table.fancytree-ext-table.fancytree-treefocus tbody tr.fancytree-active {
+  background-color: #CBE8F6;
+  outline: 1px solid #26A0DA;
+}
+div.win8 table.fancytree-ext-table.fancytree-treefocus tbody tr.fancytree-selected {
+  background-color: #CBE8F6;
+}

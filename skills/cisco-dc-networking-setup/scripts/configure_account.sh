@@ -227,4 +227,5 @@ case "${ACCT_TYPE}" in
     *) log "ERROR: Unknown account type '${ACCT_TYPE}'. Use: aci, nd, nexus9k"; exit 1 ;;
 esac
 
-log "Account configuration complete. Restart Splunk to apply changes."
+log "Account configuration complete."
+log "$(log_platform_restart_guidance "account changes")"

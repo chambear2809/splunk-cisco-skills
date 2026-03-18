@@ -1,0 +1,187 @@
+/* Splunk Network Forwarder UI styles */
+
+body {
+	border: 0px; margin: 0px; padding: 0px;
+	font-family: roboto, helvetica, arial, sans-serif;
+	font-size: 12pt;
+	color: #f5f5f5;
+    background-color: #222222;
+}
+a:link, a:visited, a:active {
+	color: #65A637;
+	text-decoration: none;
+}
+a:hover {
+	color: #65A637;
+	text-decoration: underline;
+}
+h1 {
+	font-size: 16pt;
+	font-weight: bold;
+	color: #65A637;
+}
+.error {
+	color: #ff0000;
+}
+div#page-top {
+	width: 100%;
+	height: 120px;
+    background-color: #222222;
+}
+div#page-bottom {
+	width: 100%;
+	min-width: 500px;
+	max-width: 800px;
+	margin-left: auto; margin-right: auto;
+}
+div#page-footer {
+	font-size: 12px;
+	color: #555;
+	position: fixed;
+	bottom: 0px;
+	padding-bottom: 10px;
+}
+div.page-logo {
+	width: 500px;
+	position: relative; top: 50px;
+	margin-left: auto; margin-right: auto;
+}
+div.page-header {
+	width: 350px;
+	position: relative; top: 40px;
+	margin-left: auto; margin-right: auto;
+}
+div#add-dialog-insight {
+	display: none;
+}
+div#add-dialog-stream {
+}
+div#add-dialog-splunk {
+	display: none;
+}
+table.login {
+	width: 350px;
+	padding: 10px;
+}
+.ui-widget {
+	font-family: helvetica, arial, sans-serif;
+	font-size: 1.0em;
+}
+
+/* Styles applying to SSL Key dialog */
+
+#ssl-keys-dialog-form {
+	position: relative;
+}
+#ssl-keys-dialog-form select {
+	margin-bottom: 20px;
+}
+.saved-keys {
+	position: absolute;
+	right: 5px;
+	top: 0;
+}
+
+/* Styles applying to both Data Capture and sender blocks */
+
+.title {
+	font-size: 14pt;
+	font-weight: bold;
+}
+div.flash-message, div.data-capture, div.sender {
+	-webkit-border-radius: .5em;
+	margin: 20px;
+	padding: 10px;
+}
+div.data-capture {
+	color: #f5f5f5;
+	border: 1px solid #555;
+}
+div.sender {
+	color: #000000;
+	background-color: #f5f5f5;
+}
+div.flash-message {
+	color: #f5f5f5;
+	background-color: #000000;
+	display: none;
+}
+
+.header {
+	margin-bottom: 10px;
+}
+.header .url {
+	float: right;
+}
+.stats {
+	float: left;
+	padding-left: 10px;
+}
+.stats table {
+	text-align: right;
+}
+.links {
+	float: right;
+}
+.links .insight {
+	margin-bottom: 10px;
+}
+.clear {
+	clear: both;
+}
+
+/* Styles specific to Data Capture block */
+
+.button-bar {
+	margin-top: 15px;
+}
+.button-bar a {
+	margin-right: 40px;
+}
+
+/* Styles specific to sender blocks */
+
+.sender {
+	position: relative;
+}
+.sender .url {
+	position: absolute;
+
+	/* should match padding in .sender */
+	top: 10px;
+	right: 10px;
+}
+
+/* Splunk branding */
+
+@font-face {
+    font-family: 'Splunk Icons';
+    src: url('/fonts/splunkicons-regular-webfont.eot');
+    src: url('/fonts/splunkicons-regular-webfont.eot?#iefix') format('embedded-opentype'),
+         url('/fonts/splunkicons-regular-webfont.woff') format('woff'),
+         url('/fonts/splunkicons-regular-webfont.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+#brand {
+    font-family: "Splunk Icons";
+    font-weight: normal;
+    color: #ffffff;
+    text-shadow: none;
+    text-decoration: none;
+    font-size: 48px;
+    line-height: 100%;
+    cursor: default;
+    padding-bottom: 20px;
+}
+
+#brand > span.prompt {
+    color: #65A637;
+}
+
+#brand > span.product {
+    font-family: ProximaNovaBold,Arial,Helvetica,sans-serif;
+    font-size: 36px;
+    color: #65A637;
+}

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="tds">
+    <Name>TDS (Sybase/SQL Server) Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="tds.event">
+      <Type>object</Type>
+      <Comment>Event representing a TDS event</Comment>
+    </Term>
+    <Term id="tds.application">
+      <Type>shortstring</Type>
+      <Comment>Name of application used to connect to the database</Comment>
+    </Term>
+    <Term id="tds.dbname">
+      <Type>shortstring</Type>
+      <Comment>Name of the used database</Comment>
+    </Term>
+    <Term id="tds.hostname">
+      <Type>shortstring</Type>
+      <Comment>Name of workstation communicating with the SQL server</Comment>
+    </Term>
+    <Term id="tds.language">
+      <Type>shortstring</Type>
+      <Comment>User locale</Comment>
+    </Term>
+    <Term id="tds.library">
+      <Type>shortstring</Type>
+      <Comment>Name of network dynamic-link library used</Comment>
+    </Term>
+    <Term id="tds.login">
+      <Type>shortstring</Type>
+      <Comment>User's login string</Comment>
+    </Term>
+    <Term id="tds.password">
+      <Type>shortstring</Type>
+      <Comment>User's password string</Comment>
+    </Term>
+    <Term id="tds.query">
+      <Type>string</Type>
+      <Comment>SQL query sent by the user</Comment>
+    </Term>
+    <Term id="tds.server">
+      <Type>shortstring</Type>
+      <Comment>Name of server hosting the SQL Server</Comment>
+    </Term>
+    <Term id="tds.login-encrypted">
+      <Type>uint32</Type>
+      <Comment>Set to 1 to indicate that the login message is encrypted</Comment>
+    </Term>
+    <Term id="tds.rpc-proc-name">
+      <Type>string</Type>
+      <Comment>Name of the remote procedure name invoked</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

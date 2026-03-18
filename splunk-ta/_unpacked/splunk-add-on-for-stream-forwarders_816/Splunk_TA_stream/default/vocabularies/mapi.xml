@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="mapi">
+    <Locked>true</Locked>
+    <Name>MAPI Vocabulary</Name>
+    <Term id="mapi.event">
+      <Type>object</Type>
+      <Comment>Event representing MAPI</Comment>
+    </Term>
+    <Term id="mapi.host">
+      <Type>string</Type>
+      <Comment>Client's hostname</Comment>
+    </Term>
+    <Term id="mapi.domain">
+      <Type>string</Type>
+      <Comment>Network domain of the client</Comment>
+    </Term>
+    <Term id="mapi.authtype">
+      <Type>string</Type>
+      <Comment>The type of used authentication</Comment>
+    </Term>
+    <Term id="mapi.msg-sensibility">
+      <Type>uint32</Type>
+      <Comment>Message sensibility</Comment>
+    </Term>
+    <Term id="mapi.appoinment-location">
+      <Type>string</Type>
+      <Comment>Appointment location</Comment>
+    </Term>
+    <Term id="mapi.date">
+      <Type>uint64</Type>
+      <Comment>Message date: number of 100-nanosecond intervals since January 1, 1601</Comment>
+    </Term>
+    <Term id="mapi.size">
+      <Type>uint32</Type>
+      <Comment>Message size</Comment>
+    </Term>
+    <Term id="mapi.email-type">
+      <Type>shortstring</Type>
+        <Comment>E-mail type (enumeration)</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

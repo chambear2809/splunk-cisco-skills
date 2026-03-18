@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="sql">
+    <Term id="sql.affected-tables">
+      <Type>shortstring</Type>
+      <Comment>List of SQL tables referenced by the query</Comment>
+    </Term>
+    <Term id="sql.statement-type">
+      <Type>shortstring</Type>
+      <Comment>Type of the query's sql statement (SELECT, INSERT, etc.)</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

@@ -1,0 +1,52 @@
+.submitbutton {
+	margin-top: 20px;
+	margin-left: 10px;
+	width: 150px;
+	margin-bottom: 5px;
+	height: 34px;
+	font-size: 20px;
+	border-radius: 7px;
+	border: 2px solid rgb(82, 168, 50);
+	color: #fff;
+	background-color: rgb(82, 168, 50);
+}
+
+.submitbutton:hover {
+	border: 2px solid rgb(50, 168, 66);
+	color: #fff;
+	background-color: rgb(50, 168, 66);
+}
+
+.threshold_submit_button {
+	display: flex;
+	gap: 10px;
+}
+
+.cancel {
+	margin-top: 20px;
+	margin-left: 10px;
+	width: 100px;
+	margin-bottom: 5px;
+	height: 34px;
+	font-size: 14px;
+	border-radius: 0.4px;
+}
+
+.flex{
+	display: flex;
+	gap: 10px;
+}
+
+.threshold_inputs{
+	flex: 1;
+}
+
+label{
+	display: block;
+	text-align: left;
+}
+
+.success {
+	color: green;
+	font-weight: bolder;
+}

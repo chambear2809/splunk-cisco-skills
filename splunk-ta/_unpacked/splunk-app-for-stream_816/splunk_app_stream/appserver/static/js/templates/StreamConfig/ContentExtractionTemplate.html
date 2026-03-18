@@ -1,0 +1,335 @@
+<script type="text/template">
+    <div id="edit-filters-dialog" class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Content Extraction</h4>
+                <% if (extraction) { %>
+                    <h5>Editing: <%- extraction.name %></h5>
+                <% } else { %>
+                    <h5>Creating a new extraction rule.</h5>
+                <% } %>
+            </div>
+            <div class="modal-body">
+               <div class="container-fluid" id="content-extraction-modal">
+
+
+                    <!-- ============ -->
+                    <!-- Source Term -->
+                    <!-- ============ -->
+                    <div class="row-fluid">
+                       <div class="span4">Source Term: </div>
+                       <div class="span8 ce-field">
+                           <select id="origin-term">
+                               <% for (var i = 0; i < listOfStringTerms.length; i++) { %>
+                                 <option value="<%- listOfStringTerms[i].term %>"
+
+                                         <% if (listOfStringTerms[i].term === originalTerm) { %>
+                                            selected="selected"
+                                         <% } %> >
+
+                                        <%- listOfStringTerms[i].name %>
+
+                                 </option>
+                               <% } %>
+                           </select>
+                       </div>
+                    </div>
+
+                    <!-- ==== -->
+                    <!-- Name -->
+                    <!-- ==== -->
+                    <div class="row-fluid">
+                       <div class="span4">Name: </div>
+                       <div class="span8 ce-field">
+                            <input type="text"
+                                   id="extraction-name"
+                                   placeholder="required"
+                                   <% if (extraction) { %> value = "<%- extraction.name %>" <% } %>>
+                       </div>
+                    </div>
+
+                    <!-- =========== -->
+                    <!-- Description -->
+                    <!-- =========== -->
+                    <div class="row-fluid">
+                       <div class="span4">Description: </div>
+                       <div class="span8 ce-field">
+                           <textarea id="extraction-description" placeholder="required"><% if (extraction) { %><%- extraction.desc %><% } %></textarea>
+                       </div>
+                    </div>
+
+                    <hr>
+
+                    <!-- =============== -->
+                    <!-- Extraction Type -->
+                    <!-- =============== -->
+                    <div class="row-fluid">
+                        <div class="span4">Extraction Type: </div>
+                        <div class="span8 ce-field">
+                            <select id="extraction-type">
+                                <option value="regex" id="extraction-type"
+                                    <% if (extraction && extraction.transformation.type === "regex") { %>
+                                    selected="selected"
+                                    <% } %>
+                                >Regex</option>
+                                <option value="md5_hash" id="extraction-type"
+                                    <% if (extraction && extraction.transformation.type === "md5_hash") { %>
+                                    selected="selected"
+                                    <% } %>
+                                >MD5 Hash</option>
+                                <option value="sha512_hash" id="extraction-type"
+                                    <% if (extraction && extraction.transformation.type === "sha512_hash") { %>
+                                    selected="selected"
+                                    <% } %>
+                                >SHA512 Hash</option>
+                                <option value="hex" id="extraction-type"
+                                    <% if (extraction && extraction.transformation.type === "hex") { %>
+                                    selected="selected"
+                                    <% } %>
+                                >Hexadecimal</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- =============== -->
+                    <!-- Extraction Rule -->
+                    <!-- =============== -->
+                    <div class="row-fluid regex-ctl" <% if (extraction && extraction.transformation.type !== "regex") { %>style='display:none'<% } %>>
+                       <div class="span4">Extraction Rule: </div>
+                       <div class="span8 ce-field">
+                          <textarea id="extraction-rule" placeholder="required"><% if (extraction) { %><%- extraction.transformation.value %><% } %></textarea>
+                        </div>
+                    </div>
+
+                    <!-- =================== -->
+                    <!-- Extraction Matching -->
+                    <!-- =================== -->
+                    <div class="row-fluid regex-ctl" <% if (extraction && extraction.transformation.type !== "regex") { %>style='display:none'<% } %>>
+                       <div class="span4">Match:</div>
+                       <div class="span8 ce-field">
+
+                          <div class="btn-group btn-group-radio btn-toggle"
+                               id="extraction-match-btn-group"
+                               <% if (isAggregated) { %>
+                                title="Aggregated streams can only match first"
+                               <% } %> >
+
+                              <button type="button"
+                                      class="btn btn-lg
+                                      <% if (!extraction) { %> active <% } %>
+                                      <% if (extraction && !extraction.isList) { %> active <% } %>"
+                                      id="ce-match-first"
+                                      <% if (isAggregated) { %> disabled <% } %>
+                                      >First</button>
+
+                              <button type="button"
+                                      class="btn btn-lg
+                                      <% if (extraction && extraction.isList) { %> active <% } %>"
+                                      id="ce-match-all"
+                                      <% if (isAggregated) { %> disabled <% } %>>
+                                      All
+                                      </button>
+                          </div>
+
+                        </div>
+                    </div>
+
+                    <!-- =============== -->
+                    <!-- Extraction Format -->
+                    <!-- =============== -->
+                    <div class="row-fluid regex-ctl" <% if (extraction && extraction.transformation.type !== "regex") { %>style='display:none'<% } %>>
+                       <div class="span4">Extraction Format: </div>
+                       <div class="span8 ce-field">
+
+                          <textarea id="extraction-format"><% if (extraction) { %><%- extraction.transformation.format %><% } else { %>$1<% } %></textarea>
+
+                          <a class="external"
+                             href="http://docs.splunk.com/Documentation/Splunk/latest/Admin/Transformsconf"
+                             target="_blank">
+                             Formatting Documentation
+                          </a>
+
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <!-- =================== -->
+                    <!-- Extraction Hashing -->
+                    <!-- =================== -->
+                    <div class="row-fluid regex-ctl" <% if (extraction && extraction.transformation.type !== "regex") { %>style='display:none'<% } %>>
+                       <div class="span4">Hash Extraction : </div>
+                       <div class="span8 ce-field">
+
+                          <div class="btn-group btn-group-radio btn-toggle"
+                               id="extraction-hash-btn-group">
+                              <button type="button"
+                                      class="btn btn-lg <% if (extraction && extraction.transformation.hashExtracted) { %> active <% } %>"
+                                      id="ce-hash-yes">
+                                      Yes</button>
+
+                              <button type="button"
+                                      class="btn btn-lg <% if (!extraction || (extraction && !extraction.transformation.hashExtracted)) { %> active <% } %>"
+                                      id="ce-hash-no">
+                                      No
+                                      </button>
+                          </div>
+
+                        </div>
+                    </div>
+                    
+                    <!-- =========== -->
+                    <!-- Hash Length -->
+                    <!-- =========== -->
+                    <div class="row-fluid regex-ctl" <% if (extraction && extraction.transformation.type !== "regex") { %>style='display:none'<% } %>>
+                        <!-- optional, can be used to specify < 64 chars -->
+                        <div class="span4">Hash Length: </div>
+                        <div class="span8 ce-field">
+                            <input type="text" id="extraction-hash-length"
+                                <% if (extraction && extraction.transformation.hashExtractedLength) { %>
+                                value=<%- extraction.transformation.hashExtractedLength %>
+                                <% } %>
+                            >
+                            </input>
+                        </div>
+                    </div>
+
+                    <!-- =========== -->
+                    <!-- Hash Offset -->
+                    <!-- =========== -->
+                    <div class="row-fluid regex-ctl" <% if (extraction && extraction.transformation.type !== "regex") { %>style='display:none'<% } %>>
+                        <!-- optional, can be used to specify a number of leading chars to omit -->
+                        <div class="span4">Hash Offset: </div>
+                        <div class="span8 ce-field">
+                            <input type="text" id="extraction-hash-offset"
+                                <% if (extraction && extraction.transformation.hashExtractedOffset) { %>
+                                value=<%- extraction.transformation.hashExtractedOffset %>
+                                <% } %>
+                            >
+                            </input>
+                        </div>
+                    </div>
+
+                    <!-- ================ -->
+                    <!-- SHA512 Hash Salt -->
+                    <!-- ================ -->
+                    <div class="row-fluid regex-ctl" <% if (extraction && extraction.transformation.type !== "regex") { %>style='display:none'<% } %>>
+                    <!-- optional, can be used to specify salt to strengthen hashing -->
+                        <div class="span4">Hash Salt: </div>
+                        <div class="span8 ce-field">
+                            <input type="text" id="extract-sha-512-hash-salt"
+                                <% if (extraction && extraction.transformation.hashExtractedSalt) { %>
+                                value=<%- extraction.transformation.hashExtractedSalt %>
+                                <% } %>
+                            >
+                            </input>
+                        </div>
+                     </div>
+
+
+
+                    <!-- =========== -->
+                    <!-- Hash Length -->
+                    <!-- =========== -->
+                    <div class="row-fluid md5-hash-ctl" <% if (!extraction || extraction.transformation.type !== "md5_hash") { %>style='display:none'<% } %>>
+                        <!-- optional, can be used to specify < 32 chars -->
+                        <div class="span4">Hash Length: </div>
+                        <div class="span8 ce-field">
+                            <input type="text" id="md5-extraction-hash-length"
+                                <% if (extraction && extraction.transformation.hashLen) { %>
+                                value=<%- extraction.transformation.hashLen %>
+                                <% } %>
+                            >
+                            </input>
+                        </div>
+                    </div>
+
+                   <!-- =========== -->
+                   <!-- Hash Offset -->
+                   <!-- =========== -->
+                   <div class="row-fluid md5-hash-ctl" <% if (!extraction || extraction.transformation.type !== "md5_hash") { %>style='display:none'<% } %>>
+                       <!-- optional, can be used to specify a number of leading chars to omit -->
+                       <div class="span4">Hash Offset: </div>
+                       <div class="span8 ce-field">
+                           <input type="text" id="md5-extraction-hash-offset"
+                               <% if (extraction && extraction.transformation.hashOffset) { %>
+                               value=<%- extraction.transformation.hashOffset %>
+                               <% } %>
+                           >
+                           </input>
+                       </div>
+                   </div>
+
+                   <!-- ============= -->
+                   <!-- MD5 Hash Salt -->
+                   <!-- ============= -->
+                   <div class="row-fluid md5-hash-ctl" <% if (!extraction || extraction.transformation.type !== "md5_hash") { %>style='display:none'<% } %>>
+                       <!-- optional, can be used to specify salt to strengthen hashing -->
+                       <div class="span4">Hash Salt: </div>
+                       <div class="span8 ce-field">
+                           <input type="text" id="md5-extraction-hash-salt"
+                               <% if (extraction && extraction.transformation.hashSalt) { %>
+                               value=<%- extraction.transformation.hashSalt %>
+                               <% } %>
+                           >
+                           </input>
+                       </div>
+                   </div>
+
+                   <!-- =========== -->
+                   <!-- Hash Length -->
+                   <!-- =========== -->
+                   <div class="row-fluid sha512-hash-ctl" <% if (!extraction || extraction.transformation.type !== "sha512_hash") { %>style='display:none'<% } %>>
+                       <!-- optional, can be used to specify < 64 chars -->
+                       <div class="span4">Hash Length: </div>
+                       <div class="span8 ce-field">
+                           <input type="text" id="sha512-extraction-hash-length"
+                               <% if (extraction && extraction.transformation.hashLen) { %>
+                               value=<%- extraction.transformation.hashLen %>
+                               <% } %>
+                           >
+                           </input>
+                       </div>
+                   </div>
+
+                   <!-- =========== -->
+                   <!-- Hash Offset -->
+                   <!-- =========== -->
+                   <div class="row-fluid sha512-hash-ctl" <% if (!extraction || extraction.transformation.type !== "sha512_hash") { %>style='display:none'<% } %>>
+                       <!-- optional, can be used to specify a number of leading chars to omit -->
+                       <div class="span4">Hash Offset: </div>
+                       <div class="span8 ce-field">
+                           <input type="text" id="sha512-extraction-hash-offset"
+                               <% if (extraction && extraction.transformation.hashOffset) { %>
+                               value=<%- extraction.transformation.hashOffset %>
+                               <% } %>
+                           >
+                           </input>
+                       </div>
+                   </div>
+
+                   <!-- ================ -->
+                   <!-- SHA512 Hash Salt -->
+                   <!-- ================ -->
+                   <div class="row-fluid sha512-hash-ctl" <% if (!extraction || extraction.transformation.type !== "sha512_hash") { %>style='display:none'<% } %>>
+                   <!-- optional, can be used to specify salt to strengthen hashing -->
+                       <div class="span4">Hash Salt: </div>
+                       <div class="span8 ce-field">
+                           <input type="text" id="sha512-extraction-hash-salt"
+                               <% if (extraction && extraction.transformation.hashSalt) { %>
+                               value=<%- extraction.transformation.hashSalt %>
+                               <% } %>
+                           >
+                           </input>
+                       </div>
+                    </div>
+
+                 </div>
+            </div>
+            <div class="modal-footer">
+                <a href="#" data-dismiss="modal" aria-hidden="true" class="btn cancel">Cancel</a>
+                <a href="#" class="btn btn-primary save"><% if (extraction) { %> Save <% } else { %> Add <% } %></a>
+            </div>
+        </div>
+    </div>
+</script>

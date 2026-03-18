@@ -1,0 +1,90 @@
+<script type="text/template">
+
+        <td class="enabled">
+            <input class="field-status regular-checkbox"
+                    type="checkbox"
+                    <% if (stream.app !== 'Stream') { %> disabled <% } %>
+                    id="<%- field.name %>"
+                    <% if (field.enabled) { %> checked <% } %>
+            />
+        </td>
+
+        <td class="agg-type <% if (!stream.aggregated) { %> hidden <% } %>">
+            <div class="toggle-btn-grp btn-group-radio btn-toggle">
+                <% var category = terms.get(field.term).get('category') %>
+
+                <% if (field.enabled) { %>
+                    <% if (category === 'numeric' || category === 'string') { %>
+                        <input type="radio" class="key" name="<%-field.name %>"<% if (_.isString(field.aggType)) { %> checked <% } %>/>
+                        <label class="agg-type-label">Key</label>
+                        <input type="radio" class="agg" name="<%-field.name %>" <% if (_.isArray(field.aggType)) { %> checked <% } %>/>
+                        <label class="agg-type-label">Aggregated
+                            <% if (_.isArray(field.aggType)) { %>
+                                <a class="agg-methods" name="<%-field.name %>">(<%-field.aggType.length%>)</a>
+                            <% } %>
+                        </label>
+                    <% } else { %>
+                        <input type="radio" class="key" name="<%-field.name %>" checked/>
+                        <label class="agg-type-label">Key</label>
+                        <input type="radio" class="agg" name="<%-field.name %>" disabled/>
+                        <label class="agg-type-label">Aggregated</label>
+                    <% } %>
+                <% } else { %>
+                    <input type="radio" class="key" name="<%-field.name %>" checked disabled/>
+                    <label class="agg-type-label disabled">Key</label>
+                    <input type="radio" class="agg" name="<%-field.name %>" disabled/>
+                    <label class="agg-type-label disabled">Aggregated</label>
+                <% } %>
+            </div>
+        </td>
+
+        <td class="name"><%- field.name %></td>
+        <td><%- field.desc %></td>
+
+        <td>
+            <% if (field.transformation) { %>
+                Extracted
+            <% } else { %>
+                Original
+            <% } %>
+        </td>
+
+        <td>
+            <div class="field-edit btn-combo">
+                <a class="dropdown-toggle btn-pill" href="#">
+                    Edit <span class="icon-chevron-down"></span>
+                </a>
+
+                <div class="dropdown-menu dropdown-menu-narrow">
+                    <div class="arrow"></div>
+                    <ul>
+
+                        <% if (stream.app === 'Stream') { %>
+
+                            <!-- if field is extracted -->
+                            <% if (field.transformation) { %>
+
+                                <li><a class="edit-extracted-field">Edit</a></li>
+                                <li><a class="delete-extracted-field">Delete</a></li>
+
+                            <% } else { %>
+
+                                <!-- if field can be extracted -->
+                                <% if (field.term in stringTerms) { %>
+                                    <li><a class="extract-field">Extract New Field</a></li>
+                                <% } else { %>
+                                    <li><a class="no-field">No Actions Allowed</a></li>
+                                <% } %>
+
+                            <% } %>
+
+                        <% } else { %>
+                            <li><a class="no-field">No Actions Allowed</a></li>
+                        <% } %>
+
+                    </ul>
+                </div>
+            </div>
+        </td>
+  
+</script>

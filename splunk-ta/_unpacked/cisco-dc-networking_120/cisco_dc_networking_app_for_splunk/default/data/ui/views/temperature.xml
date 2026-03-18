@@ -1,0 +1,48 @@
+<form version="1.1" script="multiselect.js">
+  <label>Temperature</label>
+  <search id="baseSearch">
+    <query>| `temperature_details` </query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <default>
+        <label>Time Range</label>
+        <earliest>-60m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="multiselect" token="multiTokenQuery" searchWhenChanged="true">
+        <default>*</default>
+        <label>Device</label>
+        <delimiter> OR Device=</delimiter>
+        <choice value="*">All</choice>
+         <search>
+         <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k | lookup cisco_dc_nexus_hostname_lookup device AS device OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as device OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2) | eval hostAndHostname = hostname."(".device.")" | stats values(device) as Device by hostAndHostname | fields hostAndHostname Device | sort 0 hostAndHostname</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+         <fieldForLabel>hostAndHostname</fieldForLabel>
+         <fieldForValue>Device</fieldForValue>  
+      </input>
+  </fieldset>
+  <row>
+    <panel>
+    <table>
+      <search base="baseSearch">
+        <query>| search Device=$multiTokenQuery$ | rename sensor as Sensor tempmod as Module | stats  latest(Model) as Model latest(ModuleType) as ModuleType latest("Current Temperature(Celsius)") as "Current Temperature(Celsius)", , values(Sensor) as SensorS, latest("Major Threshold(Celsius)") as "Major Threshold(Celsius)", latest("Minor Threshold(Celsius)") as "Minor Threshold(Celsius)", latest(Status) as Status, sparkline(avg(Current Temperature(Celsius))) as "Current Temperature History" by Hostname,Device,Module,Sensor  | sort 0 Module | sort 0 Device  | fields Hostname Device Module Model ModuleType Sensor "Current Temperature(Celsius)" "Current Temperature History" "Major Threshold(Celsius)" "Minor Threshold(Celsius)" Status</query>
+      </search>
+      <format type="sparkline" field="Current Temperature History">
+        <option name="height">25</option>
+        <option name="width">150</option>
+      </format>
+      <option name="wrap">true</option>
+      <option name="rowNumbers">false</option>
+      <option name="dataOverlayMode">none</option>
+      <option name="count">10</option>
+    </table>
+    </panel>
+  </row>
+</form>

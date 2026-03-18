@@ -28,6 +28,11 @@ if ! SK=$(get_session_key "${SPLUNK_URI}"); then
     exit 1
 fi
 
+CLOUD_MODE=false
+if is_splunk_cloud; then
+    CLOUD_MODE=true
+fi
+
 # --- App Installation ---
 log "--- App Installation ---"
 
@@ -42,14 +47,22 @@ if rest_check_app "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream"; then
     version=$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream")
     pass "Splunk TA Stream (Forwarder) installed (v${version})"
 else
-    fail "Splunk TA Stream (Forwarder) not installed"
+    if ${CLOUD_MODE}; then
+        warn "Splunk TA Stream (Forwarder) not installed on the Cloud search tier. This is expected when Stream forwarders run on infrastructure you control."
+    else
+        fail "Splunk TA Stream (Forwarder) not installed"
+    fi
 fi
 
 if rest_check_app "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream_wire_data"; then
     version=$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream_wire_data")
     pass "Splunk TA Stream Wire Data installed (v${version})"
 else
-    fail "Splunk TA Stream Wire Data not installed"
+    if ${CLOUD_MODE}; then
+        warn "Splunk TA Stream Wire Data not installed on the Cloud search tier."
+    else
+        fail "Splunk TA Stream Wire Data not installed"
+    fi
 fi
 
 # --- Stream Forwarder Binary ---
@@ -61,13 +74,13 @@ info "Binary check skipped in remote mode — streamfwd must run on the Splunk h
 log ""
 log "--- Indexes ---"
 
-if rest_check_index "${SK}" "${SPLUNK_URI}" "netflow"; then
+if platform_check_index "${SK}" "${SPLUNK_URI}" "netflow"; then
     pass "Index 'netflow' exists"
 else
     warn "Index 'netflow' not found"
 fi
 
-if rest_check_index "${SK}" "${SPLUNK_URI}" "stream"; then
+if platform_check_index "${SK}" "${SPLUNK_URI}" "stream"; then
     pass "Index 'stream' exists"
 else
     warn "Index 'stream' not found"
@@ -77,7 +90,9 @@ fi
 log ""
 log "--- Stream Forwarder Config ---"
 
-if rest_check_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "streamfwd" "streamfwd"; then
+if ${CLOUD_MODE}; then
+    info "Cloud mode: forwarder-side streamfwd validation is skipped on the search tier. Run this validation against the forwarder management endpoint to validate Splunk_TA_stream."
+elif rest_check_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "streamfwd" "streamfwd"; then
     pass "streamfwd.conf stanza exists"
 
     ip_addr=$(rest_get_conf_value "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "streamfwd" "streamfwd" "ipAddr")
@@ -111,7 +126,9 @@ fi
 log ""
 log "--- Stream Input (inputs.conf) ---"
 
-if rest_check_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "inputs" "streamfwd://streamfwd"; then
+if ${CLOUD_MODE}; then
+    info "Cloud mode: streamfwd input validation is skipped on the search tier."
+elif rest_check_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "inputs" "streamfwd://streamfwd"; then
     pass "streamfwd://streamfwd input stanza exists"
 
     app_location=$(rest_get_conf_value "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "inputs" "streamfwd://streamfwd" "splunk_stream_app_location")

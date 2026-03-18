@@ -12,6 +12,18 @@ description: >-
 
 Automates installation, update, and management of Splunk apps and add-ons.
 
+## Package Model
+
+Use the original packaged archives in `splunk-ta/` as the deployment source of
+truth.
+
+- Cloud workflow: install the original archive with ACS, then configure the
+  installed app with the appropriate follow-on skill.
+- Enterprise workflow: install the original archive through the Splunk REST API
+  or local filesystem path.
+- `_unpacked` app directories are for review only and are not part of the
+  normal install workflow.
+
 ## Agent Behavior — Credentials & Prompting
 
 **The agent must NEVER ask for passwords or secrets in chat.**
@@ -31,13 +43,19 @@ The agent should still ask the user for non-secret values:
 
 ## Environment
 
-All scripts operate entirely via the Splunk REST API and can run from any host with
-network access to the Splunk management port (8089). No local Splunk installation is
-required.
+The installer supports two target modes:
+
+- **Splunk Enterprise**: install and remove apps through the Splunk REST API on
+  port `8089`, with SSH staging as a fallback for remote package delivery.
+- **Splunk Cloud**: install and remove apps through the Admin Config Service
+  (ACS) CLI. Search-tier REST access on port `8089` is optional and is used by
+  other setup skills, not by the generic install/uninstall operations.
 
 | Item | Value |
 |------|-------|
-| Management API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Optional override | `SPLUNK_PLATFORM=enterprise|cloud` when a hybrid credentials file makes a run ambiguous |
+| Enterprise management API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Cloud stack | `SPLUNK_CLOUD_STACK` in `credentials` |
 | TA app name | varies (installs any app) |
 | Credentials | Project-root `credentials` file (fallback: `~/.splunk/credentials`) |
 | Skill scripts | `skills/splunk-app-install/scripts/` (relative to repo root) |
@@ -66,13 +84,25 @@ bash skills/splunk-app-install/scripts/install_app.sh
 
 Prompts for: source type (Local/Remote/Splunkbase), file/URL/app-ID, version, upgrade y/n. Credentials
 are read from the project-root `credentials` file (falls back to `~/.splunk/credentials`).
-After a successful install, the script restarts Splunk automatically and waits
-for the management API to return. Use `--no-restart` only when batching changes.
+After a successful install, the script either:
 
-For remote Splunk hosts, local package installs try a direct REST upload first.
-If the target does not support upload, the script falls back to SSH staging using
-`SPLUNK_SSH_HOST`, `SPLUNK_SSH_PORT`, `SPLUNK_SSH_USER`, and `SPLUNK_SSH_PASS`
-from the credentials file.
+- restarts Splunk automatically on Enterprise and waits for the management API
+  to return, or
+- checks `acs status current-stack` on Splunk Cloud and only restarts the stack
+  if ACS reports `restartRequired=true`.
+
+Use `--no-restart` only when batching changes.
+
+For remote Enterprise hosts, local package installs try a direct REST upload
+first. If the target does not support upload, the script falls back to SSH
+staging using `SPLUNK_SSH_HOST`, `SPLUNK_SSH_PORT`, `SPLUNK_SSH_USER`, and
+`SPLUNK_SSH_PASS` from the credentials file.
+
+For Splunk Cloud:
+
+- local and downloaded packages are installed as private apps via ACS
+- Splunkbase apps are installed or updated via ACS
+- the ACS CLI must be installed and configured for the target stack
 
 To skip prompts, supply values via flags:
 
@@ -131,12 +161,15 @@ Prompts for: app selection and confirmation. Credentials are read from the proje
 1. **Determine the operation** — install, list, or uninstall.
 2. **Ask the user** for all required information (source, details).
 3. **Run the script** with gathered values as flags.
-4. **Wait for the automatic restart** — successful installs and uninstalls restart Splunk and wait for the management API.
-5. **Verify** — run `list_apps.sh` after install to confirm.
+4. **Enterprise**: wait for the automatic restart and management API recovery.
+5. **Cloud**: let ACS finish the operation, then restart only if
+   `restartRequired=true`.
+6. **Verify** — run `list_apps.sh` after install to confirm.
 
 ## Post-Install Notes
 
-- The install and uninstall scripts restart Splunk automatically by default.
+- The install and uninstall scripts restart Splunk automatically by default on
+  Enterprise, and perform an ACS restart check by default on Splunk Cloud.
 - Use `--no-restart` only when intentionally batching multiple changes before a single final restart.
 - If the app has a setup page, the user configures it via Splunk Web or a
   dedicated setup skill (e.g., `cisco-catalyst-ta-setup`).

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="icmp">
+    <Name>ICMP Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="icmp.event">
+      <Type>object</Type>
+      <Comment>Event representing an ICMP message</Comment>
+    </Term>
+    <Term id="icmp.code">
+      <Type>uint8</Type>
+      <Comment>Message code</Comment>
+    </Term>
+    <Term id="icmp.code-string">
+      <Type>shortstring</Type>
+      <Comment>Message code string</Comment>
+    </Term>
+    <Term id="icmp.type">
+      <Type>uint8</Type>
+      <Comment>Message type</Comment>
+    </Term>
+     <Term id="icmp.type-string">
+      <Type>shortstring</Type>
+      <Comment>Message type string</Comment>
+    </Term>
+    <Term id="icmp.checksum">
+      <Type>uint32</Type>
+      <Comment>checksum</Comment>
+    </Term>
+    <Term id="icmp.id">
+    <Type>uint32</Type>
+      <Comment>id</Comment>
+    </Term>
+     <Term id="icmp.sequence">
+      <Type>uint32</Type>
+      <Comment>sequence</Comment>
+    </Term>
+    <Term id="icmp.data">
+      <Type>blob</Type>
+      <Comment>ICMP data</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

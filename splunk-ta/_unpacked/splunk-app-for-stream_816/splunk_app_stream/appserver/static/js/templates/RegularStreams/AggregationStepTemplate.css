@@ -1,0 +1,59 @@
+.aggregation-step .controls {
+    padding-left: 20px;
+}
+
+.aggregation-step label.aggregation-toggle {
+    display: inline-block;
+    margin-right: 20px;
+}
+
+/* We're using class 'control-group' to get error styling via bootstrap.css.
+ * This is an example of overriding one of those rules.
+ */
+.aggregation-step .control-group.error input {
+/*
+    border: 1px dotted lime;
+*/
+}
+
+.aggregation-step input.time-interval {
+    width: 40px;
+    margin-left: -3px;
+    margin-bottom: 0;
+}
+
+.aggregation-step .trailing-label {
+    margin-top: 4px;
+    margin-left: 2px;
+    display: inline-block;
+}
+
+.aggregation-step .expandable {
+    background-color: #F5F5F5; /* matching the wizard header background */
+    border: 1px solid #DDD;
+    margin: 30px 20px 20px 20px;
+    padding: 10px;
+}
+
+.aggregation-step .expandable .expansion-trigger {
+/*
+    border: 1px dotted red;
+*/
+}
+
+.aggregation-step .expandable .content {
+    margin-top: 20px;
+}
+
+.aggregation-step .expandable .content img {
+    margin: 20px;
+}
+
+.aggregation-step .left-label {
+    display: inline;
+}
+
+.aggregation-step .right-label {
+    margin-left: 210px;
+    display: inline;
+}

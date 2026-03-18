@@ -1,0 +1,84 @@
+<script id="forwarder-management-table-row-template" type="text/template">
+
+        <!-- ====== -->
+        <!-- i icon -->
+        <!-- ====== -->
+        <td class="more-info-td">
+            <span class="icon-chevron-right more-info-toggle"></span>
+        </td>
+
+        <!-- ==== -->
+        <!-- Name -->
+        <!-- ==== -->
+        <td>
+            <%- model.id %>
+        </td>
+
+        <!-- =========== -->
+        <!-- Description -->
+        <!-- =========== -->
+        <td>
+            <%- model.description %>
+        </td>
+
+        <!-- ==== -->
+        <!-- Rule -->
+        <!-- ==== -->
+        <td>
+            <%- model.rule %>
+        </td>
+
+        <!-- ====================== -->
+        <!-- Include Default Group? -->
+        <!-- ====================== -->
+        <td>
+            <% if (model.includeEphemeralStreams) { %>
+                Yes
+            <% } else { %>
+                No
+            <% } %>
+        </td>
+
+        <!-- ================ -->
+        <!-- Contains Streams -->
+        <!-- ================ -->
+        <td>
+            <%- model.streams.length %>
+        </td>
+
+        <!-- =================== -->
+        <!-- Endpoint Autoconfig -->
+        <!-- =================== -->
+        <td>
+            <% if (model.hec.autoConfig) { %>
+                On
+            <% } else { %>
+                Off
+            <% } %>
+        </td>
+
+        <!-- ======= -->
+        <!-- Actions -->
+        <!-- ======= -->
+        <td>
+            <div class="forwarder-group-action-popdown btn-combo">
+                <a class="dropdown-toggle btn-pill" href="#"><span class="icon-chevron-down"></span></a>
+
+                <div class="dropdown-menu dropdown-menu-narrow">
+                    <div class="arrow"></div>
+                    <ul>
+
+                        <li><a href="#" class="fwd-group-edit">Edit Forwarder Group</a></li>
+                        <% if (model.id !== "defaultgroup") { %>
+                            <li><a href="#" class="fwd-group-edit-rule">Edit Rule</a></li>
+                        <% } %>
+                        <li><a href="#" class="fwd-group-modify-streams">Edit List of Streams</a></li>
+                        <% if (model.id !== "defaultgroup") { %>
+                            <li><a href="#" class="fwd-group-delete">Delete</a></li>
+                        <% } %>
+
+                    </ul>
+                </div>
+            </div>
+        </td>
+</script>

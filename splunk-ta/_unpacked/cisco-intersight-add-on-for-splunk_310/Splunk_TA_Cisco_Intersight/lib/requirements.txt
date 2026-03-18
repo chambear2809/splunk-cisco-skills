@@ -1,0 +1,15 @@
+certifi>=2024.8.30
+charset-normalizer>=3.4.0
+defusedxml>=0.7.1
+deprecation>=2.1.0
+idna>=3.10
+packaging>=24.2
+PySocks>=1.7.1
+requests>=2.32.3
+solnlib>=6.0.1
+sortedcontainers>=2.4.0
+splunk-sdk>=2.1.0
+splunktalib>=3.0.5
+splunktaucclib>=6.5.3
+urllib3>=1.26.20
+oauthlib==3.2.2

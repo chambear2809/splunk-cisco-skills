@@ -1,0 +1,347 @@
+{
+  "app": "Stream", 
+  "category": "Authentication", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "diameter.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+      "enabled": true, 
+      "name": "time_taken", 
+      "term": "flow.time-taken"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport level protocol", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates how many octets have been received from the port over the course of this service being provided", 
+      "enabled": true, 
+      "name": "acct_input_octets", 
+      "term": "diameter.acct-input-octets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Link between multiple accounting sessions", 
+      "enabled": true, 
+      "name": "acct_multi_session_id", 
+      "term": "diameter.acct-multi-session-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates how many octets have been sent to the port in the course of delivering this service", 
+      "enabled": true, 
+      "name": "acct_output_octets", 
+      "term": "diameter.acct-output-octets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Unique identifier for one record within a session", 
+      "enabled": true, 
+      "name": "acct_record_number", 
+      "term": "diameter.acct-record-number"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Record type", 
+      "enabled": true, 
+      "name": "acct_record_type", 
+      "term": "diameter.acct-record-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Accounting session ID", 
+      "enabled": true, 
+      "name": "acct_session_id", 
+      "term": "diameter.acct-session-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sub-session identifier", 
+      "enabled": true, 
+      "name": "acct_sub_session_id", 
+      "term": "diameter.acct-sub-session-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identify which application the message is applicable for", 
+      "enabled": true, 
+      "name": "application_id", 
+      "term": "diameter.application-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Requested authentication type", 
+      "enabled": true, 
+      "name": "auth_request_type", 
+      "term": "diameter.auth-request-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The phone number that the user called, using Dialed Number Identification (DNIS) or similar technology", 
+      "enabled": true, 
+      "name": "called_station_id", 
+      "term": "diameter.called-station-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client id", 
+      "enabled": true, 
+      "name": "calling_station_id", 
+      "term": "diameter.calling-station-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Command associated with the Diameter request", 
+      "enabled": true, 
+      "name": "command_code", 
+      "term": "diameter.command-code"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Bitfield which defines some attributes of a command on one byte as follows: [RPE.....] ('R'equest/answer, 'P'roxiable, 'E'rror)", 
+      "enabled": true, 
+      "name": "command_flags", 
+      "term": "diameter.command-flags"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Destination Diameter host for the current message", 
+      "enabled": true, 
+      "name": "destination_host", 
+      "term": "diameter.destination-host"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Used to detect duplicate messages", 
+      "enabled": true, 
+      "name": "end_to_end_id", 
+      "term": "diameter.end-to-end-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address", 
+      "enabled": true, 
+      "name": "framed_ip", 
+      "term": "diameter.framed-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Used to match Diameter request and reply messages", 
+      "enabled": true, 
+      "name": "hop_by_hop_id", 
+      "term": "diameter.hop-by-hop-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "User's login string", 
+      "enabled": true, 
+      "name": "login", 
+      "term": "diameter.login"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Unique identifier of NAS originating access request", 
+      "enabled": true, 
+      "name": "nas_id", 
+      "term": "diameter.nas-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of of NAS originating access request", 
+      "enabled": true, 
+      "name": "nas_ip", 
+      "term": "diameter.nas-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Physical port number of the user on the NAS", 
+      "enabled": true, 
+      "name": "nas_port", 
+      "term": "diameter.nas-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifies the NAS", 
+      "enabled": true, 
+      "name": "nas_port_id", 
+      "term": "diameter.nas-port-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the type of physical port NAS is using to authenticate the user", 
+      "enabled": true, 
+      "name": "nas_port_type", 
+      "term": "diameter.nas-port-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Source Diameter host for the current message", 
+      "enabled": true, 
+      "name": "origin_host", 
+      "term": "diameter.origin-host"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates whether a particular Diameter request was completed successfully or not", 
+      "enabled": true, 
+      "name": "result_code", 
+      "term": "diameter.result-code"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Uniquely identifies the current user session", 
+      "enabled": false, 
+      "name": "session_id", 
+      "term": "diameter.session-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "This attribute indicates how the session was terminated", 
+      "enabled": false, 
+      "name": "terminate_cause", 
+      "term": "diameter.terminate-cause"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "diameter", 
+  "isReferenceStream": true,  
+  "name": "Diameter Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "Diameter", 
+  "sourcetype": "stream:diameter", 
+  "streamType": "event"
+}

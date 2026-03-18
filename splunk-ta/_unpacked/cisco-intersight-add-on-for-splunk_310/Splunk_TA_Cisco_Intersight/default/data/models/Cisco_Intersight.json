@@ -1,0 +1,3377 @@
+{
+    "modelName": "Cisco_Intersight",
+    "displayName": "Cisco Intersight",
+    "description": "",
+    "objectSummary": {
+        "Event-Based": 15,
+        "Transaction-Based": 0,
+        "Search-Based": 0
+    },
+    "objects": [
+        {
+            "objectName": "cisco_intersight",
+            "displayName": "cisco_intersight",
+            "parentName": "BaseEvent",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [],
+            "constraints": [
+                {
+                    "search": "`cisco_intersight_index`",
+                    "owner": "cisco_intersight"
+                }
+            ],
+            "lineage": "cisco_intersight"
+        },
+        {
+            "objectName": "cisco_intersight_serverProfiles",
+            "displayName": "cisco_intersight_serverProfiles",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "serverProfiles_AssignedServer_Moid",
+                            "owner": "cisco_intersight.cisco_intersight_serverProfiles",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "serverProfiles_AssignedServer_Moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "nmxmtkl4tz",
+                    "owner": "cisco_intersight.cisco_intersight_serverProfiles",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "if(isnull('AssignedServer.Moid'), \"-\", 'AssignedServer.Moid')"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "serverProfiles_ConfigStateSummary",
+                            "owner": "cisco_intersight.cisco_intersight_serverProfiles",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "serverProfiles_ConfigStateSummary",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "3th9705fimk",
+                    "owner": "cisco_intersight.cisco_intersight_serverProfiles",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'ConfigContext.ConfigStateSummary'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "serverProfiles_Name",
+                            "owner": "cisco_intersight.cisco_intersight_serverProfiles",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "serverProfiles_Name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "a07cekk3pzp",
+                    "owner": "cisco_intersight.cisco_intersight_serverProfiles",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Name"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "serverProfiles_AssignedServer_Name",
+                            "owner": "cisco_intersight.cisco_intersight_serverProfiles",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "serverProfiles_AssignedServer_Name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "jqzps6u7p4",
+                    "owner": "cisco_intersight.cisco_intersight_serverProfiles",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "if(isnull('AssignedServer.Name'), \"-\", 'AssignedServer.Name')"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:profiles\" source=\"serverProfile\"",
+                    "owner": "cisco_intersight.cisco_intersight_serverProfiles"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_serverProfiles"
+        },
+        {
+            "objectName": "cisco_intersight_inventoryObjects",
+            "displayName": "cisco_intersight_inventoryObjects",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_PlatformType",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_PlatformType",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "sgx9nswli3",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "PlatformType"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_Moid",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_Moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "vhc2jivqqs",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Moid"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_Name",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_Name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "vlz9hodtv5",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Name"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_ObjectType",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_ObjectType",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "guewuua84tl",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "ObjectType"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjectsAncestors_Moid",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjectsAncestors_Moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "smr7lewe959",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'Ancestors{}.Moid'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_Chassis_Moid",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_Chassis_Moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "4a6exlvcj7w",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Chassis_Moid"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_DeviceMoId",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_DeviceMoId",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "49j5z80wib9",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "DeviceMoId"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:compute\" source=\"inventoryObjects\"",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_inventoryObjects"
+        },
+        {
+            "objectName": "cisco_intersight_inventoryObjects_bladeidentity",
+            "displayName": "cisco_intersight_inventoryObjects_bladeidentity",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_bladeidentity_SlotId",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects_bladeidentity",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_bladeidentity_SlotId",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "22cfggfzwj",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects_bladeidentity",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "CurrentSlotId"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_bladeidentity_DeviceMoId",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects_bladeidentity",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_bladeidentity_DeviceMoId",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "8778h6ysjwd",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects_bladeidentity",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'RegisteredDevice.Moid'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "inventoryObjects_bladeidentity_CurrentChassisId",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects_bladeidentity",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "inventoryObjects_bladeidentity_CurrentChassisId",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "dx2c4opf3e",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects_bladeidentity",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "CurrentChassisId"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:compute\" source=\"inventoryObjects\" ObjectType=\"compute.BladeIdentity\" ",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects_bladeidentity"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_inventoryObjects_bladeidentity"
+        },
+        {
+            "objectName": "cisco_intersight_condAlarms",
+            "displayName": "cisco_intersight_condAlarms",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_AcknowledgeBy",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_AcknowledgeBy",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "u7jrnhf7ii",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "if(AcknowledgeBy=='', '-', AcknowledgeBy)"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_Suppressed",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_Suppressed",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "qmkrji2d3qq",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Suppressed"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_AffectedMoDisplayName",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_AffectedMoDisplayName",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "gehayfedt4",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "AffectedMoDisplayName"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_Severity",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_Severity",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "xhnwss7vx1b",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Severity"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_Name",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_Name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "zxy75wmmlxi",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Name"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_Moid",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_Moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "l537teos5xs",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Moid"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_OrigSeverity",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_OrigSeverity",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "8p6ld6o9yg",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "OrigSeverity"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_ModTime",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_ModTime",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "ta7wuntlpte",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "ModTime"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_CreationTime",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_CreationTime",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "nprih5mvf4",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "CreationTime"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_Description",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_Description",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "csaw0si23qt",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Description"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "condAlarms_AccountName",
+                            "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "condAlarms_AccountName",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "y1klnhpnk4p",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'account_name'"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:alarms\" source=\"condAlarm\"",
+                    "owner": "cisco_intersight.cisco_intersight_condAlarms"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_condAlarms"
+        },
+        {
+            "objectName": "cisco_intersight_EquipmentChasses",
+            "displayName": "cisco_intersight_EquipmentChasses",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "EquipmentChasses_DeviceMoId",
+                            "owner": "cisco_intersight.cisco_intersight_EquipmentChasses",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "EquipmentChasses_DeviceMoId",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "egvso7pr2sg",
+                    "owner": "cisco_intersight.cisco_intersight_EquipmentChasses",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "DeviceMoId"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "EquipmentChasses_Moid",
+                            "owner": "cisco_intersight.cisco_intersight_EquipmentChasses",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "EquipmentChasses_Moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "8k95hbzmqek",
+                    "owner": "cisco_intersight.cisco_intersight_EquipmentChasses",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Moid"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "EquipmentChasses_Name",
+                            "owner": "cisco_intersight.cisco_intersight_EquipmentChasses",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "EquipmentChasses_Name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "1qkf451b6s6",
+                    "owner": "cisco_intersight.cisco_intersight_EquipmentChasses",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "Name"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "EquipmentChasses_ChassisId",
+                            "owner": "cisco_intersight.cisco_intersight_EquipmentChasses",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "EquipmentChasses_ChassisId",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "4a6exlvcj7w",
+                    "owner": "cisco_intersight.cisco_intersight_EquipmentChasses",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "ChassisId"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:compute\" source=\"equipmentChasses\"",
+                    "owner": "cisco_intersight.cisco_intersight_EquipmentChasses"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_EquipmentChasses"
+        },
+        {
+            "objectName": "cisco_intersight_network",
+            "displayName": "cisco_intersight_network",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_domain_id",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_domain_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "6uq8nou615",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.intersight.domain.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_domain_name",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_domain_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "1pgq8m8jl5a",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.intersight.domain.name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_parent_name",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_parent_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "xxudhtqs27a",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.parent.name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_name",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "d5u5dj32qib",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_crc_duration_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_crc_duration_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "bsk3kqyw1w",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_receive_crc-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_timestamp",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_timestamp",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "qisscddrkk",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "timestamp"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_id",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "qineaaqqq5q",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_host_id",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_host_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "zcefwngrau",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.host.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_chassis_number",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_chassis_number",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "366s81cxqzt",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.chassis.number'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_port_role",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_port_role",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "2xx6o17kck8",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.network.port.role'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_receive_utilization",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_receive_utilization",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "mea0s52xhoh",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-network-bandwidth-utilization_receive-Avg'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_transmit_utilization",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_transmit_utilization",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "nk4nb6zvfi",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-network-bandwidth-utilization_transmit-Avg'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_receive_ppp_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_receive_ppp_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "m1s5pxmtvdo",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-network-packets_receive_ppp-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_transmit_ppp_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_transmit_ppp_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "dkqbviq163",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-network-packets_transmit_ppp-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_transmit_pause_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_transmit_pause_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "fyuuiztesn",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_transmit_pause-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_receive_pause_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_receive_pause_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "tswueb12j2q",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_receive_pause-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_runt_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_runt_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "mpy799i6ea",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_receive_runt-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_too_long_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_too_long_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "7h6ad7kbwvk",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_receive_too_long-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_no_buffer_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_no_buffer_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "4i1ikaujihs",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_receive_no_buffer-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_too_short_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_too_short_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "ekwvsr3j4s7",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_receive_too_short-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_receive_discard_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_receive_discard_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "fza1qi7q2m",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_receive_discard-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_transmit_discard_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_transmit_discard_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "d6p2vrha6gm",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_transmit_discard-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_transmit_deferred_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_transmit_deferred_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "meygysvppbg",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_transmit_deferred-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_late_collisions_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_late_collisions_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "nirf8kr7qie",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_late_collisions-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_carrier_sense_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_carrier_sense_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "bfszqwn83b7",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_carrier_sense-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_transmit_jabber_error_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_transmit_jabber_error_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "o9m3jbthixn",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_transmit_jabber-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_chassis",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_chassis",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "jgdwwgcgjzp",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.chassis.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_server_id",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_server_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "b2rdyhryyes",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.server.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_port_type",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_port_type",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "3ov5uuqtg79",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.network.port.type'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_host_name",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_host_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "1bxx7s61bvv",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.host.name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_io_transmit",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_io_transmit",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "yhv0nx5jftn",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.network.io_transmit-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_io_receive",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_io_receive",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "jzi6ard4uq",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.network.io_receive-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_bandwidth_receive_utilization_avg",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_bandwidth_receive_utilization_avg",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "3wznxszxp24",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.nura'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_bandwidth_receive_utilization_max",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_bandwidth_receive_utilization_max",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "jmekcvyrno",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.nurmx'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_bandwidth_transmit_utilization_avg",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_bandwidth_transmit_utilization_avg",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "dhhnlxpuy7t",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.nuta'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_bandwidth_transmit_utilization_max",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_bandwidth_transmit_utilization_max",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "8xlu24afx6u",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.nutmx'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_io_transmit_ag",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_io_transmit_ag",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "xpurmxuk6jd",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.nitsag'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_io_receive_ag",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_io_receive_ag",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "f8kjvspz94r",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.nirsag'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_account_moid",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_account_moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "yx7bc6vkyns",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.AccountMoid'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_account_name",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_account_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "8u0ae7kq137",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'account_name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_crc_duration_rate",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_crc_duration_rate",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "tnfc2zfnsap",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-errors_network_receive_crc-Rate'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_receive_crc_rate",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_receive_crc_rate",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "ck5t1mlk0iu",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-errors_network_receive_crc-Rate'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "network_receive_crc_sum",
+                            "owner": "cisco_intersight.cisco_intersight_network",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "network_receive_crc_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "r1mlgrl1xma",
+                    "owner": "cisco_intersight.cisco_intersight_network",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_network_receive_crc-Sum'"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:metrics\" source=\"network\"",
+                    "owner": "cisco_intersight.cisco_intersight_network"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_network"
+        },
+        {
+            "objectName": "cisco_intersight_compute",
+            "displayName": "cisco_intersight_compute",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "compute_RegisteredDevice_Hostname",
+                            "owner": "cisco_intersight.cisco_intersight_compute",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "compute_RegisteredDevice_Hostname",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "pfgccn9471",
+                    "owner": "cisco_intersight.cisco_intersight_compute",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "if(isnull('RegisteredDevice.DeviceHostname{}'), \"-\", 'RegisteredDevice.DeviceHostname{}')"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "compute_RegisteredDevice_Moid",
+                            "owner": "cisco_intersight.cisco_intersight_compute",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "compute_RegisteredDevice_Moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "j3n6dij70hm",
+                    "owner": "cisco_intersight.cisco_intersight_compute",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'RegisteredDevice.Moid'"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:compute\"",
+                    "owner": "cisco_intersight.cisco_intersight_compute"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_compute"
+        },
+        {
+            "objectName": "cisco_intersight_metrics",
+            "displayName": "cisco_intersight_metrics",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "metrics_domain_id",
+                            "owner": "cisco_intersight.cisco_intersight_metrics",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "metrics_domain_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "x2oo4dzjhek",
+                    "owner": "cisco_intersight.cisco_intersight_metrics",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.intersight.domain.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "metrics_domain_name",
+                            "owner": "cisco_intersight.cisco_intersight_metrics",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "metrics_domain_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "nn4atmknfzq",
+                    "owner": "cisco_intersight.cisco_intersight_metrics",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.intersight.domain.name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "temp",
+                            "owner": "cisco_intersight.cisco_intersight_metrics",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "temp",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "c30w7oyeg1a",
+                    "owner": "cisco_intersight.cisco_intersight_metrics",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.ta'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "hostid",
+                            "owner": "cisco_intersight.cisco_intersight_metrics",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "hostid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "cn3v9eo4kdc",
+                    "owner": "cisco_intersight.cisco_intersight_metrics",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.HostId'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "hosttype",
+                            "owner": "cisco_intersight.cisco_intersight_metrics",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "hosttype",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "h4s8e7h4v2j",
+                    "owner": "cisco_intersight.cisco_intersight_metrics",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.HostType'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "accountid",
+                            "owner": "cisco_intersight.cisco_intersight_metrics",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "accountid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "ndy3cavikpd",
+                    "owner": "cisco_intersight.cisco_intersight_metrics",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.AccountMoid'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "nitr",
+                            "owner": "cisco_intersight.cisco_intersight_metrics",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "nitr",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "n1jv8omu5qb",
+                    "owner": "cisco_intersight.cisco_intersight_metrics",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.nitr'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "fanspeed",
+                            "owner": "cisco_intersight.cisco_intersight_metrics",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "fanspeed",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "woovtcwveog",
+                    "owner": "cisco_intersight.cisco_intersight_metrics",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.fsa'"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:metrics\"",
+                    "owner": "cisco_intersight.cisco_intersight_metrics"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_metrics"
+        },
+        {
+            "objectName": "cisco_intersight_memory",
+            "displayName": "cisco_intersight_memory",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_domain_id",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_domain_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "p27zcs955o",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.intersight.domain.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_domain_name",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_domain_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "ks3bhiokggf",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.intersight.domain.name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_host_name",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_host_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "3hvswh5sh2i",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.host.name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_name",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "7vh68m4bu76",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_correctable_ecc_errors_sum",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_correctable_ecc_errors_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "g9is28pmgzt",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_correctable_ecc_errors-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_timestamp",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_timestamp",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "hq5cazorso",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "timestamp"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_id",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "3faenb1j9bp",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_uncorrectable_ecc_errors_sum",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_uncorrectable_ecc_errors_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "vq2kaymizx",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw.errors_uncorrectable_ecc_errors-Sum'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_correctable_ecc_errors_max",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_correctable_ecc_errors_max",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "r7zdzsze1qj",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-errors_correctable_ecc_errors_max-Max'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_account_name",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_account_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "cco2um7lae",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'account_name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_correctable_ecc_errors_rate",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_correctable_ecc_errors_rate",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "3rjavbrf03n",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-errors_correctable_ecc_errors-Rate'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_correctable_ecc_errors_min",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_correctable_ecc_errors_min",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "fg7rurroruh",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-errors_correctable_ecc_errors_min-Min'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_uncorrectable_ecc_errors_rate",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_uncorrectable_ecc_errors_rate",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "1jppl3hhe9v",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-errors_uncorrectable_ecc_errors-Rate'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_uncorrectable_ecc_errors_max",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_uncorrectable_ecc_errors_max",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "vjij2ruorf8",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-errors_uncorrectable_ecc_errors_max-Max'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "memory_uncorrectable_ecc_errors_min",
+                            "owner": "cisco_intersight.cisco_intersight_memory",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "memory_uncorrectable_ecc_errors_min",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "dpr0jaq0aia",
+                    "owner": "cisco_intersight.cisco_intersight_memory",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.hw-errors_uncorrectable_ecc_errors_min-Min'"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:metrics\" source=\"memory\"",
+                    "owner": "cisco_intersight.cisco_intersight_memory"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_memory"
+        },
+        {
+            "objectName": "cisco_intersight_cpu_utilization",
+            "displayName": "cisco_intersight_cpu_utilization",
+            "parentName": "cisco_intersight",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_account_name",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_account_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "ozx06ppc71",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'account_name'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_domain_id",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_domain_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "lq0c9ufycei",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.DomainId'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_domain_name",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_domain_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "vu4ana7s2mn",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.DomainName'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_chassis_moid",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_chassis_moid",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "7nrgptrz1nk",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.ChassisMoid'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_server_id",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_server_id",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "rt7vss48m",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.host.id'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_server_name",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_server_name",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "oypcm3xc3l",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.HostName'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_average",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_average",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "tygnduinum",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.ca'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_sum",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_sum",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "gbusim493q",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.cs'"
+                },
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "cpu_util_max",
+                            "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "cpu_util_max",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "ab96vi3ihbi",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.cmx'"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "sourcetype=\"cisco:intersight:metrics\" source=\"cpu_utilization\"",
+                    "owner": "cisco_intersight.cisco_intersight_cpu_utilization"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_cpu_utilization"
+        },
+        {
+            "objectName": "physical_summary",
+            "displayName": "physical_summary",
+            "parentName": "cisco_intersight_inventoryObjects",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "power_status",
+                            "owner": "cisco_intersight.cisco_intersight_inventoryObjects.physical_summary",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "power_status",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "5tpagmr08k2",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects.physical_summary",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'OperPowerState'"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "ObjectType=\"compute.PhysicalSummary\"",
+                    "owner": "cisco_intersight.cisco_intersight_inventoryObjects.physical_summary"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_inventoryObjects.physical_summary"
+        },
+        {
+            "objectName": "temp_data",
+            "displayName": "temp_data",
+            "parentName": "cisco_intersight_metrics",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [],
+            "constraints": [
+                {
+                    "search": "source=\"temperature\"",
+                    "owner": "cisco_intersight.cisco_intersight_metrics.temp_data"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_metrics.temp_data"
+        },
+        {
+            "objectName": "network_data",
+            "displayName": "network_data",
+            "parentName": "cisco_intersight_metrics",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [],
+            "constraints": [
+                {
+                    "search": "source=network",
+                    "owner": "cisco_intersight.cisco_intersight_metrics.network_data"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_metrics.network_data"
+        },
+        {
+            "objectName": "fan_data",
+            "displayName": "fan_data",
+            "parentName": "cisco_intersight_metrics",
+            "comment": "",
+            "fields": [
+                {
+                    "fieldName": "_time",
+                    "owner": "BaseEvent",
+                    "type": "timestamp",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "_time",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "host",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "host",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "source",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "source",
+                    "comment": ""
+                },
+                {
+                    "fieldName": "sourcetype",
+                    "owner": "BaseEvent",
+                    "type": "string",
+                    "fieldSearch": "",
+                    "required": false,
+                    "multivalue": false,
+                    "hidden": false,
+                    "editable": true,
+                    "displayName": "sourcetype",
+                    "comment": ""
+                }
+            ],
+            "calculations": [
+                {
+                    "outputFields": [
+                        {
+                            "fieldName": "fansp",
+                            "owner": "cisco_intersight.cisco_intersight_metrics.fan_data",
+                            "type": "string",
+                            "fieldSearch": "",
+                            "required": false,
+                            "multivalue": false,
+                            "hidden": false,
+                            "editable": true,
+                            "displayName": "fansp",
+                            "comment": ""
+                        }
+                    ],
+                    "calculationID": "gtfw1a676ap",
+                    "owner": "cisco_intersight.cisco_intersight_metrics.fan_data",
+                    "editable": true,
+                    "comment": "",
+                    "calculationType": "Eval",
+                    "expression": "'event.fsa'"
+                }
+            ],
+            "constraints": [
+                {
+                    "search": "source=fan",
+                    "owner": "cisco_intersight.cisco_intersight_metrics.fan_data"
+                }
+            ],
+            "lineage": "cisco_intersight.cisco_intersight_metrics.fan_data"
+        }
+    ],
+    "objectNameList": [
+        "cisco_intersight",
+        "cisco_intersight_serverProfiles",
+        "cisco_intersight_inventoryObjects",
+        "cisco_intersight_inventoryObjects_bladeidentity",
+        "cisco_intersight_condAlarms",
+        "cisco_intersight_EquipmentChasses",
+        "cisco_intersight_network",
+        "cisco_intersight_compute",
+        "cisco_intersight_metrics",
+        "cisco_intersight_memory",
+        "cisco_intersight_cpu_utilization",
+        "physical_summary",
+        "temp_data",
+        "network_data",
+        "fan_data"
+    ]
+}

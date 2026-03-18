@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+	<Vocabulary id="http">
+		<Name>HTTP</Name>
+		<Comment>Vocabulary for describing HTTP events.</Comment>
+		<Locked>true</Locked>
+		<Term id="http.event">
+			<Type>object</Type>
+			<Comment>Event for an HTTP request and response</Comment>
+		</Term>
+		<Term id="http.page-event">
+			<Type>object</Type>
+			<Comment>Event that represents a single clickstream page view</Comment>
+		</Term>
+		<Term id="http.status">
+			<Type>uint16</Type>
+			<Comment>The HTTP status code returned to the client</Comment>
+		</Term>
+		<Term id="http.cs-content-type">
+			<Type>string</Type>
+			<Comment>The Content-Type HTTP request header</Comment>
+		</Term>
+		<Term id="http.page-title">
+			<Type>shortstring</Type>
+			<Comment>Page title, extracted from HTML content</Comment>
+		</Term>
+		<Term id="http.page-content">
+			<Type>blob</Type>
+			<Comment>Response content (normally HTML) for the http-event which triggered the new page-event</Comment>
+		</Term>
+		<Term id="http.comment">
+			<Type>shortstring</Type>
+			<Comment>The HTTP status message returned to the client</Comment>
+		</Term>
+		<Term id="http.method">
+			<Type>shortstring</Type>
+			<Comment>The HTTP method of the request (GET, POST, etc.)</Comment>
+		</Term>
+		<Term id="http.uri">
+			<Type>string</Type>
+			<Comment>The requested resource (including query)</Comment>
+		</Term>
+		<Term id="http.uri-stem">
+			<Type>string</Type>
+			<Comment>The requested resource (excluding query)</Comment>
+		</Term>
+		<Term id="http.uri-query">
+			<Type>string</Type>
+			<Comment>The query portion of the requested resource</Comment>
+		</Term>
+		<Term id="http.uri-parm">
+			<Type>string</Type>
+			<Comment>The parameters portion of the requested resource</Comment>
+		</Term>
+		<Term id="http.form-data">
+			<Type>string</Type>
+			<Comment>A urlencoded string representing all form data fields</Comment>
+		</Term>
+		<Term id="http.request">
+			<Type>string</Type>
+			<Comment>The request line exactly as it came from the client</Comment>
+		</Term>
+		<Term id="http.host">
+			<Type>shortstring</Type>	
+			<Comment>The Host HTTP request header</Comment>
+		</Term>
+		<Term id="http.referer">
+			<Type>string</Type>
+			<Comment>The Referer HTTP request header</Comment>
+		</Term>
+		<Term id="http.useragent">
+			<Type>string</Type>
+			<Comment>The User-Agent HTTP request header</Comment>
+		</Term>
+		<Term id="http.set-cookie">
+			<Type>string</Type>
+			<Comment>The Set-Cookie HTTP response header</Comment>
+		</Term>
+		<Term id="http.content-type">
+			<Type>string</Type>
+			<Comment>The Content-Type HTTP response header</Comment>
+		</Term>
+		<Term id="http.cs-content-length">
+			<Type>uint64</Type>
+			<Comment>HTTP request content length</Comment>
+		</Term>
+		<Term id="http.content-length">
+			<Type>uint64</Type>
+			<Comment>HTTP response content length</Comment>
+		</Term>
+		<Term id="http.location">
+			<Type>string</Type>
+			<Comment>The Location HTTP response header</Comment>
+		</Term>
+		<Term id="http.cs-headers">
+			<Type>zblob</Type>
+			<Comment>All HTTP headers sent from client to server</Comment>
+		</Term>
+		<Term id="http.sc-headers">
+			<Type>zblob</Type>
+			<Comment>All HTTP headers sent from server to client</Comment>
+		</Term>
+		<Term id="http.cs-content">
+			<Type>blob</Type>
+			<Comment>HTTP request content sent from client to server</Comment>
+		</Term>
+		<Term id="http.sc-content">
+			<Type>zblob</Type>
+			<Comment>HTTP response content sent from server to client</Comment>
+		</Term>
+		<Term id="http.cs-version">
+			<Type>shortstring</Type>
+			<Comment>The protocol version that the client used</Comment>
+		</Term>
+		<Term id="http.session-pages">
+			<Type>uint32</Type>
+			<Comment>Number of page views associated with a visitor session</Comment>
+		</Term>
+		<Term id="http.session-hits">
+			<Type>uint32</Type>
+			<Comment>Number of HTTP requests associated with a visitor session</Comment>
+		</Term>
+		<Term id="http.session-dwell">
+			<Type>uint32</Type>
+			<Comment>Number of seconds spent viewing all pages within a visitor session</Comment>
+		</Term>
+		<Term id="http.session-length">
+			<Type>uint32</Type>
+			<Comment>Number of seconds between the first and last session requests</Comment>
+		</Term>
+		<Term id="http.visitor-status">
+			<Type>shortstring</Type>
+			<Comment>New visitor: how determined? c=Cookie, v=visitorDB, a=anonDB</Comment>
+		</Term>
+		<Term id="http.new-page">
+			<Type>uint8</Type>
+			<Comment>1 if the http-event triggered the generation of a new page</Comment>
+		</Term>
+		<Term id="http.new-session">
+			<Type>uint8</Type>
+			<Comment>1 if the (http or page) event triggered the generation of a new visitor session</Comment>
+		</Term>
+		<Term id="http.page-object">
+			<Type>uint8</Type>
+			<Comment>1 if the http event matched the page object detection rules</Comment>
+		</Term>
+		<Term id="http.page-load">
+			<Type>uint32</Type>
+			<Comment>Number of microseconds that it took to load a page view</Comment>
+		</Term>
+		<Term id="http.page-load-redirect">
+			<Type>uint32</Type>
+			<Comment>Number of microseconds that it took redirecting a page view</Comment>
+		</Term>
+		<Term id="http.page-load-base">
+			<Type>uint32</Type>
+			<Comment>Number of microseconds that it took loading a page's HTML</Comment>
+		</Term>
+		<Term id="http.page-load-content">
+			<Type>uint32</Type>
+			<Comment>Number of microseconds that it took loading a page's content</Comment>
+		</Term>
+		<Term id="http.authuser">
+			<Type>shortstring</Type>
+			<Comment>The username as which the user has authenticated himself</Comment>
+		</Term>
+		<Term id="http.cached">
+			<Type>uint8</Type>
+			<Comment>1 if the response was cached, 0 if it was not</Comment>
+		</Term>
+		<Term id="http.session-event">
+			<Type>object</Type>
+			<Comment>Event that represents a single clickstream visitor session</Comment>
+		</Term>
+		<Term id="http.session-group">
+			<Type>shortstring</Type>
+			<Comment>Clickstream session group this event was assigned to</Comment>
+		</Term>
+		<Term id="http.session-id">
+			<Type>shortstring</Type>
+			<Comment>Unique identifier assigned to the clickstream visitor session</Comment>
+		</Term>
+		<Term id="http.visitor-id">
+			<Type>shortstring</Type>
+			<Comment>Unique identifier assigned to the visitor (across sessions)</Comment>
+		</Term>
+		<Term id="http.content-id">
+			<Type>shortstring</Type>
+			<Comment>Unique identifier assigned to a http request (in storage)</Comment>
+		</Term>
+		<Term id="http.cookie-id">
+			<Type>string</Type>
+			<Comment>Cookie identifier used for sessionizing clickstream ("name:value")</Comment>
+		</Term>
+		<Term id="http.page-number">
+			<Type>uint32</Type>
+			<Comment>Page sequence number, or total number of pages found for session events</Comment>
+		</Term>
+		<Term id="http.request-number">
+			<Type>uint32</Type>
+			<Comment>Request sequence number, or total number of requests for session and page view events</Comment>
+		</Term>
+		<Term id="http.cookie">
+			<Type>string</Type>
+			<Comment>The Cookie HTTP request header</Comment>
+		</Term>
+		<Term id="http.rfc931">
+			<Type>shortstring</Type>
+			<Comment>The remote logname of the user</Comment>
+		</Term>
+		<Term id="http.robot">
+			<Type>uint8</Type>
+			<Comment>1 if the event was generated by a robot visitor, undefined if it was not</Comment>
+		</Term>
+		<Term id="http.page-hits">
+			<Type>uint32</Type>
+			<Comment>Number of HTTP requests associated with the page view</Comment>
+		</Term>
+		<Term id="http.page-dwell">
+			<Type>uint32</Type>
+			<Comment>Number of seconds spent viewing a completed page view</Comment>
+		</Term>
+		<Term id="http.doc-id">
+			<Type>uint64</Type>
+			<Comment>Unique identifier assigned to a doc(page content) in text index</Comment>
+		</Term>
+		<Term id="http.sitename">
+			<Type>shortstring</Type>
+			<Comment>The Internet service name and instance number that was running on the client</Comment>
+		</Term>
+		<Term id="http.computername">
+			<Type>shortstring</Type>
+			<Comment>The name of the server on which the log file entry was generated</Comment>
+		</Term>
+		<Term id="http.substatus">
+			<Type>uint16</Type>
+			<Comment>The HTTP substatus error code</Comment>
+		</Term>
+		<Term id="http.win32status">
+			<Type>shortstring</Type>
+			<Comment>The Windows status code</Comment>
+		</Term>
+		<Term id="http.compressed">
+			<Type>uint8</Type>
+			<Comment>ContentStorage compressed</Comment>
+		</Term>
+		<Term id="http.c-ip">
+			<Type>shortstring</Type>
+			<Comment>IP address of the client in dot-quad notation. Contains the value of X-Forwarded-For header or equal to flow.c-ip is X-Forwarded-For is not set.</Comment>
+		</Term>
+		<Term id="http.content-location">
+			<Type>shortstring</Type>
+			<Comment>The Content-Location HTTP response header. An alternate location for the returned data.</Comment>
+		</Term>
+		<Term id="http.transfer-encoding">
+			<Type>shortstring</Type>
+			<Comment>The Transfer-Encoding HTTP response header. The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, gzip, identity.</Comment>
+		</Term>
+		<Term id="http.accept">
+			<Type>shortstring</Type>
+			<Comment>The Accept HTTP request header. Content-Types that are acceptable for the response.</Comment>
+		</Term>
+		<Term id="http.server">
+			<Type>shortstring</Type>
+			<Comment>The Server HTTP response header. A name for the server.</Comment>
+		</Term>
+		<Term id="http.allow">
+			<Type>shortstring</Type>
+			<Comment>The Allow HTTP response header. Valid actions for a specified resource. To be used for a 405 Method not allowed.</Comment>
+		</Term>
+		<Term id="http.connection-type">
+			<Type>shortstring</Type>
+			<Comment>Connection type desired by the sender for that particular connection.</Comment>
+		</Term>
+		<Term id="http.content-disposition">
+			<Type>shortstring</Type>
+			<Comment>Information related to the disposition of the content present on the web page.</Comment>
+		</Term>
+		<Term id="http.part-filename">
+			<Type>shortstring</Type>
+            <Comment>Name of uploaded file if content-type is multipart.</Comment>
+		</Term>
+		<Term id="http.content-encoding">
+			<Type>shortstring</Type>
+			<Comment>Contains content encoding format.</Comment>
+		</Term>
+		<Term id="http.forward-addr">
+			<Type>shortstring</Type>
+			<Comment>The X-Forwarded-For HTTP header. IP Address of client that initiated the request and subsequent proxies in a chain of proxies.</Comment>
+		</Term>
+		<Term id="http.ntlm-user">
+			<Type>shortstring</Type>
+			<Comment>User attribute of the NTLM protocol.</Comment>
+		</Term>
+		<Term id="http.ntlm-domain">
+			<Type>shortstring</Type>
+			<Comment>Domain attribute of the NTLM protocol.</Comment>
+		</Term>
+		<Term id="http.ntlm-workstation">
+			<Type>shortstring</Type>
+			<Comment>Workstation attribute of the NTLM protocol.</Comment>
+		</Term>
+		<Term id="http.proxy-auth">
+			<Type>shortstring</Type>
+			<Comment>Authentication type on the proxy (Basic - Digest - NTLM).</Comment>
+		</Term>
+		<Term id="http.proxy-login">
+			<Type>shortstring</Type>
+			<Comment>Login used for proxy authentication.</Comment>
+		</Term>
+		<Term id="http.www-auth">
+			<Type>shortstring</Type>
+			<Comment>Authentication type used.</Comment>
+		</Term>
+		<Term id="http.accept-language">
+			<Type>string</Type>
+			<Comment>The set of natural languages that are preferred as a response to the request.</Comment>
+		</Term>
+		<Term id="http.content-language">
+			<Type>string</Type>
+			<Comment>The natural language or languages of the intended audience for the enclosed entity.</Comment>
+		</Term>
+		<Term id="http.cs-pragma">
+			<Type>string</Type>
+			<Comment>Implementation specific directives from client to server.</Comment>
+		</Term>
+		<Term id="http.sc-pragma">
+			<Type>string</Type>
+			<Comment>Implementation specific directives from server to client.</Comment>
+		</Term>
+		<Term id="http.cs-cache-control">
+			<Type>string</Type>
+			<Comment>Directives that MUST be obeyed by all caching mechanisms from client to server.</Comment>
+		</Term>
+		<Term id="http.sc-cache-control">
+			<Type>string</Type>
+			<Comment>Directives that MUST be obeyed by all caching mechanisms from server to client.</Comment>
+		</Term>
+		<Term id="http.expires">
+			<Type>string</Type>
+			<Comment>The date/time after which the response is considered stale.</Comment>
+		</Term>
+		<Term id="http.age">
+			<Type>int32</Type>
+			<Comment>The sender's estimate of the amount of time since the response was generated at the origin server.</Comment>
+		</Term>
+		<Term id="http.etag">
+			<Type>string</Type>
+			<Comment>The current value of the entity tag for the requested variant.</Comment>
+		</Term>
+		<Term id="http.cs-date">
+			<Type>string</Type>
+			<Comment>The date and time at which the request was originated.</Comment>
+		</Term>
+		<Term id="http.sc-date">
+			<Type>string</Type>
+			<Comment>The date and time at which the response was originated.</Comment>
+		</Term>
+		<Term id="http.cs-content-md5-hash">
+			<Type>string</Type>
+			<Comment>Used for storing the incrementally computed MD5 hash of http.cs-content.</Comment>
+		</Term>
+		<Term id="http.sc-content-md5-hash">
+			<Type>string</Type>
+			<Comment>Used for storing the incrementally computed MD5 hash of http.sc-content.</Comment>
+		</Term>
+                <Term id="http.cs-content-sha512-hash">
+                        <Type>string</Type>
+                        <Comment>Used for storing the incrementally computed SHA512 hash of http.cs-content.</Comment>
+                </Term>
+                <Term id="http.sc-content-sha512-hash">
+                        <Type>string</Type>
+                        <Comment>Used for storing the incrementally computed SHA512 hash of http.sc-content.</Comment>
+                </Term>
+        <Term id="http.file-size">
+            <Type>uint32</Type>
+            <Comment>Size of extracted file(only set if file extraction is turned on)</Comment>
+        </Term>
+        <Term id="http.mime-type">
+            <Type>string</Type>
+            <Comment>Content type of the request or the web page</Comment>
+        </Term>
+        <Term id="http.file-name">
+            <Type>string</Type>
+            <Comment>Name of uploaded file</Comment>
+        </Term>
+	</Vocabulary>
+</CmConfig>

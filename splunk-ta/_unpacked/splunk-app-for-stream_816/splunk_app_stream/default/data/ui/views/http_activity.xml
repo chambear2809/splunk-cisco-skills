@@ -1,0 +1,66 @@
+<form version="1.1">
+  <label>HTTP Activity</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="field1">
+      <label></label>
+      <default>
+        <earliest>-60m@m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title></title>
+      <table>
+        <title>HTTP Requests by URI</title>
+        <search>
+          <query>index=* source="stream:Splunk_HTTPURI"  uri_path!="" | rename count as counts, uri_path as URI, sum(time_taken) as time_taken | eval error=if(status&gt;=400, counts, 0) | stats sum(counts) as Count sum(error) as Errors sum(time_taken) as TimeTaken by URI | sort Count desc | eval "Avg. Response Time"=(TimeTaken/Count)/(1000*1000) | fields - TimeTaken</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title></title>
+      <table>
+        <title>HTTP Activity by Domain</title>
+        <search>
+          <query>index=* source="stream:Splunk_HTTPURI" site!="" | rename count as counts, sum(bytes_in) as bytes_in | stats sum(counts) as Count sum(bytes_in) as "Bytes In" sum(sum(bytes_out))  as "Bytes Out" by site | rename site as Domain | sort by Count desc</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title></title>
+      <table>
+        <title>EndPoint (Client) Activity</title>
+        <search>
+          <query>index=* source="stream:Splunk_HTTPClient" | rename count as Count, c_ip as Client, sum(time_taken) as time_taken, sum(bytes_in) as bytes_in, sum(bytes_out) as bytes_out | stats sum(Count) as Requests , sum(time_taken) as TimeTaken, sum(bytes_in) as "Bytes In"  , sum(bytes_out) as "Bytes Out"  by Client | sort Requests desc | eval "Response Time"=(TimeTaken/Requests)/(1000*1000) |  fields - TimeTaken</query>
+          <earliest>$field1.earliest$</earliest>
+          <latest>$field1.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">cell</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+</form>

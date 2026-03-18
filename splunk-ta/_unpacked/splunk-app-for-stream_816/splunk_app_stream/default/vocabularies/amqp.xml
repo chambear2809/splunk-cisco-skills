@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="amqp">
+    <Locked>true</Locked>
+    <Name>AMQP Protocol Vocabulary</Name>
+    <Term id="amqp.event">
+        <Type>object</Type>
+        <Comment>Event representing an AMQP event</Comment>
+    </Term>
+    <Term id="amqp.major-version">
+        <Type>uint32</Type>
+        <Comment>Major version of the protocol</Comment>
+    </Term>
+    <Term id="amqp.minor-version">
+        <Type>uint32</Type>
+        <Comment>Minor version of the protocol</Comment>
+    </Term>
+    <Term id="amqp.method">
+        <Type>shortstring</Type>
+        <Comment>Command launched</Comment>
+    </Term>
+    <Term id="amqp.response-time">
+        <Type>uint32</Type>
+        <Comment>Server response time (microseconds)</Comment>
+    </Term>
+    <Term id="amqp.revision">
+        <Type>uint8</Type>
+        <Comment>Revision version of the protocol used by the client.</Comment>
+    </Term>
+    <Term id="amqp.type">
+        <Type>uint8</Type>
+        <Comment>Type of AMQP request.</Comment>
+    </Term>
+    <Term id="amqp.class">
+        <Type>uint16</Type>
+        <Comment>Class of AMQP request.</Comment>
+    </Term>
+    <Term id="amqp.server-major-version">
+        <Type>uint8</Type>
+        <Comment>Major version of the protocol used by the server.</Comment>
+    </Term>
+    <Term id="amqp.server-minor-version">
+        <Type>uint8</Type>
+        <Comment>Minor version of the protocol used by the server.</Comment>
+    </Term>
+    <Term id="amqp.exchange-type">
+        <Type>string</Type>
+        <Comment>Mode of AMQP exchange.</Comment>
+    </Term>
+    <Term id="amqp.routing-key">
+        <Type>string</Type>
+        <Comment>Virtual address used to route a message.</Comment>
+    </Term>
+    <Term id="amqp.correlation-id">
+        <Type>string</Type>
+        <Comment>Identifier used to correlate the application.</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

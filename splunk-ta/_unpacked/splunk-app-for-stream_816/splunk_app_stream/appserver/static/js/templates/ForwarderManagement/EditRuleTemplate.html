@@ -1,0 +1,89 @@
+<script id="new-forwarder-modal-template" type="text/template">
+    <div id="edit-rule-modal">
+
+        <!-- ====== -->
+        <!-- Header -->
+        <!-- ====== -->
+        <div class="modal-header">
+            <h3 class="modal-tital">
+                Matched Forwarders
+                <span class="subtext">
+                    (
+                    <% if (isWizard) { %>
+                        New Rule
+                    <% } else { %>
+                        <%- fwdGroupModel.id %>
+                    <% } %>
+                    )
+                </span>
+            </h3>
+        </div>
+
+        <!-- ====== -->
+        <!-- Search -->
+        <!-- ====== -->
+        <div class="modal-secondary-header">
+            <div id="fwd-group-rule-search">
+                <span class="desc"> <b>Regex Rule:</b> </span>
+                <span>
+                    <input type="text" id="fwd-group-rule-input" value="<%- fwdGroupModel.rule %>"/>
+                </span>
+            </div>
+            <div><b>Preview of Matched Forwarders: </b> <span id="num-matched-fwds"></span></div>
+        </div>
+
+        <!-- ==== -->
+        <!-- Body -->
+        <!-- ==== -->
+        <div class="modal-content">
+
+            <div class="modal-body">
+                <div class="container-fluid" id="edit-rule-modal-body">
+
+
+                     <!-- ===== -->
+                     <!-- Table -->
+                     <!-- ===== -->
+                     <table class="table table-chrome table-hover" id="edit-rule-table">
+
+                         <thead>
+                             <tr>
+                                 <th>
+                                    Forwarder ID
+                                 </th>
+                                 <th>
+                                    Last Known Event
+                                 </th>
+                             </tr>
+                         </thead>
+
+                         <tbody>
+                             <% for (var i = 0; i < forwardersMasterList.length; i++) { %>
+                                 <tr id="fwd-info-<%-forwardersMasterList[i].id%>" class="fwd-info" data-id=<%-forwardersMasterList[i].id%>>
+                                     <td><%-forwardersMasterList[i].id%></td>
+                                     <td><%-forwardersMasterList[i].latestTime%></td>
+                                 </tr>
+                             <% } %>
+                         </tbody>
+
+                     </table>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== -->
+        <!-- Footer -->
+        <!-- ====== -->
+        <div class="modal-footer">
+            <a href="#" data-dismiss="modal" aria-hidden="true" class="btn secondary cancel pull-left">Cancel</a>
+            <% if (isWizard) { %>
+                <a href="#" id="btnYes" class="btn btn-primary back"> < Back </a>
+                <a href="#" id="btnSave" class="btn btn-primary next"> Next > </a>
+            <% } else { %>
+                <a href="#" id="btnSave" class="btn btn-primary save">Save</a>
+            <% } %>
+        </div>
+
+    </div>
+</script>

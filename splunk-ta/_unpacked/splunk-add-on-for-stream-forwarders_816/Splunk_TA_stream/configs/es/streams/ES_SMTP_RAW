@@ -1,0 +1,729 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Email", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "smtp.event"
+    }, 
+    "fields": [
+        {
+            "aggType": "value", 
+            "desc": "MD5 hash of attach_content_decoded", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "attach_content_decoded_md5_hash", 
+            "term": "email.attach-content-decoded", 
+            "transformation": {
+                "type": "md5_hash"
+            }
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "MD5 hash of attach_content", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "attach_content_md5_hash", 
+            "term": "email.attach-content", 
+            "transformation": {
+                "type": "md5_hash"
+            }
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Attached file disposition, inline vs attachment", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "attach_disposition", 
+            "term": "email.attach-disposition"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Attachment name", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "attach_filename", 
+            "term": "email.attach-filename"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Attachment MIME size", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "attach_size", 
+            "term": "email.attach-size"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Size of decoded attached file in bytes", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "attach_size_decoded", 
+            "term": "email.attach-size-decoded"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the encoding of the attached content", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "attach_transfer_encoding", 
+            "term": "email.attach-transfer-encoding"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Content type of the sent attached file", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "attach_type", 
+            "term": "email.attach-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Transfer-encoding used on the e-mail message", 
+            "enabled": true, 
+            "name": "content_transfer_encoding", 
+            "term": "email.content-transfer-encoding"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Content type header value", 
+            "enabled": true, 
+            "name": "content_type", 
+            "term": "email.content-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Message date", 
+            "enabled": true, 
+            "name": "date", 
+            "term": "email.date"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server IP Address", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server port number", 
+            "enabled": true, 
+            "name": "dest_port", 
+            "term": "flow.s-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Duration of the SMTP session in microseconds", 
+            "enabled": true, 
+            "name": "duration", 
+            "term": "smtp.duration"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Received or sent file content type", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "file_type", 
+            "term": "email.file-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Flow Id", 
+            "enabled": true, 
+            "name": "flow_id", 
+            "term": "flow.flow-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the greeting message of the server", 
+            "enabled": true, 
+            "name": "greeting", 
+            "term": "email.greeting-message"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "User's login string", 
+            "enabled": true, 
+            "name": "login", 
+            "term": "email.login"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Command sent by the client", 
+            "enabled": true, 
+            "name": "method", 
+            "term": "email.method"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Mime-type of the e-mail message", 
+            "enabled": true, 
+            "name": "mime_type", 
+            "term": "email.mime-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Mime version header value", 
+            "enabled": true, 
+            "name": "mime_version", 
+            "term": "email.mime-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Unique identifier for the e-mail message", 
+            "enabled": true, 
+            "name": "msg_id", 
+            "term": "email.message-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from client to server", 
+            "enabled": true, 
+            "name": "packets_in", 
+            "term": "flow.cs-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from server to client", 
+            "enabled": true, 
+            "name": "packets_out", 
+            "term": "flow.sc-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Protocol stack of flow", 
+            "enabled": true, 
+            "name": "protocol_stack", 
+            "term": "flow.protocol-stack"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the IP address of the receiving host name", 
+            "enabled": true, 
+            "name": "received_by_ip", 
+            "term": "email.received-by-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the receiving host name", 
+            "enabled": true, 
+            "name": "received_by_name", 
+            "term": "email.received-by-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Date when the transport service relayed the message", 
+            "enabled": true, 
+            "name": "received_date", 
+            "term": "email.received-date"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the IP address of the sending host name", 
+            "enabled": true, 
+            "name": "received_from_ip", 
+            "term": "email.received-from-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the sending host name", 
+            "enabled": true, 
+            "name": "received_from_name", 
+            "term": "email.received-from-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the name of the server agent", 
+            "enabled": true, 
+            "name": "received_server_agent", 
+            "term": "email.received-server-agent"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the software used to send the email", 
+            "enabled": true, 
+            "name": "received_with", 
+            "term": "email.received-with"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Full address of email receiver (including cc and bcc receivers)", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "receiver", 
+            "term": "email.receiver"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of email receiver (included cc and bcc receivers)", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "receiver_alias", 
+            "term": "email.receiver-alias"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Domain of the recipient's email address", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "receiver_domain", 
+            "term": "smtp.receiver-domain"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "E-mail address of the message recipient", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "receiver_email", 
+            "term": "email.receiver-email"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Recipient's email address (used by RCPT TO method)", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "receiver_rcpt_to", 
+            "term": "smtp.receiver-rcpt-to"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Type of the email receiver", 
+            "enabled": true, 
+            "isList": true, 
+            "name": "receiver_type", 
+            "term": "email.receiver-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to start replying to a request", 
+            "enabled": true, 
+            "name": "reply_time", 
+            "term": "flow.sc-reply-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Email address to use in a reply for this message", 
+            "enabled": true, 
+            "name": "reply_to", 
+            "term": "email.reply-to"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the client to send a request", 
+            "enabled": true, 
+            "name": "request_time", 
+            "term": "flow.cs-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Return code", 
+            "enabled": true, 
+            "name": "response_code", 
+            "term": "smtp.response-code"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to send a response", 
+            "enabled": true, 
+            "name": "response_time", 
+            "term": "flow.sc-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Full address of email sender (alias followed by email address)", 
+            "enabled": true, 
+            "name": "sender", 
+            "term": "email.sender"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of the email sender", 
+            "enabled": true, 
+            "name": "sender_alias", 
+            "term": "email.sender-alias"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Domain of the sender's email address", 
+            "enabled": true, 
+            "name": "sender_domain", 
+            "term": "smtp.sender-domain"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Email address of the email sender", 
+            "enabled": true, 
+            "name": "sender_email", 
+            "term": "email.sender-email"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sender's email address (used by MAIL FROM method)", 
+            "enabled": true, 
+            "name": "sender_mail_from", 
+            "term": "smtp.sender-mail-from"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the name of the used smtp server", 
+            "enabled": true, 
+            "name": "sender_server", 
+            "term": "smtp.sender-server"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The software name used by the email server", 
+            "enabled": true, 
+            "name": "server_agent", 
+            "term": "smtp.server-agent"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The return code of the server", 
+            "enabled": true, 
+            "name": "server_response", 
+            "term": "email.server-response"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client IP Address", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client port number", 
+            "enabled": true, 
+            "name": "src_port", 
+            "term": "flow.c-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Starting time of SMTP session", 
+            "enabled": true, 
+            "name": "start_time", 
+            "term": "smtp.start-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Ending time of SMTP session", 
+            "enabled": true, 
+            "name": "stop_time", 
+            "term": "smtp.stop-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Subject of the e-mail message", 
+            "enabled": true, 
+            "name": "subject", 
+            "term": "email.subject"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+            "enabled": true, 
+            "name": "time_taken", 
+            "term": "flow.time-taken"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Transport layer protocol (udp or tcp)", 
+            "enabled": true, 
+            "name": "transport", 
+            "term": "flow.transport"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of the client software used", 
+            "enabled": true, 
+            "name": "useragent", 
+            "term": "email.user-agent"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+            "enabled": true, 
+            "name": "vlan_id", 
+            "term": "flow.vlan-id"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Contains the user_agent of the used mailer", 
+            "enabled": true, 
+            "name": "xmailer", 
+            "term": "email.xmailer"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from client to server", 
+            "enabled": false, 
+            "name": "ack_packets_in", 
+            "term": "flow.cs-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from server to client", 
+            "enabled": false, 
+            "name": "ack_packets_out", 
+            "term": "flow.sc-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Attached files content", 
+            "enabled": false, 
+            "isList": true, 
+            "name": "attach_content", 
+            "term": "email.attach-content"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Decoded attached files content", 
+            "enabled": false, 
+            "isList": true, 
+            "name": "attach_content_decoded", 
+            "term": "email.attach-content-decoded"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates client terminated connection with RST flag", 
+            "enabled": false, 
+            "name": "canceled", 
+            "term": "flow.canceled"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": false, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the client to the point of capture", 
+            "enabled": false, 
+            "name": "client_rtt", 
+            "term": "flow.cp-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the client to the point of capture", 
+            "enabled": false, 
+            "name": "client_rtt_packets", 
+            "term": "flow.cp-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the client to the point of capture", 
+            "enabled": false, 
+            "name": "client_rtt_sum", 
+            "term": "flow.cp-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP session server endpoint (IP address and TCP port)", 
+            "enabled": false, 
+            "name": "connection", 
+            "term": "flow.connection"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Message content", 
+            "enabled": false, 
+            "name": "content", 
+            "term": "email.content"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Data containing body", 
+            "enabled": false, 
+            "name": "content_body", 
+            "term": "email.content-body"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from client to server", 
+            "enabled": false, 
+            "name": "data_packets_in", 
+            "term": "flow.cs-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from server to client", 
+            "enabled": false, 
+            "name": "data_packets_out", 
+            "term": "flow.sc-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from client to server", 
+            "enabled": false, 
+            "name": "duplicate_packets_in", 
+            "term": "flow.cs-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from server to client", 
+            "enabled": false, 
+            "name": "duplicate_packets_out", 
+            "term": "flow.sc-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the request", 
+            "enabled": false, 
+            "name": "missing_packets_in", 
+            "term": "flow.cs-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the response", 
+            "enabled": false, 
+            "name": "missing_packets_out", 
+            "term": "flow.sc-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": false, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "User's password string", 
+            "enabled": false, 
+            "name": "password", 
+            "term": "email.password"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates server terminated connection with RST flag", 
+            "enabled": false, 
+            "name": "refused", 
+            "term": "flow.refused"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to acknowledge receipt of the request", 
+            "enabled": false, 
+            "name": "request_ack_time", 
+            "term": "flow.cs-ack-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the client to acknowledge receipt of the response", 
+            "enabled": false, 
+            "name": "response_ack_time", 
+            "term": "flow.sc-ack-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the server to the point of capture", 
+            "enabled": false, 
+            "name": "server_rtt", 
+            "term": "flow.ps-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the server to the point of capture", 
+            "enabled": false, 
+            "name": "server_rtt_packets", 
+            "term": "flow.ps-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the server to the point of capture", 
+            "enabled": false, 
+            "name": "server_rtt_sum", 
+            "term": "flow.ps-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to negotiate an SSL handshake", 
+            "enabled": false, 
+            "name": "ssl_time", 
+            "term": "flow.ssl-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL protocol version used for encryption, or undefined if not encrypted", 
+            "enabled": false, 
+            "name": "ssl_version", 
+            "term": "flow.ssl-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP handshake status (0=OK, 1=RESET, 2=IGNORED)", 
+            "enabled": false, 
+            "name": "tcp_status", 
+            "term": "flow.tcp-status"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+
+    ], 
+    "filters": {
+        "comparisons": [], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ES_SMTP_RAW", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "modifiedBy": "admin", 
+    "name": "Stream for ES Config Template - SMTP Raw", 
+    "protocolName": "SMTP", 
+    "sourcetype": "stream:smtp", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

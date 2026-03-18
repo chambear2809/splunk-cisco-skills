@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="smpp">
+    <Name>SMPP Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+      <Term id="smpp.event">
+          <Type>object</Type>
+          <Comment>Event representing smpp</Comment>
+      </Term>
+      <Term id="smpp.content">
+          <Type>blob</Type>
+          <Comment>Content of the Short Message</Comment>
+      </Term>
+      <Term id="smpp.receiver">
+          <Type>shortstring</Type>
+          <Comment>Receiver's address</Comment>
+      </Term>
+      <Term id="smpp.sender">
+          <Type>shortstring</Type>
+          <Comment>Sender's address</Comment>
+      </Term>
+  </Vocabulary>
+</CmConfig>

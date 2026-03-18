@@ -55,9 +55,13 @@ log_live_input_summary() {
     log "Live input status: total=${total}, enabled=${enabled}, disabled=${disabled}"
 }
 
-check_prereqs() {
+ensure_search_api_session() {
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
     SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk"; exit 1; }
+}
+
+check_prereqs() {
+    ensure_search_api_session
     if ! rest_check_app "$SK" "$SPLUNK_URI" "Splunk_TA_Cisco_Intersight"; then
         log "ERROR: Cisco Intersight TA not installed"
         exit 1
@@ -66,7 +70,10 @@ check_prereqs() {
 
 create_indexes() {
     log "Creating indexes..."
-    if rest_create_index "$SK" "$SPLUNK_URI" "intersight" "512000"; then
+    if ! is_splunk_cloud; then
+        ensure_search_api_session
+    fi
+    if platform_create_index "$SK" "$SPLUNK_URI" "intersight" "512000"; then
         log "  Index 'intersight' created or already exists"
     else
         log "  ERROR: Failed to create index 'intersight'"
@@ -237,9 +244,8 @@ enable_metrics_inputs() {
 }
 
 main() {
-    check_prereqs
-
     if $ENABLE_INPUTS; then
+        check_prereqs
         if [[ -z "${ACCOUNT}" || -z "${INDEX}" || -z "${INPUT_TYPE}" ]]; then
             log "ERROR: --enable-inputs requires --account, --index, and --input-type"
             exit 1
@@ -256,11 +262,12 @@ main() {
             *) log "ERROR: Unknown input type '${INPUT_TYPE}'. Use: audit_alarms, inventory, metrics, all"; exit 1 ;;
         esac
         log_live_input_summary
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "input changes")"
         exit 0
     fi
 
     if $MACROS_ONLY; then
+        check_prereqs
         create_macros
         exit 0
     fi
@@ -270,9 +277,11 @@ main() {
         exit 0
     fi
 
+    check_prereqs
     create_indexes
     create_macros
-    log "Setup complete. Restart Splunk to apply changes."
+    log "Setup complete."
+    log "$(log_platform_restart_guidance "index or macro changes")"
 }
 
 main

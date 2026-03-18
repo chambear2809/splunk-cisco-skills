@@ -1,0 +1,46 @@
+.global-ip-filters-page h5 {
+	padding-left: 15px;
+	font-weight: 200;
+}
+
+.global-ip-filters-page .dashboard-header {
+	margin-bottom: 20px;
+	margin-top: 16px;
+	padding-top: 0px;
+}
+
+#ip-addr-format-tooltip {
+	padding: 10px;
+	background-color: #f5f5f5;
+}
+
+#ip-addr-format-tooltip h4,
+#ip-addr-format-tooltip li {
+	margin-top: 0px;
+	font-weight: 100;
+	font-size: 12px;
+}
+
+#ip-addr-format-tooltip li {
+	margin-left: 20px;
+}
+
+#white-black-comparison-table {
+	margin-bottom: 0px;
+}
+
+#white-black-comparison-table td {
+	font-weight: 100;
+	font-size: 12px;
+}
+
+#toggle-help {
+	font-size: 16px;
+	vertical-align: middle;
+	cursor: pointer;
+}
+
+#help {
+	display:none;
+}
+

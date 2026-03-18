@@ -1,0 +1,237 @@
+{
+  "app": "Stream", 
+  "category": "Networking", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "igmp.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of the client in dot-quad notation", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IP address of the server in dot-quad notation", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IGMP message type",
+      "enabled": true, 
+      "name": "type",
+      "term": "igmp.type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IGMP message type string",
+      "enabled": true, 
+      "name": "type_string",
+      "term": "igmp.type-string"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IGMP checksum",
+      "enabled": true, 
+      "name": "checksum",
+      "term": "igmp.checksum"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Maximum allowed time before sending a response report in units of 1/10 second",
+      "enabled": true, 
+      "name": "max_resp_time",
+      "term": "igmp.max-resp-time"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IP multicast address",
+      "enabled": true, 
+      "name": "multicast_address",
+      "term": "igmp.multicast-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Resv, S and QRV fields",
+      "enabled": true, 
+      "name": "misc",
+      "term": "igmp.misc"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Querier's query interval code",
+      "enabled": true, 
+      "name": "qqic",
+      "term": "igmp.qqic"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Number of source addresses present in the query",
+      "enabled": true, 
+      "name": "num_sources",
+      "term": "igmp.num-sources"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Source IP unicast address",
+      "enabled": true, 
+      "isList": true,
+      "name": "source_address",
+      "term": "igmp.source-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Number of group records",
+      "enabled": true, 
+      "name": "num_groups",
+      "term": "igmp.num-groups"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Group record type",
+      "enabled": true, 
+      "isList": true,
+      "name": "group_record_type",
+      "term": "igmp.group-record-type"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Group record type string",
+      "enabled": true, 
+      "isList": true,
+      "name": "group_record_type_string",
+      "term": "igmp.group-record-type-string"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Length of auxiliary data field in the group record",
+      "enabled": true, 
+      "isList": true,
+      "name": "group_record_aux_data_len",
+      "term": "igmp.group-record-aux-data-len"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Number of source addresses present in the group record",
+      "enabled": true, 
+      "isList": true,
+      "name": "group_record_num_sources",
+      "term": "igmp.group-record-num-sources"
+    },
+    {
+      "aggType": "value", 
+      "desc": "IP multicast address in the group record",
+      "enabled": true, 
+      "isList": true,
+      "name": "group_record_multicast_address",
+      "term": "igmp.group-record-multicast-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Source IP unicast address in the group record",
+      "enabled": true, 
+      "isList": true,
+      "name": "group_record_source_address",
+      "term": "igmp.group-record-source-address"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Aux data in group record",
+      "enabled": false, 
+      "isList": true,
+      "name": "group_record_aux_data",
+      "term": "igmp.group-record-aux-data"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+   
+  ], 
+  "id": "igmp", 
+  "isReferenceStream": true, 
+  "name": "IGMP Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "IGMP", 
+  "sourcetype": "stream:igmp", 
+  "streamType": "event"
+}

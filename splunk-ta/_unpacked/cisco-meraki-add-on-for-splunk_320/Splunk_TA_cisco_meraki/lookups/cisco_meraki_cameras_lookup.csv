@@ -1,0 +1,7 @@
+meraki_event_type,action,object_category,change_type,result
+update_user_settings,modified,user_settings,update,modified
+motion_alert_schedule_applied,started,motion_alert_schedule,start,started
+motion_alert_schedule_removed,deleted,motion_alert_schedule,delete,deleted
+video_export_delete,deleted,video_export,delete,deleted
+schedule_edited,modified,schedule,update,modified
+schedule_applied,started,schedule,start,started

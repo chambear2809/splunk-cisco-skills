@@ -1,0 +1,82 @@
+<form version="1.1">
+  <label>Camera Data</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Camera Details</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:cameras" $orgid$ 
+| rename eventData.start as "Event Start Time", eventData.end as "Event End Time", deviceName as "Name", deviceSerial as "Serial", category as "Category" , description as "Description", type as "Type", networkId as "Network ID"
+| table "Name", "Serial","Category", "Network ID", "Description", "Type", "Event Start Time", "Event End Time"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:cameras" $orgid$ deviceName="$row.Name$" deviceSerial="$row.Serial$" category="$row.Category$" description="$row.Description$" type="$row.Type$" networkId="$row.Network ID$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Cameras Count By Network</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:cameras" $orgid$
+| stats count as Count by networkId
+| rename networkId as "Netrwork Id"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:cameras" $orgid$ networkId="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Camera Events by Type</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:cameras" $orgid$
+| stats count as Count by type
+| rename type as "Type"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:cameras" $orgid$ type="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+</form>

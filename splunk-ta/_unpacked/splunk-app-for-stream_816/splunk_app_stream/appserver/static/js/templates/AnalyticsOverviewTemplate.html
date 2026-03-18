@@ -1,0 +1,297 @@
+<script type="text/template">
+<div>
+<!-- ===== -->
+<!-- SETUP -->
+<!-- ===== -->
+<div id="setup"></div>
+
+<!-- ========== -->
+<!-- DASHBOARDS -->
+<!-- ========== -->
+<div class="dashboard-body container-fluid main-section-body" data-role="main" style="display:none" id="overview-dashboard">
+
+    <!-- ================ -->
+    <!-- Dashboard Header -->
+    <!-- ================ -->
+    <div>
+        <h2>Analytics Overview</h2>
+    </div>
+
+    <!-- =========== -->
+    <!-- Time Picker -->
+    <!-- =========== -->
+    <div class="fieldset">
+        <div class="input input-timerangepicker" id="timepicker">
+        </div>
+    </div>
+
+    <!-- ============= -->
+    <!-- App Analytics -->
+    <!-- ============= -->
+    <div id="app-analytics-wrapper">
+        <h3>
+            App Analytics
+            <span class="dashboard-link">
+                <a href="/en-US/app/splunk_app_stream/app_analytics">
+                    <span class="dashboard-link">App Analytics</span>
+                </a>
+            </span>
+            <span class="dashboard-link">
+                <a href="/en-US/app/splunk_app_stream/flow_visualization">
+                    <span class="dashboard-link">Flow Visualization</span>
+                </a>
+            </span>
+        </h3>
+    </div>
+
+    <div id="row1" class="dashboard-row">
+        <!-- Top Applications by Volume -->
+        <div id="panel1_1" class="dashboard-cell" style="width: 50%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element1_1" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Top Applications by Volume (Bytes)</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Flow Visualization -->
+        <div id="panel1_2" class="dashboard-cell" style="width: 50%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element1_2" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Flow Visualization</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============= -->
+    <!-- Web Analytics -->
+    <!-- ============= -->
+    <div id="web-analytics-wrapper">
+        <h3>
+            Web Analytics
+            <span class="dashboard-link">
+                <a href="/en-US/app/splunk_app_stream/http_activity">
+                    <span class="dashboard-link">HTTP Activity</span>
+                </a>
+            </span>
+            <span class="dashboard-link">
+                <a href="/en-US/app/splunk_app_stream/http_overview">
+                    <span class="dashboard-link">HTTP Overview</span>
+                </a>
+            </span>
+        </h3>
+    </div>
+
+    <div id="row2" class="dashboard-row">
+        <!-- Domain Traffic Overview -->
+        <div id="panel2_1" class="dashboard-cell" style="width: 50%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element2_1" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Web Traffic Overview</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Client Errors-->
+        <div id="panel2_2" class="dashboard-cell" style="width: 25%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                     <div id="element2_2" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Client Errors Breakdown</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Server Errors -->
+        <div id="panel2_3" class="dashboard-cell" style="width: 25%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element2_3" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Server Errors Breakdown</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================== -->
+    <!-- Database Analytics -->
+    <!-- ================== -->
+    <div>
+        <h3>
+            Database Analytics
+            <span class="dashboard-link">
+                <a href="/en-US/app/splunk_app_stream/database_metrics">
+                    <span class="dashboard-link">Database Activity</span>
+                </a>
+            </span>
+        </h3>
+    </div>
+
+    <div id="row3" class="dashboard-row">
+
+        <!-- Response Time by Sourcetype-->
+        <div id="panel3_1" class="dashboard-cell" style="width: 50%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element3_1" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Response Times</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Avg Response Times-->
+        <div id="panel3_2" class="dashboard-cell" style="width: 50%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element3_2" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Average Response Times</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============= -->
+    <!-- DNS Analytics -->
+    <!-- ============= -->
+    <div>
+        <h3>
+            DNS Analytics
+            <span class="dashboard-link">
+                <a href="/en-US/app/splunk_app_stream/dns_activity">
+                    <span class="dashboard-link">DNS Activity</span>
+                </a>
+            </span>
+            <span class="dashboard-link">
+                <a href="/en-US/app/splunk_app_stream/dns_overview">
+                    <span class="dashboard-link">DNS Overview</span>
+                </a>
+            </span>
+        </h3>
+    </div>
+
+    <div id="row4" class="dashboard-row">
+
+        <!-- DNS Queries-->
+        <div id="panel4_1" class="dashboard-cell" style="width: 50%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element4_1" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>DNS Queries</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Errors Over Time-->
+        <div id="panel4_2" class="dashboard-cell" style="width: 25%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element4_2" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Error Count</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Errors -->
+        <div id="panel4_3" class="dashboard-cell" style="width: 25%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element4_3" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Total Errors</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============= -->
+    <!-- SSL Analytics -->
+    <!-- ============= -->
+    <div>
+        <h3>
+            SSL Analytics
+            <span class="dashboard-link">
+                <a href="/en-US/app/splunk_app_stream/ssl_activity">
+                    <span class="dashboard-link">SSL Activity</span>
+                </a>
+            </span>
+        </h3>
+    </div>
+
+    <div id="row5" class="dashboard-row">
+
+        <!-- Top Queries-->
+        <div id="panel5_1" class="dashboard-cell" style="width: 50%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element5_1" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>SSL Activity by Common-name/Domain</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SSL Certificate Expiry-->
+        <div id="panel5_2" class="dashboard-cell" style="width: 50%;">
+            <div class="dashboard-panel clearfix">
+                <div class="panel-element-row">
+                    <div id="element5_2" class="dashboard-element single">
+                        <div class="panel-head">
+                            <h3>Certificates Closest to Expiry</h3>
+                        </div>
+                        <div class="panel-body"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+</div>
+</script>

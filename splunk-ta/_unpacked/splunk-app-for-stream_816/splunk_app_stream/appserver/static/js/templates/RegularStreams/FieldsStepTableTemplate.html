@@ -1,0 +1,64 @@
+<script type="text/template">
+    <table class="field-list table table-chrome table-hover">
+        <thead>
+            <tr>
+                <th class="enable-disable">Enable</th>
+                <% if (isAggregated) { %>
+                <th class="agg-type">Agg. Type</th>
+                <% } %>
+                <th class="name">Name</th>
+                <th class="description">Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% var regex = new RegExp(searchString, "i"); %>
+            <% for (var i = 0; i < stream.fields.length; i++) { %>
+                <% var field = stream.fields[i]; %>
+                <% if (regex.test(field.name) || regex.test(field.desc)) { %>
+                    <tr data-name="<%- field.name %>">
+                        <td class="enabled">
+                            <input class="field-status regular-checkbox"
+                                   type="checkbox"
+                                   <% if (field.enabled) { %> checked <% } %>
+                            />
+                        </td>
+
+                        <% if (isAggregated) { %>
+                        <td class="agg-type">
+                            <div class="toggle-btn-grp btn-group-radio btn-toggle">
+                                <% var category = terms.get(field.term).get('category') %>
+
+                                <% if (field.enabled) { %>
+                                    <% if (category === 'numeric' || category === 'string') { %>
+                                        <input type="radio" class="key" name="<%-field.name %>"<% if (_.isString(field.aggType)) { %> checked <% } %>/>
+                                        <label class="agg-type-label">Key</label>
+                                        <input type="radio" class="agg" name="<%-field.name %>" <% if (_.isArray(field.aggType)) { %> checked <% } %>/>
+                                        <label class="agg-type-label">Aggregated
+                                            <% if (_.isArray(field.aggType)) { %>
+                                                <a class="agg-methods" name="<%-field.name %>">(<%-field.aggType.length%>)</a>
+                                            <% } %>
+                                        </label>
+                                    <% } else { %>
+                                        <input type="radio" class="key" name="<%-field.name %>" checked/>
+                                        <label class="agg-type-label">Key</label>
+                                        <input type="radio" class="agg" name="<%-field.name %>" disabled/>
+                                        <label class="agg-type-label">Aggregated</label>
+                                    <% } %>
+                                <% } else { %>
+                                    <input type="radio" class="key" name="<%-field.name %>" checked disabled/>
+                                    <label class="agg-type-label disabled">Key</label>
+                                    <input type="radio" class="agg" name="<%-field.name %>" disabled/>
+                                    <label class="agg-type-label disabled">Aggregated</label>
+                                <% } %>
+                            </div>
+                        </td>
+                        <% } %>
+
+                        <td class="name"><%- field.name %></td>
+                        <td><%- field.desc %></td>
+                    </tr>
+                <% } %>
+            <% } %>
+        </tbody>
+    </table>
+</script>

@@ -1,0 +1,94 @@
+<form version="1.1">
+  <label>Wireless Device Packet Loss</label>
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Packet Loss By Network</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:wirelessdevicespacketlossbydevice" $orgid$ 
+| eval direction = mvappend("downstream", "upstream") 
+| mvexpand direction 
+| eval loss_percentage = if(direction="downstream", 'downstream.lossPercentage', 'upstream.lossPercentage') 
+| rename network.name as "Network" 
+| timechart span=1h avg(loss_percentage) as "Loss Percentage" by "Network"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Total Packets v/s Lost Packets</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:wirelessdevicespacketlossbydevice" $orgid$ 
+| eval direction = mvappend("Downstream", "Upstream") 
+| mvexpand direction 
+| eval total_packets = if(direction="Downstream", 'downstream.total', 'upstream.total') 
+| eval lost_packets = if(direction="Downstream", 'downstream.lost', 'upstream.lost') 
+| rename direction as "Direction" 
+| stats sum(total_packets) as "Total Packets" sum(lost_packets) as "Lost Packets" by "Direction"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Top Networks with High Packet Loss</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:wirelessdevicespacketlossbydevice" $orgid$ 
+| rename upstream.lost as upstream_loss ,downstream.lost as downstream_loss, upstream.total as upstream_total ,downstream.total as downstream_total 
+| eval avg_loss=((upstream_loss + downstream_loss) / (upstream_total+downstream_total)) * 100 
+| stats avg(avg_loss) as avg_loss by network.id, network.name 
+| eval avg_loss=round(avg_loss,2) 
+| where avg_loss &gt; 0 
+| sort - avg_loss 
+| rename network.name as "Network Name", avg_loss as "Average Loss" 
+| table "Network Name", "Average Loss"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+</form>

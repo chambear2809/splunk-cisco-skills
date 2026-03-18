@@ -1,0 +1,242 @@
+{
+  "app": "Stream", 
+  "category": "Network Management", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "snmp.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of the client in dot-quad notation", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of data packets sent from client to server", 
+      "enabled": false, 
+      "name": "data_packets_in", 
+      "term": "flow.cs-data-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": true, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IP address of the server in dot-quad notation", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of data packets sent from server to client", 
+      "enabled": false, 
+      "name": "data_packets_out", 
+      "term": "flow.sc-data-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": true, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+      "enabled": true, 
+      "name": "time_taken", 
+      "term": "flow.time-taken"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport layer protocol (udp or tcp)", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Community name", 
+      "enabled": true, 
+      "name": "community", 
+      "term": "snmp.community"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SNMP request type", 
+      "enabled": true, 
+      "name": "method", 
+      "term": "snmp.method"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of the user", 
+      "enabled": true, 
+      "name": "name", 
+      "term": "snmp.name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Object Identifier (deprecated by varbind_list)", 
+      "enabled": true, 
+      "name": "oid", 
+      "term": "snmp.oid"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Request Identifier", 
+      "enabled": true, 
+      "name": "request_id", 
+      "term": "snmp.request-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Size of raw value in bytes (deprecated)", 
+      "enabled": true, 
+      "name": "value_len", 
+      "term": "snmp.value-len"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "OID raw value (deprecated by varbind_list)", 
+      "enabled": true, 
+      "name": "value_raw", 
+      "term": "snmp.value-raw"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Object type (deprecated by varbind_list)", 
+      "enabled": true, 
+      "name": "value_type", 
+      "term": "snmp.value-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SNMP Version", 
+      "enabled": true, 
+      "name": "version", 
+      "term": "snmp.version"
+    },
+    {
+      "aggType": "value", 
+      "desc": "List of OID variable bindings in JSON format", 
+      "enabled": true, 
+      "name": "varbind_list", 
+      "term": "snmp.varbind-list"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "snmp", 
+  "isReferenceStream": true, 
+  "name": "SNMP Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "SNMP", 
+  "sourcetype": "stream:snmp", 
+  "streamType": "event"
+}

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="nfs">
+    <Locked>true</Locked>
+    <Name>NFS Protocol Vocabulary</Name>
+    <Term id="nfs.event">
+      <Type>object</Type>
+      <Comment>Event representing a NFS event</Comment>
+    </Term>
+    <Term id="nfs.content">
+      <Type>blob</Type>
+      <Comment>File content</Comment>
+    </Term>
+    <Term id="nfs.file-handle">
+      <Type>blob</Type>
+      <Comment>Unique identifier for a file</Comment>
+    </Term>
+    <Term id="nfs.symlink">
+      <Type>shortstring</Type>
+      <Comment>Fine name for symbolic link</Comment>
+    </Term>
+    <Term id="nfs.mount-point">
+      <Type>shortstring</Type>
+      <Comment>Directory where the filesystem is mounted</Comment>
+    </Term>
+    <Term id="nfs.path">
+      <Type>shortstring</Type>
+      <Comment>File path</Comment>
+    </Term>
+    <Term id="nfs.filename">
+      <Type>shortstring</Type>
+      <Comment>Accessed, written or read file name</Comment>
+    </Term>
+    <Term id="nfs.filesize">
+      <Type>uint64</Type>
+      <Comment>Size of the file</Comment>
+    </Term>
+    <Term id="nfs.gid">
+      <Type>uint32</Type>
+      <Comment>Identifier of the file owner's group</Comment>
+    </Term>
+    <Term id="nfs.mode">
+      <Type>shortstring</Type>
+      <Comment>Protection mode bits</Comment>
+    </Term>
+    <Term id="nfs.offset">
+      <Type>uint64</Type>
+      <Comment>Offset of the written/read file</Comment>
+    </Term>
+    <Term id="nfs.command">
+      <Type>shortstring</Type>
+      <Comment>Procedure or command set</Comment>
+    </Term>
+    <Term id="nfs.status">
+      <Type>shortstring</Type>
+      <Comment>Response status for a request</Comment>
+    </Term>
+    <Term id="nfs.type">
+      <Type>shortstring</Type>
+      <Comment>File type</Comment>
+    </Term>
+    <Term id="nfs.uid">
+      <Type>uint32</Type>
+      <Comment>Generic user Id</Comment>
+    </Term>
+    <Term id="nfs.version">
+      <Type>shortstring</Type>
+      <Comment>Used version</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

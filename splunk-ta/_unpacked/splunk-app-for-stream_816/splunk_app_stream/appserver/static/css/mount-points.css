@@ -1,0 +1,70 @@
+/*
+
+ #   #                    #
+ #   #                    #
+ #   #   ###    ###    ## #   ###   # ##
+ #####  #   #      #  #  ##  #   #  ##  #
+ #   #  #####   ####  #   #  #####  #
+ #   #  #      #   #  #  ##  #      #
+ #   #   ###    ####   ## #   ###   #
+
+*/
+
+#mount-points-page > .container-fluid {
+  padding: 0px;
+}
+
+#mount-points-page .top-wrapper {
+  font-weight:100;
+  font-size:24px;
+}
+
+#mount-points-page .top-header {
+  border-bottom: 1px solid #ccc;
+  /*padding:20px;*/
+}
+
+#mount-points-page .header-wrapper {
+  margin: 10px 20px 20px 20px;
+}
+
+#mount-points-config-button-panel {
+  float: right;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+#mount-point-count {
+  height: 50px;
+  line-height: 50px;
+  margin-left: 20px;
+}
+
+#mount-points-page .table-search {
+  margin-left:10px;
+}
+
+/*
+
+ #####         #       ##
+   #           #        #
+   #     ###   # ##     #     ###
+   #        #  ##  #    #    #   #
+   #     ####  #   #    #    #####
+   #    #   #  ##  #    #    #
+   #     ####  # ##    ###    ###
+
+*/
+
+#mount-point-table {
+  background-color: white;
+}
+
+#mount-point-table-body td {
+  padding: 7px 3px 2px 4px;
+}
+
+#mount-point-table-body td:first-child {
+  padding-left: 20px;
+}
+

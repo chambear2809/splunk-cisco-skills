@@ -1,0 +1,98 @@
+<script type="text/template">
+    <div id="edit-aggregation-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Edit Aggregation Functions for <%- field.name %></h4>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+                    <div id="edit-aggregation-guide">
+                      <span>Specify how you want to aggregate <%- field.name %>:</span>
+                    </div>
+
+                    <br />
+
+                    <div id="edit-aggregation-checkboxes">
+                        <% if (isNumeric) { %>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="sum" type="checkbox"
+                                  <% if (field.aggType.indexOf('sum') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">sum</span>
+                            </label>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="sumsq" type="checkbox"
+                                  <% if (field.aggType.indexOf('sumsq') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">sum squared</span>
+                            </label>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="max" type="checkbox"
+                                  <% if (field.aggType.indexOf('max') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">max</span>
+                            </label>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="min" type="checkbox"
+                                  <% if (field.aggType.indexOf('min') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">min</span>
+                            </label>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="mean" type="checkbox"
+                                  <% if (field.aggType.indexOf('mean') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">mean</span>
+                            </label>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="median" type="checkbox"
+                                  <% if (field.aggType.indexOf('median') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">median</span>
+                            </label>
+                        <% } %>
+
+                        <label>
+                            <input class="regular-checkbox agg-checkbox" id="mode" type="checkbox"
+                              <% if (field.aggType.indexOf('mode') !== -1) { %> checked <% } %>/>
+                            <span class="edit-aggregation-label">mode</span>
+                        </label>
+
+                        <% if (isNumeric) { %>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="stdev" type="checkbox"
+                                  <% if (field.aggType.indexOf('stdev') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">sample standard deviation</span>
+                            </label>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="stdevp" type="checkbox"
+                                  <% if (field.aggType.indexOf('stdevp') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">population standard deviation</span>
+                            </label>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="var" type="checkbox"
+                                  <% if (field.aggType.indexOf('var') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">sample variance</span>
+                            </label>
+                            <label>
+                                <input class="regular-checkbox agg-checkbox" id="varp" type="checkbox"
+                                  <% if (field.aggType.indexOf('varp') !== -1) { %> checked <% } %>/>
+                                <span class="edit-aggregation-label">population variance</span>
+                            </label>
+                        <% } %>
+
+                        <label>
+                            <input class="regular-checkbox agg-checkbox" id="dc" type="checkbox"
+                              <% if (field.aggType.indexOf('dc') !== -1) { %> checked <% } %>/>
+                            <span class="edit-aggregation-label">distinct count</span>
+                        </label>
+                        <label>
+                            <input class="regular-checkbox agg-checkbox" id="values" type="checkbox"
+                              <% if (field.aggType.indexOf('values') !== -1) { %> checked <% } %>/>
+                            <span class="edit-aggregation-label">distinct values</span>
+                        </label>
+                    </div>
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="#" data-dismiss="modal" aria-hidden="true" class="btn cancel">Cancel</a>
+                <a href="#" class="btn btn-primary save">Save</a>
+            </div>
+        </div>
+    </div>
+</script>

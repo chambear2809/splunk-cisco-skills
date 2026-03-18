@@ -1,0 +1,69 @@
+/* --- Compact Custom Tabs (Grey + Light Blue Theme) --- */
+
+.custom-nav-tabs {
+  border-bottom: 1px solid #d1d5db; /* light gray border */
+  margin-bottom: 10px;
+  padding-left: 0;
+  list-style: none;
+  text-align: left;
+}
+
+.custom-nav-tabs > li {
+  display: inline-block;
+  margin-right: 6px;
+}
+
+/* --- Default Tab Style --- */
+.custom-nav-tabs > li > a {
+  display: block;
+  width: 110px;                /* fixed width for consistent size */
+  height: 36px;                /* fixed height for consistent box size */
+  padding: 8px 0;
+  background-color: #e5e7eb;   /* light gray background */
+  color: #1f2937;              /* dark gray text */
+  font-size: 15px;
+  font-weight: 500;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.2s ease-in-out;
+  vertical-align: middle;
+  line-height: 20px;
+  outline: none;
+  box-shadow: none;
+}
+
+/* --- Hover Effect --- */
+.custom-nav-tabs > li > a:hover {
+  background-color: #90b395;   /* light blue on hover */
+  color: black;              /* navy blue text */
+  border-color: #90b395;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* --- Active Tab --- */
+.custom-nav-tabs > li.active > a {
+  background-color: #1A8929;   /* solid light blue */
+  color: white;                /* white text */
+  font-weight: 600;
+  border-color: #1A8929;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Optional: smooth edge on active tab bottom */
+.custom-nav-tabs > li.active > a::after {
+  content: '';
+  display: block;
+  background: #1A8929;
+  position: relative;
+  top: 5px;
+  border-radius: 0 0 4px 4px;
+  height: 2px;
+}
+
+.fancytree-node.fancytree-active {
+  background: #67968f !important;
+}

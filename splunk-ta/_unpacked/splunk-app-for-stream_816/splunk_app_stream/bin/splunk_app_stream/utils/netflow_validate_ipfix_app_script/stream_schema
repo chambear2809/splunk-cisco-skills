@@ -1,0 +1,309 @@
+{
+    "$schema": "http://json-schema.org/schema#",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "string"
+        },
+        "app": {
+            "type": "string"
+        },
+        "name": {
+            "type": "string"
+        },
+        "category": {
+            "type": "string"
+        },
+        "enabled": {
+            "type": "boolean"
+        },
+        "statsOnly": {
+            "type": "boolean"
+        },
+        "createDate": {
+            "type": "integer"
+        },
+        "expirationDate": {
+            "type": "integer"
+        },
+        "absoluteLatestTime": {
+            "type": "integer"
+        },
+        "latestEnableTime": {
+            "type": "integer"
+        },
+        "maxElapsedTime": {
+            "type": "integer"
+        },
+        "maxFlowsCaptured": {
+            "type": "integer"
+        },
+        "maxPacketsCaptured": {
+            "type": "integer"
+        },
+        "maxBytesCaptured": {
+            "type": "integer"
+        },
+        "extras": {
+            "type": "object",
+            "properties": {
+                "eventType": {
+                    "type": "string"
+                },
+                "interval": {
+                    "type": "integer"
+                },
+                "topLimit": {
+                    "type": "integer"
+                },
+                "topSortBy": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "eventType"
+            ]
+        },
+        "fields": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "aggType": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        ]
+                    },
+                    "desc": {
+                        "type": "string"
+                    },
+                    "enabled": {
+                        "type": "boolean"
+                    },
+                    "isList": {
+                        "type": "boolean"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "term": {
+                        "type": "string"
+                    },
+                    "transformation": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "regex"
+                                        ]
+                                    },
+                                    "value": {
+                                        "type": "string"
+                                    },
+                                    "format": {
+                                        "type": "string"
+                                    },
+                            	    "hashExtracted": {
+                                        "type": "boolean"
+                            	    },
+                            	    "hashExtractedSalt": {
+                                        "type": "string"
+                            	    },
+                                    "hashExtractedOffset": {
+                                        "type": "integer"
+                                    },
+                                    "hashExtractedLength": {
+                                        "type": "integer"
+                                    }
+                                },
+                                "required": [
+                                    "type",
+                                    "value"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "md5_hash"
+                                        ]
+                                    },
+                                    "hashLen": {
+                                        "type": "integer"
+                                    },
+                                    "hashOffset": {
+                                        "type": "integer"
+                                    },
+                                    "hashSalt": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "type"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "sha512_hash"
+                                        ]
+                                    },
+                                    "hashLen": {
+                                        "type": "integer"
+                                    },
+                                    "hashOffset": {
+                                        "type": "integer"
+                                    },
+                                    "hashSalt": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "type"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "hex"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "type"
+                                ]
+                            }
+                        ]
+                    }
+                },
+                "required": [
+                    "aggType",
+                    "name",
+                    "desc",
+                    "enabled",
+                    "term"
+                ]
+            }
+        },
+        "filters": {
+            "type": "object",
+            "properties": {
+                "comparisons": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "matchAllValues": {
+                                "type": "boolean"
+                            },
+                            "term": {
+                                "type": "string"
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "false",
+                                    "true",
+                                    "is-defined",
+                                    "is-not-defined",
+                                    "equals",
+                                    "not-equals",
+                                    "greater-than",
+                                    "less-than",
+                                    "greater-or-equal",
+                                    "less-or-equal",
+                                    "regex",
+                                    "not-regex",
+                                    "exact-match-primary",
+                                    "not-exact-match-primary",
+                                    "contains-primary",
+                                    "not-contains-primary",
+                                    "starts-with-primary",
+                                    "not-starts-with-primary",
+                                    "ends-with-primary",
+                                    "not-ends-with-primary",
+                                    "ordered-before-primary",
+                                    "not-ordered-before-primary",
+                                    "ordered-after-primary",
+                                    "not-ordered-after-primary",
+                                    "same-date-time",
+                                    "not-same-date-time",
+                                    "earlier-date-time",
+                                    "later-date-time",
+                                    "same-or-earlier-date-time",
+                                    "same-or-later-date-time",
+                                    "same-date",
+                                    "not-same-date",
+                                    "earlier-date",
+                                    "later-date",
+                                    "same-or-earlier-date",
+                                    "same-or-later-date",
+                                    "same-time",
+                                    "not-same-time",
+                                    "earlier-time",
+                                    "later-time",
+                                    "same-or-earlier-time",
+                                    "same-or-later-time"
+                                ]
+                            },
+                            "value": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "matchAllComparisons": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "isPacketStream": {
+            "type": "boolean"
+        },
+        "isReferenceStream": {
+            "type": "boolean"
+        },
+        "protocolName": {
+            "type": "string"
+        },
+        "sourcetype": {
+            "type": "string"
+        },
+        "streamType": {
+            "type": "string"
+        },
+        "createdBy": {
+            "type": "string"
+        }
+    },
+    "required": [
+        "id",
+        "app",
+        "name",
+        "category",
+        "enabled",
+        "extras",
+        "fields",
+        "sourcetype",
+        "streamType"
+    ]
+}

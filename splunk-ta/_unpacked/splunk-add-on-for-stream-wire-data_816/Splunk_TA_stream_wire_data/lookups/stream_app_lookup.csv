@@ -1,0 +1,11 @@
+sourcetype,app,protocol
+stream:smtp,smtp,smtp
+stream:imap,imap,imap
+stream:pop3,pop3,pop3
+stream:dhcp,dhcp,dhcp
+stream:http,http,http
+stream:mysql,mysql,mysql
+stream:tns,tns,tns
+stream:postgres,postgres,postgres
+stream:tds,tds,tds
+stream:dns,dns,dns

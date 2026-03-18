@@ -52,9 +52,13 @@ log_live_input_summary() {
     log "Live input status: total=${total}, enabled=${enabled}, disabled=${disabled}"
 }
 
-check_prereqs() {
+ensure_search_api_session() {
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
     SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk. Check credentials."; exit 1; }
+}
+
+check_prereqs() {
+    ensure_search_api_session
     if ! rest_check_app "${SK}" "${SPLUNK_URI}" "${APP_NAME}"; then
         log "ERROR: Cisco Meraki TA not found. Install the app first."
         exit 1
@@ -63,7 +67,10 @@ check_prereqs() {
 
 create_indexes() {
     log "Creating indexes..."
-    if rest_create_index "${SK}" "${SPLUNK_URI}" "meraki" "512000"; then
+    if ! is_splunk_cloud; then
+        ensure_search_api_session
+    fi
+    if platform_create_index "${SK}" "${SPLUNK_URI}" "meraki" "512000"; then
         log "  Index 'meraki' created or already exists."
     else
         log "ERROR: Failed to create index 'meraki'"
@@ -264,9 +271,8 @@ enable_all_inputs() {
 }
 
 main() {
-    check_prereqs
-
     if $ENABLE_INPUTS; then
+        check_prereqs
         INDEX="${INDEX:-meraki}"
         if [[ -z "${ACCOUNT}" || -z "${INPUT_TYPE}" ]]; then
             log "ERROR: --enable-inputs requires --account and --input-type"
@@ -287,12 +293,12 @@ main() {
             *) log "ERROR: Unknown input type '${INPUT_TYPE}'."; usage ;;
         esac
         log_live_input_summary
-        log "Restart Splunk to apply changes."
+        log "$(log_platform_restart_guidance "input changes")"
         exit 0
     fi
 
     create_indexes
-    log "Restart Splunk to apply changes."
+    log "$(log_platform_restart_guidance "index changes")"
 }
 
 main

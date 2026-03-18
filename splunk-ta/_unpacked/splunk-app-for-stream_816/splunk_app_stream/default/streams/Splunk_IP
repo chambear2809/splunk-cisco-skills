@@ -1,0 +1,189 @@
+{
+    "id": "Splunk_IP",
+    "filters": {
+        "comparisons": [],
+        "matchAllComparisons": true
+    },
+    "statsOnly": false,
+    "isReferenceStream": false,
+    "name": "Built-in stream populating Flow Visualization dashboard",
+    "aggregated": true,
+    "sourcetype": "stream:ip",
+    "enabled": true,
+    "category": "Networking",
+    "fields": [
+        {
+            "aggType": "key",
+            "term": "flow.s-ip",
+            "enabled": true,
+            "desc": "Server IP Address",
+            "name": "dest_ip"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.c-ip",
+            "enabled": true,
+            "desc": "Client IP Address",
+            "name": "src_ip"
+        },
+        {
+            "aggType": [
+                "sum"
+            ],
+            "term": "flow.bytes",
+            "enabled": true,
+            "desc": "The total number of bytes transferred",
+            "name": "bytes"
+        },
+        {
+            "aggType": [
+                "sum"
+            ],
+            "term": "flow.cs-packets",
+            "enabled": true,
+            "desc": "The total number of packets sent from client to server",
+            "name": "packets_in"
+        },
+        {
+            "aggType": [
+                "sum"
+            ],
+            "term": "flow.sc-packets",
+            "enabled": true,
+            "desc": "The total number of packets sent from server to client",
+            "name": "packets_out"
+        },
+        {
+            "aggType": [
+                "values"
+            ],
+            "term": "flow.flow-id",
+            "enabled": true,
+            "desc": "Flow Id",
+            "name": "flow_id"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.cs-bytes",
+            "enabled": false,
+            "desc": "The number of bytes sent from client to server",
+            "name": "bytes_in"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.sc-bytes",
+            "enabled": false,
+            "desc": "The number of bytes sent from server to client",
+            "name": "bytes_out"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.hostname",
+            "enabled": false,
+            "desc": "Hostname where flow was captured",
+            "name": "capture_hostname"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.sc-content",
+            "enabled": false,
+            "desc": "All raw payload content sent from server to client",
+            "name": "dest_content"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.s-mac",
+            "enabled": false,
+            "desc": "Server packets MAC address in hexadecimal format",
+            "name": "dest_mac"
+        },
+        {
+            "aggType": "key",
+            "term": "ip.fragment-count",
+            "enabled": false,
+            "desc": "Count of IP datagrams that are fragmented",
+            "name": "fragment_count"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.interface-name",
+            "enabled": false,
+            "desc": "Name of network interface",
+            "name": "network_interface"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.protocol",
+            "enabled": false,
+            "desc": "Layer 4 protocol name",
+            "name": "protocol"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.protocol-stack",
+            "enabled": false,
+            "desc": "Protocol stack of flow",
+            "name": "protocol_stack"
+        },
+        {
+            "aggType": "key",
+            "term": "ip.protoid",
+            "enabled": false,
+            "desc": "Upper layer protocol",
+            "name": "protoid"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.cs-content",
+            "enabled": false,
+            "desc": "All raw payload content sent from client to server",
+            "name": "src_content"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.c-mac",
+            "enabled": false,
+            "desc": "Client packets MAC address in hexadecimal format",
+            "name": "src_mac"
+        },
+        {
+            "aggType": "key",
+            "term": "ip.tos",
+            "enabled": false,
+            "desc": "Type of Service",
+            "name": "tos"
+        },
+        {
+            "aggType": "key",
+            "term": "ip.version",
+            "enabled": false,
+            "desc": "IP version",
+            "name": "version"
+        },
+        {
+            "aggType": "key",
+            "term": "flow.vlan-id",
+            "enabled": false,
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag",
+            "name": "vlan_id"
+        },
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+    ],
+    "streamType": "agg_event",
+    "app": "Stream",
+    "extras": {
+        "interval": 10,
+        "topLimit": 1000,
+        "eventType": "flow.ip-event",
+        "topSortBy": "count"
+    },
+    "_user": "nobody",
+    "_key": "Splunk_IP"
+}

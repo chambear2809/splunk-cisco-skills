@@ -1,0 +1,256 @@
+{
+  "app": "Stream", 
+  "category": "File Transfer", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "nfs.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+      "enabled": true, 
+      "name": "time_taken", 
+      "term": "flow.time-taken"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport layer protocol (udp or tcp)", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Procedure or command set", 
+      "enabled": true, 
+      "name": "command", 
+      "term": "nfs.command"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "File content", 
+      "enabled": true, 
+      "name": "content", 
+      "term": "nfs.content"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Unique identifier for a file", 
+      "enabled": false, 
+      "name": "file-handle", 
+      "term": "nfs.file-handle"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Mount point where the filesystem is mounted", 
+      "enabled": false, 
+      "name": "mount_point", 
+      "term": "nfs.mount-point"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "File path", 
+      "enabled": true, 
+      "name": "path", 
+      "term": "nfs.path"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Accessed, written or read file name", 
+      "enabled": true, 
+      "name": "filename", 
+      "term": "nfs.filename"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Size of the file", 
+      "enabled": true, 
+      "name": "filesize", 
+      "term": "nfs.filesize"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifier of the file owner's group", 
+      "enabled": true, 
+      "name": "gid", 
+      "term": "nfs.gid"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Protection mode bits", 
+      "enabled": true, 
+      "name": "mode", 
+      "term": "nfs.mode"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Offset of the written/read file", 
+      "enabled": true, 
+      "name": "offset", 
+      "term": "nfs.offset"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Response status for a request", 
+      "enabled": true, 
+      "name": "status", 
+      "term": "nfs.status"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "File type", 
+      "enabled": true, 
+      "name": "type", 
+      "term": "nfs.type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Generic user Id", 
+      "enabled": true, 
+      "name": "uid", 
+      "term": "nfs.uid"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Used version", 
+      "enabled": true, 
+      "name": "version", 
+      "term": "nfs.version"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "nfs", 
+  "isReferenceStream": true, 
+  "name": "NFS Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "NFS", 
+  "sourcetype": "stream:nfs", 
+  "streamType": "event"
+}

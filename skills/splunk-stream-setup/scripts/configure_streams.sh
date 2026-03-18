@@ -4,8 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
-# Derive Splunk Web URL from management URI (port 8000) for Stream app REST API
-SPLUNK_WEB_URL="${SPLUNK_WEB_URL:-${SPLUNK_URI/8089/8000}}"
+# Derive a default Splunk Web URL from the management URI.
+# Splunk Cloud exposes the app over standard HTTPS rather than port 8000.
+if is_splunk_cloud; then
+    SPLUNK_WEB_URL="${SPLUNK_WEB_URL:-${SPLUNK_URI/8089/443}}"
+else
+    SPLUNK_WEB_URL="${SPLUNK_WEB_URL:-${SPLUNK_URI/8089/8000}}"
+fi
 
 ENABLE_LIST=""
 DISABLE_LIST=""
@@ -267,7 +272,7 @@ main() {
         disable_streams
     fi
 
-    log "Restart Splunk to apply changes."
+    log "$(log_platform_restart_guidance "stream definition changes")"
 }
 
 main

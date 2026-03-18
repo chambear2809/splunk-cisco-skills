@@ -1,0 +1,120 @@
+<form version="1.1">
+  <label>Security Appliances</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Appliance Security Events</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:securityappliances" $orgid$ 
+| dedup occurredAt, deviceSerial
+|spath description
+| rename eventData.summary as Summary
+| eval Summary = if(isnull(Summary),"-",Summary)
+| rename clientId as "Client ID", deviceName as "Device Name", deviceSerial as "Device Serial",description as "Description", category as "Category" ,occurredAt as "Occured At" 
+| table "Client ID", "Device Name", "Device Serial","Description" ,"Summary", "Category" ,"Occured At"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:securityappliances" $orgid$ 
+| dedup occurredAt, deviceSerial
+|spath description
+| rename eventData.summary as Summary
+| eval Summary = if(isnull(Summary),"-",Summary)
+|search clientId="$row.Client ID$" deviceName="$row.Device Name$" deviceSerial="$row.Device Serial$" description="$row.Description$" Summary="$row.Summary$" category="$row.Category$" occurredAt="$row.Occured At$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Categories of Data</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:securityappliances" $orgid$
+| dedup occurredAt, deviceSerial
+| stats count as Count by category
+| sort - 0 Count
+| rename category as "Category"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:securityappliances" $orgid$ | dedup occurredAt, deviceSerial | search category="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Top Devices with IP Conflicts</title>
+      <table>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:securityappliances" category="ip_conflicts" $orgid$
+| dedup occurredAt, deviceSerial
+| stats count as Count by deviceName
+| rename deviceName as "Device Name"
+| sort - 0 Count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:securityappliances" category="ip_conflicts" $orgid$ | dedup occurredAt, deviceSerial | search deviceName="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Security Events Occurred by Time</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:securityappliances" $orgid$
+| dedup occurredAt, deviceSerial
+| timechart count as "Events Occured" span=1d</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.text">Occurred At</option>
+        <option name="charting.axisTitleY.text">Events Occurred</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:securityappliances" $orgid$ | dedup occurredAt, deviceSerial &amp;earliest=$earliest$&amp;latest=$latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+</form>

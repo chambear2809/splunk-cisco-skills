@@ -1,0 +1,236 @@
+{
+  "app": "Stream", 
+  "category": "Infrastructure", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "amqp.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "Major version of the protocol", 
+      "enabled": true, 
+      "name": "major_version", 
+      "term": "amqp.major-version"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Command launched", 
+      "enabled": true, 
+      "name": "method", 
+      "term": "amqp.method"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Minor version of the protocol", 
+      "enabled": true, 
+      "name": "minor_version", 
+      "term": "amqp.minor-version"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server response time (microseconds)", 
+      "enabled": true, 
+      "name": "response_time", 
+      "term": "amqp.response-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Revision version of the protocol used by the client.", 
+      "enabled": true, 
+      "name": "revision", 
+      "term": "amqp.revision"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Type of AMQP request.", 
+      "enabled": true, 
+      "name": "type", 
+      "term": "amqp.type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Class of AMQP request.", 
+      "enabled": true, 
+      "name": "class", 
+      "term": "amqp.class"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Major version of the protocol used by the server.", 
+      "enabled": true, 
+      "name": "server_major_version", 
+      "term": "amqp.server-major-version"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Minor version of the protocol used by the server.", 
+      "enabled": true, 
+      "name": "server_minor_version", 
+      "term": "amqp.server-minor-version"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Mode of AMQP exchange.", 
+      "enabled": true, 
+      "name": "exchange_type", 
+      "term": "amqp.exchange-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Virtual address used to route a message.", 
+      "enabled": true, 
+      "name": "routing_key", 
+      "term": "amqp.routing-key"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Identifier used to correlate the application.", 
+      "enabled": true, 
+      "name": "correlation_id", 
+      "term": "amqp.correlation-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport level protocol", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+
+  ], 
+  "id": "amqp", 
+  "isReferenceStream": true,  
+  "name": "AMQP Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "AMQP", 
+  "sourcetype": "stream:amqp", 
+  "streamType": "event"
+}

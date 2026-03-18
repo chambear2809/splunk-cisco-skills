@@ -1,0 +1,68 @@
+<script type="text/template">
+
+    <!-- ============ -->
+    <!-- Table Header -->
+    <!-- ============ -->
+    <div class="row search-wrapper">
+
+        <div style="float:left">
+            <!-- Desc-->
+            <span id="filters-table-desc">Create <%- name %>s for the fields.</span>
+            <!-- Search -->
+            <span class="search search-control">
+                <input type="text" class="input-medium search-query" placeholder="Search"/>
+                <a class="clear"><i class="icon-x-circle"></i></a>
+            </span>
+        </div>
+
+        <div style="float:right">
+            <!-- Match ALL/ANY -->
+            <span>Match <%- name[0].toUpperCase() + name.slice(1) %>s: </span>
+            <div class="btn-group btn-toggle btn-group-radio" id="match-all-aggregation-btns">
+                <button type="button"
+                        value="all"
+                        class="btn btn-lg <% if (stream.filters.matchAllComparisons) { %> active <% } %>">
+                    All
+                </button>
+                <button type="button"
+                        value="any"
+                        class="btn btn-lg <% if (!stream.filters.matchAllComparisons) { %> active <% } %>">
+
+                    Any
+                </button>
+            </div>
+            <!-- Create New Filter -->
+            <div class="btn" id='create-new-filter'>Create New <%- name[0].toUpperCase() + name.slice(1) %></div>
+        </div>
+
+    </div>
+
+    <!-- ===== -->
+    <!-- Table -->
+    <!-- ===== -->
+    <table id="filters" class="filter-list table table-chrome table-hover" style="margin-top: 10px;">
+
+    <thead>
+        <tr>
+            <th class="enable-disable">
+                Field Name
+            </th>
+            <th style="width: 10%">
+                Comparison
+            </th>
+            <th style="width: 60%">
+                Value
+            </th>
+            <th style="width: 20%">
+                Match All
+            </th>
+            <th class="add-to-filters">Actions</th>
+        </tr>
+    </thead>
+    <tbody id="filter-rows">
+        <!-- ================== -->
+        <!-- Table Rows Go Here -->
+        <!-- ================== -->
+    </tbody>
+    </table>
+</script>

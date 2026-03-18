@@ -1,0 +1,720 @@
+{
+    "aggregated": false, 
+    "app": "Stream", 
+    "category": "Web", 
+    "createdBy": "admin", 
+    "enabled": true, 
+    "extras": {
+        "eventType": "http.event"
+    }, 
+    "fields": [
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from client to server", 
+            "enabled": true, 
+            "name": "ack_packets_in", 
+            "term": "flow.cs-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of acknowledgement packets sent from server to client", 
+            "enabled": true, 
+            "name": "ack_packets_out", 
+            "term": "flow.sc-ack-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The sender's estimate of the amount of time since the response was generated at the origin server", 
+            "enabled": true, 
+            "name": "age", 
+            "term": "http.age"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of bytes transferred", 
+            "enabled": true, 
+            "name": "bytes", 
+            "term": "flow.bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from client to server", 
+            "enabled": true, 
+            "name": "bytes_in", 
+            "term": "flow.cs-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of bytes sent from server to client", 
+            "enabled": true, 
+            "name": "bytes_out", 
+            "term": "flow.sc-bytes"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address of the client in dot-quad notation", 
+            "enabled": true, 
+            "name": "c_ip", 
+            "term": "flow.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Hostname where flow was captured", 
+            "enabled": true, 
+            "name": "capture_hostname", 
+            "term": "flow.hostname"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt", 
+            "term": "flow.cp-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt_packets", 
+            "term": "flow.cp-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the client to the point of capture", 
+            "enabled": true, 
+            "name": "client_rtt_sum", 
+            "term": "flow.cp-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from client to server", 
+            "enabled": true, 
+            "name": "data_packets_in", 
+            "term": "flow.cs-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of data packets sent from server to client", 
+            "enabled": true, 
+            "name": "data_packets_out", 
+            "term": "flow.sc-data-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address of the server in dot-quad notation", 
+            "enabled": true, 
+            "name": "dest_ip", 
+            "term": "flow.s-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "dest_mac", 
+            "term": "flow.s-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Server port number", 
+            "enabled": true, 
+            "name": "dest_port", 
+            "term": "flow.s-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The HTTP status message returned to the client", 
+            "enabled": true, 
+            "name": "http_comment", 
+            "term": "http.comment"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "HTTP response content length", 
+            "enabled": true, 
+            "name": "http_content_length", 
+            "term": "http.content-length"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The HTTP method of the request (GET, POST, etc.)", 
+            "enabled": true, 
+            "name": "http_method", 
+            "term": "http.method"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Referer HTTP request header", 
+            "enabled": true, 
+            "name": "http_referrer", 
+            "term": "http.referer"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The User-Agent HTTP request header", 
+            "enabled": true, 
+            "name": "http_user_agent", 
+            "term": "http.useragent"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the request", 
+            "enabled": true, 
+            "name": "missing_packets_in", 
+            "term": "flow.cs-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of missing packet gaps detected within the response", 
+            "enabled": true, 
+            "name": "missing_packets_out", 
+            "term": "flow.sc-missing-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Name of network interface", 
+            "enabled": true, 
+            "name": "network_interface", 
+            "term": "flow.interface-name"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from client to server", 
+            "enabled": true, 
+            "name": "packets_in", 
+            "term": "flow.cs-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The total number of packets sent from server to client", 
+            "enabled": true, 
+            "name": "packets_out", 
+            "term": "flow.sc-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to start replying to a request", 
+            "enabled": true, 
+            "name": "reply_time", 
+            "term": "flow.sc-reply-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to acknowledge receipt of the request", 
+            "enabled": true, 
+            "name": "request_ack_time", 
+            "term": "flow.cs-ack-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the client to send a request", 
+            "enabled": true, 
+            "name": "request_time", 
+            "term": "flow.cs-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the client to acknowledge receipt of the response", 
+            "enabled": true, 
+            "name": "response_ack_time", 
+            "term": "flow.sc-ack-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took the server to send a response", 
+            "enabled": true, 
+            "name": "response_time", 
+            "term": "flow.sc-send-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Server HTTP response header", 
+            "enabled": true, 
+            "name": "server", 
+            "term": "http.server"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Average round trip time in microseconds from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt", 
+            "term": "flow.ps-rtt"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of round trip measurements from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt_packets", 
+            "term": "flow.ps-rtt-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Sum of all round trip time measurements from the server to the point of capture", 
+            "enabled": true, 
+            "name": "server_rtt_sum", 
+            "term": "flow.ps-rtt-sum"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Host HTTP request header", 
+            "enabled": true, 
+            "name": "site", 
+            "term": "http.host"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "IP address of the client in dot-quad notation. Contains the value of X-Forwarded-For header or equal to flow.c-ip is X-Forwarded-For is not set.", 
+            "enabled": true, 
+            "name": "src_ip", 
+            "term": "http.c-ip"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client packets MAC address in hexadecimal format", 
+            "enabled": true, 
+            "name": "src_mac", 
+            "term": "flow.c-mac"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Client port number", 
+            "enabled": true, 
+            "name": "src_port", 
+            "term": "flow.c-port"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "SSL protocol version used for encryption, or undefined if not encrypted", 
+            "enabled": true, 
+            "name": "ssl_version", 
+            "term": "flow.ssl-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The HTTP status code returned to the client", 
+            "enabled": true, 
+            "name": "status", 
+            "term": "http.status"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP handshake status (0=OK, 1=RESET, 2=IGNORED)", 
+            "enabled": true, 
+            "name": "tcp_status", 
+            "term": "flow.tcp-status"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+            "enabled": true, 
+            "name": "time_taken", 
+            "term": "flow.time-taken"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Page title, extracted from HTML content", 
+            "enabled": true, 
+            "name": "title", 
+            "term": "http.page-title"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Transport layer protocol (udp or tcp)", 
+            "enabled": true, 
+            "name": "transport", 
+            "term": "flow.transport"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The requested resource (including query)", 
+            "enabled": true, 
+            "name": "uri", 
+            "term": "http.uri"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The parameters portion of the requested resource", 
+            "enabled": true, 
+            "name": "uri_parm", 
+            "term": "http.uri-parm"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The requested resource (excluding query)", 
+            "enabled": true, 
+            "name": "uri_path", 
+            "term": "http.uri-stem"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The query portion of the requested resource", 
+            "enabled": true, 
+            "name": "uri_query", 
+            "term": "http.uri-query"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+            "enabled": true, 
+            "name": "vlan_id", 
+            "term": "flow.vlan-id"
+        }, 
+        {
+            "aggType": "key", 
+            "desc": "The Accept HTTP request header", 
+            "enabled": false, 
+            "name": "accept", 
+            "term": "http.accept"
+        }, 
+        {
+            "aggType": "key", 
+            "desc": "The set of natural languages that are preferred as a response to the request", 
+            "enabled": false, 
+            "name": "accept_language", 
+            "term": "http.accept-language"
+        }, 
+        {
+            "aggType": "key", 
+            "desc": "The Cookie HTTP request header", 
+            "enabled": false, 
+            "name": "cookie", 
+            "term": "http.cookie"
+        }, 
+        {
+            "aggType": "key", 
+            "desc": "All HTTP headers sent from server to client", 
+            "enabled": false, 
+            "name": "dest_headers", 
+            "term": "http.sc-headers"
+        }, 
+        {
+            "aggType": "key", 
+            "desc": "A urlencoded string representing all form data fields", 
+            "enabled": false, 
+            "name": "form_data", 
+            "term": "http.form-data"
+        }, 
+        {
+            "aggType": "key", 
+            "desc": "The Content-Type HTTP response header", 
+            "enabled": false, 
+            "name": "http_content_type", 
+            "term": "http.content-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Allow HTTP response header", 
+            "enabled": false, 
+            "name": "allow", 
+            "term": "http.allow"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "1 if the response was cached, 0 if it was not", 
+            "enabled": false, 
+            "name": "cached", 
+            "term": "http.cached"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates client terminated connection with RST flag", 
+            "enabled": false, 
+            "name": "canceled", 
+            "term": "flow.canceled"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "TCP session server endpoint (IP address and TCP port)", 
+            "enabled": false, 
+            "name": "connection", 
+            "term": "flow.connection"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The connection type desired by the sender for that particular connection", 
+            "enabled": false, 
+            "name": "connection_type", 
+            "term": "http.connection-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Information related to the disposition of the content present on the web page", 
+            "enabled": false, 
+            "name": "content_disposition", 
+            "term": "http.content-disposition"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The content encoding format", 
+            "enabled": false, 
+            "name": "content_encoding", 
+            "term": "http.content-encoding"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The natural language or languages of the intended audience for the enclosed entity", 
+            "enabled": false, 
+            "name": "content_language", 
+            "term": "http.content-language"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Content-Location HTTP response header", 
+            "enabled": false, 
+            "name": "content_location", 
+            "term": "http.content-location"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Directives that MUST be obeyed by all caching mechanisms from client to server", 
+            "enabled": false, 
+            "name": "cs_cache_control", 
+            "term": "http.cs-cache-control"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "HTTP request content length", 
+            "enabled": false, 
+            "name": "cs_content_length", 
+            "term": "http.cs-content-length"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Content-Type HTTP request header", 
+            "enabled": false, 
+            "name": "cs_content_type", 
+            "term": "http.cs-content-type"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The date and time at which the request was originated", 
+            "enabled": false, 
+            "name": "cs_date", 
+            "term": "http.cs-date"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Implementation specific directives from client to server", 
+            "enabled": false, 
+            "name": "cs_pragma", 
+            "term": "http.cs-pragma"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The protocol version that the client used", 
+            "enabled": false, 
+            "name": "cs_version", 
+            "term": "http.cs-version"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds from the last request packet to the last response packet", 
+            "enabled": false, 
+            "name": "data_center_time", 
+            "term": "flow.data-center-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "All HTTP payload content sent from server to client", 
+            "enabled": false, 
+            "name": "dest_content", 
+            "term": "http.sc-content"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from client to server", 
+            "enabled": false, 
+            "name": "duplicate_packets_in", 
+            "term": "flow.cs-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The number of duplicate packets sent from server to client", 
+            "enabled": false, 
+            "name": "duplicate_packets_out", 
+            "term": "flow.sc-duplicate-packets"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The current value of the entity tag for the requested variant", 
+            "enabled": false, 
+            "name": "etag", 
+            "term": "http.etag"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The date/time after which the response is considered stale", 
+            "enabled": false, 
+            "name": "expires", 
+            "term": "http.expires"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The X-Forwarded-For HTTP header. IP Address of client that initiated the request and subsequent proxies in a chain of proxies", 
+            "enabled": false, 
+            "name": "forward_address", 
+            "term": "http.forward-addr"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Location HTTP response header", 
+            "enabled": false, 
+            "name": "location", 
+            "term": "http.location"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Domain attribute of NTLM protocol", 
+            "enabled": false, 
+            "name": "ntlm_domain", 
+            "term": "http.ntlm-domain"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The User attribute of NTLM protocol", 
+            "enabled": false, 
+            "name": "ntlm_user", 
+            "term": "http.ntlm-user"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Workstation attribute of NTLM protocol", 
+            "enabled": false, 
+            "name": "ntlm_workstation", 
+            "term": "http.ntlm-workstation"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The name of uploaded file", 
+            "enabled": false, 
+            "name": "part_filename", 
+            "term": "http.part-filename"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Authentication type on the proxy (Basic - Digest - NTLM)", 
+            "enabled": false, 
+            "name": "proxy_auth", 
+            "term": "http.proxy-auth"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Login used for proxy authentication", 
+            "enabled": false, 
+            "name": "proxy_login", 
+            "term": "http.proxy-login"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Indicates server terminated connection with RST flag", 
+            "enabled": false, 
+            "name": "refused", 
+            "term": "flow.refused"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The request line exactly as it came from the client", 
+            "enabled": false, 
+            "name": "request", 
+            "term": "http.request"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Directives that MUST be obeyed by all caching mechanisms from server to client", 
+            "enabled": false, 
+            "name": "sc_cache_control", 
+            "term": "http.sc-cache-control"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The date and time at which the response was originated", 
+            "enabled": false, 
+            "name": "sc_date", 
+            "term": "http.sc-date"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Implementation specific directives from server to client", 
+            "enabled": false, 
+            "name": "sc_pragma", 
+            "term": "http.sc-pragma"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Set-Cookie HTTP response header", 
+            "enabled": false, 
+            "name": "set_cookie", 
+            "term": "http.set-cookie"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "All HTTP payload content sent from client to server", 
+            "enabled": false, 
+            "name": "src_content", 
+            "term": "http.cs-content"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "All HTTP headers sent from client to server", 
+            "enabled": false, 
+            "name": "src_headers", 
+            "term": "http.cs-headers"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Number of microseconds that it took to negotiate an SSL handshake", 
+            "enabled": false, 
+            "name": "ssl_time", 
+            "term": "flow.ssl-time"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The Transfer-Encoding HTTP response header", 
+            "enabled": false, 
+            "name": "transfer_encoding", 
+            "term": "http.transfer-encoding"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "The username as which the user has authenticated himself", 
+            "enabled": false, 
+            "name": "user", 
+            "term": "http.authuser"
+        }, 
+        {
+            "aggType": "value", 
+            "desc": "Authentication type used", 
+            "enabled": false, 
+            "name": "www_auth", 
+            "term": "http.www-auth"
+        },
+    	{
+      		"aggType": "value", 
+      		"desc": "VXLAN Network Identifier", 
+      		"enabled": true, 
+      		"name": "vxlan_id", 
+      		"term": "flow.vxlan-id"
+    	},
+        {
+          "aggType": "value",
+          "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+          "enabled": false,
+          "isList": true,
+          "name": "vlan_tags",
+          "term": "flow.vlan-tags"
+        }
+
+    ], 
+    "filters": {
+        "comparisons": [], 
+        "matchAllComparisons": true
+    }, 
+    "id": "ITSI_HTTP_Raw", 
+    "index": null, 
+    "isReferenceStream": false, 
+    "modifiedBy": "admin", 
+    "name": "Stream for ITSI Config Template - HTTP Raw", 
+    "protocolName": "HTTP", 
+    "sourcetype": "stream:http", 
+    "statsOnly": false, 
+    "streamType": "event"
+}

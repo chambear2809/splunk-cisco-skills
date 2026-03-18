@@ -1,0 +1,23 @@
+
+.dashboard-link {
+    font-size: 13px;
+    margin-left: 10px;
+}
+
+#overview-dashboard h2 {
+  font-weight: 200;
+  font-size: 24px;
+}
+
+#overview-dashboard h3 {
+  font-weight: 200;
+  font-size: 18px;
+}
+
+.dashboard-row {
+  margin-bottom: 30px;
+}
+
+#web-analytics-wrapper {
+  margin-top: 30px;
+}

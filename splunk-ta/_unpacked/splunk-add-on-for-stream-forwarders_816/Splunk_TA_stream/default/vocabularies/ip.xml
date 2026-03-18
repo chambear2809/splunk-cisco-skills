@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="ip">
+    <Name>IP Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="flow.ip-event">
+      <Type>object</Type>
+      <Comment>Event representing an IP flow</Comment>
+    </Term>
+    <Term id="ip.version">
+      <Type>uint8</Type>
+      <Comment>IP version</Comment>
+    </Term>
+    <Term id="ip.tos">
+      <Type>uint8</Type>
+      <Comment>Type of Service</Comment>
+    </Term>
+    <Term id="ip.protoid">
+      <Type>uint8</Type>
+      <Comment>Identifier of the upper layer protocol</Comment>
+    </Term>
+    <Term id="ip.fragment-count">
+      <Type>uint64</Type>
+      <Comment>Count of IP datagrams that are fragmented</Comment>
+    </Term>
+    <Term id="ip.fragment-offset">
+        <Type>uint16</Type>
+        <Comment>The fragment-offset value from fragmented IP packets</Comment>
+    </Term>
+    <Term id="ip.fragment-flags">
+        <Type>uint8</Type>
+        <Comment>The Fragmentation properties indicated by flags in the IPv4
+            packet header or the IPv6 Fragment header, respectively</Comment>
+    </Term>
+    <Term id="ip.id">
+        <Type>uint32</Type>
+        <Comment>Identification field in the IPv4 packet header or in the IPv6 Fragment header</Comment>
+    </Term>
+    <Term id="ip.ttl">
+        <Type>uint8</Type>
+        <Comment>The Time to Live (TTL) field in the IP packet</Comment>
+    </Term>
+    <Term id="ip.nxt-hdr">
+        <Type>uint8</Type>
+        <Comment>The value of the Next Header field of the IPv6 header</Comment>
+    </Term>
+    <Term id="ip.diff-serv-code-point">
+        <Type>uint8</Type>
+        <Comment>This value encodes the 6 bits of the Differentiated Services field</Comment>
+    </Term>
+    <Term id="ip.precedence">
+        <Type>uint8</Type>
+        <Comment>The IP Precedence value is encoded in the first 3 bits of the IPv4 TOS field or the IPv6 Traffic Class field, respectively. </Comment>
+    </Term>
+    <Term id="ip.packet-len">
+        <Type>uint32</Type>
+        <Comment>The length of the IP packet excluding lower layer encapsulations </Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

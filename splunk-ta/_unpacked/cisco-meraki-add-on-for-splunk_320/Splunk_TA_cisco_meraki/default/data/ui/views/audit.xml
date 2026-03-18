@@ -1,0 +1,83 @@
+<form version="1.1">
+  <label>Audit Data</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Total Changes</title>
+      <single>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:audit" $orgid$
+| dedup ts, adminId
+| stats count as "Total Changes"</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="drilldown">all</option>
+        <option name="height">251</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:audit" $orgid$ | dedup ts, adminId&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <title>Top 10 Pages</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:audit" $orgid$
+| dedup ts, adminId
+| stats count as "Count" by page
+| rename page as "Page"
+| sort - 10 Count</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">search?q=`meraki_index` sourcetype="meraki:audit" $orgid$ | dedup ts, adminId | search page="$click.value$"&amp;earliest=$time.earliest$&amp;latest=$time.latest$</link>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Audit Data</title>
+      <event>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:audit" $orgid$
+| dedup ts, adminId</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="list.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </event>
+    </panel>
+  </row>
+</form>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="database">
+    <Locked>true</Locked>
+    <Name>Base vocabulary for database protocols</Name>
+    <Term id="database.result-column-count">
+      <Type>uint64</Type>
+      <Comment>Column count in the result data set retrieved from server after a SQL query</Comment>
+    </Term>
+    <Term id="database.result-row-count">
+      <Type>uint32</Type>
+      <Comment>Row count in the result data set retrieved from server after a SQL query</Comment>
+    </Term>
+    <Term id="database.sql-error-code">
+      <Type>shortstring</Type>
+      <Comment>SQL error code</Comment>
+    </Term>
+    <Term id="database.sql-error-code-int">
+      <Type>uint32</Type>
+      <Comment>SQL error code</Comment>
+    </Term>
+    <Term id="database.bind-variable-id">
+      <Type>shortstring</Type>
+      <Comment>Query parameter (Bind Variable) identifier within a SQL request.</Comment>
+    </Term>
+    <Term id="database.bind-variable-type">
+      <Type>shortstring</Type>
+      <Comment>Data type of a SQL query parameter (Bind Variable)</Comment>
+    </Term>
+    <Term id="database.bind-variable-value">
+      <Type>blob</Type>
+      <Comment>Query parameter (Bind Variable) value in the associated format</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

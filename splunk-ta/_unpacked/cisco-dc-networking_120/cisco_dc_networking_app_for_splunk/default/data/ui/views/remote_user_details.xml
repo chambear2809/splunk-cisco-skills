@@ -1,0 +1,21 @@
+<form version="1.1">
+  <label>Remote User</label>
+  
+  <row>
+    <panel>
+      <table>
+        <title>User Details (Host: $display_apic_host$)</title>
+        <search>
+          <query>| tstats `summariesonly` latest(classInfo.loginDomain) AS "Login Domain"  latest(classInfo.actualCiscoAvPair) AS ciscoAvPair latest(classInfo.unixUserId) AS "Unix User-Id" latest(classInfo.loginTime) AS "Login Time" latest(classInfo.sequenceNumber) AS "Sequence Number"  from datamodel=Cisco_DCN_Systems where classInfo.component=aaaRemoteUser groupby classInfo.name, classInfo.apic_host | rename classInfo.apic_host as apic_host | search $formed_apic_host$ | rename classInfo.name AS User | fields - classInfo.apic_host</query>
+          <earliest>$time_token.earliest$</earliest>
+          <latest>$time_token.latest$</latest>
+        </search>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">false</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+</form>

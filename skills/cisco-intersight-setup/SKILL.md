@@ -13,6 +13,17 @@ description: >-
 
 Automates the **Cisco Intersight Add-On for Splunk** (`Splunk_TA_Cisco_Intersight` v3.1.0).
 
+## Package Model
+
+Install the original vendor archive from `splunk-ta/` as-is:
+
+- `cisco-intersight-add-on-for-splunk_310.tgz`
+
+For Splunk Cloud, install that archive with ACS and then use this skill to
+configure the account, inputs, macros, and validation over search-tier REST.
+Any `splunk-ta/_unpacked/` copy is review-only and not part of the normal
+workflow.
+
 ## Agent Behavior — Credentials
 
 **The agent must NEVER ask for passwords, API keys, or secrets in chat.**
@@ -39,13 +50,15 @@ The agent may freely ask for non-secret values: account names, hostnames, client
 
 ## Environment
 
-All scripts operate entirely via the Splunk REST API and can run from any host with
-network access to the Splunk management port (8089). No local Splunk installation is
-required.
+Setup and validation use the Splunk search-tier REST API and can run from any
+host with network access to the Splunk management port (`8089`). In Splunk
+Cloud, app installation, index creation, and restarts are handled through ACS
+instead of the search-tier REST endpoints.
 
 | Item | Value |
 |------|-------|
-| Management API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Search-tier API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs (`SPLUNK_PLATFORM` is only an override for hybrid runs) |
 | TA app name | `Splunk_TA_Cisco_Intersight` |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/cisco-intersight-setup/scripts/` (relative to repo root) |
@@ -83,6 +96,7 @@ bash skills/cisco-intersight-setup/scripts/setup.sh
 
 Creates one index and updates the search macro. No `sudo` required when running
 as the `splunk` user.
+In Splunk Cloud, the setup script creates this index through ACS.
 
 | Index | Macro | Purpose | Max Size |
 |-------|-------|---------|----------|
@@ -128,10 +142,11 @@ bash scripts/setup.sh --enable-inputs \
 | `metrics` | 2 (device metrics, network metrics) | `intersight` |
 | `all` | 7 (all of the above) | `intersight` |
 
-### Step 4: Restart Splunk
+### Step 4: Restart If Required
 
-New indexes require a restart to activate. Restart via the Splunk UI, CLI on the
-server, or the REST API (scripts will prompt when needed).
+On Splunk Enterprise, restart Splunk after new index creation.
+On Splunk Cloud, check `acs status current-stack` and only run
+`acs restart current-stack` when ACS reports `restartRequired=true`.
 
 ### Step 5: Validate
 
@@ -172,7 +187,8 @@ bash scripts/load_mcp_tools.sh
 
 1. **OAuth2 authentication**: Intersight uses Client ID + Client Secret (not
    username/password). The TA's REST handler encrypts the secret automatically.
-2. **Splunk restart required**: New indexes are not available until after restart.
+2. **Restart behavior differs by platform**: Enterprise requires a Splunk
+   restart after new index creation. Splunk Cloud uses ACS restart checks.
 3. **No sudo needed**: Scripts run fine as the `splunk` OS user.
 4. **SSL verification**: The `ssl_validation` setting defaults to `true` in
    `splunk_ta_cisco_intersight_settings.conf`.

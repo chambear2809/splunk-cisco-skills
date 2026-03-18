@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CmConfig xmlns="http://purl.org/cloudmeter/config" version="8.1.6">
+  <Vocabulary id="postgres">
+    <Name>ProstgreSQL Protocol Vocabulary</Name>
+    <Locked>true</Locked>
+    <Term id="postgres.event">
+      <Type>object</Type>
+      <Comment>Event representing a PostgreSQL event</Comment>
+    </Term>
+    <Term id="postgres.auth-type">
+      <Type>shortstring</Type>
+      <Comment>Authentication method requested by the server</Comment>
+    </Term>
+    <Term id="postgres.dbname">
+      <Type>shortstring</Type>
+      <Comment>Database name</Comment>
+    </Term>
+    <Term id="postgres.error">
+      <Type>shortstring</Type>
+      <Comment>Error message</Comment>
+    </Term>
+    <Term id="postgres.login">
+      <Type>shortstring</Type>
+      <Comment>User's login string</Comment>
+    </Term>
+    <Term id="postgres.password">
+      <Type>shortstring</Type>
+      <Comment>User's password string</Comment>
+    </Term>
+    <Term id="postgres.proto-version">
+      <Type>shortstring</Type>
+      <Comment>Protocol version</Comment>
+    </Term>
+    <Term id="postgres.query">
+      <Type>longstring</Type>
+      <Comment>Query sent</Comment>
+    </Term>
+    <Term id="postgres.server-version">
+      <Type>shortstring</Type>
+      <Comment>Server version</Comment>
+    </Term>
+  </Vocabulary>
+</CmConfig>

@@ -1,0 +1,4 @@
+meraki_event_type,result
+poe_budget_change,modified
+psu_insert,modified
+port_bounce,modified

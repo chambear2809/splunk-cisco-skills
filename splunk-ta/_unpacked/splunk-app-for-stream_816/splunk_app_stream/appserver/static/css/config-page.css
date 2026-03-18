@@ -1,0 +1,294 @@
+/*
+Make checkboxes with '.required' and '.not-our-stream' act disabled, without actually disabling
+them, so that we can detect when they're clicked on.
+*/
+.regular-checkbox.required, .regular-checkbox.not-our-stream {
+    cursor: not-allowed;
+}
+
+/*
+Make the checkboxes for required fields a little fainter than non-required fields.
+'.required' always implies checked, but we're explicitly including it to override .regular-checkbox:checked
+I'm not changing the styling for '.not-our-stream' checkboxes because that class applies to all fields on a page,
+so there's no need to contrast neighboring enabled and disabled checkboxes, and the default styling for a
+checkbox already looks disabled.
+*/
+.regular-checkbox.required:checked {
+    /* original colors
+    background-color: #e9ecee;
+    border-color: #adb8c0;
+    */
+    border-color: #ccc;
+}
+
+.regular-checkbox.required:checked:after {
+    /* original color
+    color: #99a1a7;
+    */
+    color: #ccc;
+}
+
+#app-secondary-layout .stream-header {
+    margin: 10px 0px 10px 0px;
+}
+
+#app-secondary-layout .stream-header .row {
+    font-size: 12px;
+}
+
+#app-secondary-layout .stream-title {
+    font-size: 18px;
+    margin-bottom: 5px;
+}
+
+#app-secondary-layout .stream-description {
+    clear: both;
+    font-size: 12px;
+    margin-bottom: 10px;
+}
+
+#app-secondary-layout .streams-list-link {
+    cursor: pointer;
+    color: #5379af;
+    margin-bottom: 20px;
+}
+
+#app-secondary-layout .stream-title-wrapper{
+    float:left;
+    width:67%;
+    overflow:hidden;
+}
+
+#app-secondary-layout .stream-config-button-panel {
+    float: right;
+    overflow: hidden;
+}
+
+#app-secondary-layout .row {
+    margin-left: 0px;
+}
+
+#app-secondary-layout .field-label {
+    width: 100px !important;
+}
+
+#app-secondary-layout .dashboard-panel.stream-fields-panel {
+    margin-left: -20px;
+    margin-right: -20px;
+}
+
+#app-secondary-layout #stream-enabled.active {
+    color: #65a637;
+}
+
+#app-secondary-layout #stream-disabled.active {
+    color: #e2001a;
+}
+
+#app-secondary-layout #stream-stats-only.active {
+    color: #ec7133;
+}
+
+#app-secondary-layout .row .icon-alert {
+    font-size: larger;
+}
+
+#app-secondary-layout #fields button.active {
+    color: #333;
+    background-image: none;
+    background-color: rgba(83, 121, 175, 0.2);
+}
+
+#app-secondary-layout #fields .field-disabled {
+    opacity: 0.8;
+}
+
+#app-secondary-layout #fields .field-disabled button {
+    cursor: not-allowed;
+}
+
+#app-secondary-layout .edit-filters {
+    margin-left:10px;
+}
+
+/* Search */
+
+#app-secondary-layout #stream .search-wrapper {
+    padding: 10px 10px 5px 20px;
+}
+
+#app-secondary-layout #stream .search-control {
+    width: 172px;
+}
+
+#filters-table-desc, #fields-table-desc {
+    width: 160px;
+    margin-top: 3px;
+}
+
+#create-new-filter, #extract-new-field {
+    margin: 0px 20px 0px 40px;
+}
+
+/*
+Table CSS
+*/
+
+th.header {
+    cursor: pointer;
+}
+
+th.header:after {
+    content: "\2195"; /* up and down arrows */
+    font-family: "Splunk Icons";
+    color: #bbb;
+    padding-left: 5px;
+}
+
+th.headerSortUp:after {
+    content: "\21A7"; /* down arrow */
+    color: black;
+}
+
+th.headerSortDown:after {
+    content: "\21A5"; /* up arrow */
+    color: black;
+}
+
+/*
+
+Top X fields
+
+*/
+.agg-interval-label, .topx-fields-label {
+    display:inline-block;
+    margin-right: 3px;
+}
+
+#agg-controls .time-interval, #topLimitInput {
+    margin: 1px 2px 0px -3px;
+    height: 15px;
+    width: 40px;
+}
+
+input.error{
+    border: 1px solid #d85d3c;
+    border-radius: 2px;
+    box-shadow: 0px 0px 4px #d85d3c;
+}
+
+#topSortBySelection {
+    margin-left: 2px;
+    width: 110px;
+    margin-bottom: 0px;
+}
+
+.centered-button {
+    margin-top:-5px;
+}
+
+/*
+Based on "C:\Program Files\Splunk\share\splunk\search_mrsparkle\exposed\css\build\pages\search-bootstrap.min.css"
+(ultimately from "C:\Program Files\Splunk\share\splunk\search_mrsparkle\exposed\less\pages\search-bootstrap.less")
+*/
+
+#app-secondary-layout #stream .search {
+    position: relative;
+    margin-left: 20px;
+    margin-bottom: 0;
+}
+
+#app-secondary-layout #stream .search input {
+    -webkit-border-radius: 10px;
+    -moz-border-radius: 10px;
+    border-radius: 10px;
+    margin-bottom: 0;
+    height: 20px;
+    line-height: 20px;
+    padding: 0 10px;
+}
+
+#app-secondary-layout #stream .search .clear {
+    font-size: 18px;
+    color: #999999;
+    vertical-align: middle;
+    position: relative;
+    left: -22px;
+}
+
+#app-secondary-layout .regular-checkbox:checked:after {
+    left: 2px;
+}
+
+#app-secondary-layout #individual-config {
+    min-height:0px;
+}
+
+td {
+    word-break: break-word;
+}
+
+/*
+
+Nav Tabs
+
+*/
+
+#fields-tab:after,
+#fields-tab:before,
+#filters-tab:after,
+#filters-tab:before {
+    bottom: -1px;
+}
+
+
+/*
+                #                           #               #
+ ####           #                           #               #
+ #             ###                         ###              #
+ ###    #  #    #     # #     ###    ###    #      ##     ###
+ #       ##     # #   ## #   #  #   #       # #   # ##   #  #
+ #       ##     # #   #      #  #   #       # #   ##     #  #
+ ####   #  #     #    #       ####   ###     #     ###    ###
+
+ */
+
+.field-edit, .extracted-field-edit {
+    height: 16px;
+    position:relative;
+    top:-3px;
+}
+
+#content-extraction-modal .ce-field > * {
+    width: 70%;
+    float: left;
+}
+
+#content-extraction-modal .ce-field #extraction-match-btn-group {
+    padding-bottom: 9px;
+    /* overwrite 70% above to prevent button misclick */
+    width: 90px;
+}
+
+#content-extraction-modal .ce-field #extraction-hash-btn-group {
+    padding-bottom: 9px;
+    /* overwrite 70% above to prevent button misclick */
+    width: 90px;
+}
+
+/* content-extraction modal: align text to right */
+#content-extraction-modal .row-fluid .span4  {
+    text-align:right;
+    padding-right:10px;
+    position:relative;
+    top: 4px;
+}
+
+
+#extraction-match-btn-group .btn {
+    outline: 0;
+}
+
+#extraction-hash-btn-group .btn {
+    outline: 0;
+}

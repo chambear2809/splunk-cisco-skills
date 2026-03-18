@@ -1,0 +1,52 @@
+<script id="mount-point-editor-modal-template" type="text/template">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <% if (create) { %>
+                <h4 class="modal-title">Add File Server and Mount Point</h4>
+                <% } else { %>
+                <h4 class="modal-title">Edit Mount Point</h4>
+                <% } %>
+            </div>
+            <div class="modal-body">
+                <div class="container-fluid">
+                     <!-- =========== -->
+                     <!-- File Server -->
+                     <!-- =========== -->
+                     <div class="row-fluid">
+                        <div class="span4">File Server: </div>
+                        <div class="span8 ce-field">
+                             <input type="text"
+                                    class="file-server"
+                                    placeholder="required"
+                                    value="<%- mountPointModel.id %>"
+                                    <% if (! create) { %> disabled <% } %> >
+                        </div>
+                     </div>
+
+                     <!-- =========== -->
+                     <!-- Mount Point -->
+                     <!-- =========== -->
+                     <div class="row-fluid">
+                        <div class="span4">Mount Point: </div>
+                        <div class="span8 ce-field">
+                             <input type="text"
+                                    class="mount-point"
+                                    placeholder="required"
+                                    value="<%- mountPointModel.mount_point %>"
+                                    >
+                        </div>
+                     </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="#" data-dismiss="modal" aria-hidden="true" class="btn cancel">Cancel</a>
+                <% if (create) { %>
+                <a href="#" class="btn btn-primary save">Create</a>
+                <% } else { %>
+                <a href="#" class="btn btn-primary save">Save</a>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</script>

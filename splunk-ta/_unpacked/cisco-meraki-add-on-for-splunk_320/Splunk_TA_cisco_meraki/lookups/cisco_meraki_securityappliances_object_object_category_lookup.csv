@@ -1,0 +1,6 @@
+meraki_event_type,object,object_category
+ids_start,intrusion detection,security service
+ids_update,intrusion detection,policy
+web_cache_started,securityappliance,web_cache
+web_cache_stopped,securityappliance,web_cache
+vpn_registry_change,securityappliance,site_to_site_vpn

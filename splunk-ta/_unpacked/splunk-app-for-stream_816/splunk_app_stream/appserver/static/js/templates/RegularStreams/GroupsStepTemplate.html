@@ -1,0 +1,25 @@
+<div class="groups-step">
+    <div class="step-subheading">
+        <%- stepTitle %>
+        <div class="step-subsubheading">
+            Select the forwarder groups that must use this stream.
+        </div>
+    </div>
+    <div class="controls">
+    <% for (var i = 0; i < availableGroups.length; i++) { %>
+        <% var group = availableGroups.models[i]; %>
+        <% var id = group.get('id'); %>
+        <% var description = group.get('description'); %>
+        <div class="group">
+            <input data-id="<%- id %>" class="regular-checkbox"
+                   type="checkbox"
+                   <% if (_(selectedGroupIds).contains(id)) { %> checked="checked" <% } %>
+            />
+            <span class="control-label"><%- id %></span>
+            <div class="field-explanation">
+                <%- description %>
+            </div>
+        </div>
+    <% } %>
+    </div>
+</div>

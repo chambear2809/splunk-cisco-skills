@@ -13,6 +13,17 @@ description: >-
 Automates the **Cisco Enterprise Networking for Splunk Platform**
 (`cisco-catalyst-app` v3.0.0).
 
+## Package Model
+
+Install the original vendor archive from `splunk-ta/` as-is:
+
+- `cisco-enterprise-networking-for-splunk-platform_310.tar.gz`
+
+For Splunk Cloud, install that archive with ACS and then use this skill to
+configure macros, saved searches, acceleration, and validation over search-tier
+REST. Any `splunk-ta/_unpacked/` copy is review-only and not part of the normal
+workflow.
+
 This is a **visualization app** — it provides dashboards and saved searches but
 does not collect data. Data collection is handled by the companion
 **Cisco Catalyst Add-on** (`TA_cisco_catalyst`). Use the
@@ -33,13 +44,15 @@ The agent may freely ask for non-secret values: index names, macro settings, etc
 
 ## Environment
 
-All scripts operate entirely via the Splunk REST API and can run from any host with
-network access to the Splunk management port (8089). No local Splunk installation is
-required.
+Setup and validation use the Splunk search-tier REST API and can run from any
+host with network access to the Splunk management port (`8089`). In Splunk
+Cloud, stack-level restarts are handled through ACS instead of the search-tier
+REST endpoints.
 
 | Item | Value |
 |------|-------|
-| Management API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Search-tier API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs (`SPLUNK_PLATFORM` is only an override for hybrid runs) |
 | TA app name | `cisco-catalyst-app` |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/cisco-enterprise-networking-setup/scripts/` (relative to repo root) |
@@ -94,6 +107,10 @@ bash skills/cisco-enterprise-networking-setup/scripts/setup.sh --accelerate
 
 Enables acceleration on the `Cisco_Catalyst_App` data model for faster
 dashboard loading.
+
+If Splunk Cloud later reports `restartRequired=true`, use
+`acs restart current-stack` instead of trying to restart the deployment through
+the search-tier REST API.
 
 ### Step 4: Validate
 

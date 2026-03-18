@@ -1,0 +1,58 @@
+<script id="streams-list-template" type="text/template">
+
+        <!-- ====== -->
+        <!-- Search -->
+        <!-- ====== -->
+        <div class="ephem-stream-search">
+            <span class="title">Stream Buckets</span>
+            <div class="ephem-stream-docs">
+
+                Ephemeral Streams give users of integrated Splunk apps the ability to schedule stream data capture for a
+                user-defined period of time. <br>Users configure and schedule ephemeral stream capture from inside
+                the UI of the integrated app. Ephemeral streams are always clones of default streams.
+                <br>
+                <a href="http://docs.splunk.com/Documentation/StreamApp/latest/User/ConfigureStreams#Support_for_ephemeral_streams">Learn more.</a>
+            </div>
+            <div class="subtitle-bar">
+
+                <div class="ephemeral-bulk-edit btn-combo">
+
+                    <a class="dropdown-toggle btn-pill" href="#">Bulk Edit<span class="caret"></span></a>
+
+                    <div class="dropdown-menu dropdown-menu-narrow streams-bulk-edit-menu">
+                        <div class="arrow"></div>
+                        <ul>
+                            <li><a href="#" id="bulkEnableGroup">Enable Selected Groups</a></li>
+                            <li><a href="#" id="bulkDisableGroup">Disable Selected Groups</a></li>
+                            <li><a href="#" id="bulkDeleteGroup">Delete Selected Groups</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <span>
+                    <div class="ephemeral-page-search">
+                        <input type="text" class="input-medium search-query" placeholder="Search" id="ephem-search" value="<%- searchString %>"/>
+                        <a class="clear"><i class="icon-x-circle"></i></a>
+                    </div>
+                </span>
+
+            </div>
+        </div>
+
+        <!-- ===== -->
+        <!-- Table -->
+        <!-- ===== -->
+        <table class="table table-chrome table-hover" id="ephemeral-streams-table" style="width: 400;">
+
+           <!-- ~~~~~~~~~~~~~~~~~~ -->
+
+           <!-- Template goes here -->
+
+           <!-- ~~~~~~~~~~~~~~~~~~ -->
+
+        </table>
+
+    </div>
+
+</script>
+

@@ -1,0 +1,1179 @@
+
+<dashboard version="2" theme="dark">
+    <label>Chassis</label>
+    <description>Gain comprehensive insights into network performance including utilization, congestion, and error rates for Chassis related Network Objects within IMM, Standalone and Unified Edge targets. This dashboard leverages both Inventory and Network Metrics data sources to deliver a unified, correlated view of network health and performance across your infrastructure.</description>
+    <definition><![CDATA[
+{
+    "visualizations": {
+        "viz_RHNg7sxE": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_evbDgF3H"
+            },
+            "title": "Utilization % per port",
+            "showProgressBar": true,
+            "description": "This panel shows how much bandwidth each network port in the chassis is using. It skips internal or unused ports, so you only see real traffic. This helps you quickly spot which ports are heavily used and if there might be any network slowdowns."
+        },
+        "viz_tCkRBBzI": {
+            "type": "splunk.bar",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "showSplitSeries": false
+            },
+            "dataSources": {
+                "primary": "ds_Tcau3P6l"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "eth_transmit_util_chassis",
+                                "key": "row.Server Name.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Ethernet Transmit utilization per Server (Sum)",
+            "showProgressBar": true,
+            "description": "This panel displays the total Ethernet transmit utilization per server within the chassis, using the network_io_transmit metric. It helps identify server-wise outbound traffic patterns, providing insights into network load distribution and potential hotspots across connected servers."
+        },
+        "viz_akPvXIo8": {
+            "type": "splunk.bar",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true
+            },
+            "dataSources": {
+                "primary": "ds_weyuWeLm"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "eth_receive_util_chassis",
+                                "key": "row.Server Name.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Ethernet Receive utilization per Server (Sum)",
+            "showProgressBar": true,
+            "description": "This panel displays the total Ethernet receive utilization per server within the chassis, using the network_io_receive metric. It helps identify server-wise outbound traffic patterns, providing insights into network load distribution and potential hotspots across connected servers."
+        },
+        "viz_cBTTp4FW": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_efqgDcPA"
+            },
+            "title": "Ethernet Transmit utilization per Server (Sum): $eth_transmit_util_chassis$",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        },
+        "viz_h8S5bFsR": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "none",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_IwnIVVeg"
+            },
+            "title": "Ethernet Receive utilization per Server (Sum): $eth_receive_util_chassis$",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        },
+        "viz_q3avs5o2": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "cell",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_q6zouYNl"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "transmit_ifm_uplink_chassis",
+                                "key": "row._event_id.value"
+                            },
+                            {
+                                "token": "transmit_ifm_uplink_chassis_name",
+                                "key": "row.Port Name.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Transmit utilization in % per IFM uplink port",
+            "showProgressBar": true,
+            "description": "This panel shows the transmit utilization percentage for each IFM uplink port (iom_uplink role), based on the network_bandwidth_utilization_transmit metric. It helps monitor uplink performance from IO Modules, highlighting heavily utilized ports and aiding in bandwidth planning and congestion analysis."
+        },
+        "viz_JCqWwMxb": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "cell",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_Hy2lNdPz"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "receive_ifm_uplink_chassis",
+                                "key": "row._event_id.value"
+                            },
+                            {
+                                "token": "receive_ifm_uplink_chassis_name",
+                                "key": "row.Port Name.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Receive utilization in % per IFM uplink port",
+            "showProgressBar": true,
+            "description": "This panel shows the receive utilization percentage for each IFM uplink port (iom_uplink role), based on the network_bandwidth_utilization_receive metric. It helps monitor uplink performance from IO Modules, highlighting heavily utilized ports and aiding in bandwidth planning and congestion analysis."
+        },
+        "viz_NcrWwvk6": {
+            "type": "splunk.line",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "legendDisplay": "top"
+            },
+            "dataSources": {
+                "primary": "ds_98Ezcz4z"
+            },
+            "title": "Transmit utilization in % per IFM uplink port: $transmit_ifm_uplink_chassis_name$",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        },
+        "viz_h20KpzL2": {
+            "type": "splunk.line",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "legendDisplay": "top"
+            },
+            "dataSources": {
+                "primary": "ds_afdRi8OK"
+            },
+            "title": "Receive utilization in % per IFM uplink port: $receive_ifm_uplink_chassis_name$",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        },
+        "viz_QOied80k": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "cell",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_bt38kHA4"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "transmit_ifm_downlink_chassis_name",
+                                "key": "row.Port Name.value"
+                            },
+                            {
+                                "token": "transmit_ifm_downlink_chassis",
+                                "key": "row._event_id.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Transmit utilization in % per IFM downlink port",
+            "showProgressBar": true,
+            "description": "This panel displays the transmit utilization percentage for each IFM downlink port, specifically those with roles backplane_port and host_port, using the network_bandwidth_utilization_transmit metric. It helps assess traffic load from server-facing links, ensuring optimal downlink performance and identifying potential bottlenecks."
+        },
+        "viz_wjI8Eex0": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "cell",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_CF9Tavbn"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "receive_ifm_downlink_chassis_name",
+                                "key": "row.Port Name.value"
+                            },
+                            {
+                                "token": "receive_ifm_downlink_chassis",
+                                "key": "row._event_id.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Receive utilization in % per IFM downlink port",
+            "showProgressBar": true,
+            "description": "This panel displays the receive utilization percentage for each IFM downlink port, specifically those with roles backplane_port and host_port, using the network_bandwidth_utilization_receive metric. It helps assess traffic load from server-facing links, ensuring optimal downlink performance and identifying potential bottlenecks."
+        },
+        "viz_dhKQcPOk": {
+            "type": "splunk.line",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "legendDisplay": "top"
+            },
+            "dataSources": {
+                "primary": "ds_Ai8snlrL"
+            },
+            "title": "Transmit utilization in % per IFM downlink port: $transmit_ifm_downlink_chassis_name$",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        },
+        "viz_B23MKWni": {
+            "type": "splunk.line",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "legendDisplay": "top"
+            },
+            "dataSources": {
+                "primary": "ds_5zGvVlB4"
+            },
+            "title": "Receive utilization in % per IFM downlink port: $receive_ifm_downlink_chassis_name$",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        },
+        "viz_BEzG8Zev": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "cell",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_KnhLZ50W"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_transmit_congestion_chassis",
+                                "key": "row._hwchassis.value"
+                            },
+                            {
+                                "token": "clicked_transmit_congestion_chassis_name",
+                                "key": "row.Port Name.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Congestion - Transmit Pause Frames",
+            "showProgressBar": true
+        },
+        "viz_xL4WPjTX": {
+            "type": "splunk.line",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "yAxisTitleText": "KB",
+                "yAxisTitleVisibility": "hide"
+            },
+            "dataSources": {
+                "primary": "ds_YQECnIkl"
+            },
+            "title": "Transmit Pause Frames per selected port: '$clicked_transmit_congestion_chassis_name$'",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        },
+        "viz_HudSblva": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "cell",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_6L97ZD2H"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_receive_congestion_chassis",
+                                "key": "row._hwchassis.value"
+                            },
+                            {
+                                "token": "clicked_receive_congestion_chassis_name",
+                                "key": "row.Port Name.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Receive Pause Frames",
+            "showProgressBar": true
+        },
+        "viz_mqEB7yWt": {
+            "type": "splunk.line",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "yAxisTitleText": "KB",
+                "yAxisTitleVisibility": "hide"
+            },
+            "dataSources": {
+                "primary": "ds_usNr7m3b"
+            },
+            "title": "Receive Pause Frames per selected port: '$clicked_receive_congestion_chassis_name$'",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        },
+        "viz_wliAi4z8": {
+            "type": "splunk.table",
+            "options": {
+                "drilldown": "row",
+                "showInternalFields": false,
+                "count": 5
+            },
+            "dataSources": {
+                "primary": "ds_vAEZbxmV"
+            },
+            "eventHandlers": [
+                {
+                    "type": "drilldown.setToken",
+                    "options": {
+                        "tokens": [
+                            {
+                                "token": "clicked_errors_chassis",
+                                "key": "row._hwchassis.value"
+                            },
+                            {
+                                "token": "clicked_errors_name_chassis",
+                                "key": "row.Port Name.value"
+                            }
+                        ]
+                    }
+                }
+            ],
+            "title": "Errors - Overview",
+            "showProgressBar": true
+        },
+        "viz_V0m4GKJi": {
+            "type": "splunk.line",
+            "options": {
+                "yAxisAbbreviation": "off",
+                "y2AxisAbbreviation": "off",
+                "showRoundedY2AxisLabels": false,
+                "legendTruncation": "ellipsisMiddle",
+                "showY2MajorGridLines": true,
+                "xAxisLabelRotation": -45,
+                "xAxisTitleText": "Timestamp",
+                "xAxisTitleVisibility": "hide",
+                "yAxisTitleText": "KB",
+                "yAxisTitleVisibility": "hide"
+            },
+            "dataSources": {
+                "primary": "ds_UKbrjWPT"
+            },
+            "title": "Errors per selected port: '$clicked_errors_name_chassis$'",
+            "showProgressBar": true,
+            "hideWhenNoData": true
+        }
+    },
+    "dataSources": {
+        "ds_MRht5eW9": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats values(cisco_intersight.cisco_intersight_network.network_domain_name) as DomainName \n         values(cisco_intersight.cisco_intersight_network.network_domain_id) as DomainId \n  from datamodel=Cisco_Intersight \n  where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_domain_name=*\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n  by cisco_intersight.cisco_intersight_network.network_domain_id, \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| rename DomainName as \"event.DomainName\", DomainId as \"event.DomainId\"\n| table event.DomainName, event.DomainId",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Select Domains search"
+        },
+        "ds_LU3nqIRB": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats values(cisco_intersight.cisco_intersight_network.network_chassis) as Chassis\n  from datamodel=Cisco_Intersight \n  where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$), cisco_intersight.cisco_intersight_network.network_chassis!=null\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n  by cisco_intersight.cisco_intersight_network.network_domain_id, cisco_intersight.cisco_intersight_network.network_chassis, cisco_intersight.cisco_intersight_network.network_account_name\n| dedup Chassis\n| rex field=Chassis \"/api/v1/equipment/Chasses/(?<chassis_id>[^/]+)\"\n| join type=left chassis_id [ | inputlookup cisco_intersight_equipment_chasses | where splunk_managed_lifecycle == \"PRESENT\" | rename Moid as chassis_id, Name as chassis_name | table chassis_id, chassis_name ]\n| table Chassis, chassis_name",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Select Chassis search"
+        },
+        "ds_evbDgF3H": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly` count\n       avg(\"cisco_intersight.cisco_intersight_network.network_bandwidth_receive_utilization_avg\") as total_nura,\n       max(\"cisco_intersight.cisco_intersight_network.network_bandwidth_receive_utilization_max\") as total_nurmx,\n       avg(\"cisco_intersight.cisco_intersight_network.network_bandwidth_transmit_utilization_avg\") as total_nuta,\n       max(\"cisco_intersight.cisco_intersight_network.network_bandwidth_transmit_utilization_max\") as total_nutmx\n       from datamodel=Cisco_Intersight\n       where nodename=cisco_intersight.cisco_intersight_network\n       AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n       AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" IN ($select_domain$)\n       AND cisco_intersight.cisco_intersight_network.network_chassis != null\n       AND \"cisco_intersight.cisco_intersight_network.network_chassis\" IN ($select_chassis$)\n       AND NOT \"cisco_intersight.cisco_intersight_network.network_port_role\" IN (\"unconfigured\", \"server_pc\", \"fabric_pc\", \"host_pc\", \"vethernet\", \"vfc\", \"vnic\", \"vhba\", \"eth_uplink_pc\")\n       by \"cisco_intersight.cisco_intersight_network.network_domain_name\",\n          \"cisco_intersight.cisco_intersight_network.network_domain_id\",\n          \"cisco_intersight.cisco_intersight_network.network_host_name\",\n          \"cisco_intersight.cisco_intersight_network.network_id\",\n          \"cisco_intersight.cisco_intersight_network.network_chassis\",\n          \"cisco_intersight.cisco_intersight_network.network_chassis_number\",\n          \"cisco_intersight.cisco_intersight_network.network_name\", \n          \"cisco_intersight.cisco_intersight_network.network_port_role\"\n          \"cisco_intersight.cisco_intersight_network.network_account_moid\",\n          \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| where \"$show_zero_values$\"=\"true\" \n   OR (round(total_nura * 100, 2) > 0 \n       and round(total_nurmx * 100, 2) > 0 \n       and round(total_nuta * 100, 2) > 0 \n       and round(total_nutmx * 100, 2) > 0)\n\n| eval total_nura = round(total_nura * 100, 2) . \"%\"\n| eval total_nurmx = round(total_nurmx * 100, 2) . \"%\"\n| eval total_nuta = round(total_nuta * 100, 2) . \"%\"\n| eval total_nutmx = round(total_nutmx * 100, 2) . \"%\"\n\n| eval 'cisco_intersight.cisco_intersight_network.network_chassis_number' = coalesce('cisco_intersight.cisco_intersight_network.network_chassis_number', \"\")\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_id\" \"/(?<Moid>[^/]+)$\"\n| eval _key='cisco_intersight.cisco_intersight_network.network_account_moid' + \"_\" + Moid\n\n| join type=left _key [\n    | inputlookup cisco_intersight_ether_hostports | where splunk_managed_lifecycle == \"PRESENT\"\n    | append [| inputlookup cisco_intersight_ether_networkports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | append [| inputlookup cisco_intersight_ether_physicalports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | fields _key PortId Dn OperSpeed OperState PortChannelId Role SwitchId\n]\n\n| rename \"cisco_intersight.cisco_intersight_network.network_domain_name\" as \"Domain Name\", \n         \"cisco_intersight.cisco_intersight_network.network_domain_id\" as event.DomainId, \"cisco_intersight.cisco_intersight_network.network_id\" as event_id, \"cisco_intersight.cisco_intersight_network.network_chassis_number\" as \"Chassis Number\", \"cisco_intersight.cisco_intersight_network.network_name\" as Name, \"cisco_intersight.cisco_intersight_network.network_port_role\" as \"Port Role\",\n         total_nura as \"Avg receive Utilization\", total_nuta as \"Avg Transmit Utilization\", total_nurmx as \"Max receive Utilization\", total_nutmx as \"Max transmit Utilization\", \"SwitchId\" as \"FI\"\n\n| table \"FI\", \"Chassis Number\", \"Port Role\", Name, Dn, OperSpeed, OperState, \"Avg Transmit Utilization\", \"Max transmit Utilization\", \"Avg receive Utilization\", \"Max receive Utilization\"\n| sort \"Port Role\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Chassis Utilization - Utilization _ per port search"
+        },
+        "ds_Tcau3P6l": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats `cisco_intersight_summariesonly`\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n    from datamodel=Cisco_Intersight\n    where nodename = cisco_intersight.cisco_intersight_network\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" IN ($select_domain$)\n        AND cisco_intersight.cisco_intersight_network.network_chassis!=null\n        AND \"cisco_intersight.cisco_intersight_network.network_chassis\" IN ($select_chassis$)\n        AND \"cisco_intersight.cisco_intersight_network.network_server_id\" != \"\"\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"vnic\"\n    by \"cisco_intersight.cisco_intersight_network.network_server_id\",\n       \"cisco_intersight.cisco_intersight_network.network_domain_id\",\n       \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| rename \n    \"cisco_intersight.cisco_intersight_network.network_domain_id\" as event.DomainId\n\n| search cisco_intersight.cisco_intersight_network.network_server_id=\"*Blades*\"\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_server_id\" \".*/(?<server_id>[^/]+)$\"\n\n| join type=left server_id [\n    | inputlookup cisco_intersight_compute_physicalsummaries | where splunk_managed_lifecycle == \"PRESENT\"\n    | rename \"Moid\" as server_id, \"Name\" as server_name\n]\n\n| where \"$show_zero_values$\"=\"true\" OR (total_nits != 0)\n\n| eval \"Transmit ($data_unit_transmit$)\" = `cisco_intersight_bytes_to_given_unit(total_nits,$data_unit_transmit$)`\n| sort server_name\n| rename server_name as \"Server Name\"\n| table \"Server Name\", \"Transmit ($data_unit_transmit$)\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Ethernet Transmit utilization per Server _Sum_ 1 search"
+        },
+        "ds_weyuWeLm": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats `cisco_intersight_summariesonly`\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n    from datamodel=Cisco_Intersight\n    where nodename = cisco_intersight.cisco_intersight_network\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" IN ($select_domain$)\n        AND cisco_intersight.cisco_intersight_network.network_chassis!=null\n        AND \"cisco_intersight.cisco_intersight_network.network_chassis\" IN ($select_chassis$)\n        AND \"cisco_intersight.cisco_intersight_network.network_server_id\" != \"\"\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"vnic\"\n    by \"cisco_intersight.cisco_intersight_network.network_server_id\",\n       \"cisco_intersight.cisco_intersight_network.network_domain_id\",\n       \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| rename\n    \"cisco_intersight.cisco_intersight_network.network_server_id\" as server_id,\n    \"cisco_intersight.cisco_intersight_network.network_domain_id\" as event.DomainId\n\n| eval server_id = mvindex(split(server_id, \"/\"), -1)\n\n| join type=left server_id [\n    | inputlookup cisco_intersight_compute_physicalsummaries | where splunk_managed_lifecycle == \"PRESENT\"\n    | rename \"Moid\" as server_id, \"Name\" as server_name\n]\n\n| where \"$show_zero_values$\"=\"true\" OR (total_nirs != 0)\n\n| eval \"Receive ($data_unit_receive$)\" = `cisco_intersight_bytes_to_given_unit(total_nirs,$data_unit_receive$)`\n| rename server_name as \"Server Name\"\n| table \"Server Name\", \"Receive ($data_unit_receive$)\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Ethernet Receive utilization per Server _Sum_ 1 search"
+        },
+        "ds_efqgDcPA": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats `cisco_intersight_summariesonly`\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_transmit\") as total_nits\n    from datamodel=Cisco_Intersight\n    where nodename = cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" IN ($select_domain$)\n        AND \"cisco_intersight.cisco_intersight_network.network_chassis\" IN ($select_chassis$)\n        AND \"cisco_intersight.cisco_intersight_network.network_server_id\" != \"\"\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"vnic\"\n    by \"cisco_intersight.cisco_intersight_network.network_server_id\",\n       \"cisco_intersight.cisco_intersight_network.network_name\",\n       \"cisco_intersight.cisco_intersight_network.network_domain_name\",\n       \"cisco_intersight.cisco_intersight_network.network_chassis_number\",\n       \"cisco_intersight.cisco_intersight_network.network_host_name\",\n       \"cisco_intersight.cisco_intersight_network.network_port_role\"\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_server_id\" \".*/(?<server_id>[^/]+)$\"\n\n| join type=left server_id [\n    | inputlookup cisco_intersight_compute_physicalsummaries | where splunk_managed_lifecycle == \"PRESENT\"\n    | rename \"Moid\" as server_id, \"Name\" as server_name\n]\n\n| search server_name=$eth_transmit_util_chassis$\n\n| eval Transmit = `cisco_intersight_human_readable_bytes(total_nits)` . \" \" . `cisco_intersight_human_readable_unit(total_nits)`\n\n| rename \n    server_name as \"Server Name\",\n    \"cisco_intersight.cisco_intersight_network.network_name\" as Name,\n    \"cisco_intersight.cisco_intersight_network.network_domain_name\" as \"Domain Name\",\n    \"cisco_intersight.cisco_intersight_network.network_chassis_number\" as Chassis,\n    \"cisco_intersight.cisco_intersight_network.network_host_name\" as \"Host Name\",\n    \"cisco_intersight.cisco_intersight_network.network_port_role\" as \"Port Role\"\n\n| sort \"Server Name\"\n\n| table \"Domain Name\", Chassis, \"Server Name\", \"Port Role\", Name, Transmit",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Ethernet Transmit utilization per Server _Sum__ _eth_transmit_util_chassis_ search"
+        },
+        "ds_IwnIVVeg": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats `cisco_intersight_summariesonly`\n    sum(\"cisco_intersight.cisco_intersight_network.network_io_receive\") as total_nirs\n    from datamodel=Cisco_Intersight\n    where nodename = cisco_intersight.cisco_intersight_network\n        AND \"cisco_intersight.cisco_intersight_network.network_domain_id\" IN ($select_domain$)\n        AND \"cisco_intersight.cisco_intersight_network.network_chassis\" IN ($select_chassis$)\n        AND \"cisco_intersight.cisco_intersight_network.network_server_id\" != \"\"\n        AND \"cisco_intersight.cisco_intersight_network.network_port_role\" = \"vnic\"\n    by \"cisco_intersight.cisco_intersight_network.network_server_id\",\n       \"cisco_intersight.cisco_intersight_network.network_name\",\n       \"cisco_intersight.cisco_intersight_network.network_domain_name\",\n       \"cisco_intersight.cisco_intersight_network.network_chassis_number\",\n       \"cisco_intersight.cisco_intersight_network.network_host_name\",\n       \"cisco_intersight.cisco_intersight_network.network_port_role\"\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_server_id\" \".*/(?<server_id>[^/]+)$\"\n\n| join type=left server_id [\n    | inputlookup cisco_intersight_compute_physicalsummaries | where splunk_managed_lifecycle == \"PRESENT\"\n    | rename \"Moid\" as server_id, \"Name\" as server_name\n]\n\n| search server_name=$eth_receive_util_chassis$\n\n| eval Receive = `cisco_intersight_human_readable_bytes(total_nirs)` . \" \" . `cisco_intersight_human_readable_unit(total_nirs)`\n\n| rename \n    server_name as \"Server Name\",\n    \"cisco_intersight.cisco_intersight_network.network_name\" as Name,\n    \"cisco_intersight.cisco_intersight_network.network_domain_name\" as \"Domain Name\",\n    \"cisco_intersight.cisco_intersight_network.network_chassis_number\" as Chassis,\n    \"cisco_intersight.cisco_intersight_network.network_host_name\" as \"Host Name\",\n    \"cisco_intersight.cisco_intersight_network.network_port_role\" as \"Port Role\"\n\n| sort \"Server Name\"\n\n| table \"Domain Name\", Chassis, \"Server Name\", \"Port Role\", Name, Receive",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Ethernet Receive utilization per Server _Sum__ _eth_receive_util_chassis_ search"
+        },
+        "ds_q6zouYNl": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    avg(cisco_intersight.cisco_intersight_network.network_transmit_utilization) as nuta, \n    max(cisco_intersight.cisco_intersight_network.network_bandwidth_transmit_utilization_max) as nutmx \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n        AND cisco_intersight.cisco_intersight_network.network_port_role=\"iom_uplink\"\n    by \n        cisco_intersight.cisco_intersight_network.network_domain_name, \n        cisco_intersight.cisco_intersight_network.network_host_name, \n        cisco_intersight.cisco_intersight_network.network_chassis_id,\n        cisco_intersight.cisco_intersight_network.network_chassis_number,\n        cisco_intersight.cisco_intersight_network.network_name, \n        cisco_intersight.cisco_intersight_network.network_id\n          \"cisco_intersight.cisco_intersight_network.network_account_moid\",\n          \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| where \"$show_zero_values$\"=\"true\" OR (round(nuta * 100, 2) != 0 and round(nutmx * 100, 2) != 0)\n\n| eval \"Utilization (avg)\" = round(nuta * 100, 2), \n       \"Utilization (max)\" = round(nutmx * 100, 2)\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_host_name\" \"FI-(?<FI>[AB])\"\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_id\" \"/(?<Moid>[^/]+)$\"\n| eval _key='cisco_intersight.cisco_intersight_network.network_account_moid' + \"_\" + Moid\n\n| join type=left _key [\n    | inputlookup cisco_intersight_ether_hostports | where splunk_managed_lifecycle == \"PRESENT\"\n    | append [| inputlookup cisco_intersight_ether_networkports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | append [| inputlookup cisco_intersight_ether_physicalports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | fields _key PortId Dn OperSpeed OperState PortChannelId Role SwitchId\n]\n\n| rename \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_chassis_number as \"Chassis Number\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_id as _event_id, \"SwitchId\" as \"FI\",\n\n| table \"Domain Name\", \"FI\", \"Chassis Number\", \"Port Name\", Dn, OperSpeed, OperState, \"Utilization (avg)\", \"Utilization (max)\", _event_id",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Transmit utilization in _ per IFM uplink port search"
+        },
+        "ds_Hy2lNdPz": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    avg(cisco_intersight.cisco_intersight_network.network_receive_utilization) as nura, \n    max(cisco_intersight.cisco_intersight_network.network_bandwidth_receive_utilization_max) as nurmx \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n        AND cisco_intersight.cisco_intersight_network.network_port_role=\"iom_uplink\"\n    by \n        cisco_intersight.cisco_intersight_network.network_domain_name, \n        cisco_intersight.cisco_intersight_network.network_host_name, \n        cisco_intersight.cisco_intersight_network.network_chassis_id,\n        cisco_intersight.cisco_intersight_network.network_chassis_number,\n        cisco_intersight.cisco_intersight_network.network_name, \n        cisco_intersight.cisco_intersight_network.network_id\n          \"cisco_intersight.cisco_intersight_network.network_account_moid\",\n          \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| where \"$show_zero_values$\"=\"true\" OR (round(nura * 100, 2) != 0 and round(nurmx * 100, 2) != 0)\n\n| eval \"Utilization (avg)\" = round(nura * 100, 2), \n       \"Utilization (max)\" = round(nurmx * 100, 2)\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_host_name\" \"FI-(?<FI>[AB])\"\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_id\" \"/(?<Moid>[^/]+)$\"\n| eval _key='cisco_intersight.cisco_intersight_network.network_account_moid' + \"_\" + Moid\n\n| join type=left _key [\n    | inputlookup cisco_intersight_ether_hostports | where splunk_managed_lifecycle == \"PRESENT\"\n    | append [| inputlookup cisco_intersight_ether_networkports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | append [| inputlookup cisco_intersight_ether_physicalports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | fields _key PortId Dn OperState PortChannelId Role SwitchId\n]\n\n| rename \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_chassis_number as \"Chassis Number\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_id as _event_id, \"SwitchId\" as \"FI\"\n\n| table \"Domain Name\", \"FI\", \"Chassis Number\", \"Port Name\", Dn, OperState, \"Utilization (avg)\", \"Utilization (max)\", _event_id",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Receive utilization in _ per IFM uplink port search"
+        },
+        "ds_98Ezcz4z": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    avg(cisco_intersight.cisco_intersight_network.network_transmit_utilization) as nuta, \n    max(cisco_intersight.cisco_intersight_network.network_bandwidth_transmit_utilization_max) as nutmx \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_id = \"$transmit_ifm_uplink_chassis$\"\n        AND cisco_intersight.cisco_intersight_network.network_port_role = \"iom_uplink\"\n    by _time, \n       cisco_intersight.cisco_intersight_network.network_name, \n       cisco_intersight.cisco_intersight_network.network_id\n\n| eval nuta = round(nuta * 100, 2), \n       nutmx = round(nutmx * 100, 2)\n\n| rename \n    cisco_intersight.cisco_intersight_network.network_name as Name\n\n| $granularity$\n    sum(nuta) AS \"Transmit Utilziation % per IFM uplink (avg)\", \n    sum(nutmx) AS \"Transmit Utilziation % per IFM uplink (max)\" \n    by Name",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Transmit utilization in _ per IFM uplink port_ _transmit_ifm_uplink_chassis_name_ search"
+        },
+        "ds_afdRi8OK": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    avg(cisco_intersight.cisco_intersight_network.network_receive_utilization) as nuta, \n    max(cisco_intersight.cisco_intersight_network.network_bandwidth_receive_utilization_max) as nutmx \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_id = \"$receive_ifm_uplink_chassis$\"\n        AND cisco_intersight.cisco_intersight_network.network_port_role = \"iom_uplink\"\n    by _time, \n       cisco_intersight.cisco_intersight_network.network_name, \n       cisco_intersight.cisco_intersight_network.network_id\n\n| eval nuta = round(nuta * 100, 2), \n       nutmx = round(nutmx * 100, 2)\n\n| rename \n    cisco_intersight.cisco_intersight_network.network_name as Name\n\n| $granularity$ \n    sum(nuta) AS \"Transmit Utilziation % per IFM uplink (avg)\", \n    sum(nutmx) AS \"Transmit Utilziation % per IFM uplink (max)\" \n    by Name",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Receive utilization in _ per IFM uplink port_ _receive_ifm_uplink_chassis_name_ search"
+        },
+        "ds_bt38kHA4": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    avg(cisco_intersight.cisco_intersight_network.network_transmit_utilization) as nuta, \n    max(cisco_intersight.cisco_intersight_network.network_bandwidth_transmit_utilization_max) as nutmx \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND cisco_intersight.cisco_intersight_network.network_port_role = \"host_port\"\n        AND cisco_intersight.cisco_intersight_network.network_port_type = \"backplane_port\"\n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n    by \n        cisco_intersight.cisco_intersight_network.network_domain_name,\n        cisco_intersight.cisco_intersight_network.network_host_name,\n        cisco_intersight.cisco_intersight_network.network_chassis_id,\n        cisco_intersight.cisco_intersight_network.network_chassis_number,\n        cisco_intersight.cisco_intersight_network.network_name,\n        cisco_intersight.cisco_intersight_network.network_id\n          \"cisco_intersight.cisco_intersight_network.network_account_moid\",\n          \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| search nuta != null\n| search nutmx != null\n\n| where \"$show_zero_values$\"=\"true\" OR (nuta != 0 and nutmx != 0)\n\n| eval nuta = round(nuta * 100, 2),\n       nutmx = round(nutmx * 100, 2)\n\n| rex field=cisco_intersight.cisco_intersight_network.network_host_name \"FI-(?<FI>[AB])\"\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_id\" \"/(?<Moid>[^/]+)$\"\n| eval _key='cisco_intersight.cisco_intersight_network.network_account_moid' + \"_\" + Moid\n\n| join type=left _key [\n    | inputlookup cisco_intersight_ether_hostports | where splunk_managed_lifecycle == \"PRESENT\"\n    | append [| inputlookup cisco_intersight_ether_networkports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | append [| inputlookup cisco_intersight_ether_physicalports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | fields _key PortId Dn OperSpeed OperState PortChannelId Role SwitchId\n]\n\n| rename \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_chassis_number as \"Chassis Number\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_id as _event_id,\n    nuta as \"Utilization (avg)\",\n    nutmx as \"Utilization (max)\", \"SwitchId\" as \"FI\"\n\n| table \"Domain Name\", \"FI\", \"Chassis Number\", \"Port Name\", Dn, OperSpeed, OperState, \"Utilization (avg)\", \"Utilization (max)\", _event_id",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Transmit utilization in _ per IFM downlink port search"
+        },
+        "ds_CF9Tavbn": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    avg(cisco_intersight.cisco_intersight_network.network_receive_utilization) as nuta, \n    max(cisco_intersight.cisco_intersight_network.network_bandwidth_receive_utilization_max) as nutmx \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND cisco_intersight.cisco_intersight_network.network_port_role = \"host_port\"\n        AND cisco_intersight.cisco_intersight_network.network_port_type = \"backplane_port\"\n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n    by \n        cisco_intersight.cisco_intersight_network.network_domain_name,\n        cisco_intersight.cisco_intersight_network.network_host_name,\n        cisco_intersight.cisco_intersight_network.network_chassis_id,\n        cisco_intersight.cisco_intersight_network.network_chassis_number,\n        cisco_intersight.cisco_intersight_network.network_name,\n        cisco_intersight.cisco_intersight_network.network_id\n          \"cisco_intersight.cisco_intersight_network.network_account_moid\",\n          \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| search nuta != null\n| search nutmx != null\n\n| where \"$show_zero_values$\"=\"true\" OR (nuta != 0 and nutmx != 0)\n\n| eval nuta = round(nuta * 100, 2),\n       nutmx = round(nutmx * 100, 2)\n\n| rex field=cisco_intersight.cisco_intersight_network.network_host_name \"FI-(?<FI>[AB])\"\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_id\" \"/(?<Moid>[^/]+)$\"\n| eval _key='cisco_intersight.cisco_intersight_network.network_account_moid' + \"_\" + Moid\n\n| join type=left _key [\n    | inputlookup cisco_intersight_ether_hostports | where splunk_managed_lifecycle == \"PRESENT\"\n    | append [| inputlookup cisco_intersight_ether_networkports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | append [| inputlookup cisco_intersight_ether_physicalports | where splunk_managed_lifecycle == \"PRESENT\"]\n    | fields _key PortId Dn OperSpeed OperState PortChannelId Role SwitchId\n]\n\n| rename \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_chassis_number as \"Chassis Number\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_id as _event_id,\n    nuta as \"Utilization (avg)\",\n    nutmx as \"Utilization (max)\", \"SwitchId\" as \"FI\"\n\n| table \"Domain Name\", \"FI\", \"Chassis Number\", \"Port Name\", Dn, OperSpeed, OperState, \"Utilization (avg)\", \"Utilization (max)\", _event_id",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Receive utilization in _ per IFM downlink port search"
+        },
+        "ds_Ai8snlrL": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats \n    avg(cisco_intersight.cisco_intersight_network.network_transmit_utilization) as nuta, \n    max(cisco_intersight.cisco_intersight_network.network_bandwidth_transmit_utilization_max) as nutmx \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_id = \"$transmit_ifm_downlink_chassis$\"\n        AND cisco_intersight.cisco_intersight_network.network_port_role = \"host_port\"\n        AND cisco_intersight.cisco_intersight_network.network_port_type = \"backplane_port\"\n    by \n        cisco_intersight.cisco_intersight_network.network_name,\n        cisco_intersight.cisco_intersight_network.network_id,\n        _time\n\n| eval nuta = round(nuta * 100, 2)\n| eval nutmx = round(nutmx * 100, 2)\n\n| rename cisco_intersight.cisco_intersight_network.network_name as Name\n\n| $granularity$ \n    sum(nuta) as \"Transmit Utilziation % per IFM downlink (avg)\", \n    sum(nutmx) as \"Transmit Utilziation % per IFM downlink (max)\" \n    by Name",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Transmit utilization in _ per IFM downlink port_ _transmit_ifm_downlink_chassis_name_ search"
+        },
+        "ds_5zGvVlB4": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats \n    avg(cisco_intersight.cisco_intersight_network.network_receive_utilization) as nura, \n    max(cisco_intersight.cisco_intersight_network.network_bandwidth_receive_utilization_max) as nurmx \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_id = \"$receive_ifm_downlink_chassis$\"\n        AND cisco_intersight.cisco_intersight_network.network_port_role = \"host_port\"\n        AND cisco_intersight.cisco_intersight_network.network_port_type = \"backplane_port\"\n    by \n        cisco_intersight.cisco_intersight_network.network_name,\n        cisco_intersight.cisco_intersight_network.network_id,\n        _time\n\n| eval nura = round(nura * 100, 2)\n| eval nurmx = round(nurmx * 100, 2)\n\n| rename cisco_intersight.cisco_intersight_network.network_name as Name\n\n| $granularity$ \n    sum(nura) as \"Transmit Utilziation % per IFM downlink (avg)\", \n    sum(nurmx) as \"Transmit Utilziation % per IFM downlink (max)\" \n    by Name",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Receive utilization in _ per IFM downlink port_ _receive_ifm_downlink_chassis_name_ search"
+        },
+        "ds_KnhLZ50W": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_pause_sum) as ntps,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_ppp_sum) as nptppps \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n        AND NOT cisco_intersight.cisco_intersight_network.network_chassis IN (null)\n        AND cisco_intersight.cisco_intersight_network.network_chassis IN ($select_chassis$)\n        AND NOT cisco_intersight.cisco_intersight_network.network_transmit_pause_sum IN (null)\n        AND NOT cisco_intersight.cisco_intersight_network.network_transmit_ppp_sum IN (null)\n        AND NOT cisco_intersight.cisco_intersight_network.network_port_role IN (\"unconfigured\", \"server_pc\", \"fabric_pc\", \"host_pc\", \"vethernet\", \"vfc\", \"vnic\", \"vhba\", \"eth_uplink_pc\")\n    by \n        cisco_intersight.cisco_intersight_network.network_domain_name,\n        cisco_intersight.cisco_intersight_network.network_host_name,\n        cisco_intersight.cisco_intersight_network.network_port_role,\n        cisco_intersight.cisco_intersight_network.network_name,\n        cisco_intersight.cisco_intersight_network.network_chassis,\n        cisco_intersight.cisco_intersight_network.network_chassis_number\n          \"cisco_intersight.cisco_intersight_network.network_account_moid\",\n          cisco_intersight.cisco_intersight_network.network_id,\n          \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| where isnotnull(ntps)\n| where isnotnull(nptppps)\n\n| where \"$show_zero_values$\"=\"true\" OR (ntps != 0 and nptppps != 0)\n\n| eval total_congestion = 'ntps' + 'nptppps'\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_id\" \"/(?<Moid>[^/]+)$\"\n| eval _key='cisco_intersight.cisco_intersight_network.network_account_moid' + \"_\" + Moid\n\n| join type=left _key [\n    | inputlookup cisco_intersight_ether_hostports | where splunk_managed_lifecycle == \"PRESENT\"\n    | fields _key PortId Dn OperSpeed OperState PortChannelId Role SwitchId\n]\n\n| rename \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_port_role as \"Network Port Role\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_chassis_number as Chassis,\n    cisco_intersight.cisco_intersight_network.network_chassis as _hwchassis,\n    ntps as Ethernet,\n    total_congestion as \"Total Congestion\"\n    nptppps as FC, \"SwitchId\" as \"FI\",\n\n| table \"Domain Name\", \"FI\", Chassis, \"Network Port Role\", \"Port Name\", Dn, OperSpeed, OperState, \"Total Congestion\", \"Ethernet\", \"FC\", _hwchassis\n\n| sort \"Network Port Role\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Chassis Congestion - Transmit Pause Frames search"
+        },
+        "ds_YQECnIkl": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats \n    sum(cisco_intersight.cisco_intersight_network.network_transmit_pause_sum) as ntps,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_ppp_sum) as nptppps \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_chassis=\"$clicked_transmit_congestion_chassis$\"\n        AND cisco_intersight.cisco_intersight_network.network_name=\"$clicked_transmit_congestion_chassis_name$\"\n    by _time\n\n| $granularity$ sum(ntps) as \"Ethernet\", sum(nptppps) as \"FC\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "name": "Transmit Pause Frames per selected port_ __clicked_transmit_congestion_chassis_name__ search"
+        },
+        "ds_6L97ZD2H": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_receive_pause_sum) as nrps,\n    sum(cisco_intersight.cisco_intersight_network.network_receive_ppp_sum) as nprppps \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n        AND NOT cisco_intersight.cisco_intersight_network.network_chassis IN (null)\n        AND cisco_intersight.cisco_intersight_network.network_chassis IN ($select_chassis$)\n        AND NOT cisco_intersight.cisco_intersight_network.network_transmit_pause_sum IN (null)\n        AND NOT cisco_intersight.cisco_intersight_network.network_transmit_ppp_sum IN (null)\n        AND NOT cisco_intersight.cisco_intersight_network.network_port_role IN (\"unconfigured\", \"server_pc\", \"fabric_pc\", \"host_pc\", \"vethernet\", \"vfc\", \"vnic\", \"vhba\", \"eth_uplink_pc\")\n    by \n        cisco_intersight.cisco_intersight_network.network_domain_name,\n        cisco_intersight.cisco_intersight_network.network_host_name,\n        cisco_intersight.cisco_intersight_network.network_port_role,\n        cisco_intersight.cisco_intersight_network.network_name,\n        cisco_intersight.cisco_intersight_network.network_chassis,\n        cisco_intersight.cisco_intersight_network.network_chassis_number\n        cisco_intersight.cisco_intersight_network.network_account_moid,\n        cisco_intersight.cisco_intersight_network.network_id,\n        \"cisco_intersight.cisco_intersight_network.network_account_name\"\n\n| where isnotnull(nrps)\n| where isnotnull(nprppps)\n\n| where \"$show_zero_values$\"=\"true\" OR (nrps != 0 and nprppps != 0)\n\n| eval total_congestion = 'nrps' + 'nprppps'\n\n| rex field=\"cisco_intersight.cisco_intersight_network.network_id\" \"/(?<Moid>[^/]+)$\"\n| eval _key='cisco_intersight.cisco_intersight_network.network_account_moid' + \"_\" + Moid\n\n| join type=left _key [\n    | inputlookup cisco_intersight_ether_hostports | where splunk_managed_lifecycle == \"PRESENT\"\n    | fields _key PortId Dn OperSpeed OperState PortChannelId Role SwitchId\n]\n\n| rename \n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_port_role as \"Network Port Role\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_chassis_number as Chassis,\n    cisco_intersight.cisco_intersight_network.network_chassis as _hwchassis,\n    nrps as Ethernet,\n    total_congestion as \"Total Congestion\"\n    nprppps as FC, \"SwitchId\" as \"FI\",\n\n| table \"Domain Name\", \"FI\", Chassis, \"Network Port Role\", \"Port Name\", \"Dn\", \"OperSpeed\", \"OperState\", \"Total Congestion\", \"Ethernet\", \"FC\", _hwchassis\n\n| sort \"Network Port Role\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                }
+            },
+            "name": "Receive Pause Frames 2 search"
+        },
+        "ds_usNr7m3b": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats \n    sum(cisco_intersight.cisco_intersight_network.network_receive_pause_sum) as nrps,\n    sum(cisco_intersight.cisco_intersight_network.network_receive_ppp_sum) as nprppps \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network \n        AND cisco_intersight.cisco_intersight_network.network_chassis=\"$clicked_transmit_congestion_chassis$\"\n        AND cisco_intersight.cisco_intersight_network.network_name=\"$clicked_transmit_congestion_chassis_name$\"\n    by _time\n\n| $granularity$ sum(nrps) as \"Ethernet\", sum(nprppps) as \"FC\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "name": "Receive Pause Frames per selected port_ __clicked_receive_congestion_chassis_name__ search"
+        },
+        "ds_vAEZbxmV": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_receive_discard_error_sum) as enrds,\n    sum(cisco_intersight.cisco_intersight_network.network_too_short_error_sum) as enrtss,\n    sum(cisco_intersight.cisco_intersight_network.network_no_buffer_sum) as enrnbs,\n    sum(cisco_intersight.cisco_intersight_network.network_crc_duration_sum) as ncrccs,\n    sum(cisco_intersight.cisco_intersight_network.network_too_long_error_sum) as enrtls,\n    sum(cisco_intersight.cisco_intersight_network.network_runt_error_sum) as nrrs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_jabber_error_sum) as entjs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_discard_error_sum) as entds,\n    sum(cisco_intersight.cisco_intersight_network.network_carrier_sense_error_sum) as encss,\n    sum(cisco_intersight.cisco_intersight_network.network_late_collisions_error_sum) as enlcs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_deferred_error_sum) as entdfs \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network\n        AND cisco_intersight.cisco_intersight_network.network_account_name IN ($account_name$)\n        AND cisco_intersight.cisco_intersight_network.network_domain_id IN ($select_domain$)\n        AND NOT cisco_intersight.cisco_intersight_network.network_chassis IN (null)\n        AND cisco_intersight.cisco_intersight_network.network_chassis IN ($select_chassis$)\n        AND NOT cisco_intersight.cisco_intersight_network.network_port_role IN (\"unconfigured\", \"server_pc\", \"fabric_pc\", \"host_pc\", \"vethernet\", \"vfc\", \"vnic\", \"vhba\", \"eth_uplink_pc\")\n        AND cisco_intersight.cisco_intersight_network.network_name=\"*$errors_port_name_chassis$*\"\n    by cisco_intersight.cisco_intersight_network.network_domain_name,\n       cisco_intersight.cisco_intersight_network.network_port_role,\n       cisco_intersight.cisco_intersight_network.network_name,\n       cisco_intersight.cisco_intersight_network.network_chassis,\n       cisco_intersight.cisco_intersight_network.network_chassis_number,\n       cisco_intersight.cisco_intersight_network.network_account_name\n\n| where (\"$show_zero_values$\"=\"false\" \n   AND ((enrds != 0 AND isnotnull(enrds)) OR (enrtss != 0 AND isnotnull(enrtss)) OR (enrnbs != 0 AND isnotnull(enrnbs)) OR (ncrccs != 0 AND isnotnull(ncrccs)) OR (enrtls != 0 AND isnotnull(enrtls)) OR (nrrs != 0 AND isnotnull(nrrs)) OR (entjs != 0 AND isnotnull(entjs)) OR (entds != 0 AND isnotnull(entds)) OR (encss != 0 AND isnotnull(encss)) OR (enlcs != 0 AND isnotnull(enlcs)) OR (entdfs != 0 AND isnotnull(entdfs)))) OR (\"$show_zero_values$\"=\"true\" AND (isnotnull(enrds) OR isnotnull(enrtss) OR isnotnull(enrnbs) OR isnotnull(ncrccs) OR isnotnull(enrtls) OR isnotnull(nrrs) OR isnotnull(entjs) OR isnotnull(entds) OR isnotnull(encss) OR isnotnull(enlcs) OR isnotnull(entdfs)))\n\n| eval rx_sum = enrds + enrtss + enrnbs + ncrccs + enrtls + nrrs\n| eval tx_sum = entjs + entds + encss + enlcs + entdfs\n| eval total = rx_sum + tx_sum\n\n| rename \n    nrrs as Runt,\n    enrtls as \"Too Long\",\n    enrnbs as \"No Buffer\",\n    enrtss as \"Too Short\",\n    enrds as \"Receive Discard\",\n    entds as \"Transmit Discard\",\n    entdfs as \"Transmit Deferred\",\n    enlcs as \"Late Collision\",\n    encss as \"Carrier Sense\",\n    entjs as Jabber,\n    ncrccs as CRC,\n    rx_sum as \"Receive Errors Sum\",\n    tx_sum as \"Transmit Errors Sum\",\n    total as \"Total Errors\",\n    cisco_intersight.cisco_intersight_network.network_domain_name as \"Domain Name\",\n    cisco_intersight.cisco_intersight_network.network_port_role as \"Network Port Role\",\n    cisco_intersight.cisco_intersight_network.network_name as \"Port Name\",\n    cisco_intersight.cisco_intersight_network.network_chassis_number as \"Chassis Number\",\n    cisco_intersight.cisco_intersight_network.network_chassis as _hwchassis\n\n| table \"Domain Name\", \"Chassis Number\", \"Network Port Role\", \"Port Name\", \"Total Errors\", \"Receive Errors Sum\", \"Receive Discard\", \"Too Short\", \"No Buffer\", \"CRC\", \"Too Long\", \"Runt\", \"Transmit Errors Sum\", \"Jabber\", \"Transmit Discard\", \"Carrier Sense\", \"Late Collision\", \"Transmit Deferred\", _hwchassis\n\n| sort \"Network Port Role\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "name": "Chassis Errors - Overview search"
+        },
+        "ds_UKbrjWPT": {
+            "type": "ds.search",
+            "options": {
+                "query": "| tstats fillnull_value=\"-\" `cisco_intersight_summariesonly`\n    sum(cisco_intersight.cisco_intersight_network.network_receive_discard_error_sum) as enrds,\n    sum(cisco_intersight.cisco_intersight_network.network_too_short_error_sum) as enrtss,\n    sum(cisco_intersight.cisco_intersight_network.network_no_buffer_sum) as enrnbs,\n    sum(cisco_intersight.cisco_intersight_network.network_crc_duration_sum) as ncrccs,\n    sum(cisco_intersight.cisco_intersight_network.network_too_long_error_sum) as enrtls,\n    sum(cisco_intersight.cisco_intersight_network.network_runt_error_sum) as nrrs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_jabber_error_sum) as entjs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_discard_error_sum) as entds,\n    sum(cisco_intersight.cisco_intersight_network.network_carrier_sense_error_sum) as encss,\n    sum(cisco_intersight.cisco_intersight_network.network_late_collisions_error_sum) as enlcs,\n    sum(cisco_intersight.cisco_intersight_network.network_transmit_deferred_error_sum) as entdfs \n    from datamodel=Cisco_Intersight \n    where nodename=cisco_intersight.cisco_intersight_network\n        AND cisco_intersight.cisco_intersight_network.network_chassis=\"$clicked_errors_chassis$\"\n        AND cisco_intersight.cisco_intersight_network.network_name=\"*$clicked_errors_name_chassis$*\"\n    by _time\n\n| $granularity$ \n    sum(enrds) as \"Receive Discard\", \n    sum(enrtss) as \"Too Short\", \n    sum(enrnbs) as \"No Buffer\", \n    sum(ncrccs) as \"CRC\", \n    sum(enrtls) as \"Too Long\", \n    sum(nrrs) as \"Runt\", \n    sum(entjs) as \"Jabber\", \n    sum(entds) as \"Transmit Discard\", \n    sum(encss) as \"Carrier Sense\", \n    sum(enlcs) as \"Late Collision\", \n    sum(entdfs) as \"Transmit Deferred\"",
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "refresh": "15m",
+                "refreshType": "delay"
+            },
+            "name": "Errors per selected port_ __clicked_errors_name_chassis__ search"
+        },
+        "ds_ypj6BEjR": {
+            "type": "ds.search",
+            "options": {
+                "queryParameters": {
+                    "earliest": "$time_range.earliest$",
+                    "latest": "$time_range.latest$"
+                },
+                "query": "| tstats values(cisco_intersight.cisco_intersight_network.network_account_name) as account_name \n  from datamodel=Cisco_Intersight \n  where nodename=cisco_intersight.cisco_intersight_network \n  by cisco_intersight.cisco_intersight_network.network_account_name\n| dedup account_name\n| table account_name"
+            },
+            "name": "account_name"
+        }
+    },
+    "defaults": {
+        "dataSources": {
+            "ds.search": {
+                "options": {
+                    "queryParameters": {}
+                }
+            }
+        }
+    },
+    "inputs": {
+        "input_bDtDrWq5": {
+            "type": "input.timerange",
+            "options": {
+                "token": "time_range",
+                "defaultValue": "-24h@h,now"
+            },
+            "title": "Select Time Range"
+        },
+        "input_domainSelect": {
+            "type": "input.multiselect",
+            "options": {
+                "items": "> frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "select_domain",
+                "defaultValue": [
+                    "*"
+                ]
+            },
+            "title": "Select Domains",
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": "> statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": "> primary | seriesByName(\"event.DomainName\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": "> primary | seriesByName(\"event.DomainId\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            },
+            "dataSources": {
+                "primary": "ds_MRht5eW9"
+            }
+        },
+        "input_chassisSelect": {
+            "type": "input.multiselect",
+            "options": {
+                "defaultValue": "*",
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "select_chassis"
+            },
+            "title": "Select Chassis",
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"chassis_name\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"Chassis\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            },
+            "dataSources": {
+                "primary": "ds_LU3nqIRB"
+            }
+        },
+        "input_OeigvZHr": {
+            "options": {
+                "defaultValue": "*",
+                "token": "errors_port_name_chassis"
+            },
+            "title": "Port Name",
+            "type": "input.text"
+        },
+        "input_K5u1EAo8": {
+            "options": {
+                "items": [
+                    {
+                        "label": "Auto",
+                        "value": "timechart"
+                    },
+                    {
+                        "label": "15 Minutes",
+                        "value": "timechart span=15m"
+                    },
+                    {
+                        "label": "30 Minutes",
+                        "value": "timechart span=30m"
+                    },
+                    {
+                        "label": "1 Hour",
+                        "value": "timechart span=1h"
+                    }
+                ],
+                "defaultValue": "timechart",
+                "token": "granularity"
+            },
+            "title": "Granularity for Linecharts",
+            "type": "input.dropdown"
+        },
+        "input_rz8otacy": {
+            "options": {
+                "items": [
+                    {
+                        "label": "KB",
+                        "value": "KB"
+                    },
+                    {
+                        "label": "MB",
+                        "value": "MB"
+                    },
+                    {
+                        "label": "GB",
+                        "value": "GB"
+                    },
+                    {
+                        "label": "TB",
+                        "value": "TB"
+                    }
+                ],
+                "token": "data_unit_transmit",
+                "defaultValue": "MB"
+            },
+            "title": "Ethernet Transmit utilization per Server - Data Unit",
+            "type": "input.dropdown"
+        },
+        "input_rz8otacz": {
+            "options": {
+                "items": [
+                    {
+                        "label": "KB",
+                        "value": "KB"
+                    },
+                    {
+                        "label": "MB",
+                        "value": "MB"
+                    },
+                    {
+                        "label": "GB",
+                        "value": "GB"
+                    },
+                    {
+                        "label": "TB",
+                        "value": "TB"
+                    }
+                ],
+                "token": "data_unit_receive",
+                "defaultValue": "MB"
+            },
+            "title": "Ethernet Receiver utilization per Server - Data Unit",
+            "type": "input.dropdown"
+        },
+        "input_Tvxat609": {
+            "type": "input.dropdown",
+            "options": {
+                "items": [
+                    {
+                        "label": "Exclude zero values",
+                        "value": "false"
+                    },
+                    {
+                        "label": "Include zero values",
+                        "value": "true"
+                    }
+                ],
+                "token": "show_zero_values",
+                "defaultValue": "false"
+            },
+            "title": "",
+            "context": {},
+            "dataSources": {}
+        },
+        "input_DuIBl4D7": {
+            "options": {
+                "items": ">frame(label, value) | prepend(formattedStatics) | objects()",
+                "token": "account_name",
+                "defaultValue": [
+                    "*"
+                ]
+            },
+            "title": "Intersight Account Name",
+            "type": "input.multiselect",
+            "dataSources": {
+                "primary": "ds_ypj6BEjR"
+            },
+            "context": {
+                "formattedConfig": {
+                    "number": {
+                        "prefix": ""
+                    }
+                },
+                "formattedStatics": ">statics | formatByType(formattedConfig)",
+                "statics": [
+                    [
+                        "All"
+                    ],
+                    [
+                        "*"
+                    ]
+                ],
+                "label": ">primary | seriesByName(\"account_name\") | renameSeries(\"label\") | formatByType(formattedConfig)",
+                "value": ">primary | seriesByName(\"account_name\") | renameSeries(\"value\") | formatByType(formattedConfig)"
+            }
+        }
+    },
+    "layout": {
+        "type": "grid",
+        "options": {
+            "height": 7000,
+            "width": 1440,
+            "display": "auto"
+        },
+        "structure": [
+            {
+                "item": "viz_RHNg7sxE",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 1440,
+                    "h": 485
+                }
+            },
+            {
+                "item": "input_rz8otacy",
+                "type": "input",
+                "position": {
+                    "x": 0,
+                    "y": 485,
+                    "w": 720,
+                    "h": 99
+                }
+            },
+            {
+                "item": "viz_tCkRBBzI",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 584,
+                    "w": 720,
+                    "h": 339
+                }
+            },
+            {
+                "item": "viz_cBTTp4FW",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 923,
+                    "w": 720,
+                    "h": 400
+                }
+            },
+            {
+                "item": "viz_q3avs5o2",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1323,
+                    "w": 720,
+                    "h": 400
+                }
+            },
+            {
+                "item": "viz_NcrWwvk6",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1723,
+                    "w": 720,
+                    "h": 229
+                }
+            },
+            {
+                "item": "viz_QOied80k",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 1952,
+                    "w": 720,
+                    "h": 442
+                }
+            },
+            {
+                "item": "viz_dhKQcPOk",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 2394,
+                    "w": 720,
+                    "h": 330
+                }
+            },
+            {
+                "item": "viz_BEzG8Zev",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 2724,
+                    "w": 720,
+                    "h": 372
+                }
+            },
+            {
+                "item": "viz_xL4WPjTX",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3096,
+                    "w": 720,
+                    "h": 239
+                }
+            },
+            {
+                "item": "input_OeigvZHr",
+                "type": "input",
+                "position": {
+                    "x": 0,
+                    "y": 3335,
+                    "w": 1440,
+                    "h": 110
+                }
+            },
+            {
+                "item": "viz_wliAi4z8",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3445,
+                    "w": 1440,
+                    "h": 473
+                }
+            },
+            {
+                "item": "viz_V0m4GKJi",
+                "type": "block",
+                "position": {
+                    "x": 0,
+                    "y": 3918,
+                    "w": 1440,
+                    "h": 309
+                }
+            },
+            {
+                "item": "input_rz8otacz",
+                "type": "input",
+                "position": {
+                    "x": 720,
+                    "y": 485,
+                    "w": 720,
+                    "h": 99
+                }
+            },
+            {
+                "item": "viz_akPvXIo8",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 584,
+                    "w": 720,
+                    "h": 339
+                }
+            },
+            {
+                "item": "viz_h8S5bFsR",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 923,
+                    "w": 720,
+                    "h": 400
+                }
+            },
+            {
+                "item": "viz_JCqWwMxb",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 1323,
+                    "w": 720,
+                    "h": 400
+                }
+            },
+            {
+                "item": "viz_h20KpzL2",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 1723,
+                    "w": 720,
+                    "h": 229
+                }
+            },
+            {
+                "item": "viz_wjI8Eex0",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 1952,
+                    "w": 720,
+                    "h": 442
+                }
+            },
+            {
+                "item": "viz_B23MKWni",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 2394,
+                    "w": 720,
+                    "h": 330
+                }
+            },
+            {
+                "item": "viz_HudSblva",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 2724,
+                    "w": 720,
+                    "h": 372
+                }
+            },
+            {
+                "item": "viz_mqEB7yWt",
+                "type": "block",
+                "position": {
+                    "x": 720,
+                    "y": 3096,
+                    "w": 720,
+                    "h": 239
+                }
+            }
+        ],
+        "globalInputs": [
+            "input_bDtDrWq5",
+            "input_DuIBl4D7",
+            "input_domainSelect",
+            "input_chassisSelect",
+            "input_K5u1EAo8",
+            "input_Tvxat609"
+        ]
+    },
+    "description": "Gain comprehensive insights into network performance including utilization, congestion, and error rates for Chassis related Network Objects within IMM, Standalone and Unified Edge targets. This dashboard leverages both Inventory and Network Metrics data sources to deliver a unified, correlated view of network health and performance across your infrastructure.",
+    "title": "Chassis"
+}
+    ]]></definition>
+    <meta type="hiddenElements"><![CDATA[
+{
+    "hideEdit": false,
+    "hideOpenInSearch": false,
+    "hideExport": false
+}
+    ]]></meta>
+</dashboard>

@@ -1,0 +1,182 @@
+<form version="1.1">
+  <label>Auditing</label>
+  <search id="baseSearch">
+    <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog | table _raw category host user action</query>
+    <earliest>$time_token.earliest$</earliest>
+    <latest>$time_token.latest$</latest>
+  </search>
+  <fieldset autoRun="true" submitButton="false">
+    <input type="time" searchWhenChanged="true" token="time_token">
+      <label>Time Range</label>
+      <default>
+        <earliest>-60m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="device" searchWhenChanged="true">
+      <label>Device</label>
+      <choice value="*">All</choice>
+      <search>
+        <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog | lookup cisco_dc_nexus_hostname_lookup device AS host OUTPUT hostname AS hostname1 | lookup cisco_dc_nexus_hostname_lookup device_without_port as host OUTPUT hostname as hostname2 | eval hostname = coalesce(hostname1, hostname2)  | eval hostAndHostname = hostname."(".host.")" | stats count by host,hostAndHostname | rename hostAndHostname as hostname | table host hostname</query>
+        <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+      </search>
+      <fieldForLabel>hostname</fieldForLabel>
+      <fieldForValue>host</fieldForValue>
+      <default>*</default>
+    </input>
+    <input type="dropdown" token="user_tkn" searchWhenChanged="true">
+      <label>User</label>
+      <choice value="*">All</choice>
+      <search base="baseSearch">
+        <query>
+| dedup user
+| table user</query>
+      </search>
+      <fieldForLabel>user</fieldForLabel>
+      <fieldForValue>user</fieldForValue>
+      <default>*</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Unique devices</title>
+      <single>
+        <search base="baseSearch">
+          <query>
+| search host = "$device$" AND user="$user_tkn$"
+| stats dc(host) AS "Count of Devices"</query>
+        </search>
+        <option name="refresh.display">progressbar</option>
+        <option name="underLabel">Unique devices</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Users</title>
+      <single>
+        <search base="baseSearch">
+          <query>| search category="AAA" 
+| search host = "$device$" AND user = "$user_tkn$"
+| stats dc(user)</query>
+        </search>
+        <option name="refresh.display">progressbar</option>
+        <option name="underLabel">Users</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Device Logins</title>
+      <single>
+        <search base="baseSearch">
+          <query>| search category="AAA" 
+| rex field=_raw "\s+(?&lt;act&gt;\w+):[^:]+:(?&lt;user_a&gt;\w+):" 
+| search host = "$device$" AND user = "$user_tkn$"
+| search act="start" AND action=success 
+| stats count</query>
+        </search>
+        <option name="refresh.display">progressbar</option>
+        <option name="underLabel">Logins</option>
+      </single>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Device Logins by User (Top 10)</title>
+      <chart>
+        <search base="baseSearch">
+          <query>| search category="AAA"
+| rex field=_raw "\s+(?&lt;act&gt;\w+):[^:]+:(?&lt;user_a&gt;\w+):"
+| search host = "$device$" AND user = "$user_tkn$"
+| search act=start AND action=success
+| stats count by user
+| sort 0 - count
+| head 10</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Failed Device Logins by User (Top 10)</title>
+      <chart>
+        <search base="baseSearch">
+          <query>| search category="AAA"
+| rex field=_raw "\s+(?&lt;act&gt;\w+):[^:]+:(?&lt;user_a&gt;\w+):"
+| search host = "$device$" AND user = "$user_tkn$"
+| search action=failure AND act=start
+| stats count by user
+| sort 0 - count
+| head 10</query>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Configuration Started by Host</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog "*CONFIG_I*"
+| search host = "$device$" AND user = "$user_tkn$"
+| stats count by host</query>
+          <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Configuration Changes by User</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_n9k_index` sourcetype=cisco:dc:nexus9k:syslog "*CONFIG_I*" 
+| search host = "$device$" AND user = "$user_tkn$"
+| stats count by user</query>
+          <earliest>$time_token.earliest$</earliest>
+        <latest>$time_token.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+</form>

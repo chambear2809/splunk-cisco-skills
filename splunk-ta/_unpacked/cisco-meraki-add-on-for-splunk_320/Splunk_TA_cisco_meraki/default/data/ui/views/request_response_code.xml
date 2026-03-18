@@ -1,0 +1,53 @@
+<form version="1.1">
+  <label>API Response Insights</label>
+  <fieldset submitButton="false">
+    <input type="time" token="time">
+      <label>Time</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="orgid">
+      <label>Organization Id</label>
+      <choice value="*">All</choice>
+      <default>*</default>
+      <prefix>organizationId = "</prefix>
+      <suffix>"</suffix>
+      <fieldForLabel>name</fieldForLabel>
+      <fieldForValue>id</fieldForValue>
+      <search>
+        <query>`meraki_index` sourcetype="meraki:organizations"
+| dedup id
+| table id, name</query>
+        <earliest>$time.earliest$</earliest>
+        <latest>$time.latest$</latest>
+      </search>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Response Codes</title>
+      <chart>
+        <search>
+          <query>`meraki_index` sourcetype="meraki:apirequestsresponsecodes" $orgid$
+| spath input=_raw path=counts{} output=counts_raw
+| mvexpand counts_raw
+| spath input=counts_raw path=code output=code
+| spath input=counts_raw path=count output=count
+| eval start_time=strftime(strptime(startTs, "%Y-%m-%dT%H:%M:%S.%6NZ"), "%Y-%m-%d %H:%M:%S")
+| timechart span=1h sum(count) by code</query>
+          <earliest>$time.earliest$</earliest>
+          <latest>$time.latest$</latest>
+        </search>
+        <option name="charting.axisTitleX.text">Time</option>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.fieldColors">{"429":"#FF0000", "200":"#008000"}</option>
+        <option name="charting.drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
+    </panel>
+  </row>
+</form>

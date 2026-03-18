@@ -1,0 +1,405 @@
+<form script="set_apic_token.js" version="1.1">
+  <label>Controller Statistics</label>
+  <search id="baseSearch">
+    <query>`cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" $formed_apic_host$ | table *</query>
+    <earliest>$timetoken.earliest$</earliest>
+    <latest>$timetoken.latest$</latest>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup apic_host | table apic_host | eval apic_host="apic_host!=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " AND ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition>
+        <set token="not_search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'==0">
+        <unset token="hide_filter"></unset>
+        <set token="non_mso_filter">non_mso_filter</set>
+        <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+      </condition>
+      <condition>
+        <set token="hide_filter">hide_filter</set>
+      </condition>
+    </done>
+  </search>
+  <search>
+    <query>| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host | eval apic_host="apic_host=".apic_host | mvcombine apic_host | eval apic_host=mvjoin(apic_host, " OR ")</query>
+    <earliest>-24h@h</earliest>
+    <latest>now</latest>
+    <done>
+      <condition match="'job.resultCount'&gt;0">
+        <set token="search_apic_host">$result.apic_host$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset submitButton="false">
+    <input type="time" token="timetoken">
+      <label>Time Picker</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+    <input type="dropdown" token="mso_host" searchWhenChanged="true" depends="$hide_filter$">
+      <label>Nexus Dashboard</label>
+      <fieldForLabel>mso_host</fieldForLabel>
+      <fieldForValue>mso_host</fieldForValue>
+      <search>
+        <query>| inputlookup cisco_dc_mso_site_details | dedup mso_host | table mso_host</query>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </search>
+      <choice value="non_mso_sites">Non Orchestrator Sites</choice>
+      <change>
+        <condition value="non_mso_sites">
+          <set token="host_filter">$not_search_apic_host$</set>
+          <set token="apic_host_query">eventtype="cisco_dc_aci_*" component=credentials $not_search_apic_host$ | fields apic_host | dedup apic_host | sort 0 apic_host</set>
+        </condition>
+        <condition>
+          <set token="host_filter">$search_apic_host$</set>
+          <set token="apic_host_query">| inputlookup cisco_dc_mso_site_details | search mso_host=$mso_host$ | dedup apic_host | table apic_host</set>
+        </condition>
+      </change>
+      <default>non_mso_sites</default>
+    </input>
+    <input type="dropdown" token="apic_host" searchWhenChanged="true">
+      <label>APIC Sites/Cluster</label>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search>
+        <query>$apic_host_query$</query>
+        <earliest>$timetoken.earliest$</earliest>
+        <latest>$timetoken.latest$</latest>
+      </search>
+      <fieldForLabel>apic_host</fieldForLabel>
+      <fieldForValue>apic_host</fieldForValue>
+      <choice value="all">All</choice>
+      <change>
+        <condition match="$value$==&quot;all&quot; AND $non_mso_filter$==&quot;non_mso_filter&quot;">
+          <set token="formed_apic_host">apic_host=*</set>
+          <unset token="form.pod"></unset>
+        </condition>
+        <condition match="$value$==&quot;all&quot; AND $mso_host$==&quot;non_mso_sites&quot;">
+          <set token="formed_apic_host">$not_search_apic_host$</set>
+          <unset token="form.pod"></unset>
+        </condition>
+        <condition value="all">
+          <set token="formed_apic_host">$search_apic_host$</set>
+          <unset token="form.pod"></unset>
+        </condition>
+        <condition>
+          <set token="formed_apic_host">apic_host=$apic_host$</set>
+          <unset token="form.pod"></unset>
+        </condition>
+      </change>
+    </input>
+    <input type="dropdown" token="pod">
+      <label>Pod</label>
+      <fieldForLabel>Pod</fieldForLabel>
+      <fieldForValue>Pod</fieldForValue>
+      <search base="baseSearch">
+        <query>|rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)" | dedup Pod| table Pod</query>
+      </search>
+      <selectFirstChoice>true</selectFirstChoice>
+      <change>
+        <unset token="form.node"></unset>
+      </change>
+    </input>
+    <input type="dropdown" token="node">
+      <label>Controller</label>
+      <fieldForLabel>oobMgmtAddr</fieldForLabel>
+      <fieldForValue>oobMgmtAddr</fieldForValue>
+      <selectFirstChoice>true</selectFirstChoice>
+      <search base="baseSearch">
+        <query>|rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)"| search Pod=$pod$| dedup APIC, apic_host | table APIC, apic_host |join APIC, apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC, apic_host | table APIC, apic_host, oobMgmtAddr]| dedup oobMgmtAddr| table oobMgmtAddr</query>
+      </search>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <title>Controller Processes: CPU Utilization</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:stats $formed_apic_host$ component=procCPU5min OR procCPU15min |rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)\/sys\/proc\/proc-(?&lt;Process&gt;[^\/]+)"|search Pod=$pod$| join APIC,apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host | search oobMgmtAddr=$node$ | table APIC,oobMgmtAddr,apic_host] | xyseries repIntvEnd Process currentAvg</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">CPU Usage (%)</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="process">$click.name2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Controller Processes: Memory Allocation</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:stats $formed_apic_host$ component=procMem5min OR component=procMem15min |rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)\/sys\/proc\/proc-(?&lt;Process&gt;[^\/]+)"|search Pod=$pod$| join APIC,apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host| search oobMgmtAddr=$node$ | table APIC,oobMgmtAddr,apic_host]| eval currentAvg=round(currentAvg/(1024*1024),4)  | xyseries repIntvEnd Process currentAvg</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.text">Memory Allocated (GB)</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="memory">$click.name2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$process$">
+      <title>CPU Usage (%) for : $process$</title>
+      <table>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:stats $formed_apic_host$ component=procCPU5min OR procCPU15min |rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)\/sys\/proc\/proc-(?&lt;Process&gt;[^\/]+)"|search Pod=$pod$| join APIC,apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host| search oobMgmtAddr=$node$ | table APIC,oobMgmtAddr,apic_host ] | search Process=$process$ | table apic_host, currentAvg, currentMax, currentMin, repIntvStart, repIntvEnd | rename apic_host As "APIC Site/Cluster", currentAvg AS "Average CPU Utilization", currentMax AS "Max CPU Utilization", currentMin AS "Min CPU Utilization", repIntvStart AS "Interval Start", repIntvEnd AS "Interval End"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel depends="$memory$">
+      <title>Memory Allocated (GB) for: $memory$</title>
+      <table>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:stats $formed_apic_host$ component=procMem5min OR component=procMem15min |rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)\/sys\/proc\/proc-(?&lt;Process&gt;[^\/]+)"|search Pod=$pod$ Process=$memory$| join APIC,apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host| search oobMgmtAddr=$node$ | table APIC,oobMgmtAddr,apic_host]| eval currentAvg=round(currentAvg/(1024*1024),4)| eval currentMax=round(currentMax/(1024*1024),4)| eval currentMin=round(currentMin/(1024*1024),4)| table apic_host, currentAvg, currentMax, currentMin, repIntvStart, repIntvEnd | rename apic_host As "APIC Site/Cluster", currentAvg AS "Average Memory Allocated", currentMax AS "Max Memory Allocated", currentMin AS "Min Memory Allocated", repIntvStart AS "Interval Start", repIntvEnd AS "Interval End"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Controller Faults by Severity</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=faultInst|rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)"|search Pod=$pod$| join APIC,apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host| search oobMgmtAddr="$node$" | table APIC,oobMgmtAddr,apic_host] | dedup dn,apic_host | stats count(dn) by severity</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
+        <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisTitleX.visibility">visible</option>
+        <option name="charting.axisTitleY.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisX.abbreviation">none</option>
+        <option name="charting.axisX.scale">linear</option>
+        <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.scale">linear</option>
+        <option name="charting.axisY2.abbreviation">none</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.chart">pie</option>
+        <option name="charting.chart.bubbleMaximumSize">50</option>
+        <option name="charting.chart.bubbleMinimumSize">10</option>
+        <option name="charting.chart.bubbleSizeBy">area</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.chart.showDataLabels">none</option>
+        <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
+        <option name="charting.chart.stackMode">default</option>
+        <option name="charting.chart.style">shiny</option>
+        <option name="charting.drilldown">all</option>
+        <option name="charting.layout.splitSeries">0</option>
+        <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
+        <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
+        <option name="charting.legend.mode">standard</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.lineWidth">2</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="trellis.enabled">0</option>
+        <option name="trellis.scales.shared">1</option>
+        <option name="trellis.size">medium</option>
+        <drilldown>
+          <set token="severity">$click.value$</set>
+        </drilldown>
+      </chart>
+    </panel>
+    <panel>
+      <title>Controller Storage over Time</title>
+      <chart>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" $formed_apic_host$ component=eqptStorage |rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)" | search Pod=$pod$ | join APIC type=left [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host | table APIC,oobMgmtAddr,apic_host] |search oobMgmtAddr=$node$ |chart avg(capUtilized) AS "% Utilized" by modTs,mount useother=false</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.chart.nullValueMode">connect</option>
+        <option name="charting.drilldown">all</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <set token="mnt">$click.name2$</set>
+        </drilldown>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$severity$">
+      <title>Fault Statistics: $severity$</title>
+      <table>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=faultInst severity=$severity$|rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)"|search Pod=$pod$| join APIC, apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host | search oobMgmtAddr=$node$ | table APIC,oobMgmtAddr,apic_host] | stats latest(ack) as Acknowledged latest(APIC) AS Node latest(severity) AS Severity latest(cause) AS Cause latest(descr) AS Descr latest(rule) AS Rule latest(type) AS Type  latest(created) AS Created latest(code) AS code latest(changeSet) AS ChangeSet by dn,apic_host |join type=left code [|inputlookup cisco_dc_APICFaultDetails.csv]| table apic_host,dn, Acknowledged, Node, Severity, Cause, description, "Recommended Action", Descr, Rule, Type, Created, code, ChangeSet | rename apic_host AS "APIC Site/Cluster", code AS Code, description AS "Explanation", dn AS FQDN</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel depends="$mnt$">
+      <title>Storage Resource: $mnt$</title>
+      <table>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype="cisco:dc:aci:class" $formed_apic_host$ component=eqptStorage |rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)" | search Pod=$pod$ | join APIC, apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host | search oobMgmtAddr=$node$ | table APIC,oobMgmtAddr,apic_host] | search mount="$mnt$" | stats avg(capUtilized) by apic_host, fileSystem, blocks, operSt| rename apic_host AS "APIC Site/Cluster", fileSystem AS "File System", avg(capUtilized) AS " Avg. Disk Storage Utilization (%)", blocks AS "Blocks", operSt AS "Operational State"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="rowNumbers">false</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Power Supply Details</title>
+      <table>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:health $formed_apic_host$ component=eqptPsu| rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)\/sys\/ch\/psu(?&lt;psu&gt;[^\/]+)\/psu"| search Pod=$pod$ | join APIC,apic_host type=left [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,oobMgmtAddr,apic_host | table APIC,oobMgmtAddr,apic_host] |search oobMgmtAddr=$node$ | stats latest(volt) AS "Voltage" latest(drawnCurr) AS "Drawn Current" latest(operSt) AS "Operational State" latest(ser) AS "Serial No." by apic_host, psu, Pod, APIC | rename psu AS "Slot", apic_host As "APIC Site/Cluster"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Containers (App Center Apps)</title>
+      <table>
+        <search>
+          <query>`cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$  dn="*/node-*/*" component=procContainer |rex field=dn "topology\/(?&lt;Pod&gt;[^\/]+)\/(?&lt;APIC&gt;[^\/]+)"|search Pod=$pod$| join APIC, apic_host [search `cisco_dc_aci_index` sourcetype=cisco:dc:aci:class $formed_apic_host$ component=topSystem role=controller | eval APIC= "node-"+id |dedup APIC,apic_host,oobMgmtAddr]| search oobMgmtAddr="$node$" | stats latest(id) AS "Container Id"  latest(adminSt) AS "Admin State" latest(processId) AS "Process Id"  latest(cpuPct) AS "CPU Usage" latest(memPct) AS "Memory Allocated" latest(modTs) AS "Last Updated" by apic_host, containerName | rename containerName AS "Container Name", apic_host AS "APIC Site/Cluster"</query>
+          <earliest>$timetoken.earliest$</earliest>
+          <latest>$timetoken.latest$</latest>
+          
+        </search>
+        <option name="count">10</option>
+        <option name="dataOverlayMode">none</option>
+        <option name="drilldown">none</option>
+        <option name="percentagesRow">false</option>
+        <option name="rowNumbers">true</option>
+        <option name="totalsRow">false</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

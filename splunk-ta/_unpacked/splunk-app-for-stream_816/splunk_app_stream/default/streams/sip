@@ -1,0 +1,767 @@
+{
+  "app": "Stream", 
+  "category": "Telephony", 
+  "enabled": true, 
+  "extras": {
+    "eventType": "sip.event"
+  },
+  "fields": [
+    {
+      "aggType": "value", 
+      "desc": "The total number of bytes transferred", 
+      "enabled": true, 
+      "name": "bytes", 
+      "term": "flow.bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client IP Address", 
+      "enabled": true, 
+      "name": "src_ip", 
+      "term": "flow.c-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "src_mac", 
+      "term": "flow.c-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client port number", 
+      "enabled": true, 
+      "name": "src_port", 
+      "term": "flow.c-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates client terminated connection with RST flag",
+      "enabled": false, 
+      "name": "canceled", 
+      "term": "flow.canceled"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "TCP session server endpoint (IP address and TCP port)", 
+      "enabled": false, 
+      "name": "connection", 
+      "term": "flow.connection"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Average round trip time in microseconds from the client to the point of capture", 
+      "enabled": false, 
+      "name": "client_rtt", 
+      "term": "flow.cp-rtt"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of round trip measurements from the client to the point of capture", 
+      "enabled": false, 
+      "name": "client_rtt_packets", 
+      "term": "flow.cp-rtt-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sum of all round trip time measurements from the client to the point of capture", 
+      "enabled": false, 
+      "name": "client_rtt_sum", 
+      "term": "flow.cp-rtt-sum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of acknowledgement packets sent from client to server", 
+      "enabled": false, 
+      "name": "ack_packets_in", 
+      "term": "flow.cs-ack-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from client to server", 
+      "enabled": true, 
+      "name": "bytes_in", 
+      "term": "flow.cs-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of data packets sent from client to server", 
+      "enabled": false, 
+      "name": "data_packets_in", 
+      "term": "flow.cs-data-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of duplicate packets sent from client to server", 
+      "enabled": false, 
+      "name": "duplicate_packets_in", 
+      "term": "flow.cs-duplicate-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of missing packet gaps detected within the request", 
+      "enabled": false, 
+      "name": "missing_packets_in", 
+      "term": "flow.cs-missing-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from client to server", 
+      "enabled": false, 
+      "name": "packets_in", 
+      "term": "flow.cs-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took the client to send a request", 
+      "enabled": true, 
+      "name": "request_time", 
+      "term": "flow.cs-send-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Name of network interface", 
+      "enabled": false, 
+      "name": "network_interface", 
+      "term": "flow.interface-name"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Hostname where flow was captured", 
+      "enabled": false, 
+      "name": "capture_hostname", 
+      "term": "flow.hostname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Average round trip time in microseconds from the server to the point of capture", 
+      "enabled": false, 
+      "name": "server_rtt", 
+      "term": "flow.ps-rtt"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of round trip measurements from the server to the point of capture", 
+      "enabled": false, 
+      "name": "server_rtt_packets", 
+      "term": "flow.ps-rtt-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sum of all round trip time measurements from the server to the point of capture", 
+      "enabled": false, 
+      "name": "server_rtt_sum", 
+      "term": "flow.ps-rtt-sum"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates server terminated connection with RST flag",
+      "enabled": false, 
+      "name": "refused", 
+      "term": "flow.refused"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server IP Address", 
+      "enabled": true, 
+      "name": "dest_ip", 
+      "term": "flow.s-ip"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server packets MAC address in hexadecimal format", 
+      "enabled": true, 
+      "name": "dest_mac", 
+      "term": "flow.s-mac"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server port number", 
+      "enabled": true, 
+      "name": "dest_port", 
+      "term": "flow.s-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of acknowledgement packets sent from server to client", 
+      "enabled": false, 
+      "name": "ack_packets_out", 
+      "term": "flow.sc-ack-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of bytes sent from server to client", 
+      "enabled": true, 
+      "name": "bytes_out", 
+      "term": "flow.sc-bytes"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of data packets sent from server to client", 
+      "enabled": false, 
+      "name": "data_packets_out", 
+      "term": "flow.sc-data-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of duplicate packets sent from server to client", 
+      "enabled": false, 
+      "name": "duplicate_packets_out", 
+      "term": "flow.sc-duplicate-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The number of missing packet gaps detected within the response", 
+      "enabled": false, 
+      "name": "missing_packets_out", 
+      "term": "flow.sc-missing-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The total number of packets sent from server to client", 
+      "enabled": false, 
+      "name": "packets_out", 
+      "term": "flow.sc-packets"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took the server to start replying to a request", 
+      "enabled": true, 
+      "name": "reply_time", 
+      "term": "flow.sc-reply-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took the server to send a response", 
+      "enabled": true, 
+      "name": "response_time", 
+      "term": "flow.sc-send-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took to negotiate an SSL handshake", 
+      "enabled": false, 
+      "name": "ssl_time", 
+      "term": "flow.ssl-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "SSL protocol version used for encryption, or undefined if not encrypted", 
+      "enabled": false, 
+      "name": "ssl_version", 
+      "term": "flow.ssl-version"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "TCP handshake status (0=OK, 1=RESET, 2=IGNORED)", 
+      "enabled": false, 
+      "name": "tcp_status", 
+      "term": "flow.tcp-status"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Number of microseconds that it took to complete a flow event, from the end user's perspective", 
+      "enabled": true, 
+      "name": "time_taken", 
+      "term": "flow.time-taken"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Transport layer protocol (udp or tcp)", 
+      "enabled": true, 
+      "name": "transport", 
+      "term": "flow.transport"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "VLAN ID from 802.1Q header - with multiple vlan tags, this field is the innermost tag", 
+      "enabled": false, 
+      "name": "vlan_id", 
+      "term": "flow.vlan-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Flow Id", 
+      "enabled": true, 
+      "name": "flow_id", 
+      "term": "flow.flow-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the preferred languages", 
+      "enabled": true, 
+      "name": "accept_language", 
+      "term": "sip.accept-language"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Specifies an alternative ring tone", 
+      "enabled": true, 
+      "name": "alert_info", 
+      "term": "sip.alert-info"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Call duration in microseconds", 
+      "enabled": true, 
+      "name": "call_duration", 
+      "term": "sip.call-duration"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Call id, extracted for each call", 
+      "enabled": true, 
+      "name": "call_id", 
+      "term": "sip.call-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Provides additional information about the caller or callee", 
+      "enabled": true, 
+      "name": "call_info", 
+      "term": "sip.call-info"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the identity of the called party for a call", 
+      "enabled": true, 
+      "name": "callee", 
+      "term": "sip.callee"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IPv4 address which could be used by the called party", 
+      "enabled": true, 
+      "name": "callee_addr", 
+      "term": "sip.callee-addr"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IPv6 address which could be used by the called party", 
+      "enabled": true, 
+      "name": "callee_addr_v6", 
+      "term": "sip.callee-addr-v6"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Callee's domain", 
+      "enabled": true, 
+      "name": "callee_domain", 
+      "term": "sip.callee-domain"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Format of the callee's telephone numbers", 
+      "enabled": true, 
+      "name": "callee_e164", 
+      "term": "sip.callee-e164"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Callee nickname", 
+      "enabled": true, 
+      "name": "callee_nickname", 
+      "term": "sip.callee-nickname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Port which could be used by the callee", 
+      "enabled": true, 
+      "name": "callee_port", 
+      "term": "sip.callee-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server's software in the callee way", 
+      "enabled": true, 
+      "name": "callee_server_agent", 
+      "term": "sip.callee-server-agent"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client's software used by the callee", 
+      "enabled": true, 
+      "name": "callee_user_agent", 
+      "term": "sip.callee-user-agent"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Callee's phone presence flag", 
+      "enabled": true, 
+      "name": "callee_user_phone", 
+      "term": "sip.callee-user-phone"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the identity of the initiator of the call", 
+      "enabled": true, 
+      "name": "caller", 
+      "term": "sip.caller"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IPv4 address which could be used by the initiator of the call", 
+      "enabled": true, 
+      "name": "caller_addr", 
+      "term": "sip.caller-addr"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "IPv6 address which could be used by the initiator of the call", 
+      "enabled": true, 
+      "name": "caller_addr_v6", 
+      "term": "sip.caller-addr-v6"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Caller's domain", 
+      "enabled": true, 
+      "name": "caller_domain", 
+      "term": "sip.caller-domain"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Format of the caller's telephone numbers", 
+      "enabled": true, 
+      "name": "caller_e164", 
+      "term": "sip.caller-e164"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Caller nickname", 
+      "enabled": true, 
+      "name": "caller_nickname", 
+      "term": "sip.caller-nickname"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Port which could be used by the caller", 
+      "enabled": true, 
+      "name": "caller_port", 
+      "term": "sip.caller-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server's software in the caller way", 
+      "enabled": true, 
+      "name": "caller_server_agent", 
+      "term": "sip.caller-server-agent"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client's software in the caller way", 
+      "enabled": true, 
+      "name": "caller_user_agent", 
+      "term": "sip.caller-user-agent"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Caller's phone presence flag", 
+      "enabled": true, 
+      "name": "caller_user_phone", 
+      "term": "sip.caller-user-phone"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Callee's name, in a confcall", 
+      "enabled": true, 
+      "name": "confcall_callee", 
+      "term": "sip.confcall-callee"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Caller's name, in a confcall", 
+      "enabled": true, 
+      "name": "confcall_caller", 
+      "term": "sip.confcall-caller"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Connection IPv4 address", 
+      "enabled": true, 
+      "name": "connection_info_addr", 
+      "term": "sip.connection-info-addr"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Connection address type", 
+      "enabled": true, 
+      "name": "connection_info_addr_type", 
+      "term": "sip.connection-info-addr-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Connection IPv6 address", 
+      "enabled": true, 
+      "name": "connection_info_addr_v6", 
+      "term": "sip.connection-info-addr-v6"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Network type for the connection", 
+      "enabled": true, 
+      "name": "connection_info_net_type", 
+      "term": "sip.connection-info-net-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The Contact header field provides a SIP or SIPS URI that can be used to contact that specific instance of the UA for subsequent requests", 
+      "enabled": true, 
+      "name": "contact", 
+      "term": "sip.contact"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Sequence number", 
+      "enabled": true, 
+      "name": "cseq", 
+      "term": "sip.cseq"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Data port for client's protocol", 
+      "enabled": true, 
+      "name": "data_port", 
+      "term": "sip.data-port"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the date and time", 
+      "enabled": true, 
+      "name": "date", 
+      "term": "sip.date"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Status of the call end", 
+      "enabled": true, 
+      "name": "end_status", 
+      "term": "sip.end-status"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The initiator of the request", 
+      "enabled": true, 
+      "name": "from", 
+      "term": "sip.from"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "A globally unique id of the caller", 
+      "enabled": true, 
+      "name": "from_tag", 
+      "term": "sip.from-tag"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Media attributes", 
+      "enabled": true, 
+      "name": "media_attr", 
+      "term": "sip.media-attr"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client's protocol formats available", 
+      "enabled": true, 
+      "name": "media_format", 
+      "term": "sip.media-format"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Protocol used in client stream", 
+      "enabled": true, 
+      "name": "media_proto", 
+      "term": "sip.media-proto"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the media type", 
+      "enabled": true, 
+      "name": "media_type", 
+      "term": "sip.media-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The command", 
+      "enabled": true, 
+      "name": "method", 
+      "term": "sip.method"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Data type", 
+      "enabled": true, 
+      "name": "mime_type", 
+      "term": "sip.mime-type"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Indicates the identity of the trusted SIP server", 
+      "enabled": true, 
+      "name": "p_asserted_id", 
+      "term": "sip.p-asserted-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Allows the client to identify itself (or its user) to a proxy that requires authentication", 
+      "enabled": true, 
+      "name": "proxy_authorization", 
+      "term": "sip.proxy-authorization"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The reason a Session Initiation Protocol request was issued", 
+      "enabled": true, 
+      "name": "reason", 
+      "term": "sip.reason"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The Record-Route header field is inserted by proxies in a request to force future requests in the dialog to be routed through the proxy", 
+      "enabled": true, 
+      "name": "record_route", 
+      "term": "sip.record-route"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The IP address of the remote party", 
+      "enabled": true, 
+      "name": "remote_party_id", 
+      "term": "sip.remote-party-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Return status code", 
+      "enabled": true, 
+      "name": "reply_code", 
+      "term": "sip.reply-code"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Call's id extracted for each sip request", 
+      "enabled": true, 
+      "name": "request_call_id", 
+      "term": "sip.request-call-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Server's software", 
+      "enabled": true, 
+      "name": "server_agent", 
+      "term": "sip.server-agent"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Session duration in microseconds", 
+      "enabled": true, 
+      "name": "session_duration", 
+      "term": "sip.session-duration"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Call setup delay in microseconds", 
+      "enabled": true, 
+      "name": "setup_delay", 
+      "term": "sip.setup-delay"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Start date of the call", 
+      "enabled": true, 
+      "name": "start_time", 
+      "term": "sip.start-time"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The subject header present in the SIP packet", 
+      "enabled": true, 
+      "name": "subject", 
+      "term": "sip.subject"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Waiting delay before speak in microseconds", 
+      "enabled": true, 
+      "name": "time_before_spk", 
+      "term": "sip.time-before-spk"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The recipient of the request", 
+      "enabled": true, 
+      "name": "to", 
+      "term": "sip.to"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "A globally unique id of the callee", 
+      "enabled": true, 
+      "name": "to_tag", 
+      "term": "sip.to-tag"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains the URI (similar to To: field)", 
+      "enabled": true, 
+      "name": "uri", 
+      "term": "sip.uri"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client's software", 
+      "enabled": true, 
+      "name": "useragent", 
+      "term": "sip.user-agent"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Client identifier used for his registering with a SIP server", 
+      "enabled": true, 
+      "name": "user_id", 
+      "term": "sip.user-id"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "The Via header field indicates the transport used for the transaction and identifies the location where the response is to be sent", 
+      "enabled": true, 
+      "name": "via", 
+      "term": "sip.via"
+    }, 
+    {
+      "aggType": "value", 
+      "desc": "Contains an authentication challenge", 
+      "enabled": true, 
+      "name": "www_authenticate", 
+      "term": "sip.www-authenticate"
+    },
+    {
+      "aggType": "value", 
+      "desc": "Protocol stack of flow", 
+      "enabled": true, 
+      "name": "protocol_stack", 
+      "term": "flow.protocol-stack"
+    },
+    {
+      "aggType": "value", 
+      "desc": "VXLAN Network Identifier", 
+      "enabled": true, 
+      "name": "vxlan_id", 
+      "term": "flow.vxlan-id"
+    },
+    {
+      "aggType": "value",
+      "desc": "All VLAN tags collected from 802.1Q and 802.1ad headers",
+      "enabled": false,
+      "isList": true,
+      "name": "vlan_tags",
+      "term": "flow.vlan-tags"
+    }
+  ], 
+  "id": "sip", 
+  "isReferenceStream": true, 
+  "name": "SIP Protocol Events", 
+  "statsOnly": true,
+  "protocolName": "SIP", 
+  "sourcetype": "stream:sip", 
+  "streamType": "event"
+}
