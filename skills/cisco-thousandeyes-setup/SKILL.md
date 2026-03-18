@@ -89,7 +89,7 @@ Scripts read Splunk credentials from the project-root `credentials` file (falls
 back to `~/.splunk/credentials`) automatically:
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-thousandeyes-setup/scripts/validate.sh
 ```
 
 If credentials are not yet configured:
@@ -160,7 +160,7 @@ Before running, the agent must ask the user for:
 - HEC token name (default: `thousandeyes`)
 
 ```bash
-bash scripts/setup.sh --enable-inputs \
+bash skills/cisco-thousandeyes-setup/scripts/setup.sh --enable-inputs \
   --account "user@example.com" \
   --account-group "My Account Group" \
   --hec-token "thousandeyes" \
@@ -191,7 +191,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 8: Validate
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-thousandeyes-setup/scripts/validate.sh
 ```
 
 Checks: app installation, HEC token, indexes, OAuth account, token refresh
@@ -211,7 +211,7 @@ input, data inputs, data flow, settings, and optional ITSI status.
 ## MCP Server Integration
 
 ```bash
-bash scripts/load_mcp_tools.sh
+bash skills/cisco-thousandeyes-setup/scripts/load_mcp_tools.sh
 ```
 
 ## Key Learnings / Known Issues

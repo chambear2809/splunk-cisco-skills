@@ -93,12 +93,18 @@ detect_hec_target() {
     printf 'https://%s:8088' "${host}"
 }
 
+_ACS_HEC_CMD_GROUP=""
 acs_hec_command_group() {
-    if acs_command hec-token list --count 1 >/dev/null 2>&1; then
-        printf '%s' "hec-token"
-    else
-        printf '%s' "http-event-collectors"
+    if [[ -n "${_ACS_HEC_CMD_GROUP}" ]]; then
+        printf '%s' "${_ACS_HEC_CMD_GROUP}"
+        return 0
     fi
+    if acs_command hec-token list --count 1 >/dev/null 2>&1; then
+        _ACS_HEC_CMD_GROUP="hec-token"
+    else
+        _ACS_HEC_CMD_GROUP="http-event-collectors"
+    fi
+    printf '%s' "${_ACS_HEC_CMD_GROUP}"
 }
 
 cloud_get_hec_token_state() {

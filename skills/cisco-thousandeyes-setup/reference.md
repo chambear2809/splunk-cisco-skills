@@ -118,7 +118,7 @@ streams:manage alerts:manage tags:read integrations:manage`
 ### Splunk Cloud
 
 - **Target URL**: `https://http-inputs-{stack}.splunkcloud.com:443/services/collector/event`
-- **Management**: ACS `http-event-collectors` commands
+- **Management**: ACS `hec-token` commands
 - **Default token name**: `thousandeyes`
 
 ### Splunk Enterprise
