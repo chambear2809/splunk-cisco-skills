@@ -19,10 +19,11 @@ Install the original vendor archive from `splunk-ta/` as-is:
 
 - `cisco-enterprise-networking-for-splunk-platform_310.tar.gz`
 
-For Splunk Cloud, install that archive with ACS and then use this skill to
-configure macros, saved searches, acceleration, and validation over search-tier
-REST. Any `splunk-ta/_unpacked/` copy is review-only and not part of the normal
-workflow.
+For Splunk Cloud, prefer the ACS Splunkbase install path for this app so ACS
+can fetch the latest compatible release, then use this skill to configure
+macros, saved searches, acceleration, and validation over search-tier REST.
+Keep the archive in `splunk-ta/` as the local cache/reference copy. Any
+`splunk-ta/_unpacked/` copy is review-only and not part of the normal workflow.
 
 This is a **visualization app** — it provides dashboards and saved searches but
 does not collect data. Data collection is handled by the companion
@@ -51,7 +52,7 @@ REST endpoints.
 
 | Item | Value |
 |------|-------|
-| Search-tier API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Search-tier API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs (`SPLUNK_PLATFORM` is only an override for hybrid runs) |
 | TA app name | `cisco-catalyst-app` |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
@@ -62,7 +63,7 @@ REST endpoints.
 To run against a remote Splunk instance:
 
 ```bash
-export SPLUNK_URI="https://splunk-host:8089"
+export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 ```
 
 ## Prerequisites

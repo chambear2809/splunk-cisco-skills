@@ -3,7 +3,7 @@ set -euo pipefail
 
 SETUP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SETUP_SCRIPT_DIR}/../../.." && pwd)"
-CRED_FILE="${PROJECT_ROOT}/credentials"
+CRED_FILE="${SPLUNK_CREDENTIALS_FILE:-${PROJECT_ROOT}/credentials}"
 
 quote_credential_value() {
     printf '%s' "$1" | python3 -c 'import json, sys; print(json.dumps(sys.stdin.read()), end="")'
@@ -46,10 +46,22 @@ else:
 PY
 }
 
+default_acs_server_for_uri() {
+    local uri="$1"
+    local host
+    host="$(derive_host_from_uri "${uri}")"
+    if [[ "${host}" == *.stg.splunkcloud.com ]]; then
+        printf '%s' "https://staging.admin.splunk.com"
+    else
+        printf '%s' "https://admin.splunk.com"
+    fi
+}
+
 echo "=== Splunk Credentials Setup ==="
 echo ""
 echo "Credentials will be saved to: ${CRED_FILE}"
 echo "(This file is gitignored and will not be committed.)"
+echo "Set SPLUNK_CREDENTIALS_FILE to write to a different file."
 echo ""
 
 if [[ -f "${CRED_FILE}" ]]; then
@@ -62,7 +74,7 @@ if [[ -f "${CRED_FILE}" ]]; then
 fi
 
 echo ""
-read -rp "Search-tier REST URI (optional; leave blank if this file is only for ACS or if you will set SPLUNK_URI per run): " splunk_uri
+read -rp "Search-tier REST URI (optional; stored as SPLUNK_SEARCH_API_URI; leave blank if this file is only for ACS or if you will set it per run): " splunk_uri
 
 splunk_host="$(derive_host_from_uri "${splunk_uri}")"
 splunk_mgmt_port="$(derive_port_from_uri "${splunk_uri}")"
@@ -71,7 +83,7 @@ if [[ -z "${splunk_mgmt_port}" ]]; then
 fi
 
 echo ""
-read -rp "Search-tier admin username (leave blank to skip): " sp_user
+read -rp "Search-tier admin username (leave blank to skip; for Cloud this is often the stack-local username): " sp_user
 sp_pass=""
 if [[ -n "${sp_user}" ]]; then
     read -rsp "Search-tier admin password: " sp_pass
@@ -97,7 +109,7 @@ fi
 splunk_cloud_stack=""
 splunk_cloud_search_head=""
 splunk_cloud_index_searchable_days="90"
-acs_server="https://admin.splunk.com"
+acs_server="$(default_acs_server_for_uri "${splunk_uri}")"
 stack_username=""
 stack_password=""
 stack_token=""
@@ -106,17 +118,17 @@ stack_token_user=""
 echo ""
 read -rp "Add Splunk Cloud ACS settings? [y/N]: " add_cloud
 if [[ "${add_cloud}" =~ ^[yY] ]]; then
-    read -rp "Splunk Cloud stack name (URL prefix, required for ACS): " splunk_cloud_stack
-    read -rp "Target specific search head prefix (optional): " splunk_cloud_search_head
-    read -rp "ACS server URL (default: https://admin.splunk.com): " acs_server_input
-    acs_server="${acs_server_input:-https://admin.splunk.com}"
+    read -rp "ACS stack identifier (required for ACS; for staging use the prefix before .stg.splunkcloud.com): " splunk_cloud_stack
+    read -rp "Target specific ACS search head prefix (optional; example: sh-i-0910d0dfdb9ed913a or shc1): " splunk_cloud_search_head
+    read -rp "ACS server URL (default: ${acs_server}): " acs_server_input
+    acs_server="${acs_server_input:-${acs_server}}"
     read -rp "Default searchable days for ACS-created indexes (default: 90): " searchable_days_input
     splunk_cloud_index_searchable_days="${searchable_days_input:-90}"
 
     echo ""
     echo "ACS authentication setup:"
     echo "  1) Skip for now"
-    echo "  2) Store an existing stack token"
+    echo "  2) Store an existing stack token (recommended for staging / SSO)"
     echo "  3) Store stack-local username/password so ACS CLI can create a token"
     read -rp "Choose [1/2/3]: " acs_auth_choice
     case "${acs_auth_choice}" in
@@ -160,7 +172,7 @@ fi
 
 splunk_host_q=$(quote_credential_value "${splunk_host}")
 splunk_mgmt_port_q=$(quote_credential_value "${splunk_mgmt_port}")
-splunk_uri_q=$(quote_credential_value "${splunk_uri}")
+splunk_search_api_uri_q=$(quote_credential_value "${splunk_uri}")
 sp_user_q=$(quote_credential_value "${sp_user}")
 sp_pass_q=$(quote_credential_value "${sp_pass}")
 splunk_ssh_host_q=$(quote_credential_value "${splunk_ssh_host}")
@@ -184,10 +196,16 @@ cat > "${CRED_FILE}" <<EOF
 # Splunk credential file — chmod 600
 # Used by skill scripts for REST API, ACS, and Splunkbase authentication.
 # Do NOT commit this file to version control.
-# Values are stored as literal strings. Shell expressions are not executed.
+# Values are stored as strings. The helper supports simple \${OTHER_KEY}
+# references from this file, but does not execute arbitrary shell expressions.
+# Optional profile support:
+# - Set SPLUNK_PROFILE to select a named profile in this file.
+# - Profile entries use PROFILE_<name>__KEY="value".
 SPLUNK_HOST=${splunk_host_q}
 SPLUNK_MGMT_PORT=${splunk_mgmt_port_q}
-SPLUNK_URI=${splunk_uri_q}
+SPLUNK_SEARCH_API_URI=${splunk_search_api_uri_q}
+# Legacy alias kept for backward compatibility with older automation.
+SPLUNK_URI=\${SPLUNK_SEARCH_API_URI}
 SPLUNK_USER=${sp_user_q}
 SPLUNK_PASS=${sp_pass_q}
 SPLUNK_SSH_HOST=${splunk_ssh_host_q}
@@ -213,6 +231,7 @@ chmod 600 "${CRED_FILE}"
 echo ""
 echo "Credentials saved to ${CRED_FILE} (mode 600)"
 echo "Scripts will read from this file automatically."
+echo "Advanced option: define PROFILE_<name>__KEY entries and set SPLUNK_PROFILE to manage multiple targets in one file."
 if [[ "${add_cloud}" =~ ^[yY] ]]; then
     echo "Cloud note: ACS app installs and index management use the ACS CLI, while app-specific TA setup still needs search-api access if you plan to configure the search tier over REST."
 fi

@@ -99,7 +99,7 @@ local_body=$(form_urlencode_pairs \
     automatic_input_creation_index "${AUTO_INDEX}") || exit 1
 resp=$(splunk_curl_post "${SK}" \
     "${local_body}" \
-    "${local_endpoint}" -w '\n%{http_code}')
+    "${local_endpoint}?output_mode=json" -w '\n%{http_code}')
 http_code=$(echo "${resp}" | tail -1)
 
 if [[ "${http_code}" == "201" || "${http_code}" == "200" ]]; then
@@ -117,7 +117,7 @@ elif [[ "${http_code}" == "409" ]]; then
         automatic_input_creation_index "${AUTO_INDEX}") || exit 1
     resp=$(splunk_curl_post "${SK}" \
         "${update_body}" \
-        "${local_endpoint}/${ACCT_NAME}" -w '\n%{http_code}')
+        "${local_endpoint}/${ACCT_NAME}?output_mode=json" -w '\n%{http_code}')
     http_code=$(echo "${resp}" | tail -1)
     log "  UPDATE: HTTP ${http_code}"
 else

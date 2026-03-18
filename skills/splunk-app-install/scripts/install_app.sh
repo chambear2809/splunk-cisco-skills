@@ -20,6 +20,8 @@ UPDATE_SET=false
 RESTART_SPLUNK=true
 PRE_VETTED=false
 
+CISCO_LICENSE_ACK_URL="https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
+
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 is_interactive() { [[ -t 0 ]]; }
@@ -63,6 +65,65 @@ safe_read() {
     read "$@"
 }
 
+cloud_known_splunkbase_metadata_from_package() {
+    local package_name
+    package_name="$(basename "${1:-}" | tr '[:upper:]' '[:lower:]')"
+    case "${package_name}" in
+        cisco-catalyst-add-on-for-splunk_*.tar.gz|cisco-catalyst-add-on-for-splunk_*.tgz|cisco-catalyst-add-on-for-splunk_*.spl)
+            printf '%s|%s\n' "7538" "${CISCO_LICENSE_ACK_URL}"
+            ;;
+        cisco-dc-networking_*.tar.gz|cisco-dc-networking_*.tgz|cisco-dc-networking_*.spl)
+            printf '%s|%s\n' "7777" "${CISCO_LICENSE_ACK_URL}"
+            ;;
+        cisco-enterprise-networking-for-splunk-platform_*.tar.gz|cisco-enterprise-networking-for-splunk-platform_*.tgz|cisco-enterprise-networking-for-splunk-platform_*.spl)
+            printf '%s|%s\n' "7539" "${CISCO_LICENSE_ACK_URL}"
+            ;;
+        cisco-intersight-add-on-for-splunk_*.tar.gz|cisco-intersight-add-on-for-splunk_*.tgz|cisco-intersight-add-on-for-splunk_*.spl)
+            printf '%s|%s\n' "7828" "${CISCO_LICENSE_ACK_URL}"
+            ;;
+        cisco-meraki-add-on-for-splunk_*.tar.gz|cisco-meraki-add-on-for-splunk_*.tgz|cisco-meraki-add-on-for-splunk_*.spl)
+            printf '%s|%s\n' "5580" "${CISCO_LICENSE_ACK_URL}"
+            ;;
+    esac
+}
+
+cloud_known_license_ack_url_by_app_id() {
+    case "${1:-}" in
+        7538|7539|7777|7828|5580)
+            printf '%s\n' "${CISCO_LICENSE_ACK_URL}"
+            ;;
+    esac
+}
+
+cloud_apply_known_splunkbase_defaults() {
+    local default_license
+    default_license="$(cloud_known_license_ack_url_by_app_id "${APP_ID}")"
+    if [[ -z "${LICENSE_ACK_URL}" && -n "${default_license}" ]]; then
+        LICENSE_ACK_URL="${default_license}"
+    fi
+}
+
+cloud_prefer_splunkbase_for_known_package() {
+    local package_path="$1"
+    local metadata known_app_id default_license
+
+    metadata="$(cloud_known_splunkbase_metadata_from_package "${package_path}")"
+    [[ -n "${metadata}" ]] || return 0
+
+    IFS='|' read -r known_app_id default_license <<< "${metadata}"
+    APP_ID="${known_app_id}"
+    [[ -z "${LICENSE_ACK_URL}" ]] && LICENSE_ACK_URL="${default_license}"
+    APP_FILE=""
+    APP_URL=""
+    SOURCE="splunkbase"
+
+    if [[ -n "${APP_VERSION}" ]]; then
+        log "Known Splunkbase package detected for Splunk Cloud; switching to ACS Splunkbase install for app ID ${APP_ID} version ${APP_VERSION}."
+    else
+        log "Known Splunkbase package detected for Splunk Cloud; switching to ACS Splunkbase install for the latest compatible version (app ID ${APP_ID})."
+    fi
+}
+
 # Accept flags for non-interactive use; anything missing gets prompted
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -101,6 +162,8 @@ Credentials and remote host settings are read from the project-root credentials 
 For Splunk Cloud installs, configure ACS access. If one credentials file contains
 both Cloud and Enterprise targets, interactive runs will prompt when needed, or
 you can override with SPLUNK_PLATFORM=cloud or SPLUNK_PLATFORM=enterprise.
+For Enterprise search-tier REST access, set SPLUNK_SEARCH_API_URI when targeting
+non-localhost (legacy alias: SPLUNK_URI).
 For remote Enterprise local-package installs, the script tries REST upload first,
 then falls back to SSH staging using SPLUNK_SSH_HOST/SPLUNK_SSH_USER/SPLUNK_SSH_PASS.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
@@ -206,6 +269,7 @@ prompt_splunkbase() {
         echo ""
         safe_read "--app-version" -rp "App version (leave blank for latest): " APP_VERSION
     fi
+    cloud_apply_known_splunkbase_defaults
 }
 
 prompt_update() {
@@ -292,29 +356,13 @@ restart_splunk_or_exit() {
 
 cloud_wait_for_status() {
     local timeout_secs="${1:-300}" interval_secs="${2:-5}"
-    local waited=0 status_json state
+    local waited=0 infra restart_required
 
     while (( waited < timeout_secs )); do
-        status_json=$(acs_command status current-stack 2>/dev/null || true)
-        state=$(printf '%s' "${status_json}" \
-            | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    infra = ((data.get('status') or {}).get('infrastructure') or {}).get('status', '')
-    restart_required = ((data.get('messages') or {}).get('restartRequired', False))
-    if restart_required:
-        print('restart-required')
-    else:
-        print(infra or 'unknown')
-except Exception:
-    print('unknown')
-")
-        case "${state}" in
-            Ready|restart-required)
-                return 0
-                ;;
-        esac
+        read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
+        if [[ "${infra}" == "Ready" || "${restart_required}" == "true" ]]; then
+            return 0
+        fi
         sleep "${interval_secs}"
         waited=$((waited + interval_secs))
     done
@@ -350,7 +398,8 @@ cloud_restart_or_exit() {
 cloud_resolve_splunkbase_app_name() {
     local splunkbase_id="$1"
     acs_prepare_context || return 1
-    acs_command apps list --splunkbase --count 1000 2>/dev/null \
+    acs_command apps list --splunkbase --count 100 2>/dev/null \
+        | acs_extract_http_response_json \
         | python3 -c "
 import json, sys
 target = str(sys.argv[1])
@@ -368,19 +417,29 @@ except Exception:
 cloud_install_private_app() {
     local file_path="$1"
     local -a cmd=(apps install private --acs-legal-ack Y --app-package "${file_path}")
-    local response app_name version status
+    local response app_name version status rc
 
     acs_prepare_context || exit 1
     ${PRE_VETTED} && cmd+=(--pre-vetted)
     cloud_requires_local_scope && cmd+=(--scope local)
 
     log "Installing private app package $(basename "${file_path}") to Splunk Cloud via ACS..."
-    response=$(acs_command "${cmd[@]}" 2>/dev/null) || {
-        log "ERROR: ACS private app install failed."
+    set +e
+    response=$(acs_command "${cmd[@]}" 2>&1)
+    rc=$?
+    set -e
+    if (( rc != 0 )); then
+        if [[ "${response}" == *"App id conflict with Splunkbase App id"* ]]; then
+            log "ERROR: ACS rejected this package because it maps to a Splunkbase app. Use --source splunkbase or let the installer auto-switch for known packages."
+        else
+            log "ERROR: ACS private app install failed."
+        fi
+        [[ -n "${response}" ]] && printf '%s\n' "${response}"
         exit 1
-    }
+    fi
 
     read -r app_name version status <<< "$(printf '%s' "${response}" \
+        | acs_extract_http_response_json \
         | python3 -c "
 import json, sys
 try:
@@ -395,9 +454,10 @@ except Exception:
 
 cloud_install_splunkbase_app() {
     local -a cmd response_fields
-    local response app_name version status installed_name
+    local response app_name version status installed_name rc
 
     acs_prepare_context || exit 1
+    cloud_apply_known_splunkbase_defaults
 
     if ${UPDATE}; then
         installed_name="$(cloud_resolve_splunkbase_app_name "${APP_ID}" || true)"
@@ -422,12 +482,18 @@ cloud_install_splunkbase_app() {
         log "Installing Splunkbase app ID ${APP_ID} via ACS..."
     fi
 
-    response=$(acs_command "${cmd[@]}" 2>/dev/null) || {
+    set +e
+    response=$(acs_command "${cmd[@]}" 2>&1)
+    rc=$?
+    set -e
+    if (( rc != 0 )); then
         log "ERROR: ACS Splunkbase app operation failed."
+        [[ -n "${response}" ]] && printf '%s\n' "${response}"
         exit 1
-    }
+    fi
 
     read -r app_name version status <<< "$(printf '%s' "${response}" \
+        | acs_extract_http_response_json \
         | python3 -c "
 import json, sys
 try:
@@ -828,10 +894,12 @@ main() {
         case "${SOURCE}" in
             local)
                 prompt_local_file
+                cloud_prefer_splunkbase_for_known_package "${APP_FILE}"
                 ;;
             remote|url)
                 prompt_url
                 download_from_url
+                cloud_prefer_splunkbase_for_known_package "${APP_FILE}"
                 ;;
             splunkbase)
                 prompt_splunkbase

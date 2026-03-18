@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
-# Derive a default Splunk Web URL from the management URI.
+# Derive a default Splunk Web URL from the search-tier REST URI.
 # Splunk Cloud exposes the app over standard HTTPS rather than port 8000.
 if is_splunk_cloud; then
     SPLUNK_WEB_URL="${SPLUNK_WEB_URL:-${SPLUNK_URI/8089/443}}"
@@ -40,8 +40,8 @@ Examples:
   $(basename "$0") --disable irc,xmpp
 
 Environment:
-  SPLUNK_URI            Splunk management URI (default: https://localhost:8089)
-  SPLUNK_WEB_URL        Splunk Web URI for Stream API (default: derived from SPLUNK_URI)
+  SPLUNK_SEARCH_API_URI Search-tier REST URI (legacy alias: SPLUNK_URI)
+  SPLUNK_WEB_URL        Splunk Web URI for Stream API (default: derived from the search-tier REST URI)
 
 Splunk credentials are read from the project-root credentials file automatically.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh

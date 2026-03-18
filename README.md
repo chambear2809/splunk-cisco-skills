@@ -62,14 +62,19 @@ skill-specific details.
 
 ## Vendor Package Policy
 
-This repo now treats the vendor-provided app archives in `splunk-ta/` as the
-deployment source of truth.
+This repo now treats `splunk-ta/` as the local package cache and review cache,
+not as the only cloud deployment source.
 
-- **Install as-is**: for both Splunk Enterprise and Splunk Cloud, the normal
-  workflow installs the original `.tgz`, `.tar.gz`, or `.spl` archive from
-  `splunk-ta/`.
-- **Cloud install path**: use ACS to install the original package, then use the
-  skill-specific REST/API automation to configure the installed app.
+- **Enterprise install path**: install the original `.tgz`, `.tar.gz`, or `.spl`
+  archive from `splunk-ta/`, a remote URL, or Splunkbase.
+- **Cloud install path**: for apps published on Splunkbase, prefer ACS
+  Splunkbase installs and let ACS fetch the latest compatible release. Use
+  private package uploads only for genuinely private or pre-vetted apps that do
+  not have a public Splunkbase install path.
+- **Known Cisco cloud installs**: the cloud installer now prefers ACS
+  Splunkbase installs for the Cisco Catalyst, Cisco DC Networking, Cisco
+  Enterprise Networking, Cisco Intersight, and Cisco Meraki packages shipped in
+  this repo.
 - **No extract/repack required**: unpacked app trees are not part of the normal
   deployment workflow.
 - **Review-only unpacked copies**: anything under `splunk-ta/_unpacked/` is for
@@ -95,8 +100,9 @@ The normal workflow is:
 ### 1. Configure Credentials
 
 All scripts load deployment settings from a project-root `credentials` file
-first, and fall back to `~/.splunk/credentials` if the project file does not
-exist.
+first, fall back to `~/.splunk/credentials` if the project file does not exist,
+and honor `SPLUNK_CREDENTIALS_FILE` when you want to point a run at an
+alternate credentials file entirely.
 
 The simplest setup path is:
 
@@ -114,13 +120,60 @@ chmod 600 credentials
 The project-level `credentials` file is gitignored and intended only for local
 use.
 
+If one file needs to represent multiple targets, the helper also supports named
+profiles. Keep the flat keys for the default target, or define
+`PROFILE_<name>__KEY="value"` entries and select them with `SPLUNK_PROFILE`.
+
+Example:
+
+```bash
+SPLUNK_PROFILE="cloud"
+
+PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_SEARCH_API_URI="https://my-stack.stg.splunkcloud.com:8089"
+PROFILE_cloud__SPLUNK_CLOUD_STACK="my-stack"
+PROFILE_cloud__ACS_SERVER="https://staging.admin.splunk.com"
+
+PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+
+PROFILE_onprem__SPLUNK_PLATFORM="enterprise"
+PROFILE_onprem__SPLUNK_SEARCH_API_URI="https://onprem.example.com:8089"
+```
+
+This lets one `credentials` file cover:
+
+- a Splunk Cloud stack/search tier
+- a heavy forwarder or intermediate Enterprise node
+- a separate on-prem search head or lab deployment
+
+If one workflow needs two targets at once, keep `SPLUNK_PROFILE` on the primary
+platform target and set `SPLUNK_SEARCH_PROFILE` for the paired search-tier REST
+target.
+
+Example:
+
+```bash
+SPLUNK_PROFILE="cloud"
+SPLUNK_SEARCH_PROFILE="hf"
+```
+
+In that mode:
+
+- Cloud keeps `SPLUNK_PLATFORM`, ACS, stack, and token settings
+- HF overrides only search-tier REST and SSH settings such as
+  `SPLUNK_SEARCH_API_URI`, `SPLUNK_URI`, `SPLUNK_USER`, `SPLUNK_PASS`, and
+  `SPLUNK_SSH_*`
+
 For Enterprise targets, that same file can also include connection and SSH
 staging settings:
 
 ```bash
 SPLUNK_HOST="10.110.253.20"
 SPLUNK_MGMT_PORT="8089"
-SPLUNK_URI="https://10.110.253.20:8089"
+SPLUNK_SEARCH_API_URI="https://10.110.253.20:8089"
+# Legacy alias kept for backward compatibility
+SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
 SPLUNK_SSH_HOST="10.110.253.20"
 SPLUNK_SSH_PORT="22"
 SPLUNK_SSH_USER="splunk"
@@ -130,6 +183,7 @@ SPLUNK_SSH_PASS=""
 For Splunk Cloud, the credentials file can also include:
 
 ```bash
+SPLUNK_SEARCH_API_URI="https://your-stack.stg.splunkcloud.com:8089"
 SPLUNK_CLOUD_STACK="your-stack-name"
 SPLUNK_CLOUD_SEARCH_HEAD=""
 ACS_SERVER="https://admin.splunk.com"
@@ -144,10 +198,12 @@ current operation plus your Cloud/REST settings. If one credentials file
 contains both Cloud and Enterprise/HF targets, interactive runs will prompt
 when a command is ambiguous.
 
-Use `SPLUNK_URI="https://<deployment>.splunkcloud.com:8089"` only when you also
-need search-tier REST API access for app-specific configuration or validation.
-These values are stored as literal strings in the `credentials` file. Do not use
-shell expressions there.
+Use `SPLUNK_SEARCH_API_URI="https://<deployment>.splunkcloud.com:8089"` only
+when you also need search-tier REST API access for app-specific configuration or
+validation. The helper prefers `SPLUNK_SEARCH_API_URI` and falls back to the
+legacy alias `SPLUNK_URI`. These values are stored as strings in the
+`credentials` file; the helper supports simple `${OTHER_KEY}` references there,
+but does not execute arbitrary shell expressions.
 
 ### 2. Use `splunk-ta/` As The Local Package Cache
 
@@ -206,8 +262,8 @@ When the target platform is **Splunk Enterprise**, the installer will:
 
 When the target platform is **Splunk Cloud**, the installer uses ACS:
 
-1. private apps are vetted and installed with `acs apps install private`
-2. Splunkbase apps are installed or updated with ACS app-management commands
+1. known Splunkbase-backed apps are installed or updated with ACS Splunkbase commands
+2. private apps are vetted and installed with `acs apps install private`
 3. restart requirements are checked through `acs status current-stack`
 
 After a successful install or uninstall, the generic app-management scripts
@@ -293,11 +349,12 @@ index creation logic use ACS.
 To target a remote Splunk instance instead of localhost:
 
 ```bash
-export SPLUNK_URI="https://splunk-host:8089"
+export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 ```
 
-You can also define `SPLUNK_URI` in the `credentials` file so you do not have to
-export it each session.
+You can also define `SPLUNK_SEARCH_API_URI` in the `credentials` file so you do
+not have to export it each session. The helper still accepts `SPLUNK_URI` as a
+legacy alias.
 
 Remote workflows matter most in two places:
 

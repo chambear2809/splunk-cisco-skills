@@ -17,8 +17,12 @@ Automates installation, update, and management of Splunk apps and add-ons.
 Use the original packaged archives in `splunk-ta/` as the deployment source of
 truth.
 
-- Cloud workflow: install the original archive with ACS, then configure the
-  installed app with the appropriate follow-on skill.
+- Cloud workflow: prefer ACS Splunkbase installs for apps that are published on
+  Splunkbase, and let ACS fetch the latest compatible release by default. Use
+  private package uploads only for genuinely private or pre-vetted apps.
+- For known Cisco packages shipped in this repo, the cloud installer now
+  auto-switches local/remote package selections to the matching ACS Splunkbase
+  install path.
 - Enterprise workflow: install the original archive through the Splunk REST API
   or local filesystem path.
 - `_unpacked` app directories are for review only and are not part of the
@@ -54,7 +58,7 @@ The installer supports two target modes:
 | Item | Value |
 |------|-------|
 | Optional override | `SPLUNK_PLATFORM=enterprise|cloud` when a hybrid credentials file makes a run ambiguous |
-| Enterprise management API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Enterprise search-tier REST API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` in `credentials` |
 | TA app name | varies (installs any app) |
 | Credentials | Project-root `credentials` file (fallback: `~/.splunk/credentials`) |
@@ -65,7 +69,7 @@ The installer supports two target modes:
 To run against a remote Splunk instance:
 
 ```bash
-export SPLUNK_URI="https://splunk-host:8089"
+export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 ```
 
 ## Scripts
@@ -100,7 +104,9 @@ staging using `SPLUNK_SSH_HOST`, `SPLUNK_SSH_PORT`, `SPLUNK_SSH_USER`, and
 
 For Splunk Cloud:
 
-- local and downloaded packages are installed as private apps via ACS
+- local and downloaded packages that map to known Splunkbase apps are installed
+  through ACS Splunkbase commands
+- remaining local and downloaded packages are installed as private apps via ACS
 - Splunkbase apps are installed or updated via ACS
 - the ACS CLI must be installed and configured for the target stack
 

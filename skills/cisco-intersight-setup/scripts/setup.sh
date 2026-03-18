@@ -29,7 +29,8 @@ Options:
   --help                  Show this help
 
 With no flags, runs full setup (indexes + macros).
-Runs against remote Splunk via REST API (set SPLUNK_URI for non-localhost).
+Runs against remote Splunk via search-tier REST API (set
+SPLUNK_SEARCH_API_URI for non-localhost; legacy alias: SPLUNK_URI).
 EOF
     exit 0
 }
@@ -73,7 +74,7 @@ create_indexes() {
     if ! is_splunk_cloud; then
         ensure_search_api_session
     fi
-    if platform_create_index "$SK" "$SPLUNK_URI" "intersight" "512000"; then
+    if platform_create_index "${SK-}" "$SPLUNK_URI" "intersight" "512000"; then
         log "  Index 'intersight' created or already exists"
     else
         log "  ERROR: Failed to create index 'intersight'"

@@ -45,7 +45,7 @@ NetFlow Options (optional):
   --netflow-decoder TYPE   Flow decoder: netflow, sflow (default: netflow)
 
 Environment:
-  SPLUNK_URI               Splunk management URI (default: https://localhost:8089)
+  SPLUNK_SEARCH_API_URI    Search-tier REST URI (legacy alias: SPLUNK_URI)
   TA_CACHE                 Local cache for app packages (default: project-root splunk-ta/)
 
 Splunk credentials are read from the project-root credentials file automatically.
@@ -87,7 +87,7 @@ check_connectivity() {
     local http_code
     http_code=$(splunk_curl "${SK}" "${SPLUNK_URI}/services/server/info?output_mode=json" -o /dev/null -w '%{http_code}' 2>/dev/null) || true
     if [[ "${http_code}" != "200" ]]; then
-        log "ERROR: Cannot connect to Splunk at ${SPLUNK_URI}. Check SPLUNK_URI and credentials."
+        log "ERROR: Cannot connect to Splunk at ${SPLUNK_URI}. Check SPLUNK_SEARCH_API_URI/SPLUNK_URI and credentials."
         return 1
     fi
     return 0

@@ -72,7 +72,7 @@ This skill supports two different deployment patterns:
 
 | Item | Value |
 |------|-------|
-| Search-tier API | `SPLUNK_URI` env var (default: `https://localhost:8089`) |
+| Search-tier API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs (`SPLUNK_PLATFORM` is only an override for hybrid runs) |
 | TA app name | `splunk_app_stream`, `Splunk_TA_stream`, `Splunk_TA_stream_wire_data` |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
@@ -83,7 +83,7 @@ This skill supports two different deployment patterns:
 To run against a remote Splunk instance:
 
 ```bash
-export SPLUNK_URI="https://splunk-host:8089"
+export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 ```
 
 ## Available Packages
@@ -195,7 +195,8 @@ On Splunk Cloud, check `acs status current-stack` and only run
 bash skills/splunk-stream-setup/scripts/validate.sh
 ```
 
-Checks the cloud search tier or Enterprise target that `SPLUNK_URI` points to.
+Checks the cloud search tier or Enterprise target that `SPLUNK_SEARCH_API_URI`
+(or legacy `SPLUNK_URI`) points to.
 In Splunk Cloud, forwarder-side `Splunk_TA_stream` checks are reported as
 non-fatal warnings because that component usually lives outside the cloud search
 tier.

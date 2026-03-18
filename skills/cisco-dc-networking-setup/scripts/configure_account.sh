@@ -105,7 +105,7 @@ configure_aci_account() {
     fi
 
     local http_code resp
-    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}" -w '\n%{http_code}' 2>/dev/null)
+    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
 
     case "${http_code}" in
@@ -122,7 +122,7 @@ configure_aci_account() {
             if [[ -n "${LOGIN_DOMAIN}" ]]; then
                 update_body="${update_body}&$(form_urlencode_pairs apic_login_domain "${LOGIN_DOMAIN}")"
             fi
-            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}" -w '\n%{http_code}' 2>/dev/null)
+            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
             http_code=$(echo "${resp}" | tail -1)
             log "ACI account '${ACCT_NAME}' updated (HTTP ${http_code})"
             ;;
@@ -154,7 +154,7 @@ configure_nd_account() {
     fi
 
     local http_code resp
-    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}" -w '\n%{http_code}' 2>/dev/null)
+    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
 
     case "${http_code}" in
@@ -171,7 +171,7 @@ configure_nd_account() {
             if [[ -n "${LOGIN_DOMAIN}" ]]; then
                 update_body="${update_body}&$(form_urlencode_pairs nd_login_domain "${LOGIN_DOMAIN}")"
             fi
-            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}" -w '\n%{http_code}' 2>/dev/null)
+            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
             http_code=$(echo "${resp}" | tail -1)
             log "Nexus Dashboard account '${ACCT_NAME}' updated (HTTP ${http_code})"
             ;;
@@ -199,7 +199,7 @@ configure_nexus9k_account() {
         nexus_9k_enable_proxy "${PROXY_ENABLED}") || exit 1
 
     local http_code resp
-    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}" -w '\n%{http_code}' 2>/dev/null)
+    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
 
     case "${http_code}" in
@@ -212,7 +212,7 @@ configure_nexus9k_account() {
                 nexus_9k_username "${USERNAME}" \
                 nexus_9k_password "${PASSWORD}" \
                 nexus_9k_enable_proxy "${PROXY_ENABLED}") || exit 1
-            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}" -w '\n%{http_code}' 2>/dev/null)
+            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
             http_code=$(echo "${resp}" | tail -1)
             log "Nexus 9K account '${ACCT_NAME}' updated (HTTP ${http_code})"
             ;;

@@ -74,7 +74,7 @@ body=$(form_urlencode_pairs \
     client_secret "${CLIENT_SECRET}") || exit 1
 resp=$(splunk_curl_post "${SK}" \
     "${body}" \
-    "${local_endpoint}" -w '\n%{http_code}' 2>/dev/null)
+    "${local_endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
 http_code=$(echo "${resp}" | tail -1)
 resp_body=$(printf '%s\n' "${resp}" | sed '$d')
 
@@ -88,7 +88,7 @@ elif [[ "${http_code}" == "409" ]] || { [[ "${http_code}" == "400" ]] && echo "$
         client_secret "${CLIENT_SECRET}") || exit 1
     resp=$(splunk_curl_post "${SK}" \
         "${update_body}" \
-        "${local_endpoint}/${ACCT_NAME}" -w '\n%{http_code}' 2>/dev/null)
+        "${local_endpoint}/${ACCT_NAME}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     if [[ "${http_code}" == "200" ]]; then
         log "  SUCCESS: Account '${ACCT_NAME}' updated (HTTP ${http_code})"

@@ -43,7 +43,7 @@ if is_splunk_cloud; then
     log "Fetching installed apps from Splunk Cloud via ACS..."
     echo ""
 
-    response=$(acs_command apps list --count 1000 2>/dev/null)
+    response=$(acs_command apps list --count 100 2>/dev/null | acs_extract_http_response_json)
 
     APP_RESPONSE="${response}" python3 - "${FILTER}" <<'PYEOF'
 import json, os, sys

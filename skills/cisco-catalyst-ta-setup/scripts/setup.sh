@@ -73,7 +73,7 @@ create_indexes() {
     fi
 
     for idx in catalyst ise sdwan cybervision; do
-        if platform_create_index "$SK" "$SPLUNK_URI" "${idx}" "512000"; then
+        if platform_create_index "${SK-}" "$SPLUNK_URI" "${idx}" "512000"; then
             log "  Index '${idx}' created or already exists."
         else
             log "  ERROR: Failed to create index '${idx}'."

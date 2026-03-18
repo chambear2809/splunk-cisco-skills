@@ -7,6 +7,8 @@
 _CRED_HELPERS_LOADED=true
 _ACS_CONTEXT_PREPARED=false
 _RESOLVED_SPLUNK_PLATFORM=""
+_RESOLVED_CREDENTIAL_PROFILE=""
+_RESOLVED_SEARCH_CREDENTIAL_PROFILE=""
 
 # Resolve SCRIPT_DIR for the sourcing script if not already set.
 if [[ -z "${SCRIPT_DIR:-}" ]]; then
@@ -14,11 +16,14 @@ if [[ -z "${SCRIPT_DIR:-}" ]]; then
 fi
 
 # Locate the credentials file. Priority:
+#   0. SPLUNK_CREDENTIALS_FILE env var (explicit override)
 #   1. Project-root ./credentials  (next to README.md)
 #   2. ~/.splunk/credentials       (user-level fallback)
 _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _PROJECT_ROOT="$(cd "${_LIB_DIR}/../../.." 2>/dev/null && pwd)"
-if [[ -f "${_PROJECT_ROOT}/credentials" ]]; then
+if [[ -n "${SPLUNK_CREDENTIALS_FILE:-}" ]]; then
+    _CRED_FILE="${SPLUNK_CREDENTIALS_FILE}"
+elif [[ -f "${_PROJECT_ROOT}/credentials" ]]; then
     _CRED_FILE="${_PROJECT_ROOT}/credentials"
 else
     _CRED_FILE="${HOME}/.splunk/credentials"
@@ -26,15 +31,20 @@ fi
 
 _read_credential_file_entries() {
     local file_path="$1"
-    python3 - "$file_path" <<'PY'
+    local selected_profile="${2:-}"
+    python3 - "$file_path" "$selected_profile" <<'PY'
 import ast
 import os
 import re
 import sys
 
 path = sys.argv[1]
+selected_profile = sys.argv[2].strip()
 allowed_keys = [
+    "SPLUNK_PROFILE",
+    "SPLUNK_SEARCH_PROFILE",
     "SPLUNK_PLATFORM",
+    "SPLUNK_SEARCH_API_URI",
     "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT",
     "SPLUNK_URI",
@@ -59,6 +69,8 @@ allowed_keys = [
 ]
 allowed = set(allowed_keys)
 raw_values = {}
+profile_values = {}
+profile_pattern = re.compile(r"PROFILE_([A-Za-z0-9][A-Za-z0-9_-]*)__([A-Za-z_][A-Za-z0-9_]*)$")
 
 with open(path, encoding="utf-8") as handle:
     for raw_line in handle:
@@ -70,8 +82,6 @@ with open(path, encoding="utf-8") as handle:
 
         key, value = raw_line.split("=", 1)
         key = key.strip()
-        if key not in allowed:
-            continue
 
         value = value.strip()
         if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
@@ -80,24 +90,49 @@ with open(path, encoding="utf-8") as handle:
             except Exception:
                 value = value[1:-1]
 
+        profile_match = profile_pattern.fullmatch(key)
+        if profile_match:
+            profile_name, actual_key = profile_match.groups()
+            if actual_key not in allowed:
+                continue
+            profile_values.setdefault(profile_name, {})[actual_key] = value
+            continue
+
+        if key not in allowed:
+            continue
+
         raw_values[key] = value
 
 pattern = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
-def resolve_value(value, stack):
+def resolve_value(value, profile_name, stack):
     def repl(match):
         name = match.group(1)
         if name in stack:
             return match.group(0)
+        if profile_name and name in profile_values.get(profile_name, {}):
+            return resolve_value(profile_values[profile_name][name], profile_name, stack | {name})
         if name in raw_values:
-            return resolve_value(raw_values[name], stack | {name})
+            return resolve_value(raw_values[name], profile_name, stack | {name})
         return os.environ.get(name, match.group(0))
     return pattern.sub(repl, value)
 
+emitted = set()
+if selected_profile and selected_profile in profile_values:
+    for key in allowed_keys:
+        if key not in profile_values[selected_profile]:
+            continue
+        resolved = resolve_value(profile_values[selected_profile][key], selected_profile, {key})
+        sys.stdout.buffer.write(key.encode("utf-8"))
+        sys.stdout.buffer.write(b"\0")
+        sys.stdout.buffer.write(resolved.encode("utf-8"))
+        sys.stdout.buffer.write(b"\0")
+        emitted.add(key)
+
 for key in allowed_keys:
-    if key not in raw_values:
+    if key not in raw_values or key in emitted:
         continue
-    resolved = resolve_value(raw_values[key], {key})
+    resolved = resolve_value(raw_values[key], selected_profile or None, {key})
     sys.stdout.buffer.write(key.encode("utf-8"))
     sys.stdout.buffer.write(b"\0")
     sys.stdout.buffer.write(resolved.encode("utf-8"))
@@ -105,28 +140,266 @@ for key in allowed_keys:
 PY
 }
 
+_list_credential_profiles_from_file() {
+    local file_path="$1"
+    [[ -f "${file_path}" ]] || return 0
+    python3 - "$file_path" <<'PY'
+import sys
+
+path = sys.argv[1]
+profiles = set()
+
+with open(path, encoding="utf-8") as handle:
+    for raw_line in handle:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in raw_line:
+            continue
+        key, _ = raw_line.split("=", 1)
+        key = key.strip()
+        if key.startswith("PROFILE_") and "__" in key:
+            profiles.add(key[len("PROFILE_"):].split("__", 1)[0])
+
+for name in sorted(profiles):
+    sys.stdout.buffer.write(name.encode("utf-8"))
+    sys.stdout.buffer.write(b"\0")
+PY
+}
+
+_credential_file_has_flat_target_entries() {
+    local file_path="$1"
+    [[ -f "${file_path}" ]] || return 1
+    python3 - "$file_path" <<'PY'
+import sys
+
+path = sys.argv[1]
+flat_target_keys = {
+    "SPLUNK_PLATFORM",
+    "SPLUNK_SEARCH_API_URI",
+    "SPLUNK_HOST",
+    "SPLUNK_MGMT_PORT",
+    "SPLUNK_URI",
+    "SPLUNK_SSH_HOST",
+    "SPLUNK_SSH_PORT",
+    "SPLUNK_SSH_USER",
+    "SPLUNK_SSH_PASS",
+    "SPLUNK_USER",
+    "SPLUNK_PASS",
+    "SPLUNK_CLOUD_STACK",
+    "SPLUNK_CLOUD_SEARCH_HEAD",
+    "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS",
+    "ACS_SERVER",
+    "STACK_USERNAME",
+    "STACK_PASSWORD",
+    "STACK_TOKEN",
+    "STACK_TOKEN_USER",
+    "SPLUNK_USERNAME",
+    "SPLUNK_PASSWORD",
+    "SB_USER",
+    "SB_PASS",
+}
+
+has_flat = False
+with open(path, encoding="utf-8") as handle:
+    for raw_line in handle:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in raw_line:
+            continue
+        key, _ = raw_line.split("=", 1)
+        key = key.strip()
+        if key in flat_target_keys:
+            has_flat = True
+            break
+
+sys.exit(0 if has_flat else 1)
+PY
+}
+
+_default_credential_profile_from_file() {
+    local file_path="$1"
+    [[ -f "${file_path}" ]] || return 0
+    python3 - "$file_path" <<'PY'
+import ast
+import sys
+
+path = sys.argv[1]
+
+with open(path, encoding="utf-8") as handle:
+    for raw_line in handle:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in raw_line:
+            continue
+        key, value = raw_line.split("=", 1)
+        key = key.strip()
+        if key != "SPLUNK_PROFILE":
+            continue
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+            try:
+                value = ast.literal_eval(value)
+            except Exception:
+                value = value[1:-1]
+        print(value, end="")
+        break
+PY
+}
+
+_prompt_for_credential_profile() {
+    local -a profiles=("$@")
+    local choice
+
+    [[ -t 0 ]] || return 1
+
+    echo ""
+    echo "Multiple credential profiles detected."
+    for i in "${!profiles[@]}"; do
+        printf "  %d) %s\n" $((i + 1)) "${profiles[$i]}"
+    done
+
+    while true; do
+        read -rp "Choose the profile for this run by number or name: " choice
+        if [[ -z "${choice}" ]]; then
+            continue
+        fi
+        if [[ "${choice}" =~ ^[0-9]+$ ]] && [[ "${choice}" -ge 1 ]] && [[ "${choice}" -le ${#profiles[@]} ]]; then
+            _RESOLVED_CREDENTIAL_PROFILE="${profiles[$((choice - 1))]}"
+            return 0
+        fi
+        for profile in "${profiles[@]}"; do
+            if [[ "${choice}" == "${profile}" ]]; then
+                _RESOLVED_CREDENTIAL_PROFILE="${profile}"
+                return 0
+            fi
+        done
+    done
+}
+
+resolve_credential_profile() {
+    local default_profile
+    local -a profiles=()
+    local profile
+
+    if [[ -n "${_RESOLVED_CREDENTIAL_PROFILE:-}" ]]; then
+        printf '%s' "${_RESOLVED_CREDENTIAL_PROFILE}"
+        return 0
+    fi
+
+    if [[ -n "${SPLUNK_PROFILE:-}" ]]; then
+        _RESOLVED_CREDENTIAL_PROFILE="${SPLUNK_PROFILE}"
+        printf '%s' "${_RESOLVED_CREDENTIAL_PROFILE}"
+        return 0
+    fi
+
+    [[ -f "${_CRED_FILE}" ]] || return 0
+
+    while IFS= read -r -d '' profile; do
+        profiles+=("${profile}")
+    done < <(_list_credential_profiles_from_file "${_CRED_FILE}")
+
+    if (( ${#profiles[@]} == 0 )); then
+        return 0
+    fi
+
+    default_profile="$(_default_credential_profile_from_file "${_CRED_FILE}")"
+    if [[ -n "${default_profile}" ]]; then
+        _RESOLVED_CREDENTIAL_PROFILE="${default_profile}"
+        printf '%s' "${_RESOLVED_CREDENTIAL_PROFILE}"
+        return 0
+    fi
+
+    if _credential_file_has_flat_target_entries "${_CRED_FILE}"; then
+        return 0
+    fi
+
+    if (( ${#profiles[@]} == 1 )); then
+        _RESOLVED_CREDENTIAL_PROFILE="${profiles[0]}"
+        printf '%s' "${_RESOLVED_CREDENTIAL_PROFILE}"
+        return 0
+    fi
+
+    if ! _prompt_for_credential_profile "${profiles[@]}"; then
+        echo "ERROR: Multiple credential profiles are defined in ${_CRED_FILE}." >&2
+        echo "Set SPLUNK_PROFILE to the desired profile for non-interactive runs." >&2
+        return 1
+    fi
+
+    printf '%s' "${_RESOLVED_CREDENTIAL_PROFILE}"
+}
+
+resolve_search_credential_profile() {
+    if [[ -n "${_RESOLVED_SEARCH_CREDENTIAL_PROFILE:-}" ]]; then
+        printf '%s' "${_RESOLVED_SEARCH_CREDENTIAL_PROFILE}"
+        return 0
+    fi
+
+    if [[ -n "${SPLUNK_SEARCH_PROFILE:-}" ]]; then
+        _RESOLVED_SEARCH_CREDENTIAL_PROFILE="${SPLUNK_SEARCH_PROFILE}"
+        printf '%s' "${_RESOLVED_SEARCH_CREDENTIAL_PROFILE}"
+        return 0
+    fi
+
+    return 0
+}
+
+_search_profile_overrides_key() {
+    case "${1:-}" in
+        SPLUNK_HOST|SPLUNK_MGMT_PORT|SPLUNK_SEARCH_API_URI|SPLUNK_URI|SPLUNK_SSH_HOST|SPLUNK_SSH_PORT|SPLUNK_SSH_USER|SPLUNK_SSH_PASS|SPLUNK_USER|SPLUNK_PASS)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 _load_credential_values_from_file() {
     local file_path="${1:-${_CRED_FILE}}"
+    local selected_profile=""
+    local search_profile=""
     local key value current_value
 
     [[ -f "${file_path}" ]] || return 0
+
+    if [[ "${file_path}" == "${_CRED_FILE}" ]]; then
+        selected_profile="$(resolve_credential_profile)"
+    fi
 
     while IFS= read -r -d '' key && IFS= read -r -d '' value; do
         current_value="${!key-}"
         if [[ -z "${current_value}" ]]; then
             printf -v "${key}" '%s' "${value}"
         fi
-    done < <(_read_credential_file_entries "${file_path}")
+    done < <(_read_credential_file_entries "${file_path}" "${selected_profile}")
+
+    if [[ "${file_path}" == "${_CRED_FILE}" ]]; then
+        search_profile="$(resolve_search_credential_profile)"
+        if [[ -n "${search_profile}" && "${search_profile}" != "${selected_profile}" ]]; then
+            while IFS= read -r -d '' key && IFS= read -r -d '' value; do
+                if _search_profile_overrides_key "${key}"; then
+                    printf -v "${key}" '%s' "${value}"
+                fi
+            done < <(_read_credential_file_entries "${file_path}" "${search_profile}")
+        fi
+    fi
 }
 
 load_splunk_connection_settings() {
     _load_credential_values_from_file "${_CRED_FILE}"
 
     SPLUNK_MGMT_PORT="${SPLUNK_MGMT_PORT:-8089}"
-    if [[ -z "${SPLUNK_URI:-}" && -n "${SPLUNK_HOST:-}" ]]; then
-        SPLUNK_URI="https://${SPLUNK_HOST}:${SPLUNK_MGMT_PORT}"
+
+    # Prefer the purpose-based search-tier REST URI name, but continue to accept
+    # the legacy SPLUNK_URI alias for backward compatibility.
+    if [[ -n "${SPLUNK_SEARCH_API_URI:-}" ]]; then
+        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+    elif [[ -n "${SPLUNK_URI:-}" ]]; then
+        SPLUNK_SEARCH_API_URI="${SPLUNK_URI}"
+    elif [[ -n "${SPLUNK_HOST:-}" ]]; then
+        SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:${SPLUNK_MGMT_PORT}"
+        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+    else
+        SPLUNK_SEARCH_API_URI="https://localhost:8089"
+        SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
     fi
-    SPLUNK_URI="${SPLUNK_URI:-https://localhost:8089}"
 }
 
 splunk_host_from_uri() {
@@ -135,6 +408,41 @@ splunk_host_from_uri() {
     uri="${uri#https://}"
     uri="${uri%%/*}"
     printf '%s' "${uri%%:*}"
+}
+
+_is_staging_splunk_cloud_host() {
+    local value="${1:-}" host
+    value="${value#http://}"
+    value="${value#https://}"
+    host="${value%%/*}"
+    host="${host%%:*}"
+    [[ "${host}" == *.stg.splunkcloud.com ]]
+}
+
+_normalize_cloud_stack_name() {
+    local value="${1:-}" host
+    value="${value#http://}"
+    value="${value#https://}"
+    host="${value%%/*}"
+    host="${host%%:*}"
+    case "${host}" in
+        *.stg.splunkcloud.com) printf '%s' "${host%.stg.splunkcloud.com}" ;;
+        *.splunkcloud.com) printf '%s' "${host%.splunkcloud.com}" ;;
+        *) printf '%s' "${host}" ;;
+    esac
+}
+
+_extract_acs_search_head_prefix() {
+    local value="${1:-}" host
+    value="${value#http://}"
+    value="${value#https://}"
+    host="${value%%/*}"
+    host="${host%%:*}"
+    case "${host}" in
+        sh-i-*.*|shc[0-9]*.*|sh[0-9]*.*) printf '%s' "${host%%.*}" ;;
+        sh-i-*|shc[0-9]*|sh[0-9]*) printf '%s' "${host}" ;;
+        *) printf '%s' "" ;;
+    esac
 }
 
 load_splunk_connection_settings
@@ -203,9 +511,33 @@ resolve_splunk_platform() {
 }
 
 load_splunk_platform_settings() {
+    local raw_stack raw_search_head default_acs_server normalized_search_head
     _load_credential_values_from_file "${_CRED_FILE}"
 
-    ACS_SERVER="${ACS_SERVER:-https://admin.splunk.com}"
+    raw_stack="${SPLUNK_CLOUD_STACK:-}"
+    raw_search_head="${SPLUNK_CLOUD_SEARCH_HEAD:-}"
+
+    default_acs_server="https://admin.splunk.com"
+    if _is_staging_splunk_cloud_host "${SPLUNK_URI:-}" \
+        || _is_staging_splunk_cloud_host "${SPLUNK_HOST:-}" \
+        || _is_staging_splunk_cloud_host "${raw_stack}" \
+        || _is_staging_splunk_cloud_host "${raw_search_head}"; then
+        default_acs_server="https://staging.admin.splunk.com"
+    fi
+
+    ACS_SERVER="${ACS_SERVER:-${default_acs_server}}"
+    if [[ -n "${raw_stack}" ]]; then
+        SPLUNK_CLOUD_STACK="$(_normalize_cloud_stack_name "${raw_stack}")"
+    fi
+    if [[ -n "${raw_search_head}" ]]; then
+        normalized_search_head="$(_extract_acs_search_head_prefix "${raw_search_head}")"
+        if [[ -n "${normalized_search_head}" ]]; then
+            SPLUNK_CLOUD_SEARCH_HEAD="${normalized_search_head}"
+        elif [[ "${raw_search_head}" == *".splunkcloud.com"* ]]; then
+            # Friendly search-tier hostnames are not valid ACS target prefixes.
+            SPLUNK_CLOUD_SEARCH_HEAD=""
+        fi
+    fi
     SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS="${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}"
 }
 
@@ -225,6 +557,68 @@ acs_command() {
     [[ -n "${ACS_SERVER:-}" ]] && cmd+=(--server "${ACS_SERVER}")
     cmd+=("$@")
     "${cmd[@]}"
+}
+
+acs_extract_http_response_json() {
+    python3 -c '
+import json
+import sys
+
+text = sys.stdin.read().strip()
+if not text:
+    print("{}", end="")
+    raise SystemExit(0)
+
+try:
+    data = json.loads(text)
+except Exception:
+    print("{}", end="")
+    raise SystemExit(0)
+
+payload = None
+if isinstance(data, list):
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "http":
+            continue
+        response = item.get("response")
+        if isinstance(response, str) and response.strip():
+            try:
+                payload = json.loads(response)
+                break
+            except Exception:
+                pass
+        payload = item
+        break
+elif isinstance(data, dict):
+    payload = data
+
+json.dump(payload or {}, sys.stdout)
+'
+}
+
+acs_stack_status_snapshot() {
+    local payload
+    acs_prepare_context || return 1
+    payload=$(acs_command status current-stack 2>/dev/null | acs_extract_http_response_json) || return 1
+    printf '%s' "${payload}" | python3 -c '
+import json
+import sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print("unknown\tfalse", end="")
+    raise SystemExit(0)
+
+infra = (
+    data.get("infrastructure")
+    or ((data.get("status") or {}).get("infrastructure") or {})
+).get("status", "unknown")
+restart_required = str(bool((data.get("messages") or {}).get("restartRequired", False))).lower()
+print(f"{infra}\t{restart_required}", end="")
+'
 }
 
 acs_prepare_context() {
@@ -304,40 +698,18 @@ cloud_create_index() {
 }
 
 acs_restart_required() {
-    acs_prepare_context || return 1
-    acs_command status current-stack 2>/dev/null \
-        | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    messages = data.get('messages', {}) or {}
-    print(str(messages.get('restartRequired', False)).lower())
-except Exception:
-    print('false')
-"
+    local infra restart_required
+    read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
+    printf '%s\n' "${restart_required:-false}"
 }
 
 acs_wait_for_ready() {
     local timeout_secs="${1:-900}" interval_secs="${2:-10}"
-    local waited=0 status_json readiness
+    local waited=0 infra restart_required
 
     while (( waited < timeout_secs )); do
-        status_json=$(acs_command status current-stack 2>/dev/null || true)
-        readiness=$(printf '%s' "${status_json}" \
-            | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    infra = ((data.get('status') or {}).get('infrastructure') or {}).get('status', '')
-    restart_required = ((data.get('messages') or {}).get('restartRequired', False))
-    if infra == 'Ready' and not restart_required:
-        print('ready')
-    else:
-        print('waiting')
-except Exception:
-    print('waiting')
-")
-        if [[ "${readiness}" == "ready" ]]; then
+        read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
+        if [[ "${infra}" == "Ready" && "${restart_required}" != "true" ]]; then
             return 0
         fi
         sleep "${interval_secs}"
@@ -349,13 +721,23 @@ except Exception:
 
 cloud_restart_if_required() {
     local timeout_secs="${1:-900}"
+    local restart_output rc
 
     acs_prepare_context || return 1
     if [[ "$(acs_restart_required)" != "true" ]]; then
         return 0
     fi
 
-    acs_command restart current-stack >/dev/null
+    set +e
+    restart_output=$(acs_command restart current-stack 2>&1)
+    rc=$?
+    set -e
+
+    if (( rc != 0 )) && [[ "${restart_output}" != *"another restart is already in progress"* ]]; then
+        printf '%s\n' "${restart_output}" >&2
+        return 1
+    fi
+
     acs_wait_for_ready "${timeout_secs}" 10
 }
 
@@ -389,6 +771,15 @@ platform_create_index() {
 
 load_splunk_credentials() {
     _load_credential_values_from_file "${_CRED_FILE}"
+
+    if is_splunk_cloud; then
+        if [[ -z "${SPLUNK_USER:-}" && -n "${STACK_USERNAME:-}" ]]; then
+            SPLUNK_USER="${STACK_USERNAME}"
+        fi
+        if [[ -z "${SPLUNK_PASS:-}" && -n "${STACK_PASSWORD:-}" ]]; then
+            SPLUNK_PASS="${STACK_PASSWORD}"
+        fi
+    fi
 
     if [[ -z "${SPLUNK_USER:-}" ]]; then
         read -rp "Splunk username: " SPLUNK_USER

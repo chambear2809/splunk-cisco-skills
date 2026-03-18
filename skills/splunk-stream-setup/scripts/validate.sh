@@ -24,7 +24,7 @@ if ! load_splunk_credentials; then
 fi
 
 if ! SK=$(get_session_key "${SPLUNK_URI}"); then
-    log "ERROR: Could not authenticate to Splunk. Check credentials and SPLUNK_URI."
+    log "ERROR: Could not authenticate to Splunk. Check credentials and SPLUNK_SEARCH_API_URI/SPLUNK_URI."
     exit 1
 fi
 

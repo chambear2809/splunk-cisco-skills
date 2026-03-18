@@ -83,29 +83,13 @@ restart_splunk_or_exit() {
 
 cloud_wait_for_status() {
     local timeout_secs="${1:-300}" interval_secs="${2:-5}"
-    local waited=0 status_json state
+    local waited=0 infra restart_required
 
     while (( waited < timeout_secs )); do
-        status_json=$(acs_command status current-stack 2>/dev/null || true)
-        state=$(printf '%s' "${status_json}" \
-            | python3 -c "
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    infra = ((data.get('status') or {}).get('infrastructure') or {}).get('status', '')
-    restart_required = ((data.get('messages') or {}).get('restartRequired', False))
-    if restart_required:
-        print('restart-required')
-    else:
-        print(infra or 'unknown')
-except Exception:
-    print('unknown')
-")
-        case "${state}" in
-            Ready|restart-required)
-                return 0
-                ;;
-        esac
+        read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
+        if [[ "${infra}" == "Ready" || "${restart_required}" == "true" ]]; then
+            return 0
+        fi
         sleep "${interval_secs}"
         waited=$((waited + interval_secs))
     done
@@ -147,7 +131,7 @@ if is_splunk_cloud; then
     if [[ -z "${APP_NAME}" ]]; then
         echo ""
         echo "Fetching installed apps from Splunk Cloud..."
-        response=$(acs_command apps list --count 1000 2>/dev/null)
+        response=$(acs_command apps list --count 100 2>/dev/null | acs_extract_http_response_json)
 
         app_list=()
         while IFS= read -r app_name; do
