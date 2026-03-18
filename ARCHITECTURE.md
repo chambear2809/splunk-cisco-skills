@@ -1,0 +1,254 @@
+# Deployment Architecture
+
+How the scripts in this repo adapt to Splunk Cloud, Enterprise (on-prem), and
+hybrid deployments.
+
+## Deployment Models
+
+### Splunk Cloud
+
+All infrastructure is managed by Splunk. The repo interacts through two API
+surfaces: ACS for platform operations and the search-tier REST API on port 8089
+for app-specific configuration.
+
+```mermaid
+flowchart TB
+  subgraph userMachine [User Machine]
+    Scripts[Skill Scripts]
+    ACSCLI[ACS CLI]
+  end
+
+  subgraph splunkCloud [Splunk Cloud]
+    subgraph acsLayer [ACS Control Plane -- admin.splunk.com]
+      ACSApps[App Install / Uninstall]
+      ACSIndexes[Index Management]
+      ACSHEC[HEC Token Management]
+      ACSRestart[Stack Restart]
+      ACSAllowlist[IP Allowlist]
+    end
+
+    subgraph searchTier ["Search Tier -- :8089"]
+      SHCluster["Search Head Cluster"]
+      AppREST["App REST Handlers\n(accounts, inputs, conf)"]
+      SearchJobs[Search Jobs]
+    end
+
+    subgraph indexTier [Index Tier]
+      HECEndpoint["HEC Endpoint -- :443"]
+      Indexers[Indexers]
+    end
+  end
+
+  Scripts --> ACSCLI
+  ACSCLI -->|"HTTPS"| acsLayer
+  Scripts -->|"REST :8089\n(search-api allowlist)"| searchTier
+  AppREST --> SHCluster
+  SHCluster --> Indexers
+  HECEndpoint --> Indexers
+```
+
+**Credential flow**: ACS uses `STACK_TOKEN` or `STACK_USERNAME/PASSWORD` plus
+`SPLUNK_USERNAME/PASSWORD` for Splunkbase operations. Search-tier REST uses
+`SPLUNK_USER/PASS` (defaulting to `STACK_USERNAME/PASSWORD` on Cloud).
+
+**Automatic behaviors**:
+- Direct search-head resolution via ACS to bypass SHC propagation delays
+- Public IP auto-added to search-api allowlist
+- Stack-local credentials swapped in for 8089 auth
+
+### Enterprise (On-Prem)
+
+A single Splunk instance or a distributed deployment under your control. All
+operations go through the REST API on port 8089. ACS is not involved.
+
+```mermaid
+flowchart TB
+  subgraph userMachine [User Machine]
+    Scripts[Skill Scripts]
+  end
+
+  subgraph splunkEnterprise [Splunk Enterprise]
+    subgraph searchHead ["Search Head -- :8089"]
+      RESTApps[App Install via REST Upload]
+      RESTIndexes[Index Management]
+      RESTHEC[HEC Token Management]
+      AppREST["App REST Handlers\n(accounts, inputs, conf)"]
+      SearchJobs[Search Jobs]
+    end
+
+    subgraph indexer [Indexer Layer]
+      HECEndpoint["HEC Endpoint -- :8088"]
+      Indexers[Indexers]
+    end
+  end
+
+  Scripts -->|"REST :8089"| searchHead
+  Scripts -.->|"SSH staging\n(fallback for app install)"| searchHead
+  HECEndpoint --> Indexers
+  searchHead --> Indexers
+```
+
+**Credential flow**: `SPLUNK_USER/PASS` for REST API access. `SPLUNK_SSH_*` for
+remote file staging when REST upload is unavailable.
+
+**App install paths** (tried in order):
+1. REST upload via `/services/apps/local`
+2. SSH staging to `$SPLUNK_HOME/etc/apps/`
+
+### Hybrid (Cloud + Heavy Forwarder)
+
+The most common production pattern for data collection TAs on Splunk Cloud.
+The search tier runs in Splunk Cloud, but data collection happens on a
+customer-controlled heavy forwarder (HF) or universal forwarder (UF).
+
+```mermaid
+flowchart TB
+  subgraph userMachine [User Machine]
+    Scripts[Skill Scripts]
+    ACSCLI[ACS CLI]
+  end
+
+  subgraph splunkCloud [Splunk Cloud]
+    subgraph acsLayer [ACS Control Plane]
+      ACSApps[App Install]
+      ACSIndexes[Indexes]
+      ACSHEC[HEC Tokens]
+      ACSRestart[Restart]
+    end
+
+    subgraph searchTier ["Search Tier -- :8089"]
+      SHCluster[Search Head Cluster]
+      AppREST["App REST Handlers"]
+    end
+
+    subgraph indexTier [Index Tier]
+      HECEndpoint["HEC -- :443"]
+      S2SEndpoint["S2S -- :9997"]
+      Indexers[Indexers]
+    end
+  end
+
+  subgraph customerInfra [Customer Infrastructure]
+    HF["Heavy Forwarder"]
+    DataSources["Data Sources\n(network devices, APIs, agents)"]
+  end
+
+  Scripts --> ACSCLI
+  ACSCLI --> acsLayer
+  Scripts -->|"REST :8089"| searchTier
+  Scripts -->|"SSH / REST :8089"| HF
+
+  DataSources --> HF
+  HF -->|"S2S :9997"| S2SEndpoint
+  HF -->|"HEC :443"| HECEndpoint
+  S2SEndpoint --> Indexers
+  HECEndpoint --> Indexers
+  SHCluster --> Indexers
+```
+
+**Credential flow**: The `credentials` file contains both Cloud (ACS/stack)
+settings and Enterprise (HF) settings. The repo supports two resolution
+strategies:
+
+1. **Profile-based** -- `SPLUNK_PROFILE=cloud` and
+   `SPLUNK_SEARCH_PROFILE=hf` in the credentials file. Cloud keeps
+   platform/ACS settings while HF overrides search-tier REST and SSH settings.
+2. **Platform override** -- `SPLUNK_PLATFORM=cloud` or
+   `SPLUNK_PLATFORM=enterprise` per command to select the target explicitly.
+
+When ambiguous, interactive scripts prompt the user to choose.
+
+**Typical hybrid operations**:
+
+| Operation | Target | API Surface |
+|-----------|--------|-------------|
+| App install on search tier | Cloud | ACS |
+| Index creation | Cloud | ACS |
+| TA account config on search tier | Cloud search head | REST :8089 |
+| App install on HF | HF | REST :8089 or SSH |
+| Input config on HF | HF | REST :8089 |
+| Forwarder output config | HF | Host-level config |
+
+## How Scripts Select the Target
+
+```mermaid
+flowchart TB
+  Start[Script sources credential_helpers.sh] --> LoadFile[Load credentials file]
+  LoadFile --> ResolveProfile{Profile set?}
+  ResolveProfile -->|Yes| UseProfile[Apply profile values]
+  ResolveProfile -->|No| UseFlatKeys[Apply flat key values]
+  UseProfile --> DetectPlatform
+  UseFlatKeys --> DetectPlatform
+
+  DetectPlatform{Detect platform}
+  DetectPlatform -->|"SPLUNK_PLATFORM set"| UseExplicit[Use explicit platform]
+  DetectPlatform -->|"URI contains .splunkcloud.com"| IsCloud[Cloud]
+  DetectPlatform -->|"Cloud config + localhost URI"| IsCloud
+  DetectPlatform -->|"Cloud config + non-Cloud URI"| IsHybrid{Hybrid -- prompt or error}
+  DetectPlatform -->|"No Cloud config"| IsEnterprise[Enterprise]
+
+  IsCloud --> CloudSetup[Auto-resolve search head\nAuto-allowlist IP\nSwap to stack credentials]
+  IsEnterprise --> EnterpriseSetup[Use SPLUNK_URI as-is]
+  IsHybrid -->|Interactive| PromptUser[User selects target]
+  IsHybrid -->|Non-interactive| ErrorOut[Error: set SPLUNK_PLATFORM]
+  PromptUser --> CloudSetup
+  PromptUser --> EnterpriseSetup
+```
+
+## Port Usage Summary
+
+| Port | Service | Used By | Allowlist Feature |
+|------|---------|---------|-------------------|
+| 443 | Splunk Web (UI) | Browser access | `search-ui` |
+| 443 | HEC ingestion | ThousandEyes streams, webhook alerts | `hec` |
+| 8089 | Search-tier REST API | All TA configuration and validation | `search-api` |
+| 8089 | IDM API | Add-on data ingestion | `idm-api` |
+| 8088 | HEC (Enterprise) | Enterprise HEC ingestion | N/A (local) |
+| 9997 | S2S forwarding | HF/UF to Cloud indexers | `s2s` |
+| 22 | SSH | Enterprise app staging fallback | N/A (local) |
+
+## Data Flow by TA Type
+
+### Polling TAs (Catalyst, Meraki, Intersight, DC Networking)
+
+```mermaid
+flowchart LR
+  VendorAPI["Vendor API\n(Catalyst Center, Meraki Dashboard,\nIntersight, DCNM/NDFC)"]
+  SplunkInput["Splunk Modular Input\n(runs on search tier or HF)"]
+  Index[Splunk Index]
+
+  VendorAPI -->|"API poll"| SplunkInput
+  SplunkInput -->|"index locally or\nforward via S2S"| Index
+```
+
+### HEC Push TAs (ThousandEyes)
+
+```mermaid
+flowchart LR
+  TEStreaming["ThousandEyes\nStreaming API"]
+  TEWebhook["ThousandEyes\nWebhook"]
+  TEPolling["ThousandEyes\nEvents API"]
+  HEC["Splunk HEC\n(:443 Cloud / :8088 Enterprise)"]
+  SplunkInput["Splunk Modular Input\n(polling only)"]
+  Index[Splunk Index]
+
+  TEStreaming -->|"HEC push"| HEC
+  TEWebhook -->|"HEC push"| HEC
+  TEPolling -->|"API poll"| SplunkInput
+  HEC --> Index
+  SplunkInput --> Index
+```
+
+### Passive Capture (Splunk Stream)
+
+```mermaid
+flowchart LR
+  Network["Network Traffic"]
+  StreamTA["Stream TA\n(on HF/UF)"]
+  StreamApp["Stream App\n(on search tier)"]
+  Index[Splunk Index]
+
+  Network -->|"packet capture"| StreamTA
+  StreamTA -->|"S2S forward"| Index
+  StreamApp -->|"search-time\nknowledge"| Index
+```

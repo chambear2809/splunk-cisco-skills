@@ -19,6 +19,8 @@ splunk-ta/*.tar.gz
 projects/*
 !projects/*/
 projects/*/*
+# Ignore temporary project directories
+projects/tmp-*/
 # MCP tool descriptors, resources, prompts
 !projects/*/mcps/
 !projects/*/mcps/**
@@ -54,3 +56,11 @@ projects/*/agent-transcripts/
 # User-level cursor rules
 !rules/
 !rules/**
+# ShellCheck config
+!.shellcheckrc
+# Test suites
+!tests/
+!tests/**
+# Cloud deployment matrix
+!CLOUD_DEPLOYMENT_MATRIX.md
+!ARCHITECTURE.md
