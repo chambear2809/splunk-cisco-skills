@@ -1,0 +1,85 @@
+{
+  "description": "Central registry of Splunkbase app metadata for this repo. Used by the cloud installer, batch scripts, and skill docs as the single source of truth for Splunkbase IDs, license-ack URLs, and known package filenames.",
+  "apps": [
+    {
+      "skill": "cisco-catalyst-ta-setup",
+      "app_name": "TA_cisco_catalyst",
+      "splunkbase_id": "7538",
+      "label": "Cisco Catalyst Add-on for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-catalyst-add-on-for-splunk_*"]
+    },
+    {
+      "skill": "cisco-dc-networking-setup",
+      "app_name": "cisco_dc_networking_app_for_splunk",
+      "splunkbase_id": "7777",
+      "label": "Cisco DC Networking App for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-dc-networking_*"]
+    },
+    {
+      "skill": "cisco-enterprise-networking-setup",
+      "app_name": "cisco-catalyst-app",
+      "splunkbase_id": "7539",
+      "label": "Cisco Enterprise Networking for Splunk Platform",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-enterprise-networking-for-splunk-platform_*"]
+    },
+    {
+      "skill": "cisco-intersight-setup",
+      "app_name": "Splunk_TA_Cisco_Intersight",
+      "splunkbase_id": "7828",
+      "label": "Cisco Intersight Add-On for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-intersight-add-on-for-splunk_*"]
+    },
+    {
+      "skill": "cisco-meraki-ta-setup",
+      "app_name": "Splunk_TA_cisco_meraki",
+      "splunkbase_id": "5580",
+      "label": "Splunk Add-on for Cisco Meraki",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-meraki-add-on-for-splunk_*"]
+    },
+    {
+      "skill": "splunk-stream-setup",
+      "app_name": "splunk_app_stream",
+      "splunkbase_id": "1809",
+      "label": "Splunk App for Stream",
+      "license_ack_url": "",
+      "package_patterns": ["splunk-app-for-stream_*"]
+    },
+    {
+      "skill": "splunk-stream-setup",
+      "app_name": "Splunk_TA_stream",
+      "splunkbase_id": "5234",
+      "label": "Splunk Add-on for Stream Forwarders",
+      "license_ack_url": "",
+      "package_patterns": ["splunk-add-on-for-stream-forwarders_*"]
+    },
+    {
+      "skill": "splunk-stream-setup",
+      "app_name": "Splunk_TA_stream_wire_data",
+      "splunkbase_id": "5235",
+      "label": "Splunk Add-on for Stream Wire Data",
+      "license_ack_url": "",
+      "package_patterns": ["splunk-add-on-for-stream-wire-data_*"]
+    },
+    {
+      "skill": "cisco-thousandeyes-setup",
+      "app_name": "ta_cisco_thousandeyes",
+      "splunkbase_id": "7719",
+      "label": "Cisco ThousandEyes App for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-thousandeyes-app-for-splunk_*"]
+    },
+    {
+      "skill": "splunk-itsi-setup",
+      "app_name": "SA-ITOA",
+      "splunkbase_id": "1841",
+      "label": "Splunk IT Service Intelligence",
+      "license_ack_url": "",
+      "package_patterns": ["splunk-it-service-intelligence_*", "itsi_*"]
+    }
+  ]
+}

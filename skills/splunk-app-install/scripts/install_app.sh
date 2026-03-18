@@ -21,8 +21,7 @@ RESTART_SPLUNK=true
 PRE_VETTED=false
 
 CISCO_LICENSE_ACK_URL="https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
-
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+REGISTRY_FILE="${SCRIPT_DIR}/../../../skills/shared/app_registry.json"
 
 is_interactive() { [[ -t 0 ]]; }
 
@@ -68,31 +67,38 @@ safe_read() {
 cloud_known_splunkbase_metadata_from_package() {
     local package_name
     package_name="$(basename "${1:-}" | tr '[:upper:]' '[:lower:]')"
-    case "${package_name}" in
-        cisco-catalyst-add-on-for-splunk_*.tar.gz|cisco-catalyst-add-on-for-splunk_*.tgz|cisco-catalyst-add-on-for-splunk_*.spl)
-            printf '%s|%s\n' "7538" "${CISCO_LICENSE_ACK_URL}"
-            ;;
-        cisco-dc-networking_*.tar.gz|cisco-dc-networking_*.tgz|cisco-dc-networking_*.spl)
-            printf '%s|%s\n' "7777" "${CISCO_LICENSE_ACK_URL}"
-            ;;
-        cisco-enterprise-networking-for-splunk-platform_*.tar.gz|cisco-enterprise-networking-for-splunk-platform_*.tgz|cisco-enterprise-networking-for-splunk-platform_*.spl)
-            printf '%s|%s\n' "7539" "${CISCO_LICENSE_ACK_URL}"
-            ;;
-        cisco-intersight-add-on-for-splunk_*.tar.gz|cisco-intersight-add-on-for-splunk_*.tgz|cisco-intersight-add-on-for-splunk_*.spl)
-            printf '%s|%s\n' "7828" "${CISCO_LICENSE_ACK_URL}"
-            ;;
-        cisco-meraki-add-on-for-splunk_*.tar.gz|cisco-meraki-add-on-for-splunk_*.tgz|cisco-meraki-add-on-for-splunk_*.spl)
-            printf '%s|%s\n' "5580" "${CISCO_LICENSE_ACK_URL}"
-            ;;
-    esac
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 -c "
+import json, sys, fnmatch
+
+pkg = sys.argv[1]
+with open(sys.argv[2]) as f:
+    registry = json.load(f)
+for app in registry.get('apps', []):
+    for pat in app.get('package_patterns', []):
+        for ext in ('*.tar.gz', '*.tgz', '*.spl'):
+            if fnmatch.fnmatch(pkg, pat.rstrip('*') + ext):
+                sid = app.get('splunkbase_id', '')
+                lic = app.get('license_ack_url', '')
+                if sid:
+                    print(f'{sid}|{lic}', end='')
+                    raise SystemExit(0)
+" "${package_name}" "${REGISTRY_FILE}" 2>/dev/null || true
 }
 
 cloud_known_license_ack_url_by_app_id() {
-    case "${1:-}" in
-        7538|7539|7777|7828|5580)
-            printf '%s\n' "${CISCO_LICENSE_ACK_URL}"
-            ;;
-    esac
+    local app_id="${1:-}"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 -c "
+import json, sys
+target = sys.argv[1]
+with open(sys.argv[2]) as f:
+    registry = json.load(f)
+for app in registry.get('apps', []):
+    if str(app.get('splunkbase_id', '')) == target:
+        print(app.get('license_ack_url', ''), end='')
+        break
+" "${app_id}" "${REGISTRY_FILE}" 2>/dev/null || true
 }
 
 cloud_apply_known_splunkbase_defaults() {
@@ -177,17 +183,21 @@ done
 
 prompt_source() {
     [[ -n "${SOURCE}" ]] && return
+    if ! is_interactive; then
+        SOURCE="splunkbase"
+        return
+    fi
     echo ""
     echo "How do you want to install the app?"
-    echo "  1) Local             — .tgz/.spl file on this server or in the project"
-    echo "  2) Remote            — download from a remote URL"
-    echo "  3) Splunkbase        — download from splunkbase.splunk.com"
+    echo "  1) Splunkbase        — download latest from splunkbase.splunk.com (default)"
+    echo "  2) Local             — .tgz/.spl file on this server or in the project"
+    echo "  3) Remote            — download from a remote URL"
     echo ""
-    safe_read "--source" -rp "Select source [1/2/3]: " choice
+    safe_read "--source" -rp "Select source [1/2/3] (default: 1): " choice
     case "${choice}" in
-        1|local)                SOURCE="local" ;;
-        2|remote|url)           SOURCE="remote" ;;
-        3|splunkbase)           SOURCE="splunkbase" ;;
+        ""|1|splunkbase)        SOURCE="splunkbase" ;;
+        2|local)                SOURCE="local" ;;
+        3|remote|url)           SOURCE="remote" ;;
         *) log "ERROR: Invalid choice '${choice}'"; exit 1 ;;
     esac
 }

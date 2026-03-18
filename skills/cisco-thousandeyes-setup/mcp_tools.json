@@ -1,0 +1,127 @@
+{
+  "name": "cisco-thousandeyes-tools",
+  "description": "MCP tools for Cisco ThousandEyes data in Splunk",
+  "version": "1.0.0",
+  "author": "cisco-thousandeyes-setup skill",
+  "tools": [
+    {
+      "_key": "cisco_thousandeyes:check_health",
+      "name": "cisco_thousandeyes_check_health",
+      "title": "ThousandEyes Health Check",
+      "description": "Overview of ThousandEyes data flow across all input types (metrics, traces, events, activity, alerts, path visualization).",
+      "category": "cisco_thousandeyes",
+      "tags": ["thousandeyes", "health", "overview"],
+      "time_range": true,
+      "row_limiter": false,
+      "spl": "| tstats count as event_count dc(sourcetype) as sourcetype_count where index=thousandeyes_* by index | sort - event_count",
+      "arguments": [],
+      "examples": [
+        "Check ThousandEyes data health",
+        "Is ThousandEyes data flowing?",
+        "ThousandEyes status overview"
+      ]
+    },
+    {
+      "_key": "cisco_thousandeyes:list_inputs",
+      "name": "cisco_thousandeyes_list_inputs",
+      "title": "ThousandEyes Input Status",
+      "description": "List all ThousandEyes data inputs with their enabled/disabled status.",
+      "category": "cisco_thousandeyes",
+      "tags": ["thousandeyes", "inputs", "configuration"],
+      "time_range": false,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all splunk_server=local | search eai:acl.app=ta_cisco_thousandeyes | table title, eai:acl.app, disabled | rename title as Input, disabled as Disabled",
+      "arguments": [],
+      "examples": [
+        "List ThousandEyes inputs",
+        "What ThousandEyes inputs are configured?",
+        "Show ThousandEyes input status"
+      ]
+    },
+    {
+      "_key": "cisco_thousandeyes:metrics_summary",
+      "name": "cisco_thousandeyes_metrics_summary",
+      "title": "ThousandEyes Metrics Summary",
+      "description": "Recent test metrics data from ThousandEyes streaming inputs.",
+      "category": "cisco_thousandeyes",
+      "tags": ["thousandeyes", "metrics", "tests"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=thousandeyes_metrics sourcetype=\"cisco:thousandeyes:metric\" | stats count by source, sourcetype | sort - count",
+      "arguments": [],
+      "examples": [
+        "Show ThousandEyes metrics",
+        "What test metrics are arriving?",
+        "ThousandEyes metrics summary"
+      ]
+    },
+    {
+      "_key": "cisco_thousandeyes:alerts",
+      "name": "cisco_thousandeyes_alerts",
+      "title": "ThousandEyes Alerts",
+      "description": "Recent alert notifications from ThousandEyes.",
+      "category": "cisco_thousandeyes",
+      "tags": ["thousandeyes", "alerts", "notifications"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=thousandeyes_alerts sourcetype=\"cisco:thousandeyes:alerts\" | head 50 | table _time, source, _raw",
+      "arguments": [],
+      "examples": [
+        "Show ThousandEyes alerts",
+        "Any ThousandEyes alert notifications?",
+        "Recent ThousandEyes alerts"
+      ]
+    },
+    {
+      "_key": "cisco_thousandeyes:events",
+      "name": "cisco_thousandeyes_events",
+      "title": "ThousandEyes Events",
+      "description": "Recent events from ThousandEyes event polling.",
+      "category": "cisco_thousandeyes",
+      "tags": ["thousandeyes", "events"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=thousandeyes_events sourcetype=\"cisco:thousandeyes:event\" | head 50 | table _time, source, _raw",
+      "arguments": [],
+      "examples": [
+        "Show ThousandEyes events",
+        "What ThousandEyes events occurred?",
+        "Recent ThousandEyes events"
+      ]
+    },
+    {
+      "_key": "cisco_thousandeyes:activity",
+      "name": "cisco_thousandeyes_activity",
+      "title": "ThousandEyes Activity Logs",
+      "description": "Recent activity and audit log entries from ThousandEyes.",
+      "category": "cisco_thousandeyes",
+      "tags": ["thousandeyes", "activity", "audit"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=thousandeyes_activity sourcetype=\"cisco:thousandeyes:activity\" | head 50 | table _time, source, _raw",
+      "arguments": [],
+      "examples": [
+        "Show ThousandEyes activity logs",
+        "ThousandEyes audit log",
+        "Recent ThousandEyes activity"
+      ]
+    },
+    {
+      "_key": "cisco_thousandeyes:traces",
+      "name": "cisco_thousandeyes_traces",
+      "title": "ThousandEyes Traces",
+      "description": "Recent test trace data from ThousandEyes streaming inputs.",
+      "category": "cisco_thousandeyes",
+      "tags": ["thousandeyes", "traces", "tests"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=thousandeyes_traces sourcetype=\"cisco:thousandeyes:trace\" | stats count by source, sourcetype | sort - count",
+      "arguments": [],
+      "examples": [
+        "Show ThousandEyes traces",
+        "What test traces are arriving?",
+        "ThousandEyes trace summary"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+# ACS CLI context management, output parsing, status checks, and restart helpers.
+# Sourced by credential_helpers.sh; not intended for direct use.
+
+[[ -n "${_ACS_HELPERS_LOADED:-}" ]] && return 0
+_ACS_HELPERS_LOADED=true
+
+_ACS_CONTEXT_PREPARED=false
+
+acs_cli_available() {
+    command -v acs >/dev/null 2>&1
+}
+
+acs_command() {
+    load_splunk_platform_settings
+    local -a cmd=(acs --format structured)
+    [[ -n "${ACS_SERVER:-}" ]] && cmd+=(--server "${ACS_SERVER}")
+    cmd+=("$@")
+    "${cmd[@]}"
+}
+
+acs_extract_http_response_json() {
+    python3 -c '
+import json
+import sys
+
+text = sys.stdin.read().strip()
+if not text:
+    print("{}", end="")
+    raise SystemExit(0)
+
+try:
+    data = json.loads(text)
+except Exception:
+    print("{}", end="")
+    raise SystemExit(0)
+
+payload = None
+if isinstance(data, list):
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") != "http":
+            continue
+        response = item.get("response")
+        if isinstance(response, str) and response.strip():
+            try:
+                payload = json.loads(response)
+                break
+            except Exception:
+                pass
+        payload = item
+        break
+elif isinstance(data, dict):
+    payload = data
+
+json.dump(payload or {}, sys.stdout)
+'
+}
+
+acs_stack_status_snapshot() {
+    local payload
+    acs_prepare_context || return 1
+    payload=$(acs_command status current-stack 2>/dev/null | acs_extract_http_response_json) || return 1
+    printf '%s' "${payload}" | python3 -c '
+import json
+import sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    print("unknown\tfalse", end="")
+    raise SystemExit(0)
+
+infra = (
+    data.get("infrastructure")
+    or ((data.get("status") or {}).get("infrastructure") or {})
+).get("status", "unknown")
+restart_required = str(bool((data.get("messages") or {}).get("restartRequired", False))).lower()
+print(f"{infra}\t{restart_required}", end="")
+'
+}
+
+acs_prepare_context() {
+    if [[ "${_ACS_CONTEXT_PREPARED}" == "true" ]]; then
+        return 0
+    fi
+
+    load_splunk_platform_settings
+    _load_credential_values_from_file "${_CRED_FILE}"
+
+    if ! acs_cli_available; then
+        echo "ERROR: ACS CLI is required for Splunk Cloud operations. Install it with Homebrew: brew install acs" >&2
+        return 1
+    fi
+
+    export ACS_SERVER
+
+    if [[ -z "${SPLUNK_USERNAME:-}" && -n "${SB_USER:-}" ]]; then
+        export SPLUNK_USERNAME="${SB_USER}"
+    fi
+    if [[ -z "${SPLUNK_PASSWORD:-}" && -n "${SB_PASS:-}" ]]; then
+        export SPLUNK_PASSWORD="${SB_PASS}"
+    fi
+    [[ -n "${SPLUNK_USERNAME:-}" ]] && export SPLUNK_USERNAME
+    [[ -n "${SPLUNK_PASSWORD:-}" ]] && export SPLUNK_PASSWORD
+
+    [[ -n "${STACK_USERNAME:-}" ]] && export STACK_USERNAME
+    [[ -n "${STACK_PASSWORD:-}" ]] && export STACK_PASSWORD
+    [[ -n "${STACK_TOKEN:-}" ]] && export STACK_TOKEN
+    [[ -n "${STACK_TOKEN_USER:-}" ]] && export STACK_TOKEN_USER
+
+    if [[ -n "${SPLUNK_CLOUD_STACK:-}" ]]; then
+        if [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]; then
+            acs_command config add-stack "${SPLUNK_CLOUD_STACK}" --target-sh "${SPLUNK_CLOUD_SEARCH_HEAD}" >/dev/null 2>&1 || true
+            acs_command config use-stack "${SPLUNK_CLOUD_STACK}" --target-sh "${SPLUNK_CLOUD_SEARCH_HEAD}" >/dev/null
+        else
+            acs_command config add-stack "${SPLUNK_CLOUD_STACK}" >/dev/null 2>&1 || true
+            acs_command config use-stack "${SPLUNK_CLOUD_STACK}" >/dev/null
+        fi
+    fi
+
+    if [[ -n "${STACK_TOKEN:-}" ]]; then
+        acs_command login >/dev/null
+    elif [[ -n "${STACK_USERNAME:-}" || -n "${STACK_PASSWORD:-}" || -n "${STACK_TOKEN_USER:-}" ]]; then
+        if [[ -z "${STACK_USERNAME:-}" || -z "${STACK_PASSWORD:-}" || -z "${STACK_TOKEN_USER:-}" ]]; then
+            echo "ERROR: STACK_USERNAME, STACK_PASSWORD, and STACK_TOKEN_USER are all required for ACS login without STACK_TOKEN." >&2
+            return 1
+        fi
+        acs_command login --token-user "${STACK_TOKEN_USER}" >/dev/null
+    fi
+
+    _ACS_CONTEXT_PREPARED=true
+}
+
+cloud_requires_local_scope() {
+    [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]
+}
+
+cloud_check_index() {
+    local idx="$1"
+    acs_prepare_context || return 1
+    acs_command indexes describe "${idx}" >/dev/null 2>&1
+}
+
+cloud_create_index() {
+    local idx="$1"
+    local searchable_days="${2:-${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}}"
+
+    acs_prepare_context || return 1
+    if acs_command indexes describe "${idx}" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    acs_command indexes create --name "${idx}" --searchable-days "${searchable_days}" >/dev/null
+}
+
+acs_restart_required() {
+    local infra restart_required
+    read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
+    printf '%s\n' "${restart_required:-false}"
+}
+
+acs_wait_for_ready() {
+    local timeout_secs="${1:-900}" interval_secs="${2:-10}"
+    local waited=0 infra restart_required
+
+    while (( waited < timeout_secs )); do
+        read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
+        if [[ "${infra}" == "Ready" && "${restart_required}" != "true" ]]; then
+            return 0
+        fi
+        sleep "${interval_secs}"
+        waited=$((waited + interval_secs))
+    done
+
+    return 1
+}
+
+cloud_restart_if_required() {
+    local timeout_secs="${1:-900}"
+    local restart_output rc
+
+    acs_prepare_context || return 1
+    if [[ "$(acs_restart_required)" != "true" ]]; then
+        return 0
+    fi
+
+    set +e
+    restart_output=$(acs_command restart current-stack 2>&1)
+    rc=$?
+    set -e
+
+    if (( rc != 0 )) && [[ "${restart_output}" != *"another restart is already in progress"* ]]; then
+        printf '%s\n' "${restart_output}" >&2
+        return 1
+    fi
+
+    acs_wait_for_ready "${timeout_secs}" 10
+}
+
+acs_current_search_head_prefix() {
+    load_splunk_platform_settings
+    [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]] && {
+        printf '%s' "${SPLUNK_CLOUD_SEARCH_HEAD}"
+        return 0
+    }
+
+    acs_prepare_context || return 1
+    acs config current-stack 2>/dev/null | python3 -c '
+import re
+import sys
+
+text = sys.stdin.read()
+
+current = re.search(r"^Current Search Head:\s*([A-Za-z0-9-]+)\s*$", text, re.MULTILINE)
+if current and current.group(1).strip():
+    print(current.group(1).strip(), end="")
+    raise SystemExit(0)
+
+search_heads = re.search(r"^Search Heads:\s*\[([^\]]+)\]\s*$", text, re.MULTILINE)
+if search_heads:
+    heads = [item.strip() for item in search_heads.group(1).split(",") if item.strip()]
+    if heads:
+        print(heads[0], end="")
+' 2>/dev/null
+}
+
+cloud_current_search_api_uri() {
+    local prefix suffix
+
+    load_splunk_platform_settings
+    [[ -n "${SPLUNK_CLOUD_STACK:-}" ]] || return 1
+
+    prefix="$(acs_current_search_head_prefix 2>/dev/null || true)"
+    [[ -n "${prefix}" ]] || return 1
+
+    if [[ "${ACS_SERVER:-}" == "https://staging.admin.splunk.com" ]] \
+        || _is_staging_splunk_cloud_host "${SPLUNK_URI:-}" \
+        || _is_staging_splunk_cloud_host "${SPLUNK_HOST:-}"; then
+        suffix=".stg.splunkcloud.com"
+    else
+        suffix=".splunkcloud.com"
+    fi
+
+    printf 'https://%s.%s%s:8089' "${prefix}" "${SPLUNK_CLOUD_STACK}" "${suffix}"
+}
+
+prefer_current_cloud_search_api_uri() {
+    local current_host candidate
+
+    is_splunk_cloud || return 0
+    current_host="$(splunk_host_from_uri "${SPLUNK_URI:-}")"
+    [[ "${current_host}" == sh-* ]] && return 0
+
+    candidate="$(cloud_current_search_api_uri 2>/dev/null || true)"
+    [[ -n "${candidate}" ]] || return 0
+
+    SPLUNK_URI="${candidate}"
+    SPLUNK_SEARCH_API_URI="${candidate}"
+    if [[ -n "${STACK_USERNAME:-}" && -n "${STACK_PASSWORD:-}" ]]; then
+        SPLUNK_USER="${STACK_USERNAME}"
+        SPLUNK_PASS="${STACK_PASSWORD}"
+        export SPLUNK_USER SPLUNK_PASS
+    fi
+    export SPLUNK_URI SPLUNK_SEARCH_API_URI
+}
+
+log_platform_restart_guidance() {
+    local prefix="${1:-changes}"
+    if is_splunk_cloud; then
+        echo "Splunk Cloud: check 'acs status current-stack' after ${prefix} and run 'acs restart current-stack' only if restartRequired=true."
+    else
+        echo "Restart Splunk to apply ${prefix}."
+    fi
+}
+
+platform_check_index() {
+    local sk="$1" uri="$2" idx="$3"
+    if is_splunk_cloud; then
+        cloud_check_index "${idx}"
+    else
+        rest_check_index "${sk}" "${uri}" "${idx}"
+    fi
+}
+
+platform_create_index() {
+    local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}"
+    if is_splunk_cloud; then
+        cloud_create_index "${idx}" "${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}"
+    else
+        rest_create_index "${sk}" "${uri}" "${idx}" "${max_size}"
+    fi
+}
