@@ -44,8 +44,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 log_live_input_summary() {
     local total enabled disabled
     read -r total enabled disabled <<< "$(rest_get_live_input_counts "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
@@ -77,6 +75,46 @@ create_indexes() {
         exit 1
     fi
     log "Index creation complete."
+}
+
+ensure_app_visible() {
+    ensure_search_api_session
+    local visible
+    visible=$(splunk_curl "${SK}" \
+        "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null \
+        | python3 -c "
+import json, sys
+try: print(json.load(sys.stdin)['entry'][0]['content'].get('visible', True))
+except: print('True')
+" 2>/dev/null || echo "True")
+    if [[ "${visible}" == "False" ]]; then
+        log "Setting ${APP_NAME} visible=true..."
+        splunk_curl "${SK}" -X POST \
+            "${SPLUNK_URI}/services/apps/local/${APP_NAME}" \
+            -d "visible=true" -d "output_mode=json" >/dev/null 2>&1 || true
+    fi
+}
+
+configure_dashboards() {
+    local index_name="${1:-meraki}"
+    ensure_search_api_session
+    log "Configuring dashboard macro 'meraki_index' -> index IN(${index_name})..."
+    local new_def="index IN(${index_name})"
+    local def_encoded body current_def
+    def_encoded=$(_urlencode "${new_def}")
+    body="definition=${def_encoded}&iseval=0"
+    current_def=$(rest_get_conf_value "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "macros" "meraki_index" "definition" 2>/dev/null || true)
+    if [[ -n "${current_def}" ]] && [[ "${current_def}" == "${new_def}" ]]; then
+        log "  Macro already set to '${index_name}' — no change needed."
+    else
+        if rest_set_conf "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "macros" "meraki_index" "${body}"; then
+            log "  Updated: meraki_index = ${new_def}"
+        else
+            log "ERROR: Failed to set meraki_index macro"
+            exit 1
+        fi
+    fi
+    log "Dashboard configuration complete."
 }
 
 add_input() {
@@ -297,8 +335,62 @@ main() {
         exit 0
     fi
 
+    if $INDEXES_ONLY; then
+        create_indexes
+        log "$(log_platform_restart_guidance "index changes")"
+        exit 0
+    fi
+
     create_indexes
-    log "$(log_platform_restart_guidance "index changes")"
+    configure_dashboards "meraki"
+    ensure_app_visible
+    log "$(log_platform_restart_guidance "index and dashboard changes")"
+
+    [[ -t 0 ]] || return 0
+    log ""
+    read -rp "Would you like to configure a Meraki organization account now? [y/N]: " yn
+    case "${yn}" in
+        [yY]|[yY][eE][sS]) ;;
+        *) return 0 ;;
+    esac
+
+    local acct_name org_id region api_key_file auto_idx
+    read -rp "Account name (e.g. MY_ORG): " acct_name
+    [[ -z "${acct_name}" ]] && { log "ERROR: Account name is required."; return 1; }
+    read -rp "Organization ID: " org_id
+    [[ -z "${org_id}" ]] && { log "ERROR: Organization ID is required."; return 1; }
+    read -rp "Region [global/india/canada/china/fedramp] (default: global): " region
+    region="${region:-global}"
+
+    log ""
+    log "Write your Meraki Dashboard API key to a temp file:"
+    log "  echo \"YOUR_API_KEY\" > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key"
+    log ""
+    read -rp "Path to API key file (default: /tmp/meraki_api_key): " api_key_file
+    api_key_file="${api_key_file:-/tmp/meraki_api_key}"
+    [[ -f "${api_key_file}" ]] || { log "ERROR: File not found: ${api_key_file}"; return 1; }
+
+    read -rp "Auto-create all inputs? [Y/n]: " auto_yn
+    local auto_flag=""
+    case "${auto_yn}" in
+        [nN]|[nN][oO]) ;;
+        *) auto_flag="--auto-inputs" ;;
+    esac
+    read -rp "Target index for inputs (default: meraki): " auto_idx
+    auto_idx="${auto_idx:-meraki}"
+
+    log ""
+    bash "${SCRIPT_DIR}/configure_account.sh" \
+        --name "${acct_name}" \
+        --api-key-file "${api_key_file}" \
+        --org-id "${org_id}" \
+        --region "${region}" \
+        ${auto_flag} \
+        --index "${auto_idx}"
+
+    rm -f "${api_key_file}" 2>/dev/null || true
+    log ""
+    log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
 }
 
 main

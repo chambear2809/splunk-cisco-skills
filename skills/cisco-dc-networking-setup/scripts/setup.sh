@@ -46,8 +46,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 log_live_input_summary() {
     local total enabled disabled
     read -r total enabled disabled <<< "$(rest_get_live_input_counts "$SK" "$SPLUNK_URI" "$APP_NAME")"

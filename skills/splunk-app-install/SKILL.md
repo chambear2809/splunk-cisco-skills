@@ -14,17 +14,19 @@ Automates installation, update, and management of Splunk apps and add-ons.
 
 ## Package Model
 
-Use the original packaged archives in `splunk-ta/` as the deployment source of
-truth.
+**Pull from Splunkbase first, then fall back to local packages in `splunk-ta/`.**
+This applies to both Splunk Cloud and Splunk Enterprise targets.
 
-- Cloud workflow: prefer ACS Splunkbase installs for apps that are published on
-  Splunkbase, and let ACS fetch the latest compatible release by default. Use
-  private package uploads only for genuinely private or pre-vetted apps.
-- For known Cisco packages shipped in this repo, the cloud installer now
-  auto-switches local/remote package selections to the matching ACS Splunkbase
-  install path.
-- Enterprise workflow: install the original archive through the Splunk REST API
-  or local filesystem path.
+- Primary path: `--source splunkbase --app-id <ID>` pulls the latest
+  compatible release from Splunkbase. Omit `--app-version` to get the latest.
+- Fallback path: if Splunkbase is unavailable (no credentials, download
+  failure, private app), use `--source local` and the installer will look for
+  matching packages in `splunk-ta/`.
+- Cloud: ACS fetches the release directly from Splunkbase.
+- Enterprise: the installer downloads the package, caches it in `splunk-ta/`,
+  and installs it through the REST API or SSH staging.
+- For known Cisco packages, the installer auto-resolves the Splunkbase ID and
+  license-ack URL from `skills/shared/app_registry.json`.
 - `_unpacked` app directories are for review only and are not part of the
   normal install workflow.
 
@@ -40,10 +42,16 @@ If neither file exists, guide the user to create it:
 bash skills/shared/scripts/setup_credentials.sh
 ```
 
-The agent should still ask the user for non-secret values:
-- **Installation source** — Local, Remote, or Splunkbase
-- **Source-specific details** — file path, remote URL, or Splunkbase app ID and version
+The agent should always try Splunkbase first (latest version), then fall back
+to local packages in `splunk-ta/` if Splunkbase is not available. Ask the user
+only for:
+- **Splunkbase app ID** — if not already known from the skill's registry entry
 - **Whether this is an upgrade** of an existing app
+
+Do not prompt for source type or version unless the user specifically requests
+a pinned version or a remote URL. The default flow is:
+1. Try `--source splunkbase --app-id <ID>` (latest version).
+2. If that fails, retry with `--source local` to pick from `splunk-ta/`.
 
 ## Environment
 
@@ -165,12 +173,16 @@ Prompts for: app selection and confirmation. Credentials are read from the proje
 ## Workflow
 
 1. **Determine the operation** — install, list, or uninstall.
-2. **Ask the user** for all required information (source, details).
-3. **Run the script** with gathered values as flags.
-4. **Enterprise**: wait for the automatic restart and management API recovery.
-5. **Cloud**: let ACS finish the operation, then restart only if
+2. **Look up the app ID** from `skills/shared/app_registry.json` when
+   available. Only ask the user for the app ID if it is not already known.
+3. **Try Splunkbase first**: run with `--source splunkbase --app-id <ID>`
+   to pull the latest version.
+4. **Fall back to local**: if Splunkbase fails (no creds, download error,
+   private app), retry with `--source local` to install from `splunk-ta/`.
+5. **Enterprise**: wait for the automatic restart and management API recovery.
+6. **Cloud**: let ACS finish the operation, then restart only if
    `restartRequired=true`.
-6. **Verify** — run `list_apps.sh` after install to confirm.
+7. **Verify** — run `list_apps.sh` after install to confirm.
 
 ## Post-Install Notes
 

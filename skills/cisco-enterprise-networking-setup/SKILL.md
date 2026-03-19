@@ -15,15 +15,14 @@ Automates the **Cisco Enterprise Networking for Splunk Platform**
 
 ## Package Model
 
-Install the original vendor archive from `splunk-ta/` as-is:
+**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
+Use `splunk-app-install` with `--source splunkbase --app-id 7539` to get the
+latest release. If Splunkbase is unavailable, fall back to the local package
+in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 
-- `cisco-enterprise-networking-for-splunk-platform_310.tar.gz`
-
-For Splunk Cloud, prefer the ACS Splunkbase install path for this app so ACS
-can fetch the latest compatible release, then use this skill to configure
-macros, saved searches, acceleration, and validation over search-tier REST.
-Keep the archive in `splunk-ta/` as the local cache/reference copy. Any
-`splunk-ta/_unpacked/` copy is review-only and not part of the normal workflow.
+After installation, use this skill to configure macros, saved searches,
+acceleration, and validation over search-tier REST. Any `splunk-ta/_unpacked/`
+tree is review-only.
 
 This is a **visualization app** — it provides dashboards and saved searches but
 does not collect data. Data collection is handled by the companion

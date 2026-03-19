@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
         --port) PORT="$2"; shift 2 ;;
         --auth-type) AUTH_TYPE="$2"; shift 2 ;;
         --username) USERNAME="$2"; shift 2 ;;
-        --password) PASSWORD="$2"; shift 2 ;;
+        --password) echo "WARNING: --password exposes secrets in process listings. Prefer --password-file." >&2; PASSWORD="$2"; shift 2 ;;
         --password-file) PASSWORD=$(read_secret_file "$2"); shift 2 ;;
         --device-ip) DEVICE_IP="$2"; shift 2 ;;
         --login-domain) LOGIN_DOMAIN="$2"; shift 2 ;;
@@ -67,8 +67,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 if [[ -z "${ACCT_TYPE}" || -z "${ACCT_NAME}" || -z "${USERNAME}" || -z "${PASSWORD}" ]]; then
     log "ERROR: --type, --name, --username, and --password (or --password-file) are required"
     exit 1
@@ -76,10 +74,6 @@ fi
 
 load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
 SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
-
-_urlencode() {
-    python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"
-}
 
 configure_aci_account() {
     if [[ -z "${HOSTNAME}" ]]; then
@@ -90,9 +84,8 @@ configure_aci_account() {
     local endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/cisco_dc_networking_app_for_splunk_aci_account"
     log "Configuring ACI account '${ACCT_NAME}' via REST..."
 
-    local body enc_name update_body
-    enc_name=$(_urlencode "${ACCT_NAME}")
-    body=$(form_urlencode_pairs \
+    local create_body update_body http_code
+    create_body=$(form_urlencode_pairs \
         name "${ACCT_NAME}" \
         apic_hostname "${HOSTNAME}" \
         apic_port "${PORT}" \
@@ -100,34 +93,22 @@ configure_aci_account() {
         apic_username "${USERNAME}" \
         apic_password "${PASSWORD}" \
         apic_proxy_enabled "${PROXY_ENABLED}") || exit 1
+    update_body=$(form_urlencode_pairs \
+        apic_hostname "${HOSTNAME}" \
+        apic_port "${PORT}" \
+        apic_authentication_type "${AUTH_TYPE}" \
+        apic_username "${USERNAME}" \
+        apic_password "${PASSWORD}" \
+        apic_proxy_enabled "${PROXY_ENABLED}") || exit 1
     if [[ -n "${LOGIN_DOMAIN}" ]]; then
-        body="${body}&$(form_urlencode_pairs apic_login_domain "${LOGIN_DOMAIN}")"
+        local domain_pair
+        domain_pair=$(form_urlencode_pairs apic_login_domain "${LOGIN_DOMAIN}")
+        create_body="${create_body}&${domain_pair}"
+        update_body="${update_body}&${domain_pair}"
     fi
 
-    local http_code resp
-    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
-
-    case "${http_code}" in
-        201|200) log "ACI account '${ACCT_NAME}' created (HTTP ${http_code})" ;;
-        409)
-            log "Account already exists. Updating..."
-            update_body=$(form_urlencode_pairs \
-                apic_hostname "${HOSTNAME}" \
-                apic_port "${PORT}" \
-                apic_authentication_type "${AUTH_TYPE}" \
-                apic_username "${USERNAME}" \
-                apic_password "${PASSWORD}" \
-                apic_proxy_enabled "${PROXY_ENABLED}") || exit 1
-            if [[ -n "${LOGIN_DOMAIN}" ]]; then
-                update_body="${update_body}&$(form_urlencode_pairs apic_login_domain "${LOGIN_DOMAIN}")"
-            fi
-            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-            http_code=$(echo "${resp}" | tail -1)
-            log "ACI account '${ACCT_NAME}' updated (HTTP ${http_code})"
-            ;;
-        *) log "ERROR: Create ACI account failed (HTTP ${http_code})"; sanitize_response "${resp}" 5; exit 1 ;;
-    esac
+    http_code=$(rest_create_or_update_account "${SK}" "${endpoint}" "${ACCT_NAME}" "${create_body}" "${update_body}") || exit 1
+    log "  SUCCESS: ACI account '${ACCT_NAME}' configured (HTTP ${http_code})"
 }
 
 configure_nd_account() {
@@ -139,9 +120,8 @@ configure_nd_account() {
     local endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/cisco_dc_networking_app_for_splunk_nd_account"
     log "Configuring Nexus Dashboard account '${ACCT_NAME}' via REST..."
 
-    local body enc_name update_body
-    enc_name=$(_urlencode "${ACCT_NAME}")
-    body=$(form_urlencode_pairs \
+    local create_body update_body http_code
+    create_body=$(form_urlencode_pairs \
         name "${ACCT_NAME}" \
         nd_hostname "${HOSTNAME}" \
         nd_port "${PORT}" \
@@ -149,34 +129,22 @@ configure_nd_account() {
         nd_username "${USERNAME}" \
         nd_password "${PASSWORD}" \
         nd_enable_proxy "${PROXY_ENABLED}") || exit 1
+    update_body=$(form_urlencode_pairs \
+        nd_hostname "${HOSTNAME}" \
+        nd_port "${PORT}" \
+        nd_authentication_type "${AUTH_TYPE}" \
+        nd_username "${USERNAME}" \
+        nd_password "${PASSWORD}" \
+        nd_enable_proxy "${PROXY_ENABLED}") || exit 1
     if [[ -n "${LOGIN_DOMAIN}" ]]; then
-        body="${body}&$(form_urlencode_pairs nd_login_domain "${LOGIN_DOMAIN}")"
+        local domain_pair
+        domain_pair=$(form_urlencode_pairs nd_login_domain "${LOGIN_DOMAIN}")
+        create_body="${create_body}&${domain_pair}"
+        update_body="${update_body}&${domain_pair}"
     fi
 
-    local http_code resp
-    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
-
-    case "${http_code}" in
-        201|200) log "Nexus Dashboard account '${ACCT_NAME}' created (HTTP ${http_code})" ;;
-        409)
-            log "Account already exists. Updating..."
-            update_body=$(form_urlencode_pairs \
-                nd_hostname "${HOSTNAME}" \
-                nd_port "${PORT}" \
-                nd_authentication_type "${AUTH_TYPE}" \
-                nd_username "${USERNAME}" \
-                nd_password "${PASSWORD}" \
-                nd_enable_proxy "${PROXY_ENABLED}") || exit 1
-            if [[ -n "${LOGIN_DOMAIN}" ]]; then
-                update_body="${update_body}&$(form_urlencode_pairs nd_login_domain "${LOGIN_DOMAIN}")"
-            fi
-            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-            http_code=$(echo "${resp}" | tail -1)
-            log "Nexus Dashboard account '${ACCT_NAME}' updated (HTTP ${http_code})"
-            ;;
-        *) log "ERROR: Create ND account failed (HTTP ${http_code})"; sanitize_response "${resp}" 5; exit 1 ;;
-    esac
+    http_code=$(rest_create_or_update_account "${SK}" "${endpoint}" "${ACCT_NAME}" "${create_body}" "${update_body}") || exit 1
+    log "  SUCCESS: Nexus Dashboard account '${ACCT_NAME}' configured (HTTP ${http_code})"
 }
 
 configure_nexus9k_account() {
@@ -188,36 +156,23 @@ configure_nexus9k_account() {
     local endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/cisco_dc_networking_app_for_splunk_nexus_9k_account"
     log "Configuring Nexus 9K account '${ACCT_NAME}' via REST..."
 
-    local body enc_name update_body
-    enc_name=$(_urlencode "${ACCT_NAME}")
-    body=$(form_urlencode_pairs \
+    local create_body update_body http_code
+    create_body=$(form_urlencode_pairs \
         name "${ACCT_NAME}" \
         nexus_9k_device_ip "${DEVICE_IP}" \
         nexus_9k_port "${PORT}" \
         nexus_9k_username "${USERNAME}" \
         nexus_9k_password "${PASSWORD}" \
         nexus_9k_enable_proxy "${PROXY_ENABLED}") || exit 1
+    update_body=$(form_urlencode_pairs \
+        nexus_9k_device_ip "${DEVICE_IP}" \
+        nexus_9k_port "${PORT}" \
+        nexus_9k_username "${USERNAME}" \
+        nexus_9k_password "${PASSWORD}" \
+        nexus_9k_enable_proxy "${PROXY_ENABLED}") || exit 1
 
-    local http_code resp
-    resp=$(splunk_curl_post "$SK" "${body}" "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
-
-    case "${http_code}" in
-        201|200) log "Nexus 9K account '${ACCT_NAME}' created (HTTP ${http_code})" ;;
-        409)
-            log "Account already exists. Updating..."
-            update_body=$(form_urlencode_pairs \
-                nexus_9k_device_ip "${DEVICE_IP}" \
-                nexus_9k_port "${PORT}" \
-                nexus_9k_username "${USERNAME}" \
-                nexus_9k_password "${PASSWORD}" \
-                nexus_9k_enable_proxy "${PROXY_ENABLED}") || exit 1
-            resp=$(splunk_curl_post "$SK" "${update_body}" "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-            http_code=$(echo "${resp}" | tail -1)
-            log "Nexus 9K account '${ACCT_NAME}' updated (HTTP ${http_code})"
-            ;;
-        *) log "ERROR: Create Nexus 9K account failed (HTTP ${http_code})"; sanitize_response "${resp}" 5; exit 1 ;;
-    esac
+    http_code=$(rest_create_or_update_account "${SK}" "${endpoint}" "${ACCT_NAME}" "${create_body}" "${update_body}") || exit 1
+    log "  SUCCESS: Nexus 9K account '${ACCT_NAME}' configured (HTTP ${http_code})"
 }
 
 case "${ACCT_TYPE}" in

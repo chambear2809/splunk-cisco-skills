@@ -124,6 +124,63 @@ case "${refresh_status}" in
 esac
 
 log ""
+log "--- HEC Target Validation ---"
+_hec_platform="$(resolve_splunk_platform)"
+_hec_targets_json=$(splunk_curl "${SK}" \
+    "${SPLUNK_URI}/services/data/inputs/all?output_mode=json&count=0" 2>/dev/null || echo "{}")
+_hec_target_issues=$(echo "${_hec_targets_json}" | python3 -c "
+import json, sys
+
+platform = sys.argv[1]
+is_cloud = (platform == 'cloud')
+
+data = json.load(sys.stdin)
+issues = []
+checked = 0
+for entry in data.get('entry', []):
+    acl = entry.get('acl', {}) or {}
+    if acl.get('app', '') != 'ta_cisco_thousandeyes':
+        continue
+    content = entry.get('content', {}) or {}
+    hec = content.get('hec_target', '')
+    if not hec:
+        continue
+    checked += 1
+    name = entry.get('name', '')
+    if is_cloud:
+        if ':8088' in hec or not ('http-inputs-' in hec and '.splunkcloud.com' in hec):
+            issues.append(f'{name}: {hec}')
+    else:
+        if 'http-inputs-' in hec and '.splunkcloud.com' in hec:
+            issues.append(f'{name}: {hec}')
+
+print(f'checked={checked}')
+for i in issues:
+    print(i)
+" "${_hec_platform}" 2>/dev/null || echo "checked=0")
+
+_hec_checked=$(echo "${_hec_target_issues}" | head -1 | sed 's/checked=//')
+_hec_bad=$(echo "${_hec_target_issues}" | tail -n +2)
+if [[ "${_hec_checked}" -gt 0 ]]; then
+    if [[ -z "${_hec_bad}" ]]; then
+        pass "HEC targets on ${_hec_checked} streaming input(s) match platform (${_hec_platform})"
+    else
+        fail "HEC target mismatch — inputs point to wrong endpoint for ${_hec_platform}:"
+        echo "${_hec_bad}" | while IFS= read -r line; do
+            [[ -n "${line}" ]] && log "    ${line}"
+        done
+        if [[ "${_hec_platform}" == "cloud" ]]; then
+            log "    Expected: https://http-inputs-{stack}.splunkcloud.com:443"
+            log "    Fix: re-run setup.sh --enable-inputs to update HEC targets"
+        else
+            log "    Expected: https://{host}:8088"
+        fi
+    fi
+else
+    log "  INFO: No streaming inputs with hec_target found (nothing to check)"
+fi
+
+log ""
 log "--- Data Inputs ---"
 input_count=$(rest_count_live_inputs "${SK}" "${SPLUNK_URI}" "${APP_NAME}" 2>/dev/null || echo "0")
 enabled_inputs=$(rest_count_live_inputs "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "0" 2>/dev/null || echo "0")

@@ -48,8 +48,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 log_live_input_summary() {
     local total enabled disabled
     read -r total enabled disabled <<< "$(rest_get_live_input_counts "$SK" "$SPLUNK_URI" "$APP_NAME")"
@@ -81,6 +79,24 @@ create_indexes() {
         exit 1
     fi
     log "Index creation complete."
+}
+
+ensure_app_visible() {
+    ensure_search_api_session
+    local visible
+    visible=$(splunk_curl "${SK}" \
+        "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null \
+        | python3 -c "
+import json, sys
+try: print(json.load(sys.stdin)['entry'][0]['content'].get('visible', True))
+except: print('True')
+" 2>/dev/null || echo "True")
+    if [[ "${visible}" == "False" ]]; then
+        log "Setting ${APP_NAME} visible=true..."
+        splunk_curl "${SK}" -X POST \
+            "${SPLUNK_URI}/services/apps/local/${APP_NAME}" \
+            -d "visible=true" -d "output_mode=json" >/dev/null 2>&1 || true
+    fi
 }
 
 create_macros() {
@@ -281,8 +297,52 @@ main() {
     check_prereqs
     create_indexes
     create_macros
+    ensure_app_visible
     log "Setup complete."
     log "$(log_platform_restart_guidance "index or macro changes")"
+
+    [[ -t 0 ]] || return 0
+    log ""
+    read -rp "Would you like to configure an Intersight account now? [y/N]: " yn
+    case "${yn}" in
+        [yY]|[yY][eE][sS]) ;;
+        *) return 0 ;;
+    esac
+
+    local acct_name client_id hostname secret_file
+    read -rp "Account name (e.g. CVF_Intersight): " acct_name
+    [[ -z "${acct_name}" ]] && { log "ERROR: Account name is required."; return 1; }
+    read -rp "Intersight hostname (default: intersight.com): " hostname
+    hostname="${hostname:-intersight.com}"
+    read -rp "OAuth2 Client ID: " client_id
+    [[ -z "${client_id}" ]] && { log "ERROR: Client ID is required."; return 1; }
+
+    log ""
+    log "Write your OAuth2 Client Secret to a temp file:"
+    log "  echo \"YOUR_SECRET\" > /tmp/client_secret && chmod 600 /tmp/client_secret"
+    log ""
+    read -rp "Path to client secret file (default: /tmp/client_secret): " secret_file
+    secret_file="${secret_file:-/tmp/client_secret}"
+    [[ -f "${secret_file}" ]] || { log "ERROR: File not found: ${secret_file}"; return 1; }
+
+    read -rp "Enable default inputs after account creation? [Y/n]: " defaults_yn
+    local defaults_flag=""
+    case "${defaults_yn}" in
+        [nN]|[nN][oO]) ;;
+        *) defaults_flag="--create-defaults" ;;
+    esac
+
+    log ""
+    bash "${SCRIPT_DIR}/configure_account.sh" \
+        --name "${acct_name}" \
+        --hostname "${hostname}" \
+        --client-id "${client_id}" \
+        --client-secret-file "${secret_file}" \
+        ${defaults_flag}
+
+    rm -f "${secret_file}" 2>/dev/null || true
+    log ""
+    log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
 }
 
 main

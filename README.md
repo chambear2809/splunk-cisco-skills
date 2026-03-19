@@ -57,6 +57,8 @@ skill-specific details.
 | `cisco-intersight-setup` | `Splunk_TA_Cisco_Intersight` | Configure Cisco Intersight account, index, and inputs |
 | `cisco-meraki-ta-setup` | `Splunk_TA_cisco_meraki` | Configure Meraki organization account, index, and polling inputs |
 | `cisco-enterprise-networking-setup` | `cisco-catalyst-app` | Configure the visualization app’s macros and related app settings |
+| `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
+| `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
 
@@ -90,11 +92,11 @@ See `CLOUD_DEPLOYMENT_MATRIX.md` for the per-TA deployment model.
 The normal workflow is:
 
 1. Configure credentials once.
-2. Put app packages in `splunk-ta/` or download them from Splunkbase.
-3. Install the app or TA.
-4. Run the skill-specific setup script.
-5. Validate the deployment.
-6. Restart Splunk if the setup script tells you to. The generic install/uninstall
+2. Install the app or TA from Splunkbase (latest version). If Splunkbase is
+   unavailable, fall back to local packages in `splunk-ta/`.
+3. Run the skill-specific setup script.
+4. Validate the deployment.
+5. Restart Splunk if the setup script tells you to. The generic install/uninstall
    scripts already restart Splunk automatically unless you explicitly skip it.
 
 ### 1. Configure Credentials
@@ -205,33 +207,10 @@ legacy alias `SPLUNK_URI`. These values are stored as strings in the
 `credentials` file; the helper supports simple `${OTHER_KEY}` references there,
 but does not execute arbitrary shell expressions.
 
-### 2. Use `splunk-ta/` As The Local Package Cache
+### 2. Install Apps Or TAs
 
-The repository’s `splunk-ta/` directory is the canonical local package cache.
-
-That means:
-
-- Splunkbase downloads are saved there by default.
-- URL-based downloads are saved there by default.
-- `--source local` looks there first when listing available packages.
-- The package binaries are intentionally ignored by Git.
-
-This makes `splunk-ta/` the shared working directory for app packages without
-polluting version control history.
-
-### 3. Install Apps Or TAs
-
-The generic installer is:
-
-```bash
-bash skills/splunk-app-install/scripts/install_app.sh
-```
-
-You can run it interactively, or pass flags.
-
-Examples:
-
-**Install from Splunkbase**
+The default installation path is **Splunkbase first, local fallback**. Pull
+the latest version from Splunkbase:
 
 ```bash
 bash skills/splunk-app-install/scripts/install_app.sh \
@@ -239,7 +218,8 @@ bash skills/splunk-app-install/scripts/install_app.sh \
   --app-id 5580
 ```
 
-**Install from a local package**
+If Splunkbase is unavailable (no credentials, download failure, or a private
+app), fall back to a local package in `splunk-ta/`:
 
 ```bash
 bash skills/splunk-app-install/scripts/install_app.sh \
@@ -247,13 +227,9 @@ bash skills/splunk-app-install/scripts/install_app.sh \
   --file splunk-ta/my_app.tgz
 ```
 
-**Install from a remote URL**
-
-```bash
-bash skills/splunk-app-install/scripts/install_app.sh \
-  --source remote \
-  --url https://example.com/path/to/app.tgz
-```
+The `splunk-ta/` directory is the local package cache. Splunkbase downloads
+are saved there automatically, `--source local` looks there when listing
+available packages, and the binaries are intentionally ignored by Git.
 
 When the target platform is **Splunk Enterprise**, the installer will:
 
@@ -271,7 +247,7 @@ restart Splunk automatically on Enterprise or trigger an ACS restart only when
 Splunk Cloud reports `restartRequired=true`. Use `--no-restart` only when
 batching multiple changes before a single final restart.
 
-### 4. Run A Skill-Specific Setup
+### 3. Run A Skill-Specific Setup
 
 After installation, use the matching setup skill.
 
@@ -303,7 +279,7 @@ such as:
 Secrets should come from the `credentials` file or from temporary files passed
 to `--password-file`, `--api-token-file`, or similar flags.
 
-### 5. Validate The Deployment
+### 4. Validate The Deployment
 
 Each skill provides a validation script under its own `scripts/` directory.
 
@@ -351,6 +327,20 @@ To target a remote Splunk instance instead of localhost:
 ```bash
 export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 ```
+
+### SSL Verification
+
+By default, the scripts skip TLS certificate verification (`curl -k`) because
+on-prem Splunk deployments typically use self-signed certificates. To enable
+strict certificate verification (recommended for Splunk Cloud or any
+environment with trusted certs), set:
+
+```bash
+export SPLUNK_VERIFY_SSL="true"
+```
+
+You can also add this to your `credentials` file. When enabled, curl will
+reject untrusted or expired certificates instead of silently ignoring them.
 
 You can also define `SPLUNK_SEARCH_API_URI` in the `credentials` file so you do
 not have to export it each session. The helper still accepts `SPLUNK_URI` as a
@@ -406,17 +396,29 @@ rules/credential-handling.mdc
 ## Repository Layout
 
 ```text
-splunk-ta-skills/
+splunk-cloud-skills/
 ├── README.md
+├── CLOUD_DEPLOYMENT_MATRIX.md
+├── DEMO_SCRIPTS.md
 ├── credentials.example
 ├── credentials                  # local only, gitignored
+├── .shellcheckrc
 ├── splunk-ta/                   # local package cache; binaries ignored by git
+│   └── _unpacked/              # review-only extracted copies
 ├── skills/
 │   ├── shared/
+│   │   ├── app_registry.json   # single source of truth for Splunkbase IDs
 │   │   ├── lib/
-│   │   │   └── credential_helpers.sh
+│   │   │   ├── credential_helpers.sh    # shim that sources all modules
+│   │   │   ├── credentials.sh           # profile resolution and loading
+│   │   │   ├── rest_helpers.sh          # Splunk REST API wrappers
+│   │   │   ├── acs_helpers.sh           # ACS CLI wrappers
+│   │   │   ├── splunkbase_helpers.sh    # Splunkbase auth and downloads
+│   │   │   └── configure_account_helpers.sh  # create-or-update pattern
 │   │   └── scripts/
-│   │       └── setup_credentials.sh
+│   │       ├── setup_credentials.sh
+│   │       ├── cloud_batch_install.sh
+│   │       └── cloud_batch_uninstall.sh
 │   ├── splunk-app-install/
 │   ├── cisco-catalyst-ta-setup/
 │   ├── cisco-dc-networking-setup/
@@ -424,6 +426,7 @@ splunk-ta-skills/
 │   ├── cisco-meraki-ta-setup/
 │   ├── cisco-enterprise-networking-setup/
 │   └── splunk-stream-setup/
+├── tests/                       # bats and pytest test suites
 └── rules/
     └── credential-handling.mdc
 ```

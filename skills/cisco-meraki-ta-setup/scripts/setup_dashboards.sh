@@ -8,8 +8,6 @@ APP_NAME="Splunk_TA_cisco_meraki"
 
 INDEX_NAME="${1:-meraki}"
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
 SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk. Check credentials."; exit 1; }
 

@@ -40,15 +40,13 @@ while [[ $# -gt 0 ]]; do
         --name) ACCT_NAME="$2"; shift 2 ;;
         --hostname) HOSTNAME="$2"; shift 2 ;;
         --client-id) CLIENT_ID="$2"; shift 2 ;;
-        --client-secret) CLIENT_SECRET="$2"; shift 2 ;;
+        --client-secret) echo "WARNING: --client-secret exposes secrets in process listings. Prefer --client-secret-file." >&2; CLIENT_SECRET="$2"; shift 2 ;;
         --client-secret-file) CLIENT_SECRET=$(read_secret_file "$2"); shift 2 ;;
         --create-defaults) CREATE_DEFAULTS="true"; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
 done
-
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
 if [[ -z "${ACCT_NAME}" || -z "${CLIENT_ID}" || -z "${CLIENT_SECRET}" ]]; then
     log "ERROR: --name, --client-id, and --client-secret (or --client-secret-file) are required"
@@ -64,44 +62,18 @@ log "Authenticated to Splunk REST API."
 local_endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/Splunk_TA_Cisco_Intersight_account"
 log "Creating Intersight account '${ACCT_NAME}' (hostname: ${HOSTNAME})..."
 
-body=""
-update_body=""
-http_code=""
-body=$(form_urlencode_pairs \
+create_body=$(form_urlencode_pairs \
     name "${ACCT_NAME}" \
     intersight_hostname "${HOSTNAME}" \
     client_id "${CLIENT_ID}" \
     client_secret "${CLIENT_SECRET}") || exit 1
-resp=$(splunk_curl_post "${SK}" \
-    "${body}" \
-    "${local_endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-http_code=$(echo "${resp}" | tail -1)
-resp_body=$(printf '%s\n' "${resp}" | sed '$d')
+update_body=$(form_urlencode_pairs \
+    intersight_hostname "${HOSTNAME}" \
+    client_id "${CLIENT_ID}" \
+    client_secret "${CLIENT_SECRET}") || exit 1
 
-if [[ "${http_code}" == "201" || "${http_code}" == "200" ]]; then
-    log "  SUCCESS: Account '${ACCT_NAME}' created (HTTP ${http_code})"
-elif [[ "${http_code}" == "409" ]] || { [[ "${http_code}" == "400" ]] && echo "${resp_body}" | grep -q 'Conflict'; }; then
-    log "  Account already exists. Updating..."
-    update_body=$(form_urlencode_pairs \
-        intersight_hostname "${HOSTNAME}" \
-        client_id "${CLIENT_ID}" \
-        client_secret "${CLIENT_SECRET}") || exit 1
-    resp=$(splunk_curl_post "${SK}" \
-        "${update_body}" \
-        "${local_endpoint}/${ACCT_NAME}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
-    if [[ "${http_code}" == "200" ]]; then
-        log "  SUCCESS: Account '${ACCT_NAME}' updated (HTTP ${http_code})"
-    else
-        log "  ERROR: Update returned HTTP ${http_code}"
-        sanitize_response "${resp}"
-        exit 1
-    fi
-else
-    log "  ERROR: HTTP ${http_code}"
-    sanitize_response "${resp}"
-    exit 1
-fi
+http_code=$(rest_create_or_update_account "${SK}" "${local_endpoint}" "${ACCT_NAME}" "${create_body}" "${update_body}") || exit 1
+log "  SUCCESS: Intersight account '${ACCT_NAME}' configured (HTTP ${http_code})"
 
 if [[ "${CREATE_DEFAULTS}" == "true" ]]; then
     log "Enabling default Intersight inputs for account '${ACCT_NAME}'..."

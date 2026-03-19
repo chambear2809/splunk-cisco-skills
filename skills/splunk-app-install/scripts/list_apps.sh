@@ -6,8 +6,6 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 FILTER=""
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 # Accept flags for non-interactive use; anything missing gets prompted
 while [[ $# -gt 0 ]]; do
     case "$1" in

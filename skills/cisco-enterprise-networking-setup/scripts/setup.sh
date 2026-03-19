@@ -44,8 +44,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
 SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 

@@ -15,15 +15,14 @@ Automates the **Cisco Catalyst Add-on for Splunk** (`TA_cisco_catalyst` v3.0.0).
 
 ## Package Model
 
-Install the original vendor archive from `splunk-ta/` as-is:
+**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
+Use `splunk-app-install` with `--source splunkbase --app-id 7538` to get the
+latest release. If Splunkbase is unavailable, fall back to the local package
+in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 
-- `cisco-catalyst-add-on-for-splunk_310.tar.gz`
-
-For Splunk Cloud, prefer the ACS Splunkbase install path for this app so ACS
-can fetch the latest compatible release, then use this skill to configure
-accounts, inputs, and validation over search-tier REST. Keep the archive in
-`splunk-ta/` as the local cache/reference copy. Any `splunk-ta/_unpacked/`
-copy is review-only and not part of the normal workflow.
+After installation, use this skill to configure accounts, inputs, and
+validation over search-tier REST. Any `splunk-ta/_unpacked/` tree is
+review-only.
 
 ## Agent Behavior — Credentials
 

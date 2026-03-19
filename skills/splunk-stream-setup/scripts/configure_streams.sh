@@ -60,8 +60,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 capitalize_word() {
     local word="${1:-}"
     if [[ -z "${word}" ]]; then

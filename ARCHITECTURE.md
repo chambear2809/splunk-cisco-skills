@@ -64,6 +64,31 @@ flowchart TB
 - Public IP auto-added to search-api allowlist
 - Stack-local credentials swapped in for 8089 auth
 
+### ACS Deployment Caveats
+
+ACS app installs are generally reliable but have several edge cases that the
+scripts defend against:
+
+**App content corruption** — When multiple Splunkbase apps are installed in
+rapid succession (especially after uninstall/reinstall cycles), ACS can
+occasionally deploy the wrong app's files into another app's directory. This
+corrupts the affected app: its custom REST handlers return 404, modular input
+types do not register, and `app.conf` shows metadata from a different app. The
+`cloud_batch_install.sh` script includes a post-install verification pass that
+queries each app's `configs/conf-app/package` endpoint to confirm the `id`
+field matches the expected app name. If a mismatch is detected, uninstall the
+affected app and reinstall it individually.
+
+**Visibility defaults to false** — TAs installed via ACS may have
+`visible=false` in their app settings, making them invisible in Splunk Web. The
+skill-specific `setup.sh` scripts auto-fix this by POSTing `visible=true` to
+`/services/apps/local/{app}` during the default setup flow.
+
+**409 on reinstall** — If ACS believes an app is already installed, a fresh
+`apps install splunkbase` returns HTTP 409. The batch installer treats this as a
+skip rather than a failure. To force a re-deployment, uninstall first via
+`acs apps uninstall`, wait for the stack to settle, then install again.
+
 ### Enterprise (On-Prem)
 
 A single Splunk instance or a distributed deployment under your control. All

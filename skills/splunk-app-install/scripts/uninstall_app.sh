@@ -8,8 +8,6 @@ SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
 APP_NAME=""
 RESTART_SPLUNK=true
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 # Accept flags for non-interactive use; anything missing gets prompted
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -185,14 +183,52 @@ except Exception:
         exit 1
     fi
 
-    log "Removing app '${APP_NAME}' from Splunk Cloud..."
+    log "Removing app '${APP_NAME}' from Splunk Cloud via ACS..."
     if cloud_requires_local_scope; then
-        acs_command apps uninstall "${APP_NAME}" --scope local >/dev/null
+        acs_command apps uninstall "${APP_NAME}" --scope local >/dev/null 2>&1 || true
     else
-        acs_command apps uninstall "${APP_NAME}" >/dev/null
+        acs_command apps uninstall "${APP_NAME}" >/dev/null 2>&1 || true
     fi
-    log "SUCCESS: App '${APP_NAME}' has been removed"
+
     cloud_restart_or_exit "app removal"
+
+    cloud_uninstall_rest_fallback_needed=false
+    if [[ -n "${SPLUNK_URI:-}" ]] && [[ "${SPLUNK_URI}" == *".splunkcloud.com"* ]]; then
+        load_splunk_credentials 2>/dev/null || true
+        if SK_VERIFY=$(get_session_key "${SPLUNK_URI}" 2>/dev/null); then
+            if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}"; then
+                log "WARNING: ACS reported success but the app is still present on the search tier."
+                cloud_uninstall_rest_fallback_needed=true
+            fi
+        fi
+    fi
+
+    if ${cloud_uninstall_rest_fallback_needed}; then
+        log "Attempting direct search-tier REST DELETE as fallback..."
+        local delete_code
+        delete_code=$(splunk_curl "${SK_VERIFY}" \
+            -X DELETE "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" \
+            -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
+        case "${delete_code}" in
+            200)
+                log "Search-tier REST DELETE succeeded (HTTP ${delete_code})."
+                cloud_restart_or_exit "search-tier app removal"
+                ;;
+            404)
+                log "App already absent from search tier (HTTP 404)."
+                ;;
+            *)
+                log "WARNING: Search-tier REST DELETE returned HTTP ${delete_code}. Manual cleanup may be required."
+                ;;
+        esac
+    fi
+
+    if [[ -n "${SK_VERIFY:-}" ]] && rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}" 2>/dev/null; then
+        log "WARNING: App '${APP_NAME}' may still be present on some search-head cluster members."
+        log "On Victoria stacks with SHC, a direct REST DELETE on each member followed by an ACS restart may be required."
+    else
+        log "SUCCESS: App '${APP_NAME}' has been removed from Splunk Cloud."
+    fi
     exit 0
 fi
 

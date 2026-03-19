@@ -9,8 +9,6 @@ KV_COLLECTION="mcp_tools"
 KV_ENABLED_COLLECTION="mcp_tools_enabled"
 APP_CONTEXT="Splunk_MCP_Server"
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 if [[ ! -f "${MCP_TOOLS_JSON}" ]]; then
     log "ERROR: MCP tools file not found at ${MCP_TOOLS_JSON}"
     exit 1

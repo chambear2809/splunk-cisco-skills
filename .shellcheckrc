@@ -1,0 +1,14 @@
+# ShellCheck configuration for splunk-cloud-skills
+# https://github.com/koalaman/shellcheck/wiki/Directive
+
+# Allow sourcing files relative to the script location
+source-path=SCRIPTDIR
+
+# Shared library files are sourced, not executed directly
+external-sources=true
+
+# SC2034: variable appears unused — many variables are set for callers
+disable=SC2034
+
+# SC1091: not following sourced file — paths are resolved at runtime
+disable=SC1091

@@ -15,15 +15,14 @@ Automates the **Cisco Intersight Add-On for Splunk** (`Splunk_TA_Cisco_Intersigh
 
 ## Package Model
 
-Install the original vendor archive from `splunk-ta/` as-is:
+**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
+Use `splunk-app-install` with `--source splunkbase --app-id 7828` to get the
+latest release. If Splunkbase is unavailable, fall back to the local package
+in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 
-- `cisco-intersight-add-on-for-splunk_310.tgz`
-
-For Splunk Cloud, prefer the ACS Splunkbase install path for this app so ACS
-can fetch the latest compatible release, then use this skill to configure the
-account, inputs, macros, and validation over search-tier REST. Keep the archive
-in `splunk-ta/` as the local cache/reference copy. Any `splunk-ta/_unpacked/`
-copy is review-only and not part of the normal workflow.
+After installation, use this skill to configure the account, inputs, macros,
+and validation over search-tier REST. Any `splunk-ta/_unpacked/` tree is
+review-only.
 
 ## Agent Behavior — Credentials
 
@@ -95,8 +94,11 @@ bash skills/shared/scripts/setup_credentials.sh
 bash skills/cisco-intersight-setup/scripts/setup.sh
 ```
 
-Creates one index and updates the search macro. No `sudo` required when running
-as the `splunk` user.
+Creates one index, updates the search macro, and ensures the app is visible in
+Splunk Web. When run interactively (TTY), the script prompts to continue with
+account configuration after the initial setup completes.
+
+No `sudo` required when running as the `splunk` user.
 In Splunk Cloud, the setup script creates this index through ACS.
 
 | Index | Macro | Purpose | Max Size |
@@ -201,6 +203,17 @@ bash scripts/load_mcp_tools.sh
    endpoints (set via `MAX_INPUT_LIMIT` in settings).
 8. **CIM compliance**: Audit records map to Authentication and Change CIM models.
    Alarms map to the Alerts CIM model. Metrics map to Performance.
+9. **ACS deployment verification**: After ACS install, verify the app identity
+   via REST (`configs/conf-app/package`). ACS can occasionally deploy the wrong
+   app content into an app directory. If `app.conf` shows a different app ID,
+   uninstall and reinstall the app individually.
+10. **Visibility after ACS install**: The app may default to `visible=false`
+    after ACS install, making it invisible in Splunk Web. The setup script now
+    sets `visible=true` automatically. The standalone fix is a POST to
+    `/services/apps/local/Splunk_TA_Cisco_Intersight` with `visible=true`.
+11. **Interactive continuation**: When run from a TTY, `setup.sh` prompts to
+    continue with account configuration after the initial setup completes. This
+    is skipped in non-interactive (piped) contexts.
 
 ## Additional Resources
 

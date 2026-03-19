@@ -75,8 +75,6 @@ if ! $INSTALL && ! $INDEXES_ONLY && ! $CONFIGURE_STREAMFWD; then
     FULL_SETUP=true
 fi
 
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-
 _get_session_key() {
     load_splunk_credentials || return 1
     SK=$(get_session_key "${SPLUNK_URI}") || return 1

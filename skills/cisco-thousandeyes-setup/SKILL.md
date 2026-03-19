@@ -107,26 +107,23 @@ bash skills/splunk-app-install/scripts/install_app.sh \
   --source splunkbase --app-id 7719
 ```
 
-### Step 2: Verify or Create HEC Token
-
-ThousandEyes pushes most data via HEC. A valid HEC token and endpoint are
-required before creating streaming inputs.
+### Step 2: Create HEC Token and Indexes
 
 ```bash
-bash skills/cisco-thousandeyes-setup/scripts/setup.sh --hec-only
+bash skills/cisco-thousandeyes-setup/scripts/setup.sh
 ```
 
-This checks for an existing HEC token named `thousandeyes` and creates one if
-it does not exist. For Splunk Cloud, it uses ACS; for Enterprise, it uses the
-REST API.
+The default flow verifies or creates a HEC token named `thousandeyes`, then
+creates six indexes. When run interactively (TTY), the script prompts to
+continue with OAuth authentication and input enablement after the initial
+setup completes.
 
-### Step 3: Create Indexes
+For Splunk Cloud, HEC tokens are managed through ACS and indexes are created
+through ACS. For Enterprise, both use the REST API.
 
-```bash
-bash skills/cisco-thousandeyes-setup/scripts/setup.sh --indexes-only
-```
+Partial runs: `--hec-only`, `--indexes-only`.
 
-Creates six indexes. In Splunk Cloud, indexes are created through ACS.
+Creates six indexes:
 
 | Index | Purpose | Sourcetype |
 |-------|---------|------------|
@@ -137,7 +134,7 @@ Creates six indexes. In Splunk Cloud, indexes are created through ACS.
 | `thousandeyes_alerts` | Alert notifications | `cisco:thousandeyes:alerts` |
 | `thousandeyes_pathvis` | Path visualization | `cisco:thousandeyes:path-vis` |
 
-### Step 4: Authenticate via OAuth
+### Step 3: Authenticate via OAuth
 
 ```bash
 bash skills/cisco-thousandeyes-setup/scripts/configure_account.sh
@@ -151,7 +148,7 @@ The script will:
 The agent should instruct the user to visit the URL shown in the terminal
 output and enter the displayed code.
 
-### Step 5: Enable Inputs
+### Step 4: Enable Inputs
 
 Before running, the agent must ask the user for:
 - ThousandEyes account name (the email shown after OAuth)
@@ -176,19 +173,19 @@ bash skills/cisco-thousandeyes-setup/scripts/setup.sh --enable-inputs \
 | `alerts` | HEC webhook | Alert notifications via webhook |
 | `all` | Mixed | All of the above |
 
-### Step 6: ITSI Integration (Optional)
+### Step 5: ITSI Integration (Optional)
 
 If Splunk ITSI (`SA-ITOA`) is installed, the app can forward Splunk notable
 events to ThousandEyes and receive alert data. The validate script checks for
 ITSI presence automatically.
 
-### Step 7: Restart If Required
+### Step 6: Restart If Required
 
 On Splunk Enterprise, restart Splunk after new index creation.
 On Splunk Cloud, check `acs status current-stack` and only run
 `acs restart current-stack` when ACS reports `restartRequired=true`.
 
-### Step 8: Validate
+### Step 7: Validate
 
 ```bash
 bash skills/cisco-thousandeyes-setup/scripts/validate.sh
@@ -230,12 +227,26 @@ bash skills/cisco-thousandeyes-setup/scripts/load_mcp_tools.sh
    that pushes data to Splunk. Deleting the input should clean up the stream.
 5. **Alerts use webhooks**: The alerts input creates webhook operations and
    connectors in ThousandEyes that push data to Splunk's HEC endpoint.
-6. **Cloud HEC URL format**: For Splunk Cloud, HEC targets use
-   `https://http-inputs-{stack}.splunkcloud.com:443`.
+6. **Cloud vs Enterprise HEC URL format**: The HEC target URL differs by
+   platform. Splunk Cloud uses `https://http-inputs-{stack}.splunkcloud.com:443`
+   (or `.stg.splunkcloud.com` for staging). Enterprise uses
+   `https://{host}:8088`. The `detect_hec_target()` function in `setup.sh`
+   auto-detects the correct format, but falls back to the Enterprise pattern if
+   `SPLUNK_CLOUD_STACK` is empty. If streaming inputs have a search-head
+   hostname or port 8088 on a Cloud stack, ThousandEyes cannot reach the HEC
+   endpoint and no data flows. The validate script checks for this mismatch.
+   Fix by re-running `setup.sh --enable-inputs`.
 7. **Client ID is hardcoded**: The OAuth client ID (`0oalgciz1dyS1Uonr697`) is
    built into the app; you do not need to provide it.
 8. **ITSI is optional**: The ITSI integration only activates if `SA-ITOA` is
    installed. The app works fully without it.
+9. **Existing account conflict**: If `configure_account.sh` fails with a
+   409/500 ("Name already in use"), the account already exists from a prior
+   session. The existing OAuth tokens are retained and typically still valid.
+   Run `validate.sh` to check the account status before re-authenticating.
+10. **Interactive continuation**: When run from a TTY, `setup.sh` prompts to
+    continue with OAuth authentication and input enablement after HEC/index
+    setup completes. This is skipped in non-interactive (piped) contexts.
 
 ## Additional Resources
 

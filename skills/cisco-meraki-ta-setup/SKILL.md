@@ -10,19 +10,18 @@ description: >-
 
 # Cisco Meraki TA Setup Automation
 
-Automates the **Splunk Add-on for Cisco Meraki** (`Splunk_TA_cisco_meraki` v3.2.0).
+Automates the **Splunk Add-on for Cisco Meraki** (`Splunk_TA_cisco_meraki` v3.3.0).
 
 ## Package Model
 
-Install the original vendor archive from `splunk-ta/` as-is:
+**Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
+Use `splunk-app-install` with `--source splunkbase --app-id 5580` to get the
+latest release. If Splunkbase is unavailable, fall back to the local package
+in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 
-- `cisco-meraki-add-on-for-splunk_320.tgz`
-
-For Splunk Cloud, prefer the ACS Splunkbase install path for this app so ACS
-can fetch the latest compatible release, then use this skill to configure the
-account, inputs, dashboard macro, and validation over search-tier REST. Keep
-the archive in `splunk-ta/` as the local cache/reference copy. Any
-`splunk-ta/_unpacked/` copy is review-only and not part of the normal workflow.
+After installation, use this skill to configure the account, inputs, dashboard
+macro, and validation over search-tier REST. Any `splunk-ta/_unpacked/` tree
+is review-only.
 
 ## Agent Behavior — Credentials
 
@@ -87,20 +86,24 @@ bash skills/shared/scripts/setup_credentials.sh
 
 ## Setup Workflow
 
-### Step 1: Create Index
+### Step 1: Create Index and Configure Dashboards
 
 ```bash
 bash skills/cisco-meraki-ta-setup/scripts/setup.sh
 ```
 
-Creates one index. No `sudo` required when running as the `splunk` user.
-In Splunk Cloud, the setup script creates this index through ACS.
+Creates the index, sets the `meraki_index` dashboard macro, and ensures the app
+is visible in Splunk Web. When run interactively (TTY), the script prompts to
+continue with account configuration after the initial setup completes.
+
+No `sudo` required when running as the `splunk` user.
+In Splunk Cloud, the setup script creates the index through ACS.
 
 | Index | Purpose | Max Size |
 |-------|---------|----------|
 | `meraki` | All Meraki Dashboard data | 512 GB |
 
-Partial runs: `--indexes-only`.
+Partial runs: `--indexes-only` (skips dashboard macro and visibility fix).
 
 ### Step 2: Configure Organization Account
 
@@ -165,48 +168,13 @@ bash scripts/setup.sh --enable-inputs \
 | `organization` | 2 | Networks and organizations |
 | `sensor` | 1 | Sensor readings history |
 
-### Step 4: Configure Dashboards
-
-The Meraki TA includes **32 built-in dashboards**. All dashboards use the
-`meraki_index` macro, which defaults to `index IN(main)`. This must be updated
-to point to the `meraki` index.
-
-```bash
-bash scripts/setup_dashboards.sh
-```
-
-Or with a custom index name:
-
-```bash
-bash scripts/setup_dashboards.sh my_custom_index
-```
-
-This updates `meraki_index` via the TA's REST configuration endpoint so all 32
-dashboards query the correct index. Search-tier Splunk credentials are required.
-
-Built-in dashboards include:
-
-| Category | Dashboards |
-|----------|------------|
-| Core | Access Points, Air Marshal, Audit, Cameras, Switches, Security Appliances, Org Security |
-| Devices | Devices, Device Availability, Device Uplinks, Firmware Upgrades |
-| Wireless | Wireless Ethernet Statuses, Wireless Packet Loss |
-| Summary | Top Appliances, Top Clients, Top Devices, Top Switches by Energy |
-| VPN | Appliance VPN Stats, Appliance VPN Statuses |
-| Licenses | Coterm, Subscription Entitlements, Subscriptions |
-| Switch | Switch Port Overview |
-| Sensor | Sensor Reading History |
-| API | API Request History, Request Overview, Response Codes |
-| Assurance | Assurance Alerts |
-| Organization | Organizations, Organization Networks |
-
-### Step 5: Restart If Required
+### Step 4: Restart If Required
 
 On Splunk Enterprise, restart Splunk after new index creation.
 On Splunk Cloud, check `acs status current-stack` and only run
 `acs restart current-stack` when ACS reports `restartRequired=true`.
 
-### Step 6: Validate
+### Step 5: Validate
 
 ```bash
 bash scripts/validate.sh
@@ -260,6 +228,20 @@ bash scripts/load_mcp_tools.sh
    and is not part of the standard polling inputs.
 7. **Rate limiting**: The `max_api_calls_per_second` field controls API rate
    limiting (default 5, max 10).
+8. **ACS deployment verification**: After ACS install, verify the app identity
+   via REST (`configs/conf-app/package`). ACS can occasionally deploy the wrong
+   app content into an app directory. If `app.conf` shows a different app ID,
+   uninstall and reinstall the app individually.
+9. **Visibility after ACS install**: The app may default to `visible=false`
+   after ACS install, making it invisible in Splunk Web. The setup script now
+   sets `visible=true` automatically. The standalone fix is a POST to
+   `/services/apps/local/Splunk_TA_cisco_meraki` with `visible=true`.
+10. **Dashboard macro in default setup**: The `setup.sh` default flow (no flags)
+    now creates indexes AND configures the `meraki_index` dashboard macro.
+    `setup_dashboards.sh` still exists for standalone use or custom index names.
+11. **Interactive continuation**: When run from a TTY, `setup.sh` prompts to
+    continue with account configuration after the initial setup completes. This
+    is skipped in non-interactive (piped) contexts.
 
 ## Additional Resources
 

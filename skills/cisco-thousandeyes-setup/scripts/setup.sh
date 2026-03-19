@@ -86,6 +86,10 @@ detect_hec_target() {
             fi
             return 0
         fi
+        log "WARNING: Cloud platform detected but SPLUNK_CLOUD_STACK is empty." >&2
+        log "  HEC target will fall back to search-head host on port 8088," >&2
+        log "  which is incorrect for Splunk Cloud. Set SPLUNK_CLOUD_STACK" >&2
+        log "  in your credentials file." >&2
     fi
     local host
     host=$(splunk_host_from_uri "${SPLUNK_URI}")
@@ -276,6 +280,7 @@ enable_metrics_inputs() {
     hec_target=$(detect_hec_target)
 
     log "Enabling metrics stream input for account='${account}'..."
+    log "  HEC target: ${hec_target}"
     local body
     body=$(form_urlencode_pairs \
         disabled "0" \
@@ -422,6 +427,58 @@ main() {
     fi
     create_indexes
     log "$(log_platform_restart_guidance "setup changes")"
+
+    [[ -t 0 ]] || return 0
+    log ""
+    read -rp "Would you like to authenticate a ThousandEyes account now? [y/N]: " yn
+    case "${yn}" in
+        [yY]|[yY][eE][sS]) ;;
+        *) return 0 ;;
+    esac
+
+    log ""
+    bash "${SCRIPT_DIR}/configure_account.sh"
+    local account_email
+    account_email=$(bash -c '
+        source "'"${SCRIPT_DIR}"'/../../shared/lib/credential_helpers.sh"
+        load_splunk_credentials >/dev/null 2>&1
+        SK=$(get_session_key "${SPLUNK_URI}" 2>/dev/null)
+        splunk_curl "${SK}" \
+            "${SPLUNK_URI}/servicesNS/nobody/ta_cisco_thousandeyes/ta_cisco_thousandeyes_account?output_mode=json" \
+            2>/dev/null | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    for e in data.get(\"entry\", []):
+        print(e.get(\"name\", \"\"), end=\"\")
+        break
+except: pass
+" 2>/dev/null
+    ' 2>/dev/null || true)
+
+    if [[ -z "${account_email}" ]]; then
+        log "Could not detect the ThousandEyes account name."
+        log "Run setup.sh --enable-inputs manually after verifying the account."
+        return 0
+    fi
+
+    log ""
+    read -rp "Would you like to enable data inputs for ${account_email}? [y/N]: " inputs_yn
+    case "${inputs_yn}" in
+        [yY]|[yY][eE][sS]) ;;
+        *) log ""; log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."; return 0 ;;
+    esac
+
+    local acc_group
+    read -rp "ThousandEyes account group name: " acc_group
+    [[ -z "${acc_group}" ]] && { log "ERROR: Account group is required for inputs."; return 1; }
+
+    log ""
+    check_prereqs
+    enable_all_inputs "${account_email}" "${acc_group}" "${HEC_TOKEN}"
+    log_live_input_summary
+    log ""
+    log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
 }
 
 main
