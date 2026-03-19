@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Splunkbase authentication, release resolution, and download helpers.
 # Sourced by credential_helpers.sh; not intended for direct use.
+#
+# See credential_helpers.sh for the sourcing contract.
 
 [[ -n "${_SPLUNKBASE_HELPERS_LOADED:-}" ]] && return 0
 _SPLUNKBASE_HELPERS_LOADED=true
@@ -8,6 +10,7 @@ _SPLUNKBASE_HELPERS_LOADED=true
 get_splunkbase_session() {
     local response_file cookie_file http_code response session
 
+    _set_splunkbase_curl_tls_args || return 1
     response_file="$(mktemp)"
     cookie_file="$(mktemp)"
     chmod 600 "${cookie_file}"
@@ -16,7 +19,8 @@ get_splunkbase_session() {
         rm -f "${SB_COOKIE_JAR}"
     fi
 
-    http_code=$(curl -sk \
+    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
+    http_code=$(curl -s "${_tls_verify_args[@]}" \
         -X POST "https://splunkbase.splunk.com/api/account:login" \
         -K <(
             printf 'form-string = "username=%s"\n' "$(_curl_config_escape "${SB_USER}")"
@@ -49,7 +53,10 @@ get_splunkbase_release_metadata() {
     local app_version="$2"
     local metadata
 
-    metadata=$(curl -sk "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" 2>/dev/null \
+    _set_splunkbase_curl_tls_args || return 1
+
+    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
+    metadata=$(curl -s "${_tls_verify_args[@]}" "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" 2>/dev/null \
         | python3 -c "
 import json
 import sys
@@ -92,6 +99,7 @@ print(f'{version}\\t{filename}\\thttps://splunkbase.splunk.com/app/{app_id}/rele
         return 1
     }
 
+    # shellcheck disable=SC2034  # SB_DOWNLOAD_VERSION, SB_DOWNLOAD_FILENAME read by callers
     IFS=$'\t' read -r SB_DOWNLOAD_VERSION SB_DOWNLOAD_FILENAME SB_DOWNLOAD_SOURCE_URL <<< "${metadata}"
 
     if [[ -z "${SB_DOWNLOAD_VERSION:-}" || -z "${SB_DOWNLOAD_FILENAME:-}" || -z "${SB_DOWNLOAD_SOURCE_URL:-}" ]]; then
@@ -113,11 +121,17 @@ download_splunkbase_release() {
     get_splunkbase_release_metadata "${app_id}" "${app_version}" || return 1
 
     tmp_file="$(mktemp)"
+    # shellcheck disable=SC2034  # read by callers after download_splunkbase_release returns
     SB_DOWNLOAD_EFFECTIVE_URL=""
 
     mkdir -p "$(dirname "${output_path}")"
+    if ! _set_splunkbase_curl_tls_args; then
+        rm -f "${tmp_file}"
+        return 1
+    fi
 
-    meta=$(curl -skL \
+    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
+    meta=$(curl -sL "${_tls_verify_args[@]}" \
         -b "${SB_COOKIE_JAR}" \
         -K <(printf 'header = "X-Auth-Token: %s"\n' "$(_curl_config_escape "${SB_SESSION_ID}")") \
         -o "${tmp_file}" \
@@ -131,6 +145,7 @@ download_splunkbase_release() {
     fi
 
     if [[ "${http_code}" == "200" ]] && [[ -s "${tmp_file}" ]] && _is_splunk_package "${tmp_file}"; then
+        # shellcheck disable=SC2034  # read by callers after download_splunkbase_release returns
         SB_DOWNLOAD_EFFECTIVE_URL="${effective_url}"
         mv -f "${tmp_file}" "${output_path}"
         return 0

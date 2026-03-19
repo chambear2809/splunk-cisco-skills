@@ -1,46 +1,28 @@
-# Ignore everything by default, then explicitly allow tracked repo content below
-*
-# Project-level files
+# --- Secrets ---
 credentials
-!README.md
-!credentials.example
-!.gitignore
-!DEMO_SCRIPTS.md
-!.github/
-!.github/**
-# Local TA packages directory
-!splunk-ta/
-!splunk-ta/**
-# Ignore actual TA package binaries (install from Splunkbase or keep in LFS)
+
+# --- TA package binaries (install from Splunkbase or keep in LFS) ---
 splunk-ta/*.tgz
 splunk-ta/*.spl
 splunk-ta/*.tar.gz
-# Plugin cache (rules, skills, agents)
-!plugins/
-!plugins/**
-# User's personal skills
-!skills/
-!skills/**
-# User's personal slash commands
-!commands/
-!commands/**
-# User's plan files
-!plans/
-!plans/**
-# Subagent state/transcripts
-!subagents/
-!subagents/**
-# User-level cursor rules
-!rules/
-!rules/**
-# ShellCheck config
-!.shellcheckrc
-# Test suites
-!tests/
-!tests/**
-# Python cache files
+
+# --- Unpacked vendor packages (review-only, too large for git) ---
+splunk-ta/_unpacked/
+
+# --- Python cache ---
 **/__pycache__/
 **/*.pyc
-# Cloud deployment matrix
-!CLOUD_DEPLOYMENT_MATRIX.md
-!ARCHITECTURE.md
+
+# --- macOS ---
+.DS_Store
+
+# --- Root-level SKILL.md (ACS staging context, local only) ---
+# Per-skill SKILL.md files under skills/ are tracked normally.
+/SKILL.md
+
+# --- IDE / agent scaffolding (not project content) ---
+skills-cursor/
+plugins/
+commands/
+subagents/
+projects/tmp-*

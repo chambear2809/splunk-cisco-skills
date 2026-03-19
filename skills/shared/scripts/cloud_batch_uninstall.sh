@@ -78,6 +78,7 @@ for app in "${APP_NAMES[@]}"; do
         log "  ACS uninstall accepted for '${app}'."
     else
         log "  ACS uninstall returned rc=${rc} for '${app}' (may already be removed)."
+        [[ -n "${output}" ]] && printf '%s\n' "${output}" >&2
     fi
 done
 

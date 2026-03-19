@@ -18,7 +18,6 @@ LIST_STREAMS=false
 TARGET_INDEX=""
 
 STREAM_API_BASE="${SPLUNK_WEB_URL}/en-US/custom/splunk_app_stream"
-STREAM_API_AVAILABLE=false
 
 usage() {
     cat <<EOF
@@ -51,9 +50,9 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --enable) ENABLE_LIST="$2"; shift 2 ;;
-        --disable) DISABLE_LIST="$2"; shift 2 ;;
-        --index) TARGET_INDEX="$2"; shift 2 ;;
+        --enable) require_arg "$1" $# || exit 1; ENABLE_LIST="$2"; shift 2 ;;
+        --disable) require_arg "$1" $# || exit 1; DISABLE_LIST="$2"; shift 2 ;;
+        --index) require_arg "$1" $# || exit 1; TARGET_INDEX="$2"; shift 2 ;;
         --list) LIST_STREAMS=true; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
@@ -75,7 +74,7 @@ _get_session_key() {
 }
 
 # Try to fetch stream list via Stream REST API or KV Store.
-# Sets STREAM_API_AVAILABLE and populates streams_json on success.
+# Returns success and prints JSON to streams_json when available.
 check_stream_api() {
     local resp http_code
 
@@ -85,7 +84,6 @@ check_stream_api() {
     if [[ "${http_code}" == "200" ]]; then
         streams_json=$(echo "${resp}" | sed '$d')
         if echo "${streams_json}" | python3 -c "import json,sys; d=json.load(sys.stdin); isinstance(d, list) or isinstance(d, dict)" 2>/dev/null; then
-            STREAM_API_AVAILABLE=true
             return 0
         fi
     fi
@@ -96,7 +94,6 @@ check_stream_api() {
     if [[ "${http_code}" == "200" ]]; then
         streams_json=$(echo "${resp}" | sed '$d')
         if echo "${streams_json}" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
-            STREAM_API_AVAILABLE=true
             return 0
         fi
     fi
@@ -165,15 +162,17 @@ kvstore_update_stream() {
     body=$(echo "${doc}" | python3 -c "
 import json, sys
 try:
+    enable_val = sys.argv[1]
+    index_val = sys.argv[2]
     d = json.load(sys.stdin)
     doc = d[0] if isinstance(d, list) and d else (d if isinstance(d, dict) else {})
-    doc['enabled'] = ('${enable}' == 'true')
-    if '${index}':
-        doc['index'] = '${index}'
+    doc['enabled'] = (enable_val == 'true')
+    if index_val:
+        doc['index'] = index_val
     print(json.dumps(doc))
 except Exception as e:
     sys.exit(1)
-" 2>/dev/null) || return 1
+" "${enable}" "${index}" 2>/dev/null) || return 1
 
     local http_code
     http_code=$(splunk_curl_post "${SK}" "${body}" "${kv_url}/${encoded_key}" \

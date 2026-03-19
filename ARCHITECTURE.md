@@ -1,7 +1,88 @@
-# Deployment Architecture
+# Repository and Deployment Architecture
 
-How the scripts in this repo adapt to Splunk Cloud, Enterprise (on-prem), and
-hybrid deployments.
+How this repo is organized, and how the shared automation adapts to Splunk
+Cloud, Enterprise (on-prem), and hybrid deployments.
+
+## Repository Architecture
+
+This document complements `README.md`: the README is the operator-facing
+overview, while this file focuses on the architectural boundaries inside the
+repo and the runtime deployment models those scripts target.
+
+### Core Building Blocks
+
+| Path | Role |
+|------|------|
+| `skills/<skill>/` | Skill-specific docs and automation for install, setup, validation, and optional MCP loading |
+| `skills/shared/lib/` | Shared platform layer for credentials, ACS, REST, Splunkbase, and account helpers |
+| `skills/shared/scripts/` | Shared operational entrypoints such as credential setup and cloud batch install/uninstall |
+| `skills/shared/app_registry.json` | Single source of truth for Splunkbase IDs, package patterns, app names, and license-ack metadata |
+| `splunk-ta/` | Local package cache for downloaded or manually staged `.tgz` / `.spl` archives |
+| `splunk-ta/_unpacked/` | Review-only extracted copies, not the normal deployment path |
+| `tests/` and `.github/workflows/ci.yml` | Regression coverage for helper libraries and first-party shell scripts |
+
+### Shared Helper Modules
+
+All skill scripts source `skills/shared/lib/credential_helpers.sh`, which is a
+compatibility shim over the focused shared modules:
+
+| Module | Responsibility |
+|--------|----------------|
+| `credential_helpers.sh` | Sources the shared modules and locates the active credentials file |
+| `credentials.sh` | Loads credential files, resolves profiles, and detects Cloud vs Enterprise vs hybrid targets |
+| `acs_helpers.sh` | ACS login/context, current search-head resolution, `search-api` allowlisting, and Cloud index/restart helpers |
+| `rest_helpers.sh` | Search-tier REST wrappers for apps, configs, inputs, saved searches, HEC, and validation |
+| `splunkbase_helpers.sh` | Splunkbase authentication and package download helpers |
+| `configure_account_helpers.sh` | Shared create-or-update flow for TA account endpoints |
+
+### Skill Composition Pattern
+
+Most skills follow the same layout, even if some omit optional files:
+
+| File / directory | Purpose |
+|------------------|---------|
+| `SKILL.md` | Agent-facing instructions and expected workflow |
+| `reference.md` | Product-specific notes such as input families, field mappings, or behavioral caveats |
+| `scripts/setup.sh` | Default setup workflow |
+| `scripts/validate.sh` | Post-deployment verification |
+| `scripts/load_mcp_tools.sh` + `mcp_tools.json` | Optional search tooling loaded into `Splunk_MCP_Server` |
+
+### Installer And Package Flow
+
+- `skills/splunk-app-install/scripts/install_app.sh` is the generic app-delivery
+  entrypoint used across the repo.
+- On Splunk Enterprise, the installer tries REST upload first and falls back to
+  SSH staging when direct upload is unavailable.
+- On Splunk Cloud, the installer uses ACS and consults
+  `skills/shared/app_registry.json` to map known package files to Splunkbase app
+  installs, license acknowledgements, and expected app names.
+- `skills/shared/scripts/cloud_batch_install.sh` batches ACS installs and
+  performs a post-install identity check to catch corrupted or mis-mapped app
+  deployments.
+
+### Skill Roles
+
+The current skills fall into three architectural roles:
+
+- **Collector/setup skills** — install apps, create indexes, configure accounts,
+  and enable inputs. Examples: Catalyst, DC Networking, Intersight, Meraki,
+  and ThousandEyes.
+- **Search-time / visualization skills** — configure macros, saved searches, or
+  data model behavior on top of data collected elsewhere. Example:
+  `cisco-enterprise-networking-setup`.
+- **Platform/package skills** — manage generic app delivery or multi-component
+  app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`, and
+  `splunk-itsi-setup`.
+
+### CI And Validation
+
+The repo treats the shared shell libraries as first-party code with regression
+coverage. `.github/workflows/ci.yml` runs:
+
+- `pytest` for Python tests
+- `bats` for shell behavior tests
+- `bash -n` for shell syntax checks
+- `shellcheck` for static shell linting
 
 ## Deployment Models
 
@@ -302,3 +383,26 @@ flowchart LR
   StreamTA -->|"S2S forward"| Index
   StreamApp -->|"search-time\nknowledge"| Index
 ```
+
+**Implementation guardrail**: in Splunk Cloud, `splunk-stream-setup` only
+supports index creation against the Cloud stack. Installing Stream apps and
+configuring `Splunk_TA_stream` must target the forwarder or Enterprise
+management endpoint, because Stream remains a hybrid deployment.
+
+### Search-Time And Premium Apps
+
+Some skills do not own the collection path at all. They sit on top of existing
+indexes and configure search-time knowledge objects, dashboards, or premium app
+features.
+
+```mermaid
+flowchart LR
+  IndexedData["Existing indexed data"] --> SearchApp["Search-time app\n(macros, saved searches,\ndata models, dashboards)"]
+  SearchApp --> Users["Analysts / Operators"]
+```
+
+**Examples**:
+- `cisco-enterprise-networking-setup` updates macros, enables saved searches,
+  and can enable data model acceleration for the visualization app.
+- `splunk-itsi-setup` installs and validates the premium app layer that other
+  skills may integrate with.

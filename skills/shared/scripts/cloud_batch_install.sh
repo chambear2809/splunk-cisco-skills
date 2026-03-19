@@ -32,7 +32,7 @@ RESTART=true
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --version) APP_VERSION="$2"; shift 2 ;;
+        --version) require_arg "$1" $# || exit 1; APP_VERSION="$2"; shift 2 ;;
         --no-restart) RESTART=false; shift ;;
         --help) usage ;;
         --*) log "Unknown option: $1"; usage ;;

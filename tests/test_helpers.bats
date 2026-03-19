@@ -77,6 +77,44 @@ setup() {
     [ "$result" = "-sk" ]
 }
 
+@test "_curl_ssl_flags returns -s when SPLUNK_CA_CERT is set" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    tmpfile=$(mktemp)
+    export SPLUNK_CA_CERT="$tmpfile"
+    result=$(_curl_ssl_flags)
+    rm -f "$tmpfile"
+    unset SPLUNK_CA_CERT
+    [ "$result" = "-s" ]
+}
+
+@test "_set_splunk_curl_tls_args adds cacert when configured" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    tmpfile=$(mktemp)
+    export SPLUNK_CA_CERT="$tmpfile"
+    _set_splunk_curl_tls_args
+    [ "${_tls_verify_args[0]}" = "--cacert" ]
+    [ "${_tls_verify_args[1]}" = "$tmpfile" ]
+    rm -f "$tmpfile"
+    unset SPLUNK_CA_CERT
+}
+
+@test "_set_splunkbase_curl_tls_args verifies by default" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    unset SPLUNKBASE_VERIFY_SSL
+    unset SPLUNKBASE_CA_CERT
+    _set_splunkbase_curl_tls_args
+    [ "${#_tls_verify_args[@]}" -eq 0 ]
+}
+
+@test "_set_app_download_curl_tls_args inherits insecure Splunk mode by default" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    export SPLUNK_VERIFY_SSL="false"
+    unset APP_DOWNLOAD_VERIFY_SSL
+    unset APP_DOWNLOAD_CA_CERT
+    _set_app_download_curl_tls_args
+    [ "${_tls_verify_args[0]}" = "-k" ]
+}
+
 # --- log ---
 
 @test "log outputs timestamped message" {

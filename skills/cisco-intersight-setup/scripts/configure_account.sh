@@ -37,11 +37,11 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --name) ACCT_NAME="$2"; shift 2 ;;
-        --hostname) HOSTNAME="$2"; shift 2 ;;
-        --client-id) CLIENT_ID="$2"; shift 2 ;;
-        --client-secret) echo "WARNING: --client-secret exposes secrets in process listings. Prefer --client-secret-file." >&2; CLIENT_SECRET="$2"; shift 2 ;;
-        --client-secret-file) CLIENT_SECRET=$(read_secret_file "$2"); shift 2 ;;
+        --name) require_arg "$1" $# || exit 1; ACCT_NAME="$2"; shift 2 ;;
+        --hostname) require_arg "$1" $# || exit 1; HOSTNAME="$2"; shift 2 ;;
+        --client-id) require_arg "$1" $# || exit 1; CLIENT_ID="$2"; shift 2 ;;
+        --client-secret) require_arg "$1" $# || exit 1; echo "WARNING: --client-secret exposes secrets in process listings. Prefer --client-secret-file." >&2; CLIENT_SECRET="$2"; shift 2 ;;
+        --client-secret-file) require_arg "$1" $# || exit 1; CLIENT_SECRET=$(read_secret_file "$2"); shift 2 ;;
         --create-defaults) CREATE_DEFAULTS="true"; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;

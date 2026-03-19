@@ -51,16 +51,16 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --type) ACCT_TYPE="$2"; shift 2 ;;
-        --name) ACCT_NAME="$2"; shift 2 ;;
-        --hostname) HOSTNAME="$2"; shift 2 ;;
-        --port) PORT="$2"; shift 2 ;;
-        --auth-type) AUTH_TYPE="$2"; shift 2 ;;
-        --username) USERNAME="$2"; shift 2 ;;
-        --password) echo "WARNING: --password exposes secrets in process listings. Prefer --password-file." >&2; PASSWORD="$2"; shift 2 ;;
-        --password-file) PASSWORD=$(read_secret_file "$2"); shift 2 ;;
-        --device-ip) DEVICE_IP="$2"; shift 2 ;;
-        --login-domain) LOGIN_DOMAIN="$2"; shift 2 ;;
+        --type) require_arg "$1" $# || exit 1; ACCT_TYPE="$2"; shift 2 ;;
+        --name) require_arg "$1" $# || exit 1; ACCT_NAME="$2"; shift 2 ;;
+        --hostname) require_arg "$1" $# || exit 1; HOSTNAME="$2"; shift 2 ;;
+        --port) require_arg "$1" $# || exit 1; PORT="$2"; shift 2 ;;
+        --auth-type) require_arg "$1" $# || exit 1; AUTH_TYPE="$2"; shift 2 ;;
+        --username) require_arg "$1" $# || exit 1; USERNAME="$2"; shift 2 ;;
+        --password) require_arg "$1" $# || exit 1; echo "WARNING: --password exposes secrets in process listings. Prefer --password-file." >&2; PASSWORD="$2"; shift 2 ;;
+        --password-file) require_arg "$1" $# || exit 1; PASSWORD=$(read_secret_file "$2"); shift 2 ;;
+        --device-ip) require_arg "$1" $# || exit 1; DEVICE_IP="$2"; shift 2 ;;
+        --login-domain) require_arg "$1" $# || exit 1; LOGIN_DOMAIN="$2"; shift 2 ;;
         --proxy-enabled) PROXY_ENABLED="1"; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;

@@ -40,9 +40,9 @@ while [[ $# -gt 0 ]]; do
         --indexes-only) INDEXES_ONLY=true; shift ;;
         --macros-only) MACROS_ONLY=true; shift ;;
         --enable-inputs) ENABLE_INPUTS=true; shift ;;
-        --account) ACCOUNT="$2"; shift 2 ;;
-        --index) INDEX="$2"; shift 2 ;;
-        --input-type) INPUT_TYPE="$2"; shift 2 ;;
+        --account) require_arg "$1" $# || exit 1; ACCOUNT="$2"; shift 2 ;;
+        --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
+        --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -76,7 +76,7 @@ create_indexes() {
         log "  Index 'intersight' created or already exists"
     else
         log "  ERROR: Failed to create index 'intersight'"
-        exit 1
+        return 1
     fi
     log "Index creation complete."
 }
@@ -338,7 +338,7 @@ main() {
         --hostname "${hostname}" \
         --client-id "${client_id}" \
         --client-secret-file "${secret_file}" \
-        ${defaults_flag}
+        ${defaults_flag:+"${defaults_flag}"}
 
     rm -f "${secret_file}" 2>/dev/null || true
     log ""

@@ -26,8 +26,10 @@ if ! get_splunkbase_session; then
     echo "FAIL: Splunkbase authentication failed. Check SB_USER/SB_PASS in credentials." >&2
     # Debug: show what the session API returned (redacted)
     if [[ -n "${DEBUG_SPLUNKBASE:-}" ]]; then
+        _set_splunkbase_curl_tls_args || exit 1
         response_file="$(mktemp)"
-        http_code=$(curl -sk \
+        # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
+        http_code=$(curl -s "${_tls_verify_args[@]}" \
             -X POST "https://splunkbase.splunk.com/api/account:login" \
             -K <(
                 printf 'form-string = "username=%s"\n' "$(_curl_config_escape "${SB_USER}")"

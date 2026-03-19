@@ -36,9 +36,9 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --indexes-only) INDEXES_ONLY=true; shift ;;
         --enable-inputs) ENABLE_INPUTS=true; shift ;;
-        --account) ACCOUNT="$2"; shift 2 ;;
-        --index) INDEX="$2"; shift 2 ;;
-        --input-type) INPUT_TYPE="$2"; shift 2 ;;
+        --account) require_arg "$1" $# || exit 1; ACCOUNT="$2"; shift 2 ;;
+        --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
+        --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -72,7 +72,7 @@ create_indexes() {
         log "  Index 'meraki' created or already exists."
     else
         log "ERROR: Failed to create index 'meraki'"
-        exit 1
+        return 1
     fi
     log "Index creation complete."
 }
@@ -385,7 +385,7 @@ main() {
         --api-key-file "${api_key_file}" \
         --org-id "${org_id}" \
         --region "${region}" \
-        ${auto_flag} \
+        ${auto_flag:+"${auto_flag}"} \
         --index "${auto_idx}"
 
     rm -f "${api_key_file}" 2>/dev/null || true

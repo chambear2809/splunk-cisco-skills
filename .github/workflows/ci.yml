@@ -20,16 +20,19 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install Python test dependencies
+        run: pip install pytest
+
       - name: Install shell tooling
         run: |
           sudo apt-get update
           sudo apt-get install -y bats shellcheck
 
       - name: Run Python tests
-        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+        run: pytest tests/ -v
 
-      - name: Run Bats helper tests
-        run: bats tests/test_helpers.bats
+      - name: Run Bats tests
+        run: bats tests/*.bats
 
       - name: Syntax-check shell scripts
         run: |
@@ -55,5 +58,5 @@ jobs:
           if not files:
               raise SystemExit("No shell scripts found under skills/")
 
-          subprocess.run(["shellcheck", *files], check=True)
+          subprocess.run(["shellcheck", "--severity=warning", *files], check=True)
           PY

@@ -11,7 +11,7 @@ RESTART_SPLUNK=true
 # Accept flags for non-interactive use; anything missing gets prompted
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --app-name) APP_NAME="$2"; shift 2 ;;
+        --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
         --no-restart) RESTART_SPLUNK=false; shift ;;
         --help)
             cat <<EOF
@@ -32,92 +32,15 @@ EOF
 done
 
 restart_splunk_or_exit() {
-    local operation="$1"
-    local rc
-
-    if ! "${RESTART_SPLUNK}"; then
-        log "Skipping Splunk restart (--no-restart). Restart manually before relying on the uninstall state."
-        return 0
-    fi
-
-    log ""
-    log "Restarting Splunk to complete ${operation}..."
-    log "Waiting for the management API to cycle..."
-
-    restart_splunk_and_wait "${SK}" "${SPLUNK_URI}"
-    rc=$?
-
-    case "${SPLUNK_RESTART_HTTP_CODE:-}" in
-        000)
-            log "Restart request closed before an HTTP response was returned, which can happen during shutdown."
-            ;;
-        200|201|204)
-            log "Restart request accepted (HTTP ${SPLUNK_RESTART_HTTP_CODE})."
-            ;;
-    esac
-
-    case "${rc}" in
-        0)
-            log "SUCCESS: Splunk restart completed and the management API is responding again."
-            ;;
-        1)
-            log "ERROR: Failed to request a Splunk restart (HTTP ${SPLUNK_RESTART_HTTP_CODE:-unknown})."
-            exit 1
-            ;;
-        2)
-            log "ERROR: Splunk did not stop responding after the restart request."
-            exit 1
-            ;;
-        3)
-            log "ERROR: Splunk did not come back online before the restart timeout expired."
-            exit 1
-            ;;
-        *)
-            log "ERROR: Unexpected restart failure."
-            exit 1
-            ;;
-    esac
-}
-
-cloud_wait_for_status() {
-    local timeout_secs="${1:-300}" interval_secs="${2:-5}"
-    local waited=0 infra restart_required
-
-    while (( waited < timeout_secs )); do
-        read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
-        if [[ "${infra}" == "Ready" || "${restart_required}" == "true" ]]; then
-            return 0
-        fi
-        sleep "${interval_secs}"
-        waited=$((waited + interval_secs))
-    done
-
-    return 1
+    : "${RESTART_SPLUNK}"  # Consumed by app_restart_splunk_or_exit.
+    app_restart_splunk_or_exit "${SK}" "${SPLUNK_URI}" "$1" \
+        "Restart manually before relying on the uninstall state." || exit 1
 }
 
 cloud_restart_or_exit() {
-    local operation="$1"
-
-    if ! "${RESTART_SPLUNK}"; then
-        log "Skipping Splunk Cloud restart check (--no-restart). Run 'acs status current-stack' and restart if required before relying on the uninstall state."
-        return 0
-    fi
-
-    if ! cloud_wait_for_status 300 5; then
-        log "WARNING: Timed out waiting for the Splunk Cloud stack to settle after ${operation}."
-    fi
-
-    if [[ "$(acs_restart_required 2>/dev/null || echo "false")" != "true" ]]; then
-        log "No Splunk Cloud restart required after ${operation}."
-        return 0
-    fi
-
-    log "Restarting Splunk Cloud search tier via ACS to complete ${operation}..."
-    if ! cloud_restart_if_required 900; then
-        log "ERROR: ACS restart failed or the stack did not return to Ready status."
-        exit 1
-    fi
-    log "SUCCESS: Splunk Cloud restart completed and the stack returned to Ready."
+    : "${RESTART_SPLUNK}"  # Consumed by cloud_app_restart_or_exit.
+    cloud_app_restart_or_exit "$1" \
+        "Run 'acs status current-stack' and restart if required before relying on the uninstall state." || exit 1
 }
 
 refresh_cloud_verify_session() {

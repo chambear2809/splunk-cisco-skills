@@ -162,6 +162,9 @@ bash skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh
    once before dashboards referencing those lookups will populate.
 4. **No inputs here**: This app only visualizes — all data collection config
    belongs in the TA (`TA_cisco_catalyst`).
+5. **No `configure_account.sh`**: Unlike the TA skills, this app does not
+   collect data and has no add-on accounts to configure. Account and input
+   setup belongs in the companion `cisco-catalyst-ta-setup` skill.
 
 ## Additional Resources
 

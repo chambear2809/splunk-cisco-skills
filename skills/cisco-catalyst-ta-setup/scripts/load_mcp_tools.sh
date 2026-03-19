@@ -25,15 +25,16 @@ fi
 log "Session key obtained. Loading MCP tools..."
 
 TOOL_COUNT=$(python3 -c "
-import json
-with open('${MCP_TOOLS_JSON}') as f:
+import json, sys
+with open(sys.argv[1]) as f:
     data = json.load(f)
 print(len(data.get('tools', [])))
-")
+" "${MCP_TOOLS_JSON}")
 
 log "Found ${TOOL_COUNT} tools to load."
 
 export __SPLUNK_SK="${SK}"
+splunk_export_python_tls_env || { log "ERROR: Could not configure TLS settings for MCP tool loading."; exit 1; }
 python3 - "${MCP_TOOLS_JSON}" "${SPLUNK_URI}" "${APP_CONTEXT}" \
           "${KV_COLLECTION}" "${KV_ENABLED_COLLECTION}" <<'PYEOF'
 import json
@@ -45,10 +46,15 @@ import ssl
 
 tools_file, splunk_uri, app, kv_coll, kv_enabled = sys.argv[1:6]
 session_key = os.environ.pop("__SPLUNK_SK", "")
+tls_mode = os.environ.pop("__SPLUNK_TLS_MODE", "insecure")
+tls_ca_cert = os.environ.pop("__SPLUNK_TLS_CA_CERT", "")
 
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
+if tls_mode == "ca-cert":
+    ctx = ssl.create_default_context(cafile=tls_ca_cert)
+elif tls_mode == "verify":
+    ctx = ssl.create_default_context()
+else:
+    ctx = ssl._create_unverified_context()
 
 headers = {
     "Authorization": f"Splunk {session_key}",

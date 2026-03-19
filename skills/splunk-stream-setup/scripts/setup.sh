@@ -59,13 +59,13 @@ while [[ $# -gt 0 ]]; do
         --install) INSTALL=true; shift ;;
         --indexes-only) INDEXES_ONLY=true; shift ;;
         --configure-streamfwd) CONFIGURE_STREAMFWD=true; shift ;;
-        --ip-addr) IP_ADDR="$2"; shift 2 ;;
-        --port) PORT="$2"; shift 2 ;;
-        --splunk-web-url) SPLUNK_WEB_URL="$2"; shift 2 ;;
-        --ssl-verify) SSL_VERIFY="$2"; shift 2 ;;
-        --netflow-ip) NETFLOW_IP="$2"; shift 2 ;;
-        --netflow-port) NETFLOW_PORT="$2"; shift 2 ;;
-        --netflow-decoder) NETFLOW_DECODER="$2"; shift 2 ;;
+        --ip-addr) require_arg "$1" $# || exit 1; IP_ADDR="$2"; shift 2 ;;
+        --port) require_arg "$1" $# || exit 1; PORT="$2"; shift 2 ;;
+        --splunk-web-url) require_arg "$1" $# || exit 1; SPLUNK_WEB_URL="$2"; shift 2 ;;
+        --ssl-verify) require_arg "$1" $# || exit 1; SSL_VERIFY="$2"; shift 2 ;;
+        --netflow-ip) require_arg "$1" $# || exit 1; NETFLOW_IP="$2"; shift 2 ;;
+        --netflow-port) require_arg "$1" $# || exit 1; NETFLOW_PORT="$2"; shift 2 ;;
+        --netflow-decoder) require_arg "$1" $# || exit 1; NETFLOW_DECODER="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -145,13 +145,13 @@ create_indexes() {
         log "  Index 'netflow' created or already exists."
     else
         log "  ERROR: Failed to create index 'netflow'."
-        exit 1
+        return 1
     fi
     if platform_create_index "${session_key}" "${SPLUNK_URI}" "stream" "512000"; then
         log "  Index 'stream' created or already exists."
     else
         log "  ERROR: Failed to create index 'stream'."
-        exit 1
+        return 1
     fi
 
     log "Index creation complete."

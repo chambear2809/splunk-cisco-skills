@@ -50,13 +50,13 @@ while [[ $# -gt 0 ]]; do
         --indexes-only) INDEXES_ONLY=true; shift ;;
         --hec-only) HEC_ONLY=true; shift ;;
         --enable-inputs) ENABLE_INPUTS=true; shift ;;
-        --account) ACCOUNT="$2"; shift 2 ;;
-        --account-group) ACCOUNT_GROUP="$2"; shift 2 ;;
-        --index) INDEX="$2"; shift 2 ;;
-        --input-type) INPUT_TYPE="$2"; shift 2 ;;
-        --hec-token) HEC_TOKEN="$2"; shift 2 ;;
-        --pathvis-index) PATHVIS_INDEX="$2"; shift 2 ;;
-        --pathvis-interval) PATHVIS_INTERVAL="$2"; shift 2 ;;
+        --account) require_arg "$1" $# || exit 1; ACCOUNT="$2"; shift 2 ;;
+        --account-group) require_arg "$1" $# || exit 1; ACCOUNT_GROUP="$2"; shift 2 ;;
+        --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
+        --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
+        --hec-token) require_arg "$1" $# || exit 1; HEC_TOKEN="$2"; shift 2 ;;
+        --pathvis-index) require_arg "$1" $# || exit 1; PATHVIS_INDEX="$2"; shift 2 ;;
+        --pathvis-interval) require_arg "$1" $# || exit 1; PATHVIS_INTERVAL="$2"; shift 2 ;;
         --no-pathvis) PATHVIS_ENABLED=false; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
@@ -277,7 +277,7 @@ create_indexes() {
             log "  Index '${idx}' created or already exists."
         else
             log "ERROR: Failed to create index '${idx}'"
-            exit 1
+            return 1
         fi
     done
     log "Index creation complete."

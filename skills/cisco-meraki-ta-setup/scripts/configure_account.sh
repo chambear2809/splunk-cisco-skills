@@ -46,14 +46,14 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --name) ACCT_NAME="$2"; shift 2 ;;
-        --api-key) echo "WARNING: --api-key exposes secrets in process listings. Prefer --api-key-file." >&2; API_KEY="$2"; shift 2 ;;
-        --api-key-file) API_KEY=$(read_secret_file "$2"); shift 2 ;;
-        --org-id) ORG_ID="$2"; shift 2 ;;
-        --region) REGION="$2"; shift 2 ;;
-        --max-api-rate) MAX_API_RATE="$2"; shift 2 ;;
+        --name) require_arg "$1" $# || exit 1; ACCT_NAME="$2"; shift 2 ;;
+        --api-key) require_arg "$1" $# || exit 1; echo "WARNING: --api-key exposes secrets in process listings. Prefer --api-key-file." >&2; API_KEY="$2"; shift 2 ;;
+        --api-key-file) require_arg "$1" $# || exit 1; API_KEY=$(read_secret_file "$2"); shift 2 ;;
+        --org-id) require_arg "$1" $# || exit 1; ORG_ID="$2"; shift 2 ;;
+        --region) require_arg "$1" $# || exit 1; REGION="$2"; shift 2 ;;
+        --max-api-rate) require_arg "$1" $# || exit 1; MAX_API_RATE="$2"; shift 2 ;;
         --auto-inputs) AUTO_INPUTS="1"; shift ;;
-        --index) AUTO_INDEX="$2"; shift 2 ;;
+        --index) require_arg "$1" $# || exit 1; AUTO_INDEX="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac

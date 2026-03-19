@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Credential file loading, profile resolution, and Splunk connection settings.
 # Sourced by credential_helpers.sh; not intended for direct use.
+#
+# See credential_helpers.sh for the sourcing contract.
 
 [[ -n "${_CREDENTIALS_LOADED:-}" ]] && return 0
 _CREDENTIALS_LOADED=true
@@ -33,6 +35,7 @@ allowed_keys = [
     "SPLUNK_SSH_PASS",
     "SPLUNK_USER",
     "SPLUNK_PASS",
+    "SPLUNK_CA_CERT",
     "SPLUNK_CLOUD_STACK",
     "SPLUNK_CLOUD_SEARCH_HEAD",
     "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS",
@@ -46,6 +49,10 @@ allowed_keys = [
     "SB_USER",
     "SB_PASS",
     "SPLUNK_VERIFY_SSL",
+    "SPLUNKBASE_VERIFY_SSL",
+    "SPLUNKBASE_CA_CERT",
+    "APP_DOWNLOAD_VERIFY_SSL",
+    "APP_DOWNLOAD_CA_CERT",
 ]
 allowed = set(allowed_keys)
 raw_values = {}
@@ -156,11 +163,13 @@ flat_target_keys = {
     "SPLUNK_PLATFORM", "SPLUNK_SEARCH_API_URI", "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT", "SPLUNK_URI", "SPLUNK_SSH_HOST", "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS", "SPLUNK_USER", "SPLUNK_PASS",
+    "SPLUNK_CA_CERT",
     "SPLUNK_CLOUD_STACK", "SPLUNK_CLOUD_SEARCH_HEAD",
     "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS", "ACS_SERVER",
     "STACK_USERNAME", "STACK_PASSWORD", "STACK_TOKEN", "STACK_TOKEN_USER",
     "SPLUNK_USERNAME", "SPLUNK_PASSWORD", "SB_USER", "SB_PASS",
-    "SPLUNK_VERIFY_SSL",
+    "SPLUNK_VERIFY_SSL", "SPLUNKBASE_VERIFY_SSL", "SPLUNKBASE_CA_CERT",
+    "APP_DOWNLOAD_VERIFY_SSL", "APP_DOWNLOAD_CA_CERT",
 }
 
 with open(path, encoding="utf-8") as handle:

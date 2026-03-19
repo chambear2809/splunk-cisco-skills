@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --macros-only) MACROS_ONLY=true; shift ;;
         --accelerate) ACCELERATE=true; shift ;;
-        --custom-indexes) CUSTOM_INDEXES="$2"; shift 2 ;;
+        --custom-indexes) require_arg "$1" $# || exit 1; CUSTOM_INDEXES="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac

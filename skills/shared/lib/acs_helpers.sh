@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # ACS CLI context management, output parsing, status checks, and restart helpers.
 # Sourced by credential_helpers.sh; not intended for direct use.
+#
+# See credential_helpers.sh for the sourcing contract.
 
 [[ -n "${_ACS_HELPERS_LOADED:-}" ]] && return 0
 _ACS_HELPERS_LOADED=true
@@ -105,10 +107,10 @@ acs_prepare_context() {
     [[ -n "${SPLUNK_USERNAME:-}" ]] && export SPLUNK_USERNAME
     [[ -n "${SPLUNK_PASSWORD:-}" ]] && export SPLUNK_PASSWORD
 
-    [[ -n "${STACK_USERNAME:-}" ]] && export STACK_USERNAME
-    [[ -n "${STACK_PASSWORD:-}" ]] && export STACK_PASSWORD
-    [[ -n "${STACK_TOKEN:-}" ]] && export STACK_TOKEN
-    [[ -n "${STACK_TOKEN_USER:-}" ]] && export STACK_TOKEN_USER
+    [[ -n "${STACK_USERNAME:-}" ]] && export STACK_USERNAME || true
+    [[ -n "${STACK_PASSWORD:-}" ]] && export STACK_PASSWORD || true
+    [[ -n "${STACK_TOKEN:-}" ]] && export STACK_TOKEN || true
+    [[ -n "${STACK_TOKEN_USER:-}" ]] && export STACK_TOKEN_USER || true
 
     if [[ -n "${SPLUNK_CLOUD_STACK:-}" ]]; then
         if [[ -n "${SPLUNK_CLOUD_SEARCH_HEAD:-}" ]]; then
@@ -342,6 +344,55 @@ prefer_current_cloud_search_api_uri() {
     export SPLUNK_URI SPLUNK_SEARCH_API_URI
 
     acs_ensure_search_api_access
+}
+
+# Wait for the Splunk Cloud stack to become Ready or require a restart.
+# Unlike acs_wait_for_ready (which waits for Ready AND no restart needed),
+# this returns as soon as the stack is actionable (Ready, or restart pending).
+cloud_wait_for_settled() {
+    local timeout_secs="${1:-300}" interval_secs="${2:-5}"
+    local waited=0 infra restart_required
+
+    while (( waited < timeout_secs )); do
+        read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
+        if [[ "${infra}" == "Ready" || "${restart_required}" == "true" ]]; then
+            return 0
+        fi
+        sleep "${interval_secs}"
+        waited=$((waited + interval_secs))
+    done
+
+    return 1
+}
+
+# Cloud-side restart with user-facing log messages.
+# Expects RESTART_SPLUNK (bool) as a script-level global.
+#
+# Usage: cloud_app_restart_or_exit <operation> [skip_message]
+cloud_app_restart_or_exit() {
+    local operation="$1"
+    local skip_msg="${2:-Run 'acs status current-stack' and restart if required.}"
+
+    if [[ "${RESTART_SPLUNK:-true}" != "true" ]]; then
+        log "Skipping Splunk Cloud restart check (--no-restart). ${skip_msg}"
+        return 0
+    fi
+
+    if ! cloud_wait_for_settled 300 5; then
+        log "WARNING: Timed out waiting for the Splunk Cloud stack to settle after ${operation}."
+    fi
+
+    if [[ "$(acs_restart_required 2>/dev/null || echo "false")" != "true" ]]; then
+        log "No Splunk Cloud restart required after ${operation}."
+        return 0
+    fi
+
+    log "Restarting Splunk Cloud search tier via ACS to complete ${operation}..."
+    if ! cloud_restart_if_required 900; then
+        log "ERROR: ACS restart failed or the stack did not return to Ready status."
+        return 1
+    fi
+    log "SUCCESS: Splunk Cloud restart completed and the stack returned to Ready."
 }
 
 log_platform_restart_guidance() {

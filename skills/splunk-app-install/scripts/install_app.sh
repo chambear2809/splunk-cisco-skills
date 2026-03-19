@@ -20,7 +20,6 @@ UPDATE_SET=false
 RESTART_SPLUNK=true
 PRE_VETTED=false
 
-CISCO_LICENSE_ACK_URL="https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf"
 REGISTRY_FILE="${SCRIPT_DIR}/../../../skills/shared/app_registry.json"
 
 is_interactive() { [[ -t 0 ]]; }
@@ -133,12 +132,12 @@ cloud_prefer_splunkbase_for_known_package() {
 # Accept flags for non-interactive use; anything missing gets prompted
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --source)       SOURCE="$2";      shift 2 ;;
-        --file)         APP_FILE="$2";     shift 2 ;;
-        --url)          APP_URL="$2";      shift 2 ;;
-        --app-id)       APP_ID="$2";       shift 2 ;;
-        --app-version)  APP_VERSION="$2";  shift 2 ;;
-        --license-ack-url) LICENSE_ACK_URL="$2"; shift 2 ;;
+        --source) require_arg "$1" $# || exit 1;       SOURCE="$2";      shift 2 ;;
+        --file) require_arg "$1" $# || exit 1;         APP_FILE="$2";     shift 2 ;;
+        --url) require_arg "$1" $# || exit 1;          APP_URL="$2";      shift 2 ;;
+        --app-id) require_arg "$1" $# || exit 1;       APP_ID="$2";       shift 2 ;;
+        --app-version) require_arg "$1" $# || exit 1;  APP_VERSION="$2";  shift 2 ;;
+        --license-ack-url) require_arg "$1" $# || exit 1; LICENSE_ACK_URL="$2"; shift 2 ;;
         --update)       UPDATE=true;  UPDATE_SET=true;  shift ;;
         --no-update)    UPDATE=false; UPDATE_SET=true;  shift ;;
         --no-restart)   RESTART_SPLUNK=false; shift ;;
@@ -182,6 +181,7 @@ done
 # ── Prompt helpers ──────────────────────────────────────────────────
 
 prompt_source() {
+    local choice=""
     [[ -n "${SOURCE}" ]] && return
     if ! is_interactive; then
         SOURCE="splunkbase"
@@ -203,6 +203,7 @@ prompt_source() {
 }
 
 prompt_local_file() {
+    local choice=""
     [[ -n "${APP_FILE}" ]] && return
     echo ""
 
@@ -283,6 +284,7 @@ prompt_splunkbase() {
 }
 
 prompt_update() {
+    local yn=""
     $UPDATE_SET && return
     echo ""
     safe_read "--update or --no-update" -rp "Is this an upgrade of an existing app? [y/N]: " yn
@@ -317,92 +319,15 @@ splunkbase_auth() {
 }
 
 restart_splunk_or_exit() {
-    local operation="$1"
-    local rc
-
-    if ! "${RESTART_SPLUNK}"; then
-        log "Skipping Splunk restart (--no-restart). Restart manually before using the updated app."
-        return 0
-    fi
-
-    log ""
-    log "Restarting Splunk to complete ${operation}..."
-    log "Waiting for the management API to cycle..."
-
-    restart_splunk_and_wait "${SK}" "${SPLUNK_URI}"
-    rc=$?
-
-    case "${SPLUNK_RESTART_HTTP_CODE:-}" in
-        000)
-            log "Restart request closed before an HTTP response was returned, which can happen during shutdown."
-            ;;
-        200|201|204)
-            log "Restart request accepted (HTTP ${SPLUNK_RESTART_HTTP_CODE})."
-            ;;
-    esac
-
-    case "${rc}" in
-        0)
-            log "SUCCESS: Splunk restart completed and the management API is responding again."
-            ;;
-        1)
-            log "ERROR: Failed to request a Splunk restart (HTTP ${SPLUNK_RESTART_HTTP_CODE:-unknown})."
-            exit 1
-            ;;
-        2)
-            log "ERROR: Splunk did not stop responding after the restart request."
-            exit 1
-            ;;
-        3)
-            log "ERROR: Splunk did not come back online before the restart timeout expired."
-            exit 1
-            ;;
-        *)
-            log "ERROR: Unexpected restart failure."
-            exit 1
-            ;;
-    esac
-}
-
-cloud_wait_for_status() {
-    local timeout_secs="${1:-300}" interval_secs="${2:-5}"
-    local waited=0 infra restart_required
-
-    while (( waited < timeout_secs )); do
-        read -r infra restart_required <<< "$(acs_stack_status_snapshot 2>/dev/null || echo "unknown false")"
-        if [[ "${infra}" == "Ready" || "${restart_required}" == "true" ]]; then
-            return 0
-        fi
-        sleep "${interval_secs}"
-        waited=$((waited + interval_secs))
-    done
-
-    return 1
+    : "${RESTART_SPLUNK}"  # Consumed by app_restart_splunk_or_exit.
+    app_restart_splunk_or_exit "${SK}" "${SPLUNK_URI}" "$1" \
+        "Restart manually before using the updated app." || exit 1
 }
 
 cloud_restart_or_exit() {
-    local operation="$1"
-
-    if ! "${RESTART_SPLUNK}"; then
-        log "Skipping Splunk Cloud restart check (--no-restart). Run 'acs status current-stack' and restart if required before using the updated app."
-        return 0
-    fi
-
-    if ! cloud_wait_for_status 300 5; then
-        log "WARNING: Timed out waiting for the Splunk Cloud stack to settle after ${operation}."
-    fi
-
-    if [[ "$(acs_restart_required 2>/dev/null || echo "false")" != "true" ]]; then
-        log "No Splunk Cloud restart required after ${operation}."
-        return 0
-    fi
-
-    log "Restarting Splunk Cloud search tier via ACS to complete ${operation}..."
-    if ! cloud_restart_if_required 900; then
-        log "ERROR: ACS restart failed or the stack did not return to Ready status."
-        exit 1
-    fi
-    log "SUCCESS: Splunk Cloud restart completed and the stack returned to Ready."
+    : "${RESTART_SPLUNK}"  # Consumed by cloud_app_restart_or_exit.
+    cloud_app_restart_or_exit "$1" \
+        "Run 'acs status current-stack' and restart if required before using the updated app." || exit 1
 }
 
 cloud_resolve_splunkbase_app_name() {
@@ -463,7 +388,7 @@ except Exception:
 }
 
 cloud_install_splunkbase_app() {
-    local -a cmd response_fields
+    local -a cmd
     local response app_name version status installed_name rc
 
     acs_prepare_context || exit 1
@@ -545,7 +470,13 @@ resolve_splunkbase_release_metadata() {
         log "Resolving latest version for app ID ${APP_ID}..."
     fi
 
-    metadata=$(curl -sk "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
+    if ! _set_splunkbase_curl_tls_args; then
+        log "Could not configure Splunkbase TLS settings for release metadata lookup."
+        return 0
+    fi
+
+    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
+    metadata=$(curl -s "${_tls_verify_args[@]}" "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
         | python3 -c "
 import json
 import sys
@@ -669,7 +600,9 @@ download_from_url() {
 
     log "Downloading from: ${APP_URL}"
     local http_code
-    http_code=$(curl -skL -w "%{http_code}" \
+    _set_app_download_curl_tls_args || exit 1
+    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_app_download_curl_tls_args.
+    http_code=$(curl -sL "${_tls_verify_args[@]}" -w "%{http_code}" \
         -o "${output_path}" \
         "${APP_URL}" 2>/dev/null || echo "000")
 
@@ -790,8 +723,7 @@ install_app() {
     local response http_code body
     local abs_file_path
     abs_file_path="$(cd "$(dirname "${file_path}")" && pwd)/$(basename "${file_path}")"
-    local file_dir file_name
-    file_dir="$(dirname "${abs_file_path}")"
+    local file_name
     file_name="$(basename "${abs_file_path}")"
 
     log "Installing to ${SPLUNK_URI} ..."

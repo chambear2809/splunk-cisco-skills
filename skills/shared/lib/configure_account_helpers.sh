@@ -2,6 +2,8 @@
 # Shared helper for TA account creation/update via custom REST handlers.
 # Provides rest_create_or_update_account() to eliminate the duplicated
 # create/409-update pattern across configure_account.sh scripts.
+#
+# See credential_helpers.sh for the sourcing contract.
 
 [[ -n "${_CONFIGURE_ACCOUNT_HELPERS_LOADED:-}" ]] && return 0
 _CONFIGURE_ACCOUNT_HELPERS_LOADED=true

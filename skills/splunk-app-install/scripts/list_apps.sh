@@ -9,7 +9,7 @@ FILTER=""
 # Accept flags for non-interactive use; anything missing gets prompted
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --filter) FILTER="$2"; shift 2 ;;
+        --filter) require_arg "$1" $# || exit 1; FILTER="$2"; shift 2 ;;
         --help)
             cat <<EOF
 List Installed Splunk Apps (interactive)

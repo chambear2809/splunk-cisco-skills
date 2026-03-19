@@ -38,9 +38,9 @@ while [[ $# -gt 0 ]]; do
         --indexes-only) INDEXES_ONLY=true; shift ;;
         --macros-only) MACROS_ONLY=true; shift ;;
         --enable-inputs) ENABLE_INPUTS=true; shift ;;
-        --account) ACCOUNT="$2"; shift 2 ;;
-        --index) INDEX="$2"; shift 2 ;;
-        --input-type) INPUT_TYPE="$2"; shift 2 ;;
+        --account) require_arg "$1" $# || exit 1; ACCOUNT="$2"; shift 2 ;;
+        --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
+        --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac

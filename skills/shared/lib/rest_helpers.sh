@@ -1,29 +1,173 @@
 #!/usr/bin/env bash
 # Splunk REST API helpers: auth, curl wrappers, app/index/conf/input/search management.
 # Sourced by credential_helpers.sh; not intended for direct use.
+#
+# See credential_helpers.sh for the sourcing contract.
 
 [[ -n "${_REST_HELPERS_LOADED:-}" ]] && return 0
 _REST_HELPERS_LOADED=true
 
+# Shared Python helper for normalizing the Splunk 'disabled' field.
+# Safe for interpolation inside double-quoted python3 -c strings.
+_PY_NORMALIZE_DISABLED="
+def _normalize_disabled(value):
+    if isinstance(value, bool):
+        return '1' if value else '0'
+    text = str(value).strip().lower()
+    if text in ('1', 'true'):
+        return '1'
+    if text in ('0', 'false'):
+        return '0'
+    return text
+"
+
 _curl_ssl_flags() {
-    if [[ "${SPLUNK_VERIFY_SSL:-false}" == "true" ]]; then
+    if [[ -n "${SPLUNK_CA_CERT:-}" || "${SPLUNK_VERIFY_SSL:-false}" == "true" ]]; then
         printf '%s' "-s"
     else
         printf '%s' "-sk"
     fi
 }
 
+_tls_verify_args=()
+
+_bool_is_true() {
+    case "${1:-}" in
+        1|[Tt][Rr][Uu][Ee]|[Yy]|[Yy][Ee][Ss]|[Oo][Nn])
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+_warn_once() {
+    local guard_var="$1"
+    local message="$2"
+    if [[ -n "${!guard_var:-}" ]]; then
+        return 0
+    fi
+    printf '%s\n' "${message}" >&2
+    printf -v "${guard_var}" '%s' "true"
+}
+
+_set_tls_verify_args() {
+    local verify_value="${1:-}"
+    local default_verify="${2:-true}"
+    local ca_cert="${3:-}"
+    local warning_guard="$4"
+    local warning_message="$5"
+
+    _tls_verify_args=()
+
+    if [[ -n "${ca_cert}" ]]; then
+        if [[ ! -f "${ca_cert}" ]]; then
+            echo "ERROR: CA certificate file not found: ${ca_cert}" >&2
+            return 1
+        fi
+        _tls_verify_args+=(--cacert "${ca_cert}")
+        return 0
+    fi
+
+    if [[ -z "${verify_value}" ]]; then
+        verify_value="${default_verify}"
+    fi
+
+    if _bool_is_true "${verify_value}"; then
+        return 0
+    fi
+
+    _tls_verify_args+=(-k)
+    _warn_once "${warning_guard}" "${warning_message}"
+}
+
+_set_splunk_curl_tls_args() {
+    _set_tls_verify_args \
+        "${SPLUNK_VERIFY_SSL:-}" \
+        "false" \
+        "${SPLUNK_CA_CERT:-}" \
+        "_WARNED_SPLUNK_INSECURE_TLS" \
+        "WARNING: TLS verification is disabled for Splunk REST connections. Set SPLUNK_VERIFY_SSL=true or SPLUNK_CA_CERT=/path/to/ca.pem to enable verification."
+}
+
+_set_splunkbase_curl_tls_args() {
+    _set_tls_verify_args \
+        "${SPLUNKBASE_VERIFY_SSL:-}" \
+        "true" \
+        "${SPLUNKBASE_CA_CERT:-}" \
+        "_WARNED_SPLUNKBASE_INSECURE_TLS" \
+        "WARNING: TLS verification is disabled for Splunkbase connections. Set SPLUNKBASE_VERIFY_SSL=true or SPLUNKBASE_CA_CERT=/path/to/ca.pem to enable verification."
+}
+
+_set_app_download_curl_tls_args() {
+    local verify_value="${APP_DOWNLOAD_VERIFY_SSL:-${SPLUNK_VERIFY_SSL:-}}"
+    local ca_cert="${APP_DOWNLOAD_CA_CERT:-${SPLUNK_CA_CERT:-}}"
+
+    _set_tls_verify_args \
+        "${verify_value}" \
+        "false" \
+        "${ca_cert}" \
+        "_WARNED_APP_DOWNLOAD_INSECURE_TLS" \
+        "WARNING: TLS verification is disabled for remote app downloads. Set APP_DOWNLOAD_VERIFY_SSL=true or APP_DOWNLOAD_CA_CERT=/path/to/ca.pem to enable verification."
+}
+
+splunk_tls_mode() {
+    if [[ -n "${SPLUNK_CA_CERT:-}" ]]; then
+        printf '%s' "ca-cert"
+    elif _bool_is_true "${SPLUNK_VERIFY_SSL:-false}"; then
+        printf '%s' "verify"
+    else
+        printf '%s' "insecure"
+    fi
+}
+
+splunk_export_python_tls_env() {
+    local tls_mode
+
+    tls_mode="$(splunk_tls_mode)"
+    if [[ "${tls_mode}" == "ca-cert" && ! -f "${SPLUNK_CA_CERT:-}" ]]; then
+        echo "ERROR: CA certificate file not found: ${SPLUNK_CA_CERT}" >&2
+        return 1
+    fi
+
+    if [[ "${tls_mode}" == "insecure" ]]; then
+        _warn_once \
+            "_WARNED_SPLUNK_INSECURE_TLS" \
+            "WARNING: TLS verification is disabled for Splunk REST connections. Set SPLUNK_VERIFY_SSL=true or SPLUNK_CA_CERT=/path/to/ca.pem to enable verification."
+    fi
+
+    export __SPLUNK_TLS_MODE="${tls_mode}"
+    export __SPLUNK_TLS_CA_CERT="${SPLUNK_CA_CERT:-}"
+}
+
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+
+# Guard for flag parsers: validates that a flag's required value is present.
+# Usage (inside a while/case arg loop):
+#   --flag) require_arg "$1" $# || exit 1; VAR="$2"; shift 2 ;;
+require_arg() {
+    if [[ "$2" -lt 2 ]]; then
+        log "ERROR: Option '$1' requires a value."
+        return 1
+    fi
+}
 
 verify_search_api_connectivity() {
     local uri="${1:-${SPLUNK_URI:-https://localhost:8089}}"
-    local host port ssl_flags http_code
+    local host port http_code
 
     host="$(python3 -c "from urllib.parse import urlparse; p=urlparse('${uri}'); print(p.hostname or '')" 2>/dev/null || true)"
     port="$(python3 -c "from urllib.parse import urlparse; p=urlparse('${uri}'); print(p.port or 8089)" 2>/dev/null || echo 8089)"
 
     if command -v nc >/dev/null 2>&1; then
-        if ! nc -z -G 5 "${host}" "${port}" >/dev/null 2>&1; then
+        local nc_timeout_flag="-G 5"  # macOS
+        # GNU nc uses -w for connect timeout; detect by checking if -G is supported
+        if ! nc -z -G 1 127.0.0.1 1 >/dev/null 2>&1 && nc -h 2>&1 | grep -q '\-w'; then
+            nc_timeout_flag="-w 5"
+        fi
+        # shellcheck disable=SC2086  # nc_timeout_flag is intentionally unquoted
+        if ! nc -z ${nc_timeout_flag} "${host}" "${port}" >/dev/null 2>&1; then
             echo "ERROR: Cannot reach ${host}:${port} (connection refused or timed out)." >&2
             if type is_splunk_cloud &>/dev/null && is_splunk_cloud 2>/dev/null; then
                 echo "  HINT: Your IP may not be on the search-api allowlist. Run:" >&2
@@ -33,8 +177,8 @@ verify_search_api_connectivity() {
         fi
     fi
 
-    ssl_flags="$(_curl_ssl_flags)"
-    http_code=$(curl ${ssl_flags} --connect-timeout 8 --max-time 15 \
+    _set_splunk_curl_tls_args || return 1
+    http_code=$(curl -s "${_tls_verify_args[@]}" --connect-timeout 8 --max-time 15 \
         -o /dev/null -w '%{http_code}' "${uri}/services/auth/login" 2>/dev/null || echo "000")
     case "${http_code}" in
         000)
@@ -60,11 +204,11 @@ verify_search_api_connectivity() {
 
 get_session_key() {
     local uri="${1:-https://localhost:8089}"
-    local body sk ssl_flags
-    ssl_flags="$(_curl_ssl_flags)"
+    local body sk
+    _set_splunk_curl_tls_args || return 1
     body=$(form_urlencode_pairs username "${SPLUNK_USER}" password "${SPLUNK_PASS}") || return 1
     sk=$(printf '%s' "${body}" \
-        | curl ${ssl_flags} --connect-timeout 10 --max-time 30 "${uri}/services/auth/login" -d @- 2>/dev/null \
+        | curl -s "${_tls_verify_args[@]}" --connect-timeout 10 --max-time 30 "${uri}/services/auth/login" -d @- 2>/dev/null \
         | sed -n 's/.*<sessionKey>\([^<]*\)<.*/\1/p' || true)
 
     if [[ -z "${sk}" ]]; then
@@ -76,18 +220,16 @@ get_session_key() {
 
 splunk_curl() {
     local sk="$1"; shift
-    local ssl_flags
-    ssl_flags="$(_curl_ssl_flags)"
-    curl ${ssl_flags} -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") "$@"
+    _set_splunk_curl_tls_args || return 1
+    curl -s "${_tls_verify_args[@]}" -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") "$@"
 }
 
 splunk_curl_post() {
     local sk="$1"; shift
     local post_data="$1"; shift
-    local ssl_flags
-    ssl_flags="$(_curl_ssl_flags)"
+    _set_splunk_curl_tls_args || return 1
     printf '%s' "${post_data}" \
-        | curl ${ssl_flags} -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") -d @- "$@"
+        | curl -s "${_tls_verify_args[@]}" -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") -d @- "$@"
 }
 
 read_secret_file() {
@@ -305,20 +447,10 @@ rest_count_live_inputs() {
     splunk_curl "${sk}" \
         "${uri}/services/data/inputs/all?output_mode=json&count=0" \
         2>/dev/null \
-        | python3 -c "
+        | python3 -c "${_PY_NORMALIZE_DISABLED}
 import json, sys
 target_app = sys.argv[1]
 disabled_filter = sys.argv[2] if len(sys.argv) > 2 else ''
-
-def normalize_disabled(value):
-    if isinstance(value, bool):
-        return '1' if value else '0'
-    text = str(value).strip().lower()
-    if text in ('1', 'true'):
-        return '1'
-    if text in ('0', 'false'):
-        return '0'
-    return text
 
 try:
     data = json.load(sys.stdin)
@@ -329,7 +461,7 @@ try:
         entry_app = acl.get('app', '')
         if entry_app != target_app:
             continue
-        disabled = normalize_disabled(content.get('disabled'))
+        disabled = _normalize_disabled(content.get('disabled'))
         if disabled_filter and disabled != disabled_filter:
             continue
         count += 1
@@ -344,20 +476,10 @@ rest_get_live_input_counts() {
     splunk_curl "${sk}" \
         "${uri}/services/data/inputs/all?output_mode=json&count=0" \
         2>/dev/null \
-        | python3 -c "
+        | python3 -c "${_PY_NORMALIZE_DISABLED}
 import json, sys
 target_app = sys.argv[1]
 total = enabled = disabled = 0
-
-def normalize_disabled(value):
-    if isinstance(value, bool):
-        return '1' if value else '0'
-    text = str(value).strip().lower()
-    if text in ('1', 'true'):
-        return '1'
-    if text in ('0', 'false'):
-        return '0'
-    return text
 
 try:
     data = json.load(sys.stdin)
@@ -367,7 +489,7 @@ try:
         if acl.get('app', '') != target_app:
             continue
         total += 1
-        normalized = normalize_disabled(content.get('disabled'))
+        normalized = _normalize_disabled(content.get('disabled'))
         if normalized == '0':
             enabled += 1
         elif normalized == '1':
@@ -544,6 +666,7 @@ wait_for_splunk_ready() {
 restart_splunk_and_wait() {
     local sk="$1" uri="$2" shutdown_timeout="${3:-90}" startup_timeout="${4:-300}"
 
+    # shellcheck disable=SC2034  # read by callers after restart_splunk_and_wait returns
     SPLUNK_RESTART_HTTP_CODE=$(rest_restart_splunk "${sk}" "${uri}")
     case "${SPLUNK_RESTART_HTTP_CODE}" in
         000|200|201|204) ;;
@@ -553,4 +676,57 @@ restart_splunk_and_wait() {
     sleep 2
     wait_for_splunk_unavailable "${uri}" "${shutdown_timeout}" 2 || return 2
     wait_for_splunk_ready "${uri}" "${startup_timeout}" 5 || return 3
+}
+
+# Restart Splunk via REST and wait, with user-facing log messages.
+# Expects RESTART_SPLUNK (bool) as a script-level global.
+#
+# Usage: app_restart_splunk_or_exit <sk> <uri> <operation> [skip_message]
+app_restart_splunk_or_exit() {
+    local sk="$1" uri="$2" operation="$3"
+    local skip_msg="${4:-Restart manually before relying on the updated state.}"
+    local rc
+
+    if [[ "${RESTART_SPLUNK:-true}" != "true" ]]; then
+        log "Skipping Splunk restart (--no-restart). ${skip_msg}"
+        return 0
+    fi
+
+    log ""
+    log "Restarting Splunk to complete ${operation}..."
+    log "Waiting for the management API to cycle..."
+
+    restart_splunk_and_wait "${sk}" "${uri}"
+    rc=$?
+
+    case "${SPLUNK_RESTART_HTTP_CODE:-}" in
+        000)
+            log "Restart request closed before an HTTP response was returned, which can happen during shutdown."
+            ;;
+        200|201|204)
+            log "Restart request accepted (HTTP ${SPLUNK_RESTART_HTTP_CODE})."
+            ;;
+    esac
+
+    case "${rc}" in
+        0)
+            log "SUCCESS: Splunk restart completed and the management API is responding again."
+            ;;
+        1)
+            log "ERROR: Failed to request a Splunk restart (HTTP ${SPLUNK_RESTART_HTTP_CODE:-unknown})."
+            return 1
+            ;;
+        2)
+            log "ERROR: Splunk did not stop responding after the restart request."
+            return 1
+            ;;
+        3)
+            log "ERROR: Splunk did not come back online before the restart timeout expired."
+            return 1
+            ;;
+        *)
+            log "ERROR: Unexpected restart failure."
+            return 1
+            ;;
+    esac
 }

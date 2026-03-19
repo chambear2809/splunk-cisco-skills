@@ -13,18 +13,35 @@ pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 info() { log "  INFO: $*"; }
+finish_validation() {
+    local force_fail="${1:-false}"
+    log ""
+    log "=== Validation Summary ==="
+    log "  PASS: ${PASS} | WARN: ${WARN} | FAIL: ${FAIL}"
+
+    if [[ "${force_fail}" == "true" || ${FAIL} -gt 0 ]]; then
+        log "  Status: ISSUES FOUND — review failures above"
+        exit 1
+    elif [[ ${WARN} -gt 0 ]]; then
+        log "  Status: OK with warnings"
+        exit 0
+    else
+        log "  Status: ALL CHECKS PASSED"
+        exit 0
+    fi
+}
 
 log "=== Splunk Stream Validation ==="
 log ""
 
 if ! load_splunk_credentials; then
-    log "ERROR: Could not load Splunk credentials. Check credentials file."
-    exit 1
+    fail "Could not load Splunk credentials. Check credentials file."
+    finish_validation true
 fi
 
 if ! SK=$(get_session_key "${SPLUNK_URI}"); then
-    log "ERROR: Could not authenticate to Splunk. Check credentials and SPLUNK_SEARCH_API_URI/SPLUNK_URI."
-    exit 1
+    fail "Could not authenticate to Splunk. Check credentials and SPLUNK_SEARCH_API_URI/SPLUNK_URI."
+    finish_validation true
 fi
 
 CLOUD_MODE=false
@@ -202,18 +219,4 @@ else
     warn "KV Store status: ${kvstore_status} (Stream app requires healthy KV Store)"
 fi
 
-# --- Summary ---
-log ""
-log "=== Validation Summary ==="
-log "  PASS: ${PASS} | WARN: ${WARN} | FAIL: ${FAIL}"
-
-if [[ ${FAIL} -gt 0 ]]; then
-    log "  Status: ISSUES FOUND — review failures above"
-    exit 1
-elif [[ ${WARN} -gt 0 ]]; then
-    log "  Status: OK with warnings"
-    exit 0
-else
-    log "  Status: ALL CHECKS PASSED"
-    exit 0
-fi
+finish_validation false

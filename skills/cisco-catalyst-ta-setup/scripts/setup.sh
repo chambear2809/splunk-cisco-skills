@@ -35,9 +35,9 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --indexes-only) INDEXES_ONLY=true; shift ;;
         --enable-inputs) ENABLE_INPUTS=true; shift ;;
-        --account) ACCOUNT="$2"; shift 2 ;;
-        --index) INDEX="$2"; shift 2 ;;
-        --input-type) INPUT_TYPE="$2"; shift 2 ;;
+        --account) require_arg "$1" $# || exit 1; ACCOUNT="$2"; shift 2 ;;
+        --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
+        --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -243,6 +243,13 @@ main() {
         esac
         log_live_input_summary
         log "$(log_platform_restart_guidance "input changes")"
+        exit 0
+    fi
+
+    if $INDEXES_ONLY; then
+        create_indexes
+        log "Setup complete."
+        log "$(log_platform_restart_guidance "index changes")"
         exit 0
     fi
 

@@ -88,6 +88,11 @@ class ShellScriptRegressionTests(unittest.TestCase):
             "skills/cisco-enterprise-networking-setup/scripts/validate.sh",
             "skills/cisco-dc-networking-setup/scripts/validate.sh",
             "skills/cisco-catalyst-ta-setup/scripts/validate.sh",
+            "skills/cisco-intersight-setup/scripts/validate.sh",
+            "skills/cisco-meraki-ta-setup/scripts/validate.sh",
+            "skills/cisco-thousandeyes-setup/scripts/validate.sh",
+            "skills/splunk-itsi-setup/scripts/validate.sh",
+            "skills/splunk-stream-setup/scripts/validate.sh",
         ]
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -226,6 +231,32 @@ class ShellScriptRegressionTests(unittest.TestCase):
         self.assertIn("PATHVIS_ENABLED=true", script_text)
         self.assertIn('related_paths "1"', script_text)
         self.assertIn("--no-pathvis", script_text)
+
+    def test_thousandeyes_configure_account_avoids_eval_for_network_data(self):
+        script_text = (
+            REPO_ROOT / "skills/cisco-thousandeyes-setup/scripts/configure_account.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn('eval "$(parse_device_authorization_response', script_text)
+        self.assertNotIn('eval "$(parse_token_success_response', script_text)
+        self.assertNotIn('eval "$(parse_token_error_response', script_text)
+
+    def test_mcp_loaders_follow_shared_tls_policy(self):
+        loader_paths = [
+            "skills/cisco-catalyst-ta-setup/scripts/load_mcp_tools.sh",
+            "skills/cisco-dc-networking-setup/scripts/load_mcp_tools.sh",
+            "skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh",
+            "skills/cisco-intersight-setup/scripts/load_mcp_tools.sh",
+            "skills/cisco-meraki-ta-setup/scripts/load_mcp_tools.sh",
+            "skills/cisco-thousandeyes-setup/scripts/load_mcp_tools.sh",
+        ]
+
+        for rel_path in loader_paths:
+            with self.subTest(script=rel_path):
+                script_text = (REPO_ROOT / rel_path).read_text(encoding="utf-8")
+                self.assertIn("splunk_export_python_tls_env", script_text)
+                self.assertNotIn("ssl.CERT_NONE", script_text)
+                self.assertNotIn("check_hostname = False", script_text)
 
     def test_cloud_uninstall_script_no_longer_uses_top_level_local_keyword(self):
         script_text = (REPO_ROOT / "skills/splunk-app-install/scripts/uninstall_app.sh").read_text(encoding="utf-8")

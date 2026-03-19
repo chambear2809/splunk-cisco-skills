@@ -330,17 +330,26 @@ export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 
 ### SSL Verification
 
-By default, the scripts skip TLS certificate verification (`curl -k`) because
-on-prem Splunk deployments typically use self-signed certificates. To enable
-strict certificate verification (recommended for Splunk Cloud or any
-environment with trusted certs), set:
+By default, Splunk REST calls keep compatibility mode and skip TLS certificate
+verification (`curl -k`) because on-prem Splunk deployments often use
+self-signed certificates. To enable strict verification with system trust,
+set:
 
 ```bash
 export SPLUNK_VERIFY_SSL="true"
 ```
 
-You can also add this to your `credentials` file. When enabled, curl will
-reject untrusted or expired certificates instead of silently ignoring them.
+If you need secure verification with a private CA instead of the system trust
+store, set:
+
+```bash
+export SPLUNK_CA_CERT="/path/to/splunk-ca.pem"
+```
+
+Splunkbase uses certificate verification by default. Remote app downloads keep
+compatibility with the Splunk TLS setting unless you override them separately
+with `APP_DOWNLOAD_VERIFY_SSL`, `APP_DOWNLOAD_CA_CERT`,
+`SPLUNKBASE_VERIFY_SSL`, or `SPLUNKBASE_CA_CERT`.
 
 You can also define `SPLUNK_SEARCH_API_URI` in the `credentials` file so you do
 not have to export it each session. The helper still accepts `SPLUNK_URI` as a

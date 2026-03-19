@@ -14,6 +14,8 @@ THOUSANDEYES_CURRENT_USER_URL="${THOUSANDEYES_BASE_URL}/users/current"
 THOUSANDEYES_CLIENT_ID="0oalgciz1dyS1Uonr697"
 THOUSANDEYES_AUTH_SCOPE="organization:read offline_access tests:read endpoint-tests:read streams:manage alerts:manage tags:read integrations:manage"
 THOUSANDEYES_DEVICE_GRANT_TYPE="urn:ietf:params:oauth:grant-type:device_code"
+# Parse multiple fields from untrusted JSON without using eval.
+PARSE_FIELD_SEP=$'\x1f'
 
 usage() {
     cat <<EOF
@@ -40,8 +42,8 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --poll-interval) POLL_INTERVAL="$2"; shift 2 ;;
-        --poll-timeout) POLL_TIMEOUT="$2"; shift 2 ;;
+        --poll-interval) require_arg "$1" $# || exit 1; POLL_INTERVAL="$2"; shift 2 ;;
+        --poll-timeout) require_arg "$1" $# || exit 1; POLL_TIMEOUT="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -71,6 +73,7 @@ get_external_json() {
 parse_device_authorization_response() {
     printf '%s' "$1" | python3 -c "
 import json, sys
+sep = '\x1f'
 try:
     data = json.load(sys.stdin)
     if isinstance(data, list):
@@ -81,42 +84,38 @@ try:
     entries = data.get('entry', [data] if isinstance(data, dict) and 'device_code' in data else [])
     if entries:
         content = entries[0].get('content', entries[0]) if isinstance(entries[0], dict) else {}
-        dc = content.get('device_code', '')
-        uc = content.get('user_code', '')
-        vu = content.get('verification_uri_complete') or content.get('verification_url') or content.get('verification_uri', '')
-        print(f'device_code={dc!r}')
-        print(f'user_code={uc!r}')
-        print(f'verification_url={vu!r}')
+        dc = str(content.get('device_code', '') or '')
+        uc = str(content.get('user_code', '') or '')
+        vu = str(content.get('verification_uri_complete') or content.get('verification_url') or content.get('verification_uri') or '')
+        print(sep.join((dc, uc, vu)), end='')
+    else:
+        print(sep.join(('', '', '')), end='')
 except Exception:
-    print('device_code=\"\"')
-    print('user_code=\"\"')
-    print('verification_url=\"\"')
+    print(sep.join(('', '', '')), end='')
 " 2>/dev/null
 }
 
 parse_token_success_response() {
     printf '%s' "$1" | python3 -c "
 import json, sys
+sep = '\x1f'
 try:
     data = json.load(sys.stdin)
-    print(f'access_token={data.get(\"access_token\", \"\")!r}')
-    print(f'refresh_token={data.get(\"refresh_token\", \"\")!r}')
+    print(sep.join((str(data.get('access_token', '') or ''), str(data.get('refresh_token', '') or ''))), end='')
 except Exception:
-    print('access_token=\"\"')
-    print('refresh_token=\"\"')
+    print(sep.join(('', '')), end='')
 " 2>/dev/null
 }
 
 parse_token_error_response() {
     printf '%s' "$1" | python3 -c "
 import json, sys
+sep = '\x1f'
 try:
     data = json.load(sys.stdin)
-    print(f'oauth_error={data.get(\"error\", \"\")!r}')
-    print(f'oauth_error_description={data.get(\"error_description\", \"\")!r}')
+    print(sep.join((str(data.get('error', '') or ''), str(data.get('error_description', '') or ''))), end='')
 except Exception:
-    print('oauth_error=\"\"')
-    print('oauth_error_description=\"\"')
+    print(sep.join(('', '')), end='')
 " 2>/dev/null
 }
 
@@ -181,14 +180,14 @@ poll_for_oauth_tokens() {
 
         case "${token_http_code}" in
             200|201)
-                eval "$(parse_token_success_response "${token_resp_body}")"
+                IFS="${PARSE_FIELD_SEP}" read -r access_token refresh_token <<< "$(parse_token_success_response "${token_resp_body}")"
                 if [[ -n "${access_token}" && -n "${refresh_token}" ]]; then
                     auth_success=true
                     break
                 fi
                 ;;
             400)
-                eval "$(parse_token_error_response "${token_resp_body}")"
+                IFS="${PARSE_FIELD_SEP}" read -r oauth_error oauth_error_description <<< "$(parse_token_error_response "${token_resp_body}")"
                 case "${oauth_error}" in
                     authorization_pending|"")
                         ;;
@@ -290,7 +289,7 @@ fi
 device_code=""
 user_code=""
 verification_url=""
-eval "$(parse_device_authorization_response "${authorize_body}")"
+IFS="${PARSE_FIELD_SEP}" read -r device_code user_code verification_url <<< "$(parse_device_authorization_response "${authorize_body}")"
 
 if [[ -z "${verification_url}" || -z "${user_code}" ]]; then
     log "ERROR: Could not parse OAuth authorization response."

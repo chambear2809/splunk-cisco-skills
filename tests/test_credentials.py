@@ -25,6 +25,7 @@ ALLOWED_KEYS = [
     "SPLUNK_SSH_PASS",
     "SPLUNK_USER",
     "SPLUNK_PASS",
+    "SPLUNK_CA_CERT",
     "SPLUNK_CLOUD_STACK",
     "SPLUNK_CLOUD_SEARCH_HEAD",
     "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS",
@@ -38,6 +39,10 @@ ALLOWED_KEYS = [
     "SB_USER",
     "SB_PASS",
     "SPLUNK_VERIFY_SSL",
+    "SPLUNKBASE_VERIFY_SSL",
+    "SPLUNKBASE_CA_CERT",
+    "APP_DOWNLOAD_VERIFY_SSL",
+    "APP_DOWNLOAD_CA_CERT",
 ]
 
 
@@ -204,6 +209,21 @@ class TestCredentialParsing(unittest.TestCase):
         text = 'SPLUNK_VERIFY_SSL="true"\n'
         result = parse_credential_file(text)
         self.assertEqual(result["SPLUNK_VERIFY_SSL"], "true")
+
+    def test_tls_ca_and_external_tls_keys_allowed(self):
+        text = textwrap.dedent("""\
+            SPLUNK_CA_CERT="/tmp/splunk-ca.pem"
+            SPLUNKBASE_VERIFY_SSL="false"
+            SPLUNKBASE_CA_CERT="/tmp/splunkbase-ca.pem"
+            APP_DOWNLOAD_VERIFY_SSL="true"
+            APP_DOWNLOAD_CA_CERT="/tmp/download-ca.pem"
+        """)
+        result = parse_credential_file(text)
+        self.assertEqual(result["SPLUNK_CA_CERT"], "/tmp/splunk-ca.pem")
+        self.assertEqual(result["SPLUNKBASE_VERIFY_SSL"], "false")
+        self.assertEqual(result["SPLUNKBASE_CA_CERT"], "/tmp/splunkbase-ca.pem")
+        self.assertEqual(result["APP_DOWNLOAD_VERIFY_SSL"], "true")
+        self.assertEqual(result["APP_DOWNLOAD_CA_CERT"], "/tmp/download-ca.pem")
 
 
 class TestCredentialFileRoundtrip(unittest.TestCase):
