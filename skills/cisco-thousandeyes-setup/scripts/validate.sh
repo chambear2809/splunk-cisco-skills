@@ -181,6 +181,52 @@ else
 fi
 
 log ""
+log "--- Path Visualization ---"
+_pathvis_status=$(echo "${_hec_targets_json}" | python3 -c "
+import json, sys
+
+data = json.load(sys.stdin)
+metrics_inputs = 0
+enabled = 0
+details = []
+
+for entry in data.get('entry', []):
+    acl = entry.get('acl', {}) or {}
+    if acl.get('app', '') != 'ta_cisco_thousandeyes':
+        continue
+    content = entry.get('content', {}) or {}
+    if content.get('test_index', '') != 'thousandeyes_metrics':
+        continue
+    metrics_inputs += 1
+    related_paths = str(content.get('related_paths', '')).strip().lower()
+    if related_paths in ('1', 'true', 'yes', 'on'):
+        enabled += 1
+        details.append(
+            f\"{entry.get('name', '')}: index={content.get('index', '') or 'unset'}, interval={content.get('interval', '') or 'unset'}\"
+        )
+
+print(f'metrics={metrics_inputs}')
+print(f'enabled={enabled}')
+for detail in details:
+    print(detail)
+" 2>/dev/null || echo $'metrics=0\nenabled=0')
+_pathvis_metrics=$(echo "${_pathvis_status}" | sed -n '1s/metrics=//p')
+_pathvis_enabled=$(echo "${_pathvis_status}" | sed -n '2s/enabled=//p')
+_pathvis_details=$(echo "${_pathvis_status}" | tail -n +3)
+if [[ "${_pathvis_metrics:-0}" -gt 0 ]]; then
+    if [[ "${_pathvis_enabled:-0}" -gt 0 ]]; then
+        pass "Path visualization enabled on ${_pathvis_enabled} metrics input(s)"
+        echo "${_pathvis_details}" | while IFS= read -r line; do
+            [[ -n "${line}" ]] && log "    ${line}"
+        done
+    else
+        warn "Metrics stream inputs exist but related_paths is not enabled; thousandeyes_pathvis will stay empty"
+    fi
+else
+    log "  INFO: No metrics stream inputs found (nothing to check)"
+fi
+
+log ""
 log "--- Data Inputs ---"
 input_count=$(rest_count_live_inputs "${SK}" "${SPLUNK_URI}" "${APP_NAME}" 2>/dev/null || echo "0")
 enabled_inputs=$(rest_count_live_inputs "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "0" 2>/dev/null || echo "0")

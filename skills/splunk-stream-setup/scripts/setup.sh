@@ -135,17 +135,19 @@ install_apps() {
 
 create_indexes() {
     log "=== Creating Indexes ==="
+    local session_key="${SK-}"
     if ! is_splunk_cloud; then
         _get_session_key || exit 1
+        session_key="${SK}"
     fi
 
-    if platform_create_index "${SK}" "${SPLUNK_URI}" "netflow" "512000"; then
+    if platform_create_index "${session_key}" "${SPLUNK_URI}" "netflow" "512000"; then
         log "  Index 'netflow' created or already exists."
     else
         log "  ERROR: Failed to create index 'netflow'."
         exit 1
     fi
-    if platform_create_index "${SK}" "${SPLUNK_URI}" "stream" "512000"; then
+    if platform_create_index "${session_key}" "${SPLUNK_URI}" "stream" "512000"; then
         log "  Index 'stream' created or already exists."
     else
         log "  ERROR: Failed to create index 'stream'."

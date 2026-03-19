@@ -6,7 +6,8 @@ credentials
 !credentials.example
 !.gitignore
 !DEMO_SCRIPTS.md
-!blocklist
+!.github/
+!.github/**
 # Local TA packages directory
 !splunk-ta/
 !splunk-ta/**
@@ -14,33 +15,9 @@ credentials
 splunk-ta/*.tgz
 splunk-ta/*.spl
 splunk-ta/*.tar.gz
-# Un-ignore projects so we can descend to allowlisted subdirs
-!projects/
-projects/*
-!projects/*/
-projects/*/*
-# Ignore temporary project directories
-projects/tmp-*/
-# MCP tool descriptors, resources, prompts
-!projects/*/mcps/
-!projects/*/mcps/**
-# Agent transcripts should stay local only
-projects/*/agent-transcripts/
-# Terminal output files
-!projects/*/terminals/
-!projects/*/terminals/**
-# Conversation notes (shared scratchpad)
-!projects/*/agent-notes/
-!projects/*/agent-notes/**
-# Large tool output files
-!projects/*/agent-tools/
-!projects/*/agent-tools/**
 # Plugin cache (rules, skills, agents)
 !plugins/
 !plugins/**
-# Built-in Cursor skills
-!skills-cursor/
-!skills-cursor/**
 # User's personal skills
 !skills/
 !skills/**
@@ -61,6 +38,9 @@ projects/*/agent-transcripts/
 # Test suites
 !tests/
 !tests/**
+# Python cache files
+**/__pycache__/
+**/*.pyc
 # Cloud deployment matrix
 !CLOUD_DEPLOYMENT_MATRIX.md
 !ARCHITECTURE.md

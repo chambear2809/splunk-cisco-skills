@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="TA_cisco_catalyst"
+SK=""
 
 PASS=0
 FAIL=0
@@ -31,7 +32,7 @@ else
     fi
 fi
 
-if [[ -n "${SK}" ]]; then
+if [[ -n "${SK:-}" ]]; then
 log ""
 log "--- Indexes ---"
 REQUIRED_INDEXES=("catalyst" "ise" "sdwan" "cybervision")

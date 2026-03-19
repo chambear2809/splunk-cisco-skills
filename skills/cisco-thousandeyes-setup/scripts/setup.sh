@@ -16,6 +16,9 @@ ACCOUNT_GROUP=""
 INDEX=""
 INPUT_TYPE=""
 HEC_TOKEN=""
+PATHVIS_ENABLED=true
+PATHVIS_INDEX="thousandeyes_pathvis"
+PATHVIS_INTERVAL="3600"
 
 usage() {
     cat <<EOF
@@ -32,6 +35,9 @@ Options:
   --index INDEX           Target index for polling inputs
   --input-type TYPE       Input group: all, metrics, traces, events, activity, alerts
   --hec-token NAME        HEC token name (default: thousandeyes)
+  --pathvis-index INDEX   Path visualization index (default: thousandeyes_pathvis)
+  --pathvis-interval SEC  Path visualization poll interval (default: 3600)
+  --no-pathvis            Disable path visualization on metrics inputs
   --help                  Show this help
 
 With no flags, runs full setup (HEC + indexes).
@@ -49,6 +55,9 @@ while [[ $# -gt 0 ]]; do
         --index) INDEX="$2"; shift 2 ;;
         --input-type) INPUT_TYPE="$2"; shift 2 ;;
         --hec-token) HEC_TOKEN="$2"; shift 2 ;;
+        --pathvis-index) PATHVIS_INDEX="$2"; shift 2 ;;
+        --pathvis-interval) PATHVIS_INTERVAL="$2"; shift 2 ;;
+        --no-pathvis) PATHVIS_ENABLED=false; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -277,11 +286,11 @@ create_indexes() {
 enable_metrics_inputs() {
     local account="$1" acc_group="$2" hec_token="$3"
     local hec_target
+    local body
     hec_target=$(detect_hec_target)
 
     log "Enabling metrics stream input for account='${account}'..."
     log "  HEC target: ${hec_target}"
-    local body
     body=$(form_urlencode_pairs \
         disabled "0" \
         thousandeyes_user "${account}" \
@@ -289,6 +298,13 @@ enable_metrics_inputs() {
         hec_target "${hec_target}" \
         hec_token "${hec_token}" \
         test_index "thousandeyes_metrics")
+    if ${PATHVIS_ENABLED}; then
+        body="${body}&$(form_urlencode_pairs \
+            related_paths "1" \
+            index "${PATHVIS_INDEX}" \
+            interval "${PATHVIS_INTERVAL}")"
+        log "  Path visualization enabled (index=${PATHVIS_INDEX}, interval=${PATHVIS_INTERVAL}s)."
+    fi
     rest_create_input "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
         "test_metrics_stream" "metrics_${account}" "${body}"
     log "  Metrics stream input enabled."

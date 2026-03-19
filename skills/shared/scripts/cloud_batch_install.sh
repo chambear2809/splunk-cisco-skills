@@ -120,6 +120,7 @@ for app_id in "${APP_IDS[@]}"; do
     declare -a cmd=(apps install splunkbase --splunkbase-id "${app_id}")
     [[ -n "${APP_VERSION}" ]] && cmd+=(--version "${APP_VERSION}")
     [[ -n "${license_ack}" ]] && cmd+=(--acs-licensing-ack "${license_ack}")
+    cloud_requires_local_scope && cmd+=(--scope local)
 
     set +e
     output=$(acs_command "${cmd[@]}" 2>&1)

@@ -31,7 +31,8 @@ cisco_dc_networking_app-1.2.0.tar.gz
 
 - Do **not** commit credentials, license files, or other secrets alongside
   TA packages.
-- Large `.tgz`/`.spl` files are tracked by Git. Consider using Git LFS if
-  packages exceed ~50 MB.
+- Large `.tgz`/`.spl`/`.tar.gz` files in this cache are ignored by Git.
+  Keep them local, fetch them from Splunkbase, or store them in Git LFS if you
+  intentionally want versioned package artifacts.
 - If you create `splunk-ta/_unpacked/` review copies, treat them as analysis
   workspaces only. They are not the normal deployment source for this repo.

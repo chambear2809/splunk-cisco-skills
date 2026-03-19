@@ -397,7 +397,11 @@ rules/credential-handling.mdc
 
 ```text
 splunk-cloud-skills/
+├── .github/
+│   └── workflows/
+│       └── ci.yml              # shell/unit test checks for first-party scripts
 ├── README.md
+├── ARCHITECTURE.md
 ├── CLOUD_DEPLOYMENT_MATRIX.md
 ├── DEMO_SCRIPTS.md
 ├── credentials.example
@@ -426,7 +430,8 @@ splunk-cloud-skills/
 │   ├── cisco-meraki-ta-setup/
 │   ├── cisco-enterprise-networking-setup/
 │   └── splunk-stream-setup/
-├── tests/                       # bats and pytest test suites
+├── tests/                       # bats and Python test suites
+├── plans/                       # design notes and implementation plans
 └── rules/
     └── credential-handling.mdc
 ```

@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install shell tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats shellcheck
+
+      - name: Run Python tests
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      - name: Run Bats helper tests
+        run: bats tests/test_helpers.bats
+
+      - name: Syntax-check shell scripts
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          files = sorted(str(path) for path in Path("skills").rglob("*.sh"))
+          if not files:
+              raise SystemExit("No shell scripts found under skills/")
+
+          for file_path in files:
+              subprocess.run(["bash", "-n", file_path], check=True)
+          PY
+
+      - name: ShellCheck first-party scripts
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          files = sorted(str(path) for path in Path("skills").rglob("*.sh"))
+          if not files:
+              raise SystemExit("No shell scripts found under skills/")
+
+          subprocess.run(["shellcheck", *files], check=True)
+          PY

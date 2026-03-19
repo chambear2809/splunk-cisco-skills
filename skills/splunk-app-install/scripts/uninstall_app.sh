@@ -120,6 +120,18 @@ cloud_restart_or_exit() {
     log "SUCCESS: Splunk Cloud restart completed and the stack returned to Ready."
 }
 
+refresh_cloud_verify_session() {
+    SK_VERIFY=""
+
+    if [[ -z "${SPLUNK_URI:-}" ]] || [[ "${SPLUNK_URI}" != *".splunkcloud.com"* ]]; then
+        return 1
+    fi
+
+    load_splunk_credentials 2>/dev/null || return 1
+    SK_VERIFY=$(get_session_key "${SPLUNK_URI}" 2>/dev/null || true)
+    [[ -n "${SK_VERIFY}" ]]
+}
+
 echo "=== Splunk App Uninstaller ==="
 echo ""
 
@@ -184,28 +196,44 @@ except Exception:
     fi
 
     log "Removing app '${APP_NAME}' from Splunk Cloud via ACS..."
+    acs_uninstall_output=""
+    acs_uninstall_rc=0
     if cloud_requires_local_scope; then
-        acs_command apps uninstall "${APP_NAME}" --scope local >/dev/null 2>&1 || true
+        set +e
+        acs_uninstall_output=$(acs_command apps uninstall "${APP_NAME}" --scope local 2>&1)
+        acs_uninstall_rc=$?
+        set -e
     else
-        acs_command apps uninstall "${APP_NAME}" >/dev/null 2>&1 || true
+        set +e
+        acs_uninstall_output=$(acs_command apps uninstall "${APP_NAME}" 2>&1)
+        acs_uninstall_rc=$?
+        set -e
+    fi
+
+    if (( acs_uninstall_rc == 0 )); then
+        log "ACS uninstall accepted for '${APP_NAME}'."
+    else
+        log "WARNING: ACS uninstall returned rc=${acs_uninstall_rc} for '${APP_NAME}'."
+        if [[ -n "${acs_uninstall_output}" ]]; then
+            printf '%s\n' "${acs_uninstall_output}" >&2
+        fi
     fi
 
     cloud_restart_or_exit "app removal"
 
     cloud_uninstall_rest_fallback_needed=false
-    if [[ -n "${SPLUNK_URI:-}" ]] && [[ "${SPLUNK_URI}" == *".splunkcloud.com"* ]]; then
-        load_splunk_credentials 2>/dev/null || true
-        if SK_VERIFY=$(get_session_key "${SPLUNK_URI}" 2>/dev/null); then
-            if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}"; then
-                log "WARNING: ACS reported success but the app is still present on the search tier."
-                cloud_uninstall_rest_fallback_needed=true
-            fi
+    if refresh_cloud_verify_session; then
+        if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}"; then
+            log "WARNING: ACS reported success but the app is still present on the search tier."
+            cloud_uninstall_rest_fallback_needed=true
         fi
+    else
+        log "WARNING: Could not verify search-tier app state after ACS uninstall."
     fi
 
     if ${cloud_uninstall_rest_fallback_needed}; then
         log "Attempting direct search-tier REST DELETE as fallback..."
-        local delete_code
+        delete_code="000"
         delete_code=$(splunk_curl "${SK_VERIFY}" \
             -X DELETE "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" \
             -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
@@ -223,11 +251,21 @@ except Exception:
         esac
     fi
 
-    if [[ -n "${SK_VERIFY:-}" ]] && rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}" 2>/dev/null; then
-        log "WARNING: App '${APP_NAME}' may still be present on some search-head cluster members."
-        log "On Victoria stacks with SHC, a direct REST DELETE on each member followed by an ACS restart may be required."
-    else
+    if refresh_cloud_verify_session; then
+        if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}" 2>/dev/null; then
+            log "ERROR: App '${APP_NAME}' is still present on the search tier after uninstall attempts."
+            log "On Victoria stacks with SHC, a direct REST DELETE on each member followed by an ACS restart may be required."
+            exit 1
+        fi
         log "SUCCESS: App '${APP_NAME}' has been removed from Splunk Cloud."
+        exit 0
+    fi
+
+    if (( acs_uninstall_rc == 0 )); then
+        log "WARNING: ACS uninstall completed, but search-tier verification is unavailable."
+    else
+        log "ERROR: ACS uninstall failed and search-tier verification is unavailable."
+        exit 1
     fi
     exit 0
 fi

@@ -12,6 +12,7 @@ readonly SAVED_SEARCHES=(
     "cisco_catalyst_meraki_organization_mapping"
     "cisco_catalyst_meraki_devices_serial_mapping"
 )
+SK=""
 
 PASS=0
 FAIL=0
@@ -38,7 +39,7 @@ else
     fi
 fi
 
-if [[ -n "${SK}" ]]; then
+if [[ -n "${SK:-}" ]]; then
 log ""
 log "--- Companion TA ---"
 if rest_check_app "$SK" "$SPLUNK_URI" "TA_cisco_catalyst" 2>/dev/null; then

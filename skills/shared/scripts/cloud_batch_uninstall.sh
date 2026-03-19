@@ -46,6 +46,18 @@ if ! is_splunk_cloud; then
     exit 1
 fi
 
+refresh_verify_session() {
+    SK_VERIFY=""
+
+    if [[ -z "${SPLUNK_URI:-}" ]] || [[ "${SPLUNK_URI}" != *".splunkcloud.com"* ]]; then
+        return 1
+    fi
+
+    load_splunk_credentials 2>/dev/null || return 1
+    SK_VERIFY=$(get_session_key "${SPLUNK_URI}" 2>/dev/null || true)
+    [[ -n "${SK_VERIFY}" ]]
+}
+
 acs_prepare_context || exit 1
 
 log "=== Cloud Batch Uninstall ==="
@@ -55,7 +67,11 @@ log ""
 for app in "${APP_NAMES[@]}"; do
     log "Uninstalling '${app}' via ACS..."
     set +e
-    output=$(acs_command apps uninstall "${app}" 2>&1)
+    if cloud_requires_local_scope; then
+        output=$(acs_command apps uninstall "${app}" --scope local 2>&1)
+    else
+        output=$(acs_command apps uninstall "${app}" 2>&1)
+    fi
     rc=$?
     set -e
     if (( rc == 0 )); then
@@ -72,16 +88,15 @@ if ${RESTART}; then
 fi
 
 rest_fallback_needed=false
-if [[ -n "${SPLUNK_URI:-}" ]] && [[ "${SPLUNK_URI}" == *".splunkcloud.com"* ]]; then
-    load_splunk_credentials 2>/dev/null || true
-    if SK_VERIFY=$(get_session_key "${SPLUNK_URI}" 2>/dev/null); then
-        for app in "${APP_NAMES[@]}"; do
-            if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${app}"; then
-                log "WARNING: '${app}' still present on search tier after ACS uninstall."
-                rest_fallback_needed=true
-            fi
-        done
-    fi
+if refresh_verify_session; then
+    for app in "${APP_NAMES[@]}"; do
+        if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${app}"; then
+            log "WARNING: '${app}' still present on search tier after ACS uninstall."
+            rest_fallback_needed=true
+        fi
+    done
+else
+    log "Search-tier verification skipped after ACS uninstall (no REST access)."
 fi
 
 if ${rest_fallback_needed}; then
@@ -109,7 +124,7 @@ fi
 
 log ""
 log "=== Final verification ==="
-if [[ -n "${SK_VERIFY:-}" ]]; then
+if refresh_verify_session; then
     for app in "${APP_NAMES[@]}"; do
         if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${app}" 2>/dev/null; then
             log "  ${app} = STILL PRESENT (may need per-member SHC cleanup)"
