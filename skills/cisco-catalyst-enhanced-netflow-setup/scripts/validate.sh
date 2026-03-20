@@ -57,9 +57,9 @@ if rest_check_app "$SK" "$SPLUNK_URI" "${STREAM_FWD_APP}" 2>/dev/null; then
         nf_port=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "${STREAM_FWD_APP}" "streamfwd" "streamfwd" "netflowReceiver.0.port" 2>/dev/null || true)
         nf_decoder=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "${STREAM_FWD_APP}" "streamfwd" "streamfwd" "netflowReceiver.0.decoder" 2>/dev/null || true)
 
-        [[ -n "${nf_ip}" ]] && pass "NetFlow receiver IP: ${nf_ip}" || warn "No netflowReceiver.0.ip configured"
-        [[ -n "${nf_port}" ]] && pass "NetFlow receiver port: ${nf_port}" || warn "No netflowReceiver.0.port configured"
-        [[ -n "${nf_decoder}" ]] && pass "NetFlow decoder: ${nf_decoder}" || warn "No netflowReceiver.0.decoder configured"
+        if [[ -n "${nf_ip}" ]]; then pass "NetFlow receiver IP: ${nf_ip}"; else warn "No netflowReceiver.0.ip configured"; fi
+        if [[ -n "${nf_port}" ]]; then pass "NetFlow receiver port: ${nf_port}"; else warn "No netflowReceiver.0.port configured"; fi
+        if [[ -n "${nf_decoder}" ]]; then pass "NetFlow decoder: ${nf_decoder}"; else warn "No netflowReceiver.0.decoder configured"; fi
     else
         warn "${STREAM_FWD_APP} is installed but streamfwd.conf is not configured"
     fi

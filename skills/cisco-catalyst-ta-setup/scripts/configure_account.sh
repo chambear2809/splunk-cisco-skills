@@ -13,6 +13,7 @@ USERNAME=""
 PASSWORD=""
 API_TOKEN=""
 USE_CA_CERT="false"
+SET_VERIFY_SSL=""
 
 usage() {
     cat <<EOF
@@ -45,6 +46,8 @@ Cyber Vision:
 
   --password-file FILE Read device password from FILE
   --api-token-file FILE Read API token from FILE
+  --no-verify-ssl    Disable SSL certificate verification for TA API calls
+  --verify-ssl       Re-enable SSL certificate verification for TA API calls
 
 Splunk credentials are read from the project-root credentials file (falls back to ~/.splunk/credentials) automatically.
 EOF
@@ -62,6 +65,8 @@ while [[ $# -gt 0 ]]; do
         --api-token) require_arg "$1" $# || exit 1; echo "WARNING: --api-token exposes secrets in process listings. Prefer --api-token-file." >&2; API_TOKEN="$2"; shift 2 ;;
         --api-token-file) require_arg "$1" $# || exit 1; API_TOKEN=$(read_secret_file "$2"); shift 2 ;;
         --use-ca-cert) USE_CA_CERT="true"; shift ;;
+        --no-verify-ssl) SET_VERIFY_SSL="False"; shift ;;
+        --verify-ssl) SET_VERIFY_SSL="True"; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -205,5 +210,15 @@ case "${ACCT_TYPE}" in
     cybervision) configure_cybervision ;;
     *) log "ERROR: Unknown account type '${ACCT_TYPE}'. Use: catalyst_center, ise, sdwan, cybervision"; exit 1 ;;
 esac
+
+if [[ -n "${SET_VERIFY_SSL}" ]]; then
+    if rest_set_verify_ssl "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
+        "ta_cisco_catalyst_settings" "default" "verify_ssl" "${SET_VERIFY_SSL}"; then
+        log "Set verify_ssl=${SET_VERIFY_SSL} in ta_cisco_catalyst_settings.conf."
+    else
+        log "ERROR: Failed to set verify_ssl in ta_cisco_catalyst_settings.conf."
+        exit 1
+    fi
+fi
 
 log "Account configuration complete."

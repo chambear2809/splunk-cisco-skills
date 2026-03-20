@@ -1556,6 +1556,207 @@ class ShellScriptRegressionTests(unittest.TestCase):
         script_text = (REPO_ROOT / "skills/splunk-app-install/scripts/uninstall_app.sh").read_text(encoding="utf-8")
         self.assertNotIn("local delete_code", script_text)
 
+    def _build_configure_account_env(self, tmp_path: Path) -> tuple[dict, Path]:
+        """Build a mock environment for configure_account.sh integration tests."""
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        curl_log = tmp_path / "curl.log"
+        credentials_file = tmp_path / "credentials"
+        password_file = tmp_path / "device_password"
+
+        credentials_file.write_text(
+            textwrap.dedent(
+                """\
+                SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                SPLUNK_USER="user"
+                SPLUNK_PASS="pass"
+                """
+            ),
+            encoding="utf-8",
+        )
+        password_file.write_text("device-secret", encoding="utf-8")
+
+        write_executable(
+            bin_dir / "nc",
+            """\
+            #!/usr/bin/env bash
+            exit 0
+            """,
+        )
+        write_executable(
+            bin_dir / "curl",
+            """\
+            #!/usr/bin/env python3
+            import json
+            import os
+            import sys
+            from pathlib import Path
+            from urllib.parse import parse_qs, urlparse, unquote
+
+            log_path = Path(os.environ["CURL_LOG"])
+            args = sys.argv[1:]
+            method = "GET"
+            data = ""
+            url = ""
+            write_code = False
+            output_target = None
+
+            def log(msg: str) -> None:
+                with log_path.open("a", encoding="utf-8") as handle:
+                    handle.write(msg + "\\n")
+
+            def out(body: str = "", code: int | None = None) -> None:
+                if output_target == "/dev/null" and write_code and code is not None:
+                    sys.stdout.write(str(code))
+                    raise SystemExit(0)
+                if body:
+                    sys.stdout.write(body)
+                if write_code and code is not None:
+                    sys.stdout.write(f"\\n{code}")
+                raise SystemExit(0)
+
+            i = 0
+            while i < len(args):
+                arg = args[i]
+                if arg == "-d" and i + 1 < len(args):
+                    if args[i + 1] == "@-":
+                        data = sys.stdin.read()
+                    else:
+                        data = args[i + 1]
+                    if method == "GET":
+                        method = "POST"
+                    i += 2
+                    continue
+                if arg == "-o" and i + 1 < len(args):
+                    output_target = args[i + 1]
+                    i += 2
+                    continue
+                if "%{http_code}" in arg:
+                    write_code = True
+                if arg.startswith("http://") or arg.startswith("https://"):
+                    url = arg
+                i += 1
+
+            parsed = urlparse(url)
+            path = parsed.path
+            log(f"URL={url} METHOD={method} DATA={data!r}")
+
+            if "/services/auth/login" in path:
+                out("<response><sessionKey>test-session</sessionKey></response>")
+
+            # Account creation handlers — accept any POST
+            if ("_account" in path or "_settings" in path) and method == "POST":
+                log(f"CONF_POST path={path} data={data!r}")
+                out("", 200)
+
+            out("", 200)
+            """,
+        )
+
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+        env["CURL_LOG"] = str(curl_log)
+        env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+        env["SPLUNK_PLATFORM"] = "enterprise"
+
+        return env, curl_log
+
+    def test_catalyst_configure_account_no_verify_ssl(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, curl_log = self._build_configure_account_env(tmp_path)
+            password_file = tmp_path / "device_password"
+
+            result = self.run_script(
+                "skills/cisco-catalyst-ta-setup/scripts/configure_account.sh",
+                "--type", "catalyst_center",
+                "--name", "TestDNAC",
+                "--host", "https://10.100.0.60",
+                "--username", "admin",
+                "--password-file", str(password_file),
+                "--no-verify-ssl",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("verify_ssl=False", result.stdout)
+            self.assertIn("ta_cisco_catalyst_settings", result.stdout)
+
+            log_text = curl_log.read_text(encoding="utf-8")
+            settings_posts = [
+                line for line in log_text.splitlines()
+                if "CONF_POST" in line and "ta_cisco_catalyst_settings" in line
+            ]
+            self.assertTrue(
+                len(settings_posts) > 0,
+                msg="Expected a POST to ta_cisco_catalyst_settings conf",
+            )
+            self.assertTrue(
+                any("verify_ssl" in line and "False" in line for line in settings_posts),
+                msg=f"Expected verify_ssl=False in settings POST, got: {settings_posts}",
+            )
+
+    def test_dc_networking_configure_account_no_verify_ssl(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, curl_log = self._build_configure_account_env(tmp_path)
+            password_file = tmp_path / "device_password"
+
+            result = self.run_script(
+                "skills/cisco-dc-networking-setup/scripts/configure_account.sh",
+                "--type", "aci",
+                "--name", "TestACI",
+                "--hostname", "10.0.0.1",
+                "--username", "admin",
+                "--password-file", str(password_file),
+                "--no-verify-ssl",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("verify_ssl=False", result.stdout)
+            self.assertIn("cisco_dc_networking_app_for_splunk_settings", result.stdout)
+
+            log_text = curl_log.read_text(encoding="utf-8")
+            settings_posts = [
+                line for line in log_text.splitlines()
+                if "CONF_POST" in line and "cisco_dc_networking_app_for_splunk_settings" in line
+            ]
+            self.assertTrue(
+                len(settings_posts) > 0,
+                msg="Expected a POST to cisco_dc_networking_app_for_splunk_settings conf",
+            )
+            self.assertTrue(
+                any("verify_ssl" in line and "False" in line for line in settings_posts),
+                msg=f"Expected verify_ssl=False in settings POST, got: {settings_posts}",
+            )
+
+    def test_catalyst_configure_account_without_ssl_flag_skips_setting(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, curl_log = self._build_configure_account_env(tmp_path)
+            password_file = tmp_path / "device_password"
+
+            result = self.run_script(
+                "skills/cisco-catalyst-ta-setup/scripts/configure_account.sh",
+                "--type", "catalyst_center",
+                "--name", "TestDNAC",
+                "--host", "https://10.100.0.60",
+                "--username", "admin",
+                "--password-file", str(password_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertNotIn("verify_ssl", result.stdout)
+
+            log_text = curl_log.read_text(encoding="utf-8")
+            settings_posts = [
+                line for line in log_text.splitlines()
+                if "CONF_POST" in line and "ta_cisco_catalyst_settings" in line
+            ]
+            self.assertEqual(
+                len(settings_posts), 0,
+                msg="Should not POST to settings conf when --no-verify-ssl is not passed",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

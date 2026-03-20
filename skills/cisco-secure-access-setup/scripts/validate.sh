@@ -96,10 +96,10 @@ try:
 except Exception:
     pass
 ")"
-        IFS='|' read -r found_org investigate_idx privateapp_idx appdiscovery_idx <<< "${payload_summary}"
-        [[ -n "${investigate_idx}" ]] && pass "Investigate index configured: ${investigate_idx}" || info "Investigate index not configured"
-        [[ -n "${privateapp_idx}" ]] && pass "Private Apps index configured: ${privateapp_idx}" || info "Private Apps index not configured"
-        [[ -n "${appdiscovery_idx}" ]] && pass "App Discovery index configured: ${appdiscovery_idx}" || info "App Discovery index not configured"
+        IFS='|' read -r _ investigate_idx privateapp_idx appdiscovery_idx <<< "${payload_summary}"
+        if [[ -n "${investigate_idx}" ]]; then pass "Investigate index configured: ${investigate_idx}"; else info "Investigate index not configured"; fi
+        if [[ -n "${privateapp_idx}" ]]; then pass "Private Apps index configured: ${privateapp_idx}"; else info "Private Apps index not configured"; fi
+        if [[ -n "${appdiscovery_idx}" ]]; then pass "App Discovery index configured: ${appdiscovery_idx}"; else info "App Discovery index not configured"; fi
     elif [[ "${http_code}" == "404" ]]; then
         fail "Org account '${ORG_ID}' not found"
     else
@@ -208,7 +208,7 @@ try:
 except Exception:
     pass
 ")"
-IFS='|' read -r cloudlock_name cloudlock_state cloudlock_url <<< "${cloudlock_status}"
+IFS='|' read -r cloudlock_name cloudlock_state _ <<< "${cloudlock_status}"
 if [[ -n "${cloudlock_name}" ]]; then
     pass "Cloudlock settings present: ${cloudlock_name}${cloudlock_state:+ (${cloudlock_state})}"
 else
