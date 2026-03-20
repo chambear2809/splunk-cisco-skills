@@ -1,68 +1,53 @@
 # Cisco Catalyst Add-on account intake template
 #
-# Copy this file to `template.local` in the same folder before entering real values.
-# Keep the completed file local only and never commit passwords, tokens, client
-# secrets, private keys, or certificates to git.
+# Copy this file to `template.local` in the same folder before entering real
+# values. Keep the completed file local only.
+#
+# Fill in non-secret values only. Do not store passwords, API tokens, client
+# certificates, or private keys in `template.local`.
+#
+# Current first-party automation uses only the core account fields below.
+# Proxy settings, pxGrid certificate auth, and custom CA uploads are not part of
+# the `configure_account.sh` workflow yet, so they are intentionally omitted here.
+#
+# Create secret temp files only when you are ready to run the configure script:
+# printf '%s\n' '<device_password>' > /tmp/catalyst_device_password && chmod 600 /tmp/catalyst_device_password
+# printf '%s\n' '<cybervision_api_token>' > /tmp/catalyst_cybervision_api_token && chmod 600 /tmp/catalyst_cybervision_api_token
+#
+# Then pass:
+#   --password-file /tmp/catalyst_device_password
+#   --api-token-file /tmp/catalyst_cybervision_api_token
 #
 # Fill in only the sections you plan to configure. Duplicate a section when you
 # need more than one account of the same type.
 #
 # `stanza_name` is the account name that will appear in Splunk.
+# `use_ca_cert=true` means trust the server certificate with the local/system
+# trust store. The current setup script does not upload a custom CA bundle.
 
 # Catalyst Center / DNAC account
 [catalyst_center_account]
-stanza_name =
-cisco_dna_center_host = https://
+stanza_name = DNAC_PROD
+host = https://dnac.example.local
 username =
-password =
 use_ca_cert = false
-custom_certificate =
 
 # Cisco ISE account
 [ise_account]
-stanza_name =
-hostname = https://
+stanza_name = ISE_PROD
+host = https://ise.example.local
 username =
-password =
 use_ca_cert = false
-custom_certificate =
-enable_proxy = false
-proxy_type = http
-proxy_url =
-proxy_port =
-proxy_username =
-proxy_password =
-pxgrid_host =
-pxgrid_client_username =
-pxgrid_cert_auth = false
-client_cert =
-client_key =
 
 # Cisco SD-WAN account
 [sdwan_account]
-stanza_name =
-hostname = https://
+stanza_name = SDWAN_PROD
+host = https://vmanage.example.local
 username =
-password =
 use_ca_cert = false
-custom_certificate =
-enable_proxy = false
-proxy_type = http
-proxy_url =
-proxy_port =
-proxy_username =
-proxy_password =
 
 # Cisco Cyber Vision account
 [cyber_vision_account]
-stanza_name =
-ip_address = https://
-api_token =
+stanza_name = CYBERVISION_PROD
+host = https://cybervision.example.local
 use_ca_cert = false
-custom_certificate =
-enable_proxy = false
-proxy_type = http
-proxy_url =
-proxy_port =
-proxy_username =
-proxy_password =

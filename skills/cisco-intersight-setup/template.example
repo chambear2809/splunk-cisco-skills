@@ -1,7 +1,16 @@
 # Cisco Intersight account intake template
 #
-# Copy this file to `template.local` in the same folder before entering real values.
-# Keep the completed file local only and never commit client secrets to git.
+# Copy this file to `template.local` in the same folder before entering real
+# values. Keep the completed file local only.
+#
+# Fill in non-secret values only. Do not store the OAuth client secret in
+# `template.local`.
+#
+# Create the secret temp file only when you are ready to run the configure script:
+# printf '%s\n' '<intersight_client_secret>' > /tmp/intersight_client_secret && chmod 600 /tmp/intersight_client_secret
+#
+# Then pass:
+#   --client-secret-file /tmp/intersight_client_secret
 #
 # Duplicate the section when you need more than one account.
 #
@@ -10,8 +19,8 @@
 # intentionally omitted because the add-on fills them in after authentication.
 
 [intersight_account]
-stanza_name =
+stanza_name = INTERSIGHT_PROD
 intersight_hostname = intersight.com
 client_id =
-client_secret =
+# Set to 1 if you want the setup flow to enable the default input set.
 create_default_inputs = 1

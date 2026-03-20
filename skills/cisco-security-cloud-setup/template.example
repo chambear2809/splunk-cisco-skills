@@ -1,47 +1,289 @@
-# Cisco Security Cloud input intake template
+# Cisco Security Cloud product intake template
 #
 # Copy to template.local and fill in non-secret values only.
 # Keep the completed file local. Put secrets in temporary files when running
 # configure_product.sh with --secret-file.
+#
+# This file is a worksheet, not something the scripts source directly.
+# Uncomment or copy the product block you need below. Keys mirror the
+# configure_product.sh --set names, uppercased for readability. Values in
+# <angle brackets> are placeholders to replace locally.
+# Write any needed secret file with one of these patterns:
+# printf '%s\n' '<single_line_secret>' > /tmp/secret_name && chmod 600 /tmp/secret_name
+# umask 077 && cat > /tmp/secret_name <<'EOF'
+# <multi_line_secret_or_json>
+# EOF
+#
+# Then pass the file with:
+#   --secret-file FIELD /tmp/secret_name
 
 APP_NAME=CiscoSecurityCloud
 APP_ID=7404
 
-# Pick one product key from products.json / configure_product.sh --list-products
-PRODUCT=xdr
-INPUT_NAME=XDR_Default
+# Example:
+# printf '%s\n' '<refresh_token>' > /tmp/cisco_security_cloud_xdr_refresh_token && chmod 600 /tmp/cisco_security_cloud_xdr_refresh_token
 
-# Common fields
-INDEX=
-INTERVAL=
-SOURCETYPE=
+# -----------------------------------------------------------------------------
+# Cisco Duo
+# -----------------------------------------------------------------------------
+# PRODUCT=duo
+# INPUT_NAME=Duo_Default
+# INDEX=cisco_duo
+# INTERVAL=120
+# SOURCETYPE=cisco:duo
+# API_HOST=api-123456.duosecurity.com
+# Secret files if needed:
+# --secret-file ikey /tmp/cisco_security_cloud_duo_ikey
+# --secret-file skey /tmp/cisco_security_cloud_duo_skey
+# --secret-file proxy_password /tmp/cisco_security_cloud_duo_proxy_password
 
-# Product-specific examples
-REGION=
-AUTH_METHOD=
-CLIENT_ID=
-API_HOST=
-USERNAME=
-FMC_HOST=
-FMC_PORT=
-EVENT_TYPES=
-GROUPS=
-TYPE=
-PORT=
-IP_ADDRESS=
-DOMAIN_ID=
-SE_IMPORT_TIME_RANGE=
-XDR_IMPORT_TIME_RANGE=
-ETD_REGION=
-ETD_IMPORT_TIME_RANGE=
-AFTER=
-INTEGRATION_METHOD=
-HEC_URL=
-CII_API_URL=
-CII_TOKEN_URL=
-CII_AUDIENCE=
-S3_BUCKET_URL=
-S3_BUCKET_REGION=
+# -----------------------------------------------------------------------------
+# Cisco Secure Malware Analytics
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_malware_analytics
+# INPUT_NAME=SMA_Default
+# INDEX=cisco_sma
+# INTERVAL=300
+# SOURCETYPE=cisco:sma:submissions
+# API_HOST=panacea.threatgrid.com
+# AFTER=2024-01-01T00:00:00Z
+# Secret files if needed:
+# --secret-file api_key /tmp/cisco_security_cloud_sma_api_key
+# --secret-file proxy_password /tmp/cisco_security_cloud_sma_proxy_password
 
-# Example secret temp files to create yourself:
-# echo "secret" > /tmp/cisco_security_cloud_secret && chmod 600 /tmp/cisco_security_cloud_secret
+# -----------------------------------------------------------------------------
+# Cisco XDR
+# -----------------------------------------------------------------------------
+# PRODUCT=xdr
+# INPUT_NAME=XDR_Default
+# INDEX=cisco_xdr
+# INTERVAL=300
+# SOURCETYPE=cisco:xdr:incidents
+# REGION=us
+# AUTH_METHOD=client_id
+# CLIENT_ID=example-client-id
+# XDR_IMPORT_TIME_RANGE=7 days ago
+# Secret files if needed:
+# --secret-file refresh_token /tmp/cisco_security_cloud_xdr_refresh_token
+# --secret-file access_token /tmp/cisco_security_cloud_xdr_access_token
+# --secret-file password /tmp/cisco_security_cloud_xdr_password
+
+# -----------------------------------------------------------------------------
+# Cisco Secure Firewall Syslog
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_firewall_syslog
+# INPUT_NAME=SecureFirewall_Syslog_Default
+# INDEX=cisco_sfw_ftd_syslog
+# INTERVAL=600
+# TYPE=udp
+# PORT=514
+# SOURCETYPE=<set_for_your_ftd_syslog_feed>
+# EVENT_TYPES=<comma-separated_event_groups>
+# Secret files: none
+
+# -----------------------------------------------------------------------------
+# Cisco Secure Firewall ASA Syslog
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_firewall_asa_syslog
+# INPUT_NAME=SecureFirewall_ASA_Syslog_Default
+# INDEX=cisco_sfw_ftd_syslog
+# INTERVAL=600
+# TYPE=udp
+# PORT=514
+# SOURCETYPE=<set_for_your_asa_syslog_feed>
+# EVENT_TYPES=<comma-separated_event_groups>
+# Secret files: none
+
+# -----------------------------------------------------------------------------
+# Cisco Secure Firewall eStreamer
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_firewall_estreamer
+# INPUT_NAME=SecureFirewall_eStreamer_Default
+# INDEX=cisco_secure_fw
+# INTERVAL=600
+# SOURCETYPE=cisco:sfw:estreamer
+# FMC_HOST=fmc.example.local
+# FMC_PORT=8302
+# ESTREAMER_IMPORT_TIME_RANGE=7 days ago
+# EVENT_TYPES=<comma-separated_event_groups>
+# Secret files if needed:
+# --secret-file pkcs_certificate /tmp/cisco_security_cloud_estreamer_pkcs_certificate
+# --secret-file password /tmp/cisco_security_cloud_estreamer_password
+
+# -----------------------------------------------------------------------------
+# Cisco Multicloud Defense
+# -----------------------------------------------------------------------------
+# PRODUCT=multicloud_defense
+# INPUT_NAME=MulticloudDefense_Default
+# INDEX=cisco_multicloud_defense
+# INTERVAL=300
+# SOURCETYPE=cisco:multicloud:defense
+# PORT=8088
+# Secret files: none
+
+# -----------------------------------------------------------------------------
+# Cisco Secure Firewall API
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_firewall_api
+# INPUT_NAME=SecureFirewall_API_Default
+# INDEX=cisco_sfw_api
+# INTERVAL=300
+# SOURCETYPE=cisco:sfw:policy
+# FMC_HOST=fmc.example.local
+# USERNAME=splunk_api_user
+# Secret files if needed:
+# --secret-file password /tmp/cisco_security_cloud_sfw_api_password
+
+# -----------------------------------------------------------------------------
+# Cisco Email Threat Defense
+# -----------------------------------------------------------------------------
+# PRODUCT=email_threat_defense
+# INPUT_NAME=ETD_Default
+# INDEX=cisco_etd
+# INTERVAL=3600
+# SOURCETYPE=cisco:etd
+# CLIENT_ID=example-client-id
+# ETD_REGION=us
+# ETD_IMPORT_TIME_RANGE=7 days ago
+# Secret files if needed:
+# --secret-file etd_api_key /tmp/cisco_security_cloud_etd_api_key
+# --secret-file client_secret /tmp/cisco_security_cloud_etd_client_secret
+# --secret-file proxy_password /tmp/cisco_security_cloud_etd_proxy_password
+
+# -----------------------------------------------------------------------------
+# Cisco Secure Network Analytics
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_network_analytics
+# INPUT_NAME=SNA_Default
+# INDEX=cisco_sna
+# INTERVAL=300
+# SOURCETYPE=cisco:sna
+# IP_ADDRESS=10.0.0.20
+# DOMAIN_ID=12345
+# USERNAME=splunk-api-user
+# Secret files if needed:
+# --secret-file password /tmp/cisco_security_cloud_sna_password
+
+# -----------------------------------------------------------------------------
+# Cisco Secure Endpoint
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_endpoint
+# INPUT_NAME=SecureEndpoint_Default
+# INDEX=cisco_se
+# INTERVAL=300
+# SOURCETYPE=cisco:se
+# API_HOST=api.amp.cisco.com
+# CLIENT_ID=example-client-id
+# SE_IMPORT_TIME_RANGE=7 days ago
+# EVENT_TYPES=event,group
+# GROUPS=group-guid
+# Secret files if needed:
+# --secret-file api_key /tmp/cisco_security_cloud_se_api_key
+
+# -----------------------------------------------------------------------------
+# Cisco Vulnerability Intelligence
+# -----------------------------------------------------------------------------
+# PRODUCT=vulnerability_intelligence
+# INPUT_NAME=CVI_Default
+# INDEX=cisco_cvi
+# INTERVAL=86400
+# SOURCETYPE=cisco:cvi
+# API_HOST=<cvi_api_host>
+# Secret files if needed:
+# --secret-file api_key /tmp/cisco_security_cloud_cvi_api_key
+
+# -----------------------------------------------------------------------------
+# Cisco Identity Intelligence Webhook
+# -----------------------------------------------------------------------------
+# PRODUCT=cii_webhook
+# INPUT_NAME=CII_Webhook_Default
+# INDEX=cisco_cii
+# INTERVAL=300
+# SOURCETYPE=cisco:cii
+# CII_CLIENT_ID=example-cii-client-id
+# CII_API_URL=https://<cii_api_host>
+# CII_TOKEN_URL=https://<cii_token_host>/oauth/token
+# CII_AUDIENCE=<cii_audience>
+# INTEGRATION_METHOD=<choose_supported_integration_method>
+# HEC_URL=https://http-inputs-<stack>.splunkcloud.com/services/collector
+# Secret files if needed:
+# --secret-file cii_json_text /tmp/cisco_security_cloud_cii_json_text
+# --secret-file cii_client_secret /tmp/cisco_security_cloud_cii_client_secret
+# --secret-file aws_access_secret /tmp/cisco_security_cloud_cii_aws_access_secret
+# --secret-file cii_external_id /tmp/cisco_security_cloud_cii_external_id
+
+# -----------------------------------------------------------------------------
+# Cisco Identity Intelligence AWS S3
+# -----------------------------------------------------------------------------
+# PRODUCT=cii_aws_s3
+# INPUT_NAME=CII_S3_Default
+# INDEX=cisco_cii
+# INTERVAL=300
+# SOURCETYPE=cisco:cii
+# CII_CLIENT_ID=example-cii-client-id
+# CII_API_URL=https://<cii_api_host>
+# CII_TOKEN_URL=https://<cii_token_host>/oauth/token
+# CII_AUDIENCE=<cii_audience>
+# INTEGRATION_METHOD=<choose_supported_integration_method>
+# S3_BUCKET_URL=s3://example-cii-bucket/path
+# S3_BUCKET_REGION=us-east-1
+# Secret files if needed:
+# --secret-file cii_json_text /tmp/cisco_security_cloud_cii_s3_json_text
+# --secret-file cii_client_secret /tmp/cisco_security_cloud_cii_s3_client_secret
+# --secret-file aws_access_secret /tmp/cisco_security_cloud_cii_s3_aws_access_secret
+# --secret-file cii_external_id /tmp/cisco_security_cloud_cii_s3_external_id
+
+# -----------------------------------------------------------------------------
+# Cisco AI Defense
+# -----------------------------------------------------------------------------
+# PRODUCT=ai_defense
+# INPUT_NAME=AIDefense_Default
+# INDEX=cisco_ai_defense
+# INTERVAL=300
+# SOURCETYPE=cisco:ai:defense
+# PORT=8088
+# Secret files: none
+
+# -----------------------------------------------------------------------------
+# Isovalent Runtime Security
+# -----------------------------------------------------------------------------
+# PRODUCT=isovalent
+# INPUT_NAME=Isovalent_Default
+# INDEX=cisco_isovalent
+# INTERVAL=300
+# SOURCETYPE=<set_for_your_isovalent_feed>
+# PORT=8088
+# Secret files: none
+
+# -----------------------------------------------------------------------------
+# Isovalent Edge Processor Runtime Security
+# -----------------------------------------------------------------------------
+# PRODUCT=isovalent_edge_processor
+# INPUT_NAME=IsovalentEdgeProcessor_Default
+# INDEX=cisco_isovalent
+# INTERVAL=300
+# SOURCETYPE=<set_for_your_isovalent_edge_processor_feed>
+# PORT=8088
+# Secret files: none
+
+# -----------------------------------------------------------------------------
+# Cisco Secure Client NVM
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_client_nvm
+# INPUT_NAME=NVM_Default
+# INDEX=main
+# INTERVAL=300
+# SOURCETYPE=cisco:nvm:*
+# Secret files: none
+
+# -----------------------------------------------------------------------------
+# Cisco Secure Workload
+# -----------------------------------------------------------------------------
+# PRODUCT=secure_workload
+# INPUT_NAME=SecureWorkload_Default
+# INDEX=cisco_secure_workload
+# INTERVAL=60
+# SOURCETYPE=cisco:secure:workload
+# TYPE=<choose_supported_input_type>
+# PORT=<listener_or_feed_port>
+# Secret files: none

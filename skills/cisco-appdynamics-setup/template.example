@@ -1,30 +1,45 @@
 # Cisco AppDynamics account intake template
 #
-# Copy this file to `template.local` in the same folder before entering real values.
-# Keep the completed file local only and never commit client secrets or analytics
-# secrets to git.
+# Copy this file to `template.local` in the same folder before entering real
+# values. Keep the completed file local only.
+#
+# Fill in non-secret values only. Do not store controller or analytics secrets in
+# `template.local`.
+#
+# Create secret temp files only when you are ready to run the configure scripts:
+# printf '%s\n' '<controller_client_secret>' > /tmp/appd_client_secret && chmod 600 /tmp/appd_client_secret
+# printf '%s\n' '<analytics_secret>' > /tmp/appd_analytics_secret && chmod 600 /tmp/appd_analytics_secret
+#
+# Then pass:
+#   --client-secret-file /tmp/appd_client_secret
+#   --analytics-secret-file /tmp/appd_analytics_secret
 #
 # Fill in only the sections you plan to configure. Duplicate a section when you
 # need more than one account of the same type.
 #
-# `stanza_name` is the account name that will appear in Splunk.
+# `stanza_name` is the connection name that will appear in Splunk.
 
-# Controller account
+# Controller connection
 [controller_account]
-stanza_name =
-appd_controller_url =
-appd_client_name =
-appd_client_secret =
+stanza_name = PROD
+appd_controller_url = https://example.saas.appdynamics.com
+appd_client_name = splunk-integration
 authentication = oauth
+create_inputs = recommended
+index = appdynamics
 
-# Analytics account
+# Analytics connection
 [analytics_account]
-stanza_name =
-appd_analytics_account_name =
-# Use `None` here for on-prem analytics and fill `appd_onprem_analytics_url`.
+stanza_name = PROD_ANALYTICS
+appd_analytics_account_name = customer1_abcdef
+# Use the default SaaS endpoint below, or set this field to None and fill in
+# appd_onprem_analytics_url for an on-prem analytics cluster.
 appd_analytics_endpoint = https://analytics.api.appdynamics.com
 appd_onprem_analytics_url =
-appd_analytics_secret =
+# Optional if you want configure_analytics.sh to create an input immediately.
+query =
+index = appdynamics
+source_name = appdynamics_analytics
 
 # Supported SaaS analytics endpoints include:
 # - https://analytics.api.appdynamics.com

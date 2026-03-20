@@ -1,8 +1,21 @@
 # Cisco DC Networking account intake template
 #
-# Copy this file to `template.local` in the same folder before entering real values.
-# Keep the completed file local only and never commit passwords, certificates, or
-# proxy secrets to git.
+# Copy this file to `template.local` in the same folder before entering real
+# values. Keep the completed file local only.
+#
+# Fill in non-secret values only. Do not store passwords or certificate material
+# in `template.local`.
+#
+# Current first-party automation covers the core account fields below. Advanced
+# certificate-path fields and detailed proxy settings are intentionally omitted
+# because `configure_account.sh` does not prompt for them today.
+#
+# Create secret temp files only when you are ready to run the configure script:
+# printf '%s\n' '<aci_or_apic_password>' > /tmp/dc_aci_password && chmod 600 /tmp/dc_aci_password
+# printf '%s\n' '<nexus_dashboard_password>' > /tmp/dc_nd_password && chmod 600 /tmp/dc_nd_password
+# printf '%s\n' '<nexus9k_password>' > /tmp/dc_nexus9k_password && chmod 600 /tmp/dc_nexus9k_password
+#
+# Then pass the matching file with `--password-file`.
 #
 # Fill in only the sections you plan to configure. Duplicate a section when you
 # need more than one account of the same type.
@@ -11,38 +24,28 @@
 
 # Cisco ACI / APIC account
 [aci_account]
-stanza_name =
-apic_hostname =
-apic_port = 443
-apic_authentication_type = password_authentication
-apic_login_domain =
-apic_username =
-apic_password =
-apic_certificate_name =
-apic_certificate_path =
-apic_proxy_enabled = 0
-apic_proxy_type = http
-apic_proxy_url =
-apic_proxy_port =
-apic_proxy_username =
-apic_proxy_password =
+stanza_name = ACI_PROD
+hostname = apic1.example.local,apic2.example.local
+port = 443
+auth_type = password_authentication
+login_domain =
+username =
+proxy_enabled = 0
 
 # Cisco Nexus Dashboard account
 [nexus_dashboard_account]
-stanza_name =
-nd_hostname =
-nd_port = 443
-nd_authentication_type = password_authentication
-nd_username =
-nd_password =
-nd_login_domain =
-nd_enable_proxy = 0
+stanza_name = NEXUS_DASHBOARD_PROD
+hostname = nd.example.local
+port = 443
+auth_type = password_authentication
+login_domain =
+username =
+proxy_enabled = 0
 
 # Cisco Nexus 9K account
 [nexus_9k_account]
-stanza_name =
-nexus_9k_device_ip =
-nexus_9k_port = 443
-nexus_9k_username =
-nexus_9k_password =
-nexus_9k_enable_proxy = 0
+stanza_name = NEXUS9K_PROD
+device_ip = 10.0.0.50
+port = 443
+username =
+proxy_enabled = 0
