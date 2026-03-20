@@ -62,11 +62,11 @@ Most skills follow the same layout, even if some omit optional files:
 
 ### Skill Roles
 
-The current skills fall into three architectural roles:
+The current skills fall into four architectural roles:
 
 - **Collector/setup skills** — install apps, create indexes, configure accounts,
-  and enable inputs. Examples: Catalyst, DC Networking, Intersight, Meraki,
-  Security Cloud, Secure Access, and ThousandEyes.
+  and enable inputs. Examples: AppDynamics, Catalyst, DC Networking,
+  Intersight, Meraki, Security Cloud, Secure Access, and ThousandEyes.
 - **Parser/mapping skills** — install supporting add-ons that contribute field
   mappings or search-time parsing context but rely on a separate ingestion path.
   Example: `cisco-catalyst-enhanced-netflow-setup`.
@@ -343,17 +343,22 @@ flowchart TB
 
 ## Data Flow by TA Type
 
-### Polling TAs (Catalyst, Meraki, Intersight, DC Networking)
+### Polling And App-Managed API TAs (AppDynamics, Catalyst, Meraki, Intersight, DC Networking)
 
 ```mermaid
 flowchart LR
-  VendorAPI["Vendor API\n(Catalyst Center, Meraki Dashboard,\nIntersight, DCNM/NDFC)"]
-  SplunkInput["Splunk Modular Input\n(runs on search tier or HF)"]
+  VendorAPI["Vendor API / SaaS\n(AppDynamics, Catalyst Center, Meraki Dashboard,\nIntersight, DCNM/NDFC)"]
+  SplunkInput["Splunk Modular Input or\napp-managed collector\n(runs on search tier or HF)"]
   Index[Splunk Index]
 
   VendorAPI -->|"API poll"| SplunkInput
   SplunkInput -->|"index locally or\nforward via S2S"| Index
 ```
+
+`cisco-security-cloud-setup` and `cisco-secure-access-setup` fit the same
+collector/setup role, but they lean more heavily on app-specific REST handlers,
+product wrappers, and packaged defaults than the simplified modular-input flow
+shown above.
 
 ### HEC Push TAs (ThousandEyes)
 

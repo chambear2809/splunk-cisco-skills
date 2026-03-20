@@ -57,6 +57,7 @@ skill-specific details.
 |-------|--------|--------------|
 | `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision inputs |
 | `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards |
+| `cisco-appdynamics-setup` | `Splunk_TA_AppDynamics` | Configure AppDynamics controller and analytics connections, inputs, and dashboards |
 | `cisco-security-cloud-setup` | `CiscoSecurityCloud` | Install and configure product-specific Cisco Security Cloud inputs with dashboard-ready defaults |
 | `cisco-secure-access-setup` | `cisco-cloud-security` | Install and configure Secure Access org accounts, app settings, and dashboard prerequisites |
 | `cisco-dc-networking-setup` | `cisco_dc_networking_app_for_splunk` | Configure ACI, Nexus Dashboard, and Nexus 9K data collection |
@@ -79,10 +80,11 @@ not as the only cloud deployment source.
   Splunkbase installs and let ACS fetch the latest compatible release. Use
   private package uploads only for genuinely private or pre-vetted apps that do
   not have a public Splunkbase install path.
-- **Known Cisco cloud installs**: the cloud installer now prefers ACS
-  Splunkbase installs for the Cisco Catalyst, Cisco DC Networking, Cisco
-  Enterprise Networking, Cisco Intersight, and Cisco Meraki packages shipped in
-  this repo.
+- **Registry-backed cloud installs**: when a local package matches an entry in
+  `skills/shared/app_registry.json`, the cloud installer prefers ACS
+  Splunkbase installs, applies any required license acknowledgement, resolves
+  declared companion-package dependencies, and verifies that the deployed app
+  identity matches the expected package.
 - **No extract/repack required**: unpacked app trees are not part of the normal
   deployment workflow.
 - **Review-only unpacked copies**: anything under `splunk-ta/_unpacked/` is for
@@ -450,15 +452,18 @@ splunk-cloud-skills/
 │   │       ├── cloud_batch_install.sh
 │   │       └── cloud_batch_uninstall.sh
 │   ├── splunk-app-install/
+│   ├── splunk-itsi-setup/
+│   ├── splunk-stream-setup/
+│   ├── cisco-appdynamics-setup/
 │   ├── cisco-catalyst-ta-setup/
 │   ├── cisco-catalyst-enhanced-netflow-setup/
-│   ├── cisco-security-cloud-setup/
-│   ├── cisco-secure-access-setup/
 │   ├── cisco-dc-networking-setup/
+│   ├── cisco-enterprise-networking-setup/
 │   ├── cisco-intersight-setup/
 │   ├── cisco-meraki-ta-setup/
-│   ├── cisco-enterprise-networking-setup/
-│   └── splunk-stream-setup/
+│   ├── cisco-secure-access-setup/
+│   ├── cisco-security-cloud-setup/
+│   └── cisco-thousandeyes-setup/
 ├── tests/                       # bats and Python test suites
 ├── plans/                       # design notes and implementation plans
 └── rules/
