@@ -57,7 +57,7 @@ append_kv() {
     local key="$1" value="$2" i
     for i in "${!USER_KEYS[@]}"; do
         if [[ "${USER_KEYS[$i]}" == "${key}" ]]; then
-            USER_VALUES[$i]="${value}"
+            USER_VALUES[i]="${value}"
             return 0
         fi
     done
@@ -69,7 +69,7 @@ append_secret() {
     local key="$1" path="$2" i
     for i in "${!USER_SECRET_KEYS[@]}"; do
         if [[ "${USER_SECRET_KEYS[$i]}" == "${key}" ]]; then
-            USER_SECRET_PATHS[$i]="${path}"
+            USER_SECRET_PATHS[i]="${path}"
             return 0
         fi
     done

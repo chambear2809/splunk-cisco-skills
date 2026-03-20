@@ -161,3 +161,25 @@ setup() {
     rm -f "$tmpfile"
     [ "$status" -ne 0 ]
 }
+
+# --- rest_set_verify_ssl ---
+
+@test "rest_set_verify_ssl calls rest_set_conf with correct arguments" {
+    source "${LIB_DIR}/rest_helpers.sh"
+
+    rest_set_conf() {
+        echo "$*" > "${BATS_TMPDIR}/set_conf_args_${BASHPID}"
+    }
+    export -f rest_set_conf
+
+    run rest_set_verify_ssl "sk" "https://uri" "MyApp" "my_settings" "default" "verify_ssl" "False"
+    [ "$status" -eq 0 ]
+    local captured
+    captured=$(cat "${BATS_TMPDIR}"/set_conf_args_* 2>/dev/null)
+    rm -f "${BATS_TMPDIR}"/set_conf_args_*
+    [[ "$captured" == *"MyApp"* ]]
+    [[ "$captured" == *"my_settings"* ]]
+    [[ "$captured" == *"default"* ]]
+    [[ "$captured" == *"verify_ssl"* ]]
+    [[ "$captured" == *"False"* ]]
+}

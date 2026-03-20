@@ -438,6 +438,13 @@ rest_set_conf() {
     esac
 }
 
+rest_set_verify_ssl() {
+    local sk="$1" uri="$2" app="$3" conf="$4" stanza="$5" field="${6:-verify_ssl}" value="$7"
+    local body
+    body=$(form_urlencode_pairs "${field}" "${value}") || return 1
+    rest_set_conf "${sk}" "${uri}" "${app}" "${conf}" "${stanza}" "${body}"
+}
+
 rest_check_conf() {
     local sk="$1" uri="$2" app="$3" conf="$4" stanza="$5"
     local encoded_stanza http_code

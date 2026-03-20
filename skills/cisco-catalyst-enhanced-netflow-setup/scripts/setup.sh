@@ -83,6 +83,7 @@ for raw_dir in sys.argv[2:]:
 
 resolve_latest_version() {
     _set_splunkbase_curl_tls_args || return 0
+    # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
     curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
         "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
         | python3 -c "
@@ -152,9 +153,9 @@ report_stream_receiver_context() {
             nf_port=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "${STREAM_FWD_APP}" "streamfwd" "streamfwd" "netflowReceiver.0.port" 2>/dev/null || true)
             nf_decoder=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "${STREAM_FWD_APP}" "streamfwd" "streamfwd" "netflowReceiver.0.decoder" 2>/dev/null || true)
 
-            [[ -n "${nf_ip}" ]] && log "  NetFlow receiver IP: ${nf_ip}" || log "  WARNING: No netflowReceiver.0.ip configured"
-            [[ -n "${nf_port}" ]] && log "  NetFlow receiver port: ${nf_port}" || log "  WARNING: No netflowReceiver.0.port configured"
-            [[ -n "${nf_decoder}" ]] && log "  NetFlow decoder: ${nf_decoder}" || log "  WARNING: No netflowReceiver.0.decoder configured"
+            if [[ -n "${nf_ip}" ]]; then log "  NetFlow receiver IP: ${nf_ip}"; else log "  WARNING: No netflowReceiver.0.ip configured"; fi
+            if [[ -n "${nf_port}" ]]; then log "  NetFlow receiver port: ${nf_port}"; else log "  WARNING: No netflowReceiver.0.port configured"; fi
+            if [[ -n "${nf_decoder}" ]]; then log "  NetFlow decoder: ${nf_decoder}"; else log "  WARNING: No netflowReceiver.0.decoder configured"; fi
         else
             log "  WARNING: ${STREAM_FWD_APP} is installed but streamfwd.conf is not configured."
             log "  Use the splunk-stream-setup skill if this host should receive NetFlow/IPFIX."
@@ -166,17 +167,23 @@ report_stream_receiver_context() {
 }
 
 report_related_apps() {
-    rest_check_app "$SK" "$SPLUNK_URI" "${STREAM_SEARCH_APP}" 2>/dev/null \
-        && log "Detected ${STREAM_SEARCH_APP} on this target." \
-        || log "INFO: ${STREAM_SEARCH_APP} not present on this target (normal on dedicated forwarders)."
+    if rest_check_app "$SK" "$SPLUNK_URI" "${STREAM_SEARCH_APP}" 2>/dev/null; then
+        log "Detected ${STREAM_SEARCH_APP} on this target."
+    else
+        log "INFO: ${STREAM_SEARCH_APP} not present on this target (normal on dedicated forwarders)."
+    fi
 
-    rest_check_app "$SK" "$SPLUNK_URI" "${CATALYST_TA_APP}" 2>/dev/null \
-        && log "Detected ${CATALYST_TA_APP} on this target." \
-        || log "INFO: ${CATALYST_TA_APP} not present on this target."
+    if rest_check_app "$SK" "$SPLUNK_URI" "${CATALYST_TA_APP}" 2>/dev/null; then
+        log "Detected ${CATALYST_TA_APP} on this target."
+    else
+        log "INFO: ${CATALYST_TA_APP} not present on this target."
+    fi
 
-    rest_check_app "$SK" "$SPLUNK_URI" "${ENTERPRISE_APP}" 2>/dev/null \
-        && log "Detected ${ENTERPRISE_APP} on this target." \
-        || log "INFO: ${ENTERPRISE_APP} not present on this target."
+    if rest_check_app "$SK" "$SPLUNK_URI" "${ENTERPRISE_APP}" 2>/dev/null; then
+        log "Detected ${ENTERPRISE_APP} on this target."
+    else
+        log "INFO: ${ENTERPRISE_APP} not present on this target."
+    fi
 }
 
 main() {

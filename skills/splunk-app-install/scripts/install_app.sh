@@ -60,7 +60,7 @@ safe_read() {
         exit 1
     fi
     shift
-    read "$@"
+    read -r "$@"
 }
 
 cloud_known_splunkbase_metadata_from_package() {

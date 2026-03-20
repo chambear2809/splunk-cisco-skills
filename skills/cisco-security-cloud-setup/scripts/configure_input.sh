@@ -50,7 +50,7 @@ append_param() {
     local key="$1" value="$2" i
     for i in "${!PARAM_KEYS[@]}"; do
         if [[ "${PARAM_KEYS[$i]}" == "${key}" ]]; then
-            PARAM_VALUES[$i]="${value}"
+            PARAM_VALUES[i]="${value}"
             return 0
         fi
     done

@@ -16,6 +16,7 @@ PASSWORD=""
 DEVICE_IP=""
 LOGIN_DOMAIN=""
 PROXY_ENABLED="0"
+SET_VERIFY_SSL=""
 
 usage() {
     cat <<EOF
@@ -42,6 +43,8 @@ Nexus 9K specific:
 
 Common:
   --proxy-enabled    Enable proxy (default: disabled)
+  --no-verify-ssl    Disable SSL certificate verification for TA API calls
+  --verify-ssl       Re-enable SSL certificate verification for TA API calls
   --help             Show this help
 
 Note: Use --password-file to avoid passing the password on the command line.
@@ -62,6 +65,8 @@ while [[ $# -gt 0 ]]; do
         --device-ip) require_arg "$1" $# || exit 1; DEVICE_IP="$2"; shift 2 ;;
         --login-domain) require_arg "$1" $# || exit 1; LOGIN_DOMAIN="$2"; shift 2 ;;
         --proxy-enabled) PROXY_ENABLED="1"; shift ;;
+        --no-verify-ssl) SET_VERIFY_SSL="False"; shift ;;
+        --verify-ssl) SET_VERIFY_SSL="True"; shift ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -181,6 +186,16 @@ case "${ACCT_TYPE}" in
     nexus9k) configure_nexus9k_account ;;
     *) log "ERROR: Unknown account type '${ACCT_TYPE}'. Use: aci, nd, nexus9k"; exit 1 ;;
 esac
+
+if [[ -n "${SET_VERIFY_SSL}" ]]; then
+    if rest_set_verify_ssl "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
+        "cisco_dc_networking_app_for_splunk_settings" "additional_parameters" "verify_ssl" "${SET_VERIFY_SSL}"; then
+        log "Set verify_ssl=${SET_VERIFY_SSL} in cisco_dc_networking_app_for_splunk_settings.conf."
+    else
+        log "ERROR: Failed to set verify_ssl in cisco_dc_networking_app_for_splunk_settings.conf."
+        exit 1
+    fi
+fi
 
 log "Account configuration complete."
 log "$(log_platform_restart_guidance "account changes")"
