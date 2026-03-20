@@ -79,6 +79,7 @@ skill-specific details.
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
+| `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
 
 ## Vendor Package Policy
 
@@ -290,6 +291,10 @@ Configure the Cisco Intersight TA for my account
 Install and configure Splunk Stream
 ```
 
+```text
+Prepare Splunk Connect for Syslog and render a Docker deployment
+```
+
 The agent is expected to ask only for **non-secret** values in conversation,
 such as:
 
@@ -463,6 +468,7 @@ splunk-cloud-skills/
 │   │       ├── cloud_batch_install.sh
 │   │       └── cloud_batch_uninstall.sh
 │   ├── splunk-app-install/
+│   ├── splunk-connect-for-syslog-setup/
 │   ├── splunk-itsi-setup/
 │   ├── splunk-stream-setup/
 │   ├── cisco-appdynamics-setup/
@@ -524,4 +530,7 @@ search tiers with ACS plus allowlisted REST API access**.
 The biggest Cloud-specific limitation is hybrid collection architectures. For
 example, Splunk Stream on Splunk Cloud uses a cloud-hosted `splunk_app_stream`
 plus forwarders you control; this repo therefore treats Stream as a special
-case rather than a pure single-target install.
+case rather than a pure single-target install. `splunk-connect-for-syslog-setup`
+follows a similar principle for SC4S: the repo prepares Splunk and renders the
+collector runtime assets, but the SC4S syslog-ng container itself runs on
+customer-managed infrastructure rather than on the Cloud search tier.

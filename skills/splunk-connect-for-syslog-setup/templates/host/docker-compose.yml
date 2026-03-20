@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  sc4s:
+    image: {{SC4S_IMAGE}}
+    container_name: SC4S
+    restart: unless-stopped
+    ports:
+{{PORTS_BLOCK}}
+    env_file:
+      - ./env_file
+    volumes:
+      - ./local:/etc/syslog-ng/conf.d/local:z
+      - {{SC4S_PERSIST_VOLUME}}:/var/lib/syslog-ng
+{{ARCHIVE_VOLUME_BLOCK}}{{TLS_VOLUME_BLOCK}}
+volumes:
+  {{SC4S_PERSIST_VOLUME}}:

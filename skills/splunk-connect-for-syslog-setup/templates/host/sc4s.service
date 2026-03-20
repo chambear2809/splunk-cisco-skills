@@ -1,0 +1,29 @@
+[Unit]
+Description=SC4S Container
+Wants=NetworkManager.service network-online.target
+After=NetworkManager.service network-online.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Environment="SC4S_IMAGE={{SC4S_IMAGE}}"
+Environment="SC4S_PERSIST_MOUNT={{SC4S_PERSIST_VOLUME}}:/var/lib/syslog-ng"
+Environment="SC4S_LOCAL_MOUNT={{SC4S_ROOT}}/local:/etc/syslog-ng/conf.d/local:z"
+{{ARCHIVE_ENV_LINE}}{{TLS_ENV_LINE}}TimeoutStartSec=0
+
+ExecStartPre={{RUNTIME_BIN}} pull $SC4S_IMAGE
+ExecStartPre=/usr/bin/bash -c "/usr/bin/systemctl set-environment SC4SHOST=$(hostname -s)"
+ExecStartPre=/usr/bin/bash -c "{{RUNTIME_BIN}} rm SC4S > /dev/null 2>&1 || true"
+ExecStart={{RUNTIME_BIN}} run \
+        -e "SC4S_CONTAINER_HOST=${SC4SHOST}" \
+        -v "$SC4S_PERSIST_MOUNT" \
+        -v "$SC4S_LOCAL_MOUNT" \
+{{ARCHIVE_RUN_LINE}}{{TLS_RUN_LINE}}        --env-file={{SC4S_ROOT}}/env_file \
+        --health-cmd="/usr/sbin/syslog-ng-ctl healthcheck --timeout 5" \
+        --health-interval=2m --health-retries=6 --health-timeout=5s \
+        --network host \
+        --name SC4S \
+        --rm $SC4S_IMAGE
+
+Restart=on-failure

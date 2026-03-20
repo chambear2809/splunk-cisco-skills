@@ -1,0 +1,8 @@
+replicaCount: {{REPLICA_COUNT}}
+
+splunk:
+  hec_url: "{{HEC_EVENT_URL}}"
+  hec_verify_tls: "{{HEC_VERIFY_TLS}}"
+
+sc4s:
+{{EXISTING_CERT_BLOCK}}{{VENDOR_PRODUCT_BLOCK}}{{CONTEXT_FILES_BLOCK}}{{CONFIG_FILES_BLOCK}}

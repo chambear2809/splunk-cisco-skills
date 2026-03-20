@@ -163,6 +163,27 @@ teardown() {
     [[ ! "$output" =~ "unbound variable" ]]
 }
 
+@test "sc4s setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-syslog-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SC4S Setup Automation" ]]
+}
+
+@test "sc4s validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-syslog-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SC4S Validation" ]]
+}
+
+@test "sc4s setup rejects invalid vendor port protocol" {
+    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-syslog-setup/scripts/setup.sh" \
+      --render-host \
+      --vendor-port checkpoint:ietf_udp:9000
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Invalid value 'ietf_udp'" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
 @test "security-cloud configure_product --help exits 0" {
     run bash "${PROJECT_ROOT}/skills/cisco-security-cloud-setup/scripts/configure_product.sh" --help
     [ "$status" -eq 0 ]

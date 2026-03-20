@@ -32,3 +32,6 @@ projects/tmp-*
 
 # --- Local TA intake templates ---
 **/template.local
+
+# --- Local SC4S rendered deployment assets ---
+/sc4s-rendered/

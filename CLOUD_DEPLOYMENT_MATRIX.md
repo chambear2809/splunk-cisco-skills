@@ -34,6 +34,7 @@ covered by this repo.
 | `splunk-stream-setup` search-tier app | `splunk-app-for-stream_816.tgz` | ACS or Splunk Cloud support workflow | Stream UI / REST on search tier | Cloud deployment is hybrid, not single-target. |
 | `splunk-stream-setup` wire-data add-on | `splunk-add-on-for-stream-wire-data_816.tgz` | ACS or bundled with Stream deployment | No special post-install config in normal flow | Knowledge-object support for Stream search content. |
 | `splunk-stream-setup` forwarder add-on | `splunk-add-on-for-stream-forwarders_816.tgz` | Manual install on HF/UF you control | Local HF files plus host forwarding config | This package runs on the heavy/universal forwarder, not the Cloud search tier. |
+| `splunk-connect-for-syslog-setup` | N/A | No Splunk Cloud app install; SC4S runtime is rendered for customer-managed hosts or Kubernetes | ACS for indexes/HEC where available, search-tier REST for validation, rendered host/Helm assets for runtime | External syslog-ng collector pattern. No `app_registry.json` entry because the normal workflow is Splunk prep plus customer-managed runtime deployment. |
 
 ## Stream Heavy Forwarder Model
 
@@ -44,6 +45,16 @@ For Splunk Stream on Splunk Cloud:
 - use the local overlay template in:
   - `skills/splunk-stream-setup/templates/splunk-cloud-hf-netflow-any/`
 - configure HF forwarding to Splunk Cloud at the host layer
+
+## SC4S External Collector Model
+
+For Splunk Connect for Syslog on Splunk Cloud:
+
+- create or validate indexes and HEC tokens against the Cloud stack
+- run the SC4S syslog-ng container on infrastructure you control
+- send SC4S output directly to Splunk Cloud HEC on `443`
+- keep SC4S runtime files, token material, and local archive/disk-buffer storage
+  on the customer-managed host or Kubernetes cluster
 
 ## Cloud Access Architecture
 

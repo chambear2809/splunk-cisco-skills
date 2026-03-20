@@ -74,8 +74,8 @@ The current skills fall into four architectural roles:
   data model behavior on top of data collected elsewhere. Example:
   `cisco-enterprise-networking-setup`.
 - **Platform/package skills** — manage generic app delivery or multi-component
-  app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`, and
-  `splunk-itsi-setup`.
+  app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`,
+  `splunk-connect-for-syslog-setup`, and `splunk-itsi-setup`.
 
 ### CI And Validation
 
@@ -396,6 +396,27 @@ flowchart LR
 supports index creation against the Cloud stack. Installing Stream apps and
 configuring `Splunk_TA_stream` must target the forwarder or Enterprise
 management endpoint, because Stream remains a hybrid deployment.
+
+### External Syslog Collector (SC4S)
+
+```mermaid
+flowchart LR
+  SyslogSources["Network / Security devices"]
+  SC4S["SC4S container\n(host or Kubernetes)"]
+  SplunkPrep["Repo skill\n(indexes, HEC, render assets)"]
+  HEC["Splunk HEC\n(:443 Cloud / :8088 Enterprise)"]
+  Index["Splunk Indexes"]
+
+  SplunkPrep -->|"prepare HEC + indexes"| HEC
+  SyslogSources -->|"syslog"| SC4S
+  SC4S -->|"HEC events"| HEC
+  HEC --> Index
+```
+
+**Implementation guardrail**: `splunk-connect-for-syslog-setup` does not deploy
+SC4S onto the Splunk Cloud search tier. The skill prepares the Splunk-side
+objects and renders runtime assets for customer-managed Docker/Podman/systemd
+or Kubernetes infrastructure.
 
 ### Search-Time And Premium Apps
 

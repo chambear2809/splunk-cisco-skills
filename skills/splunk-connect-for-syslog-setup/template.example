@@ -1,0 +1,89 @@
+# Splunk Connect for Syslog (SC4S) intake template
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Keep the completed file local. Put HEC tokens in temporary files with
+# restrictive permissions instead of storing them in git or pasting them in chat.
+#
+# Example secret file pattern:
+#   printf '%s\n' '<hec_token>' > /tmp/sc4s_hec_token && chmod 600 /tmp/sc4s_hec_token
+#
+# This worksheet is for planning and render inputs. The setup script does not
+# source this file directly.
+#
+# The default render output path is ./sc4s-rendered in the repo root, and that
+# directory is gitignored for local-only generated assets. If a real HEC token
+# is being rendered, custom output directories inside the repo are blocked.
+
+# -----------------------------------------------------------------------------
+# Splunk target
+# -----------------------------------------------------------------------------
+# SPLUNK_PLATFORM=cloud
+# SPLUNK_CLOUD_STACK=example-stack
+# SPLUNK_SEARCH_API_URI=https://example-stack.splunkcloud.com:8089
+
+# SPLUNK_PLATFORM=enterprise
+# SPLUNK_SEARCH_API_URI=https://splunk.example.com:8089
+
+# -----------------------------------------------------------------------------
+# SC4S deployment model
+# -----------------------------------------------------------------------------
+# DEPLOYMENT_MODEL=host
+# HOST_MODE=compose
+# RUNTIME=docker
+
+# DEPLOYMENT_MODEL=host
+# HOST_MODE=systemd
+# RUNTIME=podman
+
+# DEPLOYMENT_MODEL=k8s
+# NAMESPACE=sc4s
+# RELEASE_NAME=sc4s
+# REPLICA_COUNT=2
+
+# -----------------------------------------------------------------------------
+# Common SC4S settings
+# -----------------------------------------------------------------------------
+# SC4S_ROOT=/opt/sc4s
+# SC4S_IMAGE=ghcr.io/splunk/splunk-connect-for-syslog/container3:latest
+# HEC_TOKEN_NAME=sc4s
+# HEC_URL=https://http-inputs-<stack>.splunkcloud.com:443/services/collector/event
+# HEC_TLS_VERIFY=yes
+# INCLUDE_METRICS_INDEX=no
+# NOTE: for compose mode, the rendered `host/` directory is self-contained and
+# can be started in place; `SC4S_ROOT` mainly applies to systemd or when you
+# intentionally copy the rendered stack to a fixed host path.
+
+# -----------------------------------------------------------------------------
+# Optional features
+# -----------------------------------------------------------------------------
+# ENABLE_GLOBAL_ARCHIVE=no
+# GLOBAL_ARCHIVE_MODE=compliance
+# ENABLE_SOURCE_TLS=no
+# EXISTING_CERT=<k8s-tls-secret-name>
+
+# -----------------------------------------------------------------------------
+# Dedicated vendor listener ports
+# Format: vendor_product:protocol:port
+# Host rendering currently supports protocol values tcp, udp, and tls.
+# Kubernetes rendering will embed the same entries in sc4s.vendor_product.
+# -----------------------------------------------------------------------------
+# VENDOR_PORT_1=checkpoint:tcp:9000
+# VENDOR_PORT_2=checkpoint:udp:9000
+# VENDOR_PORT_3=cisco_asa:tcp:5514
+
+# -----------------------------------------------------------------------------
+# Optional local files
+# Format: name=/absolute/path/to/file
+# -----------------------------------------------------------------------------
+# CONTEXT_FILE_1=splunk_metadata.csv=/absolute/path/to/splunk_metadata.csv
+# CONTEXT_FILE_2=host.csv=/absolute/path/to/host.csv
+# CONFIG_FILE_1=app-workaround-cisco_asa.conf=/absolute/path/to/app-workaround-cisco_asa.conf
+
+# -----------------------------------------------------------------------------
+# Operational notes
+# -----------------------------------------------------------------------------
+# - Create the default SC4S indexes on Splunk before sending production traffic.
+# - Leave HEC Selected Indexes blank when possible so lastChanceIndex can still
+#   protect events that do not match an explicitly allowed list.
+# - Do not enable HEC acknowledgement for the SC4S token.
+# - Plan persistent storage for /var/lib/syslog-ng and archive outputs.

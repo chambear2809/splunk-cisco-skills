@@ -368,10 +368,42 @@ rest_check_index() {
     [[ "${http_code}" == "200" ]]
 }
 
+rest_get_index_datatype() {
+    local sk="$1" uri="$2" idx="$3"
+    splunk_curl "${sk}" \
+        "${uri}/services/data/indexes/${idx}?output_mode=json" 2>/dev/null \
+        | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    entries = d.get('entry', [])
+    datatype = ''
+    if entries:
+        datatype = str(entries[0].get('content', {}).get('datatype', '')).strip()
+    if datatype:
+        print(datatype, end='')
+    else:
+        print('event', end='')
+except Exception:
+    print('', end='')
+" 2>/dev/null || echo ""
+}
+
 rest_create_index() {
-    local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}"
+    local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}" index_type="${5:-event}"
     local body http_code resp
-    body=$(form_urlencode_pairs name "${idx}" maxTotalDataSizeMB "${max_size}") || return 1
+    case "${index_type}" in
+        metric)
+            body=$(form_urlencode_pairs name "${idx}" maxTotalDataSizeMB "${max_size}" datatype "metric") || return 1
+            ;;
+        ""|event)
+            body=$(form_urlencode_pairs name "${idx}" maxTotalDataSizeMB "${max_size}") || return 1
+            ;;
+        *)
+            echo "ERROR: Unsupported index type '${index_type}' for index '${idx}'." >&2
+            return 1
+            ;;
+    esac
     resp=$(splunk_curl_post "${sk}" \
         "${body}" \
         "${uri}/services/data/indexes" -w '\n%{http_code}' 2>/dev/null)

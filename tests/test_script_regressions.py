@@ -375,6 +375,198 @@ class ShellScriptRegressionTests(unittest.TestCase):
 
         return env, secrets_dir, state_file, install_log, curl_log
 
+    def build_mock_sc4s_env(self, tmp_path: Path) -> tuple[dict, Path]:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        state_file = tmp_path / "sc4s_state.json"
+        credentials_file = tmp_path / "credentials"
+
+        state_file.write_text(
+            json.dumps(
+                {
+                    "indexes": {},
+                    "hec_tokens": {},
+                    "startup_count": 2,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        credentials_file.write_text(
+            textwrap.dedent(
+                """\
+                SPLUNK_PLATFORM="enterprise"
+                SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                SPLUNK_USER="user"
+                SPLUNK_PASS="pass"
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        write_executable(
+            bin_dir / "curl",
+            """\
+            #!/usr/bin/env python3
+            import json
+            import os
+            import sys
+            from pathlib import Path
+            from urllib.parse import parse_qs, urlparse
+
+            state_path = Path(os.environ["SC4S_STATE"])
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+
+            args = sys.argv[1:]
+            method = "GET"
+            data = ""
+            url = ""
+            write_code = False
+            output_target = None
+
+            def save() -> None:
+                state_path.write_text(json.dumps(state), encoding="utf-8")
+
+            def out(body: str = "", code: int | None = None) -> None:
+                if output_target == "/dev/null" and write_code and code is not None:
+                    sys.stdout.write(str(code))
+                    raise SystemExit(0)
+                if body:
+                    sys.stdout.write(body)
+                if write_code and code is not None:
+                    sys.stdout.write(f"\\n{code}")
+                raise SystemExit(0)
+
+            def decode_form(raw: str) -> dict[str, str]:
+                parsed_body = parse_qs(raw, keep_blank_values=True)
+                return {key: values[-1] for key, values in parsed_body.items()}
+
+            i = 0
+            while i < len(args):
+                arg = args[i]
+                if arg == "-X" and i + 1 < len(args):
+                    method = args[i + 1]
+                    i += 2
+                    continue
+                if arg == "-d" and i + 1 < len(args):
+                    if args[i + 1] == "@-":
+                        data = sys.stdin.read()
+                    else:
+                        data = args[i + 1]
+                    if method == "GET":
+                        method = "POST"
+                    i += 2
+                    continue
+                if arg == "-o" and i + 1 < len(args):
+                    output_target = args[i + 1]
+                    i += 2
+                    continue
+                if "%{http_code}" in arg:
+                    write_code = True
+                if arg.startswith("http://") or arg.startswith("https://"):
+                    url = arg
+                i += 1
+
+            parsed = urlparse(url)
+            path = parsed.path
+
+            if "/services/auth/login" in path:
+                out("<response><sessionKey>test-session</sessionKey></response>")
+
+            if path.endswith("/services/data/indexes") and method == "POST":
+                body = decode_form(data)
+                idx = body.get("name", "")
+                datatype = body.get("datatype", "event")
+                if idx:
+                    state["indexes"][idx] = {"datatype": datatype}
+                    save()
+                out("", 201)
+
+            if "/services/data/indexes/" in path:
+                idx = path.rsplit("/", 1)[-1]
+                exists = idx in state["indexes"]
+                if output_target == "/dev/null" and write_code:
+                    out(code=200 if exists else 404)
+                if exists:
+                    out(
+                        json.dumps(
+                            {
+                                "entry": [
+                                    {
+                                        "name": idx,
+                                        "content": {
+                                            "datatype": state["indexes"][idx].get("datatype", "event")
+                                        },
+                                    }
+                                ]
+                            }
+                        )
+                    )
+                out(json.dumps({"entry": []}))
+
+            if path.endswith("/services/data/inputs/http") and method == "POST":
+                body = decode_form(data)
+                name = body.get("name", "sc4s")
+                state["hec_tokens"][name] = {
+                    "disabled": body.get("disabled", "false"),
+                    "useACK": body.get("useACK", "0"),
+                    "indexes": body.get("indexes", ""),
+                    "index": body.get("index", "main"),
+                    "token": f"generated-{name}-token",
+                }
+                save()
+                out("", 201)
+
+            if "/services/data/inputs/http/" in path and path.endswith("/enable") and method == "POST":
+                encoded_name = path.rsplit("/", 2)[-2]
+                name = encoded_name.replace("%3A", ":").replace("%2F", "/")
+                if name.startswith("http://"):
+                    name = name[len("http://") :]
+                token = state["hec_tokens"].setdefault(name, {"index": "main", "token": f"generated-{name}-token"})
+                token["disabled"] = "false"
+                save()
+                out("", 200)
+
+            if path.endswith("/services/data/inputs/http"):
+                entries = []
+                for name, token in sorted(state["hec_tokens"].items()):
+                    entries.append(
+                        {
+                            "name": f"http://{name}",
+                            "content": {
+                                "disabled": token.get("disabled", "false"),
+                                "useACK": token.get("useACK", "0"),
+                                "indexes": token.get("indexes", ""),
+                                "index": token.get("index", "main"),
+                                "token": token.get("token", ""),
+                            },
+                        }
+                    )
+                out(json.dumps({"entry": entries}))
+
+            if path.endswith("/services/search/jobs") and method == "POST":
+                out(json.dumps({"results": [{"count": str(state.get("startup_count", 0))}]}))
+
+            out("", 200)
+            """,
+        )
+        write_executable(
+            bin_dir / "nc",
+            """\
+            #!/usr/bin/env bash
+            exit 0
+            """,
+        )
+
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+        env["SC4S_STATE"] = str(state_file)
+        env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+        env["SPLUNK_PLATFORM"] = "enterprise"
+
+        return env, state_file
+
     def test_stream_indexes_only_cloud_mode_uses_acs_without_session_key(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -441,6 +633,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
             "skills/cisco-meraki-ta-setup/scripts/validate.sh",
             "skills/cisco-thousandeyes-setup/scripts/validate.sh",
             "skills/splunk-itsi-setup/scripts/validate.sh",
+            "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
             "skills/splunk-stream-setup/scripts/validate.sh",
         ]
 
@@ -749,6 +942,170 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 msg="Cisco Security Cloud install was not invoked through the shared installer",
             )
             self.assertTrue(curl_log.exists(), msg="Expected mock curl log to be written")
+
+    def test_sc4s_setup_smoke_flow(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4s_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4s.token"
+            context_file = tmp_path / "splunk_metadata.csv"
+            config_file = tmp_path / "app-workaround.conf"
+
+            context_file.write_text("cisco_asa,index,netfw\n", encoding="utf-8")
+            config_file.write_text(
+                textwrap.dedent(
+                    """\
+                    application app-postfilter-cisco_asa_metadata[sc4s-postfilter] {
+                      parser { app-postfilter-cisco_asa_metadata(); };
+                    };
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            setup_result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--splunk-prep",
+                "--include-metrics-index",
+                "--write-hec-token-file",
+                str(token_file),
+                "--render-host",
+                "--render-k8s",
+                "--output-dir",
+                str(output_dir),
+                "--vendor-port",
+                "checkpoint:tcp:9000",
+                "--context-file",
+                f"splunk_metadata.csv={context_file}",
+                "--config-file",
+                f"app-workaround.conf={config_file}",
+                env=env,
+            )
+            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
+            self.assertTrue(token_file.exists(), msg="Expected the SC4S token file to be written")
+            self.assertEqual(token_file.read_text(encoding="utf-8"), "generated-sc4s-token\n")
+
+            host_env = (output_dir / "host" / "env_file").read_text(encoding="utf-8")
+            host_compose = (output_dir / "host" / "docker-compose.yml").read_text(encoding="utf-8")
+            k8s_values = (output_dir / "k8s" / "values.yaml").read_text(encoding="utf-8")
+            k8s_secret = (output_dir / "k8s" / "values.secret.yaml").read_text(encoding="utf-8")
+
+            self.assertIn("SC4S_DEST_SPLUNK_HEC_DEFAULT_URL=https://example.invalid:8088", host_env)
+            self.assertIn("SC4S_DEST_SPLUNK_HEC_DEFAULT_TOKEN=generated-sc4s-token", host_env)
+            self.assertIn("SC4S_LISTEN_CHECKPOINT_TCP_PORT=9000", host_env)
+            self.assertIn("- ./env_file", host_compose)
+            self.assertIn("- ./local:/etc/syslog-ng/conf.d/local:z", host_compose)
+
+            self.assertIn('hec_url: "https://example.invalid:8088/services/collector/event"', k8s_values)
+            self.assertIn("vendor_product:", k8s_values)
+            self.assertIn("name: checkpoint", k8s_values)
+            self.assertIn("tcp: [9000]", k8s_values)
+            self.assertIn("context_files:", k8s_values)
+            self.assertIn("splunk_metadata.csv: |-", k8s_values)
+            self.assertIn("cisco_asa,index,netfw", k8s_values)
+            self.assertIn("config_files:", k8s_values)
+            self.assertIn("app-workaround.conf: |-", k8s_values)
+            self.assertIn('hec_token: "generated-sc4s-token"', k8s_secret)
+
+            self.assertTrue((output_dir / "host" / "docker-compose.yml").exists())
+            self.assertTrue((output_dir / "host" / "compose-up.sh").exists())
+            self.assertTrue((output_dir / "k8s" / "helm-install.sh").exists())
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            self.assertIn("netfw", state["indexes"])
+            self.assertIn("_metrics", state["indexes"])
+            self.assertEqual(state["indexes"]["_metrics"]["datatype"], "metric")
+            self.assertIn("sc4s", state["hec_tokens"])
+
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4s",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertIn("HEC token 'sc4s' exists", validate_result.stdout)
+            self.assertIn("SC4S startup event", validate_result.stdout)
+
+    def test_sc4s_validate_reports_wrong_metrics_index_type(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4s_env(tmp_path)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["indexes"]["_metrics"] = {"datatype": "event"}
+            state["hec_tokens"]["sc4s"] = {
+                "disabled": "false",
+                "useACK": "0",
+                "indexes": "",
+                "index": "main",
+                "token": "generated-sc4s-token",
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4s",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 1, msg=validate_result.stdout + validate_result.stderr)
+            self.assertIn("exists but is an event index", validate_result.stdout)
+
+    def test_sc4s_setup_enables_existing_disabled_hec_token(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4s_env(tmp_path)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["hec_tokens"]["sc4s"] = {
+                "disabled": "true",
+                "useACK": "0",
+                "indexes": "",
+                "index": "main",
+                "token": "generated-sc4s-token",
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+
+            setup_result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--splunk-prep",
+                "--hec-only",
+                env=env,
+            )
+            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
+            self.assertIn("exists but is disabled. Enabling it via Splunk REST", setup_result.stdout)
+            self.assertIn("Enabled HEC token 'sc4s'.", setup_result.stdout)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            self.assertEqual(state["hec_tokens"]["sc4s"]["disabled"], "false")
+
+    def test_sc4s_setup_blocks_custom_in_repo_secret_output_dir(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            tmp_path = Path(tmpdir)
+            harness_path = tmp_path / "harness"
+            harness_path.mkdir()
+            env, state_file = self.build_mock_sc4s_env(harness_path)
+            token_file = tmp_path / "sc4s.token"
+            token_file.write_text("existing-token\n", encoding="utf-8")
+
+            output_dir = tmp_path / "dangerous-render"
+            result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--render-host",
+                "--output-dir",
+                str(output_dir),
+                "--hec-token-file",
+                str(token_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+            self.assertIn("Refusing to render secret-bearing SC4S outputs inside the repo", result.stdout + result.stderr)
+
+    def test_gitignore_excludes_default_sc4s_render_output(self):
+        gitignore_text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("/sc4s-rendered/", gitignore_text)
 
     def test_secure_access_smoke_flow(self):
         with tempfile.TemporaryDirectory() as tmpdir:

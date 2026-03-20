@@ -145,16 +145,58 @@ cloud_check_index() {
     acs_command indexes describe "${idx}" >/dev/null 2>&1
 }
 
+cloud_get_index_datatype() {
+    local idx="$1"
+    local payload
+
+    acs_prepare_context || return 1
+    payload=$(acs_command indexes describe "${idx}" 2>/dev/null | acs_extract_http_response_json || echo "{}")
+    printf '%s' "${payload}" | python3 -c "
+import json
+import sys
+
+def pick_datatype(data):
+    if not isinstance(data, dict):
+        return ''
+    candidates = [
+        data.get('datatype'),
+        data.get('dataType'),
+        (data.get('spec') or {}).get('datatype'),
+        (data.get('spec') or {}).get('dataType'),
+        ((data.get('index') or {}).get('datatype')),
+        ((data.get('index') or {}).get('dataType')),
+    ]
+    for value in candidates:
+        if value is None:
+            continue
+        value = str(value).strip()
+        if value:
+            return value
+    return ''
+
+try:
+    data = json.load(sys.stdin)
+    datatype = pick_datatype(data)
+    if datatype:
+        print(datatype, end='')
+    else:
+        print('event', end='')
+except Exception:
+    print('', end='')
+" 2>/dev/null || echo ""
+}
+
 cloud_create_index() {
     local idx="$1"
     local searchable_days="${2:-${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}}"
+    local index_type="${3:-event}"
 
     acs_prepare_context || return 1
     if acs_command indexes describe "${idx}" >/dev/null 2>&1; then
         return 0
     fi
 
-    acs_command indexes create --name "${idx}" --searchable-days "${searchable_days}" >/dev/null
+    acs_command indexes create --name "${idx}" --searchable-days "${searchable_days}" --data-type "${index_type}" >/dev/null
 }
 
 acs_restart_required() {
@@ -413,11 +455,20 @@ platform_check_index() {
     fi
 }
 
-platform_create_index() {
-    local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}"
+platform_get_index_datatype() {
+    local sk="$1" uri="$2" idx="$3"
     if is_splunk_cloud; then
-        cloud_create_index "${idx}" "${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}"
+        cloud_get_index_datatype "${idx}"
     else
-        rest_create_index "${sk}" "${uri}" "${idx}" "${max_size}"
+        rest_get_index_datatype "${sk}" "${uri}" "${idx}"
+    fi
+}
+
+platform_create_index() {
+    local sk="$1" uri="$2" idx="$3" max_size="${4:-512000}" index_type="${5:-event}"
+    if is_splunk_cloud; then
+        cloud_create_index "${idx}" "${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}" "${index_type}"
+    else
+        rest_create_index "${sk}" "${uri}" "${idx}" "${max_size}" "${index_type}"
     fi
 }
