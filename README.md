@@ -4,6 +4,17 @@ This repository is a working library of Cursor agent skills and shell scripts fo
 installing, configuring, and validating Splunk apps and Technology Add-ons on
 self-managed Splunk Enterprise and Splunk Cloud deployments.
 
+## Start With The Intake Templates
+
+Before starting a setup, review the skill-local `template.example` files. They
+show the non-secret information you should collect from the product domain
+owners ahead of time, such as hostnames, account names, org IDs, regions,
+indexes, and feature choices.
+
+Use the relevant `skills/<skill>/template.example` as your intake worksheet,
+then keep any completed copy local as `template.local` rather than committing it
+to git.
+
 The repo is designed for two use cases:
 
 - **Agent-driven work in Cursor**: the agent reads the skill metadata in
