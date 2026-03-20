@@ -2,41 +2,93 @@
 
 Speaker cues are shown in brackets, for example `[pause]` and `[emphasize]`.
 
-## Executive Sales Demo Script
+## Repeatable Sales Demo Script
+
+Approximate length: 3 to 5 minutes
+
+Use this section as the live, repeatable motion for sales teams. The demo persona is the Splunk admin who has been asked to stand up new Cisco integrations so the business can see the Cisco and Splunk better together story inside Splunk. The key point to establish early is that this repo starts with the product template examples, so product owners can provide the right non-secret details before anyone begins the technical setup.
+
+1. Start with the first-step message.
+
+   "I am the Splunk admin, and I have been asked to stand up new Cisco integrations so the team can see the better together story in Splunk. The first thing I do is not run a setup command. I start with the product template example for the product I want to onboard, and I give that worksheet to the product owner first."
+
+2. Open the relevant `skills/<skill>/template.example`.
+
+   "This template shows exactly what I need to collect up front: hostnames, account names, org IDs, regions, indexes, and feature choices. Instead of chasing information across email and chat, I use a product-specific worksheet that turns a vague request into a clear onboarding plan."
+
+3. Explain how this speeds up getting data into Splunk.
+
+   "Because the product owner sees the required fields immediately, I reduce back-and-forth, avoid missing prerequisites, and accelerate time to value. That matters because the better together story only works when the Cisco telemetry is onboarded, usable, and ready to support decisions."
+
+4. Explain the security boundary.
+
+   "The template is for non-secret values only. I keep secrets in `credentials` or password and token files, which lets me share the intake worksheet without putting sensitive values into git."
+
+5. Show the handoff into execution.
+
+   "Once the worksheet is complete, I keep the local copy as `template.local`, and that becomes the starting point for the skill. From there, the workflow takes me from intake to configured integration to validated data flow."
+
+   "Now the story gets more compelling. Cisco Meraki gives me the cloud-managed network view. Cisco DC Networking gives me the data center view. Cisco Intersight gives me the compute and platform view. Splunk brings those domains together so leaders and operators can see more of the digital footprint in one place and respond with better context."
+
+6. Close with the repeatable value statement.
+
+   "That is the repeatable story I can bring to every product team. I start with the product template example, collect the right details once, onboard faster, and turn Cisco domain data into an executive outcome in Splunk: quicker time to value, broader operational visibility, and a stronger path to digital resilience."
+
+## Video Recording Scripts
+
+### Executive Sales Demo Script
 
 Approximate length: 4 minutes
 
-If you have ever rolled out a Splunk app manually, you know what happens. [pause]
+I am the Splunk admin in this story, and I have been asked to stand up new Cisco integrations so the business can see the better together story in Splunk. [pause]
 
-What should be a deployment turns into a project. [beat]
+The point is not just to install three apps. [beat]
+The point is to turn Cisco network, data center, and compute telemetry into one operational view in Splunk. [emphasize]
 
-Find the package. Install it. Configure the environment. Enable the inputs. Align the dashboards. Restart services. Then wait and hope the data actually shows up. [pause]
+That is what makes this compelling. [beat]
+Cisco gives me critical data from across the digital footprint, and Splunk lets me turn that data into visibility, context, and faster decisions. [pause]
 
-That is the pain this project removes. [emphasize]
+The first thing I do when using this repo is start with the product template example for the product I want to onboard. [pause]
 
-Splunk TA Management AI Skills turns that messy, manual process into a guided experience. [pause]
+Before I run setup, I hand that worksheet to the product owner so they can provide the non-secret details up front. [beat]
 
-Instead of relying on tribal knowledge, checklists, and trial and error, you get a workflow that helps install, configure, and validate the integration for you. [beat]
+Hostnames. Account names. Org IDs. Regions. Indexes. Feature choices. [pause]
 
-And that is why this is so compelling in a demo. [pause]
+That sounds simple, but it is a powerful business step. [beat]
+It reduces my usual back-and-forth, removes onboarding friction, and speeds up time to value. [emphasize]
+
+When I try to roll out a Splunk app manually, I know what happens. [pause]
+
+What should be a quick onboarding request turns into a project. [beat]
+
+I find the package. I install it. I configure the environment. I enable the inputs. I restart services. Then I wait to see whether the data actually shows up. [pause]
+
+That is the friction this project removes for me. [emphasize]
+
+Splunk TA Management AI Skills turns that messy, manual process into a guided operating motion for me. [pause]
+
+Instead of relying on tribal knowledge, checklists, and trial and error, I get a repeatable workflow that takes me from intake to validated telemetry. [beat]
+
+And that is why this lands so well in an executive conversation. [pause]
 
 It is not just automation. [beat]
-It is automation that feels easier than doing it by hand. [emphasize]
+It is a faster, more consistent path from request to usable insight. [emphasize]
 
-For this demo, we are focusing on three Cisco apps that tell a much bigger story. [pause]
+For this demo, I am focusing on three Cisco apps that tell a much bigger story. [pause]
 
-Cisco DC Networking gives us the data center view. [beat]
-Cisco Meraki gives us the cloud-managed network view. [beat]
-Cisco Intersight gives us the compute and platform view. [pause]
+Cisco DC Networking gives me the data center view. [beat]
+Cisco Meraki gives me the cloud-managed network view. [beat]
+Cisco Intersight gives me the compute and platform view. [pause]
 
 Three different operational domains. [beat]
-One consistent onboarding experience. [emphasize]
+One consistent onboarding experience. [beat]
+One better together story inside Splunk. [emphasize]
 
-That is where the value lands.
+That is where the business value lands.
 
-We are showing that complex integrations do not have to feel complex. [pause]
-We are showing that teams can move faster without sacrificing consistency. [pause]
-And we are showing that the path from install to usable visibility can be dramatically shorter. [emphasize]
+I am showing that complex integrations do not have to create operational drag. [pause]
+I can move faster without sacrificing consistency. [pause]
+And I can shorten the path from install to usable visibility dramatically. [emphasize]
 
 From a buyer's perspective, that matters.
 
@@ -47,20 +99,20 @@ And it means less risk when organizations are trying to move quickly. [pause]
 
 It also changes the conversation. [beat]
 
-The question is no longer, "Can we get this installed?" [pause]
-The question becomes, "How quickly can we start using this data?" [emphasize]
+The question I am no longer asking is, "Can I get this installed?" [pause]
+The question becomes, "How quickly can I turn this data into value?" [emphasize]
 
 That is the real sales story here.
 
-Splunk TA Skills reduces friction between wanting an integration and actually getting value from it. [pause]
+Splunk TA Skills reduces the friction I usually face between being asked for an integration and actually delivering value from it. [pause]
 
-The user provides the environment details. The workflow handles the heavy lifting. Validation confirms the deployment is not just complete, but working. [beat]
+I provide the environment details once. The workflow handles the heavy lifting. Validation confirms the deployment is not just complete, but ready to support real decisions. [beat]
 
-So when we demo Cisco DC Networking, Meraki, and Intersight, we are not just showing three apps. [pause]
+So when I demo Cisco DC Networking, Meraki, and Intersight, I am not just showing three apps. [pause]
 
-We are showing a repeatable operating model. [beat]
+I am showing a repeatable operating model. [beat]
 A faster path to onboarding. [beat]
-And a simpler way to turn complex data sources into real Splunk visibility. [emphasize]
+And a simpler way to turn Cisco telemetry into outcome-ready Splunk visibility across the environment. [emphasize]
 
 That is the message. [pause]
 
@@ -69,35 +121,53 @@ Faster onboarding. [beat]
 More consistency. [beat]
 Quicker insight. [pause]
 
-Splunk TA Skills makes complex Splunk integrations feel simple, guided, and ready for real-world use.
+Splunk TA Skills makes my integration work simple, guided, and business-ready, so the better together story becomes visible faster.
 
-## Technical Demo Narration
+### Technical Demo Narration
 
 Approximate length: 4 minutes
 
+I am the Splunk admin in this demo, and I have been asked to stand up new Cisco integrations so I can prove the better together story with real data inside Splunk. [pause]
+
+That means I am not treating Cisco DC Networking, Meraki, and Intersight as isolated installs. [beat]
+I am onboarding them as connected sources of context across network, data center, and compute operations, so the organization gets one clearer operating picture. [emphasize]
+
+The first technical step I take in this repo is not the install. [pause]
+
+It is the product template example. [beat]
+
+I start by using the relevant `template.example` as an intake worksheet so the product owner can give me the required non-secret configuration up front. [pause]
+
+That means I know the hostnames, account names, org IDs, regions, indexes, and feature choices before the setup begins. [beat]
+
+It is a small process change, but it removes a lot of deployment friction for me. [emphasize]
+
 What I want to show in this demo is simple. [pause]
 
-We can take integrations that are normally tedious to stand up and turn them into a fast, guided workflow. [emphasize]
+I can take integrations that are normally tedious to stand up and turn them into a guided, repeatable workflow. [emphasize]
 
-That is the technical story behind this demo. [beat]
-Less manual setup. [beat]
-Less room for error. [beat]
-Faster path to working data. [pause]
+The technical story is straightforward. [beat]
+Standardize intake. [beat]
+Onboard consistently. [beat]
+Validate outcomes. [pause]
 
-And we are showing that through three Cisco apps. [pause]
+And I am showing that through three Cisco apps. [pause]
 
 First, Cisco DC Networking. [beat]
-This is the data center story. We bring in visibility from ACI, Nexus Dashboard, and Nexus 9K without having to drag the operator through a long, fragile setup process. [pause]
+This is the data center story. I bring in visibility from ACI, Nexus Dashboard, and Nexus 9K through a process that is structured instead of fragile. [pause]
 
 Next, Cisco Meraki. [beat]
-This is a strong demo moment because it shows both breadth and simplicity. We can onboard organization, device, wireless, and security appliance visibility through one guided experience. What is usually repetitive starts to feel streamlined. [pause]
+This is a strong demo moment because it gives me both breadth and simplicity. I can onboard organization, device, wireless, and security appliance visibility through one guided experience. What is usually repetitive becomes streamlined. [pause]
 
 Then, Cisco Intersight. [beat]
-This extends the story into compute and platform operations. Now we are not just talking about networks. We are bringing compute telemetry into Splunk through the same consistent motion. [pause]
+This extends the story into compute and platform operations. Now I am not just talking about networks. I am bringing compute telemetry into Splunk through the same consistent motion. [pause]
 
-And that consistency is the key technical point. [emphasize]
+And that consistency is the key technical point for me. [emphasize]
 
-No matter which app we are onboarding, the motion feels the same. [beat]
+The bigger point for me is what happens once all of that Cisco telemetry lands in Splunk. [beat]
+Now I can connect more of the digital footprint in one place and move from isolated signals to coordinated visibility. [pause]
+
+No matter which app I am onboarding, the motion feels the same. [beat]
 Stand it up. Configure it. Enable data collection. Validate the result. [pause]
 
 That matters because most failed deployments do not fail in obvious ways. [beat]
@@ -107,61 +177,68 @@ An account gets created, but data collection is incomplete. [beat]
 Data starts flowing, but the environment is not aligned for real visibility. [beat]
 An install looks successful, but the outcome is still not usable. [pause]
 
-This workflow is designed to close those gaps. [emphasize]
+This workflow is designed to help me close those gaps. [emphasize]
 
 It is not just about speed. [beat]
 It is about confidence. [pause]
 
-Confidence that the integration is configured correctly. [beat]
-Confidence that data collection is enabled. [beat]
-Confidence that what you deployed is actually producing value. [pause]
+Confidence that I configured the integration correctly. [beat]
+Confidence that the right data is flowing. [beat]
+Confidence that the telemetry is ready to support real operational decisions. [pause]
 
-That is why this lands well in a demo. [beat]
-We are not asking people to be impressed by implementation details. [pause]
-We are showing a better operating model. [emphasize]
+That is why this lands well when I demo it. [beat]
+I am not asking people to care about setup mechanics for their own sake. [pause]
+I am showing a better operating model. [emphasize]
 
-We are showing that Cisco DC Networking, Meraki, and Intersight may bring in very different telemetry, but the onboarding experience feels unified. [pause]
+I am showing that Cisco DC Networking, Meraki, and Intersight may bring in very different telemetry, but the onboarding experience feels unified. [pause]
 
-And when the onboarding experience is unified, teams can move faster, standardize more easily, and scale adoption with less effort. [beat]
+And when the onboarding experience is unified, my team can move faster, standardize more easily, and scale adoption with less effort. [beat]
+That is how the better together story becomes operational instead of theoretical. [emphasize]
 
 That is the technical takeaway. [pause]
 
 Different integrations. [beat]
 Same guided motion. [beat]
-Faster time to usable Splunk visibility.
+Faster time to usable Splunk visibility across my Cisco environment.
 
-## Troubleshooting Demo Add-On
+### Troubleshooting Demo Add-On
 
 Approximate length: 2 minutes
 
 This is an optional section you can use when you want to show that the workflow also handles real-world friction, not just the happy path. [pause]
 
-The first issue we hit was simple, but important. [beat]
+It is a realistic Splunk admin moment. [beat]
+The better together story does not come from my slides. It comes from getting real Cisco data in, even when the environment is imperfect. [pause]
 
-When we moved into Cisco DC Networking for ACI, we had the host, username, and password file ready, but we had not included the ACI account name. [pause]
+The first issue I hit was simple, but important. [beat]
+
+When I moved into Cisco DC Networking for ACI, I had the host, username, and password file ready, but I had not included the ACI account name. [pause]
 
 That sounds minor, but it is exactly the kind of small gap that can slow down a real deployment. [beat]
 
-The workflow made the missing field obvious right away. [pause]
-We were able to supply the ACI account name, use `CVF`, and continue without guesswork. [emphasize]
+It is also why starting with the product template example matters. [beat]
+When that worksheet is complete, small but critical fields are much less likely to be missed. [pause]
 
-That is a good demo moment because it shows the process is structured. [beat]
-It does not just rush forward and hope for the best. [pause]
-It identifies what is missing, asks for the right value, and keeps the deployment moving. [emphasize]
+The workflow made the missing field obvious right away. [pause]
+I was able to supply the ACI account name, use `CVF`, and continue without guesswork. [emphasize]
+
+That is a good demo moment for me because it shows the process is structured. [beat]
+It does not just let me rush forward and hope for the best. [pause]
+It identifies what is missing, asks me for the right value, and keeps the deployment moving. [emphasize]
 
 The second issue was more realistic from an infrastructure point of view. [beat]
 
-When we tried to create the ACI account, the connection failed because SSL certificate verification blocked the request. [pause]
+When I tried to create the ACI account, the connection failed because SSL certificate verification blocked the request. [pause]
 
-In other words, the platform could reach the APIC, but it did not trust the certificate presented by that endpoint. [beat]
+In other words, I could reach the APIC, but the platform did not trust the certificate presented by that endpoint. [beat]
 
 For a production environment, the better path is to use a trusted certificate chain or the correct CA bundle. [pause]
-But for this demo, we made a deliberate choice to disable SSL verification in the Cisco DC Networking app so the onboarding could continue. [emphasize]
+But for this demo, I made a deliberate choice to disable SSL verification in the Cisco DC Networking app so the onboarding could continue. [emphasize]
 
-Once that setting was changed, the ACI account was created successfully, the inputs were enabled, Splunk restarted, and data validation passed. [pause]
+Once I changed that setting, the ACI account was created successfully, the inputs were enabled, Splunk restarted, and data validation passed. [pause]
 
-That is the value of including this section in the demo. [beat]
-It shows that the workflow is useful not only when everything is perfect, but also when the environment behaves like a real customer environment. [pause]
+That is the value of including this section in my demo. [beat]
+It shows that the workflow is useful not only when everything is perfect, but also when my environment behaves like a real customer environment. [pause]
 
-So the story is not just that we installed three Cisco integrations. [beat]
-The stronger story is that we handled missing configuration details, resolved certificate friction, and still reached working telemetry in a guided, repeatable way. [emphasize]
+So the story is not just that I installed three Cisco integrations. [beat]
+The stronger story is that I handled missing configuration details, resolved certificate friction, and still reached working telemetry in a guided, repeatable way. [emphasize]
