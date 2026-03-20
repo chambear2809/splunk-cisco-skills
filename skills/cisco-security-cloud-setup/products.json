@@ -1,0 +1,235 @@
+{
+  "duo": {
+    "title": "Cisco Duo",
+    "input_type": "sbg_duo_input",
+    "default_name": "Duo_Default",
+    "required_fields": ["api_host"],
+    "secret_fields": ["ikey", "skey", "proxy_password"],
+    "defaults": {
+      "index": "cisco_duo",
+      "interval": "120",
+      "sourcetype": "cisco:duo",
+      "logging_level": "INFO"
+    }
+  },
+  "secure_malware_analytics": {
+    "title": "Cisco Secure Malware Analytics",
+    "input_type": "cisco_sma_input",
+    "default_name": "SMA_Default",
+    "required_fields": ["api_host", "after"],
+    "secret_fields": ["api_key", "proxy_password"],
+    "defaults": {
+      "index": "cisco_sma",
+      "interval": "300",
+      "sourcetype": "cisco:sma:submissions",
+      "loglevel": "INFO"
+    }
+  },
+  "xdr": {
+    "title": "Cisco XDR",
+    "input_type": "sbg_xdr_input",
+    "default_name": "XDR_Default",
+    "required_fields": ["region", "auth_method", "client_id", "xdr_import_time_range"],
+    "secret_fields": ["refresh_token", "access_token", "password"],
+    "defaults": {
+      "index": "cisco_xdr",
+      "interval": "300",
+      "sourcetype": "cisco:xdr:incidents"
+    }
+  },
+  "secure_firewall_syslog": {
+    "title": "Cisco Secure Firewall Syslog",
+    "input_type": "sbg_sfw_syslog_input",
+    "default_name": "SecureFirewall_Syslog_Default",
+    "required_fields": ["type", "port", "sourcetype", "event_types"],
+    "secret_fields": [],
+    "defaults": {
+      "index": "cisco_sfw_ftd_syslog",
+      "interval": "600"
+    }
+  },
+  "secure_firewall_asa_syslog": {
+    "title": "Cisco Secure Firewall ASA Syslog",
+    "input_type": "sbg_sfw_asa_syslog_input",
+    "default_name": "SecureFirewall_ASA_Syslog_Default",
+    "required_fields": ["type", "port", "sourcetype", "event_types"],
+    "secret_fields": [],
+    "defaults": {
+      "index": "cisco_sfw_ftd_syslog",
+      "interval": "600"
+    }
+  },
+  "secure_firewall_estreamer": {
+    "title": "Cisco Secure Firewall eStreamer",
+    "input_type": "sbg_fw_estreamer_input",
+    "default_name": "SecureFirewall_eStreamer_Default",
+    "required_fields": ["fmc_host", "fmc_port", "estreamer_import_time_range", "event_types"],
+    "secret_fields": ["pkcs_certificate", "password"],
+    "defaults": {
+      "index": "cisco_secure_fw",
+      "interval": "600",
+      "sourcetype": "cisco:sfw:estreamer"
+    }
+  },
+  "multicloud_defense": {
+    "title": "Cisco Multicloud Defense",
+    "input_type": "sbg_multicloud_defense_input",
+    "default_name": "MulticloudDefense_Default",
+    "required_fields": [],
+    "secret_fields": [],
+    "defaults": {
+      "index": "cisco_multicloud_defense",
+      "interval": "300",
+      "sourcetype": "cisco:multicloud:defense",
+      "port": "8088"
+    }
+  },
+  "secure_firewall_api": {
+    "title": "Cisco Secure Firewall API",
+    "input_type": "sbg_sfw_api_input",
+    "default_name": "SecureFirewall_API_Default",
+    "required_fields": ["fmc_host", "username"],
+    "secret_fields": ["password"],
+    "defaults": {
+      "index": "cisco_sfw_api",
+      "interval": "300",
+      "sourcetype": "cisco:sfw:policy"
+    }
+  },
+  "email_threat_defense": {
+    "title": "Cisco Email Threat Defense",
+    "input_type": "sbg_etd_input",
+    "default_name": "ETD_Default",
+    "required_fields": ["client_id", "etd_region", "etd_import_time_range"],
+    "secret_fields": ["etd_api_key", "client_secret", "proxy_password"],
+    "defaults": {
+      "index": "cisco_etd",
+      "interval": "3600",
+      "sourcetype": "cisco:etd",
+      "proxy_type": "http"
+    }
+  },
+  "secure_network_analytics": {
+    "title": "Cisco Secure Network Analytics",
+    "input_type": "sbg_sna_input",
+    "default_name": "SNA_Default",
+    "required_fields": ["ip_address", "domain_id", "username"],
+    "secret_fields": ["password"],
+    "defaults": {
+      "index": "cisco_sna",
+      "interval": "300",
+      "sourcetype": "cisco:sna",
+      "loglevel": "INFO",
+      "include_risk_events": "true"
+    }
+  },
+  "secure_endpoint": {
+    "title": "Cisco Secure Endpoint",
+    "input_type": "sbg_se_input",
+    "default_name": "SecureEndpoint_Default",
+    "required_fields": ["api_host", "client_id", "se_import_time_range", "event_types", "groups"],
+    "secret_fields": ["api_key"],
+    "defaults": {
+      "index": "cisco_se",
+      "interval": "300",
+      "sourcetype": "cisco:se"
+    }
+  },
+  "vulnerability_intelligence": {
+    "title": "Cisco Vulnerability Intelligence",
+    "input_type": "sbg_cvi_input",
+    "default_name": "CVI_Default",
+    "required_fields": ["api_host"],
+    "secret_fields": ["api_key"],
+    "defaults": {
+      "index": "cisco_cvi",
+      "interval": "86400",
+      "sourcetype": "cisco:cvi"
+    }
+  },
+  "cii_webhook": {
+    "title": "Cisco Identity Intelligence Webhook",
+    "input_type": "sbg_cii_input",
+    "default_name": "CII_Webhook_Default",
+    "required_fields": ["cii_client_id", "cii_api_url", "cii_token_url", "cii_audience", "integration_method", "hec_url"],
+    "secret_fields": ["cii_json_text", "cii_client_secret", "aws_access_secret", "cii_external_id"],
+    "defaults": {
+      "index": "cisco_cii",
+      "interval": "300",
+      "sourcetype": "cisco:cii"
+    }
+  },
+  "cii_aws_s3": {
+    "title": "Cisco Identity Intelligence AWS S3",
+    "input_type": "sbg_cii_aws_s3_input",
+    "default_name": "CII_S3_Default",
+    "required_fields": ["cii_client_id", "cii_api_url", "cii_token_url", "cii_audience", "integration_method", "s3_bucket_url", "s3_bucket_region"],
+    "secret_fields": ["cii_json_text", "cii_client_secret", "aws_access_secret", "cii_external_id"],
+    "defaults": {
+      "index": "cisco_cii",
+      "interval": "300",
+      "sourcetype": "cisco:cii"
+    }
+  },
+  "ai_defense": {
+    "title": "Cisco AI Defense",
+    "input_type": "sbg_ai_defense_input",
+    "default_name": "AIDefense_Default",
+    "required_fields": [],
+    "secret_fields": [],
+    "defaults": {
+      "index": "cisco_ai_defense",
+      "interval": "300",
+      "sourcetype": "cisco:ai:defense",
+      "port": "8088"
+    }
+  },
+  "isovalent": {
+    "title": "Isovalent Runtime Security",
+    "input_type": "sbg_isovalent_input",
+    "default_name": "Isovalent_Default",
+    "required_fields": [],
+    "secret_fields": [],
+    "defaults": {
+      "index": "cisco_isovalent",
+      "interval": "300",
+      "port": "8088"
+    }
+  },
+  "isovalent_edge_processor": {
+    "title": "Isovalent Edge Processor Runtime Security",
+    "input_type": "sbg_isovalent_edge_processor_input",
+    "default_name": "IsovalentEdgeProcessor_Default",
+    "required_fields": [],
+    "secret_fields": [],
+    "defaults": {
+      "index": "cisco_isovalent",
+      "interval": "300",
+      "port": "8088"
+    }
+  },
+  "secure_client_nvm": {
+    "title": "Cisco Secure Client NVM",
+    "input_type": "sbg_nvm_input",
+    "default_name": "NVM_Default",
+    "required_fields": [],
+    "secret_fields": [],
+    "defaults": {
+      "index": "main",
+      "interval": "300",
+      "sourcetype": "cisco:nvm:*"
+    }
+  },
+  "secure_workload": {
+    "title": "Cisco Secure Workload",
+    "input_type": "sbg_sw_input",
+    "default_name": "SecureWorkload_Default",
+    "required_fields": ["type", "port"],
+    "secret_fields": [],
+    "defaults": {
+      "index": "cisco_secure_workload",
+      "interval": "60",
+      "sourcetype": "cisco:secure:workload"
+    }
+  }
+}

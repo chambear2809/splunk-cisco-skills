@@ -23,7 +23,32 @@
       "splunkbase_id": "7539",
       "label": "Cisco Enterprise Networking for Splunk Platform",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-enterprise-networking-for-splunk-platform_*"]
+      "package_patterns": ["cisco-enterprise-networking-for-splunk-platform_*"],
+      "install_requires": ["7538"]
+    },
+    {
+      "skill": "cisco-catalyst-enhanced-netflow-setup",
+      "app_name": "splunk_app_stream_ipfix_cisco_hsl",
+      "splunkbase_id": "6872",
+      "label": "Cisco Catalyst Enhanced Netflow Add-on for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-catalyst-enhanced-netflow-add-on-for-splunk_*"]
+    },
+    {
+      "skill": "cisco-security-cloud-setup",
+      "app_name": "CiscoSecurityCloud",
+      "splunkbase_id": "7404",
+      "label": "Cisco Security Cloud",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-security-cloud_*"]
+    },
+    {
+      "skill": "cisco-secure-access-setup",
+      "app_name": "cisco-cloud-security",
+      "splunkbase_id": "5558",
+      "label": "Cisco Secure Access App for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["cisco-secure-access-app-for-splunk_*"]
     },
     {
       "skill": "cisco-intersight-setup",
@@ -32,6 +57,14 @@
       "label": "Cisco Intersight Add-On for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
       "package_patterns": ["cisco-intersight-add-on-for-splunk_*"]
+    },
+    {
+      "skill": "cisco-appdynamics-setup",
+      "app_name": "Splunk_TA_AppDynamics",
+      "splunkbase_id": "3471",
+      "label": "Cisco Splunk Add-on for AppDynamics",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": ["cisco-splunk-add-on-for-appdynamics_*"]
     },
     {
       "skill": "cisco-meraki-ta-setup",
@@ -52,7 +85,7 @@
     {
       "skill": "splunk-stream-setup",
       "app_name": "Splunk_TA_stream",
-      "splunkbase_id": "5234",
+      "splunkbase_id": "5238",
       "label": "Splunk Add-on for Stream Forwarders",
       "license_ack_url": "",
       "package_patterns": ["splunk-add-on-for-stream-forwarders_*"]
@@ -60,7 +93,7 @@
     {
       "skill": "splunk-stream-setup",
       "app_name": "Splunk_TA_stream_wire_data",
-      "splunkbase_id": "5235",
+      "splunkbase_id": "5234",
       "label": "Splunk Add-on for Stream Wire Data",
       "license_ack_url": "",
       "package_patterns": ["splunk-add-on-for-stream-wire-data_*"]

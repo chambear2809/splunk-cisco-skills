@@ -1,0 +1,48 @@
+# Cisco DC Networking account intake template
+#
+# Copy this file to `template.local` in the same folder before entering real values.
+# Keep the completed file local only and never commit passwords, certificates, or
+# proxy secrets to git.
+#
+# Fill in only the sections you plan to configure. Duplicate a section when you
+# need more than one account of the same type.
+#
+# `stanza_name` is the account name that will appear in Splunk.
+
+# Cisco ACI / APIC account
+[aci_account]
+stanza_name =
+apic_hostname =
+apic_port = 443
+apic_authentication_type = password_authentication
+apic_login_domain =
+apic_username =
+apic_password =
+apic_certificate_name =
+apic_certificate_path =
+apic_proxy_enabled = 0
+apic_proxy_type = http
+apic_proxy_url =
+apic_proxy_port =
+apic_proxy_username =
+apic_proxy_password =
+
+# Cisco Nexus Dashboard account
+[nexus_dashboard_account]
+stanza_name =
+nd_hostname =
+nd_port = 443
+nd_authentication_type = password_authentication
+nd_username =
+nd_password =
+nd_login_domain =
+nd_enable_proxy = 0
+
+# Cisco Nexus 9K account
+[nexus_9k_account]
+stanza_name =
+nexus_9k_device_ip =
+nexus_9k_port = 443
+nexus_9k_username =
+nexus_9k_password =
+nexus_9k_enable_proxy = 0

@@ -1,0 +1,41 @@
+# Cisco Secure Access intake template
+#
+# Copy to template.local and fill in non-secret values only.
+# Keep the completed file local. Put secrets in temporary files for
+# configure_account.sh.
+
+APP_NAME=cisco-cloud-security
+APP_ID=5558
+
+ORG_ID=
+BASE_URL=
+TIMEZONE=UTC
+STORAGE_REGION=
+
+# Optional indexes
+INVESTIGATE_INDEX=
+PRIVATEAPP_INDEX=
+APPDISCOVERY_INDEX=
+
+# Optional dashboard/app settings
+SEARCH_INTERVAL=12
+REFRESH_RATE=0
+
+# Optional Cloudlock settings
+CLOUDLOCK_NAME=
+CLOUDLOCK_URL=
+CLOUDLOCK_START_DATE=
+CLOUDLOCK_SHOW_INCIDENT_DETAILS=false
+CLOUDLOCK_SHOW_UEBA=false
+
+# Optional S3-backed dashboard indexes
+DNS_INDEX=
+PROXY_INDEX=
+FIREWALL_INDEX=
+DLP_INDEX=
+RAVPN_INDEX=
+
+# Example secret temp files to create yourself:
+# echo "api-key" > /tmp/secure_access_api_key && chmod 600 /tmp/secure_access_api_key
+# echo "api-secret" > /tmp/secure_access_api_secret && chmod 600 /tmp/secure_access_api_secret
+# echo "cloudlock-token" > /tmp/secure_access_cloudlock_token && chmod 600 /tmp/secure_access_cloudlock_token

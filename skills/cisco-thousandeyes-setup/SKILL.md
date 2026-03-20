@@ -66,6 +66,10 @@ No password file or API key file is needed. Instead:
 
 The agent never handles or sees the OAuth tokens.
 
+For prerequisite collection, use `skills/cisco-thousandeyes-setup/template.example`
+as the intake worksheet. Copy it to `template.local`, capture the non-secret
+account details there, and keep the completed file local only.
+
 ## Environment
 
 | Item | Value |

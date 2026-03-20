@@ -48,6 +48,10 @@ script. After the account is created, delete the temp file.
 
 The agent may freely ask for non-secret values: account names, hostnames, client IDs, etc.
 
+For prerequisite collection, use `skills/cisco-intersight-setup/template.example`
+as the intake worksheet. Copy it to `template.local`, fill in non-secret values
+there, and keep the completed file local only.
+
 ## Environment
 
 Setup and validation use the Splunk search-tier REST API and can run from any

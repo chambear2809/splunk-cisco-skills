@@ -162,3 +162,31 @@ teardown() {
     [[ "$output" =~ "requires a value" ]]
     [[ ! "$output" =~ "unbound variable" ]]
 }
+
+@test "security-cloud configure_product --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/cisco-security-cloud-setup/scripts/configure_product.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Cisco Security Cloud Product Setup" ]]
+}
+
+@test "security-cloud configure_product --list-products exits 0" {
+    run bash "${PROJECT_ROOT}/skills/cisco-security-cloud-setup/scripts/configure_product.sh" --list-products
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "xdr" ]]
+    [[ "$output" =~ "duo" ]]
+}
+
+@test "secure-access configure_settings --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/cisco-secure-access-setup/scripts/configure_settings.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Cisco Secure Access Settings Configuration" ]]
+}
+
+@test "secure-access configure_settings rejects invalid cloudlock boolean" {
+    run bash "${PROJECT_ROOT}/skills/cisco-secure-access-setup/scripts/configure_settings.sh" \
+      --org-id example-org \
+      --cloudlock-incident-details maybe
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "must be true or false" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}

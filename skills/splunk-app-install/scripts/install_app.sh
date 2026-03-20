@@ -20,7 +20,7 @@ UPDATE_SET=false
 RESTART_SPLUNK=true
 PRE_VETTED=false
 
-REGISTRY_FILE="${SCRIPT_DIR}/../../../skills/shared/app_registry.json"
+REGISTRY_FILE="${REGISTRY_FILE:-${SCRIPT_DIR}/../../../skills/shared/app_registry.json}"
 
 is_interactive() { [[ -t 0 ]]; }
 
@@ -100,6 +100,208 @@ for app in registry.get('apps', []):
 " "${app_id}" "${REGISTRY_FILE}" 2>/dev/null || true
 }
 
+registry_app_field_by_app_id() {
+    local app_id="${1:-}"
+    local field_name="${2:-}"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 -c "
+import json, sys
+target = sys.argv[1]
+field_name = sys.argv[2]
+with open(sys.argv[3]) as f:
+    registry = json.load(f)
+for app in registry.get('apps', []):
+    if str(app.get('splunkbase_id', '')) == target:
+        value = app.get(field_name, '')
+        if isinstance(value, list):
+            print('\\n'.join(str(item) for item in value if str(item)), end='')
+        else:
+            print(str(value), end='')
+        break
+" "${app_id}" "${field_name}" "${REGISTRY_FILE}" 2>/dev/null || true
+}
+
+registry_install_requires_by_app_id() {
+    registry_app_field_by_app_id "${1:-}" "install_requires"
+}
+
+registry_install_requires_by_package() {
+    local package_name
+    package_name="$(basename "${1:-}" | tr '[:upper:]' '[:lower:]')"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 -c "
+import json, sys, fnmatch
+pkg = sys.argv[1]
+with open(sys.argv[2]) as f:
+    registry = json.load(f)
+for app in registry.get('apps', []):
+    patterns = [str(p).lower() for p in app.get('package_patterns', [])]
+    if any(fnmatch.fnmatch(pkg, pattern) for pattern in patterns):
+        print('\\n'.join(str(item) for item in app.get('install_requires', []) if str(item)), end='')
+        break
+" "${package_name}" "${REGISTRY_FILE}" 2>/dev/null || true
+}
+
+registry_app_id_by_package() {
+    local package_name
+    package_name="$(basename "${1:-}" | tr '[:upper:]' '[:lower:]')"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 -c "
+import json, sys, fnmatch
+pkg = sys.argv[1]
+with open(sys.argv[2]) as f:
+    registry = json.load(f)
+for app in registry.get('apps', []):
+    patterns = [str(p).lower() for p in app.get('package_patterns', [])]
+    if any(fnmatch.fnmatch(pkg, pattern) for pattern in patterns):
+        print(str(app.get('splunkbase_id', '')), end='')
+        break
+" "${package_name}" "${REGISTRY_FILE}" 2>/dev/null || true
+}
+
+registry_app_name_by_app_id() {
+    registry_app_field_by_app_id "${1:-}" "app_name"
+}
+
+registry_app_label_by_app_id() {
+    registry_app_field_by_app_id "${1:-}" "label"
+}
+
+registry_local_package_for_app_id() {
+    local app_id="${1:-}"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 -c "
+import json, sys, fnmatch
+from pathlib import Path
+
+registry_path = sys.argv[1]
+target = sys.argv[2]
+search_dirs = [Path(raw) for raw in sys.argv[3:] if raw]
+
+with open(registry_path) as f:
+    registry = json.load(f)
+
+patterns = []
+for app in registry.get('apps', []):
+    if str(app.get('splunkbase_id', '')) == target:
+        patterns = [str(p).lower() for p in app.get('package_patterns', [])]
+        break
+
+if not patterns:
+    raise SystemExit(0)
+
+seen = set()
+for directory in search_dirs:
+    if not directory.is_dir():
+        continue
+    for child in sorted(directory.iterdir(), key=lambda p: p.name.lower()):
+        if not child.is_file():
+            continue
+        name = child.name.lower()
+        if not (name.endswith('.tgz') or name.endswith('.spl') or name.endswith('.tar.gz')):
+            continue
+        resolved = str(child.resolve())
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if any(fnmatch.fnmatch(name, pattern) for pattern in patterns):
+            print(resolved, end='')
+            raise SystemExit(0)
+" "${REGISTRY_FILE}" "${app_id}" "${PROJECT_TA_DIR}" "${TA_CACHE}" 2>/dev/null || true
+}
+
+registry_target_app_id() {
+    if [[ -n "${APP_ID}" ]]; then
+        printf '%s' "${APP_ID}"
+        return 0
+    fi
+    if [[ -n "${APP_FILE}" ]]; then
+        registry_app_id_by_package "${APP_FILE}"
+    fi
+}
+
+registry_dependency_app_ids_for_current_target() {
+    if [[ -n "${APP_ID}" ]]; then
+        registry_install_requires_by_app_id "${APP_ID}"
+        return 0
+    fi
+    if [[ -n "${APP_FILE}" ]]; then
+        registry_install_requires_by_package "${APP_FILE}"
+    fi
+}
+
+dependency_install_chain_contains() {
+    local app_id="${1:-}"
+    case ",${SPLUNK_INSTALL_CHAIN:-}," in
+        *",${app_id},"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+install_dependency_with_current_script() {
+    local dep_id="${1:-}"
+    local dep_name dep_label dep_package current_target_id chain
+    local -a cmd
+
+    [[ -n "${dep_id}" ]] || return 0
+
+    dep_name="$(registry_app_name_by_app_id "${dep_id}")"
+    dep_label="$(registry_app_label_by_app_id "${dep_id}")"
+    [[ -z "${dep_label}" ]] && dep_label="${dep_name:-Splunkbase app ID ${dep_id}}"
+
+    if dependency_install_chain_contains "${dep_id}"; then
+        log "Skipping required companion app ${dep_label} (${dep_id}) because it is already in the install chain."
+        return 0
+    fi
+
+    if is_splunk_cloud; then
+        if [[ -n "$(cloud_resolve_splunkbase_app_name "${dep_id}" || true)" ]]; then
+            log "Required companion app ${dep_label} (${dep_id}) is already installed."
+            return 0
+        fi
+    else
+        if [[ -n "${dep_name}" ]] && rest_check_app "$SK" "$SPLUNK_URI" "${dep_name}" 2>/dev/null; then
+            log "Required companion app ${dep_label} (${dep_id}) is already installed."
+            return 0
+        fi
+    fi
+
+    dep_package="$(registry_local_package_for_app_id "${dep_id}")"
+    cmd=(bash "$0")
+    if [[ -n "${dep_package}" ]]; then
+        log "Installing required companion app ${dep_label} from ${dep_package} before continuing."
+        cmd+=(--source local --file "${dep_package}")
+    else
+        log "Installing required companion app ${dep_label} from Splunkbase (app ID ${dep_id}) before continuing."
+        cmd+=(--source splunkbase --app-id "${dep_id}")
+    fi
+
+    if [[ -n "${APP_VERSION}" ]]; then
+        cmd+=(--app-version "${APP_VERSION}")
+    fi
+    cmd+=(--no-update --no-restart)
+
+    current_target_id="$(registry_target_app_id)"
+    chain="${SPLUNK_INSTALL_CHAIN:-}"
+    if [[ -n "${current_target_id}" ]] && ! dependency_install_chain_contains "${current_target_id}"; then
+        chain="${chain:+${chain},}${current_target_id}"
+    fi
+    chain="${chain:+${chain},}${dep_id}"
+
+    if ! SPLUNK_INSTALL_CHAIN="${chain}" "${cmd[@]}"; then
+        log "ERROR: Failed to install required companion app ${dep_label} (${dep_id})."
+        exit 1
+    fi
+}
+
+install_required_dependencies() {
+    local dep_id
+    while IFS= read -r dep_id || [[ -n "${dep_id}" ]]; do
+        [[ -n "${dep_id}" ]] || continue
+        install_dependency_with_current_script "${dep_id}"
+    done < <(registry_dependency_app_ids_for_current_target)
+}
+
 cloud_apply_known_splunkbase_defaults() {
     local default_license
     default_license="$(cloud_known_license_ack_url_by_app_id "${APP_ID}")"
@@ -169,8 +371,9 @@ both Cloud and Enterprise targets, interactive runs will prompt when needed, or
 you can override with SPLUNK_PLATFORM=cloud or SPLUNK_PLATFORM=enterprise.
 For Enterprise search-tier REST access, set SPLUNK_SEARCH_API_URI when targeting
 non-localhost (legacy alias: SPLUNK_URI).
-For remote Enterprise local-package installs, the script tries REST upload first,
-then falls back to SSH staging using SPLUNK_SSH_HOST/SPLUNK_SSH_USER/SPLUNK_SSH_PASS.
+For remote Enterprise local-package installs, the script stages the package over
+SSH and then installs it through the management API using filename=true.
+Configure SPLUNK_SSH_HOST/SPLUNK_SSH_USER/SPLUNK_SSH_PASS for remote installs.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
 EOF
             exit 0 ;;
@@ -476,7 +679,7 @@ resolve_splunkbase_release_metadata() {
     fi
 
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    metadata=$(curl -s "${_tls_verify_args[@]}" "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
+    metadata=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
         | python3 -c "
 import json
 import sys
@@ -602,7 +805,7 @@ download_from_url() {
     local http_code
     _set_app_download_curl_tls_args || exit 1
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_app_download_curl_tls_args.
-    http_code=$(curl -sL "${_tls_verify_args[@]}" -w "%{http_code}" \
+    http_code=$(curl -sL ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} -w "%{http_code}" \
         -o "${output_path}" \
         "${APP_URL}" 2>/dev/null || echo "000")
 
@@ -614,20 +817,6 @@ download_from_url() {
 
     log "Downloaded to: ${output_path} (HTTP ${http_code})"
     APP_FILE="${output_path}"
-}
-
-install_via_rest_upload() {
-    local file_path="$1"
-    local update_flag="$2"
-
-    splunk_curl "${SK}" \
-        -X POST "${SPLUNK_URI}/services/apps/local" \
-        -F "name=$(basename "${file_path}")" \
-        -F "appfile=@${file_path}" \
-        -F "update=${update_flag}" \
-        -F "output_mode=json" \
-        -w '\n%{http_code}' \
-        2>/dev/null || true
 }
 
 install_via_server_path() {
@@ -652,7 +841,7 @@ stage_file_via_ssh() {
 
     if ! command -v sshpass >/dev/null 2>&1; then
         log "ERROR: sshpass is required for SSH password-based staging."
-        log "Install sshpass or use a host that supports direct REST upload."
+        log "Install sshpass or stage the package on the Splunk host before installing it."
         return 1
     fi
 
@@ -741,32 +930,24 @@ install_app() {
         log "Installing from local path: ${abs_file_path}"
         response=$(install_via_server_path "${abs_file_path}" "${update_flag}")
     else
-        # Splunk is remote — try direct REST upload first.
-        log "Trying direct REST upload to remote Splunk..."
-        response=$(install_via_rest_upload "${abs_file_path}" "${update_flag}")
-        http_code=$(echo "${response}" | tail -1)
-        body=$(echo "${response}" | sed '$d')
+        local remote_tmp
+        remote_tmp="/tmp/${file_name%.*}.$$.${RANDOM}.$(basename "${file_name}")"
 
-        if [[ "${http_code}" -lt 200 || "${http_code}" -ge 400 ]]; then
-            local remote_tmp
-            remote_tmp="/tmp/${file_name%.*}.$$.${RANDOM}.$(basename "${file_name}")"
-
-            log "REST upload returned HTTP ${http_code}; falling back to SSH staging."
-            if ! load_splunk_ssh_credentials; then
-                log "ERROR: SSH staging requested but SSH credentials are unavailable."
-                exit 1
-            fi
-
-            log "Copying package to ${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}:${remote_tmp} ..."
-            if ! stage_file_via_ssh "${abs_file_path}" "${remote_tmp}"; then
-                log "ERROR: SSH copy failed."
-                exit 1
-            fi
-
-            log "Installing staged package from ${remote_tmp} ..."
-            response=$(install_via_server_path "${remote_tmp}" "${update_flag}")
-            cleanup_remote_stage_file "${remote_tmp}"
+        log "Remote package installs require staging on the Splunk host."
+        if ! load_splunk_ssh_credentials; then
+            log "ERROR: SSH staging requested but SSH credentials are unavailable."
+            exit 1
         fi
+
+        log "Copying package to ${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}:${remote_tmp} ..."
+        if ! stage_file_via_ssh "${abs_file_path}" "${remote_tmp}"; then
+            log "ERROR: SSH copy failed."
+            exit 1
+        fi
+
+        log "Installing staged package from ${remote_tmp} ..."
+        response=$(install_via_server_path "${remote_tmp}" "${update_flag}")
+        cleanup_remote_stage_file "${remote_tmp}"
     fi
 
     http_code=$(echo "${response}" | tail -1)
@@ -853,6 +1034,7 @@ main() {
         esac
 
         prompt_update
+        install_required_dependencies
         cloud_install_app
         exit 0
     fi
@@ -878,6 +1060,7 @@ main() {
     prompt_update
     prompt_splunk_creds
     splunk_auth
+    install_required_dependencies
     install_app "${APP_FILE}"
 }
 

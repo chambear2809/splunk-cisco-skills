@@ -66,7 +66,10 @@ The current skills fall into three architectural roles:
 
 - **Collector/setup skills** — install apps, create indexes, configure accounts,
   and enable inputs. Examples: Catalyst, DC Networking, Intersight, Meraki,
-  and ThousandEyes.
+  Security Cloud, Secure Access, and ThousandEyes.
+- **Parser/mapping skills** — install supporting add-ons that contribute field
+  mappings or search-time parsing context but rely on a separate ingestion path.
+  Example: `cisco-catalyst-enhanced-netflow-setup`.
 - **Search-time / visualization skills** — configure macros, saved searches, or
   data model behavior on top of data collected elsewhere. Example:
   `cisco-enterprise-networking-setup`.

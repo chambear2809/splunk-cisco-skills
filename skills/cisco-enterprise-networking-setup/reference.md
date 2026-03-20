@@ -88,8 +88,8 @@ Controls whether dashboards use accelerated data model summaries.
 
 | Dependency | App ID | Required For |
 |---|---|---|
-| Cisco Catalyst Add-on | `TA_cisco_catalyst` | Data collection (required) |
+| Cisco Catalyst Add-on | `TA_cisco_catalyst` | Data collection (required; auto-installed alongside app ID `7539` when missing) |
 | Splunk Add-on for Stream | `splunk_app_stream` | NetFlow data (optional) |
-| Cisco Catalyst Enhanced Netflow | `splunk_app_stream_ipfix_cisco_hsl` | Enhanced NetFlow (optional) |
+| Cisco Catalyst Enhanced Netflow | `splunk_app_stream_ipfix_cisco_hsl` | Enhanced NetFlow parsing for additional dashboards (optional) |
 | Cisco Meraki Add-on | `Splunk_TA_cisco_meraki` | Meraki data (optional) |
 | Cisco ThousandEyes Add-on | `ta_cisco_thousandeyes` | ThousandEyes data (optional) |

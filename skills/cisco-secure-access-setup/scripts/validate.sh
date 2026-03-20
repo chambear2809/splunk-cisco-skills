@@ -1,0 +1,276 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+
+APP_NAME="cisco-cloud-security"
+ORG_ID=""
+SK=""
+
+PASS=0
+FAIL=0
+WARN=0
+
+pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
+fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
+warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
+info() { log "  INFO: $*"; }
+
+usage() {
+    cat <<EOF
+Cisco Secure Access Validation
+
+Usage: $(basename "$0") [OPTIONS]
+
+Options:
+  --org-id ID                Validate one specific org account
+  --help                     Show this help
+EOF
+    exit 0
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --org-id) require_arg "$1" $# || exit 1; ORG_ID="$2"; shift 2 ;;
+        --help) usage ;;
+        *) log "Unknown option: $1"; usage ;;
+    esac
+done
+
+org_accounts_get() {
+    local query="$1"
+    splunk_curl "${SK}" \
+        "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/org_accounts?${query}" \
+        -w '\n%{http_code}' 2>/dev/null || true
+}
+
+collection_get() {
+    local collection="$1"
+    splunk_curl "${SK}" \
+        "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/storage/collections/data/$(_urlencode "${collection}")" \
+        2>/dev/null || echo "[]"
+}
+
+log "=== Cisco Secure Access Validation ==="
+log ""
+
+log "--- App Installation ---"
+if ! load_splunk_credentials; then
+    fail "Could not load Splunk credentials — check credentials file"
+elif ! SK=$(get_session_key "${SPLUNK_URI}"); then
+    fail "Could not authenticate to Splunk REST API — check credentials"
+else
+    if rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null; then
+        version=$(rest_get_app_version "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null || echo "unknown")
+        pass "App installed (version: ${version})"
+    else
+        fail "App not found — install Cisco Secure Access first"
+    fi
+fi
+
+if [[ -n "${SK:-}" ]]; then
+log ""
+log "--- Org Accounts ---"
+if [[ -n "${ORG_ID}" ]]; then
+    query="orgId=$(_urlencode "${ORG_ID}")&fields=all"
+    response="$(org_accounts_get "${query}")"
+    http_code="$(echo "${response}" | sed -n '$p')"
+    body="$(echo "${response}" | sed '$d')"
+    if [[ "${http_code}" == "200" ]]; then
+        pass "Org account '${ORG_ID}' exists"
+        payload_summary="$(printf '%s' "${body}" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    payload = data.get('payload', {})
+    rows = payload.get('data', [])
+    if rows:
+        row = rows[0]
+        print('|'.join([
+            row.get('orgId', ''),
+            row.get('investigate_index', '') or '',
+            row.get('privateapp_index', '') or '',
+            row.get('appdiscovery_index', '') or '',
+        ]), end='')
+except Exception:
+    pass
+")"
+        IFS='|' read -r found_org investigate_idx privateapp_idx appdiscovery_idx <<< "${payload_summary}"
+        [[ -n "${investigate_idx}" ]] && pass "Investigate index configured: ${investigate_idx}" || info "Investigate index not configured"
+        [[ -n "${privateapp_idx}" ]] && pass "Private Apps index configured: ${privateapp_idx}" || info "Private Apps index not configured"
+        [[ -n "${appdiscovery_idx}" ]] && pass "App Discovery index configured: ${appdiscovery_idx}" || info "App Discovery index not configured"
+    elif [[ "${http_code}" == "404" ]]; then
+        fail "Org account '${ORG_ID}' not found"
+    else
+        fail "Failed to query org account '${ORG_ID}' (HTTP ${http_code})"
+    fi
+else
+    response="$(org_accounts_get "fields=all&draw=1&start=0&length=100")"
+    http_code="$(echo "${response}" | sed -n '$p')"
+    body="$(echo "${response}" | sed '$d')"
+    if [[ "${http_code}" == "200" ]]; then
+        account_count="$(printf '%s' "${body}" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    payload = data.get('payload', {})
+    print(int(payload.get('recordsTotal', 0)), end='')
+except Exception:
+    print(0, end='')
+")"
+        if [[ "${account_count}" -gt 0 ]]; then
+            pass "Configured org accounts: ${account_count}"
+        else
+            warn "No Secure Access org accounts are configured yet"
+        fi
+    else
+        fail "Failed to enumerate Secure Access org accounts (HTTP ${http_code})"
+    fi
+fi
+
+log ""
+log "--- App Bootstrap ---"
+terms_count="$(collection_get "cloudlock-v2-tos" | python3 -c "
+import json, sys
+try:
+    print(len(json.load(sys.stdin)), end='')
+except Exception:
+    print(0, end='')
+")"
+if [[ "${terms_count}" -gt 0 ]]; then
+    pass "Terms acceptance record present"
+else
+    warn "Terms acceptance record not found — app UI may still prompt for acknowledgement"
+fi
+
+global_org_value="$(collection_get "global_org" | python3 -c "
+import json, sys
+try:
+    rows = json.load(sys.stdin)
+    if rows:
+        print(rows[0].get('orgId', ''), end='')
+except Exception:
+    pass
+")"
+if [[ -n "${global_org_value}" ]]; then
+    pass "Global org configured: ${global_org_value}"
+    if [[ -n "${ORG_ID}" && "${ORG_ID}" != "${global_org_value}" ]]; then
+        fail "Requested org '${ORG_ID}' does not match global org '${global_org_value}'"
+    fi
+else
+    warn "Global org not configured"
+fi
+
+log ""
+log "--- Dashboard Settings ---"
+dashboard_interval="$(collection_get "dashboard_settings" | python3 -c "
+import json, sys
+try:
+    rows = json.load(sys.stdin)
+    if rows:
+        print(rows[-1].get('search_interval', ''), end='')
+except Exception:
+    pass
+")"
+if [[ -n "${dashboard_interval}" ]]; then
+    pass "Dashboard search interval configured: ${dashboard_interval}"
+else
+    warn "Dashboard search interval not stored — the UI falls back to 12 hours"
+fi
+
+refresh_rate="$(collection_get "refresh_rate" | python3 -c "
+import json, sys
+try:
+    rows = json.load(sys.stdin)
+    if rows:
+        print(rows[-1].get('refresh_rate', ''), end='')
+except Exception:
+    pass
+")"
+if [[ -n "${refresh_rate}" ]]; then
+    pass "Refresh rate configured: ${refresh_rate}"
+else
+    warn "Refresh rate not stored"
+fi
+
+cloudlock_status="$(collection_get "cloudlock_settings" | python3 -c "
+import json, sys
+try:
+    rows = json.load(sys.stdin)
+    if rows:
+        row = rows[-1]
+        print('|'.join([
+            row.get('configName', ''),
+            row.get('status', ''),
+            row.get('url', '')
+        ]), end='')
+except Exception:
+    pass
+")"
+IFS='|' read -r cloudlock_name cloudlock_state cloudlock_url <<< "${cloudlock_status}"
+if [[ -n "${cloudlock_name}" ]]; then
+    pass "Cloudlock settings present: ${cloudlock_name}${cloudlock_state:+ (${cloudlock_state})}"
+else
+    info "Cloudlock settings not configured"
+fi
+
+org_filter="${ORG_ID:-${global_org_value:-}}"
+dest_count="$(collection_get "selected_destination_lists" | python3 -c "
+import json, sys
+org_id = sys.argv[1]
+try:
+    rows = json.load(sys.stdin)
+    if org_id:
+        rows = [row for row in rows if row.get('orgId') == org_id]
+    print(len(rows), end='')
+except Exception:
+    print(0, end='')
+" "${org_filter}")"
+if [[ "${dest_count}" -gt 0 ]]; then
+    pass "Selected destination lists configured: ${dest_count}"
+else
+    info "No selected destination lists configured"
+fi
+
+s3_summary="$(collection_get "s3_indexes" | python3 -c "
+import json, sys
+org_id = sys.argv[1]
+try:
+    rows = json.load(sys.stdin)
+    if org_id:
+        rows = [row for row in rows if row.get('orgId') == org_id]
+    if rows:
+        row = rows[-1]
+        values = [row.get(key, '') for key in ('dns_index', 'proxy_index', 'firewall_index', 'dlp_index', 'ravpn_index')]
+        print('|'.join(values), end='')
+except Exception:
+    pass
+" "${org_filter}")"
+IFS='|' read -r dns_idx proxy_idx firewall_idx dlp_idx ravpn_idx <<< "${s3_summary}"
+if [[ -n "${dns_idx}${proxy_idx}${firewall_idx}${dlp_idx}${ravpn_idx}" ]]; then
+    pass "S3-backed indexes configured"
+    [[ -n "${dns_idx}" ]] && info "DNS index: ${dns_idx}"
+    [[ -n "${proxy_idx}" ]] && info "Proxy index: ${proxy_idx}"
+    [[ -n "${firewall_idx}" ]] && info "Firewall index: ${firewall_idx}"
+    [[ -n "${dlp_idx}" ]] && info "DLP index: ${dlp_idx}"
+    [[ -n "${ravpn_idx}" ]] && info "RA VPN index: ${ravpn_idx}"
+else
+    info "S3-backed dashboard indexes not configured"
+fi
+fi
+
+log ""
+log "=== Validation Summary ==="
+log "  PASS: ${PASS} | WARN: ${WARN} | FAIL: ${FAIL}"
+
+if [[ ${FAIL} -gt 0 ]]; then
+    log "  Status: ISSUES FOUND — review failures above"
+    exit 1
+elif [[ ${WARN} -gt 0 ]]; then
+    log "  Status: OK with warnings"
+    exit 0
+else
+    log "  Status: ALL CHECKS PASSED"
+    exit 0
+fi

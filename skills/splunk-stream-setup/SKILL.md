@@ -21,7 +21,18 @@ Automates installation and configuration of the **Splunk Stream** stack (v8.1.6)
 
 ## Package Model
 
-Use the original vendor archives from `splunk-ta/` as-is:
+On Splunk Enterprise, the install flow is:
+
+1. try Splunkbase first for the current app ID
+2. fall back to the original vendor archive in `splunk-ta/` if Splunkbase is unavailable or the download fails
+
+Current Splunkbase app IDs:
+
+- `splunk_app_stream`: `1809`
+- `Splunk_TA_stream`: `5238`
+- `Splunk_TA_stream_wire_data`: `5234`
+
+Use the original vendor archives from `splunk-ta/` as the local fallback packages:
 
 - `splunk-app-for-stream_816.tgz`
 - `splunk-add-on-for-stream-forwarders_816.tgz`
@@ -104,8 +115,11 @@ bash skills/splunk-stream-setup/scripts/setup.sh --install
 
 On Splunk Enterprise, installs any of the three apps that are not already
 present. It uses the `splunk-app-install` skill's `install_app.sh` under the
-hood, including the same remote-host behavior: direct REST upload first, then
-SSH staging when the target cannot read the local package path directly.
+hood and follows the same package policy as the rest of the repo: Splunkbase
+first, then local fallback from `splunk-ta/`. For local fallback installs on a
+remote host, the installer uses the same remote-host behavior as the generic
+app installer: direct REST upload first, then SSH staging when the target
+cannot read the local package path directly.
 
 On Splunk Cloud, do **not** run the combined install path against the cloud
 search tier. Splunk documents Stream on Cloud as a hybrid deployment:

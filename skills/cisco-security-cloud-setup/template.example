@@ -1,0 +1,47 @@
+# Cisco Security Cloud input intake template
+#
+# Copy to template.local and fill in non-secret values only.
+# Keep the completed file local. Put secrets in temporary files when running
+# configure_product.sh with --secret-file.
+
+APP_NAME=CiscoSecurityCloud
+APP_ID=7404
+
+# Pick one product key from products.json / configure_product.sh --list-products
+PRODUCT=xdr
+INPUT_NAME=XDR_Default
+
+# Common fields
+INDEX=
+INTERVAL=
+SOURCETYPE=
+
+# Product-specific examples
+REGION=
+AUTH_METHOD=
+CLIENT_ID=
+API_HOST=
+USERNAME=
+FMC_HOST=
+FMC_PORT=
+EVENT_TYPES=
+GROUPS=
+TYPE=
+PORT=
+IP_ADDRESS=
+DOMAIN_ID=
+SE_IMPORT_TIME_RANGE=
+XDR_IMPORT_TIME_RANGE=
+ETD_REGION=
+ETD_IMPORT_TIME_RANGE=
+AFTER=
+INTEGRATION_METHOD=
+HEC_URL=
+CII_API_URL=
+CII_TOKEN_URL=
+CII_AUDIENCE=
+S3_BUCKET_URL=
+S3_BUCKET_REGION=
+
+# Example secret temp files to create yourself:
+# echo "secret" > /tmp/cisco_security_cloud_secret && chmod 600 /tmp/cisco_security_cloud_secret

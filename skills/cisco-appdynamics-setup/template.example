@@ -1,0 +1,37 @@
+# Cisco AppDynamics account intake template
+#
+# Copy this file to `template.local` in the same folder before entering real values.
+# Keep the completed file local only and never commit client secrets or analytics
+# secrets to git.
+#
+# Fill in only the sections you plan to configure. Duplicate a section when you
+# need more than one account of the same type.
+#
+# `stanza_name` is the account name that will appear in Splunk.
+
+# Controller account
+[controller_account]
+stanza_name =
+appd_controller_url =
+appd_client_name =
+appd_client_secret =
+authentication = oauth
+
+# Analytics account
+[analytics_account]
+stanza_name =
+appd_analytics_account_name =
+# Use `None` here for on-prem analytics and fill `appd_onprem_analytics_url`.
+appd_analytics_endpoint = https://analytics.api.appdynamics.com
+appd_onprem_analytics_url =
+appd_analytics_secret =
+
+# Supported SaaS analytics endpoints include:
+# - https://analytics.api.appdynamics.com
+# - https://gru-ana-api.saas.appdynamics.com
+# - https://azure-ana-api.saas.appdynamics.com
+# - https://fra-ana-api.saas.appdynamics.com
+# - https://lon-ana-api.saas.appdynamics.com
+# - https://bom-ana-api.saas.appdynamics.com
+# - https://sin-ana-api.saas.appdynamics.com
+# - https://syd-ana-api.saas.appdynamics.com

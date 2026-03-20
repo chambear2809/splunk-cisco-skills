@@ -178,7 +178,7 @@ verify_search_api_connectivity() {
     fi
 
     _set_splunk_curl_tls_args || return 1
-    http_code=$(curl -s "${_tls_verify_args[@]}" --connect-timeout 8 --max-time 15 \
+    http_code=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} --connect-timeout 8 --max-time 15 \
         -o /dev/null -w '%{http_code}' "${uri}/services/auth/login" 2>/dev/null || echo "000")
     case "${http_code}" in
         000)
@@ -208,7 +208,7 @@ get_session_key() {
     _set_splunk_curl_tls_args || return 1
     body=$(form_urlencode_pairs username "${SPLUNK_USER}" password "${SPLUNK_PASS}") || return 1
     sk=$(printf '%s' "${body}" \
-        | curl -s "${_tls_verify_args[@]}" --connect-timeout 10 --max-time 30 "${uri}/services/auth/login" -d @- 2>/dev/null \
+        | curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} --connect-timeout 10 --max-time 30 "${uri}/services/auth/login" -d @- 2>/dev/null \
         | sed -n 's/.*<sessionKey>\([^<]*\)<.*/\1/p' || true)
 
     if [[ -z "${sk}" ]]; then
@@ -221,7 +221,7 @@ get_session_key() {
 splunk_curl() {
     local sk="$1"; shift
     _set_splunk_curl_tls_args || return 1
-    curl -s "${_tls_verify_args[@]}" -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") "$@"
+    curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") "$@"
 }
 
 splunk_curl_post() {
@@ -229,7 +229,7 @@ splunk_curl_post() {
     local post_data="$1"; shift
     _set_splunk_curl_tls_args || return 1
     printf '%s' "${post_data}" \
-        | curl -s "${_tls_verify_args[@]}" -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") -d @- "$@"
+        | curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") -d @- "$@"
 }
 
 read_secret_file() {

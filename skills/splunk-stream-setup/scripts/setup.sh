@@ -6,7 +6,8 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 PROJECT_TA_DIR="${SCRIPT_DIR}/../../../splunk-ta"
 TA_CACHE="${TA_CACHE:-${PROJECT_TA_DIR}}"
-APP_INSTALL_SCRIPT="${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh"
+APP_INSTALL_SCRIPT="${APP_INSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh}"
+REGISTRY_FILE="${REGISTRY_FILE:-${SCRIPT_DIR}/../../shared/app_registry.json}"
 
 INSTALL=false
 INDEXES_ONLY=false
@@ -28,7 +29,7 @@ Splunk Stream Setup Automation
 Usage: $(basename "$0") [OPTIONS]
 
 Operations:
-  --install                Install missing Stream apps from local cache
+  --install                Install missing Stream apps (Splunkbase first, local fallback)
   --indexes-only           Create indexes only
   --configure-streamfwd    Configure the stream forwarder
   (no flags)               Full setup: install + indexes + configure
@@ -46,7 +47,7 @@ NetFlow Options (optional):
 
 Environment:
   SPLUNK_SEARCH_API_URI    Search-tier REST URI (legacy alias: SPLUNK_URI)
-  TA_CACHE                 Local cache for app packages (default: project-root splunk-ta/)
+  TA_CACHE                 Local fallback cache for app packages (default: project-root splunk-ta/)
 
 Splunk credentials are read from the project-root credentials file automatically.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
@@ -91,13 +92,45 @@ check_connectivity() {
     return 0
 }
 
-install_app_from_file() {
+lookup_splunkbase_id() {
+    local app_name="$1"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 -c "
+import json, sys
+
+target_app = sys.argv[1]
+registry_path = sys.argv[2]
+
+with open(registry_path, encoding='utf-8') as handle:
+    registry = json.load(handle)
+
+for app in registry.get('apps', []):
+    if app.get('skill') == 'splunk-stream-setup' and app.get('app_name') == target_app:
+        print(app.get('splunkbase_id', ''), end='')
+        break
+" "${app_name}" "${REGISTRY_FILE}" 2>/dev/null || true
+}
+
+install_app_with_fallback() {
     local pkg_file="$1"
     local app_name="$2"
+    local app_id
 
     if rest_check_app "${SK}" "${SPLUNK_URI}" "${app_name}"; then
         log "  ${app_name} already installed — skipping"
         return 0
+    fi
+
+    app_id="$(lookup_splunkbase_id "${app_name}")"
+    if [[ -n "${app_id}" ]]; then
+        log "  Trying Splunkbase install for ${app_name} (app ID ${app_id})..."
+        if bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${app_id}" --no-update --no-restart; then
+            log "  ${app_name} installation completed via Splunkbase."
+            return 0
+        fi
+        log "  Splunkbase install failed for ${app_name}; falling back to local package."
+    else
+        log "  WARNING: No Splunkbase ID found for ${app_name}; falling back to local package."
     fi
 
     if [[ ! -f "${pkg_file}" ]]; then
@@ -106,8 +139,8 @@ install_app_from_file() {
     fi
 
     log "  Installing ${app_name} from ${pkg_file} via splunk-app-install..."
-    if bash "${APP_INSTALL_SCRIPT}" --source local --file "${pkg_file}" --no-update; then
-        log "  ${app_name} installation completed."
+    if bash "${APP_INSTALL_SCRIPT}" --source local --file "${pkg_file}" --no-update --no-restart; then
+        log "  ${app_name} installation completed from local package."
     else
         log "  ERROR: Failed to install ${app_name} from ${pkg_file}"
         return 1
@@ -118,15 +151,15 @@ install_apps() {
     log "=== Installing Splunk Stream Apps ==="
     _get_session_key || exit 1
 
-    install_app_from_file \
+    install_app_with_fallback \
         "${TA_CACHE}/splunk-app-for-stream_816.tgz" \
         "splunk_app_stream"
 
-    install_app_from_file \
+    install_app_with_fallback \
         "${TA_CACHE}/splunk-add-on-for-stream-forwarders_816.tgz" \
         "Splunk_TA_stream"
 
-    install_app_from_file \
+    install_app_with_fallback \
         "${TA_CACHE}/splunk-add-on-for-stream-wire-data_816.tgz" \
         "Splunk_TA_stream_wire_data"
 

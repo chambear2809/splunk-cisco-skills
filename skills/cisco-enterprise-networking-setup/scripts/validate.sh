@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="cisco-catalyst-app"
+CATALYST_TA_APP="TA_cisco_catalyst"
+ENHANCED_NETFLOW_TA_APP="splunk_app_stream_ipfix_cisco_hsl"
 readonly SAVED_SEARCHES=(
     "cisco_catalyst_location"
     "cisco_catalyst_sdwan_netflow"
@@ -41,11 +43,17 @@ fi
 
 if [[ -n "${SK:-}" ]]; then
 log ""
-log "--- Companion TA ---"
-if rest_check_app "$SK" "$SPLUNK_URI" "TA_cisco_catalyst" 2>/dev/null; then
-    pass "Cisco Catalyst TA (TA_cisco_catalyst) is installed"
+log "--- Companion Technical Add-ons ---"
+if rest_check_app "$SK" "$SPLUNK_URI" "${CATALYST_TA_APP}" 2>/dev/null; then
+    pass "Cisco Catalyst Add-on (${CATALYST_TA_APP}) is installed"
 else
-    fail "Cisco Catalyst TA not found — dashboards will have no data"
+    fail "Cisco Catalyst Add-on (${CATALYST_TA_APP}) not found — dashboards will have no Catalyst, ISE, SD-WAN, or Cyber Vision data"
+fi
+
+if rest_check_app "$SK" "$SPLUNK_URI" "${ENHANCED_NETFLOW_TA_APP}" 2>/dev/null; then
+    pass "Cisco Catalyst Enhanced Netflow Add-on (${ENHANCED_NETFLOW_TA_APP}) is installed"
+else
+    warn "Optional Cisco Catalyst Enhanced Netflow Add-on (${ENHANCED_NETFLOW_TA_APP}) not found — additional NetFlow-focused dashboards will remain unavailable"
 fi
 
 log ""

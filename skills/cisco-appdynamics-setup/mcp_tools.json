@@ -1,0 +1,112 @@
+{
+  "name": "Cisco AppDynamics Tools",
+  "description": "MCP tools for managing and querying the Cisco Splunk Add-on for AppDynamics",
+  "version": "1.0.0",
+  "author": "cisco-appdynamics-setup skill",
+  "tools": [
+    {
+      "_key": "cisco_appdynamics:check_health",
+      "name": "cisco_appdynamics_check_health",
+      "title": "Cisco AppDynamics Health Check",
+      "description": "Check overall AppDynamics add-on health including configured controller accounts, enabled inputs, event counts, and last event time.",
+      "category": "cisco_appdynamics",
+      "tags": ["cisco", "appdynamics", "health", "status"],
+      "time_range": false,
+      "row_limiter": false,
+      "spl": "| rest /servicesNS/nobody/Splunk_TA_AppDynamics/Splunk_TA_AppDynamics_account count=0 | stats count as controller_accounts | appendcols [| rest /services/data/inputs/all count=0 | search eai:acl.app=\"Splunk_TA_AppDynamics\" disabled=0 | stats count as enabled_inputs] | appendcols [| tstats count as total_events where index=appdynamics] | appendcols [| tstats latest(_time) as last_event where index=appdynamics | eval last_event=strftime(last_event, \"%Y-%m-%d %H:%M:%S\")]",
+      "arguments": [],
+      "examples": ["Check AppDynamics add-on health", "How many AppDynamics events are being collected?"]
+    },
+    {
+      "_key": "cisco_appdynamics:list_inputs",
+      "name": "cisco_appdynamics_list_inputs",
+      "title": "AppDynamics List Inputs",
+      "description": "List all configured AppDynamics data inputs with their state and index.",
+      "category": "cisco_appdynamics",
+      "tags": ["cisco", "appdynamics", "inputs", "configuration"],
+      "time_range": false,
+      "row_limiter": false,
+      "spl": "| rest /services/data/inputs/all count=0 | search eai:acl.app=\"Splunk_TA_AppDynamics\" | eval input_type=mvindex(split(title, \":\"), 0) | table title, input_type, disabled, index, interval | sort title",
+      "arguments": [],
+      "examples": ["List AppDynamics inputs", "Show configured AppDynamics data inputs"]
+    },
+    {
+      "_key": "cisco_appdynamics:status_summary",
+      "name": "cisco_appdynamics_status_summary",
+      "title": "AppDynamics Status Summary",
+      "description": "Summarize high-level AppDynamics status events by entity type.",
+      "category": "cisco_appdynamics",
+      "tags": ["cisco", "appdynamics", "status", "apm"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=appdynamics sourcetype=appdynamics_status | stats count by source | sort -count",
+      "arguments": [],
+      "examples": ["Show AppDynamics status summary", "What AppDynamics status data is arriving?"]
+    },
+    {
+      "_key": "cisco_appdynamics:events",
+      "name": "cisco_appdynamics_events",
+      "title": "AppDynamics Events",
+      "description": "Show AppDynamics events and health rule activity by severity and rule name.",
+      "category": "cisco_appdynamics",
+      "tags": ["cisco", "appdynamics", "events", "health-rules"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=appdynamics sourcetype=appdynamics_events | stats count by severity, healthRuleName | sort -count",
+      "arguments": [],
+      "examples": ["Show AppDynamics events", "Any critical AppDynamics health rule violations?"]
+    },
+    {
+      "_key": "cisco_appdynamics:security",
+      "name": "cisco_appdynamics_security",
+      "title": "AppDynamics Security Summary",
+      "description": "Summarize Secure Application events by status and signature.",
+      "category": "cisco_appdynamics",
+      "tags": ["cisco", "appdynamics", "security", "secureapp"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=appdynamics sourcetype=appdynamics_security | stats count by status, signature | sort -count",
+      "arguments": [],
+      "examples": ["Show AppDynamics security findings", "Any active AppDynamics attack data?"]
+    },
+    {
+      "_key": "cisco_appdynamics:audit_log",
+      "name": "cisco_appdynamics_audit_log",
+      "title": "AppDynamics Audit Log",
+      "description": "Show recent AppDynamics controller audit activity grouped by user and action.",
+      "category": "cisco_appdynamics",
+      "tags": ["cisco", "appdynamics", "audit", "controller"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=appdynamics sourcetype=appdynamics_audit | spath | eval user=coalesce(user,userName,username,principal), action=coalesce(action,auditAction,eventType,operation) | stats count by user, action | sort -count",
+      "arguments": [],
+      "examples": ["Show AppDynamics audit log", "Who changed AppDynamics controller settings?"]
+    },
+    {
+      "_key": "cisco_appdynamics:licenses",
+      "name": "cisco_appdynamics_licenses",
+      "title": "AppDynamics License Usage",
+      "description": "Show AppDynamics license usage events by license source.",
+      "category": "cisco_appdynamics",
+      "tags": ["cisco", "appdynamics", "licenses"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=appdynamics sourcetype=appdynamics_licenses | eval license_type=case(source=\"appdynamics_abl_licenses\",\"ABL\", source=\"appdynamics_ibl_licenses\",\"IBL\", 1=1, source) | stats count by license_type | sort -count",
+      "arguments": [],
+      "examples": ["Show AppDynamics license usage", "Which AppDynamics license feeds are active?"]
+    },
+    {
+      "_key": "cisco_appdynamics:ingestion_breakdown",
+      "name": "cisco_appdynamics_ingestion_breakdown",
+      "title": "AppDynamics Ingestion Breakdown",
+      "description": "Show AppDynamics event counts by sourcetype to understand which input families are active.",
+      "category": "cisco_appdynamics",
+      "tags": ["cisco", "appdynamics", "ingestion", "sourcetypes"],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "index=appdynamics sourcetype=appdynamics_* | stats count by sourcetype | sort -count",
+      "arguments": [],
+      "examples": ["Show AppDynamics ingestion breakdown", "Which AppDynamics sourcetypes are present?"]
+    }
+  ]
+}

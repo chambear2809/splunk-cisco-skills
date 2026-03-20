@@ -6,6 +6,9 @@ splunk-ta/*.tgz
 splunk-ta/*.spl
 splunk-ta/*.tar.gz
 
+# --- Also ignore the splunk_ta directory ---
+splunk_ta/
+
 # --- Unpacked vendor packages (review-only, too large for git) ---
 splunk-ta/_unpacked/
 
@@ -26,3 +29,6 @@ plugins/
 commands/
 subagents/
 projects/tmp-*
+
+# --- Local TA intake templates ---
+**/template.local

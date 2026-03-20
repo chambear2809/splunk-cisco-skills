@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/credential_helpers.sh"
 
-REGISTRY_FILE="${_PROJECT_ROOT}/skills/shared/app_registry.json"
+REGISTRY_FILE="${REGISTRY_FILE:-${_PROJECT_ROOT}/skills/shared/app_registry.json}"
 
 usage() {
     cat <<EOF
@@ -49,6 +49,41 @@ if ! is_splunk_cloud; then
     log "ERROR: This script is for Splunk Cloud only."
     exit 1
 fi
+
+expand_dependency_app_ids() {
+    if [[ ! -f "${REGISTRY_FILE}" ]]; then
+        printf '%s\n' "${APP_IDS[@]}"
+        return 0
+    fi
+
+    python3 -c "
+import json, sys
+
+with open(sys.argv[1]) as f:
+    registry = json.load(f)
+
+deps = {
+    str(app.get('splunkbase_id', '')): [str(dep) for dep in app.get('install_requires', []) if str(dep)]
+    for app in registry.get('apps', [])
+}
+
+seen = set()
+ordered = []
+
+def add(app_id):
+    if not app_id or app_id in seen:
+        return
+    for dep_id in deps.get(app_id, []):
+        add(dep_id)
+    seen.add(app_id)
+    ordered.append(app_id)
+
+for requested in sys.argv[2:]:
+    add(str(requested))
+
+print('\\n'.join(ordered), end='')
+" "${REGISTRY_FILE}" "${APP_IDS[@]}"
+}
 
 resolve_license_ack() {
     local app_id="$1"
@@ -104,6 +139,16 @@ except Exception:
     fi
     return 0
 }
+
+expanded_app_ids=()
+while IFS= read -r expanded_id || [[ -n "${expanded_id}" ]]; do
+    [[ -n "${expanded_id}" ]] || continue
+    expanded_app_ids+=("${expanded_id}")
+done < <(expand_dependency_app_ids)
+
+if (( ${#expanded_app_ids[@]} > 0 )); then
+    APP_IDS=("${expanded_app_ids[@]}")
+fi
 
 acs_prepare_context || exit 1
 

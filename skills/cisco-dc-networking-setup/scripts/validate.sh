@@ -103,8 +103,8 @@ done
 
 log ""
 log "--- Settings ---"
-ssl_verify=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_dc_networking_app_for_splunk_settings" "default" "verify_ssl" 2>/dev/null || true)
-if [[ "${ssl_verify}" == "True" ]]; then
+ssl_verify=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_dc_networking_app_for_splunk_settings" "additional_parameters" "verify_ssl" 2>/dev/null || true)
+if [[ "${ssl_verify}" == "True" || "${ssl_verify}" == "1" ]]; then
     pass "SSL verification is enabled"
 else
     warn "SSL verification is disabled (verify_ssl = ${ssl_verify})"

@@ -1,0 +1,17 @@
+# Cisco Intersight account intake template
+#
+# Copy this file to `template.local` in the same folder before entering real values.
+# Keep the completed file local only and never commit client secrets to git.
+#
+# Duplicate the section when you need more than one account.
+#
+# `stanza_name` is the account name that will appear in Splunk.
+# Auto-populated fields such as MOID, account display name, and validity dates are
+# intentionally omitted because the add-on fills them in after authentication.
+
+[intersight_account]
+stanza_name =
+intersight_hostname = intersight.com
+client_id =
+client_secret =
+create_default_inputs = 1

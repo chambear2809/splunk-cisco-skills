@@ -40,6 +40,9 @@ Most of the repo follows the same pattern:
 
 - `SKILL.md` explains when to use the skill and what values the agent may ask
   for.
+- `template.example` is present in account-driven skills as a non-secret intake
+  worksheet that admins can copy to `template.local` before gathering account
+  details.
 - `reference.md` contains vendor-specific details such as input families,
   account fields, or app behavior.
 - `scripts/` contains the actual shell automation.
@@ -53,6 +56,9 @@ skill-specific details.
 | Skill | Target | Main purpose |
 |-------|--------|--------------|
 | `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision inputs |
+| `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards |
+| `cisco-security-cloud-setup` | `CiscoSecurityCloud` | Install and configure product-specific Cisco Security Cloud inputs with dashboard-ready defaults |
+| `cisco-secure-access-setup` | `cisco-cloud-security` | Install and configure Secure Access org accounts, app settings, and dashboard prerequisites |
 | `cisco-dc-networking-setup` | `cisco_dc_networking_app_for_splunk` | Configure ACI, Nexus Dashboard, and Nexus 9K data collection |
 | `cisco-intersight-setup` | `Splunk_TA_Cisco_Intersight` | Configure Cisco Intersight account, index, and inputs |
 | `cisco-meraki-ta-setup` | `Splunk_TA_cisco_meraki` | Configure Meraki organization account, index, and polling inputs |
@@ -231,6 +237,12 @@ The `splunk-ta/` directory is the local package cache. Splunkbase downloads
 are saved there automatically, `--source local` looks there when listing
 available packages, and the binaries are intentionally ignored by Git.
 
+Some installs also pull required companion packages from the app registry. For
+example, installing Cisco Enterprise Networking (`7539`) now auto-installs the
+required Cisco Catalyst Add-on (`7538`) when it is not already present. The
+Cisco Catalyst Enhanced Netflow Add-on (`6872`) is optional for additional
+dashboard coverage and is no longer auto-installed.
+
 When the target platform is **Splunk Enterprise**, the installer will:
 
 1. try a direct REST upload first
@@ -278,6 +290,11 @@ such as:
 
 Secrets should come from the `credentials` file or from temporary files passed
 to `--password-file`, `--api-token-file`, or similar flags.
+
+For the account-driven Cisco skills, admins can also start with the skill-local
+`template.example`, copy it to `template.local`, and use that worksheet to
+collect non-secret account details before the actual setup run. Completed
+`template.local` files are intended to stay local and out of git.
 
 ### 4. Validate The Deployment
 
@@ -434,6 +451,9 @@ splunk-cloud-skills/
 │   │       └── cloud_batch_uninstall.sh
 │   ├── splunk-app-install/
 │   ├── cisco-catalyst-ta-setup/
+│   ├── cisco-catalyst-enhanced-netflow-setup/
+│   ├── cisco-security-cloud-setup/
+│   ├── cisco-secure-access-setup/
 │   ├── cisco-dc-networking-setup/
 │   ├── cisco-intersight-setup/
 │   ├── cisco-meraki-ta-setup/

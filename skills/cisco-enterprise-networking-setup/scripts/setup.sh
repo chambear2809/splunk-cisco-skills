@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="cisco-catalyst-app"
+CATALYST_TA_APP="TA_cisco_catalyst"
+ENHANCED_NETFLOW_TA_APP="splunk_app_stream_ipfix_cisco_hsl"
 
 MACROS_ONLY=false
 ACCELERATE=false
@@ -52,8 +54,11 @@ check_prereqs() {
         log "ERROR: Cisco Enterprise Networking app not found. Install it first."
         exit 1
     fi
-    if ! rest_check_app "$SK" "$SPLUNK_URI" "TA_cisco_catalyst" 2>/dev/null; then
-        log "WARNING: Cisco Catalyst TA not found — dashboards may not show data"
+    if ! rest_check_app "$SK" "$SPLUNK_URI" "${CATALYST_TA_APP}" 2>/dev/null; then
+        log "WARNING: Cisco Catalyst Add-on (${CATALYST_TA_APP}) not found — dashboards may not show Catalyst, ISE, SD-WAN, or Cyber Vision data"
+    fi
+    if ! rest_check_app "$SK" "$SPLUNK_URI" "${ENHANCED_NETFLOW_TA_APP}" 2>/dev/null; then
+        log "WARNING: Optional Cisco Catalyst Enhanced Netflow Add-on (${ENHANCED_NETFLOW_TA_APP}) not found — additional NetFlow-focused dashboards may not show data"
     fi
 }
 

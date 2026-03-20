@@ -1,0 +1,68 @@
+# Cisco Catalyst Add-on account intake template
+#
+# Copy this file to `template.local` in the same folder before entering real values.
+# Keep the completed file local only and never commit passwords, tokens, client
+# secrets, private keys, or certificates to git.
+#
+# Fill in only the sections you plan to configure. Duplicate a section when you
+# need more than one account of the same type.
+#
+# `stanza_name` is the account name that will appear in Splunk.
+
+# Catalyst Center / DNAC account
+[catalyst_center_account]
+stanza_name =
+cisco_dna_center_host = https://
+username =
+password =
+use_ca_cert = false
+custom_certificate =
+
+# Cisco ISE account
+[ise_account]
+stanza_name =
+hostname = https://
+username =
+password =
+use_ca_cert = false
+custom_certificate =
+enable_proxy = false
+proxy_type = http
+proxy_url =
+proxy_port =
+proxy_username =
+proxy_password =
+pxgrid_host =
+pxgrid_client_username =
+pxgrid_cert_auth = false
+client_cert =
+client_key =
+
+# Cisco SD-WAN account
+[sdwan_account]
+stanza_name =
+hostname = https://
+username =
+password =
+use_ca_cert = false
+custom_certificate =
+enable_proxy = false
+proxy_type = http
+proxy_url =
+proxy_port =
+proxy_username =
+proxy_password =
+
+# Cisco Cyber Vision account
+[cyber_vision_account]
+stanza_name =
+ip_address = https://
+api_token =
+use_ca_cert = false
+custom_certificate =
+enable_proxy = false
+proxy_type = http
+proxy_url =
+proxy_port =
+proxy_username =
+proxy_password =

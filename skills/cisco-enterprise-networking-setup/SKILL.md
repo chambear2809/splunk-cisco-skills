@@ -19,15 +19,25 @@ Automates the **Cisco Enterprise Networking for Splunk Platform**
 Use `splunk-app-install` with `--source splunkbase --app-id 7539` to get the
 latest release. If Splunkbase is unavailable, fall back to the local package
 in `splunk-ta/`. This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
+The shared installer enforces the required Cisco Catalyst Add-on dependency and
+installs `TA_cisco_catalyst` (Splunkbase ID `7538`) first when it is missing,
+so the visualization app is not deployed by itself. The Cisco Catalyst
+Enhanced Netflow Add-on (`splunk_app_stream_ipfix_cisco_hsl`, Splunkbase ID
+`6872`) is optional and should only be installed when the user wants the extra
+NetFlow-focused dashboards.
 
 After installation, use this skill to configure macros, saved searches,
 acceleration, and validation over search-tier REST. Any `splunk-ta/_unpacked/`
 tree is review-only.
 
 This is a **visualization app** — it provides dashboards and saved searches but
-does not collect data. Data collection is handled by the companion
-**Cisco Catalyst Add-on** (`TA_cisco_catalyst`). Use the
-`cisco-catalyst-ta-setup` skill for TA configuration.
+does not collect data. The dashboards visualize data collected by the companion
+**Cisco Catalyst Add-on** (`TA_cisco_catalyst`). Some additional dashboards
+also use the optional **Cisco Catalyst Enhanced Netflow Add-on**
+(`splunk_app_stream_ipfix_cisco_hsl`). Use the `cisco-catalyst-ta-setup` skill
+for Cisco Catalyst TA configuration and the
+`cisco-catalyst-enhanced-netflow-setup` skill when the user wants the optional
+NetFlow-focused dashboards.
 
 ## Agent Behavior — Credentials
 
@@ -41,6 +51,20 @@ bash skills/shared/scripts/setup_credentials.sh
 ```
 
 The agent may freely ask for non-secret values: index names, macro settings, etc.
+
+### Optional NetFlow Prompt
+
+Before planning optional NetFlow dashboard coverage, the agent should ask the
+user whether they want the additional NetFlow-focused dashboards enabled.
+
+If the user says yes:
+
+1. Use the `cisco-catalyst-enhanced-netflow-setup` skill to install and validate
+   the optional Cisco Catalyst Enhanced Netflow Add-on.
+2. Confirm whether a NetFlow/IPFIX ingestion path already exists.
+3. If NetFlow ingestion is not already in place, guide the user to the
+   `splunk-stream-setup` workflow so the receiver path can be installed and
+   configured before expecting those dashboards to populate.
 
 ## Environment
 
@@ -67,8 +91,12 @@ export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 
 ## Prerequisites
 
-The Cisco Catalyst Add-on (`TA_cisco_catalyst`) must be installed and configured
-before this app can display data. Use the `cisco-catalyst-ta-setup` skill first.
+The Cisco Catalyst Add-on (`TA_cisco_catalyst`) must be installed and
+configured before this app can display data. A `splunk-app-install` run for app
+ID `7539` auto-installs app ID `7538` when needed. The Cisco Catalyst Enhanced
+Netflow Add-on (`splunk_app_stream_ipfix_cisco_hsl`) is optional for additional
+NetFlow-focused dashboards and should be offered to the user explicitly rather
+than installed by default.
 
 ## Setup Workflow
 
@@ -99,7 +127,15 @@ them by default:
 | `cisco_catalyst_meraki_organization_mapping` | Daily | `meraki_org_id_name_lookup.csv` |
 | `cisco_catalyst_meraki_devices_serial_mapping` | Daily | `cisco_catalyst_meraki_device_serial_mapping.csv` |
 
-### Step 3: Enable Data Model Acceleration (Optional)
+### Step 3: Offer Optional Enhanced Netflow Support
+
+Ask the user whether they want the optional NetFlow-focused dashboards. If they
+do, use the `cisco-catalyst-enhanced-netflow-setup` skill to install and
+validate `splunk_app_stream_ipfix_cisco_hsl` (Splunkbase ID `6872`), and make
+sure the NetFlow/IPFIX ingestion path is configured, typically via the
+`splunk-stream-setup` workflow.
+
+### Step 4: Enable Data Model Acceleration (Optional)
 
 ```bash
 bash skills/cisco-enterprise-networking-setup/scripts/setup.sh --accelerate
@@ -112,7 +148,7 @@ If Splunk Cloud later reports `restartRequired=true`, use
 `acs restart current-stack` instead of trying to restart the deployment through
 the search-tier REST API.
 
-### Step 4: Validate
+### Step 5: Validate
 
 ```bash
 bash skills/cisco-enterprise-networking-setup/scripts/validate.sh
@@ -160,11 +196,13 @@ bash skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh
    initial setup/testing.
 3. **Saved searches**: The lookup-building saved searches should run at least
    once before dashboards referencing those lookups will populate.
-4. **No inputs here**: This app only visualizes — all data collection config
-   belongs in the TA (`TA_cisco_catalyst`).
+4. **No inputs here**: This app only visualizes. Base data collection belongs
+   in `TA_cisco_catalyst`, and optional NetFlow parsing belongs in
+   `splunk_app_stream_ipfix_cisco_hsl` when that path is enabled.
 5. **No `configure_account.sh`**: Unlike the TA skills, this app does not
    collect data and has no add-on accounts to configure. Account and input
-   setup belongs in the companion `cisco-catalyst-ta-setup` skill.
+   setup belongs in the companion TA workflow, especially the
+   `cisco-catalyst-ta-setup` skill for `TA_cisco_catalyst`.
 
 ## Additional Resources
 
