@@ -1280,6 +1280,8 @@ apply_k8s_assets() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     validate_args
 
     if [[ "${DO_SPLUNK_PREP}" == "true" ]]; then

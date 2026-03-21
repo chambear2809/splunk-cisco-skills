@@ -264,9 +264,84 @@ PY
 sanitize_response() {
     local resp="$1"
     local max_lines="${2:-20}"
-    printf '%s' "${resp}" \
-        | sed -E 's/(password|secret|token|api_key|client_secret|sessionKey)=[^ &"]*/\1=REDACTED/gi' \
-        | head -"${max_lines}"
+    python3 - "${max_lines}" 3<<<"${resp}" <<'PY'
+import json
+import os
+import re
+import sys
+
+max_lines = int(sys.argv[1])
+with os.fdopen(3, encoding="utf-8", errors="replace") as handle:
+    text = handle.read()
+
+def is_sensitive_key(key):
+    normalized = re.sub(r"[^a-z0-9]+", "", str(key).lower())
+    return any(token in normalized for token in (
+        "password",
+        "secret",
+        "token",
+        "apikey",
+        "clientsecret",
+        "sessionkey",
+        "certificate",
+        "privatekey",
+        "jsontext",
+        "accesssecret",
+        "externalid",
+        "passphrase",
+    ))
+
+def redact_json(value):
+    if isinstance(value, dict):
+        return {
+            key: ("REDACTED" if is_sensitive_key(key) else redact_json(item))
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [redact_json(item) for item in value]
+    return value
+
+def redact_text(raw):
+    key_pattern = r"[A-Za-z0-9_.-]*?(?:password|secret|token|api[_-]?key|client[_-]?secret|sessionkey|certificate|private[_-]?key|json[_-]?text|access[_-]?secret|external[_-]?id|passphrase)[A-Za-z0-9_.-]*"
+
+    def replace_equals(match):
+        return f"{match.group(1)}{match.group(2)}REDACTED"
+
+    def replace_colon(match):
+        value = match.group(3)
+        if value.startswith('"') and value.endswith('"'):
+            replacement = '"REDACTED"'
+        elif value.startswith("'") and value.endswith("'"):
+            replacement = "'REDACTED'"
+        else:
+            replacement = "REDACTED"
+        return f"{match.group(1)}{match.group(2)}{replacement}"
+
+    raw = re.sub(
+        rf"(?i)\b({key_pattern})\b(\s*=\s*)([^&\s]+)",
+        replace_equals,
+        raw,
+    )
+    raw = re.sub(
+        rf"""(?ix)
+        (["']?\b{key_pattern}\b["']?)
+        (\s*:\s*)
+        ("[^"]*"|'[^']*'|[^,\}}\]\s]+)
+        """,
+        replace_colon,
+        raw,
+    )
+    return raw
+
+try:
+    sanitized = json.dumps(redact_json(json.loads(text)))
+except Exception:
+    sanitized = redact_text(text)
+
+lines = sanitized.splitlines() or [sanitized]
+for line in lines[:max_lines]:
+    print(line)
+PY
 }
 
 _urlencode() {

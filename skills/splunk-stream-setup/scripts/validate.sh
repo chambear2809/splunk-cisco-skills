@@ -34,6 +34,8 @@ finish_validation() {
 log "=== Splunk Stream Validation ==="
 log ""
 
+warn_if_current_skill_role_unsupported
+
 if ! load_splunk_credentials; then
     fail "Could not load Splunk credentials. Check credentials file."
     finish_validation true
@@ -49,6 +51,21 @@ if is_splunk_cloud; then
     CLOUD_MODE=true
 fi
 
+STREAM_VALIDATE_ROLE="$(resolve_splunk_target_role)"
+WIRE_DATA_PRESENT=false
+
+stream_role_is_search_tier() {
+    [[ "${STREAM_VALIDATE_ROLE:-}" == "search-tier" ]]
+}
+
+stream_role_is_forwarder() {
+    [[ "${STREAM_VALIDATE_ROLE:-}" == "heavy-forwarder" || "${STREAM_VALIDATE_ROLE:-}" == "universal-forwarder" ]]
+}
+
+stream_role_is_indexer() {
+    [[ "${STREAM_VALIDATE_ROLE:-}" == "indexer" ]]
+}
+
 # --- App Installation ---
 log "--- App Installation ---"
 
@@ -56,14 +73,24 @@ if rest_check_app "${SK}" "${SPLUNK_URI}" "splunk_app_stream"; then
     version=$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "splunk_app_stream")
     pass "Splunk Stream installed (v${version})"
 else
-    fail "Splunk Stream not installed"
+    if stream_role_is_forwarder; then
+        warn "Splunk Stream search-tier app is not installed on this forwarder target. Validate the search tier separately."
+    elif stream_role_is_indexer; then
+        info "Splunk Stream search-tier app is not installed on this indexer target (expected on dedicated indexers)."
+    else
+        fail "Splunk Stream not installed"
+    fi
 fi
 
 if rest_check_app "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream"; then
     version=$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream")
     pass "Splunk TA Stream (Forwarder) installed (v${version})"
 else
-    if ${CLOUD_MODE}; then
+    if stream_role_is_search_tier; then
+        warn "Splunk TA Stream (Forwarder) is not installed on this search-tier target. Validate a heavy or universal forwarder separately."
+    elif stream_role_is_indexer; then
+        info "Splunk TA Stream (Forwarder) is not installed on this indexer target (expected on dedicated indexers)."
+    elif ${CLOUD_MODE}; then
         warn "Splunk TA Stream (Forwarder) not installed on the Cloud search tier. This is expected when Stream forwarders run on infrastructure you control."
     else
         fail "Splunk TA Stream (Forwarder) not installed"
@@ -71,10 +98,15 @@ else
 fi
 
 if rest_check_app "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream_wire_data"; then
+    WIRE_DATA_PRESENT=true
     version=$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream_wire_data")
     pass "Splunk TA Stream Wire Data installed (v${version})"
 else
-    if ${CLOUD_MODE}; then
+    if stream_role_is_indexer; then
+        fail "Splunk TA Stream Wire Data not installed"
+    elif stream_role_is_search_tier || stream_role_is_forwarder; then
+        warn "Splunk TA Stream Wire Data not installed on this target."
+    elif ${CLOUD_MODE}; then
         warn "Splunk TA Stream Wire Data not installed on the Cloud search tier."
     else
         fail "Splunk TA Stream Wire Data not installed"
@@ -106,7 +138,11 @@ fi
 log ""
 log "--- Stream Forwarder Config ---"
 
-if ${CLOUD_MODE}; then
+if stream_role_is_search_tier; then
+    warn "Forwarder-side streamfwd validation is skipped on the search tier. Validate Splunk_TA_stream against the forwarder management endpoint."
+elif stream_role_is_indexer; then
+    info "Forwarder-side streamfwd validation is skipped on the indexer tier."
+elif ${CLOUD_MODE}; then
     info "Cloud mode: forwarder-side streamfwd validation is skipped on the search tier. Run this validation against the forwarder management endpoint to validate Splunk_TA_stream."
 elif rest_check_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "streamfwd" "streamfwd"; then
     pass "streamfwd.conf stanza exists"
@@ -142,7 +178,11 @@ fi
 log ""
 log "--- Stream Input (inputs.conf) ---"
 
-if ${CLOUD_MODE}; then
+if stream_role_is_search_tier; then
+    warn "Forwarder-side streamfwd input validation is skipped on the search tier."
+elif stream_role_is_indexer; then
+    info "Forwarder-side streamfwd input validation is skipped on the indexer tier."
+elif ${CLOUD_MODE}; then
     info "Cloud mode: streamfwd input validation is skipped on the search tier."
 elif rest_check_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream" "inputs" "streamfwd://streamfwd"; then
     pass "streamfwd://streamfwd input stanza exists"
@@ -180,10 +220,10 @@ info "Stream enable/disable status requires Stream Web UI or local access — sk
 log ""
 log "--- Wire Data Knowledge Objects ---"
 
-if rest_check_app "${SK}" "${SPLUNK_URI}" "Splunk_TA_stream_wire_data"; then
+if ${WIRE_DATA_PRESENT}; then
     pass "Wire Data TA installed — CIM field mappings available"
 else
-    warn "Wire Data TA not installed — CIM field mappings unavailable"
+    info "Wire Data TA knowledge-object checks are skipped because Splunk_TA_stream_wire_data is not installed on this target."
 fi
 
 # --- Data Flow Check ---
@@ -200,9 +240,12 @@ for search_target in "source=stream" "index=netflow"; do
     fi
 done
 
-kvstore_status=$(splunk_curl "${SK}" \
-    "${SPLUNK_URI}/services/kvstore/status?output_mode=json" 2>/dev/null \
-    | python3 -c "
+if stream_role_is_forwarder || stream_role_is_indexer; then
+    info "KV Store check skipped on ${STREAM_VALIDATE_ROLE:-this target}; Stream UI KV Store health belongs on the search tier."
+else
+    kvstore_status=$(splunk_curl "${SK}" \
+        "${SPLUNK_URI}/services/kvstore/status?output_mode=json" 2>/dev/null \
+        | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
 entries = d.get('entry', [])
@@ -213,10 +256,11 @@ else:
     print('unknown')
 " 2>/dev/null || echo "unknown")
 
-if [[ "${kvstore_status}" == "ready" ]]; then
-    pass "KV Store status: ready"
-else
-    warn "KV Store status: ${kvstore_status} (Stream app requires healthy KV Store)"
+    if [[ "${kvstore_status}" == "ready" ]]; then
+        pass "KV Store status: ready"
+    else
+        warn "KV Store status: ${kvstore_status} (Stream app requires healthy KV Store)"
+    fi
 fi
 
 finish_validation false

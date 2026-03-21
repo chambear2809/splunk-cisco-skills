@@ -187,6 +187,8 @@ report_related_apps() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     if $INSTALL_APP; then
         install_addon
     fi

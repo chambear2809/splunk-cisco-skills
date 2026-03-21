@@ -83,25 +83,9 @@ SK=$(get_session_key "${SPLUNK_URI}")
 
 log "Authenticated to Splunk REST API."
 
-set_verify_ssl_setting() {
-    local body resp http_code
-    body=$(form_urlencode_pairs verify_ssl "${SET_VERIFY_SSL}") || return 1
-    resp=$(splunk_curl_post "${SK}" "${body}" \
-        "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/TA_cisco_catalyst_settings/additional_parameters?output_mode=json" \
-        -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
-    case "${http_code}" in
-        200|201) return 0 ;;
-        *)
-            echo "ERROR: Set TA_cisco_catalyst_settings/additional_parameters failed (HTTP ${http_code})" >&2
-            sanitize_response "${resp}" 5 >&2
-            return 1
-            ;;
-    esac
-}
-
 if [[ -n "${SET_VERIFY_SSL}" ]]; then
-    if set_verify_ssl_setting; then
+    if rest_set_verify_ssl "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
+        "ta_cisco_catalyst_settings" "additional_parameters" "verify_ssl" "${SET_VERIFY_SSL}"; then
         log "Set verify_ssl=${SET_VERIFY_SSL} in ta_cisco_catalyst_settings.conf."
     else
         log "ERROR: Failed to set verify_ssl in ta_cisco_catalyst_settings.conf."

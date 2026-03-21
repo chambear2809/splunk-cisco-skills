@@ -6,9 +6,10 @@ directory for local installation via the `splunk-app-install` skill.
 The `install_app.sh` script will list files in this directory when you choose
 the **local file** installation source.
 
-For the normal Cloud workflow, these original vendor archives are also the files
-you install through ACS. The repo treats these packaged artifacts as immutable
-deployment inputs.
+For the normal Cloud workflow, public apps are installed from Splunkbase
+through ACS and these original vendor archives stay here as the local cache and
+review copy. Use local/private uploads only for genuinely private or
+pre-vetted apps that do not have a public Splunkbase install path.
 
 ## Naming Convention
 

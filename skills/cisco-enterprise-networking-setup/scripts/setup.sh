@@ -130,6 +130,8 @@ enable_acceleration() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     check_prereqs
 
     if $ACCELERATE; then

@@ -2,7 +2,8 @@
 
 This repository is a working library of Cursor agent skills and shell scripts for
 installing, configuring, and validating Splunk apps and Technology Add-ons on
-self-managed Splunk Enterprise and Splunk Cloud deployments.
+Splunk Cloud and self-managed Splunk Enterprise deployments, including
+search-tier, indexer, forwarder, and external-collector topologies.
 
 ## Start With The Intake Templates
 
@@ -105,7 +106,46 @@ not as the only cloud deployment source.
   shipped, that is treated as a vendor/package limitation rather than something
   this repo silently fixes at install time.
 
-See `CLOUD_DEPLOYMENT_MATRIX.md` for the per-TA deployment model.
+See `DEPLOYMENT_ROLE_MATRIX.md` for cross-platform role placement and
+`CLOUD_DEPLOYMENT_MATRIX.md` for the Cloud-specific deployment model.
+
+## Platform And Role
+
+This repo now separates two different questions:
+
+- **Platform target**: are the scripts talking to Splunk Cloud APIs or a
+  self-managed Splunk Enterprise management endpoint?
+- **Deployment role**: where does the app or workflow belong inside the target
+  topology?
+
+The shared helpers still resolve the **platform** (`cloud` or `enterprise`).
+The package registry and role matrix now describe the **deployment role** using
+five role names:
+
+- `search-tier`
+- `indexer`
+- `heavy-forwarder`
+- `universal-forwarder`
+- `external-collector`
+
+Role support is package- and skill-specific. The repo does **not** assume that
+every app or workflow belongs on every tier just because the overall deployment
+contains that tier.
+
+Declare the current runtime role with `SPLUNK_TARGET_ROLE` when you want
+warning-only placement checks during install, setup, and validation. If
+`SPLUNK_SEARCH_PROFILE` points at a paired target, use
+`SPLUNK_SEARCH_TARGET_ROLE` to declare that paired role explicitly. You can
+also use `SPLUNK_SEARCH_TARGET_ROLE` as a pairing hint when the companion
+runtime is outside the current Splunk management target, such as an SC4S
+external collector. Environment variables override the selected profile's role
+metadata for the current run. In Cloud mode, warning-only checks stay anchored
+to the Cloud search tier unless you switch the run to the paired Enterprise
+target.
+
+Runtime role is also not the same thing as the delivery plane. A package may be
+validated as `search-tier`, for example, even when the admin action that
+delivers it comes through ACS, a deployer, or another control-plane path.
 
 ## How To Use This Repo
 
@@ -152,14 +192,17 @@ Example:
 SPLUNK_PROFILE="cloud"
 
 PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_TARGET_ROLE="search-tier"
 PROFILE_cloud__SPLUNK_SEARCH_API_URI="https://my-stack.stg.splunkcloud.com:8089"
 PROFILE_cloud__SPLUNK_CLOUD_STACK="my-stack"
 PROFILE_cloud__ACS_SERVER="https://staging.admin.splunk.com"
 
 PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
 PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
 
 PROFILE_onprem__SPLUNK_PLATFORM="enterprise"
+PROFILE_onprem__SPLUNK_TARGET_ROLE="search-tier"
 PROFILE_onprem__SPLUNK_SEARCH_API_URI="https://onprem.example.com:8089"
 ```
 
@@ -178,6 +221,8 @@ Example:
 ```bash
 SPLUNK_PROFILE="cloud"
 SPLUNK_SEARCH_PROFILE="hf"
+SPLUNK_TARGET_ROLE="search-tier"
+SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
 ```
 
 In that mode:
@@ -186,6 +231,11 @@ In that mode:
 - HF overrides only search-tier REST and SSH settings such as
   `SPLUNK_SEARCH_API_URI`, `SPLUNK_URI`, `SPLUNK_USER`, `SPLUNK_PASS`, and
   `SPLUNK_SSH_*`
+- `SPLUNK_TARGET_ROLE` keeps the primary Cloud/search-tier role, while
+  `SPLUNK_SEARCH_TARGET_ROLE` documents the paired HF role
+- If you want to run forwarder-side REST actions non-interactively, either
+  select the HF profile directly or override the run with
+  `SPLUNK_PLATFORM=enterprise`
 
 For Enterprise targets, that same file can also include connection and SSH
 staging settings:
@@ -205,7 +255,7 @@ SPLUNK_SSH_PASS=""
 For Splunk Cloud, the credentials file can also include:
 
 ```bash
-SPLUNK_SEARCH_API_URI="https://your-stack.stg.splunkcloud.com:8089"
+SPLUNK_SEARCH_API_URI="https://your-stack.splunkcloud.com:8089"
 SPLUNK_CLOUD_STACK="your-stack-name"
 SPLUNK_CLOUD_SEARCH_HEAD=""
 ACS_SERVER="https://admin.splunk.com"
@@ -259,8 +309,9 @@ dashboard coverage and is no longer auto-installed.
 
 When the target platform is **Splunk Enterprise**, the installer will:
 
-1. try a direct REST upload first
-2. fall back to SSH staging when the target does not support that upload path
+1. install directly from the filesystem when the Splunk host is local
+2. stage local packages over SSH for remote hosts
+3. install the resulting server-local path through the management API with `filename=true`
 
 When the target platform is **Splunk Cloud**, the installer uses ACS:
 

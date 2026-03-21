@@ -230,6 +230,17 @@ registry_dependency_app_ids_for_current_target() {
     fi
 }
 
+warn_for_current_install_target_role() {
+    local target_app_id
+
+    target_app_id="$(registry_target_app_id)"
+    if [[ -n "${target_app_id}" ]]; then
+        warn_if_role_unsupported_for_app_id "${target_app_id}"
+    elif [[ -n "$(resolve_splunk_target_role)" ]]; then
+        log "INFO: No deployment-role metadata found for the requested package. Continuing without role-aware checks."
+    fi
+}
+
 dependency_install_chain_contains() {
     local app_id="${1:-}"
     case ",${SPLUNK_INSTALL_CHAIN:-}," in
@@ -248,6 +259,8 @@ install_dependency_with_current_script() {
     dep_name="$(registry_app_name_by_app_id "${dep_id}")"
     dep_label="$(registry_app_label_by_app_id "${dep_id}")"
     [[ -z "${dep_label}" ]] && dep_label="${dep_name:-Splunkbase app ID ${dep_id}}"
+
+    warn_if_role_unsupported_for_app_id "${dep_id}"
 
     if dependency_install_chain_contains "${dep_id}"; then
         log "Skipping required companion app ${dep_label} (${dep_id}) because it is already in the install chain."
@@ -1051,6 +1064,7 @@ main() {
         esac
 
         prompt_update
+        warn_for_current_install_target_role
         install_required_dependencies
         cloud_install_app
         exit 0
@@ -1075,6 +1089,7 @@ main() {
     esac
 
     prompt_update
+    warn_for_current_install_target_role
     prompt_splunk_creds
     splunk_auth
     install_required_dependencies

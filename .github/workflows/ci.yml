@@ -31,6 +31,9 @@ jobs:
       - name: Run Python tests
         run: pytest tests/ -v
 
+      - name: Check generated deployment docs
+        run: python3 skills/shared/scripts/generate_deployment_docs.py --check
+
       - name: Run Bats tests
         run: bats tests/*.bats
 

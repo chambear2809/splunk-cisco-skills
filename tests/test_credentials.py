@@ -15,6 +15,8 @@ ALLOWED_KEYS = [
     "SPLUNK_PROFILE",
     "SPLUNK_SEARCH_PROFILE",
     "SPLUNK_PLATFORM",
+    "SPLUNK_TARGET_ROLE",
+    "SPLUNK_SEARCH_TARGET_ROLE",
     "SPLUNK_SEARCH_API_URI",
     "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT",
@@ -209,6 +211,25 @@ class TestCredentialParsing(unittest.TestCase):
         text = 'SPLUNK_VERIFY_SSL="true"\n'
         result = parse_credential_file(text)
         self.assertEqual(result["SPLUNK_VERIFY_SSL"], "true")
+
+    def test_target_role_keys_are_allowed(self):
+        text = textwrap.dedent("""\
+            SPLUNK_TARGET_ROLE="search-tier"
+            SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
+        """)
+        result = parse_credential_file(text)
+        self.assertEqual(result["SPLUNK_TARGET_ROLE"], "search-tier")
+        self.assertEqual(result["SPLUNK_SEARCH_TARGET_ROLE"], "heavy-forwarder")
+
+    def test_profile_target_role_selection(self):
+        text = textwrap.dedent("""\
+            PROFILE_cloud__SPLUNK_TARGET_ROLE="search-tier"
+            PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
+        """)
+        cloud = parse_credential_file(text, "cloud")
+        hf = parse_credential_file(text, "hf")
+        self.assertEqual(cloud["SPLUNK_TARGET_ROLE"], "search-tier")
+        self.assertEqual(hf["SPLUNK_TARGET_ROLE"], "heavy-forwarder")
 
     def test_tls_ca_and_external_tls_keys_allowed(self):
         text = textwrap.dedent("""\

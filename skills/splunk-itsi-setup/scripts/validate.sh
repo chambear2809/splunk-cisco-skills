@@ -15,6 +15,8 @@ warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 log "=== Splunk ITSI Validation ==="
 log ""
 
+warn_if_current_skill_role_unsupported
+
 log "--- Splunk Authentication ---"
 if ! load_splunk_credentials; then
     fail "Could not load Splunk credentials — check credentials file"

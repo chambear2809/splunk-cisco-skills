@@ -11,6 +11,11 @@ setup() {
     export _ACS_HELPERS_LOADED=""
     export _SPLUNKBASE_HELPERS_LOADED=""
     export _CONFIGURE_ACCOUNT_HELPERS_LOADED=""
+    export _REGISTRY_HELPERS_LOADED=""
+    export _RESOLVED_SPLUNK_TARGET_ROLE=""
+    export _RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE=""
+    export _RESOLVED_SEARCH_SPLUNK_TARGET_ROLE=""
+    export _WARNED_INVALID_SPLUNK_TARGET_ROLE=""
     export SPLUNK_USER="testuser"
     export SPLUNK_PASS="testpass"
     export SPLUNK_VERIFY_SSL="false"
@@ -151,6 +156,18 @@ setup() {
     [[ "$result" =~ user=admin ]]
 }
 
+@test "sanitize_response redacts JSON secret fields" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    input='{"refresh_token":"abc123","password":"hunter2","nested":{"apiKey":"xyz789","pkcs_certificate":"cert"},"cii_json_text":"blob","user":"admin"}'
+    result=$(sanitize_response "$input")
+    [[ "$result" =~ '"refresh_token": "REDACTED"' || "$result" =~ '"refresh_token":"REDACTED"' ]]
+    [[ "$result" =~ '"password": "REDACTED"' || "$result" =~ '"password":"REDACTED"' ]]
+    [[ "$result" =~ '"apiKey": "REDACTED"' || "$result" =~ '"apiKey":"REDACTED"' ]]
+    [[ "$result" =~ '"pkcs_certificate": "REDACTED"' || "$result" =~ '"pkcs_certificate":"REDACTED"' ]]
+    [[ "$result" =~ '"cii_json_text": "REDACTED"' || "$result" =~ '"cii_json_text":"REDACTED"' ]]
+    [[ "$result" =~ '"user": "admin"' || "$result" =~ '"user":"admin"' ]]
+}
+
 # --- _is_splunk_package ---
 
 @test "_is_splunk_package rejects non-tar file" {
@@ -182,4 +199,297 @@ setup() {
     [[ "$captured" == *"default"* ]]
     [[ "$captured" == *"verify_ssl"* ]]
     [[ "$captured" == *"False"* ]]
+}
+
+# --- deployment-role helpers ---
+
+@test "resolve_splunk_target_role infers search-tier for a cloud-only target" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_CLOUD_STACK="example-stack"
+STACK_TOKEN="token"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    result=$(resolve_splunk_target_role)
+
+    rm -f "${credentials_file}"
+    [ "${result}" = "search-tier" ]
+}
+
+@test "resolve_splunk_target_role keeps the cloud search-tier role active in hybrid mode" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_PROFILE="cloud"
+SPLUNK_SEARCH_PROFILE="hf"
+PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_TARGET_ROLE="search-tier"
+PROFILE_cloud__SPLUNK_CLOUD_STACK="example-stack"
+PROFILE_cloud__STACK_TOKEN="token"
+PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
+PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    result=$(resolve_splunk_target_role)
+
+    rm -f "${credentials_file}"
+    [ "${result}" = "search-tier" ]
+}
+
+@test "resolve_primary_splunk_target_role lets env override the selected profile role" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_PROFILE="cloud"
+PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_TARGET_ROLE="search-tier"
+PROFILE_cloud__SPLUNK_CLOUD_STACK="example-stack"
+PROFILE_cloud__STACK_TOKEN="token"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    export SPLUNK_TARGET_ROLE="indexer"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    result=$(resolve_primary_splunk_target_role)
+
+    rm -f "${credentials_file}"
+    unset SPLUNK_TARGET_ROLE
+    [ "${result}" = "indexer" ]
+}
+
+@test "resolve_splunk_target_role uses the paired search target role when enterprise is active" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_PROFILE="cloud"
+SPLUNK_SEARCH_PROFILE="hf"
+PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_TARGET_ROLE="search-tier"
+PROFILE_cloud__SPLUNK_CLOUD_STACK="example-stack"
+PROFILE_cloud__STACK_TOKEN="token"
+PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
+PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    export SPLUNK_PLATFORM="enterprise"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    result=$(resolve_splunk_target_role)
+
+    rm -f "${credentials_file}"
+    unset SPLUNK_PLATFORM
+    [ "${result}" = "heavy-forwarder" ]
+}
+
+@test "resolve_splunk_target_role uses the paired role for single-profile hybrid enterprise runs" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_CLOUD_STACK="example-stack"
+STACK_TOKEN="token"
+SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+SPLUNK_TARGET_ROLE="search-tier"
+SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    export SPLUNK_PLATFORM="enterprise"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    result=$(resolve_splunk_target_role)
+
+    rm -f "${credentials_file}"
+    unset SPLUNK_PLATFORM
+    [ "${result}" = "heavy-forwarder" ]
+}
+
+@test "resolve_splunk_target_role uses the paired role without hybrid ambiguity output" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_CLOUD_STACK="example-stack"
+STACK_TOKEN="token"
+SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+SPLUNK_TARGET_ROLE="search-tier"
+SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    run resolve_splunk_target_role
+
+    rm -f "${credentials_file}"
+    [ "$status" -eq 0 ]
+    [ "$output" = "heavy-forwarder" ]
+}
+
+@test "resolve_search_splunk_target_role accepts an explicit paired role without a search profile" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_CLOUD_STACK="example-stack"
+STACK_TOKEN="token"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    export SPLUNK_SEARCH_TARGET_ROLE="external-collector"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    result=$(resolve_search_splunk_target_role)
+
+    rm -f "${credentials_file}"
+    unset SPLUNK_SEARCH_TARGET_ROLE
+    [ "${result}" = "external-collector" ]
+}
+
+@test "load_splunk_credentials restores primary cloud credentials in hybrid mode" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_PROFILE="cloud"
+SPLUNK_SEARCH_PROFILE="hf"
+PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_CLOUD_STACK="example-stack"
+PROFILE_cloud__ACS_SERVER="https://staging.admin.splunk.com"
+PROFILE_cloud__SPLUNK_USER="cloud-user"
+PROFILE_cloud__SPLUNK_PASS="cloud-pass"
+PROFILE_cloud__SPLUNK_TARGET_ROLE="search-tier"
+PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+PROFILE_hf__SPLUNK_USER="hf-user"
+PROFILE_hf__SPLUNK_PASS="hf-pass"
+PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    unset SPLUNK_USER
+    unset SPLUNK_PASS
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    cloud_current_search_api_uri() { printf '%s' "https://shc1.example-stack.stg.splunkcloud.com:8089"; }
+    acs_ensure_search_api_access() { return 0; }
+
+    load_splunk_credentials
+
+    rm -f "${credentials_file}"
+    [ "${SPLUNK_URI}" = "https://shc1.example-stack.stg.splunkcloud.com:8089" ]
+    [ "${SPLUNK_USER}" = "cloud-user" ]
+    [ "${SPLUNK_PASS}" = "cloud-pass" ]
+}
+
+@test "load_splunk_credentials preserves env overrides after refreshing the cloud URI" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_PROFILE="cloud"
+SPLUNK_SEARCH_PROFILE="hf"
+PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_CLOUD_STACK="example-stack"
+PROFILE_cloud__ACS_SERVER="https://staging.admin.splunk.com"
+PROFILE_cloud__STACK_TOKEN="token"
+PROFILE_cloud__STACK_USERNAME="stack-user"
+PROFILE_cloud__STACK_PASSWORD="stack-pass"
+PROFILE_cloud__SPLUNK_USER="cloud-user"
+PROFILE_cloud__SPLUNK_PASS="cloud-pass"
+PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+PROFILE_hf__SPLUNK_USER="hf-user"
+PROFILE_hf__SPLUNK_PASS="hf-pass"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    export SPLUNK_USER="altadmin"
+    export SPLUNK_PASS="altpass"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    cloud_current_search_api_uri() { printf '%s' "https://shc1.example-stack.stg.splunkcloud.com:8089"; }
+    acs_ensure_search_api_access() { return 0; }
+
+    load_splunk_credentials
+
+    rm -f "${credentials_file}"
+    [ "${SPLUNK_URI}" = "https://shc1.example-stack.stg.splunkcloud.com:8089" ]
+    [ "${SPLUNK_USER}" = "altadmin" ]
+    [ "${SPLUNK_PASS}" = "altpass" ]
+    unset SPLUNK_USER
+    unset SPLUNK_PASS
+}
+
+@test "warn_if_role_unsupported_for_app_id returns success for warning-only checks" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_TARGET_ROLE="universal-forwarder"
+SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    run warn_if_role_unsupported_for_app_id "7539"
+
+    rm -f "${credentials_file}"
+    [ "$status" -eq 0 ]
+    [[ "${output}" == *"not modeled for role 'universal-forwarder'"* ]]
+}
+
+@test "resolve_splunk_target_role ignores invalid declared roles" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_TARGET_ROLE="not-a-role"
+SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    run resolve_splunk_target_role
+
+    rm -f "${credentials_file}"
+    [ "$status" -eq 0 ]
+    [[ "${output}" == *"Ignoring invalid SPLUNK_TARGET_ROLE value"* ]]
+}
+
+@test "warn_if_cloud_pairing_missing_for_skill stays quiet for enterprise-side hybrid runs" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_CLOUD_STACK="example-stack"
+STACK_TOKEN="token"
+SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+SPLUNK_TARGET_ROLE="search-tier"
+SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    run warn_if_cloud_pairing_missing_for_skill "splunk-stream-setup"
+
+    rm -f "${credentials_file}"
+    [ "$status" -eq 0 ]
+    [ -z "${output}" ]
+}
+
+@test "warn_if_cloud_pairing_missing_for_skill warns for a cloud workflow with no paired role" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_CLOUD_STACK="example-stack"
+STACK_TOKEN="token"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    run warn_if_cloud_pairing_missing_for_skill "splunk-stream-setup"
+
+    rm -f "${credentials_file}"
+    [ "$status" -eq 0 ]
+    [[ "${output}" == *"expects a paired Cloud runtime role: heavy-forwarder or universal-forwarder"* ]]
+}
+
+@test "warn_if_cloud_pairing_missing_for_skill stays quiet when the paired role is declared" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_CLOUD_STACK="example-stack"
+STACK_TOKEN="token"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    export SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    run warn_if_cloud_pairing_missing_for_skill "splunk-stream-setup"
+
+    rm -f "${credentials_file}"
+    unset SPLUNK_SEARCH_TARGET_ROLE
+    [ "$status" -eq 0 ]
+    [ -z "${output}" ]
 }

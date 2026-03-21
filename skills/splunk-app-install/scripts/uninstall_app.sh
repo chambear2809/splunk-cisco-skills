@@ -46,11 +46,10 @@ cloud_restart_or_exit() {
 refresh_cloud_verify_session() {
     SK_VERIFY=""
 
+    load_splunk_credentials 2>/dev/null || return 1
     if [[ -z "${SPLUNK_URI:-}" ]] || [[ "${SPLUNK_URI}" != *".splunkcloud.com"* ]]; then
         return 1
     fi
-
-    load_splunk_credentials 2>/dev/null || return 1
     SK_VERIFY=$(get_session_key "${SPLUNK_URI}" 2>/dev/null || true)
     [[ -n "${SK_VERIFY}" ]]
 }

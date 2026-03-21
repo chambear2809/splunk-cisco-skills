@@ -160,6 +160,7 @@ failures=0
 verify_failures=0
 for app_id in "${APP_IDS[@]}"; do
     log "Installing Splunkbase app ID ${app_id}..."
+    warn_if_role_unsupported_for_app_id "${app_id}"
 
     license_ack="$(resolve_license_ack "${app_id}")"
 
