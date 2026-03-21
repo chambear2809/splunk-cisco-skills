@@ -480,8 +480,10 @@ prompt_splunkbase() {
     fi
 
     if [[ -z "${APP_VERSION}" ]]; then
-        echo ""
-        safe_read "--app-version" -rp "App version (leave blank for latest): " APP_VERSION
+        if is_interactive; then
+            echo ""
+            safe_read "--app-version" -rp "App version (leave blank for latest): " APP_VERSION
+        fi
     fi
     cloud_apply_known_splunkbase_defaults
 }
@@ -953,7 +955,7 @@ install_app() {
     http_code=$(echo "${response}" | tail -1)
     body=$(echo "${response}" | sed '$d')
 
-    local app_name
+    local app_name error_msg
     app_name=$(echo "${body}" | python3 -c "
 import json, sys
 try:
@@ -961,21 +963,36 @@ try:
     entries = data.get('entry', [])
     if entries:
         print(entries[0].get('name', ''))
-    else:
-        msgs = data.get('messages', [])
-        for m in msgs:
-            if m.get('type') == 'ERROR':
-                print('ERROR: ' + m.get('text', 'Unknown error'), file=sys.stderr)
-                sys.exit(1)
 except Exception:
     print('', end='')
-" 2>&1 || true)
+" 2>/dev/null || true)
 
-    if [[ "${app_name}" == ERROR:* ]]; then
-        log "${app_name}"
-        log "Installation failed (HTTP ${http_code})."
-        exit 1
-    fi
+    error_msg=$(echo "${body}" | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    msgs = data.get('messages', [])
+    for m in msgs:
+        if m.get('type') == 'ERROR':
+            print(m.get('text', 'Unknown error'), end='')
+            break
+except Exception:
+    print('', end='')
+" 2>/dev/null || true)
+
+    case "${http_code}" in
+        200|201)
+            ;;
+        *)
+            if [[ -n "${error_msg}" ]]; then
+                log "ERROR: ${error_msg}"
+            else
+                log "ERROR: Installation failed (HTTP ${http_code})."
+                [[ -n "${body}" ]] && sanitize_response "${body}" 5 >&2
+            fi
+            exit 1
+            ;;
+    esac
 
     if [[ -n "${app_name}" ]]; then
         log "SUCCESS: App '${app_name}' installed (HTTP ${http_code})"

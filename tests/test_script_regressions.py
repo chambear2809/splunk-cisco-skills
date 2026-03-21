@@ -1316,6 +1316,82 @@ class ShellScriptRegressionTests(unittest.TestCase):
             ]
             self.assertEqual(install_ids, ["7538", "7539"])
 
+    def test_cloud_batch_install_returns_nonzero_when_any_install_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import sys
+
+                args = sys.argv[1:]
+                cmd = " ".join(args)
+
+                if "config current-stack" in cmd:
+                    print("Current Search Head: sh-i-abc", end="")
+                    raise SystemExit(0)
+                if "status current-stack" in cmd:
+                    print(
+                        '[{"type":"http","response":"{\\"infrastructure\\":{\\"status\\":\\"Ready\\"},\\"messages\\":{\\"restartRequired\\":false}}"}]',
+                        end="",
+                    )
+                    raise SystemExit(0)
+                if "apps install splunkbase --splunkbase-id bad-app" in cmd:
+                    print('{"statusCode":500}', file=sys.stderr)
+                    raise SystemExit(2)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import sys
+
+                args = " ".join(sys.argv[1:])
+                if "/services/auth/login" in args and "-d @-" in args:
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                elif "/configs/conf-app/package" in args:
+                    sys.stdout.write('{"entry":[{"content":{"id":"whatever"}}]}')
+                raise SystemExit(0)
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    ACS_SERVER="https://staging.admin.splunk.com"
+                    STACK_TOKEN="token"
+                    SPLUNK_SEARCH_API_URI="https://example-stack.splunkcloud.com:8089"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/shared/scripts/cloud_batch_install.sh",
+                "--no-restart",
+                "bad-app",
+                "good-app",
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+            self.assertIn("1 app(s) failed to install", result.stdout)
+
     def test_stream_app_registry_uses_current_splunkbase_ids(self):
         registry = json.loads(
             (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
@@ -1396,6 +1472,60 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 if re.search(r"--splunkbase-id (\d+)", line)
             ]
             self.assertEqual(install_ids, ["7538", "7539"])
+
+    def test_install_app_returns_nonzero_on_http_failure_without_error_payload(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "fake-app.tgz"
+            package_file.write_text("placeholder", encoding="utf-8")
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import sys
+
+                args = " ".join(sys.argv[1:])
+                if "/services/auth/login" in args and "-d @-" in args:
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                elif "/services/apps/local" in args and "%{http_code}" in args:
+                    sys.stdout.write("\\n401")
+                raise SystemExit(0)
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "local",
+                "--file",
+                str(package_file),
+                "--no-update",
+                "--no-restart",
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+            self.assertIn("Installation failed (HTTP 401)", result.stdout + result.stderr)
+            self.assertNotIn("Skipping Splunk restart", result.stdout)
 
     def test_stream_setup_install_prefers_splunkbase_before_local_fallback(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1555,6 +1685,65 @@ class ShellScriptRegressionTests(unittest.TestCase):
     def test_cloud_uninstall_script_no_longer_uses_top_level_local_keyword(self):
         script_text = (REPO_ROOT / "skills/splunk-app-install/scripts/uninstall_app.sh").read_text(encoding="utf-8")
         self.assertNotIn("local delete_code", script_text)
+
+    def test_cloud_batch_uninstall_returns_nonzero_when_failures_cannot_be_verified(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import sys
+
+                args = sys.argv[1:]
+                cmd = " ".join(args)
+
+                if "apps uninstall bad-app" in cmd:
+                    print("boom", file=sys.stderr)
+                    raise SystemExit(2)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                raise SystemExit(0)
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    ACS_SERVER="https://staging.admin.splunk.com"
+                    STACK_TOKEN="token"
+                    SPLUNK_SEARCH_API_URI="https://example-stack.splunkcloud.com:8089"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/shared/scripts/cloud_batch_uninstall.sh",
+                "--no-restart",
+                "bad-app",
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+            self.assertIn("verification skipped", (result.stdout + result.stderr).lower())
 
     def _build_configure_account_env(self, tmp_path: Path) -> tuple[dict, Path]:
         """Build a mock environment for configure_account.sh integration tests."""

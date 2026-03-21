@@ -64,6 +64,11 @@ log "=== Cloud Batch Uninstall ==="
 log "Apps: ${APP_NAMES[*]}"
 log ""
 
+acs_failures=0
+delete_failures=0
+verification_available=false
+final_failures=0
+
 for app in "${APP_NAMES[@]}"; do
     log "Uninstalling '${app}' via ACS..."
     set +e
@@ -79,6 +84,7 @@ for app in "${APP_NAMES[@]}"; do
     else
         log "  ACS uninstall returned rc=${rc} for '${app}' (may already be removed)."
         [[ -n "${output}" ]] && printf '%s\n' "${output}" >&2
+        acs_failures=$((acs_failures + 1))
     fi
 done
 
@@ -90,6 +96,7 @@ fi
 
 rest_fallback_needed=false
 if refresh_verify_session; then
+    verification_available=true
     for app in "${APP_NAMES[@]}"; do
         if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${app}"; then
             log "WARNING: '${app}' still present on search tier after ACS uninstall."
@@ -111,7 +118,10 @@ if ${rest_fallback_needed}; then
             case "${delete_code}" in
                 200) log "  REST DELETE succeeded for '${app}'." ;;
                 404) log "  '${app}' already absent (HTTP 404)." ;;
-                *) log "  WARNING: REST DELETE returned HTTP ${delete_code} for '${app}'." ;;
+                *)
+                    log "  WARNING: REST DELETE returned HTTP ${delete_code} for '${app}'."
+                    delete_failures=$((delete_failures + 1))
+                    ;;
             esac
         fi
     done
@@ -126,9 +136,11 @@ fi
 log ""
 log "=== Final verification ==="
 if refresh_verify_session; then
+    verification_available=true
     for app in "${APP_NAMES[@]}"; do
         if rest_check_app "${SK_VERIFY}" "${SPLUNK_URI}" "${app}" 2>/dev/null; then
             log "  ${app} = STILL PRESENT (may need per-member SHC cleanup)"
+            final_failures=$((final_failures + 1))
         else
             log "  ${app} = removed"
         fi
@@ -139,3 +151,11 @@ fi
 
 log ""
 log "=== Batch uninstall complete ==="
+
+if (( final_failures > 0 )); then
+    exit 1
+fi
+
+if [[ "${verification_available}" != "true" ]] && (( acs_failures > 0 || delete_failures > 0 )); then
+    exit 1
+fi
