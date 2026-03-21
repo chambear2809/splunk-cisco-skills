@@ -373,6 +373,60 @@ EOF
     [ "${SPLUNK_PASS}" = "cloud-pass" ]
 }
 
+@test "load_splunk_platform_settings infers staging ACS server from the selected cloud profile" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_PROFILE="cloud"
+SPLUNK_SEARCH_PROFILE="hf"
+PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_CLOUD_STACK="example-stack"
+PROFILE_cloud__SPLUNK_SEARCH_API_URI="https://example-stack.stg.splunkcloud.com:8089"
+PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+PROFILE_hf__SPLUNK_USER="hf-user"
+PROFILE_hf__SPLUNK_PASS="hf-pass"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    load_splunk_platform_settings
+
+    rm -f "${credentials_file}"
+    [ "${ACS_SERVER}" = "https://staging.admin.splunk.com" ]
+}
+
+@test "load_splunk_credentials falls back to the primary cloud URI when current search head lookup fails" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_PROFILE="cloud"
+SPLUNK_SEARCH_PROFILE="hf"
+PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+PROFILE_cloud__SPLUNK_CLOUD_STACK="example-stack"
+PROFILE_cloud__SPLUNK_SEARCH_API_URI="https://example-stack.stg.splunkcloud.com:8089"
+PROFILE_cloud__STACK_USERNAME="stack-user"
+PROFILE_cloud__STACK_PASSWORD="stack-pass"
+PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+PROFILE_hf__SPLUNK_USER="hf-user"
+PROFILE_hf__SPLUNK_PASS="hf-pass"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    unset SPLUNK_USER
+    unset SPLUNK_PASS
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    cloud_current_search_api_uri() { return 1; }
+    acs_ensure_search_api_access() { return 0; }
+
+    load_splunk_credentials
+
+    rm -f "${credentials_file}"
+    [ "${SPLUNK_URI}" = "https://example-stack.stg.splunkcloud.com:8089" ]
+    [ "${SPLUNK_SEARCH_API_URI}" = "https://example-stack.stg.splunkcloud.com:8089" ]
+    [ "${SPLUNK_USER}" = "stack-user" ]
+    [ "${SPLUNK_PASS}" = "stack-pass" ]
+}
+
 @test "load_splunk_credentials preserves env overrides after refreshing the cloud URI" {
     credentials_file=$(mktemp)
     cat > "${credentials_file}" <<'EOF'

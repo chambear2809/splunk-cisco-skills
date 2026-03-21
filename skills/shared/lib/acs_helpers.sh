@@ -368,16 +368,20 @@ except Exception:
 
 prefer_current_cloud_search_api_uri() {
     local current_host candidate primary_user primary_pass search_user search_pass
-    local current_user current_pass restore_primary_creds=false
+    local current_user current_pass primary_uri restore_primary_creds=false
+    local cloud_uri_active=false
 
     is_splunk_cloud || return 0
     current_host="$(splunk_host_from_uri "${SPLUNK_URI:-}")"
+    primary_uri="$(_primary_cloud_search_api_uri 2>/dev/null || true)"
 
     if [[ "${current_host}" != sh-* ]]; then
         candidate="$(cloud_current_search_api_uri 2>/dev/null || true)"
-        [[ -n "${candidate}" ]] || return 0
-        SPLUNK_URI="${candidate}"
-        SPLUNK_SEARCH_API_URI="${candidate}"
+        [[ -z "${candidate}" ]] && candidate="${primary_uri}"
+        if [[ -n "${candidate}" ]]; then
+            SPLUNK_URI="${candidate}"
+            SPLUNK_SEARCH_API_URI="${candidate}"
+        fi
     fi
 
     primary_user="$(_selected_profile_credential_value "SPLUNK_USER")"
@@ -386,6 +390,9 @@ prefer_current_cloud_search_api_uri() {
     search_pass="$(_search_profile_credential_value "SPLUNK_PASS")"
     current_user="${SPLUNK_USER:-}"
     current_pass="${SPLUNK_PASS:-}"
+    if _is_splunk_cloud_host "${SPLUNK_URI:-}"; then
+        cloud_uri_active=true
+    fi
 
     if [[ -z "${current_user}" && -z "${current_pass}" ]]; then
         restore_primary_creds=true
@@ -394,18 +401,22 @@ prefer_current_cloud_search_api_uri() {
         restore_primary_creds=true
     fi
 
-    if [[ "${restore_primary_creds}" == true && -n "${STACK_USERNAME:-}" && -n "${STACK_PASSWORD:-}" ]]; then
+    if [[ "${cloud_uri_active}" == true && "${restore_primary_creds}" == true \
+        && -n "${STACK_USERNAME:-}" && -n "${STACK_PASSWORD:-}" ]]; then
         SPLUNK_USER="${STACK_USERNAME}"
         SPLUNK_PASS="${STACK_PASSWORD}"
         export SPLUNK_USER SPLUNK_PASS
-    elif [[ "${restore_primary_creds}" == true && -n "${primary_user}" && -n "${primary_pass}" ]]; then
+    elif [[ "${cloud_uri_active}" == true && "${restore_primary_creds}" == true \
+        && -n "${primary_user}" && -n "${primary_pass}" ]]; then
         SPLUNK_USER="${primary_user}"
         SPLUNK_PASS="${primary_pass}"
         export SPLUNK_USER SPLUNK_PASS
     fi
     export SPLUNK_URI SPLUNK_SEARCH_API_URI
 
-    acs_ensure_search_api_access
+    if [[ "${cloud_uri_active}" == true ]]; then
+        acs_ensure_search_api_access
+    fi
 }
 
 # Wait for the Splunk Cloud stack to become Ready or require a restart.
