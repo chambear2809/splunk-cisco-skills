@@ -3462,6 +3462,136 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 curl_log.read_text(encoding="utf-8"),
             )
 
+    def test_cloud_uninstall_falls_back_to_stack_search_uri_when_current_search_head_lookup_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            acs_log = tmp_path / "acs.log"
+            curl_log = tmp_path / "curl.log"
+
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                log_path = Path(os.environ["ACS_LOG"])
+                cmd = " ".join(sys.argv[1:])
+                with log_path.open("a", encoding="utf-8") as handle:
+                    handle.write(cmd + "\\n")
+
+                if cmd == "config current-stack":
+                    raise SystemExit(1)
+
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+                from urllib.parse import urlparse
+
+                log_path = Path(os.environ["CURL_LOG"])
+                args = sys.argv[1:]
+                url = ""
+                output_target = None
+                write_code = False
+
+                i = 0
+                while i < len(args):
+                    arg = args[i]
+                    if arg == "-o" and i + 1 < len(args):
+                        output_target = args[i + 1]
+                        i += 2
+                        continue
+                    if "%{http_code}" in arg:
+                        write_code = True
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                    i += 1
+
+                with log_path.open("a", encoding="utf-8") as handle:
+                    handle.write(url + "\\n")
+
+                path = urlparse(url).path
+                if path.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                    raise SystemExit(0)
+
+                if "/services/apps/local/example_app" in path and output_target == "/dev/null" and write_code:
+                    sys.stdout.write("404")
+                    raise SystemExit(0)
+
+                if write_code and output_target == "/dev/null":
+                    sys.stdout.write("404")
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "nc",
+                """\
+                #!/usr/bin/env bash
+                exit 0
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PROFILE="cloud"
+                    SPLUNK_SEARCH_PROFILE="hf"
+                    PROFILE_cloud__SPLUNK_PLATFORM="cloud"
+                    PROFILE_cloud__SPLUNK_CLOUD_STACK="example-stack"
+                    PROFILE_cloud__ACS_SERVER="https://staging.admin.splunk.com"
+                    PROFILE_cloud__STACK_TOKEN="token"
+                    PROFILE_cloud__STACK_USERNAME="stack-user"
+                    PROFILE_cloud__STACK_PASSWORD="stack-pass"
+                    PROFILE_cloud__SPLUNK_TARGET_ROLE="search-tier"
+                    PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+                    PROFILE_hf__SPLUNK_USER="hf-user"
+                    PROFILE_hf__SPLUNK_PASS="hf-pass"
+                    PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
+                    SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["ACS_LOG"] = str(acs_log)
+            env["CURL_LOG"] = str(curl_log)
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/uninstall_app.sh",
+                "--app-name",
+                "example_app",
+                "--no-restart",
+                env=env,
+                input_text="yes\n",
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("has been removed from Splunk Cloud", result.stdout)
+            self.assertNotIn(
+                "search-tier verification is unavailable",
+                (result.stdout + result.stderr).lower(),
+            )
+            self.assertIn(
+                "https://example-stack.stg.splunkcloud.com:8089/services/auth/login",
+                curl_log.read_text(encoding="utf-8"),
+            )
+
     def test_list_apps_defaults_to_all_apps_in_noninteractive_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

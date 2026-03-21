@@ -432,6 +432,15 @@ _is_staging_splunk_cloud_host() {
     [[ "${host}" == *.stg.splunkcloud.com ]]
 }
 
+_is_splunk_cloud_host() {
+    local value="${1:-}" host
+    value="${value#http://}"
+    value="${value#https://}"
+    host="${value%%/*}"
+    host="${host%%:*}"
+    [[ "${host}" == *.splunkcloud.com ]]
+}
+
 _normalize_cloud_stack_name() {
     local value="${1:-}" host
     value="${value#http://}"
@@ -523,13 +532,20 @@ resolve_splunk_platform() {
 
 load_splunk_platform_settings() {
     local raw_stack raw_search_head default_acs_server normalized_search_head
+    local selected_search_api_uri selected_uri selected_host
     load_splunk_connection_settings
 
+    selected_search_api_uri="$(_selected_profile_credential_value "SPLUNK_SEARCH_API_URI")"
+    selected_uri="$(_selected_profile_credential_value "SPLUNK_URI")"
+    selected_host="$(_selected_profile_credential_value "SPLUNK_HOST")"
     raw_stack="${SPLUNK_CLOUD_STACK:-}"
     raw_search_head="${SPLUNK_CLOUD_SEARCH_HEAD:-}"
 
     default_acs_server="https://admin.splunk.com"
-    if _is_staging_splunk_cloud_host "${SPLUNK_URI:-}" \
+    if _is_staging_splunk_cloud_host "${selected_search_api_uri}" \
+        || _is_staging_splunk_cloud_host "${selected_uri}" \
+        || _is_staging_splunk_cloud_host "${selected_host}" \
+        || _is_staging_splunk_cloud_host "${SPLUNK_URI:-}" \
         || _is_staging_splunk_cloud_host "${SPLUNK_HOST:-}" \
         || _is_staging_splunk_cloud_host "${raw_stack}" \
         || _is_staging_splunk_cloud_host "${raw_search_head}"; then
@@ -552,7 +568,46 @@ load_splunk_platform_settings() {
 }
 
 is_splunk_cloud() {
-    [[ "$(resolve_splunk_platform)" == "cloud" ]]
+    resolve_splunk_platform >/dev/null || return 1
+    [[ "${_RESOLVED_SPLUNK_PLATFORM:-}" == "cloud" ]]
+}
+
+_primary_cloud_search_api_uri() {
+    local configured_uri configured_host configured_port stack suffix host
+
+    load_splunk_platform_settings
+
+    configured_uri="$(_selected_profile_credential_value "SPLUNK_SEARCH_API_URI")"
+    [[ -z "${configured_uri}" ]] && configured_uri="$(_selected_profile_credential_value "SPLUNK_URI")"
+    if _is_splunk_cloud_host "${configured_uri}"; then
+        printf '%s' "${configured_uri}"
+        return 0
+    fi
+
+    configured_host="$(_selected_profile_credential_value "SPLUNK_HOST")"
+    configured_port="$(_selected_profile_credential_value "SPLUNK_MGMT_PORT")"
+    configured_port="${configured_port:-${SPLUNK_MGMT_PORT:-8089}}"
+    if _is_splunk_cloud_host "${configured_host}"; then
+        host="$(splunk_host_from_uri "${configured_host}")"
+        printf 'https://%s:%s' "${host}" "${configured_port}"
+        return 0
+    fi
+
+    stack="${SPLUNK_CLOUD_STACK:-$(_selected_profile_credential_value "SPLUNK_CLOUD_STACK")}"
+    stack="$(_normalize_cloud_stack_name "${stack}")"
+    [[ -n "${stack}" ]] || return 1
+
+    if [[ "${ACS_SERVER:-}" == "https://staging.admin.splunk.com" ]] \
+        || _is_staging_splunk_cloud_host "${configured_uri}" \
+        || _is_staging_splunk_cloud_host "${configured_host}" \
+        || _is_staging_splunk_cloud_host "${stack}" \
+        || _is_staging_splunk_cloud_host "${SPLUNK_CLOUD_SEARCH_HEAD:-}"; then
+        suffix=".stg.splunkcloud.com"
+    else
+        suffix=".splunkcloud.com"
+    fi
+
+    printf 'https://%s%s:8089' "${stack}" "${suffix}"
 }
 
 _normalize_target_role() {
@@ -729,7 +784,7 @@ resolve_splunk_target_role() {
 }
 
 load_splunk_credentials() {
-    load_splunk_connection_settings
+    load_splunk_platform_settings
 
     if is_splunk_cloud; then
         if [[ -z "${SPLUNK_USER:-}" && -n "${STACK_USERNAME:-}" ]]; then
