@@ -21,6 +21,7 @@ SSL_VERIFY="false"
 NETFLOW_IP=""
 NETFLOW_PORT=""
 NETFLOW_DECODER="netflow"
+STREAM_SETUP_ROLE=""
 
 usage() {
     cat <<EOF
@@ -111,6 +112,103 @@ for app in registry.get('apps', []):
 " "${app_name}" "${REGISTRY_FILE}" 2>/dev/null || true
 }
 
+stream_setup_role() {
+    if [[ -n "${STREAM_SETUP_ROLE:-}" ]]; then
+        printf '%s' "${STREAM_SETUP_ROLE}"
+        return 0
+    fi
+
+    STREAM_SETUP_ROLE="$(resolve_splunk_target_role 2>/dev/null || true)"
+    printf '%s' "${STREAM_SETUP_ROLE}"
+}
+
+stream_role_supports_forwarder_actions() {
+    case "${1:-}" in
+        ""|heavy-forwarder|universal-forwarder)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+stream_preflight_role_checks() {
+    local role
+
+    role="$(stream_setup_role)"
+    [[ -n "${role}" ]] || return 0
+
+    if $FULL_SETUP; then
+        log "ERROR: Full Stream setup spans multiple runtime roles and should not run against a role-scoped target (${role})."
+        log "Use --install, --indexes-only, and --configure-streamfwd as separate role-specific runs."
+        exit 1
+    fi
+
+    if $CONFIGURE_STREAMFWD && ! stream_role_supports_forwarder_actions "${role}"; then
+        log "ERROR: Stream forwarder configuration belongs on a heavy or universal forwarder, not role '${role}'."
+        log "Point the run at the forwarder management endpoint or override the role for the forwarder-side target."
+        exit 1
+    fi
+}
+
+stream_role_support_for_app() {
+    local app_name="${1:-}"
+    local role="${2:-}"
+
+    [[ -n "${app_name}" && -n "${role}" ]] || return 0
+    shared_registry_app_role_support_by_name "${app_name}" "${role}"
+}
+
+stream_install_targets() {
+    local role="${1:-}"
+    local -a selected_apps=()
+    local support app_name
+    local -a all_apps=(
+        "splunk_app_stream"
+        "Splunk_TA_stream"
+        "Splunk_TA_stream_wire_data"
+    )
+
+    if [[ -z "${role}" ]]; then
+        printf '%s\n' "${all_apps[@]}"
+        return 0
+    fi
+
+    for app_name in "${all_apps[@]}"; do
+        support="$(stream_role_support_for_app "${app_name}" "${role}")"
+        if [[ -z "${support}" ]]; then
+            log "WARNING: Stream role metadata is unavailable for '${app_name}' on role '${role}'. Falling back to the legacy all-in-one install set." >&2
+            printf '%s\n' "${all_apps[@]}"
+            return 0
+        fi
+        if [[ "${support}" != "none" ]]; then
+            selected_apps+=("${app_name}")
+        fi
+    done
+
+    if (( ${#selected_apps[@]} == 0 )); then
+        log "ERROR: No Splunk Stream packages are modeled for role '${role}'." >&2
+        return 1
+    fi
+
+    printf '%s\n' "${selected_apps[@]}"
+}
+
+stream_package_path() {
+    case "${1:-}" in
+        splunk_app_stream)
+            printf '%s' "${TA_CACHE}/splunk-app-for-stream_816.tgz"
+            ;;
+        Splunk_TA_stream)
+            printf '%s' "${TA_CACHE}/splunk-add-on-for-stream-forwarders_816.tgz"
+            ;;
+        Splunk_TA_stream_wire_data)
+            printf '%s' "${TA_CACHE}/splunk-add-on-for-stream-wire-data_816.tgz"
+            ;;
+    esac
+}
+
 install_app_with_fallback() {
     local pkg_file="$1"
     local app_name="$2"
@@ -148,20 +246,25 @@ install_app_with_fallback() {
 }
 
 install_apps() {
+    local role app_name install_targets_output
+
     log "=== Installing Splunk Stream Apps ==="
     _get_session_key || exit 1
 
-    install_app_with_fallback \
-        "${TA_CACHE}/splunk-app-for-stream_816.tgz" \
-        "splunk_app_stream"
+    role="$(stream_setup_role)"
+    if [[ -n "${role}" ]]; then
+        log "Active deployment role: ${role}"
+    else
+        log "No deployment role declared; using the legacy all-in-one Stream install set."
+    fi
 
-    install_app_with_fallback \
-        "${TA_CACHE}/splunk-add-on-for-stream-forwarders_816.tgz" \
-        "Splunk_TA_stream"
-
-    install_app_with_fallback \
-        "${TA_CACHE}/splunk-add-on-for-stream-wire-data_816.tgz" \
-        "Splunk_TA_stream_wire_data"
+    install_targets_output="$(stream_install_targets "${role}")" || exit 1
+    while IFS= read -r app_name || [[ -n "${app_name}" ]]; do
+        [[ -n "${app_name}" ]] || continue
+        install_app_with_fallback \
+            "$(stream_package_path "${app_name}")" \
+            "${app_name}"
+    done <<< "${install_targets_output}"
 
     log "App installation complete."
 }
@@ -169,6 +272,7 @@ install_apps() {
 create_indexes() {
     log "=== Creating Indexes ==="
     local session_key="${SK-}"
+    load_splunk_connection_settings || exit 1
     if ! is_splunk_cloud; then
         _get_session_key || exit 1
         session_key="${SK}"
@@ -191,7 +295,16 @@ create_indexes() {
 }
 
 configure_streamfwd() {
+    local role
+
     log "=== Configuring Stream Forwarder ==="
+    role="$(stream_setup_role)"
+    if ! stream_role_supports_forwarder_actions "${role}"; then
+        log "ERROR: Stream forwarder configuration belongs on a heavy or universal forwarder, not role '${role:-unknown}'."
+        log "Point the run at the forwarder management endpoint or override the role for the forwarder-side target."
+        exit 1
+    fi
+
     _get_session_key || exit 1
 
     if [[ -z "${IP_ADDR}" ]]; then
@@ -241,18 +354,22 @@ stream_cloud_guard() {
 
     log "ERROR: Splunk Stream on Splunk Cloud is a hybrid deployment."
     log "The cloud search-tier app is managed on the Splunk Cloud stack, while Splunk_TA_stream runs on forwarders under your control."
-    log "This script's --install and --configure-streamfwd actions assume a single target and are not safe in cloud mode."
+    log "This script's --install and --configure-streamfwd actions target one runtime role at a time and are not safe against the Cloud search tier."
     log "Use --indexes-only against the Splunk Cloud stack, and run forwarder-side Stream configuration against the forwarder management endpoint."
     log "If your credentials file contains both Cloud and forwarder targets, interactive runs will prompt when needed. For non-interactive runs, use SPLUNK_PLATFORM=enterprise as an override."
     exit 1
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     if is_splunk_cloud; then
         if $INSTALL || $CONFIGURE_STREAMFWD || $FULL_SETUP; then
             stream_cloud_guard
         fi
     fi
+
+    stream_preflight_role_checks
 
     if is_splunk_cloud && $INDEXES_ONLY; then
         create_indexes

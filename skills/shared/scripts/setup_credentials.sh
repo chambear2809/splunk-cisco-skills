@@ -206,6 +206,16 @@ SPLUNK_MGMT_PORT=${splunk_mgmt_port_q}
 SPLUNK_SEARCH_API_URI=${splunk_search_api_uri_q}
 # Legacy alias kept for backward compatibility with older automation.
 SPLUNK_URI=\${SPLUNK_SEARCH_API_URI}
+# Optional runtime role declaration for warning-only placement checks.
+# Set SPLUNK_TARGET_ROLE for the primary/profile target. If
+# SPLUNK_SEARCH_PROFILE points at a paired target, or when a companion runtime
+# sits outside the current Splunk management endpoint, you can describe that
+# paired runtime role with SPLUNK_SEARCH_TARGET_ROLE. In Cloud mode,
+# warning-only checks stay anchored to the Cloud search tier unless you
+# override the run with SPLUNK_PLATFORM=enterprise or select the forwarder
+# profile directly.
+# SPLUNK_TARGET_ROLE="search-tier"
+# SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
 SPLUNK_USER=${sp_user_q}
 SPLUNK_PASS=${sp_pass_q}
 SPLUNK_SSH_HOST=${splunk_ssh_host_q}
@@ -232,6 +242,7 @@ echo ""
 echo "Credentials saved to ${CRED_FILE} (mode 600)"
 echo "Scripts will read from this file automatically."
 echo "Advanced option: define PROFILE_<name>__KEY entries and set SPLUNK_PROFILE to manage multiple targets in one file."
+echo "Optional role hint: set SPLUNK_TARGET_ROLE for the primary target, and SPLUNK_SEARCH_TARGET_ROLE only when a paired profile represents a different runtime role."
 if [[ "${add_cloud}" =~ ^[yY] ]]; then
     echo "Cloud note: ACS app installs and index management use the ACS CLI, while app-specific TA setup still needs search-api access if you plan to configure the search tier over REST."
 fi

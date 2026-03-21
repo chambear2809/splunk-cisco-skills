@@ -24,7 +24,8 @@ This applies to both Splunk Cloud and Splunk Enterprise targets.
   matching packages in `splunk-ta/`.
 - Cloud: ACS fetches the release directly from Splunkbase.
 - Enterprise: the installer downloads the package, caches it in `splunk-ta/`,
-  and installs it through the REST API or SSH staging.
+  and installs it through the management API. For remote hosts, local packages
+  are staged over SSH first.
 - For known Cisco packages, the installer auto-resolves the Splunkbase ID and
   license-ack URL from `skills/shared/app_registry.json`.
 - `_unpacked` app directories are for review only and are not part of the
@@ -58,7 +59,7 @@ a pinned version or a remote URL. The default flow is:
 The installer supports two target modes:
 
 - **Splunk Enterprise**: install and remove apps through the Splunk REST API on
-  port `8089`, with SSH staging as a fallback for remote package delivery.
+  port `8089`, with SSH staging for remote local-package delivery.
 - **Splunk Cloud**: install and remove apps through the Admin Config Service
   (ACS) CLI. Search-tier REST access on port `8089` is optional and is used by
   other setup skills, not by the generic install/uninstall operations.
@@ -105,10 +106,10 @@ After a successful install, the script either:
 
 Use `--no-restart` only when batching changes.
 
-For remote Enterprise hosts, local package installs try a direct REST upload
-first. If the target does not support upload, the script falls back to SSH
-staging using `SPLUNK_SSH_HOST`, `SPLUNK_SSH_PORT`, `SPLUNK_SSH_USER`, and
-`SPLUNK_SSH_PASS` from the credentials file.
+For remote Enterprise hosts, local package installs stage the package over SSH
+using `SPLUNK_SSH_HOST`, `SPLUNK_SSH_PORT`, `SPLUNK_SSH_USER`, and
+`SPLUNK_SSH_PASS` from the credentials file, then install the staged
+server-local path through the management API with `filename=true`.
 
 For Splunk Cloud:
 
@@ -192,4 +193,3 @@ Prompts for: app selection and confirmation. Credentials are read from the proje
 - If the app has a setup page, the user configures it via Splunk Web or a
   dedicated setup skill (e.g., `cisco-catalyst-ta-setup`).
 - Downloaded files are cached locally (path varies by environment) for reuse.
-

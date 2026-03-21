@@ -1,7 +1,13 @@
 # Cloud Deployment Matrix
 
-This document defines the normal Splunk Cloud deployment model for every TA/app
-covered by this repo.
+_Generated from `skills/shared/app_registry.json` by `skills/shared/scripts/generate_deployment_docs.py`; do not edit manually._
+
+This document defines the normal Splunk Cloud deployment model for the
+repo's cloud-supported apps and workflows.
+
+For cross-platform placement across search tiers, indexers, forwarders, and
+external collectors, see
+[`DEPLOYMENT_ROLE_MATRIX.md`](DEPLOYMENT_ROLE_MATRIX.md).
 
 ## Default Rule
 
@@ -17,12 +23,13 @@ covered by this repo.
 - Do **not** require extract/repack as part of the normal workflow.
 - Treat anything under `splunk-ta/_unpacked/` as review-only.
 
-## TA/App Matrix
+## App And Workflow Matrix
 
 | Skill | Splunkbase ID | Cloud install path | Cloud config path | Notes |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | `cisco-catalyst-ta-setup` | 7538 | ACS Splunkbase | REST via custom account/input handlers | Cisco EULA license-ack required. |
 | `cisco-catalyst-enhanced-netflow-setup` | 6872 | Manual install on HF/UF you control | No app-local config; validate the NetFlow/IPFIX receiver path on the same target | Cisco EULA license-ack required. Optional forwarder-side mappings for extra Enterprise Networking NetFlow dashboards. |
+| `cisco-appdynamics-setup` | 3471 | ACS Splunkbase | REST via custom account/input handlers | Configure the AppDynamics controller account and data inputs after install. |
 | `cisco-security-cloud-setup` | 7404 | ACS Splunkbase | REST via CiscoSecurityCloud custom admin handlers | Cisco EULA license-ack required. Multi-product Cisco Security integration app with product-specific setup flows for each packaged integration. |
 | `cisco-secure-access-setup` | 5558 | ACS Splunkbase | REST via `org_accounts`, `update_settings`, and related app APIs | Cisco EULA license-ack required. The local package is the Secure Access app (`cisco-cloud-security`), not the separate add-on listing. Covers org onboarding plus dashboard settings/bootstrap. |
 | `cisco-meraki-ta-setup` | 5580 | ACS Splunkbase | REST via custom account/input handlers | Cisco EULA license-ack required. Dashboard macro alignment after install. |
@@ -31,10 +38,10 @@ covered by this repo.
 | `cisco-enterprise-networking-setup` | 7539 | ACS Splunkbase | REST for macros/saved searches/datamodel settings | Cisco EULA license-ack required. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards. |
 | `cisco-thousandeyes-setup` | 7719 | ACS Splunkbase | REST for OAuth account, HEC-based streaming inputs, polling inputs | Requires HEC token. OAuth device code flow for auth. ITSI integration optional. |
 | `splunk-itsi-setup` | 1841 | ACS Splunkbase | No post-install REST config needed | Premium product; requires ITSI license. Enables ThousandEyes ITSI integration. |
-| `splunk-stream-setup` search-tier app | `splunk-app-for-stream_816.tgz` | ACS or Splunk Cloud support workflow | Stream UI / REST on search tier | Cloud deployment is hybrid, not single-target. |
-| `splunk-stream-setup` wire-data add-on | `splunk-add-on-for-stream-wire-data_816.tgz` | ACS or bundled with Stream deployment | No special post-install config in normal flow | Knowledge-object support for Stream search content. |
-| `splunk-stream-setup` forwarder add-on | `splunk-add-on-for-stream-forwarders_816.tgz` | Manual install on HF/UF you control | Local HF files plus host forwarding config | This package runs on the heavy/universal forwarder, not the Cloud search tier. |
-| `splunk-connect-for-syslog-setup` | N/A | No Splunk Cloud app install; SC4S runtime is rendered for customer-managed hosts or Kubernetes | ACS for indexes/HEC where available, search-tier REST for validation, rendered host/Helm assets for runtime | External syslog-ng collector pattern. No `app_registry.json` entry because the normal workflow is Splunk prep plus customer-managed runtime deployment. |
+| `splunk-stream-setup` search-tier app | 1809 | ACS or Splunk Cloud support workflow | Stream UI / REST on search tier | Cloud deployment is hybrid, not single-target. |
+| `splunk-stream-setup` wire-data add-on | 5234 | ACS or bundled with Stream deployment | No special post-install config in normal flow | Knowledge-object support for Stream search content. |
+| `splunk-stream-setup` forwarder add-on | 5238 | Manual install on HF/UF you control | Local HF files plus host forwarding config | This package runs on the heavy/universal forwarder, not the Cloud search tier. |
+| `splunk-connect-for-syslog-setup` | N/A | No Splunk Cloud app install; SC4S runtime is rendered for customer-managed hosts or Kubernetes | ACS for indexes/HEC where available, search-tier REST for validation, rendered host/Helm assets for runtime | External syslog-ng collector pattern. Modeled as a workflow row rather than a Splunk app package. |
 
 ## Stream Heavy Forwarder Model
 
@@ -43,7 +50,7 @@ For Splunk Stream on Splunk Cloud:
 - install `splunk_app_stream` on the Splunk Cloud search tier
 - install `Splunk_TA_stream` on a customer-controlled HF/UF
 - use the local overlay template in:
-  - `skills/splunk-stream-setup/templates/splunk-cloud-hf-netflow-any/`
+  `skills/splunk-stream-setup/templates/splunk-cloud-hf-netflow-any/`
 - configure HF forwarding to Splunk Cloud at the host layer
 
 ## SC4S External Collector Model
@@ -64,7 +71,7 @@ both depending on the operation.
 ### ACS vs Search-Tier REST (8089)
 
 | Operation | ACS (no 8089 needed) | REST 8089 required |
-|-----------|---------------------|--------------------|
+| --- | --- | --- |
 | App install / uninstall | Yes | -- |
 | Index create / check | Yes | -- |
 | HEC token management | Yes | -- |
@@ -119,4 +126,4 @@ The `_unpacked` trees exist only so we can:
 - identify Cloud compatibility risks
 - document vendor package limitations
 
-They are not the normal installation source for this repo’s Cloud workflow.
+They are not the normal installation source for this repo's Cloud workflow.

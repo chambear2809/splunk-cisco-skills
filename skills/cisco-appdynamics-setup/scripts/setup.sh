@@ -438,6 +438,8 @@ show_dashboard_index_note() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     if ${ENABLE_INPUTS}; then
         check_prereqs
         if [[ -z "${INPUT_TYPE}" ]]; then

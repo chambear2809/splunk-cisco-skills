@@ -30,7 +30,7 @@ done
 echo "=== List Installed Splunk Apps ==="
 echo ""
 
-if [[ -z "${FILTER}" ]]; then
+if [[ -z "${FILTER}" && -t 0 ]]; then
     echo ""
     read -rp "Filter by name (leave blank for all): " FILTER
 fi

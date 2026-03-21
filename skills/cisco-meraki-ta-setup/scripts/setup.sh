@@ -309,6 +309,8 @@ enable_all_inputs() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     if $ENABLE_INPUTS; then
         check_prereqs
         INDEX="${INDEX:-meraki}"

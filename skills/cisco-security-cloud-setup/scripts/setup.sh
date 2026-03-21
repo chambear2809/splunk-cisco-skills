@@ -181,6 +181,8 @@ report_status() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     validate_log_level "${SET_LOG_LEVEL}"
 
     if $INSTALL_APP; then

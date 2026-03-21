@@ -36,6 +36,8 @@ except Exception:
 log "=== Cisco Catalyst TA Validation ==="
 log ""
 
+warn_if_current_skill_role_unsupported
+
 log "--- App Installation ---"
 if ! load_splunk_credentials; then
     fail "Could not load Splunk credentials — check credentials file"

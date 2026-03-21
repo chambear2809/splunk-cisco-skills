@@ -227,6 +227,8 @@ enable_cybervision_inputs() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     check_prereqs
 
     if $ENABLE_INPUTS; then

@@ -34,6 +34,8 @@ summarize_and_exit() {
 log "=== Cisco AppDynamics Validation ==="
 log ""
 
+warn_if_current_skill_role_unsupported
+
 if ! load_splunk_credentials; then
     fail "Could not load Splunk credentials — check credentials file"
     summarize_and_exit

@@ -73,9 +73,11 @@ The agent should still ask the user for non-secret configuration values:
 
 This skill supports two different deployment patterns:
 
-- **Splunk Enterprise**: a single-target workflow where app install, index
-  creation, and `Splunk_TA_stream` configuration all happen against the same
-  Splunk deployment.
+- **Splunk Enterprise**: either a single-instance workflow or a split-role
+  workflow across search-tier, indexer, and forwarder targets. When
+  `SPLUNK_TARGET_ROLE` is declared, the install path now scopes Stream package
+  installation to the components modeled for that role. In that role-scoped
+  mode, use explicit phase flags instead of the default full setup.
 - **Splunk Cloud**: a hybrid workflow where the cloud search tier hosts
   `splunk_app_stream`, while `Splunk_TA_stream` runs on forwarders or hosts
   under your control. In Cloud mode, index creation uses ACS and the combined
@@ -118,8 +120,19 @@ present. It uses the `splunk-app-install` skill's `install_app.sh` under the
 hood and follows the same package policy as the rest of the repo: Splunkbase
 first, then local fallback from `splunk-ta/`. For local fallback installs on a
 remote host, the installer uses the same remote-host behavior as the generic
-app installer: direct REST upload first, then SSH staging when the target
-cannot read the local package path directly.
+app installer: stage the package over SSH, then install the staged
+server-local path through the management API with `filename=true`.
+
+When `SPLUNK_TARGET_ROLE` is set, the install step uses the deployment-role
+matrix to scope the package set:
+
+- `search-tier`: `splunk_app_stream` plus search-tier-compatible Stream support
+- `indexer`: `Splunk_TA_stream_wire_data`
+- `heavy-forwarder`: `Splunk_TA_stream` plus forwarder-compatible Stream support
+- `universal-forwarder`: `Splunk_TA_stream`
+
+When no role is declared, the script keeps the legacy all-in-one Enterprise
+behavior and tries all three Stream packages on the active target.
 
 On Splunk Cloud, do **not** run the combined install path against the cloud
 search tier. Splunk documents Stream on Cloud as a hybrid deployment:
@@ -272,4 +285,3 @@ All stream sourcetypes follow the pattern `stream:<protocol>`:
    permissions using your standard deployment process if raw capture is required.
 7. **KV Store**: Stream app uses KV Store for stream definitions. Ensure KV
    Store is healthy before configuration.
-

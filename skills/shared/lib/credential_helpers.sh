@@ -34,6 +34,7 @@ fi
 
 source "${_LIB_DIR}/credentials.sh"
 source "${_LIB_DIR}/rest_helpers.sh"
+source "${_LIB_DIR}/registry_helpers.sh"
 source "${_LIB_DIR}/acs_helpers.sh"
 source "${_LIB_DIR}/splunkbase_helpers.sh"
 source "${_LIB_DIR}/configure_account_helpers.sh"

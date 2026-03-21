@@ -1,5 +1,322 @@
 {
-  "description": "Central registry of Splunkbase app metadata for this repo. Used by the cloud installer, batch scripts, and skill docs as the single source of truth for Splunkbase IDs, license-ack URLs, and known package filenames.",
+  "description": "Central registry of Splunkbase app metadata and deployment-role placement for this repo. Used by the cloud installer, batch scripts, tests, and generated deployment docs as the single source of truth for package identity and role support.",
+  "deployment_roles": [
+    "search-tier",
+    "indexer",
+    "heavy-forwarder",
+    "universal-forwarder",
+    "external-collector"
+  ],
+  "deployment_role_descriptions": {
+    "search-tier": "Search heads or search-head clusters that host app UI, REST handlers, dashboards, macros, and search-time knowledge objects.",
+    "indexer": "Indexing tier where index-time parsing or indexer-side knowledge objects belong.",
+    "heavy-forwarder": "Customer-managed full Splunk Enterprise instance used for data collection, parsing, or forwarding.",
+    "universal-forwarder": "Lightweight forwarder tier used where the package or workflow is explicitly forwarder-safe.",
+    "external-collector": "Non-Splunk runtime such as SC4S, containers, or Kubernetes workloads that send data into Splunk."
+  },
+  "documentation": {
+    "cloud_matrix_rows": [
+      {
+        "kind": "app",
+        "app_name": "TA_cisco_catalyst",
+        "label": "`cisco-catalyst-ta-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST via custom account/input handlers",
+        "notes": "Cisco EULA license-ack required."
+      },
+      {
+        "kind": "app",
+        "app_name": "splunk_app_stream_ipfix_cisco_hsl",
+        "label": "`cisco-catalyst-enhanced-netflow-setup`",
+        "cloud_install_path": "Manual install on HF/UF you control",
+        "cloud_config_path": "No app-local config; validate the NetFlow/IPFIX receiver path on the same target",
+        "notes": "Cisco EULA license-ack required. Optional forwarder-side mappings for extra Enterprise Networking NetFlow dashboards."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_AppDynamics",
+        "label": "`cisco-appdynamics-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST via custom account/input handlers",
+        "notes": "Configure the AppDynamics controller account and data inputs after install."
+      },
+      {
+        "kind": "app",
+        "app_name": "CiscoSecurityCloud",
+        "label": "`cisco-security-cloud-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST via CiscoSecurityCloud custom admin handlers",
+        "notes": "Cisco EULA license-ack required. Multi-product Cisco Security integration app with product-specific setup flows for each packaged integration."
+      },
+      {
+        "kind": "app",
+        "app_name": "cisco-cloud-security",
+        "label": "`cisco-secure-access-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST via `org_accounts`, `update_settings`, and related app APIs",
+        "notes": "Cisco EULA license-ack required. The local package is the Secure Access app (`cisco-cloud-security`), not the separate add-on listing. Covers org onboarding plus dashboard settings/bootstrap."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_cisco_meraki",
+        "label": "`cisco-meraki-ta-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST via custom account/input handlers",
+        "notes": "Cisco EULA license-ack required. Dashboard macro alignment after install."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_Cisco_Intersight",
+        "label": "`cisco-intersight-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST via custom account/input handlers",
+        "notes": "Cisco EULA license-ack required. Index creation uses ACS."
+      },
+      {
+        "kind": "app",
+        "app_name": "cisco_dc_networking_app_for_splunk",
+        "label": "`cisco-dc-networking-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST via custom account/input handlers",
+        "notes": "Cisco EULA license-ack required. Index creation uses ACS."
+      },
+      {
+        "kind": "app",
+        "app_name": "cisco-catalyst-app",
+        "label": "`cisco-enterprise-networking-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST for macros/saved searches/datamodel settings",
+        "notes": "Cisco EULA license-ack required. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards."
+      },
+      {
+        "kind": "app",
+        "app_name": "ta_cisco_thousandeyes",
+        "label": "`cisco-thousandeyes-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST for OAuth account, HEC-based streaming inputs, polling inputs",
+        "notes": "Requires HEC token. OAuth device code flow for auth. ITSI integration optional."
+      },
+      {
+        "kind": "app",
+        "app_name": "SA-ITOA",
+        "label": "`splunk-itsi-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "No post-install REST config needed",
+        "notes": "Premium product; requires ITSI license. Enables ThousandEyes ITSI integration."
+      },
+      {
+        "kind": "app",
+        "app_name": "splunk_app_stream",
+        "label": "`splunk-stream-setup` search-tier app",
+        "cloud_install_path": "ACS or Splunk Cloud support workflow",
+        "cloud_config_path": "Stream UI / REST on search tier",
+        "notes": "Cloud deployment is hybrid, not single-target."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_stream_wire_data",
+        "label": "`splunk-stream-setup` wire-data add-on",
+        "cloud_install_path": "ACS or bundled with Stream deployment",
+        "cloud_config_path": "No special post-install config in normal flow",
+        "notes": "Knowledge-object support for Stream search content."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_stream",
+        "label": "`splunk-stream-setup` forwarder add-on",
+        "cloud_install_path": "Manual install on HF/UF you control",
+        "cloud_config_path": "Local HF files plus host forwarding config",
+        "notes": "This package runs on the heavy/universal forwarder, not the Cloud search tier."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-connect-for-syslog-setup",
+        "label": "`splunk-connect-for-syslog-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; SC4S runtime is rendered for customer-managed hosts or Kubernetes",
+        "cloud_config_path": "ACS for indexes/HEC where available, search-tier REST for validation, rendered host/Helm assets for runtime",
+        "notes": "External syslog-ng collector pattern. Modeled as a workflow row rather than a Splunk app package."
+      }
+    ]
+  },
+  "skill_topologies": [
+    {
+      "skill": "cisco-catalyst-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "API-driven collector app; run on the search tier or a heavy forwarder you control."
+    },
+    {
+      "skill": "cisco-catalyst-enhanced-netflow-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "heavy-forwarder",
+        "universal-forwarder"
+      ],
+      "notes": "Forwarder-side field-mapping add-on for NetFlow or IPFIX receiver paths."
+    },
+    {
+      "skill": "cisco-appdynamics-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Collector and dashboard setup skill; use on the search tier or a heavy forwarder."
+    },
+    {
+      "skill": "cisco-security-cloud-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Product-specific Cisco Security collector app; compatible with the search tier or a heavy forwarder."
+    },
+    {
+      "skill": "cisco-secure-access-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Secure Access onboarding and dashboard setup app; place on the search tier or a heavy forwarder."
+    },
+    {
+      "skill": "cisco-dc-networking-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Collector app for ACI, Nexus Dashboard, and Nexus 9K data; use on the search tier or a heavy forwarder."
+    },
+    {
+      "skill": "cisco-enterprise-networking-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-time visualization app with macros, saved searches, and KV Store content."
+    },
+    {
+      "skill": "cisco-intersight-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "API collector app; run on the search tier or a heavy forwarder."
+    },
+    {
+      "skill": "cisco-meraki-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Meraki collector app with dashboard alignment; place on the search tier or a heavy forwarder."
+    },
+    {
+      "skill": "cisco-thousandeyes-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Hybrid-capable app that combines HEC push with polling and dashboard setup."
+    },
+    {
+      "skill": "splunk-app-install",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Generic package delivery skill; actual package compatibility comes from the package or app metadata."
+    },
+    {
+      "skill": "splunk-connect-for-syslog-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "External collector workflow that prepares Splunk-side objects and renders SC4S runtime assets."
+    },
+    {
+      "skill": "splunk-itsi-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Premium search-tier app for ITSI dashboards and service analytics."
+    },
+    {
+      "skill": "splunk-stream-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "required",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "heavy-forwarder",
+        "universal-forwarder"
+      ],
+      "notes": "Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects."
+    }
+  ],
   "apps": [
     {
       "skill": "cisco-catalyst-ta-setup",
@@ -7,7 +324,22 @@
       "splunkbase_id": "7538",
       "label": "Cisco Catalyst Add-on for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-catalyst-add-on-for-splunk_*"]
+      "package_patterns": ["cisco-catalyst-add-on-for-splunk_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "cisco-dc-networking-setup",
@@ -15,7 +347,22 @@
       "splunkbase_id": "7777",
       "label": "Cisco DC Networking App for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-dc-networking_*"]
+      "package_patterns": ["cisco-dc-networking_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "cisco-enterprise-networking-setup",
@@ -24,7 +371,22 @@
       "label": "Cisco Enterprise Networking for Splunk Platform",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
       "package_patterns": ["cisco-enterprise-networking-for-splunk-platform_*"],
-      "install_requires": ["7538"]
+      "install_requires": ["7538"],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "cisco-catalyst-enhanced-netflow-setup",
@@ -32,7 +394,22 @@
       "splunkbase_id": "6872",
       "label": "Cisco Catalyst Enhanced Netflow Add-on for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-catalyst-enhanced-netflow-add-on-for-splunk_*"]
+      "package_patterns": ["cisco-catalyst-enhanced-netflow-add-on-for-splunk_*"],
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      }
     },
     {
       "skill": "cisco-security-cloud-setup",
@@ -40,7 +417,22 @@
       "splunkbase_id": "7404",
       "label": "Cisco Security Cloud",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-security-cloud_*"]
+      "package_patterns": ["cisco-security-cloud_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -48,7 +440,22 @@
       "splunkbase_id": "5558",
       "label": "Cisco Secure Access App for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-secure-access-app-for-splunk_*"]
+      "package_patterns": ["cisco-secure-access-app-for-splunk_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "cisco-intersight-setup",
@@ -56,7 +463,22 @@
       "splunkbase_id": "7828",
       "label": "Cisco Intersight Add-On for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-intersight-add-on-for-splunk_*"]
+      "package_patterns": ["cisco-intersight-add-on-for-splunk_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "cisco-appdynamics-setup",
@@ -64,7 +486,22 @@
       "splunkbase_id": "3471",
       "label": "Cisco Splunk Add-on for AppDynamics",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
-      "package_patterns": ["cisco-splunk-add-on-for-appdynamics_*"]
+      "package_patterns": ["cisco-splunk-add-on-for-appdynamics_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "cisco-meraki-ta-setup",
@@ -72,7 +509,22 @@
       "splunkbase_id": "5580",
       "label": "Splunk Add-on for Cisco Meraki",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-meraki-add-on-for-splunk_*"]
+      "package_patterns": ["cisco-meraki-add-on-for-splunk_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "splunk-stream-setup",
@@ -80,7 +532,22 @@
       "splunkbase_id": "1809",
       "label": "Splunk App for Stream",
       "license_ack_url": "",
-      "package_patterns": ["splunk-app-for-stream_*"]
+      "package_patterns": ["splunk-app-for-stream_*"],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "splunk-stream-setup",
@@ -88,7 +555,22 @@
       "splunkbase_id": "5238",
       "label": "Splunk Add-on for Stream Forwarders",
       "license_ack_url": "",
-      "package_patterns": ["splunk-add-on-for-stream-forwarders_*"]
+      "package_patterns": ["splunk-add-on-for-stream-forwarders_*"],
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "required",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": true,
+        "uf_safe": true
+      }
     },
     {
       "skill": "splunk-stream-setup",
@@ -96,7 +578,22 @@
       "splunkbase_id": "5234",
       "label": "Splunk Add-on for Stream Wire Data",
       "license_ack_url": "",
-      "package_patterns": ["splunk-add-on-for-stream-wire-data_*"]
+      "package_patterns": ["splunk-add-on-for-stream-wire-data_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "required",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "cisco-thousandeyes-setup",
@@ -104,7 +601,22 @@
       "splunkbase_id": "7719",
       "label": "Cisco ThousandEyes App for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-thousandeyes-app-for-splunk_*"]
+      "package_patterns": ["cisco-thousandeyes-app-for-splunk_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     },
     {
       "skill": "splunk-itsi-setup",
@@ -112,7 +624,22 @@
       "splunkbase_id": "1841",
       "label": "Splunk IT Service Intelligence",
       "license_ack_url": "",
-      "package_patterns": ["splunk-it-service-intelligence_*", "itsi_*"]
+      "package_patterns": ["splunk-it-service-intelligence_*", "itsi_*"],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
     }
   ]
 }

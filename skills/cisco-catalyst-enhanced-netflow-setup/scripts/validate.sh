@@ -24,6 +24,8 @@ info() { log "  INFO: $*"; }
 log "=== Cisco Catalyst Enhanced Netflow Add-on Validation ==="
 log ""
 
+warn_if_current_skill_role_unsupported
+
 log "--- Target Context ---"
 if is_splunk_cloud; then
     fail "This add-on targets forwarders you control — run validation against the Enterprise/forwarder management endpoint"

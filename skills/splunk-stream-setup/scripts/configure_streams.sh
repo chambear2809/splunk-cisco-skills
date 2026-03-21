@@ -4,20 +4,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
-# Derive a default Splunk Web URL from the search-tier REST URI.
-# Splunk Cloud exposes the app over standard HTTPS rather than port 8000.
-if is_splunk_cloud; then
-    SPLUNK_WEB_URL="${SPLUNK_WEB_URL:-${SPLUNK_URI/8089/443}}"
-else
-    SPLUNK_WEB_URL="${SPLUNK_WEB_URL:-${SPLUNK_URI/8089/8000}}"
-fi
-
 ENABLE_LIST=""
 DISABLE_LIST=""
 LIST_STREAMS=false
 TARGET_INDEX=""
 
-STREAM_API_BASE="${SPLUNK_WEB_URL}/en-US/custom/splunk_app_stream"
+STREAM_API_BASE=""
+STREAM_CONFIGURE_ROLE=""
 
 usage() {
     cat <<EOF
@@ -44,6 +37,8 @@ Environment:
 
 Splunk credentials are read from the project-root credentials file automatically.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
+
+This script manages search-tier Stream protocol definitions only.
 EOF
     exit 0
 }
@@ -70,7 +65,48 @@ capitalize_word() {
 
 _get_session_key() {
     load_splunk_credentials || return 1
+    set_stream_api_base || return 1
     SK=$(get_session_key "${SPLUNK_URI}") || return 1
+}
+
+stream_configure_role() {
+    if [[ -n "${STREAM_CONFIGURE_ROLE:-}" ]]; then
+        printf '%s' "${STREAM_CONFIGURE_ROLE}"
+        return 0
+    fi
+
+    STREAM_CONFIGURE_ROLE="$(resolve_splunk_target_role 2>/dev/null || true)"
+    printf '%s' "${STREAM_CONFIGURE_ROLE}"
+}
+
+stream_configure_preflight_role_checks() {
+    local role
+
+    role="$(stream_configure_role)"
+    [[ -z "${role}" || "${role}" == "search-tier" ]] && return 0
+
+    log "ERROR: Stream protocol configuration is search-tier only and cannot run against role '${role}'."
+    log "Run this script against the search tier where splunk_app_stream is installed."
+    exit 1
+}
+
+set_stream_api_base() {
+    local splunk_web_url=""
+
+    if [[ -z "${SPLUNK_URI:-}" ]]; then
+        load_splunk_connection_settings || return 1
+    fi
+
+    splunk_web_url="${SPLUNK_WEB_URL:-}"
+    if [[ -z "${splunk_web_url}" ]]; then
+        if is_splunk_cloud; then
+            splunk_web_url="${SPLUNK_URI/8089/443}"
+        else
+            splunk_web_url="${SPLUNK_URI/8089/8000}"
+        fi
+    fi
+
+    STREAM_API_BASE="${splunk_web_url}/en-US/custom/splunk_app_stream"
 }
 
 # Try to fetch stream list via Stream REST API or KV Store.
@@ -249,6 +285,8 @@ disable_streams() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+    stream_configure_preflight_role_checks
     _get_session_key || exit 1
 
     if $LIST_STREAMS; then

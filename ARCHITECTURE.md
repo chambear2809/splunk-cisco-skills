@@ -1,7 +1,8 @@
 # Repository and Deployment Architecture
 
 How this repo is organized, and how the shared automation adapts to Splunk
-Cloud, Enterprise (on-prem), and hybrid deployments.
+Cloud, Enterprise (on-prem), hybrid deployments, and the runtime roles inside
+those topologies.
 
 ## Repository Architecture
 
@@ -16,7 +17,7 @@ repo and the runtime deployment models those scripts target.
 | `skills/<skill>/` | Skill-specific docs and automation for install, setup, validation, and optional MCP loading |
 | `skills/shared/lib/` | Shared platform layer for credentials, ACS, REST, Splunkbase, and account helpers |
 | `skills/shared/scripts/` | Shared operational entrypoints such as credential setup and cloud batch install/uninstall |
-| `skills/shared/app_registry.json` | Single source of truth for Splunkbase IDs, package patterns, app names, and license-ack metadata |
+| `skills/shared/app_registry.json` | Single source of truth for Splunkbase IDs, package patterns, app names, license-ack metadata, and role placement |
 | `splunk-ta/` | Local package cache for downloaded or manually staged `.tgz` / `.spl` archives |
 | `splunk-ta/_unpacked/` | Review-only extracted copies, not the normal deployment path |
 | `tests/` and `.github/workflows/ci.yml` | Regression coverage for helper libraries and first-party shell scripts |
@@ -51,14 +52,42 @@ Most skills follow the same layout, even if some omit optional files:
 
 - `skills/splunk-app-install/scripts/install_app.sh` is the generic app-delivery
   entrypoint used across the repo.
-- On Splunk Enterprise, the installer tries REST upload first and falls back to
-  SSH staging when direct upload is unavailable.
+- On Splunk Enterprise, the installer installs local server paths directly and
+  stages remote local-package installs over SSH before calling the management
+  API with `filename=true`.
 - On Splunk Cloud, the installer uses ACS and consults
   `skills/shared/app_registry.json` to map known package files to Splunkbase app
   installs, license acknowledgements, and expected app names.
 - `skills/shared/scripts/cloud_batch_install.sh` batches ACS installs and
   performs a post-install identity check to catch corrupted or mis-mapped app
   deployments.
+
+### Platform And Deployment Role
+
+This repo separates **platform selection** from **deployment role**:
+
+- Platform selection decides whether the helpers are using Splunk Cloud or
+  self-managed Splunk Enterprise APIs.
+- Deployment role describes where a package or end-to-end skill belongs inside
+  the topology.
+
+The role model uses five names:
+
+- `search-tier`
+- `indexer`
+- `heavy-forwarder`
+- `universal-forwarder`
+- `external-collector`
+
+Use `DEPLOYMENT_ROLE_MATRIX.md` for the role placement truth for each package
+and skill. Use `CLOUD_DEPLOYMENT_MATRIX.md` when the question is specifically
+about Cloud install or configuration behavior.
+
+At runtime, the warning layer can consume `SPLUNK_TARGET_ROLE` and
+`SPLUNK_SEARCH_TARGET_ROLE` to describe what the active management endpoint
+represents and what paired runtime may exist alongside it. These are
+deployment-role hints, not delivery-plane selectors. Per-run environment values
+override the selected profile's role metadata.
 
 ### Skill Roles
 
@@ -213,11 +242,12 @@ flowchart TB
 ```
 
 **Credential flow**: `SPLUNK_USER/PASS` for REST API access. `SPLUNK_SSH_*` for
-remote file staging when REST upload is unavailable.
+remote local-package staging when the Splunk host cannot read the package from
+the local workstation path.
 
-**App install paths** (tried in order):
-1. REST upload via `/services/apps/local`
-2. SSH staging to `$SPLUNK_HOME/etc/apps/`
+**App install paths**:
+1. Local Splunk host: install the server-local package path through `/services/apps/local` with `filename=true`
+2. Remote Splunk host: stage the package to `/tmp` over SSH, then install that staged server-local path through `/services/apps/local` with `filename=true`
 
 ### Hybrid (Cloud + Heavy Forwarder)
 
@@ -287,6 +317,9 @@ strategies:
 1. **Profile-based** -- `SPLUNK_PROFILE=cloud` and
    `SPLUNK_SEARCH_PROFILE=hf` in the credentials file. Cloud keeps
    platform/ACS settings while HF overrides search-tier REST and SSH settings.
+   Add `SPLUNK_TARGET_ROLE=search-tier` and
+   `SPLUNK_SEARCH_TARGET_ROLE=heavy-forwarder` when you want warning-only role
+   checks to follow that split.
 2. **Platform override** -- `SPLUNK_PLATFORM=cloud` or
    `SPLUNK_PLATFORM=enterprise` per command to select the target explicitly.
 
@@ -302,6 +335,10 @@ When ambiguous, interactive scripts prompt the user to choose.
 | App install on HF | HF | REST :8089 or SSH |
 | Input config on HF | HF | REST :8089 |
 | Forwarder output config | HF | Host-level config |
+
+Runtime role and delivery plane stay separate in this model. A package can be
+classified as `search-tier` while still being delivered through ACS on Cloud or
+through a deployer/cluster-manager path in Enterprise.
 
 ## How Scripts Select the Target
 

@@ -19,7 +19,6 @@ WARN=0
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
-info() { log "  INFO: $*"; }
 
 usage() {
     cat <<EOF
@@ -123,6 +122,8 @@ fi
 
 log "=== Cisco Security Cloud Validation ==="
 log ""
+
+warn_if_current_skill_role_unsupported
 
 log "--- App Installation ---"
 if ! load_splunk_credentials; then

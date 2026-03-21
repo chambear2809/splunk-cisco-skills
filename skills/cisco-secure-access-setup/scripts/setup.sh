@@ -145,6 +145,8 @@ report_status() {
 }
 
 main() {
+    warn_if_current_skill_role_unsupported
+
     if $INSTALL_APP; then
         install_app_package
     fi

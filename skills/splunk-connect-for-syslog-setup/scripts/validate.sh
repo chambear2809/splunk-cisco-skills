@@ -370,6 +370,7 @@ except Exception:
 
 log "=== SC4S Validation ==="
 log ""
+warn_if_current_skill_role_unsupported
 log "--- Splunk Authentication ---"
 if ! ensure_search_session; then
     log ""
