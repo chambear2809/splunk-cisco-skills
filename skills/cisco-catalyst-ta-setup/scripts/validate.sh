@@ -15,6 +15,24 @@ pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 
+get_verify_ssl_setting() {
+    splunk_curl "$SK" \
+        "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/TA_cisco_catalyst_settings/additional_parameters?output_mode=json" \
+        2>/dev/null \
+        | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    entries = data.get('entry', [])
+    value = ''
+    if entries:
+        value = str(entries[0].get('content', {}).get('verify_ssl', '')).strip()
+    print(value, end='')
+except Exception:
+    print('', end='')
+" 2>/dev/null || true
+}
+
 log "=== Cisco Catalyst TA Validation ==="
 log ""
 
@@ -92,8 +110,8 @@ done
 
 log ""
 log "--- Settings ---"
-ssl_verify=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "ta_cisco_catalyst_settings" "default" "verify_ssl" 2>/dev/null || true)
-if [[ "${ssl_verify}" == "True" ]]; then
+ssl_verify="$(get_verify_ssl_setting)"
+if [[ "${ssl_verify}" == "1" || "${ssl_verify}" == "True" || "${ssl_verify}" == "true" ]]; then
     pass "SSL verification is enabled"
 else
     warn "SSL verification is disabled (verify_ssl = ${ssl_verify})"

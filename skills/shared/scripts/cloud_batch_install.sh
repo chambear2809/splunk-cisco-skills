@@ -157,6 +157,7 @@ log "Apps: ${APP_IDS[*]}"
 log ""
 
 failures=0
+verify_failures=0
 for app_id in "${APP_IDS[@]}"; do
     log "Installing Splunkbase app ID ${app_id}..."
 
@@ -200,7 +201,6 @@ log "--- Verifying app identity ---"
 load_splunk_credentials 2>/dev/null || true
 verify_sk=$(get_session_key "${SPLUNK_URI}" 2>/dev/null || true)
 if [[ -n "${verify_sk}" ]]; then
-    verify_failures=0
     for app_id in "${APP_IDS[@]}"; do
         expected_name="$(resolve_app_name "${app_id}")"
         if [[ -z "${expected_name}" ]]; then
@@ -223,3 +223,7 @@ fi
 
 log ""
 log "=== Batch install complete ==="
+
+if (( failures > 0 || verify_failures > 0 )); then
+    exit 1
+fi
