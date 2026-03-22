@@ -5,6 +5,7 @@
     "default_name": "Duo_Default",
     "required_fields": ["api_host"],
     "secret_fields": ["ikey", "skey", "proxy_password"],
+    "required_secret_fields": ["ikey", "skey"],
     "defaults": {
       "index": "cisco_duo",
       "interval": "120",
@@ -18,6 +19,7 @@
     "default_name": "SMA_Default",
     "required_fields": ["api_host", "after"],
     "secret_fields": ["api_key", "proxy_password"],
+    "required_secret_fields": ["api_key"],
     "defaults": {
       "index": "cisco_sma",
       "interval": "300",
@@ -31,6 +33,11 @@
     "default_name": "XDR_Default",
     "required_fields": ["region", "auth_method", "client_id", "xdr_import_time_range"],
     "secret_fields": ["refresh_token", "access_token", "password"],
+    "conditional_required_secret_fields": [
+      {"field": "auth_method", "value": "client_id", "secret_keys": ["refresh_token"]},
+      {"field": "auth_method", "value": "access_token", "secret_keys": ["access_token"]},
+      {"field": "auth_method", "value": "password", "secret_keys": ["password"]}
+    ],
     "defaults": {
       "index": "cisco_xdr",
       "interval": "300",
@@ -65,6 +72,7 @@
     "default_name": "SecureFirewall_eStreamer_Default",
     "required_fields": ["fmc_host", "fmc_port", "estreamer_import_time_range", "event_types"],
     "secret_fields": ["pkcs_certificate", "password"],
+    "required_secret_fields": ["pkcs_certificate", "password"],
     "defaults": {
       "index": "cisco_secure_fw",
       "interval": "600",
@@ -90,6 +98,7 @@
     "default_name": "SecureFirewall_API_Default",
     "required_fields": ["fmc_host", "username"],
     "secret_fields": ["password"],
+    "required_secret_fields": ["password"],
     "defaults": {
       "index": "cisco_sfw_api",
       "interval": "300",
@@ -102,6 +111,7 @@
     "default_name": "ETD_Default",
     "required_fields": ["client_id", "etd_region", "etd_import_time_range"],
     "secret_fields": ["etd_api_key", "client_secret", "proxy_password"],
+    "required_secret_fields": ["etd_api_key", "client_secret"],
     "defaults": {
       "index": "cisco_etd",
       "interval": "3600",
@@ -115,6 +125,7 @@
     "default_name": "SNA_Default",
     "required_fields": ["ip_address", "domain_id", "username"],
     "secret_fields": ["password"],
+    "required_secret_fields": ["password"],
     "defaults": {
       "index": "cisco_sna",
       "interval": "300",
@@ -129,6 +140,7 @@
     "default_name": "SecureEndpoint_Default",
     "required_fields": ["api_host", "client_id", "se_import_time_range", "event_types", "groups"],
     "secret_fields": ["api_key"],
+    "required_secret_fields": ["api_key"],
     "defaults": {
       "index": "cisco_se",
       "interval": "300",
@@ -141,6 +153,7 @@
     "default_name": "CVI_Default",
     "required_fields": ["api_host"],
     "secret_fields": ["api_key"],
+    "required_secret_fields": ["api_key"],
     "defaults": {
       "index": "cisco_cvi",
       "interval": "86400",

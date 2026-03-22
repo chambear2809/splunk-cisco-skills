@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 APP_NAME="ta_cisco_thousandeyes"
 POLL_INTERVAL=5
 POLL_TIMEOUT=300
+ACCOUNT_OUTPUT_FILE=""
 THOUSANDEYES_BASE_URL="https://api.thousandeyes.com/v7"
 THOUSANDEYES_DEVICE_AUTH_URL="${THOUSANDEYES_BASE_URL}/oauth2/device/authorization"
 THOUSANDEYES_TOKEN_URL="${THOUSANDEYES_BASE_URL}/oauth2/token"
@@ -30,6 +31,8 @@ the code to authorize. The script polls until authorization completes.
 Options:
   --poll-interval SECS   Seconds between token polls (default: 5)
   --poll-timeout SECS    Max seconds to wait for authorization (default: 300)
+  --account-output-file FILE
+                         Write the resolved account email to FILE
   --help                 Show this help
 
 No password or API key files are needed — the OAuth flow handles authentication.
@@ -44,6 +47,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --poll-interval) require_arg "$1" $# || exit 1; POLL_INTERVAL="$2"; shift 2 ;;
         --poll-timeout) require_arg "$1" $# || exit 1; POLL_TIMEOUT="$2"; shift 2 ;;
+        --account-output-file) require_arg "$1" $# || exit 1; ACCOUNT_OUTPUT_FILE="$2"; shift 2 ;;
         --help) usage ;;
         *) echo "Unknown option: $1"; usage ;;
     esac
@@ -332,6 +336,10 @@ fi
 if ! store_oauth_account; then
     log "ERROR: Failed to store ThousandEyes account credentials in Splunk."
     exit 1
+fi
+
+if [[ -n "${ACCOUNT_OUTPUT_FILE}" && -n "${account_email}" ]]; then
+    printf '%s\n' "${account_email}" > "${ACCOUNT_OUTPUT_FILE}"
 fi
 
 if [[ -n "${account_email}" ]]; then
