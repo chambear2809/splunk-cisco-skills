@@ -1,0 +1,177 @@
+{
+  "products": {
+    "cisco_ai_defense": {
+      "route_type": "security_cloud_product",
+      "product_key": "ai_defense"
+    },
+    "cisco_duo": {
+      "route_type": "security_cloud_product",
+      "product_key": "duo"
+    },
+    "cisco_etd": {
+      "route_type": "security_cloud_product",
+      "product_key": "email_threat_defense"
+    },
+    "cisco_xdr": {
+      "route_type": "security_cloud_product",
+      "product_key": "xdr"
+    },
+    "cisco_identity_intelligence": {
+      "route_type": "security_cloud_variant",
+      "variant_key": "variant",
+      "variants": {
+        "webhook": "cii_webhook",
+        "aws_s3": "cii_aws_s3"
+      },
+      "notes": "Choose the Cisco Identity Intelligence ingestion mode with --set variant webhook or --set variant aws_s3."
+    },
+    "cisco_isovalent": {
+      "route_type": "security_cloud_product",
+      "product_key": "isovalent"
+    },
+    "cisco_isovalent_edge_processor": {
+      "route_type": "security_cloud_product",
+      "product_key": "isovalent_edge_processor"
+    },
+    "cisco_multicloud_defense": {
+      "route_type": "security_cloud_product",
+      "product_key": "multicloud_defense"
+    },
+    "cisco_nvm": {
+      "route_type": "security_cloud_product",
+      "product_key": "secure_client_nvm"
+    },
+    "cisco_secure_endpoint": {
+      "route_type": "security_cloud_product",
+      "product_key": "secure_endpoint"
+    },
+    "cisco_secure_firewall": {
+      "route_type": "security_cloud_variant",
+      "variant_key": "variant",
+      "variants": {
+        "api": "secure_firewall_api",
+        "estreamer": "secure_firewall_estreamer",
+        "syslog": "secure_firewall_syslog",
+        "asa_syslog": "secure_firewall_asa_syslog"
+      },
+      "notes": "Choose the Secure Firewall collection mode with --set variant api, estreamer, syslog, or asa_syslog."
+    },
+    "cisco_secure_malware_analytics": {
+      "route_type": "security_cloud_product",
+      "product_key": "secure_malware_analytics"
+    },
+    "cisco_secure_network_analytics": {
+      "route_type": "security_cloud_product",
+      "product_key": "secure_network_analytics"
+    },
+    "cisco_secure_workload": {
+      "route_type": "security_cloud_product",
+      "product_key": "secure_workload"
+    },
+    "cisco_vulnerability_intelligence": {
+      "route_type": "security_cloud_product",
+      "product_key": "vulnerability_intelligence"
+    },
+    "cisco_evm": {
+      "automation_state": "manual_gap",
+      "manual_gap_reason": "The SCAN catalog maps Endpoint Visibility Module into Cisco Security Cloud, but the repo's current security-cloud wrapper does not expose a distinct EVM product flow."
+    },
+    "cisco_secure_access": {
+      "route_type": "secure_access"
+    },
+    "cisco_cloudlock": {
+      "route_type": "secure_access",
+      "extra_required_non_secret_keys": [
+        "cloudlock_name",
+        "cloudlock_url",
+        "cloudlock_start_date"
+      ],
+      "extra_optional_non_secret_keys": [
+        "cloudlock_show_incident_details",
+        "cloudlock_show_ueba"
+      ],
+      "extra_secret_keys": [
+        "cloudlock_token"
+      ],
+      "notes": "Cloudlock dashboards need the Cloudlock-specific settings in addition to the base Secure Access org account."
+    },
+    "cisco_umbrella": {
+      "route_type": "secure_access"
+    },
+    "cisco_umbrella_investigate": {
+      "route_type": "secure_access"
+    },
+    "cisco_intersight": {
+      "route_type": "intersight"
+    },
+    "cisco_meraki": {
+      "route_type": "meraki",
+      "install_companion_app": true,
+      "notes": "This repo prefers the dedicated Meraki TA and can also apply the Enterprise Networking companion dashboards used by the SCAN catalog."
+    },
+    "cisco_thousandeyes": {
+      "route_type": "thousandeyes"
+    },
+    "cisco_appdynamics": {
+      "route_type": "appdynamics"
+    },
+    "cisco_cyber_vision": {
+      "route_type": "catalyst_stack",
+      "account_type": "cybervision"
+    },
+    "cisco_catalyst_center": {
+      "route_type": "catalyst_stack",
+      "account_type": "catalyst_center"
+    },
+    "cisco_ise": {
+      "route_type": "catalyst_stack",
+      "account_type": "ise"
+    },
+    "cisco_catalyst_sdwan": {
+      "route_type": "catalyst_stack",
+      "account_type": "sdwan"
+    },
+    "cisco_access_points": {
+      "route_type": "catalyst_stack",
+      "account_type": "catalyst_center",
+      "notes": "Access Points dashboards depend on Catalyst Center telemetry rather than a separate AP-only collector."
+    },
+    "cisco_asr": {
+      "route_type": "catalyst_stack",
+      "account_type": "catalyst_center",
+      "notes": "ASR dashboards depend on Catalyst Center telemetry in the current repo automation."
+    },
+    "cisco_crs": {
+      "route_type": "catalyst_stack",
+      "account_type": "catalyst_center",
+      "notes": "CRS dashboards depend on Catalyst Center telemetry in the current repo automation."
+    },
+    "cisco_catalyst_switches": {
+      "route_type": "catalyst_stack",
+      "account_type": "catalyst_center",
+      "notes": "Catalyst Switch dashboards depend on Catalyst Center telemetry rather than a switch-only collector."
+    },
+    "cisco_isr": {
+      "route_type": "catalyst_stack",
+      "account_type": "catalyst_center",
+      "notes": "ISR dashboards depend on Catalyst Center telemetry in the current repo automation."
+    },
+    "cisco_wlc": {
+      "route_type": "catalyst_stack",
+      "account_type": "catalyst_center",
+      "notes": "WLC dashboards depend on Catalyst Center telemetry rather than a standalone WLC collector."
+    },
+    "cisco_nexus": {
+      "route_type": "dc_networking",
+      "account_type": "nexus9k"
+    },
+    "cisco_aci": {
+      "route_type": "dc_networking",
+      "account_type": "aci"
+    },
+    "cisco_nexus_dashboard": {
+      "route_type": "dc_networking",
+      "account_type": "nd"
+    }
+  }
+}

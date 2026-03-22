@@ -1,0 +1,34 @@
+# Cisco Product Router Reference
+
+This skill is a router over the existing Cisco setup skills in this repo.
+
+## Automated Route Families
+
+| Route Type | Backing skill(s) | Typical products |
+|---|---|---|
+| `security_cloud_product` | `cisco-security-cloud-setup` | Duo, XDR, ETD, Secure Endpoint |
+| `security_cloud_variant` | `cisco-security-cloud-setup` | Secure Firewall, Identity Intelligence |
+| `secure_access` | `cisco-secure-access-setup` | Secure Access, Umbrella, Cloudlock |
+| `dc_networking` | `cisco-dc-networking-setup` | ACI, Nexus Dashboard, Nexus 9K |
+| `catalyst_stack` | `cisco-catalyst-ta-setup` + `cisco-enterprise-networking-setup` | Catalyst Center, ISE, SD-WAN, Cyber Vision |
+| `meraki` | `cisco-meraki-ta-setup` (+ optional `cisco-enterprise-networking-setup`) | Meraki |
+| `intersight` | `cisco-intersight-setup` | Intersight |
+| `thousandeyes` | `cisco-thousandeyes-setup` | ThousandEyes |
+| `appdynamics` | `cisco-appdynamics-setup` | AppDynamics |
+
+## Output States
+
+| State | Meaning |
+|---|---|
+| `automated` | This repo can install and configure the product flow directly |
+| `manual_gap` | The SCAN catalog entry exists, but no local automation route is defined yet |
+| `unsupported_legacy` | The product is retired or deprecated |
+| `unsupported_roadmap` | The product is a roadmap / coverage-gap item |
+
+## Notes
+
+- Some SCAN products are visualization views over a shared collector. For those
+  products, this skill routes to the shared collector path instead of inventing
+  a product-specific collector that does not exist.
+- Meraki is a local override: SCAN maps it to the Catalyst visualization stack,
+  while this repo also has a dedicated Meraki TA setup flow.

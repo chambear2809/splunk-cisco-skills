@@ -23,6 +23,13 @@ The repo is designed for two use cases:
 - **Direct shell use**: you can run the scripts under each skill manually if you
   prefer to operate outside the agent.
 
+If you know the Cisco product name but not which TA or app it needs, start with
+`cisco-product-setup`. It resolves the product against the packaged SCAN
+catalog, points you at the right `template.example`, shows the required
+configure-time fields with `--dry-run`, classifies unsupported products
+explicitly, and routes automated products to the existing Cisco family
+workflow.
+
 The automation now supports two administration paths:
 
 - **Splunk Enterprise**: direct Splunk REST API access on port `8089`, with SSH
@@ -67,6 +74,7 @@ skill-specific details.
 
 | Skill | Target | Main purpose |
 |-------|--------|--------------|
+| `cisco-product-setup` | Cisco product catalog workflow | Resolve a Cisco product name from SCAN, classify gaps, and delegate install/configure/validate to the matching Cisco setup skill |
 | `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision inputs |
 | `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards |
 | `cisco-appdynamics-setup` | `Splunk_TA_AppDynamics` | Configure AppDynamics controller and analytics connections, inputs, and dashboards |
@@ -335,7 +343,23 @@ Set up the Cisco Catalyst TA for my Catalyst Center at 10.100.0.60
 ```
 
 ```text
+Set up Cisco ACI for my fabric and show me the dry-run first
+```
+
+```text
+Set up Nexus 9000 and tell me which TA and dashboards it needs
+```
+
+```text
+Set up Cisco Duo through Cisco Security Cloud and show me the required inputs first
+```
+
+```text
 Configure the Cisco Intersight TA for my account
+```
+
+```text
+Set up Cisco ThousandEyes and show me the dry-run first
 ```
 
 ```text
@@ -364,6 +388,11 @@ For the account-driven Cisco skills, admins can also start with the skill-local
 `template.example`, copy it to `template.local`, and use that worksheet to
 collect non-secret account details before the actual setup run. Completed
 `template.local` files are intended to stay local and out of git.
+
+When using `cisco-product-setup`, start with its dry-run output. It shows the
+routed skill, the relevant `template.example`, the missing required
+configure-time values, and whether the product is fully automated or only
+cataloged as a manual gap or unsupported item.
 
 ### 4. Validate The Deployment
 
