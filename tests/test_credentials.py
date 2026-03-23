@@ -25,6 +25,8 @@ ALLOWED_KEYS = [
     "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER",
     "SPLUNK_SSH_PASS",
+    "SPLUNK_REMOTE_TMPDIR",
+    "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER",
     "SPLUNK_PASS",
     "SPLUNK_CA_CERT",
@@ -245,6 +247,15 @@ class TestCredentialParsing(unittest.TestCase):
         self.assertEqual(result["SPLUNKBASE_CA_CERT"], "/tmp/splunkbase-ca.pem")
         self.assertEqual(result["APP_DOWNLOAD_VERIFY_SSL"], "true")
         self.assertEqual(result["APP_DOWNLOAD_CA_CERT"], "/tmp/download-ca.pem")
+
+    def test_remote_bootstrap_keys_allowed(self):
+        text = textwrap.dedent("""\
+            SPLUNK_REMOTE_TMPDIR="/var/tmp"
+            SPLUNK_REMOTE_SUDO="true"
+        """)
+        result = parse_credential_file(text)
+        self.assertEqual(result["SPLUNK_REMOTE_TMPDIR"], "/var/tmp")
+        self.assertEqual(result["SPLUNK_REMOTE_SUDO"], "true")
 
 
 class TestCredentialFileRoundtrip(unittest.TestCase):

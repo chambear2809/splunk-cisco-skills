@@ -2,8 +2,9 @@
 
 This repository is a working library of Cursor agent skills and shell scripts for
 installing, configuring, and validating Splunk apps and Technology Add-ons on
-Splunk Cloud and self-managed Splunk Enterprise deployments, including
-search-tier, indexer, forwarder, and external-collector topologies.
+Splunk Cloud and self-managed Splunk Enterprise deployments, and for
+bootstrapping Linux Splunk Enterprise hosts themselves, including search-tier,
+indexer, forwarder, and external-collector topologies.
 
 ## Start With The Intake Templates
 
@@ -44,15 +45,18 @@ operations do **not** use the search-tier REST API in cloud mode.
 
 ## What This Repository Covers
 
-At a high level, the repo gives you three layers of automation:
+At a high level, the repo gives you four layers of automation:
 
-1. **Package delivery**: download apps from Splunkbase, fetch them from a URL,
+1. **Host bootstrap**: download Splunk Enterprise packages, install them on
+   Linux hosts, and configure standalone or single-site clustered search-tier,
+   indexer, and heavy-forwarder roles.
+2. **Package delivery**: download apps from Splunkbase, fetch them from a URL,
    or install them from local `.tgz` or `.spl` files. In Splunk Cloud, installs
    are executed through ACS instead of direct `/services/apps/local` calls.
-2. **App-specific setup**: create indexes, configure accounts, enable inputs,
+3. **App-specific setup**: create indexes, configure accounts, enable inputs,
    update macros, and apply dashboard settings. In Splunk Cloud, index creation
    uses ACS and the app-specific REST configuration uses the search tier.
-3. **Validation**: confirm the app is installed, the expected objects exist, and
+4. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
 Most of the repo follows the same pattern:
@@ -87,6 +91,7 @@ skill-specific details.
 | `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
+| `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
 | `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
 
@@ -95,8 +100,8 @@ skill-specific details.
 This repo now treats `splunk-ta/` as the local package cache and review cache,
 not as the only cloud deployment source.
 
-- **Enterprise install path**: install the original `.tgz`, `.tar.gz`, or `.spl`
-  archive from `splunk-ta/`, a remote URL, or Splunkbase.
+- **Enterprise install path**: install the original `.tgz`, `.tar.gz`, `.rpm`,
+  `.deb`, or `.spl` package from `splunk-ta/`, a remote URL, or Splunkbase.
 - **Cloud install path**: for apps published on Splunkbase, prefer ACS
   Splunkbase installs and let ACS fetch the latest compatible release. Use
   private package uploads only for genuinely private or pre-vetted apps that do
@@ -370,6 +375,10 @@ Install and configure Splunk Stream
 Prepare Splunk Connect for Syslog and render a Docker deployment
 ```
 
+```text
+Bootstrap a Splunk heavy forwarder on my Linux host and point it at my indexer cluster
+```
+
 The agent is expected to ask only for **non-secret** values in conversation,
 such as:
 
@@ -474,6 +483,8 @@ Remote workflows matter most in two places:
 
 - **app installation**: Enterprise local files may need SSH staging, while
   Splunk Cloud installs use ACS
+- **host bootstrap**: Linux Enterprise host setup can run directly on the
+  target host or over SSH using staged packages and remote command execution
 - **validation/setup**: all search-tier REST operations must be able to reach
   the remote management port
 
@@ -542,12 +553,14 @@ splunk-cloud-skills/
 │   │   │   ├── rest_helpers.sh          # Splunk REST API wrappers
 │   │   │   ├── acs_helpers.sh           # ACS CLI wrappers
 │   │   │   ├── splunkbase_helpers.sh    # Splunkbase auth and downloads
+│   │   │   ├── host_bootstrap_helpers.sh # SSH/bootstrap helper functions
 │   │   │   └── configure_account_helpers.sh  # create-or-update pattern
 │   │   └── scripts/
 │   │       ├── setup_credentials.sh
 │   │       ├── cloud_batch_install.sh
 │   │       └── cloud_batch_uninstall.sh
 │   ├── splunk-app-install/
+│   ├── splunk-enterprise-host-setup/
 │   ├── splunk-connect-for-syslog-setup/
 │   ├── splunk-itsi-setup/
 │   ├── splunk-stream-setup/
@@ -598,6 +611,7 @@ brew install acs
 Depending on the workflow, you may also need:
 
 - SSH access to the target Splunk host for remote local-package installs
+- `sshpass` for password-based remote host bootstrap and package staging
 - vendor credentials or tokens supplied through files for account setup scripts
 - `search-api` allow-list access for Cloud search-tier REST operations
 

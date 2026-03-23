@@ -42,9 +42,11 @@ For Cloud-specific install and API behavior, see
 | `cisco-enterprise-networking-setup` | Required | None | None | None | None | None | Search-time visualization app with macros, saved searches, and KV Store content. |
 | `cisco-intersight-setup` | Supported | None | Supported | None | None | None | API collector app; run on the search tier or a heavy forwarder. |
 | `cisco-meraki-ta-setup` | Supported | None | Supported | None | None | None | Meraki collector app with dashboard alignment; place on the search tier or a heavy forwarder. |
+| `cisco-product-setup` | Supported | None | Supported | None | None | None | Product-name router that resolves a Cisco product from the SCAN catalog and delegates to the matching setup skill or explicit gap classification. |
 | `cisco-thousandeyes-setup` | Supported | None | Supported | None | None | None | Hybrid-capable app that combines HEC push with polling and dashboard setup. |
 | `splunk-app-install` | Supported | Supported | Supported | Supported | None | None | Generic package delivery skill; actual package compatibility comes from the package or app metadata. |
 | `splunk-connect-for-syslog-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4S runtime assets. |
+| `splunk-enterprise-host-setup` | Supported | Supported | Supported | None | None | None | Linux host bootstrap workflow for self-managed Splunk Enterprise search tiers, indexers, cluster managers, SHC members, and heavy forwarders. |
 | `splunk-itsi-setup` | Required | None | None | None | None | None | Premium search-tier app for ITSI dashboards and service analytics. |
 | `splunk-stream-setup` | Required | Supported | Required | Supported | None | HF or UF | Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects. |
 

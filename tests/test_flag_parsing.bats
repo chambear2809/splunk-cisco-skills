@@ -175,6 +175,24 @@ teardown() {
     [[ "$output" =~ "SC4S Validation" ]]
 }
 
+@test "enterprise host setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-host-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Enterprise Host Setup" ]]
+}
+
+@test "enterprise host validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-host-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Enterprise Host Validation" ]]
+}
+
+@test "enterprise host smoke latest resolution --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-host-setup/scripts/smoke_latest_resolution.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Latest Resolution Smoke Test" ]]
+}
+
 @test "sc4s setup rejects invalid vendor port protocol" {
     run bash "${PROJECT_ROOT}/skills/splunk-connect-for-syslog-setup/scripts/setup.sh" \
       --render-host \

@@ -1,10 +1,12 @@
-# Local Splunk TA Packages
+# Local Splunk Package Cache
 
-Place Splunk Technology Add-on packages (`.tgz`, `.spl`, `.tar.gz`) in this
-directory for local installation via the `splunk-app-install` skill.
+Place Splunk Technology Add-on packages and Splunk Enterprise product packages
+(`.tgz`, `.tar.gz`, `.rpm`, `.deb`, `.spl`) in this directory for local
+installation via the `splunk-app-install` and
+`splunk-enterprise-host-setup` skills.
 
-The `install_app.sh` script will list files in this directory when you choose
-the **local file** installation source.
+The install scripts list files in this directory when you choose the **local
+file** installation source.
 
 For the normal Cloud workflow, public apps are installed from Splunkbase
 through ACS and these original vendor archives stay here as the local cache and
@@ -32,8 +34,11 @@ cisco_dc_networking_app-1.2.0.tar.gz
 
 - Do **not** commit credentials, license files, or other secrets alongside
   TA packages.
-- Large `.tgz`/`.spl`/`.tar.gz` files in this cache are ignored by Git.
+- Large `.tgz`/`.tar.gz`/`.rpm`/`.deb`/`.spl` files in this cache are ignored by Git.
   Keep them local, fetch them from Splunkbase, or store them in Git LFS if you
   intentionally want versioned package artifacts.
+- Latest Splunk Enterprise download resolution may also cache hidden
+  `.latest-splunk-enterprise-*.json` metadata files here after a successful
+  official download and checksum verification. Keep them local.
 - If you create `splunk-ta/_unpacked/` review copies, treat them as analysis
   workspaces only. They are not the normal deployment source for this repo.

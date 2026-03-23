@@ -2,12 +2,15 @@
 """Regression tests for first-party shell entrypoints."""
 
 import json
+import hashlib
 import os
 import re
 import stat
 import subprocess
+import tarfile
 import tempfile
 import textwrap
+import time
 import unittest
 from pathlib import Path
 
@@ -18,6 +21,55 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def write_executable(path: Path, content: str) -> None:
     path.write_text(textwrap.dedent(content), encoding="utf-8")
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def sha512_hex(text: str) -> str:
+    return hashlib.sha512(text.encode("utf-8")).hexdigest()
+
+
+def write_mock_curl(path: Path) -> None:
+    write_executable(
+        path,
+        """\
+        #!/usr/bin/env python3
+        import json
+        import os
+        import sys
+        from pathlib import Path
+
+        state = json.loads(Path(os.environ["MOCK_CURL_STATE"]).read_text(encoding="utf-8"))
+        args = sys.argv[1:]
+        output_target = None
+        url = ""
+        i = 0
+        while i < len(args):
+            if args[i] == "-o" and i + 1 < len(args):
+                output_target = args[i + 1]
+                i += 2
+                continue
+            if args[i].startswith("http://") or args[i].startswith("https://"):
+                url = args[i]
+            i += 1
+
+        log_path = os.environ.get("CURL_LOG")
+        if log_path:
+            with Path(log_path).open("a", encoding="utf-8") as handle:
+                handle.write(url + "\\n")
+
+        if url in state.get("fail", []):
+            raise SystemExit(1)
+
+        if output_target is not None and url in state.get("files", {}):
+            Path(output_target).write_text(state["files"][url], encoding="utf-8")
+            raise SystemExit(0)
+
+        if url in state.get("text", {}):
+            sys.stdout.write(state["text"][url])
+            raise SystemExit(0)
+
+        raise SystemExit(1)
+        """,
+    )
 
 
 class ShellScriptRegressionTests(unittest.TestCase):
@@ -1176,6 +1228,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
         for app_skill in {app["skill"] for app in registry.get("apps", [])}:
             self.assertIn(app_skill, skill_topologies)
 
+        self.assertIn("cisco-product-setup", skill_topologies)
         self.assertIn("splunk-connect-for-syslog-setup", skill_topologies)
         self.assertIn("splunk-app-install", skill_topologies)
 
@@ -3860,6 +3913,1134 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 len(settings_posts), 0,
                 msg="Should not POST to settings conf when --no-verify-ssl is not passed",
             )
+
+    def test_host_bootstrap_validate_local_mode_uses_localhost_for_rest(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            splunk_home = tmp_path / "splunk"
+            (splunk_home / "bin").mkdir(parents=True)
+            curl_log = tmp_path / "curl.log"
+            credentials_file = tmp_path / "credentials"
+            password_file = tmp_path / "admin_password"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+
+            credentials_file.write_text('SPLUNK_HOST="wrong.example.com"\n', encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                url = ""
+                for arg in reversed(sys.argv[1:]):
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                        break
+                with Path(os.environ["CURL_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(url + "\\n")
+                if url.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                elif "/services/server/info" in url:
+                    sys.stdout.write('{"entry":[{"name":"server-info"}]}')
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    status) echo "splunkd is running"; exit 0 ;;
+                    version) echo "Splunk 10.0.0"; exit 0 ;;
+                    btool) exit 0 ;;
+                    show) exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "CURL_LOG": str(curl_log),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/validate.sh",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--admin-password-file", str(password_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            curl_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn("https://localhost:8089/services/auth/login", curl_requests)
+            self.assertIn("https://localhost:8089/services/server/info?output_mode=json", curl_requests)
+            self.assertNotIn("wrong.example.com", curl_requests)
+
+    def test_host_bootstrap_validate_heavy_forwarder_accepts_server_list_without_mode_flag(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            splunk_home = tmp_path / "splunk"
+            (splunk_home / "bin").mkdir(parents=True)
+            curl_log = tmp_path / "curl.log"
+            credentials_file = tmp_path / "credentials"
+            password_file = tmp_path / "admin_password"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+
+            credentials_file.write_text("", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                url = ""
+                for arg in reversed(sys.argv[1:]):
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                        break
+                with Path(os.environ["CURL_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(url + "\\n")
+                if url.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                elif "/services/server/info" in url:
+                    sys.stdout.write('{"entry":[{"name":"server-info"}]}')
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                if [[ "$1" == "status" ]]; then
+                    echo "splunkd is running"
+                    exit 0
+                fi
+                if [[ "$1" == "version" ]]; then
+                    echo "Splunk 10.0.0"
+                    exit 0
+                fi
+                if [[ "$1" == "btool" && "$2" == "outputs" ]]; then
+                    cat <<'EOF'
+[tcpout]
+defaultGroup = default-autolb-group
+indexAndForward = false
+[tcpout:default-autolb-group]
+server = idx01.example.com:9997,idx02.example.com:9997
+EOF
+                    exit 0
+                fi
+                exit 0
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "CURL_LOG": str(curl_log),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/validate.sh",
+                "--execution", "local",
+                "--host-bootstrap-role", "heavy-forwarder",
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--admin-password-file", str(password_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("outputs.conf uses a static server list", result.stdout)
+
+    def test_host_bootstrap_setup_requires_current_shc_member_for_existing_cluster(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            credentials_file = tmp_path / "credentials"
+            credentials_file.write_text("", encoding="utf-8")
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "cluster",
+                "--execution", "local",
+                "--deployment-mode", "clustered",
+                "--host-bootstrap-role", "shc-member",
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--current-shc-member-uri", result.stdout + result.stderr)
+
+    def test_host_bootstrap_setup_cluster_adds_shc_member_without_inline_auth(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            splunk_home = tmp_path / "splunk"
+            (splunk_home / "bin").mkdir(parents=True)
+            credentials_file = tmp_path / "credentials"
+            password_file = tmp_path / "admin_password"
+            shc_secret_file = tmp_path / "shc_secret"
+            cmd_log = tmp_path / "splunk_args.log"
+            stdin_log = tmp_path / "splunk_stdin.log"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+
+            credentials_file.write_text("", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+            shc_secret_file.write_text("shc-secret\n", encoding="utf-8")
+
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                args = sys.argv[1:]
+                stdin_data = sys.stdin.read()
+                with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps(args) + "\\n")
+                with Path(os.environ["SPLUNK_STDIN_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps({"args": args, "stdin": stdin_data}) + "\\n")
+                if args and args[0] == "status":
+                    sys.stdout.write("splunkd is running")
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_CMD_LOG": str(cmd_log),
+                    "SPLUNK_STDIN_LOG": str(stdin_log),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "cluster",
+                "--execution", "local",
+                "--deployment-mode", "clustered",
+                "--host-bootstrap-role", "shc-member",
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--admin-password-file", str(password_file),
+                "--shc-secret-file", str(shc_secret_file),
+                "--deployer-uri", "https://deployer.example.com:8089",
+                "--current-shc-member-uri", "https://sh1.example.com:8089",
+                "--advertise-host", "sh2.example.com",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            command_lines = cmd_log.read_text(encoding="utf-8").splitlines()
+            self.assertTrue(
+                any("init" in line and "shcluster-config" in line for line in command_lines),
+                msg=f"Expected init shcluster-config command, got: {command_lines}",
+            )
+            self.assertTrue(
+                any("add" in line and "shcluster-member" in line for line in command_lines),
+                msg=f"Expected add shcluster-member command, got: {command_lines}",
+            )
+            self.assertTrue(
+                all("-auth" not in line for line in command_lines),
+                msg=f"Did not expect inline -auth arguments, got: {command_lines}",
+            )
+
+            stdin_lines = stdin_log.read_text(encoding="utf-8")
+            self.assertIn("admin\\nchangeme", stdin_lines)
+            self.assertIn("current_member_uri", command_lines[-1] if command_lines else "")
+
+    def test_host_bootstrap_setup_rejects_deb_auto_with_custom_home(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "splunk-10.0.0-linux-amd64.deb"
+            password_file = tmp_path / "admin_password"
+
+            credentials_file.write_text("", encoding="utf-8")
+            package_file.write_text("deb-package-placeholder", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--package-type", "auto",
+                "--splunk-home", str(tmp_path / "custom-splunk"),
+                "--admin-password-file", str(password_file),
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DEB installs only support /opt/splunk", result.stdout + result.stderr)
+
+    def test_host_bootstrap_setup_rejects_existing_non_splunk_custom_tgz_target(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "splunk-10.0.0-linux-x86_64.tgz"
+            password_file = tmp_path / "admin_password"
+            target_home = tmp_path / "existing-target"
+
+            credentials_file.write_text("", encoding="utf-8")
+            package_file.write_text("tgz-package-placeholder", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+            target_home.mkdir()
+
+            env = os.environ.copy()
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--package-type", "auto",
+                "--splunk-home", str(target_home),
+                "--admin-password-file", str(password_file),
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("already exists but is not a Splunk install", result.stdout + result.stderr)
+
+    def test_host_bootstrap_remote_staging_uses_user_tmp_before_privileged_tmpdir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            local_file = tmp_path / "pkg.tgz"
+            local_file.write_text("package", encoding="utf-8")
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            cmd_log = tmp_path / "cmd.log"
+            sshpass_log = tmp_path / "sshpass.log"
+
+            write_executable(
+                bin_dir / "sshpass",
+                """\
+                #!/usr/bin/env bash
+                printf '%s\n' "$*" >> "${SSHPASS_LOG}"
+                exit 0
+                """,
+            )
+
+            helper_script = textwrap.dedent(
+                f"""\
+                source "{REPO_ROOT / 'skills/shared/lib/host_bootstrap_helpers.sh'}"
+                load_splunk_ssh_credentials() {{ :; }}
+                hbs_run_target_cmd() {{
+                    printf '%s\\n' "$2" >> "{cmd_log}"
+                    return 0
+                }}
+                export SPLUNK_SSH_USER="bootstrap"
+                export SPLUNK_SSH_HOST="hf.example.com"
+                export SPLUNK_SSH_PORT="22"
+                export SPLUNK_SSH_PASS="secret"
+                export SPLUNK_REMOTE_TMPDIR="/var/tmp/splunk"
+                result="$(hbs_stage_file_for_execution ssh "{local_file}" "pkg.tgz")"
+                printf '%s\\n' "$result"
+                """
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "SSHPASS_LOG": str(sshpass_log),
+                }
+            )
+
+            result = subprocess.run(
+                ["bash", "-lc", helper_script],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertEqual(result.stdout.strip(), "/var/tmp/splunk/pkg.tgz")
+
+            sshpass_text = sshpass_log.read_text(encoding="utf-8")
+            self.assertIn("scp", sshpass_text)
+            self.assertIn("/tmp/pkg.tgz.stage.", sshpass_text)
+            self.assertNotIn("hf.example.com:/var/tmp/splunk/pkg.tgz", sshpass_text)
+
+            cmd_text = cmd_log.read_text(encoding="utf-8")
+            self.assertIn("mkdir -p /var/tmp/splunk", cmd_text)
+            self.assertIn("install -m 600 /tmp/pkg.tgz.stage.", cmd_text)
+            self.assertIn("/var/tmp/splunk/pkg.tgz", cmd_text)
+
+    def test_host_bootstrap_install_preserves_local_package_and_cleans_user_seed_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file = tmp_path / "credentials"
+            password_file = tmp_path / "admin_password"
+            package_file = tmp_path / "splunk-package.tgz"
+            splunk_home = tmp_path / "installed-splunk"
+            package_root = tmp_path / "package-root" / "splunk"
+            (package_root / "bin").mkdir(parents=True)
+
+            credentials_file.write_text("", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+
+            write_executable(
+                bin_dir / "sudo",
+                """\
+                #!/usr/bin/env bash
+                exec "$@"
+                """,
+            )
+            write_executable(
+                bin_dir / "chown",
+                """\
+                #!/usr/bin/env bash
+                exit 0
+                """,
+            )
+            write_executable(
+                package_root / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    start|restart) echo "started"; exit 0 ;;
+                    status) echo "splunkd is running"; exit 0 ;;
+                    enable) exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+
+            with tarfile.open(package_file, "w:gz") as archive:
+                archive.add(package_root, arcname="splunk")
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_LOCAL_SUDO": "false",
+                }
+            )
+
+            install_args = (
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--admin-password-file", str(password_file),
+                "--no-boot-start",
+            )
+
+            first_result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                *install_args,
+                env=env,
+            )
+            self.assertEqual(first_result.returncode, 0, msg=first_result.stdout + first_result.stderr)
+            self.assertTrue(package_file.exists(), msg="Local package should not be deleted after install")
+            self.assertFalse((splunk_home / "etc/system/local/user-seed.conf").exists())
+            self.assertEqual(list((splunk_home / "etc/system/local").glob("user-seed.conf.bak.*")), [])
+
+            stale_backup = splunk_home / "etc/system/local/user-seed.conf.bak.stale"
+            stale_backup.parent.mkdir(parents=True, exist_ok=True)
+            stale_backup.write_text("stale", encoding="utf-8")
+
+            second_result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                *install_args,
+                env=env,
+            )
+            self.assertEqual(second_result.returncode, 0, msg=second_result.stdout + second_result.stderr)
+            self.assertTrue(package_file.exists(), msg="Local package should remain after repeated install runs")
+            self.assertFalse((splunk_home / "etc/system/local/user-seed.conf").exists())
+            self.assertEqual(list((splunk_home / "etc/system/local").glob("user-seed.conf.bak.*")), [])
+
+    def test_host_bootstrap_configure_heavy_forwarder_does_not_require_admin_password(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            splunk_home = tmp_path / "splunk"
+            (splunk_home / "bin").mkdir(parents=True)
+            credentials_file = tmp_path / "credentials"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+
+            credentials_file.write_text("", encoding="utf-8")
+
+            write_executable(
+                bin_dir / "sudo",
+                """\
+                #!/usr/bin/env bash
+                exec "$@"
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    status) echo "splunkd is running"; exit 0 ;;
+                    restart|start) exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_LOCAL_SUDO": "false",
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "configure",
+                "--execution", "local",
+                "--host-bootstrap-role", "heavy-forwarder",
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--server-list", "idx01.example.com:9997",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            outputs_conf = (splunk_home / "etc/system/local/outputs.conf").read_text(encoding="utf-8")
+            self.assertIn("server = idx01.example.com:9997", outputs_conf)
+
+    def test_host_bootstrap_cluster_manager_does_not_require_admin_password(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            splunk_home = tmp_path / "splunk"
+            (splunk_home / "bin").mkdir(parents=True)
+            credentials_file = tmp_path / "credentials"
+            idxc_secret_file = tmp_path / "idxc_secret"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+
+            credentials_file.write_text("", encoding="utf-8")
+            idxc_secret_file.write_text("idxc-secret\n", encoding="utf-8")
+
+            write_executable(
+                bin_dir / "sudo",
+                """\
+                #!/usr/bin/env bash
+                exec "$@"
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    status) echo "splunkd is running"; exit 0 ;;
+                    restart|start) exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_LOCAL_SUDO": "false",
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "cluster",
+                "--execution", "local",
+                "--deployment-mode", "clustered",
+                "--host-bootstrap-role", "cluster-manager",
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--idxc-secret-file", str(idxc_secret_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            server_conf = (splunk_home / "etc/system/local/server.conf").read_text(encoding="utf-8")
+            self.assertIn("mode = manager", server_conf)
+
+    def test_host_bootstrap_download_without_url_resolves_latest_official_tgz_and_verifies_sha512(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            curl_log = tmp_path / "curl.log"
+            mock_state_file = tmp_path / "mock-curl-state.json"
+            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.tgz"
+            old_package_name = "splunk-10.1.0-abcdef123456-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            old_package_url = f"https://download.splunk.com/products/splunk/releases/10.1.0/linux/{old_package_name}"
+            sha_url = f"{package_url}.sha512"
+            old_sha_url = f"{old_package_url}.sha512"
+            package_content = "tgz-package"
+            metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-tgz.json"
+            package_path = REPO_ROOT / "splunk-ta" / package_name
+
+            self.addCleanup(lambda: package_path.unlink(missing_ok=True))
+            self.addCleanup(lambda: metadata_path.unlink(missing_ok=True))
+
+            credentials_file.write_text("", encoding="utf-8")
+            write_mock_curl(bin_dir / "curl")
+            mock_state_file.write_text(
+                json.dumps(
+                    {
+                        "text": {
+                            "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
+                                f"""\
+                                Splunk Enterprise 10.2.1
+                                wget -O {old_package_name} "{old_package_url}"
+                                {old_package_url}
+                                {old_sha_url}
+                                wget -O {package_name} "{package_url}"
+                                {package_url}
+                                {sha_url}
+                                """
+                            ),
+                            sha_url: f"{sha512_hex(package_content)}  {package_name}\n",
+                            old_sha_url: f"{sha512_hex('older-package')}  {old_package_name}\n",
+                        },
+                        "files": {
+                            package_url: package_content,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "CURL_LOG": str(curl_log),
+                    "MOCK_CURL_STATE": str(mock_state_file),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "download",
+                "--execution", "local",
+                "--source", "auto",
+                "--package-type", "tgz",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Resolved latest Splunk Enterprise 10.2.1 package", result.stdout)
+            self.assertIn("Verifying", result.stdout)
+            self.assertTrue(package_path.exists())
+            self.assertTrue(metadata_path.exists())
+
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            self.assertEqual(metadata["version"], "10.2.1")
+            self.assertEqual(metadata["package_url"], package_url)
+            self.assertEqual(metadata["sha512"], sha512_hex(package_content))
+
+            curl_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn("https://www.splunk.com/en_us/download/splunk-enterprise.html", curl_requests)
+            self.assertIn(package_url, curl_requests)
+            self.assertIn(sha_url, curl_requests)
+            self.assertNotIn(old_package_url, curl_requests)
+
+    def test_host_bootstrap_download_without_url_resolves_latest_official_deb_when_requested(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            curl_log = tmp_path / "curl.log"
+            mock_state_file = tmp_path / "mock-curl-state.json"
+            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.deb"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            sha_url = f"{package_url}.sha512"
+            package_content = "deb-package"
+            package_path = REPO_ROOT / "splunk-ta" / package_name
+            metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-deb.json"
+
+            self.addCleanup(lambda: package_path.unlink(missing_ok=True))
+            self.addCleanup(lambda: metadata_path.unlink(missing_ok=True))
+
+            credentials_file.write_text("", encoding="utf-8")
+            write_mock_curl(bin_dir / "curl")
+            mock_state_file.write_text(
+                json.dumps(
+                    {
+                        "text": {
+                            "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
+                                f"""\
+                                Splunk Enterprise 10.2.1
+                                wget -O {package_name} "{package_url}"
+                                {package_url}
+                                {sha_url}
+                                """
+                            ),
+                            sha_url: f"{sha512_hex(package_content)}  {package_name}\n",
+                        },
+                        "files": {
+                            package_url: package_content,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "CURL_LOG": str(curl_log),
+                    "MOCK_CURL_STATE": str(mock_state_file),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "download",
+                "--execution", "local",
+                "--source", "remote",
+                "--package-type", "deb",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Resolved latest Splunk Enterprise 10.2.1 package", result.stdout)
+            self.assertTrue(package_path.exists())
+            self.assertTrue(metadata_path.exists())
+
+            curl_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn("https://www.splunk.com/en_us/download/splunk-enterprise.html", curl_requests)
+            self.assertIn(package_url, curl_requests)
+            self.assertIn(sha_url, curl_requests)
+
+    def test_host_bootstrap_download_without_url_auto_selects_deb_from_remote_target_os(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            curl_log = tmp_path / "curl.log"
+            mock_state_file = tmp_path / "mock-curl-state.json"
+            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.deb"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            sha_url = f"{package_url}.sha512"
+            package_path = REPO_ROOT / "splunk-ta" / package_name
+            metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-deb.json"
+
+            self.addCleanup(lambda: package_path.unlink(missing_ok=True))
+            self.addCleanup(lambda: metadata_path.unlink(missing_ok=True))
+
+            credentials_file.write_text("", encoding="utf-8")
+            write_mock_curl(bin_dir / "curl")
+            write_executable(
+                bin_dir / "sshpass",
+                """\
+                #!/usr/bin/env bash
+                shift 2
+                exec "$@"
+                """,
+            )
+            write_executable(
+                bin_dir / "ssh",
+                """\
+                #!/usr/bin/env bash
+                printf 'ID=ubuntu\nID_LIKE=debian\n'
+                """,
+            )
+            mock_state_file.write_text(
+                json.dumps(
+                    {
+                        "text": {
+                            "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
+                                f"""\
+                                Splunk Enterprise 10.2.1
+                                wget -O {package_name} "{package_url}"
+                                {package_url}
+                                {sha_url}
+                                """
+                            ),
+                            sha_url: f"{sha512_hex('deb-package-remote')}  {package_name}\n",
+                        },
+                        "files": {
+                            package_url: "deb-package-remote",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "CURL_LOG": str(curl_log),
+                    "MOCK_CURL_STATE": str(mock_state_file),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_SSH_HOST": "cm01.example.com",
+                    "SPLUNK_SSH_USER": "splunk",
+                    "SPLUNK_SSH_PASS": "ssh-password",
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "download",
+                "--execution", "ssh",
+                "--source", "remote",
+                "--package-type", "auto",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Auto-selected deb", result.stdout)
+            self.assertIn("Resolved latest Splunk Enterprise 10.2.1 package", result.stdout)
+            self.assertTrue(package_path.exists())
+
+    def test_host_bootstrap_download_without_url_fails_when_page_version_disagrees_with_package_version(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            mock_state_file = tmp_path / "mock-curl-state.json"
+            package_name = "splunk-10.1.0-abcdef123456-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.1.0/linux/{package_name}"
+            sha_url = f"{package_url}.sha512"
+
+            credentials_file.write_text("", encoding="utf-8")
+            write_mock_curl(bin_dir / "curl")
+            mock_state_file.write_text(
+                json.dumps(
+                    {
+                        "text": {
+                            "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
+                                f"""\
+                                Splunk Enterprise 10.2.1
+                                wget -O {package_name} "{package_url}"
+                                {package_url}
+                                {sha_url}
+                                """
+                            ),
+                            sha_url: f"{sha512_hex('bad-package')}  {package_name}\n",
+                        },
+                        "files": {
+                            package_url: "bad-package",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "MOCK_CURL_STATE": str(mock_state_file),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "download",
+                "--execution", "local",
+                "--source", "remote",
+                "--package-type", "tgz",
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Failed to resolve the latest official Splunk Enterprise tgz package", result.stdout + result.stderr)
+
+    def test_host_bootstrap_download_without_url_can_use_stale_latest_metadata_when_allowed(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            curl_log = tmp_path / "curl.log"
+            mock_state_file = tmp_path / "mock-curl-state.json"
+            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            sha_url = f"{package_url}.sha512"
+            package_content = "stale-tgz-package"
+            package_path = REPO_ROOT / "splunk-ta" / package_name
+            metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-tgz.json"
+
+            self.addCleanup(lambda: package_path.unlink(missing_ok=True))
+            self.addCleanup(lambda: metadata_path.unlink(missing_ok=True))
+
+            credentials_file.write_text("", encoding="utf-8")
+            metadata_path.write_text(
+                json.dumps(
+                    {
+                        "cached_at": "2026-03-22T00:00:00Z",
+                        "cached_at_epoch": int(time.time()),
+                        "package_type": "tgz",
+                        "package_url": package_url,
+                        "sha512": sha512_hex(package_content),
+                        "sha512_url": sha_url,
+                        "source_page_url": "https://www.splunk.com/en_us/download/splunk-enterprise.html",
+                        "version": "10.2.1",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            write_mock_curl(bin_dir / "curl")
+            mock_state_file.write_text(
+                json.dumps(
+                    {
+                        "fail": [
+                            "https://www.splunk.com/en_us/download/splunk-enterprise.html",
+                        ],
+                        "files": {
+                            package_url: package_content,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "CURL_LOG": str(curl_log),
+                    "MOCK_CURL_STATE": str(mock_state_file),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "download",
+                "--execution", "local",
+                "--source", "remote",
+                "--package-type", "tgz",
+                "--allow-stale-latest",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("attempting stale metadata fallback", result.stdout)
+            self.assertTrue(package_path.exists())
+            curl_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn("https://www.splunk.com/en_us/download/splunk-enterprise.html", curl_requests)
+            self.assertIn(package_url, curl_requests)
+            self.assertNotIn(sha_url, curl_requests)
+
+    def test_host_bootstrap_download_without_url_fails_without_allow_stale_latest(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            mock_state_file = tmp_path / "mock-curl-state.json"
+
+            credentials_file.write_text("", encoding="utf-8")
+            write_mock_curl(bin_dir / "curl")
+            mock_state_file.write_text(
+                json.dumps(
+                    {
+                        "fail": [
+                            "https://www.splunk.com/en_us/download/splunk-enterprise.html",
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "MOCK_CURL_STATE": str(mock_state_file),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "download",
+                "--execution", "local",
+                "--source", "remote",
+                "--package-type", "tgz",
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--allow-stale-latest", result.stdout + result.stderr)
+
+    def test_host_bootstrap_download_without_url_rejects_stale_metadata_older_than_30_days(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            mock_state_file = tmp_path / "mock-curl-state.json"
+            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-tgz.json"
+
+            self.addCleanup(lambda: metadata_path.unlink(missing_ok=True))
+
+            credentials_file.write_text("", encoding="utf-8")
+            metadata_path.write_text(
+                json.dumps(
+                    {
+                        "cached_at": "2026-01-01T00:00:00Z",
+                        "cached_at_epoch": int(time.time()) - (31 * 24 * 60 * 60),
+                        "package_type": "tgz",
+                        "package_url": package_url,
+                        "sha512": sha512_hex("stale-package"),
+                        "sha512_url": f"{package_url}.sha512",
+                        "source_page_url": "https://www.splunk.com/en_us/download/splunk-enterprise.html",
+                        "version": "10.2.1",
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            write_mock_curl(bin_dir / "curl")
+            mock_state_file.write_text(
+                json.dumps(
+                    {
+                        "fail": [
+                            "https://www.splunk.com/en_us/download/splunk-enterprise.html",
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "MOCK_CURL_STATE": str(mock_state_file),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "download",
+                "--execution", "local",
+                "--source", "remote",
+                "--package-type", "tgz",
+                "--allow-stale-latest",
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("older than 30 days", result.stdout + result.stderr)
+
+    def test_host_bootstrap_smoke_latest_resolution_checks_live_metadata_without_downloading_package(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            curl_log = tmp_path / "curl.log"
+            mock_state_file = tmp_path / "mock-curl-state.json"
+            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            sha_url = f"{package_url}.sha512"
+            package_path = REPO_ROOT / "splunk-ta" / package_name
+            metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-tgz.json"
+
+            package_path.unlink(missing_ok=True)
+            metadata_path.unlink(missing_ok=True)
+            self.addCleanup(lambda: package_path.unlink(missing_ok=True))
+            self.addCleanup(lambda: metadata_path.unlink(missing_ok=True))
+
+            credentials_file.write_text("", encoding="utf-8")
+            write_mock_curl(bin_dir / "curl")
+            mock_state_file.write_text(
+                json.dumps(
+                    {
+                        "text": {
+                            "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
+                                f"""\
+                                <h1>Splunk Enterprise 10.2.1</h1>
+                                <a data-link="{package_url}" data-wget='wget -O {package_name} &#34;{package_url}&#34;' data-sha512="{sha_url}" data-version="10.2.1" href="#">
+                                  Download Now
+                                </a>
+                                """
+                            ),
+                            sha_url: f"{sha512_hex('smoke-only')}  {package_name}\n",
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "CURL_LOG": str(curl_log),
+                    "MOCK_CURL_STATE": str(mock_state_file),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/smoke_latest_resolution.sh",
+                "--package-type", "tgz",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Smoke check passed for tgz (live)", result.stdout)
+            self.assertIn(package_url, result.stdout)
+            self.assertIn(sha_url, result.stdout)
+            self.assertFalse(package_path.exists())
+            self.assertFalse(metadata_path.exists())
+
+            curl_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn("https://www.splunk.com/en_us/download/splunk-enterprise.html", curl_requests)
+            self.assertIn(sha_url, curl_requests)
+            self.assertNotIn(package_url + "\n", curl_requests)
 
 
 if __name__ == "__main__":

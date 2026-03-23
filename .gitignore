@@ -5,6 +5,9 @@ credentials
 splunk-ta/*.tgz
 splunk-ta/*.spl
 splunk-ta/*.tar.gz
+splunk-ta/*.rpm
+splunk-ta/*.deb
+splunk-ta/.latest-splunk-enterprise-*.json
 
 # --- Also ignore the splunk_ta directory ---
 splunk_ta/

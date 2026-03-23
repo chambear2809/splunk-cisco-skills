@@ -36,12 +36,14 @@ external collectors, see
 | `cisco-intersight-setup` | 7828 | ACS Splunkbase | REST via custom account/input handlers | Cisco EULA license-ack required. Index creation uses ACS. |
 | `cisco-dc-networking-setup` | 7777 | ACS Splunkbase | REST via custom account/input handlers | Cisco EULA license-ack required. Index creation uses ACS. |
 | `cisco-enterprise-networking-setup` | 7539 | ACS Splunkbase | REST for macros/saved searches/datamodel settings | Cisco EULA license-ack required. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards. |
+| `cisco-product-setup` | N/A | Delegates to the routed Cisco app install path for the resolved product | Delegates to the routed Cisco setup skill after resolving the SCAN catalog product name | Top-level Cisco product orchestrator. Uses the packaged SCAN catalog plus local overrides to resolve a product name, classify gaps, and run the matching setup workflow. |
 | `cisco-thousandeyes-setup` | 7719 | ACS Splunkbase | REST for OAuth account, HEC-based streaming inputs, polling inputs | Requires HEC token. OAuth device code flow for auth. ITSI integration optional. |
 | `splunk-itsi-setup` | 1841 | ACS Splunkbase | No post-install REST config needed | Premium product; requires ITSI license. Enables ThousandEyes ITSI integration. |
 | `splunk-stream-setup` search-tier app | 1809 | ACS or Splunk Cloud support workflow | Stream UI / REST on search tier | Cloud deployment is hybrid, not single-target. |
 | `splunk-stream-setup` wire-data add-on | 5234 | ACS or bundled with Stream deployment | No special post-install config in normal flow | Knowledge-object support for Stream search content. |
 | `splunk-stream-setup` forwarder add-on | 5238 | Manual install on HF/UF you control | Local HF files plus host forwarding config | This package runs on the heavy/universal forwarder, not the Cloud search tier. |
 | `splunk-connect-for-syslog-setup` | N/A | No Splunk Cloud app install; SC4S runtime is rendered for customer-managed hosts or Kubernetes | ACS for indexes/HEC where available, search-tier REST for validation, rendered host/Helm assets for runtime | External syslog-ng collector pattern. Modeled as a workflow row rather than a Splunk app package. |
+| `splunk-enterprise-host-setup` | N/A | Not a Splunk Cloud install path; bootstraps customer-managed Enterprise hosts only | Local or SSH-driven Linux host bootstrap for search-tier, indexer, and heavy-forwarder roles | Enterprise runtime bootstrap workflow for standalone or single-site clustered hosts. |
 
 ## Stream Heavy Forwarder Model
 

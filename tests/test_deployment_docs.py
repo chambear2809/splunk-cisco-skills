@@ -78,15 +78,21 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("splunk_app_stream", app_rows)
         self.assertIn("Splunk_TA_stream", app_rows)
         self.assertIn("Splunk_TA_stream_wire_data", app_rows)
+        self.assertIn("cisco-product-setup", workflow_rows)
         self.assertIn("splunk-connect-for-syslog-setup", workflow_rows)
+        self.assertIn("splunk-enterprise-host-setup", workflow_rows)
 
-    def test_generated_docs_cover_appdynamics_sc4s_and_numeric_stream_ids(self) -> None:
+    def test_generated_docs_cover_appdynamics_sc4s_host_bootstrap_and_numeric_stream_ids(self) -> None:
         self.assertIn("| `cisco-appdynamics-setup` | 3471 |", self.cloud_matrix)
+        self.assertIn("| `cisco-product-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-connect-for-syslog-setup` | N/A |", self.cloud_matrix)
+        self.assertIn("| `splunk-enterprise-host-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-stream-setup` search-tier app | 1809 |", self.cloud_matrix)
         self.assertIn("| `splunk-stream-setup` wire-data add-on | 5234 |", self.cloud_matrix)
         self.assertIn("| `splunk-stream-setup` forwarder add-on | 5238 |", self.cloud_matrix)
         self.assertIn("| `cisco-appdynamics-setup` | Supported |", self.role_matrix)
+        self.assertIn("| `cisco-product-setup` | Supported | None | Supported |", self.role_matrix)
+        self.assertIn("| `splunk-enterprise-host-setup` | Supported | Supported | Supported |", self.role_matrix)
 
     def test_enterprise_install_docs_match_ssh_staging_behavior(self) -> None:
         stale_phrases = (
