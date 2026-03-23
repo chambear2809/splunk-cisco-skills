@@ -15,10 +15,10 @@ repo and the runtime deployment models those scripts target.
 | Path | Role |
 |------|------|
 | `skills/<skill>/` | Skill-specific docs and automation for install, setup, validation, and optional MCP loading |
-| `skills/shared/lib/` | Shared platform layer for credentials, ACS, REST, Splunkbase, and account helpers |
+| `skills/shared/lib/` | Shared platform layer for credentials, ACS, REST, Splunkbase, account helpers, and host bootstrap helpers |
 | `skills/shared/scripts/` | Shared operational entrypoints such as credential setup and cloud batch install/uninstall |
 | `skills/shared/app_registry.json` | Single source of truth for Splunkbase IDs, package patterns, app names, license-ack metadata, and role placement |
-| `splunk-ta/` | Local package cache for downloaded or manually staged `.tgz` / `.spl` archives |
+| `splunk-ta/` | Local package cache for downloaded or manually staged `.tgz`, `.tar.gz`, `.rpm`, `.deb`, or `.spl` archives |
 | `splunk-ta/_unpacked/` | Review-only extracted copies, not the normal deployment path |
 | `tests/` and `.github/workflows/ci.yml` | Regression coverage for helper libraries and first-party shell scripts |
 
@@ -35,6 +35,7 @@ compatibility shim over the focused shared modules:
 | `rest_helpers.sh` | Search-tier REST wrappers for apps, configs, inputs, saved searches, HEC, and validation |
 | `splunkbase_helpers.sh` | Splunkbase authentication and package download helpers |
 | `configure_account_helpers.sh` | Shared create-or-update flow for TA account endpoints |
+| `host_bootstrap_helpers.sh` | Shared SSH, package staging, checksum, and remote file helpers for first-install host automation |
 
 ### Skill Composition Pattern
 
@@ -104,7 +105,8 @@ The current skills fall into four architectural roles:
   `cisco-enterprise-networking-setup`.
 - **Platform/package skills** — manage generic app delivery or multi-component
   app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`,
-  `splunk-connect-for-syslog-setup`, and `splunk-itsi-setup`.
+  `splunk-connect-for-syslog-setup`, `splunk-enterprise-host-setup`, and
+  `splunk-itsi-setup`.
 
 ### CI And Validation
 

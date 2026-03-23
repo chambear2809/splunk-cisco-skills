@@ -89,6 +89,15 @@
         "notes": "Cisco EULA license-ack required. Visualization app only; installer auto-adds required TA `7538` when missing. Optional Enhanced Netflow add-on `6872` should be offered separately when users want extra NetFlow dashboards."
       },
       {
+        "kind": "workflow",
+        "skill": "cisco-product-setup",
+        "label": "`cisco-product-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Delegates to the routed Cisco app install path for the resolved product",
+        "cloud_config_path": "Delegates to the routed Cisco setup skill after resolving the SCAN catalog product name",
+        "notes": "Top-level Cisco product orchestrator. Uses the packaged SCAN catalog plus local overrides to resolve a product name, classify gaps, and run the matching setup workflow."
+      },
+      {
         "kind": "app",
         "app_name": "ta_cisco_thousandeyes",
         "label": "`cisco-thousandeyes-setup`",
@@ -136,6 +145,15 @@
         "cloud_install_path": "No Splunk Cloud app install; SC4S runtime is rendered for customer-managed hosts or Kubernetes",
         "cloud_config_path": "ACS for indexes/HEC where available, search-tier REST for validation, rendered host/Helm assets for runtime",
         "notes": "External syslog-ng collector pattern. Modeled as a workflow row rather than a Splunk app package."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-enterprise-host-setup",
+        "label": "`splunk-enterprise-host-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Not a Splunk Cloud install path; bootstraps customer-managed Enterprise hosts only",
+        "cloud_config_path": "Local or SSH-driven Linux host bootstrap for search-tier, indexer, and heavy-forwarder roles",
+        "notes": "Enterprise runtime bootstrap workflow for standalone or single-site clustered hosts."
       }
     ]
   },
@@ -252,6 +270,18 @@
       "notes": "Meraki collector app with dashboard alignment; place on the search tier or a heavy forwarder."
     },
     {
+      "skill": "cisco-product-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Product-name router that resolves a Cisco product from the SCAN catalog and delegates to the matching setup skill or explicit gap classification."
+    },
+    {
       "skill": "cisco-thousandeyes-setup",
       "role_support": {
         "search-tier": "supported",
@@ -288,6 +318,18 @@
         "external-collector"
       ],
       "notes": "External collector workflow that prepares Splunk-side objects and renders SC4S runtime assets."
+    },
+    {
+      "skill": "splunk-enterprise-host-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Linux host bootstrap workflow for self-managed Splunk Enterprise search tiers, indexers, cluster managers, SHC members, and heavy forwarders."
     },
     {
       "skill": "splunk-itsi-setup",

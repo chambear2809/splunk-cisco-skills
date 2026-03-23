@@ -1,0 +1,87 @@
+# Splunk Enterprise host bootstrap intake template
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Keep the completed file local. Put passwords and shared secrets in temporary
+# files with restrictive permissions instead of storing them in git or pasting
+# them in chat.
+#
+# Example secret-file pattern:
+#   printf '%s\n' '<admin_password>' > /tmp/splunk_admin_password && chmod 600 /tmp/splunk_admin_password
+#   printf '%s\n' '<idxc_secret>' > /tmp/splunk_idxc_secret && chmod 600 /tmp/splunk_idxc_secret
+#   printf '%s\n' '<shc_secret>' > /tmp/splunk_shc_secret && chmod 600 /tmp/splunk_shc_secret
+
+# -----------------------------------------------------------------------------
+# Host and execution model
+# -----------------------------------------------------------------------------
+# EXECUTION=local
+# EXECUTION=ssh
+# HOST_BOOTSTRAP_ROLE=heavy-forwarder
+# DEPLOYMENT_MODE=standalone
+# CLUSTER_SITE=single
+# SPLUNK_HOME=/opt/splunk
+# SERVICE_USER=splunk
+# ADVERTISE_HOST=hf01.example.com
+
+# -----------------------------------------------------------------------------
+# Package source
+# -----------------------------------------------------------------------------
+# SOURCE=remote
+# Leave URL unset, or set URL=latest, to resolve the latest official Splunk
+# Enterprise Linux package from splunk.com at runtime. Latest official
+# downloads verify Splunk's published SHA512 automatically.
+# URL=latest
+# CHECKSUM=sha256:<sha256>
+# ALLOW_STALE_LATEST=false
+
+# SOURCE=splunk-auth
+# URL=latest
+
+# SOURCE=local
+# FILE=/absolute/path/to/splunk-package.tgz
+
+# PACKAGE_TYPE=auto   # prefers deb/rpm from the target OS family, else tgz
+# PACKAGE_TYPE=tgz
+
+# -----------------------------------------------------------------------------
+# Standalone role options
+# -----------------------------------------------------------------------------
+# RECEIVER_PORT=9997
+# ENABLE_WEB=true
+# FORWARDING_MODE=server-list
+# SERVER_LIST=idx01.example.com:9997,idx02.example.com:9997
+
+# -----------------------------------------------------------------------------
+# Indexer cluster options
+# -----------------------------------------------------------------------------
+# CLUSTER_MANAGER_URI=https://cm01.example.com:8089
+# REPLICATION_FACTOR=3
+# SEARCH_FACTOR=2
+# REPLICATION_PORT=9887
+# IDXC_LABEL=primary_indexers
+
+# -----------------------------------------------------------------------------
+# Search head cluster options
+# -----------------------------------------------------------------------------
+# DEPLOYER_URI=https://shd01.example.com:8089
+# SHCLUSTER_LABEL=primary_search
+# SHC_REPLICATION_PORT=8081
+# SHC_REPLICATION_FACTOR=3
+# SHC_MEMBERS=https://sh01.example.com:8089,https://sh02.example.com:8089,https://sh03.example.com:8089
+# CURRENT_SHC_MEMBER_URI=https://sh01.example.com:8089
+# BOOTSTRAP_SHC=false
+
+# -----------------------------------------------------------------------------
+# Heavy forwarder forwarding model
+# -----------------------------------------------------------------------------
+# FORWARDING_MODE=indexer-discovery
+# INDEXER_DISCOVERY_NAME=cluster_manager
+# TCPOUT_GROUP=default-autolb-group
+
+# -----------------------------------------------------------------------------
+# Operational notes
+# -----------------------------------------------------------------------------
+# - Use Splunk Enterprise packages for search-tier, indexer, cluster-manager,
+#   search head cluster, and heavy-forwarder roles.
+# - Heavy forwarders should set indexAndForward=false unless you intentionally
+#   need local indexing on that host.
+# - Single-site clustering only in v1.
