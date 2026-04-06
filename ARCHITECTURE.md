@@ -105,8 +105,8 @@ The current skills fall into four architectural roles:
   `cisco-enterprise-networking-setup`.
 - **Platform/package skills** — manage generic app delivery or multi-component
   app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`,
-  `splunk-connect-for-syslog-setup`, `splunk-enterprise-host-setup`, and
-  `splunk-itsi-setup`.
+  `splunk-connect-for-syslog-setup`, `splunk-enterprise-host-setup`,
+  `splunk-itsi-setup`, and `splunk-mcp-server-setup`.
 
 ### CI And Validation
 

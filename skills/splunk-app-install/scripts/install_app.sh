@@ -163,8 +163,65 @@ registry_app_name_by_app_id() {
     registry_app_field_by_app_id "${1:-}" "app_name"
 }
 
+registry_app_name_by_package() {
+    local package_name
+    package_name="$(basename "${1:-}" | tr '[:upper:]' '[:lower:]')"
+    [[ -f "${REGISTRY_FILE}" ]] || return 0
+    python3 -c "
+import json, sys, fnmatch
+pkg = sys.argv[1]
+with open(sys.argv[2]) as f:
+    registry = json.load(f)
+for app in registry.get('apps', []):
+    patterns = [str(p).lower() for p in app.get('package_patterns', [])]
+    if any(fnmatch.fnmatch(pkg, pattern) for pattern in patterns):
+        print(str(app.get('app_name', '')), end='')
+        break
+" "${package_name}" "${REGISTRY_FILE}" 2>/dev/null || true
+}
+
 registry_app_label_by_app_id() {
     registry_app_field_by_app_id "${1:-}" "label"
+}
+
+guess_app_name_from_package() {
+    local package_path="${1:-}"
+    local app_id=""
+    local app_name=""
+
+    app_name="$(registry_app_name_by_package "${package_path}")"
+    if [[ -n "${app_name}" ]]; then
+        printf '%s' "${app_name}"
+        return 0
+    fi
+
+    app_id="$(registry_app_id_by_package "${package_path}")"
+    if [[ -n "${app_id}" ]]; then
+        app_name="$(registry_app_name_by_app_id "${app_id}")"
+        if [[ -n "${app_name}" ]]; then
+            printf '%s' "${app_name}"
+            return 0
+        fi
+    fi
+
+    python3 - "${package_path}" <<'PY'
+import sys
+import tarfile
+
+path = sys.argv[1]
+try:
+    with tarfile.open(path, "r:*") as archive:
+        for member in archive.getmembers():
+            name = (member.name or "").lstrip("./")
+            if not name:
+                continue
+            top_level = name.split("/", 1)[0]
+            if top_level:
+                print(top_level, end="")
+                break
+except Exception:
+    pass
+PY
 }
 
 registry_local_package_for_app_id() {
@@ -838,7 +895,7 @@ install_via_server_path() {
     local source_path="$1"
     local update_flag="$2"
 
-    splunk_curl "${SK}" \
+    splunk_curl "${SK}" --connect-timeout 10 --max-time 180 \
         -X POST "${SPLUNK_URI}/services/apps/local" \
         --data-urlencode "name=${source_path}" \
         -d "filename=true" \
@@ -846,6 +903,54 @@ install_via_server_path() {
         -d "output_mode=json" \
         -w '\n%{http_code}' \
         2>/dev/null || true
+}
+
+app_lookup_http_code() {
+    local sk="$1" uri="$2" app="$3"
+    splunk_curl "${sk}" --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" \
+        "${uri}/services/apps/local/${app}?output_mode=json" 2>/dev/null || echo "000"
+}
+
+INSTALL_HTTP_CODE=""
+INSTALL_BODY=""
+INSTALL_INCOMPLETE_BUT_PRESENT=false
+
+install_via_server_path_with_verification() {
+    local source_path="$1"
+    local update_flag="$2"
+    local expected_app_name="${3:-}"
+    local response install_rc http_code body post_install_check
+
+    INSTALL_HTTP_CODE=""
+    INSTALL_BODY=""
+    INSTALL_INCOMPLETE_BUT_PRESENT=false
+
+    response=""
+    install_rc=0
+    set +e
+    response=$(install_via_server_path "${source_path}" "${update_flag}")
+    install_rc=$?
+    set -e
+
+    http_code=$(printf '%s\n' "${response}" | tail -1)
+    body=$(printf '%s\n' "${response}" | sed '$d')
+
+    if [[ -z "${http_code}" ]] || (( install_rc != 0 )) || [[ "${http_code}" == "000" ]]; then
+        if [[ -n "${expected_app_name}" ]]; then
+            post_install_check="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${expected_app_name}")"
+            if [[ "${post_install_check}" == "200" ]]; then
+                INSTALL_INCOMPLETE_BUT_PRESENT=true
+                http_code="200"
+                body=""
+            fi
+        fi
+        if [[ -z "${http_code}" ]]; then
+            http_code="000"
+        fi
+    fi
+
+    INSTALL_HTTP_CODE="${http_code}"
+    INSTALL_BODY="${body}"
 }
 
 stage_file_via_ssh() {
@@ -924,11 +1029,12 @@ install_app() {
         log "Mode: fresh install"
     fi
 
-    local response http_code body
+    local http_code body expected_app_name
     local abs_file_path
     abs_file_path="$(cd "$(dirname "${file_path}")" && pwd)/$(basename "${file_path}")"
     local file_name
     file_name="$(basename "${abs_file_path}")"
+    expected_app_name="$(guess_app_name_from_package "${abs_file_path}")"
 
     log "Installing to ${SPLUNK_URI} ..."
 
@@ -943,7 +1049,7 @@ install_app() {
     if $is_local; then
         # Splunk is local — install directly from the filesystem path.
         log "Installing from local path: ${abs_file_path}"
-        response=$(install_via_server_path "${abs_file_path}" "${update_flag}")
+        install_via_server_path_with_verification "${abs_file_path}" "${update_flag}" "${expected_app_name}"
     else
         local remote_tmp
         remote_tmp="/tmp/${file_name%.*}.$$.${RANDOM}.$(basename "${file_name}")"
@@ -961,12 +1067,12 @@ install_app() {
         fi
 
         log "Installing staged package from ${remote_tmp} ..."
-        response=$(install_via_server_path "${remote_tmp}" "${update_flag}")
+        install_via_server_path_with_verification "${remote_tmp}" "${update_flag}" "${expected_app_name}"
         cleanup_remote_stage_file "${remote_tmp}"
     fi
 
-    http_code=$(echo "${response}" | tail -1)
-    body=$(echo "${response}" | sed '$d')
+    http_code="${INSTALL_HTTP_CODE:-000}"
+    body="${INSTALL_BODY:-}"
 
     local app_name error_msg
     app_name=$(echo "${body}" | python3 -c "
@@ -992,6 +1098,14 @@ try:
 except Exception:
     print('', end='')
 " 2>/dev/null || true)
+
+    if [[ -z "${app_name}" && -n "${expected_app_name}" && ( "${http_code}" == "200" || "${http_code}" == "201" ) ]]; then
+        app_name="${expected_app_name}"
+    fi
+
+    if ${INSTALL_INCOMPLETE_BUT_PRESENT}; then
+        log "WARNING: Install request did not finish cleanly, but the app is present."
+    fi
 
     case "${http_code}" in
         200|201)

@@ -2424,6 +2424,122 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertIn("Installation failed (HTTP 401)", result.stdout + result.stderr)
             self.assertNotIn("Skipping Splunk restart", result.stdout)
 
+    def test_install_app_treats_timeout_after_presence_as_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "splunk-mcp-server_110.tgz"
+            state_file = tmp_path / "installed.flag"
+            package_file.write_text("placeholder", encoding="utf-8")
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+                from urllib.parse import urlparse
+
+                app_name = "Splunk_MCP_Server"
+                app_version = "1.1.0"
+                state_file = Path(os.environ["MOCK_INSTALL_STATE"])
+                args = sys.argv[1:]
+                method = "GET"
+                url = ""
+                write_code = False
+                output_target = None
+
+                def out(body: str = "", code: int | None = None) -> None:
+                    if output_target == "/dev/null" and write_code and code is not None:
+                        sys.stdout.write(str(code))
+                        raise SystemExit(0)
+                    if body:
+                        sys.stdout.write(body)
+                    if write_code and code is not None:
+                        sys.stdout.write(f"\\n{code}")
+                    raise SystemExit(0)
+
+                i = 0
+                while i < len(args):
+                    arg = args[i]
+                    if arg == "-X" and i + 1 < len(args):
+                        method = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-o" and i + 1 < len(args):
+                        output_target = args[i + 1]
+                        i += 2
+                        continue
+                    if "%{http_code}" in arg:
+                        write_code = True
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                    i += 1
+
+                path = urlparse(url).path
+
+                if "/services/auth/login" in path:
+                    out("<response><sessionKey>test-session</sessionKey></response>")
+
+                if path.endswith("/services/apps/local") and method == "POST":
+                    state_file.write_text("installed", encoding="utf-8")
+                    raise SystemExit(28)
+
+                if f"/services/apps/local/{app_name}" in path:
+                    if output_target == "/dev/null" and write_code:
+                        out(code=200 if state_file.exists() else 404)
+                    if state_file.exists():
+                        out(json.dumps({"entry": [{"name": app_name, "content": {"version": app_version}}]}))
+                    out(json.dumps({"entry": []}))
+
+                out("", 200)
+                """,
+            )
+            write_executable(
+                bin_dir / "nc",
+                """\
+                #!/usr/bin/env bash
+                exit 0
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["MOCK_INSTALL_STATE"] = str(state_file)
+
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "local",
+                "--file",
+                str(package_file),
+                "--no-update",
+                "--no-restart",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("Install request did not finish cleanly, but the app is present", output)
+            self.assertIn("SUCCESS: App 'Splunk_MCP_Server' installed (HTTP 200)", output)
+            self.assertIn("Skipping Splunk restart (--no-restart)", output)
+
     def test_install_app_help_does_not_require_profile_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -2964,6 +3080,183 @@ class ShellScriptRegressionTests(unittest.TestCase):
         self.assertIn("os.fdopen(3", script_text)
         self.assertNotIn('python3 - "${max_lines}" "${resp}"', script_text)
         self.assertNotIn("text = sys.argv[2]", script_text)
+
+    def test_splunk_mcp_setup_passes_response_body_directly_to_sanitize_response(self):
+        script_text = (
+            REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/setup.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('sanitize_response "${body}" 10 >&2', script_text)
+        self.assertNotIn('printf \'%s\\n\' "${body}" | sanitize_response 10 >&2', script_text)
+
+    def test_splunk_mcp_validate_normalizes_boolean_expectations(self):
+        script_text = (
+            REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/validate.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("normalize_boolean_if_possible()", script_text)
+        self.assertIn(
+            'SERVER_REQUIRE_ENCRYPTED_TOKEN_NORMALIZED="$(normalize_boolean_if_possible "${SERVER_REQUIRE_ENCRYPTED_TOKEN}")"',
+            script_text,
+        )
+        self.assertIn(
+            'assert_equal "require_encrypted_token" "${EXPECT_REQUIRE_ENCRYPTED_TOKEN}" "${SERVER_REQUIRE_ENCRYPTED_TOKEN_NORMALIZED}"',
+            script_text,
+        )
+
+    def test_splunk_mcp_rendered_client_name_is_json_and_shell_safe(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            output_dir = tmp_path / "rendered"
+            codex_log = tmp_path / "codex-log.json"
+            marker_path = tmp_path / "client-name-marker"
+            client_name = f'bad"name$(touch {marker_path})'
+
+            write_executable(
+                bin_dir / "codex",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                Path(os.environ["CODEX_LOG"]).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
+                """,
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["CODEX_LOG"] = str(codex_log)
+
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                "https://splunk.example:8089/services/mcp",
+                "--output-dir",
+                str(output_dir),
+                "--client-name",
+                client_name,
+                "--no-register-codex",
+                "--no-configure-cursor",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+
+            rendered_config = json.loads((output_dir / ".cursor/mcp.json").read_text(encoding="utf-8"))
+            self.assertIn(client_name, rendered_config["mcpServers"])
+            self.assertEqual(
+                rendered_config["mcpServers"][client_name]["command"],
+                "${workspaceFolder}/run-splunk-mcp.sh",
+            )
+
+            register_result = subprocess.run(
+                ["bash", str(output_dir / "register-codex-mcp.sh")],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(
+                register_result.returncode,
+                0,
+                msg=register_result.stdout + register_result.stderr,
+            )
+            self.assertFalse(marker_path.exists(), "client-name command substitution should not execute")
+
+            codex_args = json.loads(codex_log.read_text(encoding="utf-8"))
+            self.assertEqual(codex_args[:3], ["mcp", "add", client_name])
+            self.assertEqual(codex_args[3], "--")
+            self.assertEqual(codex_args[4], str(output_dir / "run-splunk-mcp.sh"))
+
+    def test_splunk_mcp_rendered_env_file_is_shell_safe(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "splunk.token"
+            mcp_remote_log = tmp_path / "mcp-remote-log.json"
+            url_marker = tmp_path / "url-marker"
+            token_marker = tmp_path / "token-marker"
+            mcp_url = f"https://splunk.example:8089/services/mcp?target=$(touch {url_marker})"
+            token_value = f"token$(touch {token_marker})"
+
+            token_file.write_text(token_value, encoding="utf-8")
+            token_file.chmod(0o600)
+
+            write_executable(
+                bin_dir / "mcp-remote",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                Path(os.environ["MCP_REMOTE_LOG"]).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
+                """,
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["MCP_REMOTE_LOG"] = str(mcp_remote_log)
+
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                mcp_url,
+                "--bearer-token-file",
+                str(token_file),
+                "--output-dir",
+                str(output_dir),
+                "--no-register-codex",
+                "--no-configure-cursor",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+
+            wrapper_result = subprocess.run(
+                ["bash", str(output_dir / "run-splunk-mcp.sh")],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(
+                wrapper_result.returncode,
+                0,
+                msg=wrapper_result.stdout + wrapper_result.stderr,
+            )
+            self.assertFalse(url_marker.exists(), "MCP URL command substitution should not execute")
+            self.assertFalse(token_marker.exists(), "token command substitution should not execute")
+
+            mcp_remote_args = json.loads(mcp_remote_log.read_text(encoding="utf-8"))
+            self.assertEqual(mcp_remote_args[0], mcp_url)
+            self.assertEqual(
+                mcp_remote_args[1:3],
+                ["--header", f"Authorization: Bearer {token_value}"],
+            )
+
+    def test_splunk_mcp_validate_uses_root_protected_resource_endpoint(self):
+        script_text = (
+            REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/validate.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('/.well-known/oauth-protected-resource', script_text)
+        self.assertNotIn('/services/.well-known/oauth-protected-resource', script_text)
 
     def test_cloud_batch_uninstall_returns_nonzero_when_failures_cannot_be_verified(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3644,6 +3937,434 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 "https://example-stack.stg.splunkcloud.com:8089/services/auth/login",
                 curl_log.read_text(encoding="utf-8"),
             )
+
+    def test_enterprise_uninstall_treats_delete_timeout_after_removal_as_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            state_file = tmp_path / "deleted.flag"
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+                from urllib.parse import urlparse
+
+                state_file = Path(os.environ["DELETE_STATE_FILE"])
+                args = sys.argv[1:]
+                url = ""
+                method = "GET"
+                output_target = None
+                write_format = ""
+
+                i = 0
+                while i < len(args):
+                    arg = args[i]
+                    if arg == "-X" and i + 1 < len(args):
+                        method = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-o" and i + 1 < len(args):
+                        output_target = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-w" and i + 1 < len(args):
+                        write_format = args[i + 1]
+                        i += 2
+                        continue
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                    i += 1
+
+                path = urlparse(url).path
+                if path.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                    raise SystemExit(0)
+
+                if "/services/apps/local/example_app" in path and method == "DELETE":
+                    state_file.write_text("deleted", encoding="utf-8")
+                    raise SystemExit(28)
+
+                if "/services/apps/local/example_app" in path and output_target == "/dev/null" and "%{http_code}" in write_format:
+                    sys.stdout.write("404" if state_file.exists() else "200")
+                    raise SystemExit(0)
+
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "nc",
+                """\
+                #!/usr/bin/env bash
+                exit 0
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_SEARCH_API_URI="https://example-enterprise:8089"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_VERIFY_SSL="false"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["DELETE_STATE_FILE"] = str(state_file)
+
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/uninstall_app.sh",
+                "--app-name",
+                "example_app",
+                "--no-restart",
+                env=env,
+                input_text="yes\n",
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("did not finish cleanly, but the app is no longer present", result.stdout)
+            self.assertIn("SUCCESS: App 'example_app' has been removed", result.stdout)
+
+    def test_cloud_uninstall_treats_fallback_delete_timeout_after_removal_as_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            state_file = tmp_path / "deleted.flag"
+
+            write_executable(
+                bin_dir / "acs",
+                """\
+                #!/usr/bin/env python3
+                import sys
+
+                cmd = " ".join(sys.argv[1:])
+                if cmd == "config current-stack":
+                    print("Current Search Head: shc1")
+                    raise SystemExit(0)
+                if cmd == "apps describe example_app":
+                    raise SystemExit(0)
+                if cmd == "apps uninstall example_app":
+                    raise SystemExit(0)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+                from urllib.parse import urlparse
+
+                state_file = Path(os.environ["DELETE_STATE_FILE"])
+                args = sys.argv[1:]
+                url = ""
+                method = "GET"
+                output_target = None
+                write_format = ""
+
+                i = 0
+                while i < len(args):
+                    arg = args[i]
+                    if arg == "-X" and i + 1 < len(args):
+                        method = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-o" and i + 1 < len(args):
+                        output_target = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-w" and i + 1 < len(args):
+                        write_format = args[i + 1]
+                        i += 2
+                        continue
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                    i += 1
+
+                path = urlparse(url).path
+                if path.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                    raise SystemExit(0)
+
+                if "/services/apps/local/example_app" in path and method == "DELETE":
+                    state_file.write_text("deleted", encoding="utf-8")
+                    raise SystemExit(28)
+
+                if "/services/apps/local/example_app" in path and output_target == "/dev/null" and "%{http_code}" in write_format:
+                    if state_file.exists():
+                        sys.stdout.write("404")
+                    else:
+                        sys.stdout.write("200")
+                    raise SystemExit(0)
+
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "nc",
+                """\
+                #!/usr/bin/env bash
+                exit 0
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="cloud"
+                    SPLUNK_CLOUD_STACK="example-stack"
+                    ACS_SERVER="https://staging.admin.splunk.com"
+                    STACK_TOKEN="token"
+                    STACK_USERNAME="stack-user"
+                    STACK_PASSWORD="stack-pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["DELETE_STATE_FILE"] = str(state_file)
+
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/uninstall_app.sh",
+                "--app-name",
+                "example_app",
+                "--no-restart",
+                env=env,
+                input_text="yes\n",
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Search-tier REST DELETE did not finish cleanly, but the app is no longer present", result.stdout)
+            self.assertIn("has been removed from Splunk Cloud", result.stdout)
+
+    def test_mcp_setup_merges_existing_cursor_workspace_config(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            home_dir = tmp_path / "home"
+            workspace_dir = tmp_path / "cursor-workspace"
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "splunk.token"
+            cursor_dir = workspace_dir / ".cursor"
+            cursor_dir.mkdir(parents=True)
+            home_dir.mkdir()
+
+            token_file.write_text("encrypted-token-value", encoding="utf-8")
+            token_file.chmod(0o600)
+            (cursor_dir / "mcp.json").write_text(
+                json.dumps(
+                    {
+                        "mcpServers": {
+                            "existing": {
+                                "type": "stdio",
+                                "command": "/bin/echo",
+                                "args": ["hello"],
+                            }
+                        },
+                        "notes": {"keep": True},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["HOME"] = str(home_dir)
+
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                "https://splunk.example.invalid:8089/services/mcp",
+                "--bearer-token-file",
+                str(token_file),
+                "--output-dir",
+                str(output_dir),
+                "--cursor-workspace",
+                str(workspace_dir),
+                "--client-name",
+                "splunk-merge",
+                "--no-register-codex",
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            workspace_json = json.loads((cursor_dir / "mcp.json").read_text(encoding="utf-8"))
+            self.assertEqual(workspace_json["notes"], {"keep": True})
+            self.assertEqual(workspace_json["mcpServers"]["existing"]["command"], "/bin/echo")
+            self.assertEqual(
+                Path(workspace_json["mcpServers"]["splunk-merge"]["command"]).resolve(),
+                (output_dir / "run-splunk-mcp.sh").resolve(),
+            )
+            self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["args"], [])
+            self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["type"], "stdio")
+
+    def test_mcp_setup_rejects_invalid_cursor_workspace_config_after_render(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            home_dir = tmp_path / "home"
+            workspace_dir = tmp_path / "cursor-workspace"
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "splunk.token"
+            cursor_dir = workspace_dir / ".cursor"
+            cursor_dir.mkdir(parents=True)
+            home_dir.mkdir()
+
+            token_file.write_text("encrypted-token-value", encoding="utf-8")
+            token_file.chmod(0o600)
+            (cursor_dir / "mcp.json").write_text("{invalid json\n", encoding="utf-8")
+
+            env = os.environ.copy()
+            env["HOME"] = str(home_dir)
+
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                "https://splunk.example.invalid:8089/services/mcp",
+                "--bearer-token-file",
+                str(token_file),
+                "--output-dir",
+                str(output_dir),
+                "--cursor-workspace",
+                str(workspace_dir),
+                "--client-name",
+                "splunk-invalid-cursor",
+                "--no-register-codex",
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+            self.assertIn("not valid JSON", result.stdout + result.stderr)
+            self.assertTrue((output_dir / "run-splunk-mcp.sh").exists())
+            self.assertTrue((output_dir / ".cursor" / "mcp.json").exists())
+
+    def test_mcp_setup_defaults_cursor_workspace_to_current_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            home_dir = tmp_path / "home"
+            workspace_dir = tmp_path / "cursor-workspace"
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "splunk.token"
+            home_dir.mkdir()
+            workspace_dir.mkdir()
+
+            token_file.write_text("encrypted-token-value", encoding="utf-8")
+            token_file.chmod(0o600)
+
+            env = os.environ.copy()
+            env["HOME"] = str(home_dir)
+
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/setup.sh"),
+                    "--render-clients",
+                    "--mcp-url",
+                    "https://splunk.example.invalid:8089/services/mcp",
+                    "--bearer-token-file",
+                    str(token_file),
+                    "--output-dir",
+                    str(output_dir),
+                    "--client-name",
+                    "splunk-default-workspace",
+                    "--no-register-codex",
+                ],
+                cwd=workspace_dir,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            workspace_json = json.loads((workspace_dir / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                Path(workspace_json["mcpServers"]["splunk-default-workspace"]["command"]).resolve(),
+                (output_dir / "run-splunk-mcp.sh").resolve(),
+            )
+
+    def test_mcp_setup_repeated_runs_update_codex_registration(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            home_dir = tmp_path / "home"
+            output_dir_one = tmp_path / "rendered-one"
+            output_dir_two = tmp_path / "rendered-two"
+            token_file = tmp_path / "splunk.token"
+            home_dir.mkdir()
+
+            token_file.write_text("encrypted-token-value", encoding="utf-8")
+            token_file.chmod(0o600)
+
+            env = os.environ.copy()
+            env["HOME"] = str(home_dir)
+
+            first = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                "https://splunk.example.invalid:8089/services/mcp",
+                "--bearer-token-file",
+                str(token_file),
+                "--output-dir",
+                str(output_dir_one),
+                "--client-name",
+                "splunk-repeat",
+                "--no-configure-cursor",
+                env=env,
+            )
+            self.assertEqual(first.returncode, 0, msg=first.stdout + first.stderr)
+
+            second = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                "https://splunk.example.invalid:8089/services/mcp",
+                "--bearer-token-file",
+                str(token_file),
+                "--output-dir",
+                str(output_dir_two),
+                "--client-name",
+                "splunk-repeat",
+                "--no-configure-cursor",
+                env=env,
+            )
+            self.assertEqual(second.returncode, 0, msg=second.stdout + second.stderr)
+
+            registered = subprocess.run(
+                ["codex", "mcp", "get", "splunk-repeat", "--json"],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(registered.returncode, 0, msg=registered.stdout + registered.stderr)
+
+            data = json.loads(registered.stdout)
+            self.assertEqual(data["transport"]["type"], "stdio")
+            self.assertEqual(
+                Path(data["transport"]["command"]).resolve(),
+                (output_dir_two / "run-splunk-mcp.sh").resolve(),
+            )
+            self.assertEqual(data["transport"]["args"], [])
 
     def test_list_apps_defaults_to_all_apps_in_noninteractive_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:

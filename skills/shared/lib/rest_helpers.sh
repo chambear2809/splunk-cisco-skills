@@ -372,7 +372,7 @@ PY
 rest_check_app() {
     local sk="$1" uri="$2" app="$3"
     local http_code
-    http_code=$(splunk_curl "${sk}" \
+    http_code=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
         "${uri}/services/apps/local/${app}?output_mode=json" \
         -o /dev/null -w '%{http_code}' 2>/dev/null)
     [[ "${http_code}" == "200" ]]

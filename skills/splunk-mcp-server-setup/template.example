@@ -1,0 +1,49 @@
+# Copy to template.local and keep the filled copy local only.
+# Do not put passwords, bearer tokens, or other secrets in this file.
+
+# Target platform:
+#   cloud
+#   enterprise
+platform=cloud
+
+# Search-tier management endpoint used for REST setup.
+# Example: https://stack-name.splunkcloud.com:8089
+splunk_search_api_uri=
+
+# Optional explicit MCP endpoint override.
+# Leave blank to derive from the management URI as <scheme>://<host>:<port>/services/mcp
+mcp_url=
+
+# Username to mint the encrypted MCP bearer token for.
+token_user=
+
+# Token lifetime expression accepted by /servicesNS/nobody/Splunk_MCP_Server/mcp_token
+# Examples: +30d, +12h, 2026-12-31T23:59:59Z
+token_expires_on=+30d
+
+# If the client bridge must ignore TLS validation for lab/self-signed certificates:
+#   true
+#   false
+client_insecure_tls=false
+
+# Suggested mcp.conf server settings
+timeout=90
+max_row_limit=2000
+default_row_limit=250
+ssl_verify=true
+require_encrypted_token=true
+legacy_token_grace_days=30
+mcp_token_default_lifetime_seconds=2592000
+mcp_token_max_lifetime_seconds=7776000
+token_key_reload_interval_seconds=
+
+# Suggested rate-limit values
+global_rate_limit=600
+admission_global=0
+tenant_authenticated=240
+tenant_unauthenticated=60
+circuit_breaker_failure_threshold=20
+circuit_breaker_cooldown_seconds=30
+
+# Optional render target for the shared client bridge bundle
+render_output_dir=./splunk-mcp-rendered

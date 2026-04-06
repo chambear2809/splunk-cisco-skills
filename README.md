@@ -1,8 +1,9 @@
 # Splunk TA Skills
 
-This repository is a working library of Cursor agent skills and shell scripts for
-installing, configuring, and validating Splunk apps and Technology Add-ons on
-Splunk Cloud and self-managed Splunk Enterprise deployments, and for
+This repository is a working library of Cursor and Codex agent skills plus
+shell scripts for installing, configuring, and validating Splunk apps and
+Technology Add-ons on Splunk Cloud and self-managed Splunk Enterprise
+deployments, and for
 bootstrapping Linux Splunk Enterprise hosts themselves, including search-tier,
 indexer, forwarder, and external-collector topologies.
 
@@ -19,8 +20,8 @@ to git.
 
 The repo is designed for two use cases:
 
-- **Agent-driven work in Cursor**: the agent reads the skill metadata in
-  `skills/*/SKILL.md` and runs the matching scripts for you.
+- **Agent-driven work in Cursor or Codex**: the agent reads the skill metadata
+  in `skills/*/SKILL.md` and runs the matching scripts for you.
 - **Direct shell use**: you can run the scripts under each skill manually if you
   prefer to operate outside the agent.
 
@@ -90,6 +91,7 @@ skill-specific details.
 | `cisco-enterprise-networking-setup` | `cisco-catalyst-app` | Configure the visualization app’s macros and related app settings |
 | `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
+| `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |

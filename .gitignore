@@ -38,4 +38,5 @@ projects/tmp-*
 
 # --- Local SC4S rendered deployment assets ---
 /sc4s-rendered/
+/splunk-mcp-rendered/
 error.log

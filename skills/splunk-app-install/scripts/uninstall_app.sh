@@ -54,6 +54,50 @@ refresh_cloud_verify_session() {
     [[ -n "${SK_VERIFY}" ]]
 }
 
+app_lookup_http_code() {
+    local sk="$1" uri="$2" app="$3"
+    splunk_curl "${sk}" --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}" \
+        "${uri}/services/apps/local/${app}?output_mode=json" 2>/dev/null || echo "000"
+}
+
+DELETE_HTTP_CODE=""
+DELETE_BODY=""
+DELETE_INCOMPLETE_BUT_ABSENT=false
+
+delete_app_via_rest() {
+    local sk="$1" uri="$2" app="$3"
+    local delete_response delete_rc http_code body post_delete_check
+
+    DELETE_HTTP_CODE=""
+    DELETE_BODY=""
+    DELETE_INCOMPLETE_BUT_ABSENT=false
+
+    delete_response=""
+    delete_rc=0
+    set +e
+    delete_response=$(splunk_curl "${sk}" --connect-timeout 10 --max-time 60 -w "\n%{http_code}" \
+        -X DELETE "${uri}/services/apps/local/${app}?output_mode=json" 2>/dev/null)
+    delete_rc=$?
+    set -e
+
+    http_code=$(echo "${delete_response}" | tail -1)
+    body=$(printf '%s\n' "${delete_response}" | sed '$d')
+
+    if [[ -z "${http_code}" ]] || (( delete_rc != 0 )) || [[ "${http_code}" == "000" ]]; then
+        post_delete_check="$(app_lookup_http_code "${sk}" "${uri}" "${app}")"
+        if [[ "${post_delete_check}" -eq 404 ]]; then
+            DELETE_INCOMPLETE_BUT_ABSENT=true
+            http_code="200"
+            body=""
+        elif [[ -z "${http_code}" ]]; then
+            http_code="000"
+        fi
+    fi
+
+    DELETE_HTTP_CODE="${http_code}"
+    DELETE_BODY="${body}"
+}
+
 echo "=== Splunk App Uninstaller ==="
 echo ""
 
@@ -155,10 +199,11 @@ except Exception:
 
     if ${cloud_uninstall_rest_fallback_needed}; then
         log "Attempting direct search-tier REST DELETE as fallback..."
-        delete_code="000"
-        delete_code=$(splunk_curl "${SK_VERIFY}" \
-            -X DELETE "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" \
-            -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
+        delete_app_via_rest "${SK_VERIFY}" "${SPLUNK_URI}" "${APP_NAME}"
+        delete_code="${DELETE_HTTP_CODE:-000}"
+        if ${DELETE_INCOMPLETE_BUT_ABSENT}; then
+            log "WARNING: Search-tier REST DELETE did not finish cleanly, but the app is no longer present."
+        fi
         case "${delete_code}" in
             200)
                 log "Search-tier REST DELETE succeeded (HTTP ${delete_code})."
@@ -249,8 +294,7 @@ case "${confirm}" in
 esac
 
 log "Checking if app '${APP_NAME}' exists..."
-check_response=$(splunk_curl "${SK}" -o /dev/null -w "%{http_code}" \
-    "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null || echo "000")
+check_response="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
 
 if [[ "${check_response}" -ne 200 ]]; then
     log "ERROR: App '${APP_NAME}' not found (HTTP ${check_response})"
@@ -258,13 +302,15 @@ if [[ "${check_response}" -ne 200 ]]; then
 fi
 
 log "Removing app '${APP_NAME}'..."
-delete_response=$(splunk_curl "${SK}" -w "\n%{http_code}" \
-    -X DELETE "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null || true)
+delete_app_via_rest "${SK}" "${SPLUNK_URI}" "${APP_NAME}"
+http_code="${DELETE_HTTP_CODE:-000}"
+body="${DELETE_BODY:-}"
 
-http_code=$(echo "${delete_response}" | tail -1)
-body=$(printf '%s\n' "${delete_response}" | sed '$d')
+if ${DELETE_INCOMPLETE_BUT_ABSENT}; then
+    log "WARNING: DELETE request did not finish cleanly, but the app is no longer present."
+fi
 
-if [[ "${http_code}" -eq 200 ]]; then
+if [[ "${http_code}" -eq 200 || "${http_code}" -eq 204 ]]; then
     log "SUCCESS: App '${APP_NAME}' has been removed"
     log ""
     log "Note: The app directory may still exist at:"

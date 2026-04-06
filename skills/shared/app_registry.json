@@ -114,6 +114,15 @@
         "notes": "Premium product; requires ITSI license. Enables ThousandEyes ITSI integration."
       },
       {
+        "kind": "workflow",
+        "skill": "splunk-mcp-server-setup",
+        "label": "`splunk-mcp-server-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "ACS private app upload or vetted local package",
+        "cloud_config_path": "REST for mcp.conf settings, token policy, and rate limits; local JSON policy overlays remain package-content concerns",
+        "notes": "Search-tier MCP endpoint for Splunk with encrypted token issuance and shared Cursor/Codex bridge rendering."
+      },
+      {
         "kind": "app",
         "app_name": "splunk_app_stream",
         "label": "`splunk-stream-setup` search-tier app",
@@ -342,6 +351,18 @@
       },
       "cloud_pairing": [],
       "notes": "Premium search-tier app for ITSI dashboards and service analytics."
+    },
+    {
+      "skill": "splunk-mcp-server-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays."
     },
     {
       "skill": "splunk-stream-setup",
@@ -679,6 +700,29 @@
         "needs_search_time_objects": true,
         "needs_kvstore": true,
         "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-mcp-server-setup",
+      "app_name": "Splunk_MCP_Server",
+      "splunkbase_id": "",
+      "label": "Splunk MCP Server",
+      "license_ack_url": "",
+      "package_patterns": ["splunk-mcp-server_*"],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
       }
