@@ -96,7 +96,8 @@ step while still rendering the bundle.
 This approach is useful because:
 
 - Cursor can use a workspace-local `.cursor/mcp.json` that points at the
-  rendered wrapper through an absolute path
+  rendered wrapper through `${workspaceFolder}` when the bundle lives inside the
+  workspace, or through an absolute path otherwise
 - Codex supports stdio MCP servers through `codex mcp add <name> -- <command>`
 - the same wrapper can handle `SPLUNK_MCP_INSECURE_TLS=1` for lab certificates
 

@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "bad\"name$(touch /var/folders/x5/nls55f1122zgbqnyxw5x16dw0000gn/T/tmp0yeoqbud/client-name-marker)": {
+    "splunk-mcp": {
       "type": "stdio",
-      "command": "/private/var/folders/x5/nls55f1122zgbqnyxw5x16dw0000gn/T/tmp0yeoqbud/rendered/run-splunk-mcp.sh",
+      "command": "${workspaceFolder}/splunk-mcp-rendered/run-splunk-mcp.sh",
       "args": []
     }
   }

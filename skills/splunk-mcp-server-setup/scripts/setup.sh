@@ -147,6 +147,17 @@ except ValueError:
 PY
 }
 
+relative_path_within_dir() {
+    python3 - "$1" "$2" <<'PY'
+from pathlib import Path
+import sys
+
+target = Path(sys.argv[1]).resolve()
+base = Path(sys.argv[2]).resolve()
+print(target.relative_to(base).as_posix(), end="")
+PY
+}
+
 ensure_parent_dir() {
     mkdir -p "$(dirname "$1")"
 }
@@ -612,20 +623,34 @@ resolve_cursor_workspace_dir() {
     printf '%s' "${workspace_abs}"
 }
 
+build_cursor_wrapper_command() {
+    local workspace_dir="$1" wrapper_abs="$2"
+    local wrapper_command relative_wrapper_path
+
+    if [[ "$(path_is_within_dir "${wrapper_abs}" "${workspace_dir}")" == "yes" ]]; then
+        relative_wrapper_path="$(relative_path_within_dir "${wrapper_abs}" "${workspace_dir}")"
+        wrapper_command="\${workspaceFolder}/${relative_wrapper_path}"
+    else
+        wrapper_command="${wrapper_abs}"
+    fi
+
+    printf '%s' "${wrapper_command}"
+}
+
 build_cursor_workspace_json() {
-    local config_path="$1" server_name="$2" wrapper_path="$3"
-    python3 - "${config_path}" "${server_name}" "${wrapper_path}" <<'PY'
+    local config_path="$1" server_name="$2" wrapper_command="$3"
+    python3 - "${config_path}" "${server_name}" "${wrapper_command}" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 config_path = Path(sys.argv[1])
 server_name = sys.argv[2]
-wrapper_path = sys.argv[3]
+wrapper_command = sys.argv[3]
 
 entry = {
     "type": "stdio",
-    "command": wrapper_path,
+    "command": wrapper_command,
     "args": [],
 }
 
@@ -681,17 +706,17 @@ register_codex_client() {
 }
 
 write_cursor_workspace_config() {
-    local workspace_dir="$1" wrapper_abs="$2"
+    local workspace_dir="$1" wrapper_command="$2"
     local cursor_config_path="${workspace_dir}/.cursor/mcp.json"
     local cursor_json
 
-    cursor_json="$(build_cursor_workspace_json "${cursor_config_path}" "${CLIENT_NAME}" "${wrapper_abs}")" || exit 1
+    cursor_json="$(build_cursor_workspace_json "${cursor_config_path}" "${CLIENT_NAME}" "${wrapper_command}")" || exit 1
     write_text_file "${cursor_config_path}" "${cursor_json}"
     log "Configured Cursor MCP server '${CLIENT_NAME}' in ${workspace_dir}."
 }
 
 apply_client_setup() {
-    local wrapper_abs workspace_dir=""
+    local wrapper_abs workspace_dir="" wrapper_command=""
 
     if [[ "${REGISTER_CODEX}" != "true" && "${CONFIGURE_CURSOR}" != "true" ]]; then
         log "Skipped Codex and Cursor auto-apply; rendered bundle only."
@@ -703,8 +728,9 @@ apply_client_setup() {
 
     if [[ "${CONFIGURE_CURSOR}" == "true" ]]; then
         workspace_dir="$(resolve_cursor_workspace_dir)"
+        wrapper_command="$(build_cursor_wrapper_command "${workspace_dir}" "${wrapper_abs}")"
         # Validate and prepare any existing Cursor config before mutating Codex registration.
-        build_cursor_workspace_json "${workspace_dir}/.cursor/mcp.json" "${CLIENT_NAME}" "${wrapper_abs}" >/dev/null || exit 1
+        build_cursor_workspace_json "${workspace_dir}/.cursor/mcp.json" "${CLIENT_NAME}" "${wrapper_command}" >/dev/null || exit 1
     fi
 
     if [[ "${REGISTER_CODEX}" == "true" ]]; then
@@ -712,7 +738,7 @@ apply_client_setup() {
     fi
 
     if [[ "${CONFIGURE_CURSOR}" == "true" ]]; then
-        write_cursor_workspace_config "${workspace_dir}" "${wrapper_abs}"
+        write_cursor_workspace_config "${workspace_dir}" "${wrapper_command}"
     fi
 }
 

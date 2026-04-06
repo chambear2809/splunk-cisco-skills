@@ -4216,6 +4216,49 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["args"], [])
             self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["type"], "stdio")
 
+    def test_mcp_setup_uses_workspace_relative_cursor_command_when_bundle_is_inside_workspace(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            home_dir = tmp_path / "home"
+            workspace_dir = tmp_path / "cursor-workspace"
+            output_dir = workspace_dir / "rendered"
+            token_file = tmp_path / "splunk.token"
+            home_dir.mkdir()
+            workspace_dir.mkdir()
+
+            token_file.write_text("encrypted-token-value", encoding="utf-8")
+            token_file.chmod(0o600)
+
+            env = os.environ.copy()
+            env["HOME"] = str(home_dir)
+
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                "https://splunk.example.invalid:8089/services/mcp",
+                "--bearer-token-file",
+                str(token_file),
+                "--output-dir",
+                str(output_dir),
+                "--cursor-workspace",
+                str(workspace_dir),
+                "--client-name",
+                "splunk-relative",
+                "--no-register-codex",
+                env=env,
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            workspace_json = json.loads((workspace_dir / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                workspace_json["mcpServers"]["splunk-relative"]["command"],
+                "${workspaceFolder}/rendered/run-splunk-mcp.sh",
+            )
+            self.assertEqual(workspace_json["mcpServers"]["splunk-relative"]["args"], [])
+            self.assertEqual(workspace_json["mcpServers"]["splunk-relative"]["type"], "stdio")
+
     def test_mcp_setup_rejects_invalid_cursor_workspace_config_after_render(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -4365,6 +4408,22 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 (output_dir_two / "run-splunk-mcp.sh").resolve(),
             )
             self.assertEqual(data["transport"]["args"], [])
+
+    def test_repo_cursor_config_tracks_workspace_relative_rendered_bundle(self):
+        config = json.loads((REPO_ROOT / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            config,
+            {
+                "mcpServers": {
+                    "splunk-mcp": {
+                        "type": "stdio",
+                        "command": "${workspaceFolder}/splunk-mcp-rendered/run-splunk-mcp.sh",
+                        "args": [],
+                    }
+                }
+            },
+        )
 
     def test_list_apps_defaults_to_all_apps_in_noninteractive_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:
