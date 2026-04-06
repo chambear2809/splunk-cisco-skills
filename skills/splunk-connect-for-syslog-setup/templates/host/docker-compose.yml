@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   sc4s:
     image: {{SC4S_IMAGE}}

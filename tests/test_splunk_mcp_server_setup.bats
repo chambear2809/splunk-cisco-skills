@@ -3,6 +3,42 @@
 setup() {
     TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
     PROJECT_ROOT="$(cd "${TEST_DIR}/.." && pwd)"
+
+    MOCK_DIR="$(mktemp -d)"
+    MOCK_BIN="${MOCK_DIR}/bin"
+    mkdir -p "${MOCK_BIN}"
+
+    cat > "${MOCK_BIN}/codex" <<'PYEOF'
+#!/usr/bin/env python3
+import json, os, sys
+store = os.path.join(os.environ.get("HOME", "/tmp"), ".codex-mock-store")
+os.makedirs(store, exist_ok=True)
+args = sys.argv[1:]
+if len(args) >= 4 and args[0] == "mcp" and args[1] == "add":
+    name = args[2]
+    cmd = args[4] if len(args) > 4 else ""
+    data = {"name": name, "transport": {"type": "stdio", "command": cmd, "args": []}}
+    with open(os.path.join(store, name + ".json"), "w") as f:
+        json.dump(data, f)
+elif len(args) >= 3 and args[0] == "mcp" and args[1] == "get":
+    name = args[2]
+    path = os.path.join(store, name + ".json")
+    if not os.path.exists(path):
+        print(f"Error: server '{name}' not found", file=sys.stderr)
+        sys.exit(1)
+    with open(path) as f:
+        data = json.load(f)
+    print(json.dumps(data))
+else:
+    print(f"mock codex: unsupported args: {args}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+    chmod +x "${MOCK_BIN}/codex"
+    export PATH="${MOCK_BIN}:${PATH}"
+}
+
+teardown() {
+    rm -rf "${MOCK_DIR}"
 }
 
 @test "splunk-mcp-server setup --help exits 0" {
@@ -67,7 +103,7 @@ setup() {
     run env HOME="${home_dir}" codex mcp get "splunk-shared" --json
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"name\":\"splunk-shared\"" || "$output" =~ "\"name\": \"splunk-shared\"" ]]
-    [[ "$output" == *"${output_dir}/run-splunk-mcp.sh"* ]]
+    [[ "$output" == *"${home_dir}/.codex/mcp-bridges/splunk-shared/run-splunk-mcp.sh"* ]]
 
     rm -rf "${work_dir}"
 }
@@ -127,6 +163,7 @@ setup() {
     run env HOME="${home_dir}" codex mcp get "splunk-no-cursor" --json
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"name\":\"splunk-no-cursor\"" || "$output" =~ "\"name\": \"splunk-no-cursor\"" ]]
+    [[ "$output" == *"${home_dir}/.codex/mcp-bridges/splunk-no-cursor/run-splunk-mcp.sh"* ]]
 
     rm -rf "${work_dir}"
 }

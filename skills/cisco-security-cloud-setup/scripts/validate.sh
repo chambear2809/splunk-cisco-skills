@@ -21,7 +21,7 @@ fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
 warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco Security Cloud Validation
 
 Usage: $(basename "$0") [OPTIONS]
@@ -32,7 +32,7 @@ Options:
   --name NAME                Validate one specific input name (requires --input-type)
   --help                     Show this help
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 handler_count() {
@@ -98,7 +98,7 @@ while [[ $# -gt 0 ]]; do
         --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
         --name) require_arg "$1" $# || exit 1; INPUT_NAME="$2"; shift 2 ;;
         --help) usage ;;
-        *) log "Unknown option: $1"; usage ;;
+        *) log "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

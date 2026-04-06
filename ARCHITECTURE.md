@@ -105,8 +105,9 @@ The current skills fall into four architectural roles:
   `cisco-enterprise-networking-setup`.
 - **Platform/package skills** — manage generic app delivery or multi-component
   app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`,
-  `splunk-connect-for-syslog-setup`, `splunk-enterprise-host-setup`,
-  `splunk-itsi-setup`, and `splunk-mcp-server-setup`.
+  `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup`,
+  `splunk-enterprise-host-setup`, `splunk-itsi-setup`, and
+  `splunk-mcp-server-setup`.
 
 ### CI And Validation
 
@@ -456,6 +457,30 @@ flowchart LR
 SC4S onto the Splunk Cloud search tier. The skill prepares the Splunk-side
 objects and renders runtime assets for customer-managed Docker/Podman/systemd
 or Kubernetes infrastructure.
+
+### External SNMP Collector (SC4SNMP)
+
+```mermaid
+flowchart LR
+  Devices["Network / Infrastructure devices"]
+  Poller["SC4SNMP poller"]
+  Trap["SC4SNMP trap listener"]
+  SplunkPrep["Repo skill\n(indexes, HEC, render assets)"]
+  HEC["Splunk HEC\n(:443 Cloud / :8088 Enterprise)"]
+  Index["Splunk event + metric indexes"]
+
+  SplunkPrep -->|"prepare HEC + indexes"| HEC
+  Devices -->|"SNMP poll"| Poller
+  Devices -->|"SNMP traps"| Trap
+  Poller -->|"events + metrics"| HEC
+  Trap -->|"trap events"| HEC
+  HEC --> Index
+```
+
+**Implementation guardrail**: `splunk-connect-for-snmp-setup` does not deploy
+SC4SNMP onto the Splunk Cloud search tier. The skill prepares the Splunk-side
+objects and renders runtime assets for customer-managed Docker Compose or
+Kubernetes infrastructure.
 
 ### Search-Time And Premium Apps
 

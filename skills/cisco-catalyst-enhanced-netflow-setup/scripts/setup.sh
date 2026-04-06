@@ -21,7 +21,7 @@ RESTART_SPLUNK=true
 SK=""
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco Catalyst Enhanced Netflow Add-on Setup
 
 Usage: $(basename "$0") [OPTIONS]
@@ -33,7 +33,7 @@ Options:
 
 With no flags, reports installation status and the local NetFlow receiver context.
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
         --install) INSTALL_APP=true; shift ;;
         --no-restart) RESTART_SPLUNK=false; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

@@ -117,7 +117,7 @@ def validate_registry(registry: dict) -> None:
 def render_cloud_matrix(registry: dict) -> str:
     apps_by_name = {app["app_name"]: app for app in registry.get("apps", [])}
     rows = []
-    for row in registry["documentation"]["cloud_matrix_rows"]:
+    for row in registry.get("documentation", {}).get("cloud_matrix_rows", []):
         if row["kind"] == "app":
             splunkbase_id = apps_by_name[row["app_name"]]["splunkbase_id"]
         else:
@@ -186,6 +186,16 @@ def render_cloud_matrix(registry: dict) -> str:
             "- run the SC4S syslog-ng container on infrastructure you control",
             "- send SC4S output directly to Splunk Cloud HEC on `443`",
             "- keep SC4S runtime files, token material, and local archive/disk-buffer storage",
+            "  on the customer-managed host or Kubernetes cluster",
+            "",
+            "## SC4SNMP External Collector Model",
+            "",
+            "For Splunk Connect for SNMP on Splunk Cloud:",
+            "",
+            "- create or validate indexes and HEC tokens against the Cloud stack",
+            "- run the SC4SNMP poller and trap listener on infrastructure you control",
+            "- send SC4SNMP output directly to Splunk Cloud HEC on `443`",
+            "- keep SC4SNMP runtime files, token material, inventory, and local secret files",
             "  on the customer-managed host or Kubernetes cluster",
             "",
             "## Cloud Access Architecture",
@@ -364,8 +374,8 @@ def render_role_matrix(registry: dict) -> str:
             "  - `splunk_app_stream` on the search tier",
             "  - `Splunk_TA_stream` on a heavy or universal forwarder",
             "  - `Splunk_TA_stream_wire_data` on indexers and, where useful, search or heavy-forwarder tiers",
-            "- SC4S is modeled as an `external-collector` workflow rather than an app",
-            "  placement inside Splunk.",
+            "- SC4S and SC4SNMP are modeled as `external-collector` workflows rather than",
+            "  app placement inside Splunk.",
             "",
         ]
     )
@@ -389,7 +399,7 @@ def write_or_check(path: Path, content: str, check: bool) -> bool:
 
 def main() -> int:
     args = parse_args()
-    check = args.check
+    check = not args.write
     registry = load_registry()
     validate_registry(registry)
 

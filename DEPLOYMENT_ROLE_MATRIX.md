@@ -18,7 +18,7 @@ installs.
 | `indexer` | Indexing tier where index-time parsing or indexer-side knowledge objects belong. |
 | `heavy-forwarder` | Customer-managed full Splunk Enterprise instance used for data collection, parsing, or forwarding. |
 | `universal-forwarder` | Lightweight forwarder tier used where the package or workflow is explicitly forwarder-safe. |
-| `external-collector` | Non-Splunk runtime such as SC4S, containers, or Kubernetes workloads that send data into Splunk. |
+| `external-collector` | Non-Splunk runtime such as SC4S, SC4SNMP, containers, or Kubernetes workloads that send data into Splunk. |
 
 Platform and role are separate concepts:
 
@@ -46,6 +46,7 @@ For Cloud-specific install and API behavior, see
 | `cisco-thousandeyes-setup` | Supported | None | Supported | None | None | None | Hybrid-capable app that combines HEC push with polling and dashboard setup. |
 | `splunk-app-install` | Supported | Supported | Supported | Supported | None | None | Generic package delivery skill; actual package compatibility comes from the package or app metadata. |
 | `splunk-connect-for-syslog-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4S runtime assets. |
+| `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets. |
 | `splunk-enterprise-host-setup` | Supported | Supported | Supported | None | None | None | Linux host bootstrap workflow for self-managed Splunk Enterprise search tiers, indexers, cluster managers, SHC members, and heavy forwarders. |
 | `splunk-itsi-setup` | Required | None | None | None | None | None | Premium search-tier app for ITSI dashboards and service analytics. |
 | `splunk-mcp-server-setup` | Required | None | None | None | None | None | Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays. |
@@ -80,5 +81,5 @@ For Cloud-specific install and API behavior, see
   - `splunk_app_stream` on the search tier
   - `Splunk_TA_stream` on a heavy or universal forwarder
   - `Splunk_TA_stream_wire_data` on indexers and, where useful, search or heavy-forwarder tiers
-- SC4S is modeled as an `external-collector` workflow rather than an app
-  placement inside Splunk.
+- SC4S and SC4SNMP are modeled as `external-collector` workflows rather than
+  app placement inside Splunk.

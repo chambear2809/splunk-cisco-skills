@@ -23,6 +23,23 @@ def write_executable(path: Path, content: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
+def write_logged_command(path: Path, log_env_var: str) -> None:
+    write_executable(
+        path,
+        f"""\
+        #!/usr/bin/env python3
+        import os
+        import sys
+        from pathlib import Path
+
+        log_path = os.environ.get("{log_env_var}", "")
+        if log_path:
+            with Path(log_path).open("a", encoding="utf-8") as handle:
+                handle.write("{path.name} " + " ".join(sys.argv[1:]) + "\\n")
+        """,
+    )
+
+
 def sha512_hex(text: str) -> str:
     return hashlib.sha512(text.encode("utf-8")).hexdigest()
 
@@ -439,6 +456,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
         bin_dir.mkdir()
         state_file = tmp_path / "sc4s_state.json"
         credentials_file = tmp_path / "credentials"
+        command_log = tmp_path / "sc4s_commands.log"
 
         state_file.write_text(
             json.dumps(
@@ -617,12 +635,218 @@ class ShellScriptRegressionTests(unittest.TestCase):
             exit 0
             """,
         )
+        write_logged_command(bin_dir / "docker", "SC4S_COMMAND_LOG")
+        write_logged_command(bin_dir / "podman", "SC4S_COMMAND_LOG")
+        write_logged_command(bin_dir / "podman-compose", "SC4S_COMMAND_LOG")
+        write_logged_command(bin_dir / "helm", "SC4S_COMMAND_LOG")
+        write_logged_command(bin_dir / "systemctl", "SC4S_COMMAND_LOG")
 
         env = os.environ.copy()
         env["PATH"] = f"{bin_dir}:{env['PATH']}"
         env["SC4S_STATE"] = str(state_file)
         env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
         env["SPLUNK_PLATFORM"] = "enterprise"
+        env["SC4S_COMMAND_LOG"] = str(command_log)
+        env["SC4S_SYSTEMD_UNIT_DIR"] = str(tmp_path / "systemd-units")
+        env["SC4S_SYSTEMD_USE_SUDO"] = "never"
+
+        return env, state_file
+
+    def build_mock_sc4snmp_env(self, tmp_path: Path) -> tuple[dict, Path]:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        state_file = tmp_path / "sc4snmp_state.json"
+        credentials_file = tmp_path / "credentials"
+        command_log = tmp_path / "sc4snmp_commands.log"
+
+        state_file.write_text(
+            json.dumps(
+                {
+                    "indexes": {},
+                    "hec_tokens": {},
+                    "data_count": 4,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        credentials_file.write_text(
+            textwrap.dedent(
+                """\
+                SPLUNK_PLATFORM="enterprise"
+                SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                SPLUNK_USER="user"
+                SPLUNK_PASS="pass"
+                """
+            ),
+            encoding="utf-8",
+        )
+
+        write_executable(
+            bin_dir / "curl",
+            """\
+            #!/usr/bin/env python3
+            import json
+            import os
+            import sys
+            from pathlib import Path
+            from urllib.parse import parse_qs, urlparse
+
+            state_path = Path(os.environ["SC4SNMP_STATE"])
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+
+            args = sys.argv[1:]
+            method = "GET"
+            data = ""
+            url = ""
+            write_code = False
+            output_target = None
+
+            def save() -> None:
+                state_path.write_text(json.dumps(state), encoding="utf-8")
+
+            def out(body: str = "", code: int | None = None) -> None:
+                if output_target == "/dev/null" and write_code and code is not None:
+                    sys.stdout.write(str(code))
+                    raise SystemExit(0)
+                if body:
+                    sys.stdout.write(body)
+                if write_code and code is not None:
+                    sys.stdout.write(f"\\n{code}")
+                raise SystemExit(0)
+
+            def decode_form(raw: str) -> dict[str, str]:
+                parsed_body = parse_qs(raw, keep_blank_values=True)
+                return {key: values[-1] for key, values in parsed_body.items()}
+
+            i = 0
+            while i < len(args):
+                arg = args[i]
+                if arg == "-X" and i + 1 < len(args):
+                    method = args[i + 1]
+                    i += 2
+                    continue
+                if arg == "-d" and i + 1 < len(args):
+                    if args[i + 1] == "@-":
+                        data = sys.stdin.read()
+                    else:
+                        data = args[i + 1]
+                    if method == "GET":
+                        method = "POST"
+                    i += 2
+                    continue
+                if arg == "-o" and i + 1 < len(args):
+                    output_target = args[i + 1]
+                    i += 2
+                    continue
+                if "%{http_code}" in arg:
+                    write_code = True
+                if arg.startswith("http://") or arg.startswith("https://"):
+                    url = arg
+                i += 1
+
+            parsed = urlparse(url)
+            path = parsed.path
+
+            if "/services/auth/login" in path:
+                out("<response><sessionKey>test-session</sessionKey></response>")
+
+            if path.endswith("/services/data/indexes") and method == "POST":
+                body = decode_form(data)
+                idx = body.get("name", "")
+                datatype = body.get("datatype", "event")
+                if idx:
+                    state["indexes"][idx] = {"datatype": datatype}
+                    save()
+                out("", 201)
+
+            if "/services/data/indexes/" in path:
+                idx = path.rsplit("/", 1)[-1]
+                exists = idx in state["indexes"]
+                if output_target == "/dev/null" and write_code:
+                    out(code=200 if exists else 404)
+                if exists:
+                    out(
+                        json.dumps(
+                            {
+                                "entry": [
+                                    {
+                                        "name": idx,
+                                        "content": {
+                                            "datatype": state["indexes"][idx].get("datatype", "event")
+                                        },
+                                    }
+                                ]
+                            }
+                        )
+                    )
+                out(json.dumps({"entry": []}))
+
+            if path.endswith("/services/data/inputs/http") and method == "POST":
+                body = decode_form(data)
+                name = body.get("name", "sc4snmp")
+                state["hec_tokens"][name] = {
+                    "disabled": body.get("disabled", "false"),
+                    "useACK": body.get("useACK", "0"),
+                    "indexes": body.get("indexes", ""),
+                    "index": body.get("index", "netops"),
+                    "token": f"generated-{name}-token",
+                }
+                save()
+                out("", 201)
+
+            if "/services/data/inputs/http/" in path and path.endswith("/enable") and method == "POST":
+                encoded_name = path.rsplit("/", 2)[-2]
+                name = encoded_name.replace("%3A", ":").replace("%2F", "/")
+                if name.startswith("http://"):
+                    name = name[len("http://") :]
+                token = state["hec_tokens"].setdefault(name, {"index": "netops", "token": f"generated-{name}-token"})
+                token["disabled"] = "false"
+                save()
+                out("", 200)
+
+            if path.endswith("/services/data/inputs/http"):
+                entries = []
+                for name, token in sorted(state["hec_tokens"].items()):
+                    entries.append(
+                        {
+                            "name": f"http://{name}",
+                            "content": {
+                                "disabled": token.get("disabled", "false"),
+                                "useACK": token.get("useACK", "0"),
+                                "indexes": token.get("indexes", ""),
+                                "index": token.get("index", "netops"),
+                                "token": token.get("token", ""),
+                            },
+                        }
+                    )
+                out(json.dumps({"entry": entries}))
+
+            if path.endswith("/services/search/jobs") and method == "POST":
+                out(json.dumps({"results": [{"count": str(state.get("data_count", 0))}]}))
+
+            out("", 200)
+            """,
+        )
+        write_executable(
+            bin_dir / "nc",
+            """\
+            #!/usr/bin/env bash
+            exit 0
+            """,
+        )
+        write_logged_command(bin_dir / "docker", "SC4SNMP_COMMAND_LOG")
+        write_logged_command(bin_dir / "podman", "SC4SNMP_COMMAND_LOG")
+        write_logged_command(bin_dir / "podman-compose", "SC4SNMP_COMMAND_LOG")
+        write_logged_command(bin_dir / "helm", "SC4SNMP_COMMAND_LOG")
+
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}:{env['PATH']}"
+        env["SC4SNMP_STATE"] = str(state_file)
+        env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+        env["SPLUNK_PLATFORM"] = "enterprise"
+        env["SC4SNMP_COMMAND_LOG"] = str(command_log)
 
         return env, state_file
 
@@ -976,6 +1200,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
             "skills/cisco-thousandeyes-setup/scripts/validate.sh",
             "skills/splunk-itsi-setup/scripts/validate.sh",
             "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
+            "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
             "skills/splunk-stream-setup/scripts/validate.sh",
         ]
 
@@ -1230,6 +1455,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
 
         self.assertIn("cisco-product-setup", skill_topologies)
         self.assertIn("splunk-connect-for-syslog-setup", skill_topologies)
+        self.assertIn("splunk-connect-for-snmp-setup", skill_topologies)
         self.assertIn("splunk-app-install", skill_topologies)
 
         for skill, topology in skill_topologies.items():
@@ -1242,6 +1468,8 @@ class ShellScriptRegressionTests(unittest.TestCase):
 
         sc4s = skill_topologies["splunk-connect-for-syslog-setup"]
         self.assertEqual(sc4s["role_support"]["external-collector"], "required")
+        sc4snmp = skill_topologies["splunk-connect-for-snmp-setup"]
+        self.assertEqual(sc4snmp["role_support"]["external-collector"], "required")
 
     def test_stream_role_topology_matches_split_package_model(self):
         registry = json.loads(
@@ -1651,6 +1879,478 @@ class ShellScriptRegressionTests(unittest.TestCase):
     def test_gitignore_excludes_default_sc4s_render_output(self):
         gitignore_text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("/sc4s-rendered/", gitignore_text)
+
+    def test_sc4s_apply_host_compose_pulls_before_up(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4s_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4s.token"
+            token_file.write_text("existing-token\n", encoding="utf-8")
+
+            result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--render-host",
+                "--output-dir",
+                str(output_dir),
+                "--hec-token-file",
+                str(token_file),
+                "--apply-host",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            helper_text = (output_dir / "host" / "compose-up.sh").read_text(encoding="utf-8")
+            self.assertIn("compose -f docker-compose.yml pull", helper_text)
+
+            commands = Path(env["SC4S_COMMAND_LOG"]).read_text(encoding="utf-8").splitlines()
+            self.assertEqual(
+                commands[:2],
+                [
+                    "docker compose -f docker-compose.yml pull",
+                    "docker compose -f docker-compose.yml up -d",
+                ],
+            )
+
+    def test_sc4s_apply_host_systemd_syncs_runtime_and_restarts_service(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4s_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            runtime_root = tmp_path / "sc4s-runtime"
+            token_file = tmp_path / "sc4s.token"
+            context_file = tmp_path / "splunk_metadata.csv"
+            config_file = tmp_path / "app-workaround.conf"
+
+            token_file.write_text("existing-token\n", encoding="utf-8")
+            context_file.write_text("cisco_asa,index,netfw\n", encoding="utf-8")
+            config_file.write_text("filter f_local { level(info); };\n", encoding="utf-8")
+
+            (runtime_root / "tls").mkdir(parents=True)
+            preserved_file = runtime_root / "tls" / "existing.pem"
+            preserved_file.write_text("keep-me\n", encoding="utf-8")
+
+            result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--render-host",
+                "--host-mode",
+                "systemd",
+                "--output-dir",
+                str(output_dir),
+                "--sc4s-root",
+                str(runtime_root),
+                "--hec-token-file",
+                str(token_file),
+                "--context-file",
+                f"splunk_metadata.csv={context_file}",
+                "--config-file",
+                f"app-workaround.conf={config_file}",
+                "--apply-host",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            runtime_env = (runtime_root / "env_file").read_text(encoding="utf-8")
+            copied_context = (runtime_root / "local" / "context" / "splunk_metadata.csv").read_text(encoding="utf-8")
+            copied_config = (runtime_root / "local" / "config" / "app-workaround.conf").read_text(encoding="utf-8")
+            unit_file = Path(env["SC4S_SYSTEMD_UNIT_DIR"]) / "sc4s.service"
+
+            self.assertIn("SC4S_DEST_SPLUNK_HEC_DEFAULT_TOKEN=existing-token", runtime_env)
+            self.assertEqual(copied_context, "cisco_asa,index,netfw\n")
+            self.assertEqual(copied_config, "filter f_local { level(info); };\n")
+            self.assertTrue((runtime_root / "archive").exists())
+            self.assertTrue((runtime_root / "tls").exists())
+            self.assertEqual(preserved_file.read_text(encoding="utf-8"), "keep-me\n")
+            self.assertTrue(unit_file.exists())
+
+            commands = Path(env["SC4S_COMMAND_LOG"]).read_text(encoding="utf-8").splitlines()
+            self.assertEqual(
+                commands,
+                [
+                    "systemctl daemon-reload",
+                    "systemctl enable sc4s",
+                    "systemctl restart sc4s",
+                ],
+            )
+
+    def test_sc4s_apply_k8s_runs_helm_upgrade_install(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4s_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4s.token"
+            token_file.write_text("existing-token\n", encoding="utf-8")
+
+            result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--render-k8s",
+                "--output-dir",
+                str(output_dir),
+                "--hec-token-file",
+                str(token_file),
+                "--apply-k8s",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            commands = Path(env["SC4S_COMMAND_LOG"]).read_text(encoding="utf-8").splitlines()
+            self.assertEqual(commands[:2], ["helm repo add splunk-connect-for-syslog https://splunk.github.io/splunk-connect-for-syslog", "helm repo update"])
+            self.assertTrue(
+                any(
+                    "helm upgrade --install sc4s splunk-connect-for-syslog/splunk-connect-for-syslog --namespace sc4s --create-namespace -f values.yaml"
+                    in line
+                    for line in commands
+                ),
+                msg=f"Expected helm upgrade --install in command log, got: {commands}",
+            )
+
+    def test_sc4snmp_setup_smoke_flow(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4snmp_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4snmp.token"
+            inventory_file = tmp_path / "inventory.csv"
+            scheduler_file = tmp_path / "scheduler-config.yaml"
+            traps_file = tmp_path / "traps-config.yaml"
+
+            inventory_file.write_text(
+                "address,port,version,community,secret,security_engine,walk_interval,profiles,smart_profiles,delete\n"
+                "192.0.2.10,161,2c,public,,,300,if_mib,,false\n",
+                encoding="utf-8",
+            )
+            scheduler_file.write_text(
+                textwrap.dedent(
+                    """\
+                    groups:
+                      campus_switches:
+                        - address: 192.0.2.10
+                          port: 161
+                    profiles:
+                      if_mib:
+                        frequency: 300
+                        varBinds:
+                          - ['IF-MIB', 'ifDescr']
+                    """
+                ),
+                encoding="utf-8",
+            )
+            traps_file.write_text(
+                textwrap.dedent(
+                    """\
+                    communities:
+                      2c:
+                        - public
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            setup_result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--splunk-prep",
+                "--write-hec-token-file",
+                str(token_file),
+                "--render-compose",
+                "--render-k8s",
+                "--output-dir",
+                str(output_dir),
+                "--dns-server",
+                "10.10.10.53",
+                "--trap-listener-ip",
+                "10.10.10.50",
+                "--inventory-file",
+                str(inventory_file),
+                "--scheduler-file",
+                str(scheduler_file),
+                "--traps-file",
+                str(traps_file),
+                env=env,
+            )
+            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
+            self.assertTrue(token_file.exists(), msg="Expected the SC4SNMP token file to be written")
+            self.assertEqual(token_file.read_text(encoding="utf-8"), "generated-sc4snmp-token\n")
+
+            compose_env = (output_dir / "compose" / ".env").read_text(encoding="utf-8")
+            compose_file = (output_dir / "compose" / "docker-compose.yml").read_text(encoding="utf-8")
+            compose_inventory = (output_dir / "compose" / "config" / "inventory.csv").read_text(encoding="utf-8")
+            compose_hec_token = (output_dir / "compose" / "secrets" / "hec_token").read_text(encoding="utf-8")
+            k8s_values = (output_dir / "k8s" / "values.yaml").read_text(encoding="utf-8")
+            k8s_secret = (output_dir / "k8s" / "values.secret.yaml").read_text(encoding="utf-8")
+
+            self.assertIn("SPLUNK_HEC_HOST=example.invalid", compose_env)
+            self.assertIn("SPLUNK_HEC_PORT=8088", compose_env)
+            self.assertIn("SPLUNK_HEC_TOKEN_FILE=/opt/sc4snmp/secrets/hec_token", compose_env)
+            self.assertIn("TRAPS_PORT=162", compose_env)
+            self.assertIn("DNS_SERVER=10.10.10.53", compose_env)
+            self.assertIn("container_name: SC4SNMP-worker-poller", compose_file)
+            self.assertIn("published: 162", compose_file)
+            self.assertIn("192.0.2.10,161,2c,public", compose_inventory)
+            self.assertEqual(compose_hec_token, "generated-sc4snmp-token\n")
+
+            self.assertIn('host: "example.invalid"', k8s_values)
+            self.assertIn('port: "8088"', k8s_values)
+            self.assertIn('loadBalancerIP: "10.10.10.50"', k8s_values)
+            self.assertIn("usemetallb: false", k8s_values)
+            self.assertIn('dnsServer: "10.10.10.53"', k8s_values)
+            self.assertIn("inventory: |", k8s_values)
+            self.assertIn("address,port,version,community", k8s_values)
+            self.assertIn("groups:", k8s_values)
+            self.assertIn("profiles:", k8s_values)
+            self.assertIn("communities:", k8s_values)
+            self.assertIn('token: "generated-sc4snmp-token"', k8s_secret)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            self.assertEqual(state["indexes"]["em_logs"]["datatype"], "event")
+            self.assertEqual(state["indexes"]["netops"]["datatype"], "event")
+            self.assertEqual(state["indexes"]["em_metrics"]["datatype"], "metric")
+            self.assertEqual(state["indexes"]["netmetrics"]["datatype"], "metric")
+            self.assertIn("sc4snmp", state["hec_tokens"])
+
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4snmp",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertIn("HEC token 'sc4snmp' exists", validate_result.stdout)
+            self.assertIn("SC4SNMP event", validate_result.stdout)
+
+    def test_sc4snmp_validate_reports_wrong_metrics_index_type(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4snmp_env(tmp_path)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["indexes"]["netmetrics"] = {"datatype": "event"}
+            state["hec_tokens"]["sc4snmp"] = {
+                "disabled": "false",
+                "useACK": "0",
+                "indexes": "",
+                "index": "netops",
+                "token": "generated-sc4snmp-token",
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4snmp",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 1, msg=validate_result.stdout + validate_result.stderr)
+            self.assertIn("Index 'netmetrics' exists but is an event index", validate_result.stdout)
+
+    def test_sc4snmp_setup_enables_existing_disabled_hec_token(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4snmp_env(tmp_path)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["hec_tokens"]["sc4snmp"] = {
+                "disabled": "true",
+                "useACK": "0",
+                "indexes": "",
+                "index": "netops",
+                "token": "generated-sc4snmp-token",
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+
+            setup_result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--splunk-prep",
+                "--hec-only",
+                env=env,
+            )
+            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
+            self.assertIn("exists but is disabled. Enabling it via Splunk REST", setup_result.stdout)
+            self.assertIn("Enabled HEC token 'sc4snmp'.", setup_result.stdout)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            self.assertEqual(state["hec_tokens"]["sc4snmp"]["disabled"], "false")
+
+    def test_sc4snmp_setup_blocks_custom_in_repo_secret_output_dir(self):
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
+            tmp_path = Path(tmpdir)
+            harness_path = tmp_path / "harness"
+            harness_path.mkdir()
+            env, _state_file = self.build_mock_sc4snmp_env(harness_path)
+            token_file = tmp_path / "sc4snmp.token"
+            token_file.write_text("existing-token\n", encoding="utf-8")
+
+            output_dir = tmp_path / "dangerous-render"
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--render-compose",
+                "--output-dir",
+                str(output_dir),
+                "--hec-token-file",
+                str(token_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+            self.assertIn("Refusing to render secret-bearing SC4SNMP outputs inside the repo", result.stdout + result.stderr)
+
+    def test_gitignore_excludes_default_sc4snmp_render_output(self):
+        gitignore_text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("/sc4snmp-rendered/", gitignore_text)
+
+    def test_sc4snmp_apply_compose_pulls_before_up(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4snmp.token"
+            token_file.write_text("existing-token\n", encoding="utf-8")
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--render-compose",
+                "--output-dir",
+                str(output_dir),
+                "--hec-token-file",
+                str(token_file),
+                "--apply-compose",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            helper_text = (output_dir / "compose" / "compose-up.sh").read_text(encoding="utf-8")
+            self.assertIn("compose -f docker-compose.yml pull", helper_text)
+
+            commands = Path(env["SC4SNMP_COMMAND_LOG"]).read_text(encoding="utf-8").splitlines()
+            self.assertEqual(
+                commands[:2],
+                [
+                    "docker compose -f docker-compose.yml pull",
+                    "docker compose -f docker-compose.yml up -d",
+                ],
+            )
+
+    def test_sc4snmp_apply_k8s_runs_helm_upgrade_install(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4snmp.token"
+            token_file.write_text("existing-token\n", encoding="utf-8")
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--render-k8s",
+                "--output-dir",
+                str(output_dir),
+                "--hec-token-file",
+                str(token_file),
+                "--apply-k8s",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            commands = Path(env["SC4SNMP_COMMAND_LOG"]).read_text(encoding="utf-8").splitlines()
+            self.assertEqual(
+                commands[:2],
+                [
+                    "helm repo add splunk-connect-for-snmp https://splunk.github.io/splunk-connect-for-snmp",
+                    "helm repo update",
+                ],
+            )
+            self.assertTrue(
+                any(
+                    "helm upgrade --install sc4snmp splunk-connect-for-snmp/splunk-connect-for-snmp --namespace sc4snmp --create-namespace -f values.yaml"
+                    in line
+                    for line in commands
+                ),
+                msg=f"Expected helm upgrade --install in command log, got: {commands}",
+            )
+
+    def test_sc4snmp_render_compose_without_token_file_creates_placeholder(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--render-compose",
+                "--output-dir",
+                str(output_dir),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            placeholder = output_dir / "compose" / "secrets" / "hec_token.example"
+            self.assertTrue(placeholder.exists(), msg="Expected placeholder token file")
+            self.assertIn("<replace-with-hec-token>", placeholder.read_text(encoding="utf-8"))
+
+    def test_sc4snmp_hec_token_yaml_special_characters_escaped(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "tricky.token"
+            token_file.write_text('ab"cd\\ef', encoding="utf-8")
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--render-k8s",
+                "--output-dir",
+                str(output_dir),
+                "--hec-token-file",
+                str(token_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            secret_yaml = (output_dir / "k8s" / "values.secret.yaml").read_text(encoding="utf-8")
+            self.assertIn('token: "ab\\"cd\\\\ef"', secret_yaml)
+
+    def test_sc4snmp_validate_unexpected_useack_value(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4snmp_env(tmp_path)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["indexes"]["em_logs"] = {"datatype": "event"}
+            state["indexes"]["netops"] = {"datatype": "event"}
+            state["indexes"]["em_metrics"] = {"datatype": "metric"}
+            state["indexes"]["netmetrics"] = {"datatype": "metric"}
+            state["hec_tokens"]["sc4snmp"] = {
+                "disabled": "false",
+                "useACK": "unexpected",
+                "indexes": "",
+                "index": "netops",
+                "token": "test-token",
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4snmp",
+                env=env,
+            )
+            output = result.stdout + result.stderr
+            self.assertIn("Could not determine HEC ACK state", output)
+            self.assertNotIn("unbound variable", output.lower())
+
+    def test_sc4snmp_render_k8s_without_trap_listener_ip_uses_nodeport(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--render-k8s",
+                "--output-dir",
+                str(output_dir),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            values_yaml = (output_dir / "k8s" / "values.yaml").read_text(encoding="utf-8")
+            self.assertIn("type: NodePort", values_yaml)
+            self.assertNotIn("loadBalancerIP", values_yaml)
+            self.assertIn("usemetallb: false", values_yaml)
 
     def test_secure_access_smoke_flow(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3109,6 +3809,8 @@ class ShellScriptRegressionTests(unittest.TestCase):
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
             bin_dir.mkdir()
+            home_dir = tmp_path / "home"
+            home_dir.mkdir()
             output_dir = tmp_path / "rendered"
             codex_log = tmp_path / "codex-log.json"
             marker_path = tmp_path / "client-name-marker"
@@ -3130,6 +3832,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
             env = os.environ.copy()
             env["PATH"] = f"{bin_dir}:{env['PATH']}"
             env["CODEX_LOG"] = str(codex_log)
+            env["HOME"] = str(home_dir)
 
             result = self.run_script(
                 "skills/splunk-mcp-server-setup/scripts/setup.sh",
@@ -3174,7 +3877,8 @@ class ShellScriptRegressionTests(unittest.TestCase):
             codex_args = json.loads(codex_log.read_text(encoding="utf-8"))
             self.assertEqual(codex_args[:3], ["mcp", "add", client_name])
             self.assertEqual(codex_args[3], "--")
-            self.assertEqual(codex_args[4], str(output_dir / "run-splunk-mcp.sh"))
+            self.assertTrue(codex_args[4].startswith(str(home_dir / ".codex" / "mcp-bridges")))
+            self.assertTrue(codex_args[4].endswith("/run-splunk-mcp.sh"))
 
     def test_splunk_mcp_rendered_env_file_is_shell_safe(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -4347,16 +5051,48 @@ class ShellScriptRegressionTests(unittest.TestCase):
     def test_mcp_setup_repeated_runs_update_codex_registration(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
             home_dir = tmp_path / "home"
             output_dir_one = tmp_path / "rendered-one"
             output_dir_two = tmp_path / "rendered-two"
             token_file = tmp_path / "splunk.token"
             home_dir.mkdir()
 
+            write_executable(
+                bin_dir / "codex",
+                """\
+                #!/usr/bin/env python3
+                import json, os, sys
+                store = os.path.join(os.environ.get("HOME", "/tmp"), ".codex-mock-store")
+                os.makedirs(store, exist_ok=True)
+                args = sys.argv[1:]
+                if len(args) >= 4 and args[0] == "mcp" and args[1] == "add":
+                    name = args[2]
+                    cmd = args[4] if len(args) > 4 else ""
+                    data = {"name": name, "transport": {"type": "stdio", "command": cmd, "args": []}}
+                    with open(os.path.join(store, name + ".json"), "w") as f:
+                        json.dump(data, f)
+                elif len(args) >= 3 and args[0] == "mcp" and args[1] == "get":
+                    name = args[2]
+                    path = os.path.join(store, name + ".json")
+                    if not os.path.exists(path):
+                        print(f"Error: server '{name}' not found", file=sys.stderr)
+                        sys.exit(1)
+                    with open(path) as f:
+                        data = json.load(f)
+                    print(json.dumps(data))
+                else:
+                    print(f"mock codex: unsupported args: {args}", file=sys.stderr)
+                    sys.exit(1)
+                """,
+            )
+
             token_file.write_text("encrypted-token-value", encoding="utf-8")
             token_file.chmod(0o600)
 
             env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
             env["HOME"] = str(home_dir)
 
             first = self.run_script(
@@ -4379,7 +5115,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 "skills/splunk-mcp-server-setup/scripts/setup.sh",
                 "--render-clients",
                 "--mcp-url",
-                "https://splunk.example.invalid:8089/services/mcp",
+                "https://splunk-two.example.invalid:8089/services/mcp",
                 "--bearer-token-file",
                 str(token_file),
                 "--output-dir",
@@ -4405,9 +5141,13 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertEqual(data["transport"]["type"], "stdio")
             self.assertEqual(
                 Path(data["transport"]["command"]).resolve(),
-                (output_dir_two / "run-splunk-mcp.sh").resolve(),
+                (home_dir / ".codex" / "mcp-bridges" / "splunk-repeat" / "run-splunk-mcp.sh").resolve(),
             )
             self.assertEqual(data["transport"]["args"], [])
+            stable_env = (home_dir / ".codex" / "mcp-bridges" / "splunk-repeat" / ".env.splunk-mcp").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("https://splunk-two.example.invalid:8089/services/mcp", stable_env)
 
     def test_repo_cursor_config_tracks_workspace_relative_rendered_bundle(self):
         config = json.loads((REPO_ROOT / ".cursor" / "mcp.json").read_text(encoding="utf-8"))

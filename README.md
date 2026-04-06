@@ -95,7 +95,8 @@ skill-specific details.
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
-| `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
+| `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render or apply Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
+| `splunk-connect-for-snmp-setup` | SC4SNMP external collector | Prepare Splunk HEC/indexes and render or apply Docker Compose or Helm assets for Splunk Connect for SNMP |
 
 ## Vendor Package Policy
 
@@ -152,8 +153,9 @@ warning-only placement checks during install, setup, and validation. If
 `SPLUNK_SEARCH_PROFILE` points at a paired target, use
 `SPLUNK_SEARCH_TARGET_ROLE` to declare that paired role explicitly. You can
 also use `SPLUNK_SEARCH_TARGET_ROLE` as a pairing hint when the companion
-runtime is outside the current Splunk management target, such as an SC4S
-external collector. Environment variables override the selected profile's role
+runtime is outside the current Splunk management target, such as an SC4S or
+SC4SNMP external collector. Environment variables override the selected
+profile's role
 metadata for the current run. In Cloud mode, warning-only checks stay anchored
 to the Cloud search tier unless you switch the run to the paired Enterprise
 target.
@@ -564,6 +566,7 @@ splunk-cloud-skills/
 │   ├── splunk-app-install/
 │   ├── splunk-enterprise-host-setup/
 │   ├── splunk-connect-for-syslog-setup/
+│   ├── splunk-connect-for-snmp-setup/
 │   ├── splunk-itsi-setup/
 │   ├── splunk-stream-setup/
 │   ├── cisco-appdynamics-setup/
@@ -630,3 +633,6 @@ case rather than a pure single-target install. `splunk-connect-for-syslog-setup`
 follows a similar principle for SC4S: the repo prepares Splunk and renders the
 collector runtime assets, but the SC4S syslog-ng container itself runs on
 customer-managed infrastructure rather than on the Cloud search tier.
+`splunk-connect-for-snmp-setup` follows the same external-collector model for
+SC4SNMP polling and traps. In both workflows, the rendered apply paths are
+rerunnable install-or-upgrade entrypoints for customer-managed runtimes.

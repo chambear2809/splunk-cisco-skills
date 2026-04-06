@@ -21,7 +21,7 @@ PATHVIS_INDEX="thousandeyes_pathvis"
 PATHVIS_INTERVAL="3600"
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco ThousandEyes App Setup Automation
 
 Usage: $(basename "$0") [OPTIONS]
@@ -42,7 +42,7 @@ Options:
 
 With no flags, runs full setup (HEC + indexes).
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -59,7 +59,7 @@ while [[ $# -gt 0 ]]; do
         --pathvis-interval) require_arg "$1" $# || exit 1; PATHVIS_INTERVAL="$2"; shift 2 ;;
         --no-pathvis) PATHVIS_ENABLED=false; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

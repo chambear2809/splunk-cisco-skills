@@ -18,7 +18,7 @@ warn() { log "  WARN: $*"; WARN=$((WARN + 1)); }
 info() { log "  INFO: $*"; }
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco Secure Access Validation
 
 Usage: $(basename "$0") [OPTIONS]
@@ -27,14 +27,14 @@ Options:
   --org-id ID                Validate one specific org account
   --help                     Show this help
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --org-id) require_arg "$1" $# || exit 1; ORG_ID="$2"; shift 2 ;;
         --help) usage ;;
-        *) log "Unknown option: $1"; usage ;;
+        *) log "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

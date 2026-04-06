@@ -44,6 +44,7 @@ external collectors, see
 | `splunk-stream-setup` wire-data add-on | 5234 | ACS or bundled with Stream deployment | No special post-install config in normal flow | Knowledge-object support for Stream search content. |
 | `splunk-stream-setup` forwarder add-on | 5238 | Manual install on HF/UF you control | Local HF files plus host forwarding config | This package runs on the heavy/universal forwarder, not the Cloud search tier. |
 | `splunk-connect-for-syslog-setup` | N/A | No Splunk Cloud app install; SC4S runtime is rendered for customer-managed hosts or Kubernetes | ACS for indexes/HEC where available, search-tier REST for validation, rendered host/Helm assets for runtime | External syslog-ng collector pattern. Modeled as a workflow row rather than a Splunk app package. |
+| `splunk-connect-for-snmp-setup` | N/A | No Splunk Cloud app install; SC4SNMP runtime is rendered for customer-managed Docker Compose or Kubernetes | ACS for indexes/HEC where available, search-tier REST for validation, rendered compose/Helm assets for runtime | External SNMP collector pattern. Modeled as a workflow row rather than a Splunk app package. |
 | `splunk-enterprise-host-setup` | N/A | Not a Splunk Cloud install path; bootstraps customer-managed Enterprise hosts only | Local or SSH-driven Linux host bootstrap for search-tier, indexer, and heavy-forwarder roles | Enterprise runtime bootstrap workflow for standalone or single-site clustered hosts. |
 
 ## Stream Heavy Forwarder Model
@@ -64,6 +65,16 @@ For Splunk Connect for Syslog on Splunk Cloud:
 - run the SC4S syslog-ng container on infrastructure you control
 - send SC4S output directly to Splunk Cloud HEC on `443`
 - keep SC4S runtime files, token material, and local archive/disk-buffer storage
+  on the customer-managed host or Kubernetes cluster
+
+## SC4SNMP External Collector Model
+
+For Splunk Connect for SNMP on Splunk Cloud:
+
+- create or validate indexes and HEC tokens against the Cloud stack
+- run the SC4SNMP poller and trap listener on infrastructure you control
+- send SC4SNMP output directly to Splunk Cloud HEC on `443`
+- keep SC4SNMP runtime files, token material, inventory, and local secret files
   on the customer-managed host or Kubernetes cluster
 
 ## Cloud Access Architecture

@@ -255,19 +255,16 @@ setup() {
 @test "cloud_create_index skips creation when index already exists" {
     source "${LIB_DIR}/acs_helpers.sh"
 
-    _create_called="false"
     acs_prepare_context() { return 0; }
     acs_command() {
         if [[ "$1" == "indexes" && "$2" == "describe" ]]; then
             return 0  # index exists
         fi
-        _create_called="true"
     }
     export -f acs_prepare_context acs_command
 
     run cloud_create_index "myindex" "90" "metric"
     [ "$status" -eq 0 ]
-    # Output should be empty since describe succeeded and create was not called
     [ -z "$output" ]
 }
 

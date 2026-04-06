@@ -173,7 +173,7 @@ bash skills/splunk-mcp-server-setup/scripts/setup.sh \
 The script writes the encrypted token to the target file with `0600`
 permissions. It does not print the token to stdout.
 
-If you disable `require_encrypted_token`, the app intentionally fail-closes
+If you disable `require_encrypted_token`, the app intentionally fails closed on
 `/mcp_token` minting and key rotation. Do not combine
 `--require-encrypted-token false` with `--write-token-file` or `--rotate-keys`
 in the same run.
@@ -198,11 +198,11 @@ The rendered bundle contains:
 - `run-splunk-mcp.sh` for the stdio-to-HTTP bridge
 - `.env.splunk-mcp.example`
 - `.env.splunk-mcp` when a token file is supplied
-- `register-codex-mcp.sh` for `codex mcp add ... -- ./run-splunk-mcp.sh`
+- `register-codex-mcp.sh` to sync a portable Codex launcher bundle under `~/.codex/mcp-bridges/`
 
 When `--render-clients` runs, the skill now also applies client setup by
 default:
-- registers `CLIENT_NAME` with Codex using the rendered wrapper
+- registers `CLIENT_NAME` with Codex using a stable home-local launcher copy so repo moves do not break startup
 - merges the Splunk MCP entry into `<cursor-workspace>/.cursor/mcp.json`
 - defaults the Cursor workspace target to the current working directory when
   `--cursor-workspace` is omitted

@@ -132,6 +132,29 @@ print(Path(sys.argv[1]).expanduser().resolve(), end="")
 PY
 }
 
+sanitize_path_component() {
+    python3 - "${1:-}" <<'PY'
+import re
+import sys
+
+value = (sys.argv[1] or "").strip() or "splunk-mcp"
+value = re.sub(r"[\\/]+", "-", value)
+value = re.sub(r"\s+", "-", value)
+value = re.sub(r"[^A-Za-z0-9._-]", "-", value)
+value = re.sub(r"-{2,}", "-", value).strip("-.") or "splunk-mcp"
+print(value, end="")
+PY
+}
+
+resolve_codex_bundle_dir() {
+    local client_name="$1"
+    local codex_home safe_name
+
+    codex_home="${CODEX_HOME:-${HOME}/.codex}"
+    safe_name="$(sanitize_path_component "${client_name}")"
+    printf '%s' "${codex_home}/mcp-bridges/${safe_name}"
+}
+
 path_is_within_dir() {
     python3 - "$1" "$2" <<'PY'
 from pathlib import Path
@@ -177,6 +200,14 @@ write_secret_file() {
     printf '%s' "${content}" > "${path}"
     chmod 600 "${path}"
     umask "${previous_umask}"
+}
+
+copy_file_with_mode() {
+    local source_path="$1" dest_path="$2" mode="$3"
+
+    ensure_parent_dir "${dest_path}"
+    cp "${source_path}" "${dest_path}"
+    chmod "${mode}" "${dest_path}"
 }
 
 derive_mcp_url() {
@@ -554,8 +585,37 @@ set -euo pipefail
 SCRIPT_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
 DEFAULT_SERVER_NAME=${default_server_name_quoted}
 SERVER_NAME="\${1:-\${DEFAULT_SERVER_NAME}}"
+CODEX_HOME_DIR="\${CODEX_HOME:-\${HOME}/.codex}"
+SAFE_SERVER_NAME="\$(
+python3 - "\${SERVER_NAME}" <<'PY'
+import re
+import sys
 
-exec codex mcp add "\${SERVER_NAME}" -- "\${SCRIPT_DIR}/run-splunk-mcp.sh"
+value = (sys.argv[1] or "").strip() or "splunk-mcp"
+value = re.sub(r"[\\\\/]+", "-", value)
+value = re.sub(r"\\s+", "-", value)
+value = re.sub(r"[^A-Za-z0-9._-]", "-", value)
+value = re.sub(r"-{2,}", "-", value).strip("-.") or "splunk-mcp"
+print(value, end="")
+PY
+)"
+CODEX_BUNDLE_DIR="\${CODEX_HOME_DIR}/mcp-bridges/\${SAFE_SERVER_NAME}"
+
+mkdir -p "\${CODEX_BUNDLE_DIR}"
+cp "\${SCRIPT_DIR}/run-splunk-mcp.sh" "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.sh"
+chmod 755 "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.sh"
+
+if [[ -f "\${SCRIPT_DIR}/.env.splunk-mcp" ]]; then
+  cp "\${SCRIPT_DIR}/.env.splunk-mcp" "\${CODEX_BUNDLE_DIR}/.env.splunk-mcp"
+  chmod 600 "\${CODEX_BUNDLE_DIR}/.env.splunk-mcp"
+fi
+
+if [[ -f "\${SCRIPT_DIR}/.env.splunk-mcp.example" ]]; then
+  cp "\${SCRIPT_DIR}/.env.splunk-mcp.example" "\${CODEX_BUNDLE_DIR}/.env.splunk-mcp.example"
+  chmod 644 "\${CODEX_BUNDLE_DIR}/.env.splunk-mcp.example"
+fi
+
+exec codex mcp add "\${SERVER_NAME}" -- "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.sh"
 EOF
 )"
 
@@ -593,7 +653,7 @@ EOF
     fi
 
     log "Rendered shared Cursor/Codex MCP bridge bundle at ${output_abs}."
-    log "Open that directory as a Cursor workspace, or run ${output_abs}/register-codex-mcp.sh to register it with Codex."
+    log "Open that directory as a Cursor workspace, or run ${output_abs}/register-codex-mcp.sh to sync a portable Codex bundle and register it."
 }
 
 ensure_command_available() {
@@ -688,11 +748,27 @@ PY
 register_codex_client() {
     local wrapper_abs="$1"
     local codex_output codex_rc
+    local codex_bundle_dir stable_wrapper stable_env stable_env_example source_dir
 
     ensure_command_available "codex" "Install the Codex CLI or rerun with --no-register-codex."
+    source_dir="$(dirname "${wrapper_abs}")"
+    codex_bundle_dir="$(resolve_codex_bundle_dir "${CLIENT_NAME}")"
+    stable_wrapper="${codex_bundle_dir}/run-splunk-mcp.sh"
+    stable_env="${codex_bundle_dir}/.env.splunk-mcp"
+    stable_env_example="${codex_bundle_dir}/.env.splunk-mcp.example"
+
+    mkdir -p "${codex_bundle_dir}"
+    copy_file_with_mode "${wrapper_abs}" "${stable_wrapper}" 755
+
+    if [[ -f "${source_dir}/.env.splunk-mcp" ]]; then
+        copy_file_with_mode "${source_dir}/.env.splunk-mcp" "${stable_env}" 600
+    fi
+    if [[ -f "${source_dir}/.env.splunk-mcp.example" ]]; then
+        copy_file_with_mode "${source_dir}/.env.splunk-mcp.example" "${stable_env_example}" 644
+    fi
 
     set +e
-    codex_output="$(codex mcp add "${CLIENT_NAME}" -- "${wrapper_abs}" 2>&1)"
+    codex_output="$(codex mcp add "${CLIENT_NAME}" -- "${stable_wrapper}" 2>&1)"
     codex_rc=$?
     set -e
 
@@ -702,7 +778,7 @@ register_codex_client() {
         exit 1
     fi
 
-    log "Registered Codex MCP server '${CLIENT_NAME}' using ${wrapper_abs}."
+    log "Registered Codex MCP server '${CLIENT_NAME}' using portable bundle ${stable_wrapper}."
 }
 
 write_cursor_workspace_config() {

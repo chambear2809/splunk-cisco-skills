@@ -14,7 +14,7 @@ INDEX=""
 INPUT_TYPE=""
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco DC Networking TA Setup Automation
 
 Usage: $(basename "$0") [OPTIONS]
@@ -30,7 +30,7 @@ Options:
 
 With no flags, runs full setup (indexes + macros).
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
         --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
         --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

@@ -123,9 +123,9 @@ bash skills/splunk-connect-for-syslog-setup/scripts/setup.sh \
   --hec-token-file /tmp/sc4s_hec_token
 ```
 
-The rendered compose directory is self-contained, so `--apply-host` can start it
-directly from `./sc4s-rendered/host/` without copying files into `/opt/sc4s`
-first.
+The rendered compose directory is self-contained, so `--apply-host` can install
+or upgrade it directly from `./sc4s-rendered/host/` without copying files into
+`/opt/sc4s` first.
 
 Systemd example:
 
@@ -137,6 +137,19 @@ bash skills/splunk-connect-for-syslog-setup/scripts/setup.sh \
   --output-dir ./sc4s-rendered \
   --sc4s-root /opt/sc4s \
   --hec-token-file /tmp/sc4s_hec_token
+```
+
+Systemd apply example:
+
+```bash
+bash skills/splunk-connect-for-syslog-setup/scripts/setup.sh \
+  --render-host \
+  --host-mode systemd \
+  --runtime podman \
+  --output-dir ./sc4s-rendered \
+  --sc4s-root /opt/sc4s \
+  --hec-token-file /tmp/sc4s_hec_token \
+  --apply-host
 ```
 
 Optional dedicated vendor port:
@@ -185,6 +198,19 @@ bash skills/splunk-connect-for-syslog-setup/scripts/setup.sh \
   --apply-host
 ```
 
+Systemd:
+
+```bash
+bash skills/splunk-connect-for-syslog-setup/scripts/setup.sh \
+  --render-host \
+  --host-mode systemd \
+  --runtime podman \
+  --output-dir ./sc4s-rendered \
+  --sc4s-root /opt/sc4s \
+  --hec-token-file /tmp/sc4s_hec_token \
+  --apply-host
+```
+
 Helm:
 
 ```bash
@@ -229,6 +255,9 @@ bash skills/splunk-connect-for-syslog-setup/scripts/validate.sh --check-k8s
 8. **`_metrics` must be a metrics index**: the setup flow now creates it as a
    metrics index and validation reports when an existing `_metrics` index was
    created with the wrong type.
+9. **Re-run apply workflows for upgrades**: compose apply now pulls images
+   before `up -d`, systemd apply syncs the rendered working set into
+   `SC4S_ROOT`, and Kubernetes apply continues to use `helm upgrade --install`.
 
 ## Additional Resources
 

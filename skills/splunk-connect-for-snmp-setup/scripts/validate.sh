@@ -4,36 +4,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
-DEFAULT_INDEXES=(
-    print
-    osnix
-    oswinsec
-    oswin
-    netipam
-    netproxy
-    netwaf
+EVENT_INDEXES=(
+    em_logs
     netops
-    netlb
-    netids
-    netfw
-    netdns
-    netdlp
-    netauth
-    infraops
-    gitops
-    fireeye
-    epintel
-    epav
-    email
 )
-OPTIONAL_METRICS_INDEX="_metrics"
+METRIC_INDEXES=(
+    em_metrics
+    netmetrics
+)
 
-CHECK_HOST=false
+CHECK_COMPOSE=false
 CHECK_K8S=false
-HEC_TOKEN_NAME="sc4s"
-RUNTIME=""
-NAMESPACE="sc4s"
-RELEASE_NAME="sc4s"
+HEC_TOKEN_NAME="sc4snmp"
+COMPOSE_RUNTIME=""
+NAMESPACE="sc4snmp"
+RELEASE_NAME="sc4snmp"
 
 PASS=0
 WARN=0
@@ -43,30 +28,30 @@ SK=""
 usage() {
     local exit_code="${1:-0}"
     cat <<EOF
-SC4S Validation
+SC4SNMP Validation
 
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
-  --check-host                 Validate the local SC4S container runtime
-  --check-k8s                  Validate the SC4S Helm release and pods
-  --hec-token-name NAME        HEC token name to inspect (default: sc4s)
-  --runtime docker|podman      Host runtime override for --check-host
-  --namespace NAME             Kubernetes namespace (default: sc4s)
-  --release-name NAME          Helm release name (default: sc4s)
+  --check-compose              Validate the local Docker Compose runtime
+  --check-k8s                  Validate the SC4SNMP Helm release and pods
+  --hec-token-name NAME        HEC token name to inspect (default: sc4snmp)
+  --compose-runtime NAME       Runtime override for --check-compose: docker|podman
+  --namespace NAME             Kubernetes namespace (default: sc4snmp)
+  --release-name NAME          Helm release name (default: sc4snmp)
   --help                       Show this help
 
-With no flags, validates the Splunk-side SC4S prerequisites and startup events.
+With no flags, validates the Splunk-side SC4SNMP prerequisites and data flow.
 EOF
     exit "${exit_code}"
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --check-host) CHECK_HOST=true; shift ;;
+        --check-compose) CHECK_COMPOSE=true; shift ;;
         --check-k8s) CHECK_K8S=true; shift ;;
         --hec-token-name) require_arg "$1" $# || exit 1; HEC_TOKEN_NAME="$2"; shift 2 ;;
-        --runtime) require_arg "$1" $# || exit 1; RUNTIME="$2"; shift 2 ;;
+        --compose-runtime) require_arg "$1" $# || exit 1; COMPOSE_RUNTIME="$2"; shift 2 ;;
         --namespace) require_arg "$1" $# || exit 1; NAMESPACE="$2"; shift 2 ;;
         --release-name) require_arg "$1" $# || exit 1; RELEASE_NAME="$2"; shift 2 ;;
         --help) usage 0 ;;
@@ -95,39 +80,39 @@ ensure_search_session() {
 }
 
 validate_indexes() {
-    local idx metrics_datatype
+    local idx datatype
     log "--- Indexes ---"
-    for idx in "${DEFAULT_INDEXES[@]}"; do
+    for idx in "${EVENT_INDEXES[@]}"; do
         if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
-            pass "Index '${idx}' exists"
+            datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || echo "")"
+            case "${datatype}" in
+                ""|event) pass "Index '${idx}' exists as an event index" ;;
+                *) fail "Index '${idx}' exists but has datatype '${datatype}', expected 'event'" ;;
+            esac
         else
             warn "Index '${idx}' not found"
         fi
     done
 
-    if platform_check_index "${SK}" "${SPLUNK_URI}" "${OPTIONAL_METRICS_INDEX}" 2>/dev/null; then
-        metrics_datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${OPTIONAL_METRICS_INDEX}" 2>/dev/null || echo "")"
-        case "${metrics_datatype}" in
-            metric)
-                pass "Optional metrics index '${OPTIONAL_METRICS_INDEX}' exists and is a metrics index"
-                ;;
-            event)
-                fail "Optional metrics index '${OPTIONAL_METRICS_INDEX}' exists but is an event index"
-                ;;
-            "")
-                warn "Optional metrics index '${OPTIONAL_METRICS_INDEX}' exists but its datatype could not be determined"
-                ;;
-            *)
-                fail "Optional metrics index '${OPTIONAL_METRICS_INDEX}' exists with unexpected datatype '${metrics_datatype}'"
-                ;;
-        esac
-    else
-        warn "Optional metrics index '${OPTIONAL_METRICS_INDEX}' not found"
-    fi
+    for idx in "${METRIC_INDEXES[@]}"; do
+        if platform_check_index "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null; then
+            datatype="$(platform_get_index_datatype "${SK}" "${SPLUNK_URI}" "${idx}" 2>/dev/null || echo "")"
+            case "${datatype}" in
+                metric) pass "Index '${idx}' exists as a metrics index" ;;
+                event) fail "Index '${idx}' exists but is an event index" ;;
+                *) fail "Index '${idx}' exists but has datatype '${datatype}', expected 'metric'" ;;
+            esac
+        else
+            warn "Index '${idx}' not found"
+        fi
+    done
     log ""
 }
 
 validate_hec_token() {
+    # On Splunk Cloud, HEC tokens created via ACS may not be visible through
+    # the management REST API used here; results may report "unknown" even
+    # when the token exists and is functional.
     local token_state token_record ack_state restricted_indexes default_index
     log "--- HEC Token ---"
     token_state="$(rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
@@ -145,7 +130,7 @@ validate_hec_token() {
 
     case "${ack_state}" in
         1|true|True)
-            fail "HEC token '${HEC_TOKEN_NAME}' has acknowledgement enabled"
+            warn "HEC token '${HEC_TOKEN_NAME}' has acknowledgement enabled"
             ;;
         0|false|False)
             pass "HEC token '${HEC_TOKEN_NAME}' does not use HEC ACK"
@@ -164,21 +149,28 @@ validate_hec_token() {
     log ""
 }
 
-validate_startup_events() {
-    local startup_count
-    log "--- SC4S Startup Events ---"
-    startup_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" 'search index=* sourcetype=sc4s:events "starting up" | stats count as count' "count" 2>/dev/null || echo "0")"
-    if [[ "${startup_count}" =~ ^[0-9]+$ ]] && (( startup_count > 0 )); then
-        pass "Splunk contains ${startup_count} SC4S startup event(s)"
+validate_sc4snmp_data() {
+    local data_count metric_count
+    log "--- SC4SNMP Data ---"
+    data_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" 'search index=em_logs OR index=netops | stats count as count' "count" 2>/dev/null || echo "0")"
+    if [[ "${data_count}" =~ ^[0-9]+$ ]] && (( data_count > 0 )); then
+        pass "Splunk contains ${data_count} SC4SNMP event(s)"
     else
-        warn "No SC4S startup events were found in Splunk yet"
+        warn "No SC4SNMP event data found in Splunk yet (indexes: em_logs, netops)"
+    fi
+
+    metric_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" '| mcatalog values(_dims) WHERE index=em_metrics OR index=netmetrics | stats count as count' "count" 2>/dev/null || echo "0")"
+    if [[ "${metric_count}" =~ ^[0-9]+$ ]] && (( metric_count > 0 )); then
+        pass "Splunk contains metric dimensions across em_metrics/netmetrics"
+    else
+        warn "No SC4SNMP metric data found in Splunk yet (indexes: em_metrics, netmetrics)"
     fi
     log ""
 }
 
 resolve_runtime() {
-    if [[ -n "${RUNTIME}" ]]; then
-        printf '%s' "${RUNTIME}"
+    if [[ -n "${COMPOSE_RUNTIME}" ]]; then
+        printf '%s' "${COMPOSE_RUNTIME}"
         return 0
     fi
     if command_exists docker; then
@@ -192,20 +184,20 @@ resolve_runtime() {
     printf '%s' ""
 }
 
-validate_host_runtime() {
-    local runtime_name container_json running health log_output
-    runtime_name="$(resolve_runtime)"
-    log "--- Host Runtime ---"
+validate_compose_runtime() {
+    local runtime_name container_json running
+    log "--- Compose Runtime ---"
 
+    runtime_name="$(resolve_runtime)"
     if [[ -z "${runtime_name}" ]]; then
-        fail "No supported container runtime found for --check-host"
+        fail "No supported container runtime found for --check-compose"
         log ""
         return 0
     fi
 
-    container_json="$(${runtime_name} inspect SC4S 2>/dev/null || true)"
+    container_json="$(${runtime_name} inspect SC4SNMP-worker-poller 2>/dev/null || true)"
     if [[ -z "${container_json}" ]]; then
-        fail "SC4S container 'SC4S' not found in ${runtime_name}"
+        fail "SC4SNMP compose container 'SC4SNMP-worker-poller' not found in ${runtime_name}"
         log ""
         return 0
     fi
@@ -221,41 +213,12 @@ try:
 except Exception:
     print('unknown', end='')
 " 2>/dev/null)"
-    health="$(printf '%s' "${container_json}" | python3 -c "
-import json
-import sys
-try:
-    data = json.load(sys.stdin)
-    item = data[0] if isinstance(data, list) and data else {}
-    state = item.get('State', {}) or {}
-    health = state.get('Health', {}) or {}
-    print(health.get('Status', 'none'), end='')
-except Exception:
-    print('unknown', end='')
-" 2>/dev/null)"
 
     if [[ "${running}" == "true" ]]; then
-        pass "Container 'SC4S' is running in ${runtime_name}"
+        pass "Container 'SC4SNMP-worker-poller' is running in ${runtime_name}"
     else
-        fail "Container 'SC4S' is not running in ${runtime_name}"
+        fail "Container 'SC4SNMP-worker-poller' is not running in ${runtime_name}"
     fi
-
-    case "${health}" in
-        healthy) pass "Container health check reports healthy" ;;
-        unhealthy) fail "Container health check reports unhealthy" ;;
-        none|unknown) warn "Container health status is ${health}" ;;
-        *) warn "Container health status is ${health}" ;;
-    esac
-
-    log_output="$(${runtime_name} logs --tail 200 SC4S 2>&1 || true)"
-    case "${log_output}" in
-        *"starting syslog-ng"*|*"SC4S_ENV_CHECK_HEC"*)
-            pass "Container logs show SC4S startup markers"
-            ;;
-        *)
-            warn "Container logs do not show the expected SC4S startup markers"
-            ;;
-    esac
     log ""
 }
 
@@ -305,20 +268,20 @@ except Exception:
     fi
 
     if [[ "${pod_summary%% *}" =~ ^[0-9]+$ ]] && (( ${pod_summary%% *} > 0 )); then
-        pass "Found ${pod_summary%% *} SC4S pod(s) in namespace '${NAMESPACE}'"
+        pass "Found ${pod_summary%% *} SC4SNMP pod(s) in namespace '${NAMESPACE}'"
     else
-        fail "No SC4S pods found in namespace '${NAMESPACE}'"
+        fail "No SC4SNMP pods found in namespace '${NAMESPACE}'"
     fi
 
     if [[ "${pod_summary##* }" =~ ^[0-9]+$ ]] && (( ${pod_summary##* } > 0 )); then
-        pass "${pod_summary##* } SC4S pod(s) report Ready"
+        pass "${pod_summary##* } SC4SNMP pod(s) report Ready"
     else
-        warn "No SC4S pods report Ready yet"
+        warn "No SC4SNMP pods report Ready yet"
     fi
     log ""
 }
 
-log "=== SC4S Validation ==="
+log "=== SC4SNMP Validation ==="
 log ""
 warn_if_current_skill_role_unsupported
 log "--- Splunk Authentication ---"
@@ -333,10 +296,10 @@ log ""
 
 validate_indexes
 validate_hec_token
-validate_startup_events
+validate_sc4snmp_data
 
-if [[ "${CHECK_HOST}" == "true" ]]; then
-    validate_host_runtime
+if [[ "${CHECK_COMPOSE}" == "true" ]]; then
+    validate_compose_runtime
 fi
 
 if [[ "${CHECK_K8S}" == "true" ]]; then

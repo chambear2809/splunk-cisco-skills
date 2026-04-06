@@ -12,7 +12,7 @@
     "indexer": "Indexing tier where index-time parsing or indexer-side knowledge objects belong.",
     "heavy-forwarder": "Customer-managed full Splunk Enterprise instance used for data collection, parsing, or forwarding.",
     "universal-forwarder": "Lightweight forwarder tier used where the package or workflow is explicitly forwarder-safe.",
-    "external-collector": "Non-Splunk runtime such as SC4S, containers, or Kubernetes workloads that send data into Splunk."
+    "external-collector": "Non-Splunk runtime such as SC4S, SC4SNMP, containers, or Kubernetes workloads that send data into Splunk."
   },
   "documentation": {
     "cloud_matrix_rows": [
@@ -154,6 +154,15 @@
         "cloud_install_path": "No Splunk Cloud app install; SC4S runtime is rendered for customer-managed hosts or Kubernetes",
         "cloud_config_path": "ACS for indexes/HEC where available, search-tier REST for validation, rendered host/Helm assets for runtime",
         "notes": "External syslog-ng collector pattern. Modeled as a workflow row rather than a Splunk app package."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-connect-for-snmp-setup",
+        "label": "`splunk-connect-for-snmp-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; SC4SNMP runtime is rendered for customer-managed Docker Compose or Kubernetes",
+        "cloud_config_path": "ACS for indexes/HEC where available, search-tier REST for validation, rendered compose/Helm assets for runtime",
+        "notes": "External SNMP collector pattern. Modeled as a workflow row rather than a Splunk app package."
       },
       {
         "kind": "workflow",
@@ -327,6 +336,20 @@
         "external-collector"
       ],
       "notes": "External collector workflow that prepares Splunk-side objects and renders SC4S runtime assets."
+    },
+    {
+      "skill": "splunk-connect-for-snmp-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets."
     },
     {
       "skill": "splunk-enterprise-host-setup",

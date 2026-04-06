@@ -175,6 +175,18 @@ teardown() {
     [[ "$output" =~ "SC4S Validation" ]]
 }
 
+@test "sc4snmp setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-snmp-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SC4SNMP Setup Automation" ]]
+}
+
+@test "sc4snmp validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-snmp-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SC4SNMP Validation" ]]
+}
+
 @test "enterprise host setup --help exits 0" {
     run bash "${PROJECT_ROOT}/skills/splunk-enterprise-host-setup/scripts/setup.sh" --help
     [ "$status" -eq 0 ]
@@ -199,6 +211,29 @@ teardown() {
       --vendor-port checkpoint:ietf_udp:9000
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Invalid value 'ietf_udp'" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "sc4snmp setup rejects invalid hec tls verify" {
+    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-snmp-setup/scripts/setup.sh" \
+      --render-compose \
+      --hec-tls-verify maybe
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Expected yes or no" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "sc4snmp setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-snmp-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "sc4snmp validate rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-snmp-setup/scripts/validate.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
     [[ ! "$output" =~ "unbound variable" ]]
 }
 
@@ -228,4 +263,90 @@ teardown() {
     [ "$status" -eq 1 ]
     [[ "$output" =~ "must be true or false" ]]
     [[ ! "$output" =~ "unbound variable" ]]
+}
+
+# --- unknown-flag rejection for Cisco TA and platform setup scripts ---
+
+@test "catalyst-ta setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-catalyst-ta-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "meraki-ta setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-meraki-ta-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "dc-networking setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-dc-networking-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "intersight setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-intersight-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "thousandeyes setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-thousandeyes-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "appdynamics setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-appdynamics-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "secure-access setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-secure-access-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "security-cloud setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-security-cloud-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "enhanced-netflow setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-catalyst-enhanced-netflow-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "enterprise-networking setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-enterprise-networking-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "stream setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-stream-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "product-setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-product-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "secure-access validate rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-secure-access-setup/scripts/validate.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "security-cloud validate rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-security-cloud-setup/scripts/validate.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
 }

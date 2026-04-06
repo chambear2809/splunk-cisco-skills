@@ -24,7 +24,7 @@ NETFLOW_DECODER="netflow"
 STREAM_SETUP_ROLE=""
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Splunk Stream Setup Automation
 
 Usage: $(basename "$0") [OPTIONS]
@@ -53,7 +53,7 @@ Environment:
 Splunk credentials are read from the project-root credentials file automatically.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -69,7 +69,7 @@ while [[ $# -gt 0 ]]; do
         --netflow-port) require_arg "$1" $# || exit 1; NETFLOW_PORT="$2"; shift 2 ;;
         --netflow-decoder) require_arg "$1" $# || exit 1; NETFLOW_DECODER="$2"; shift 2 ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

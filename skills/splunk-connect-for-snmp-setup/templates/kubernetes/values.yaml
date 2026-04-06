@@ -1,0 +1,49 @@
+image:
+  repository: {{SC4SNMP_IMAGE_REPOSITORY}}
+  tag: "{{SC4SNMP_IMAGE_TAG}}"
+
+UI:
+  enable: false
+
+splunk:
+  enabled: true
+  protocol: "{{SPLUNK_HEC_PROTOCOL}}"
+  host: "{{SPLUNK_HEC_HOST}}"
+  port: "{{SPLUNK_HEC_PORT}}"
+  insecureSSL: "{{SPLUNK_HEC_INSECURESSL}}"
+  eventIndex: "netops"
+  metricsIndex: "netmetrics"
+  sourcetypeTraps: "sc4snmp:traps"
+  sourcetypePollingEvents: "sc4snmp:event"
+  sourcetypePollingMetrics: "sc4snmp:metric"
+
+scheduler:
+  logLevel: "INFO"
+{{SCHEDULER_BLOCK}}
+poller:
+  logLevel: "INFO"
+  inventory: |
+{{INVENTORY_BLOCK}}
+
+worker:
+  poller:
+    replicaCount: {{POLLER_REPLICAS}}
+  sender:
+    replicaCount: {{SENDER_REPLICAS}}
+  trap:
+    replicaCount: {{TRAP_REPLICAS}}
+
+traps:
+  replicaCount: {{TRAP_REPLICAS}}
+{{TRAPS_BLOCK}}
+  service:
+    type: {{TRAP_SERVICE_TYPE}}
+    port: {{TRAPS_PORT}}
+{{LOAD_BALANCER_IP_LINE}}    usemetallb: false
+
+inventory:
+  secret:
+    create: true
+
+global:
+  dnsServer: "{{DNS_SERVER}}"

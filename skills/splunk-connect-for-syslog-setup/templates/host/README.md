@@ -15,8 +15,9 @@ The render script replaces placeholders such as:
 - `{{SC4S_ROOT}}`
 - `{{SC4S_IMAGE}}`
 - `{{SC4S_PERSIST_VOLUME}}`
-- `{{SC4S_ENV_FILE}}`
+- `{{RUNTIME_BIN}}`
 - `{{PORTS_BLOCK}}`
+- `{{HEC_BASE_URL}}`, `{{HEC_TOKEN}}`
 
 ## Notes
 
@@ -25,7 +26,10 @@ The render script replaces placeholders such as:
   a HEC token file is supplied.
 - Compose mode publishes syslog listener ports directly and uses relative paths
   (`./env_file`, `./local`, `./archive`, `./tls`) so the rendered directory can
-  be started in place.
+  be installed or upgraded in place.
+- `compose-up.sh` pulls images before running `compose up -d`.
+- `systemd-install.sh` syncs rendered files into `SC4S_ROOT`, preserves
+  unrelated files already present there, and then reloads and restarts `sc4s`.
 - The default repo-local render path is `./sc4s-rendered/`, which is gitignored.
   When a real HEC token is being rendered, custom output directories inside the
   repo are blocked to reduce accidental secret commits.

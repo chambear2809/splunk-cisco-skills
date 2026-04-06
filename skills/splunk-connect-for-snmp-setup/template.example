@@ -1,0 +1,56 @@
+# Splunk Connect for SNMP (SC4SNMP) intake template
+#
+# Copy to template.local and fill in non-secret values before running the skill.
+# Keep secrets such as HEC tokens and SNMPv3 auth/priv keys in local-only files.
+
+# Splunk target
+# SPLUNK_PLATFORM=enterprise
+# SPLUNK_CLOUD_STACK=
+# SPLUNK_SEARCH_API_URI=https://splunk.example.com:8089
+
+# Deployment model
+# DEPLOYMENT=compose
+# DEPLOYMENT=k8s
+
+# HEC settings
+# HEC_URL=https://http-inputs-example.splunkcloud.com:443
+# HEC_TOKEN_NAME=sc4snmp
+# HEC_TLS_VERIFY=yes
+
+# Runtime
+# SC4SNMP_IMAGE=ghcr.io/splunk/splunk-connect-for-snmp/container:latest
+
+# Docker Compose settings
+# COMPOSE_RUNTIME=docker
+
+# Kubernetes settings
+# NAMESPACE=sc4snmp
+# RELEASE_NAME=sc4snmp
+# POLLER_REPLICAS=2
+# SENDER_REPLICAS=1
+# TRAP_REPLICAS=2
+
+# Network settings
+# DNS_SERVER=10.10.10.53
+# TRAP_LISTENER_IP=10.10.10.50
+# TRAP_PORT=162
+
+# Optional config file inputs
+# INVENTORY_FILE=/path/to/inventory.csv
+# SCHEDULER_FILE=/path/to/scheduler-config.yaml
+# TRAPS_FILE=/path/to/traps-config.yaml
+
+# Local-only secret inputs
+# HEC_TOKEN_FILE=/tmp/sc4snmp_hec_token
+# SNMPV3_SECRETS_FILE=/tmp/sc4snmp_secrets.json
+
+# Splunk indexes managed by this skill
+# - em_logs (event)
+# - em_metrics (metric)
+# - netops (event)
+# - netmetrics (metric)
+
+# Notes
+# - Create or validate the indexes before sending production traffic.
+# - Plan a shared trap listener IP for HA Kubernetes deployments.
+# - Ensure the chosen DNS server can resolve the HEC endpoint.

@@ -641,6 +641,65 @@ except Exception:
 " "${token_name}" 2>/dev/null || echo "unknown"
 }
 
+rest_get_hec_token_record() {
+    local sk="$1" uri="$2" token_name="$3"
+    splunk_curl "${sk}" \
+        "${uri}/services/data/inputs/http?output_mode=json&count=0" \
+        2>/dev/null \
+        | python3 -c "
+import json
+import sys
+
+target = sys.argv[1]
+aliases = {target, f'http://{target}'}
+try:
+    data = json.load(sys.stdin)
+    for entry in data.get('entry', []):
+        name = entry.get('name', '')
+        if name not in aliases:
+            continue
+        content = entry.get('content', {}) or {}
+        indexes = content.get('indexes', '')
+        if isinstance(indexes, list):
+            indexes = ','.join(str(item) for item in indexes)
+        record = {
+            'name': name,
+            'disabled': str(content.get('disabled', '')),
+            'useACK': str(content.get('useACK', content.get('useAck', ''))),
+            'indexes': str(indexes),
+            'default_index': str(content.get('index', '')),
+            'token': str(content.get('token', '')),
+        }
+        print(json.dumps(record), end='')
+        raise SystemExit(0)
+except Exception:
+    pass
+
+print('{}', end='')
+" "${token_name}" 2>/dev/null
+}
+
+rest_json_field() {
+    local json_text="$1" field="$2"
+    printf '%s' "${json_text}" | python3 -c "
+import json
+import sys
+
+field = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+    value = data.get(field, '')
+    if value is None:
+        print('', end='')
+    elif isinstance(value, bool):
+        print('true' if value else 'false', end='')
+    else:
+        print(str(value), end='')
+except Exception:
+    print('', end='')
+" "${field}" 2>/dev/null
+}
+
 rest_list_ta_stanzas() {
     local sk="$1" uri="$2" app="$3" handler="$4"
     splunk_curl "${sk}" \

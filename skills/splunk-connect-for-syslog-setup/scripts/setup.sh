@@ -79,8 +79,8 @@ Modes:
   --hec-only                     With --splunk-prep, manage HEC token only
   --render-host                  Render host deployment assets
   --render-k8s                   Render Kubernetes/Helm assets
-  --apply-host                   After --render-host, start compose deployment
-  --apply-k8s                    After --render-k8s, run helm upgrade --install
+  --apply-host                   After --render-host, install or upgrade the host deployment
+  --apply-k8s                    After --render-k8s, install or upgrade with helm
 
 Common options:
   --output-dir PATH              Render output directory (default: repo-root ./sc4s-rendered)
@@ -489,63 +489,6 @@ detect_hec_base_url() {
     printf 'https://%s:8088' "${host}"
 }
 
-rest_get_hec_token_record() {
-    local sk="$1" uri="$2" token_name="$3"
-    splunk_curl "${sk}" \
-        "${uri}/services/data/inputs/http?output_mode=json&count=0" \
-        2>/dev/null \
-        | python3 -c "
-import json
-import sys
-
-target = sys.argv[1]
-aliases = {target, f'http://{target}'}
-try:
-    data = json.load(sys.stdin)
-    for entry in data.get('entry', []):
-        name = entry.get('name', '')
-        if name not in aliases:
-            continue
-        content = entry.get('content', {}) or {}
-        indexes = content.get('indexes', '')
-        if isinstance(indexes, list):
-            indexes = ','.join(str(item) for item in indexes)
-        record = {
-            'name': name,
-            'disabled': str(content.get('disabled', '')),
-            'useACK': str(content.get('useACK', content.get('useAck', ''))),
-            'indexes': str(indexes),
-            'default_index': str(content.get('index', '')),
-            'token': str(content.get('token', '')),
-        }
-        print(json.dumps(record), end='')
-        raise SystemExit(0)
-except Exception:
-    pass
-
-print('{}', end='')
-" "${token_name}" 2>/dev/null
-}
-
-json_field() {
-    local json_text="$1" field="$2"
-    printf '%s' "${json_text}" | python3 -c "
-import json
-import sys
-
-field = sys.argv[1]
-try:
-    data = json.load(sys.stdin)
-    value = data.get(field, '')
-    if isinstance(value, bool):
-        print('true' if value else 'false', end='')
-    else:
-        print(str(value), end='')
-except Exception:
-    print('', end='')
-" "${field}" 2>/dev/null
-}
-
 rest_create_hec_token() {
     local token_name="$1" body resp http_code
     body=$(form_urlencode_pairs \
@@ -621,7 +564,7 @@ cloud_create_hec_token_via_acs() {
     local token_name="$1" cmd_group
     cmd_group="$(acs_hec_command_group)"
     if [[ "${cmd_group}" == "hec-token" ]]; then
-        acs_command hec-token create --name "${token_name}" --default-index "main" >/dev/null 2>&1
+        acs_command hec-token create --name "${token_name}" --default-index "main" --disabled=false >/dev/null 2>&1
     else
         acs_command http-event-collectors create \
             --name "${token_name}" \
@@ -664,7 +607,7 @@ write_hec_token_file_if_requested() {
     fi
 
     token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
-    token_value="$(json_field "${token_record}" "token")"
+    token_value="$(rest_json_field "${token_record}" "token")"
     if [[ -z "${token_value}" ]]; then
         log "WARN: Splunk did not return a clear HEC token value for '${token_name}'. Write the token to a local file manually."
         return 0
@@ -684,9 +627,9 @@ warn_about_hec_token_details() {
     fi
 
     token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
-    ack_state="$(json_field "${token_record}" "useACK")"
-    indexes_value="$(json_field "${token_record}" "indexes")"
-    default_index="$(json_field "${token_record}" "default_index")"
+    ack_state="$(rest_json_field "${token_record}" "useACK")"
+    indexes_value="$(rest_json_field "${token_record}" "indexes")"
+    default_index="$(rest_json_field "${token_record}" "default_index")"
 
     case "${ack_state}" in
         1|true|True)
@@ -973,11 +916,11 @@ This directory contains rendered SC4S host assets.
 
 ## Next steps
 
-1. For compose mode, the rendered host directory is self-contained and can be started in place with the helper script.
-2. For systemd mode, copy the rendered files to the target host path under \`${SC4S_ROOT}\`.
+1. For compose mode, the rendered host directory is self-contained and can be installed or upgraded in place with the helper script.
+2. For systemd mode, run \`systemd-install.sh\` or \`--apply-host\` to sync the rendered files into \`${SC4S_ROOT}\` and restart SC4S.
 3. Ensure the target host has the required directories and enough storage for the syslog-ng persistent volume.
 4. Review the rendered env file and confirm the HEC token, TLS, archive, and vendor listener settings.
-5. Start SC4S with the provided helper scripts or your standard deployment process.
+5. Re-run the same apply workflow whenever you need to roll out config or image updates.
 
 ## Notes
 
@@ -993,6 +936,7 @@ render_compose_helpers() {
 #!/usr/bin/env bash
 set -euo pipefail
 cd "\$(dirname "\${BASH_SOURCE[0]}")"
+${runtime_name} compose -f docker-compose.yml pull
 ${runtime_name} compose -f docker-compose.yml up -d
 EOF
     cat > "${host_dir}/compose-down.sh" <<EOF
@@ -1007,14 +951,46 @@ EOF
 
 render_systemd_helper() {
     local host_dir="$1"
-    cat > "${host_dir}/systemd-install.sh" <<'EOF'
+    cat > "${host_dir}/systemd-install.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
-sudo install -m 0644 sc4s.service /etc/systemd/system/sc4s.service
-sudo systemctl daemon-reload
-sudo systemctl enable sc4s
-sudo systemctl restart sc4s
+cd "\$(dirname "\${BASH_SOURCE[0]}")"
+target_root="${SC4S_ROOT}"
+unit_dir="\${SC4S_SYSTEMD_UNIT_DIR:-/etc/systemd/system}"
+use_sudo="\${SC4S_SYSTEMD_USE_SUDO:-auto}"
+systemctl_bin="\${SC4S_SYSTEMCTL_BIN:-systemctl}"
+
+run_root() {
+    if [[ "\${use_sudo}" == "never" || "\${EUID}" -eq 0 ]]; then
+        "\$@"
+    else
+        sudo "\$@"
+    fi
+}
+
+sync_dir() {
+    local src="\$1" dest="\$2"
+    [[ -d "\${src}" ]] || return 0
+    run_root install -d -m 0755 "\${dest}"
+    run_root cp -R "\${src}/." "\${dest}/"
+}
+
+run_root install -d -m 0755 \
+    "\${target_root}" \
+    "\${target_root}/local" \
+    "\${target_root}/local/context" \
+    "\${target_root}/local/config" \
+    "\${target_root}/archive" \
+    "\${target_root}/tls" \
+    "\${unit_dir}"
+run_root install -m 0600 env_file "\${target_root}/env_file"
+sync_dir local "\${target_root}/local"
+sync_dir archive "\${target_root}/archive"
+sync_dir tls "\${target_root}/tls"
+run_root install -m 0644 sc4s.service "\${unit_dir}/sc4s.service"
+run_root "\${systemctl_bin}" daemon-reload
+run_root "\${systemctl_bin}" enable sc4s
+run_root "\${systemctl_bin}" restart sc4s
 EOF
     make_executable "${host_dir}/systemd-install.sh"
 }
@@ -1156,7 +1132,7 @@ This directory contains rendered SC4S Helm assets.
 
 1. Review \`values.yaml\` and confirm the replica count, TLS setting, vendor ports, and embedded context/config blocks.
 2. Keep \`values.secret.yaml\` local-only if it contains a HEC token.
-3. Run \`helm-install.sh\` or apply the files through your standard deployment workflow.
+3. Run \`helm-install.sh\` to install or upgrade the release, or apply the files through your standard deployment workflow.
 4. Validate pod readiness and SC4S startup events after deployment.
 EOF
 }
@@ -1167,7 +1143,9 @@ render_helm_helper() {
 #!/usr/bin/env bash
 set -euo pipefail
 cd "\$(dirname "\${BASH_SOURCE[0]}")"
-helm repo add splunk-connect-for-syslog https://splunk.github.io/splunk-connect-for-syslog >/dev/null 2>&1 || true
+if ! helm repo add splunk-connect-for-syslog https://splunk.github.io/splunk-connect-for-syslog 2>/dev/null; then
+  echo "WARN: helm repo add returned non-zero (repo may already exist); continuing." >&2
+fi
 helm repo update
 cmd=(helm upgrade --install "${RELEASE_NAME}" splunk-connect-for-syslog/splunk-connect-for-syslog --namespace "${NAMESPACE}" --create-namespace -f values.yaml)
 if [[ -f values.secret.yaml ]]; then
@@ -1207,6 +1185,10 @@ render_k8s_assets() {
         config_block=""
     fi
 
+    if [[ -z "${existing_cert_block}${vendor_block}${context_block}${config_block}" ]]; then
+        existing_cert_block="  {}"$'\n'
+    fi
+
     export TPL_REPLICA_COUNT="${REPLICA_COUNT}"
     export TPL_HEC_EVENT_URL="${hec_event_url}"
     export TPL_HEC_VERIFY_TLS="${HEC_TLS_VERIFY}"
@@ -1214,16 +1196,24 @@ render_k8s_assets() {
     export TPL_VENDOR_PRODUCT_BLOCK="${vendor_block}"
     export TPL_CONTEXT_FILES_BLOCK="${context_block}"
     export TPL_CONFIG_FILES_BLOCK="${config_block}"
+    export TPL_NAMESPACE="${NAMESPACE}"
     render_template_to_file "${template_dir}/values.yaml" "${k8s_dir}/values.yaml"
     render_template_to_file "${template_dir}/namespace.yaml" "${k8s_dir}/namespace.yaml"
     cp "${template_dir}/README.md" "${k8s_dir}/README.template.md"
 
     if [[ -n "${HEC_TOKEN_FILE}" ]]; then
         assert_secret_output_dir_is_safe "${k8s_dir}"
-        token_value="$(read_secret_file "${HEC_TOKEN_FILE}")"
+        local _raw_token _escaped_token
+        _raw_token="$(read_secret_file "${HEC_TOKEN_FILE}")"
+        _escaped_token="$(printf '%s' "${_raw_token}" | python3 -c '
+import sys
+v = sys.stdin.read()
+v = v.replace("\\", "\\\\").replace("\"", "\\\"")
+print(v, end="")
+')"
         write_secret_file "${k8s_dir}/values.secret.yaml" "$(cat <<EOF
 splunk:
-  hec_token: "${token_value}"
+  hec_token: "${_escaped_token}"
 EOF
 )"
     else
@@ -1259,17 +1249,23 @@ run_compose_command() {
 
 apply_host_assets() {
     local host_dir="${OUTPUT_DIR}/host"
-    if [[ "${HOST_MODE}" != "compose" ]]; then
-        log "WARN: Automatic apply is only supported for compose mode."
-        log "WARN: Use ${host_dir}/systemd-install.sh for systemd deployment."
+    if [[ "${HOST_MODE}" == "compose" ]]; then
+        if [[ ! -f "${host_dir}/docker-compose.yml" ]]; then
+            log "ERROR: Missing rendered compose file at ${host_dir}/docker-compose.yml"
+            exit 1
+        fi
+        run_compose_command "${host_dir}" pull
+        run_compose_command "${host_dir}" up -d
+        log "Applied SC4S compose deployment from ${host_dir}"
         return 0
     fi
-    if [[ ! -f "${host_dir}/docker-compose.yml" ]]; then
-        log "ERROR: Missing rendered compose file at ${host_dir}/docker-compose.yml"
+
+    if [[ ! -x "${host_dir}/systemd-install.sh" ]]; then
+        log "ERROR: Missing rendered systemd helper at ${host_dir}/systemd-install.sh"
         exit 1
     fi
-    run_compose_command "${host_dir}" up -d
-    log "Started SC4S compose deployment from ${host_dir}"
+    (cd "${host_dir}" && ./systemd-install.sh)
+    log "Applied SC4S systemd deployment from ${host_dir}"
 }
 
 apply_k8s_assets() {

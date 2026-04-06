@@ -20,7 +20,7 @@ readonly SAVED_SEARCHES=(
 )
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco Enterprise Networking App Setup
 
 Usage: $(basename "$0") [OPTIONS]
@@ -33,7 +33,7 @@ Options:
 
 With no flags, runs full setup (macros + saved search enablement).
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -42,7 +42,7 @@ while [[ $# -gt 0 ]]; do
         --accelerate) ACCELERATE=true; shift ;;
         --custom-indexes) require_arg "$1" $# || exit 1; CUSTOM_INDEXES="$2"; shift 2 ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

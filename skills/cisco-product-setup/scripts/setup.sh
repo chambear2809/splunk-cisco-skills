@@ -47,7 +47,7 @@ EFFECTIVE_DEFAULT_KEYS=()
 EFFECTIVE_DEFAULT_VALUES=()
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco Product Setup
 
 Usage: $(basename "$0") [OPTIONS]
@@ -78,7 +78,7 @@ Examples:
     --set username api-user \\
     --secret-file password /tmp/sfw_password
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 cleanup() {
@@ -456,14 +456,14 @@ PY
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --product) [[ $# -ge 2 ]] || usage; PRODUCT_QUERY="$2"; shift 2 ;;
+            --product) [[ $# -ge 2 ]] || usage 1; PRODUCT_QUERY="$2"; shift 2 ;;
             --set)
-                [[ $# -ge 3 ]] || usage
+                [[ $# -ge 3 ]] || usage 1
                 append_user_value "$2" "$3"
                 shift 3
                 ;;
             --secret-file)
-                [[ $# -ge 3 ]] || usage
+                [[ $# -ge 3 ]] || usage 1
                 append_secret_file "$2" "$3"
                 shift 3
                 ;;
@@ -472,9 +472,9 @@ parse_args() {
             --configure-only) CONFIGURE_ONLY=true; MODE_FLAGS=$((MODE_FLAGS + 1)); shift ;;
             --validate-only) VALIDATE_ONLY=true; MODE_FLAGS=$((MODE_FLAGS + 1)); shift ;;
             --list-products) LIST_PRODUCTS=true; shift ;;
-            --catalog) [[ $# -ge 2 ]] || usage; CATALOG_PATH="$2"; shift 2 ;;
+            --catalog) [[ $# -ge 2 ]] || usage 1; CATALOG_PATH="$2"; shift 2 ;;
             --help) usage ;;
-            *) echo "Unknown option: $1" >&2; usage ;;
+            *) echo "Unknown option: $1" >&2; usage 1 ;;
         esac
     done
 }

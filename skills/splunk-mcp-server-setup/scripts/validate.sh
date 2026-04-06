@@ -62,6 +62,9 @@ from urllib.parse import urlsplit
 import sys
 
 uri = (sys.argv[1] or "").strip()
+if not uri:
+    raise SystemExit(1)
+
 parts = urlsplit(uri)
 scheme = parts.scheme or "https"
 netloc = parts.netloc or parts.path

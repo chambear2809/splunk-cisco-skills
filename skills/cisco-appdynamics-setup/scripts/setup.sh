@@ -29,7 +29,7 @@ EVENT_FILTERS=""
 INPUT_NAME=""
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco AppDynamics Setup Automation
 
 Usage: $(basename "$0") [OPTIONS]
@@ -59,7 +59,7 @@ With no flags, runs full setup (index + settings + visibility checks).
 Runs against remote Splunk via search-tier REST API (set
 SPLUNK_SEARCH_API_URI for non-localhost; legacy alias: SPLUNK_URI).
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -79,7 +79,7 @@ while [[ $# -gt 0 ]]; do
         --event-filters) require_arg "$1" $# || exit 1; EVENT_FILTERS="$2"; shift 2 ;;
         --input-name) require_arg "$1" $# || exit 1; INPUT_NAME="$2"; shift 2 ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

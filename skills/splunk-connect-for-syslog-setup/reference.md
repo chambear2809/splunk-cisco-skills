@@ -220,6 +220,7 @@ The host renderer creates a local working set similar to:
 ├── docker-compose.yml or sc4s.service
 ├── compose-up.sh          # compose mode
 ├── compose-down.sh        # compose mode
+├── systemd-install.sh     # systemd mode
 ├── local/
 │   ├── config/
 │   └── context/
@@ -231,7 +232,10 @@ For compose mode, that rendered `host/` directory is the deployment root:
 
 - `docker-compose.yml` reads `./env_file`
 - bind mounts use `./local`, `./archive`, and `./tls`
-- `--apply-host` starts the stack directly from that rendered directory
+- `--apply-host` installs or upgrades the stack directly from that rendered directory
+- `compose-up.sh` pulls images before running `compose up -d`
+- `systemd-install.sh` syncs rendered files into `SC4S_ROOT` without deleting
+  unrelated files, then reloads and restarts the `sc4s` service
 - the default repo-local render path is `./sc4s-rendered/`, which is gitignored
   for local-only use
 

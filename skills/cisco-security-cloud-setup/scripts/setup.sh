@@ -19,7 +19,7 @@ SET_LOG_LEVEL=""
 SK=""
 
 usage() {
-    cat <<EOF
+    cat >&2 <<EOF
 Cisco Security Cloud Setup
 
 Usage: $(basename "$0") [OPTIONS]
@@ -32,7 +32,7 @@ Options:
 
 With no flags, reports installation status and current logging settings.
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
         --set-log-level) require_arg "$1" $# || exit 1; SET_LOG_LEVEL="$2"; shift 2 ;;
         --no-restart) RESTART_SPLUNK=false; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

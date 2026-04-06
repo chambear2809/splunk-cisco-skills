@@ -1,0 +1,90 @@
+services:
+  redis:
+    image: bitnami/redis:7
+    container_name: SC4SNMP-redis
+    environment:
+      # Local-only lab default; set REDIS_PASSWORD for shared/production hosts
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - redis-data:/bitnami/redis/data
+
+  mongo:
+    image: bitnami/mongodb:6.0
+    container_name: SC4SNMP-mongo
+    environment:
+      # Local-only lab default; set MONGODB_ROOT_PASSWORD for shared/production hosts
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - mongo-data:/bitnami/mongodb
+
+  mibserver:
+    image: ghcr.io/pysnmp/mibs/container:latest
+    container_name: SC4SNMP-mibserver
+
+  scheduler:
+    image: {{SC4SNMP_IMAGE}}
+    container_name: SC4SNMP-scheduler
+    env_file:
+      - .env
+    volumes:
+      - ./config:/opt/sc4snmp/config:ro
+      - ./secrets:/opt/sc4snmp/secrets:ro
+      - ./mibs:/opt/sc4snmp/mibs:ro
+    depends_on:
+      - redis
+      - mongo
+      - mibserver
+
+  worker-poller:
+    image: {{SC4SNMP_IMAGE}}
+    container_name: SC4SNMP-worker-poller
+    env_file:
+      - .env
+    volumes:
+      - ./config:/opt/sc4snmp/config:ro
+      - ./secrets:/opt/sc4snmp/secrets:ro
+      - ./mibs:/opt/sc4snmp/mibs:ro
+    depends_on:
+      - scheduler
+
+  worker-sender:
+    image: {{SC4SNMP_IMAGE}}
+    container_name: SC4SNMP-worker-sender
+    env_file:
+      - .env
+    volumes:
+      - ./secrets:/opt/sc4snmp/secrets:ro
+    depends_on:
+      - scheduler
+
+  worker-trap:
+    image: {{SC4SNMP_IMAGE}}
+    container_name: SC4SNMP-worker-trap
+    env_file:
+      - .env
+    volumes:
+      - ./config:/opt/sc4snmp/config:ro
+      - ./secrets:/opt/sc4snmp/secrets:ro
+      - ./mibs:/opt/sc4snmp/mibs:ro
+    depends_on:
+      - scheduler
+
+  trap:
+    image: {{SC4SNMP_IMAGE}}
+    container_name: SC4SNMP-trap
+    env_file:
+      - .env
+    volumes:
+      - ./config:/opt/sc4snmp/config:ro
+      - ./secrets:/opt/sc4snmp/secrets:ro
+      - ./mibs:/opt/sc4snmp/mibs:ro
+    depends_on:
+      - worker-trap
+    ports:
+      - target: {{TRAPS_PORT}}
+        published: {{TRAPS_PORT}}
+        protocol: udp
+
+volumes:
+  redis-data:
+  mongo-data:

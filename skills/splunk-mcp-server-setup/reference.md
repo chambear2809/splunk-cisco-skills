@@ -80,12 +80,12 @@ Rendered files:
 | `.cursor/mcp.json` | Cursor workspace MCP registration (`type: "stdio"`) |
 | `run-splunk-mcp.sh` | Stdio wrapper that runs `mcp-remote` against Splunk |
 | `.env.splunk-mcp` | Local-only URL and token file consumed by the wrapper |
-| `register-codex-mcp.sh` | Registers the same wrapper with `codex mcp add ... -- ./run-splunk-mcp.sh` |
+| `register-codex-mcp.sh` | Syncs a portable launcher bundle into `~/.codex/mcp-bridges/<name>/` and registers that wrapper with Codex |
 
 When `--render-clients` is used, the skill:
 
 - renders the reusable bundle above
-- registers the wrapper with Codex by default
+- registers a stable home-local wrapper copy with Codex by default
 - merges the Splunk MCP entry into `<cursor-workspace>/.cursor/mcp.json` by default
 - defaults the Cursor workspace target to the current working directory when
   `--cursor-workspace` is omitted
@@ -98,7 +98,7 @@ This approach is useful because:
 - Cursor can use a workspace-local `.cursor/mcp.json` that points at the
   rendered wrapper through `${workspaceFolder}` when the bundle lives inside the
   workspace, or through an absolute path otherwise
-- Codex supports stdio MCP servers through `codex mcp add <name> -- <command>`
+- Codex can keep using stdio MCP registration without pinning the command to a repo checkout path
 - the same wrapper can handle `SPLUNK_MCP_INSECURE_TLS=1` for lab certificates
 
 ## Wrapper Prerequisite
