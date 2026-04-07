@@ -19,6 +19,7 @@ HEC_TOKEN_NAME="sc4snmp"
 COMPOSE_RUNTIME=""
 NAMESPACE="sc4snmp"
 RELEASE_NAME="sc4snmp"
+EXPECTED_DEFAULT_INDEX="netops"
 
 PASS=0
 WARN=0
@@ -127,6 +128,9 @@ validate_hec_token() {
     ack_state="$(rest_json_field "${token_record}" "useACK")"
     restricted_indexes="$(rest_json_field "${token_record}" "indexes")"
     default_index="$(rest_json_field "${token_record}" "default_index")"
+    if [[ -z "${default_index}" ]]; then
+        default_index="$(rest_json_field "${token_record}" "index")"
+    fi
 
     case "${ack_state}" in
         1|true|True)
@@ -144,7 +148,11 @@ validate_hec_token() {
         warn "HEC token '${HEC_TOKEN_NAME}' restricts Selected Indexes to: ${restricted_indexes}"
     fi
     if [[ -n "${default_index}" ]]; then
-        pass "HEC token '${HEC_TOKEN_NAME}' default index: ${default_index}"
+        if [[ "${default_index}" == "${EXPECTED_DEFAULT_INDEX}" ]]; then
+            pass "HEC token '${HEC_TOKEN_NAME}' default index: ${default_index}"
+        else
+            fail "HEC token '${HEC_TOKEN_NAME}' default index is '${default_index}', expected '${EXPECTED_DEFAULT_INDEX}'"
+        fi
     fi
     log ""
 }

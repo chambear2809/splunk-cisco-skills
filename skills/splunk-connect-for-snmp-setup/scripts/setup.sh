@@ -549,6 +549,78 @@ rest_enable_hec_token() {
     esac
 }
 
+rest_update_hec_token_default_index() {
+    local token_name="$1" target_index="$2" encoded_name body resp http_code
+    encoded_name="$(_urlencode "http://${token_name}")"
+    body="$(form_urlencode_pairs index "${target_index}")" || return 1
+    resp="$(splunk_curl_post "${SK}" "${body}" \
+        "${SPLUNK_URI}/services/data/inputs/http/${encoded_name}?output_mode=json" \
+        -w '\n%{http_code}' 2>/dev/null)"
+    http_code="$(echo "${resp}" | tail -1)"
+    case "${http_code}" in
+        200|201|409) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+cloud_update_hec_token_default_index_via_acs() {
+    local token_name="$1" target_index="$2" cmd_group
+    cmd_group="$(acs_hec_command_group)"
+    if [[ "${cmd_group}" == "hec-token" ]]; then
+        acs_command hec-token update "${token_name}" --default-index "${target_index}" >/dev/null 2>&1
+        return $?
+    fi
+    return 1
+}
+
+ensure_expected_hec_default_index() {
+    local token_name="$1" expected_index="$2" token_record default_index
+
+    if ! maybe_start_search_session; then
+        if is_splunk_cloud; then
+            log "WARN: Could not inspect the default index for HEC token '${token_name}' over Splunk REST."
+            return 0
+        fi
+        log "ERROR: Could not inspect the default index for HEC token '${token_name}'."
+        exit 1
+    fi
+
+    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
+    default_index="$(rest_json_field "${token_record}" "default_index")"
+    if [[ -z "${default_index}" ]]; then
+        default_index="$(rest_json_field "${token_record}" "index")"
+    fi
+
+    if [[ "${default_index}" == "${expected_index}" ]]; then
+        return 0
+    fi
+
+    if is_splunk_cloud; then
+        log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via ACS..."
+        if ! cloud_update_hec_token_default_index_via_acs "${token_name}" "${expected_index}"; then
+            log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via ACS."
+            exit 1
+        fi
+        return 0
+    fi
+
+    log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via Splunk REST..."
+    if ! rest_update_hec_token_default_index "${token_name}" "${expected_index}"; then
+        log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via Splunk REST."
+        exit 1
+    fi
+
+    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
+    default_index="$(rest_json_field "${token_record}" "default_index")"
+    if [[ -z "${default_index}" ]]; then
+        default_index="$(rest_json_field "${token_record}" "index")"
+    fi
+    if [[ "${default_index}" != "${expected_index}" ]]; then
+        log "ERROR: HEC token '${token_name}' default index remained '${default_index:-unknown}', expected '${expected_index}'."
+        exit 1
+    fi
+}
+
 write_hec_token_file_if_requested() {
     local token_name="$1" token_record token_value
     [[ -n "${WRITE_HEC_TOKEN_FILE}" ]] || return 0
@@ -582,6 +654,9 @@ warn_about_hec_token_details() {
     ack_state="$(rest_json_field "${token_record}" "useACK")"
     indexes_value="$(rest_json_field "${token_record}" "indexes")"
     default_index="$(rest_json_field "${token_record}" "default_index")"
+    if [[ -z "${default_index}" ]]; then
+        default_index="$(rest_json_field "${token_record}" "index")"
+    fi
 
     case "${ack_state}" in
         1|true|True)
@@ -659,6 +734,7 @@ ensure_hec_token() {
         esac
     fi
 
+    ensure_expected_hec_default_index "${HEC_TOKEN_NAME}" "netops"
     warn_about_hec_token_details "${HEC_TOKEN_NAME}"
     write_hec_token_file_if_requested "${HEC_TOKEN_NAME}"
 }

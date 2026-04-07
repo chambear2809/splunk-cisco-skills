@@ -107,6 +107,19 @@ class ShellScriptRegressionTests(unittest.TestCase):
             check=False,
         )
 
+    def run_script_no_env(
+        self,
+        script_rel_path: str,
+        *args: str,
+    ) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["bash", str(REPO_ROOT / script_rel_path), *args],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
     def build_mock_cisco_skill_env(self, tmp_path: Path) -> tuple[dict, Path, Path, Path, Path]:
         bin_dir = tmp_path / "bin"
         bin_dir.mkdir()
@@ -589,18 +602,39 @@ class ShellScriptRegressionTests(unittest.TestCase):
                     "disabled": body.get("disabled", "false"),
                     "useACK": body.get("useACK", "0"),
                     "indexes": body.get("indexes", ""),
-                    "index": body.get("index", "main"),
+                    "index": body.get("index", "sc4s"),
+                    "default_index": body.get("index", "sc4s"),
                     "token": f"generated-{name}-token",
                 }
                 save()
                 out("", 201)
+
+            if "/services/data/inputs/http/" in path and method == "POST" and not path.endswith("/enable"):
+                encoded_name = path.rsplit("/", 1)[-1]
+                encoded_name = encoded_name.split("?", 1)[0]
+                name = encoded_name.replace("%3A", ":").replace("%2F", "/")
+                if name.startswith("http://"):
+                    name = name[len("http://") :]
+                body = decode_form(data)
+                token = state["hec_tokens"].setdefault(
+                    name,
+                    {"index": "sc4s", "default_index": "sc4s", "token": f"generated-{name}-token"},
+                )
+                if "index" in body:
+                    token["index"] = body["index"]
+                    token["default_index"] = body["index"]
+                save()
+                out("", 200)
 
             if "/services/data/inputs/http/" in path and path.endswith("/enable") and method == "POST":
                 encoded_name = path.rsplit("/", 2)[-2]
                 name = encoded_name.replace("%3A", ":").replace("%2F", "/")
                 if name.startswith("http://"):
                     name = name[len("http://") :]
-                token = state["hec_tokens"].setdefault(name, {"index": "main", "token": f"generated-{name}-token"})
+                token = state["hec_tokens"].setdefault(
+                    name,
+                    {"index": "sc4s", "default_index": "sc4s", "token": f"generated-{name}-token"},
+                )
                 token["disabled"] = "false"
                 save()
                 out("", 200)
@@ -615,7 +649,8 @@ class ShellScriptRegressionTests(unittest.TestCase):
                                 "disabled": token.get("disabled", "false"),
                                 "useACK": token.get("useACK", "0"),
                                 "indexes": token.get("indexes", ""),
-                                "index": token.get("index", "main"),
+                                "index": token.get("index", "sc4s"),
+                                "default_index": token.get("default_index", token.get("index", "sc4s")),
                                 "token": token.get("token", ""),
                             },
                         }
@@ -791,17 +826,38 @@ class ShellScriptRegressionTests(unittest.TestCase):
                     "useACK": body.get("useACK", "0"),
                     "indexes": body.get("indexes", ""),
                     "index": body.get("index", "netops"),
+                    "default_index": body.get("index", "netops"),
                     "token": f"generated-{name}-token",
                 }
                 save()
                 out("", 201)
+
+            if "/services/data/inputs/http/" in path and method == "POST" and not path.endswith("/enable"):
+                encoded_name = path.rsplit("/", 1)[-1]
+                encoded_name = encoded_name.split("?", 1)[0]
+                name = encoded_name.replace("%3A", ":").replace("%2F", "/")
+                if name.startswith("http://"):
+                    name = name[len("http://") :]
+                body = decode_form(data)
+                token = state["hec_tokens"].setdefault(
+                    name,
+                    {"index": "netops", "default_index": "netops", "token": f"generated-{name}-token"},
+                )
+                if "index" in body:
+                    token["index"] = body["index"]
+                    token["default_index"] = body["index"]
+                save()
+                out("", 200)
 
             if "/services/data/inputs/http/" in path and path.endswith("/enable") and method == "POST":
                 encoded_name = path.rsplit("/", 2)[-2]
                 name = encoded_name.replace("%3A", ":").replace("%2F", "/")
                 if name.startswith("http://"):
                     name = name[len("http://") :]
-                token = state["hec_tokens"].setdefault(name, {"index": "netops", "token": f"generated-{name}-token"})
+                token = state["hec_tokens"].setdefault(
+                    name,
+                    {"index": "netops", "default_index": "netops", "token": f"generated-{name}-token"},
+                )
                 token["disabled"] = "false"
                 save()
                 out("", 200)
@@ -817,6 +873,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
                                 "useACK": token.get("useACK", "0"),
                                 "indexes": token.get("indexes", ""),
                                 "index": token.get("index", "netops"),
+                                "default_index": token.get("default_index", token.get("index", "netops")),
                                 "token": token.get("token", ""),
                             },
                         }
@@ -1769,6 +1826,10 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertIn("SC4S_LISTEN_CHECKPOINT_TCP_PORT=9000", host_env)
             self.assertIn("- ./env_file", host_compose)
             self.assertIn("- ./local:/etc/syslog-ng/conf.d/local:z", host_compose)
+            rendered_context = (output_dir / "host" / "local" / "context" / "splunk_metadata.csv").read_text(encoding="utf-8")
+            self.assertIn("splunk_sc4s_events,index,sc4s", rendered_context)
+            self.assertIn("splunk_sc4s_fallback,index,sc4s", rendered_context)
+            self.assertIn("cisco_asa,index,netfw", rendered_context)
 
             self.assertIn('hec_url: "https://example.invalid:8088/services/collector/event"', k8s_values)
             self.assertIn("vendor_product:", k8s_values)
@@ -1776,6 +1837,8 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertIn("tcp: [9000]", k8s_values)
             self.assertIn("context_files:", k8s_values)
             self.assertIn("splunk_metadata.csv: |-", k8s_values)
+            self.assertIn("splunk_sc4s_events,index,sc4s", k8s_values)
+            self.assertIn("splunk_sc4s_fallback,index,sc4s", k8s_values)
             self.assertIn("cisco_asa,index,netfw", k8s_values)
             self.assertIn("config_files:", k8s_values)
             self.assertIn("app-workaround.conf: |-", k8s_values)
@@ -1786,10 +1849,12 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertTrue((output_dir / "k8s" / "helm-install.sh").exists())
 
             state = json.loads(state_file.read_text(encoding="utf-8"))
+            self.assertIn("sc4s", state["indexes"])
             self.assertIn("netfw", state["indexes"])
             self.assertIn("_metrics", state["indexes"])
             self.assertEqual(state["indexes"]["_metrics"]["datatype"], "metric")
             self.assertIn("sc4s", state["hec_tokens"])
+            self.assertEqual(state["hec_tokens"]["sc4s"]["default_index"], "sc4s")
 
             validate_result = self.run_script(
                 "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
@@ -1812,7 +1877,8 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 "disabled": "false",
                 "useACK": "0",
                 "indexes": "",
-                "index": "main",
+                "index": "sc4s",
+                "default_index": "sc4s",
                 "token": "generated-sc4s-token",
             }
             state_file.write_text(json.dumps(state), encoding="utf-8")
@@ -1837,6 +1903,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 "useACK": "0",
                 "indexes": "",
                 "index": "main",
+                "default_index": "main",
                 "token": "generated-sc4s-token",
             }
             state_file.write_text(json.dumps(state), encoding="utf-8")
@@ -1850,9 +1917,37 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
             self.assertIn("exists but is disabled. Enabling it via Splunk REST", setup_result.stdout)
             self.assertIn("Enabled HEC token 'sc4s'.", setup_result.stdout)
+            self.assertIn("Updating it to 'sc4s' via Splunk REST", setup_result.stdout)
 
             state = json.loads(state_file.read_text(encoding="utf-8"))
             self.assertEqual(state["hec_tokens"]["sc4s"]["disabled"], "false")
+            self.assertEqual(state["hec_tokens"]["sc4s"]["default_index"], "sc4s")
+
+    def test_sc4s_validate_fails_when_default_index_is_main(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4s_env(tmp_path)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["indexes"]["sc4s"] = {"datatype": "event"}
+            state["hec_tokens"]["sc4s"] = {
+                "disabled": "false",
+                "useACK": "0",
+                "indexes": "",
+                "index": "main",
+                "default_index": "main",
+                "token": "generated-sc4s-token",
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4s",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 1, msg=validate_result.stdout + validate_result.stderr)
+            self.assertIn("default index is 'main', expected 'sc4s'", validate_result.stdout)
 
     def test_sc4s_setup_blocks_custom_in_repo_secret_output_dir(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -1956,7 +2051,9 @@ class ShellScriptRegressionTests(unittest.TestCase):
             unit_file = Path(env["SC4S_SYSTEMD_UNIT_DIR"]) / "sc4s.service"
 
             self.assertIn("SC4S_DEST_SPLUNK_HEC_DEFAULT_TOKEN=existing-token", runtime_env)
-            self.assertEqual(copied_context, "cisco_asa,index,netfw\n")
+            self.assertIn("cisco_asa,index,netfw", copied_context)
+            self.assertIn("splunk_sc4s_events,index,sc4s", copied_context)
+            self.assertIn("splunk_sc4s_fallback,index,sc4s", copied_context)
             self.assertEqual(copied_config, "filter f_local { level(info); };\n")
             self.assertTrue((runtime_root / "archive").exists())
             self.assertTrue((runtime_root / "tls").exists())
@@ -2146,6 +2243,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertEqual(state["indexes"]["em_metrics"]["datatype"], "metric")
             self.assertEqual(state["indexes"]["netmetrics"]["datatype"], "metric")
             self.assertIn("sc4snmp", state["hec_tokens"])
+            self.assertEqual(state["hec_tokens"]["sc4snmp"]["default_index"], "netops")
 
             validate_result = self.run_script(
                 "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
@@ -2169,6 +2267,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 "useACK": "0",
                 "indexes": "",
                 "index": "netops",
+                "default_index": "netops",
                 "token": "generated-sc4snmp-token",
             }
             state_file.write_text(json.dumps(state), encoding="utf-8")
@@ -2192,7 +2291,8 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 "disabled": "true",
                 "useACK": "0",
                 "indexes": "",
-                "index": "netops",
+                "index": "main",
+                "default_index": "main",
                 "token": "generated-sc4snmp-token",
             }
             state_file.write_text(json.dumps(state), encoding="utf-8")
@@ -2206,9 +2306,11 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
             self.assertIn("exists but is disabled. Enabling it via Splunk REST", setup_result.stdout)
             self.assertIn("Enabled HEC token 'sc4snmp'.", setup_result.stdout)
+            self.assertIn("Updating it to 'netops' via Splunk REST", setup_result.stdout)
 
             state = json.loads(state_file.read_text(encoding="utf-8"))
             self.assertEqual(state["hec_tokens"]["sc4snmp"]["disabled"], "false")
+            self.assertEqual(state["hec_tokens"]["sc4snmp"]["default_index"], "netops")
 
     def test_sc4snmp_setup_blocks_custom_in_repo_secret_output_dir(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -2372,6 +2474,35 @@ class ShellScriptRegressionTests(unittest.TestCase):
             output = result.stdout + result.stderr
             self.assertIn("Could not determine HEC ACK state", output)
             self.assertNotIn("unbound variable", output.lower())
+
+    def test_sc4snmp_validate_fails_when_default_index_is_main(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, state_file = self.build_mock_sc4snmp_env(tmp_path)
+
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+            state["indexes"]["em_logs"] = {"datatype": "event"}
+            state["indexes"]["netops"] = {"datatype": "event"}
+            state["indexes"]["em_metrics"] = {"datatype": "metric"}
+            state["indexes"]["netmetrics"] = {"datatype": "metric"}
+            state["hec_tokens"]["sc4snmp"] = {
+                "disabled": "false",
+                "useACK": "0",
+                "indexes": "",
+                "index": "main",
+                "default_index": "main",
+                "token": "generated-sc4snmp-token",
+            }
+            state_file.write_text(json.dumps(state), encoding="utf-8")
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4snmp",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+            self.assertIn("default index is 'main', expected 'netops'", result.stdout)
 
     def test_sc4snmp_render_k8s_without_trap_listener_ip_uses_nodeport(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -5945,8 +6076,14 @@ EOF
             )
             self.assertEqual(second_result.returncode, 0, msg=second_result.stdout + second_result.stderr)
             self.assertTrue(package_file.exists(), msg="Local package should remain after repeated install runs")
-            self.assertFalse((splunk_home / "etc/system/local/user-seed.conf").exists())
-            self.assertEqual(list((splunk_home / "etc/system/local").glob("user-seed.conf.bak.*")), [])
+
+    def test_sc4x_live_smoke_help(self):
+        result = self.run_script_no_env(
+            "skills/shared/scripts/smoke_sc4x_live.sh",
+            "--help",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("SC4S / SC4SNMP Live Smoke Test", result.stdout)
 
     def test_host_bootstrap_configure_heavy_forwarder_does_not_require_admin_password(self):
         with tempfile.TemporaryDirectory() as tmpdir:

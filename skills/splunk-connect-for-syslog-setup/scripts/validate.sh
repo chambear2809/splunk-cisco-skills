@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 DEFAULT_INDEXES=(
+    sc4s
     print
     osnix
     oswinsec
@@ -27,6 +28,7 @@ DEFAULT_INDEXES=(
     email
 )
 OPTIONAL_METRICS_INDEX="_metrics"
+EXPECTED_DEFAULT_INDEX="sc4s"
 
 CHECK_HOST=false
 CHECK_K8S=false
@@ -142,6 +144,9 @@ validate_hec_token() {
     ack_state="$(rest_json_field "${token_record}" "useACK")"
     restricted_indexes="$(rest_json_field "${token_record}" "indexes")"
     default_index="$(rest_json_field "${token_record}" "default_index")"
+    if [[ -z "${default_index}" ]]; then
+        default_index="$(rest_json_field "${token_record}" "index")"
+    fi
 
     case "${ack_state}" in
         1|true|True)
@@ -159,7 +164,11 @@ validate_hec_token() {
         warn "HEC token '${HEC_TOKEN_NAME}' restricts Selected Indexes to: ${restricted_indexes}"
     fi
     if [[ -n "${default_index}" ]]; then
-        pass "HEC token '${HEC_TOKEN_NAME}' default index: ${default_index}"
+        if [[ "${default_index}" == "${EXPECTED_DEFAULT_INDEX}" ]]; then
+            pass "HEC token '${HEC_TOKEN_NAME}' default index: ${default_index}"
+        else
+            fail "HEC token '${HEC_TOKEN_NAME}' default index is '${default_index}', expected '${EXPECTED_DEFAULT_INDEX}'"
+        fi
     fi
     log ""
 }
@@ -167,7 +176,7 @@ validate_hec_token() {
 validate_startup_events() {
     local startup_count
     log "--- SC4S Startup Events ---"
-    startup_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" 'search index=* sourcetype=sc4s:events "starting up" | stats count as count' "count" 2>/dev/null || echo "0")"
+    startup_count="$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" 'search index=sc4s sourcetype=sc4s:events "starting up" | stats count as count' "count" 2>/dev/null || echo "0")"
     if [[ "${startup_count}" =~ ^[0-9]+$ ]] && (( startup_count > 0 )); then
         pass "Splunk contains ${startup_count} SC4S startup event(s)"
     else

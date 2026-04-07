@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 DEFAULT_INDEXES=(
+    sc4s
     print
     osnix
     oswinsec
@@ -27,6 +28,7 @@ DEFAULT_INDEXES=(
     email
 )
 OPTIONAL_METRICS_INDEX="_metrics"
+SC4S_INTERNAL_INDEX="sc4s"
 
 DO_SPLUNK_PREP=false
 RENDER_HOST=false
@@ -493,7 +495,7 @@ rest_create_hec_token() {
     local token_name="$1" body resp http_code
     body=$(form_urlencode_pairs \
         name "${token_name}" \
-        index "main" \
+        index "${SC4S_INTERNAL_INDEX}" \
         disabled "false" \
         useACK "0") || return 1
     resp=$(splunk_curl_post "${SK}" "${body}" \
@@ -564,11 +566,11 @@ cloud_create_hec_token_via_acs() {
     local token_name="$1" cmd_group
     cmd_group="$(acs_hec_command_group)"
     if [[ "${cmd_group}" == "hec-token" ]]; then
-        acs_command hec-token create --name "${token_name}" --default-index "main" --disabled=false >/dev/null 2>&1
+        acs_command hec-token create --name "${token_name}" --default-index "${SC4S_INTERNAL_INDEX}" --disabled=false >/dev/null 2>&1
     else
         acs_command http-event-collectors create \
             --name "${token_name}" \
-            --default-index "main" \
+            --default-index "${SC4S_INTERNAL_INDEX}" \
             --disabled false \
             >/dev/null 2>&1
     fi
@@ -595,6 +597,78 @@ rest_enable_hec_token() {
         200|201|409) return 0 ;;
         *) return 1 ;;
     esac
+}
+
+rest_update_hec_token_default_index() {
+    local token_name="$1" target_index="$2" encoded_name body resp http_code
+    encoded_name="$(_urlencode "http://${token_name}")"
+    body="$(form_urlencode_pairs index "${target_index}")" || return 1
+    resp="$(splunk_curl_post "${SK}" "${body}" \
+        "${SPLUNK_URI}/services/data/inputs/http/${encoded_name}?output_mode=json" \
+        -w '\n%{http_code}' 2>/dev/null)"
+    http_code="$(echo "${resp}" | tail -1)"
+    case "${http_code}" in
+        200|201|409) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+cloud_update_hec_token_default_index_via_acs() {
+    local token_name="$1" target_index="$2" cmd_group
+    cmd_group="$(acs_hec_command_group)"
+    if [[ "${cmd_group}" == "hec-token" ]]; then
+        acs_command hec-token update "${token_name}" --default-index "${target_index}" >/dev/null 2>&1
+        return $?
+    fi
+    return 1
+}
+
+ensure_expected_hec_default_index() {
+    local token_name="$1" expected_index="$2" token_record default_index
+
+    if ! maybe_start_search_session; then
+        if is_splunk_cloud; then
+            log "WARN: Could not inspect the default index for HEC token '${token_name}' over Splunk REST."
+            return 0
+        fi
+        log "ERROR: Could not inspect the default index for HEC token '${token_name}'."
+        exit 1
+    fi
+
+    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
+    default_index="$(rest_json_field "${token_record}" "default_index")"
+    if [[ -z "${default_index}" ]]; then
+        default_index="$(rest_json_field "${token_record}" "index")"
+    fi
+
+    if [[ "${default_index}" == "${expected_index}" ]]; then
+        return 0
+    fi
+
+    if is_splunk_cloud; then
+        log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via ACS..."
+        if ! cloud_update_hec_token_default_index_via_acs "${token_name}" "${expected_index}"; then
+            log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via ACS."
+            exit 1
+        fi
+        return 0
+    fi
+
+    log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via Splunk REST..."
+    if ! rest_update_hec_token_default_index "${token_name}" "${expected_index}"; then
+        log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via Splunk REST."
+        exit 1
+    fi
+
+    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
+    default_index="$(rest_json_field "${token_record}" "default_index")"
+    if [[ -z "${default_index}" ]]; then
+        default_index="$(rest_json_field "${token_record}" "index")"
+    fi
+    if [[ "${default_index}" != "${expected_index}" ]]; then
+        log "ERROR: HEC token '${token_name}' default index remained '${default_index:-unknown}', expected '${expected_index}'."
+        exit 1
+    fi
 }
 
 write_hec_token_file_if_requested() {
@@ -630,6 +704,9 @@ warn_about_hec_token_details() {
     ack_state="$(rest_json_field "${token_record}" "useACK")"
     indexes_value="$(rest_json_field "${token_record}" "indexes")"
     default_index="$(rest_json_field "${token_record}" "default_index")"
+    if [[ -z "${default_index}" ]]; then
+        default_index="$(rest_json_field "${token_record}" "index")"
+    fi
 
     case "${ack_state}" in
         1|true|True)
@@ -712,6 +789,7 @@ ensure_hec_token() {
         esac
     fi
 
+    ensure_expected_hec_default_index "${HEC_TOKEN_NAME}" "${SC4S_INTERNAL_INDEX}"
     warn_about_hec_token_details "${HEC_TOKEN_NAME}"
     write_hec_token_file_if_requested "${HEC_TOKEN_NAME}"
 }
@@ -771,6 +849,60 @@ copy_named_files() {
         src="${spec#*=}"
         cp "${src}" "${target_dir}/${name}"
     done
+}
+
+copy_sc4s_context_files() {
+    local target_dir="$1"; shift
+    mkdir -p "${target_dir}"
+    python3 - "${target_dir}" "${SC4S_INTERNAL_INDEX}" "$@" <<'PY'
+from pathlib import Path
+import csv
+import shutil
+import sys
+
+target_dir = Path(sys.argv[1])
+sc4s_internal_index = sys.argv[2]
+specs = sys.argv[3:]
+target_dir.mkdir(parents=True, exist_ok=True)
+
+overrides = [
+    ("splunk_sc4s_events", "index", sc4s_internal_index),
+    ("splunk_sc4s_fallback", "index", sc4s_internal_index),
+]
+override_keys = {(key, metadata) for key, metadata, _value in overrides}
+
+base_text = ""
+for spec in specs:
+    name, path = spec.split("=", 1)
+    src = Path(path)
+    if name == "splunk_metadata.csv":
+        base_text = src.read_text(encoding="utf-8")
+        continue
+    shutil.copy2(src, target_dir / name)
+
+lines: list[str] = []
+for raw_line in base_text.splitlines():
+    stripped = raw_line.strip()
+    if not stripped or stripped.startswith("#"):
+        lines.append(raw_line)
+        continue
+    try:
+        row = next(csv.reader([raw_line]))
+    except Exception:
+        lines.append(raw_line)
+        continue
+    if len(row) >= 2 and (row[0], row[1]) in override_keys:
+        continue
+    lines.append(raw_line)
+
+for key, metadata, value in overrides:
+    lines.append(f"{key},{metadata},{value}")
+
+text = "\n".join(lines)
+if text and not text.endswith("\n"):
+    text += "\n"
+(target_dir / "splunk_metadata.csv").write_text(text, encoding="utf-8")
+PY
 }
 
 render_template_to_file() {
@@ -887,6 +1019,69 @@ for spec in specs:
         lines.append("      ")
 
 print("\n".join(lines) + "\n", end="")
+PY
+}
+
+sc4s_context_yaml_block() {
+    python3 - "${SC4S_INTERNAL_INDEX}" "$@" <<'PY'
+from pathlib import Path
+import csv
+import sys
+
+sc4s_internal_index = sys.argv[1]
+specs = sys.argv[2:]
+
+overrides = [
+    ("splunk_sc4s_events", "index", sc4s_internal_index),
+    ("splunk_sc4s_fallback", "index", sc4s_internal_index),
+]
+override_keys = {(key, metadata) for key, metadata, _value in overrides}
+
+files = []
+base_text = ""
+metadata_insert_at = None
+for spec in specs:
+    name, path = spec.split("=", 1)
+    text = Path(path).read_text(encoding="utf-8")
+    if name == "splunk_metadata.csv":
+        base_text = text
+        metadata_insert_at = len(files)
+        continue
+    files.append((name, text))
+
+lines = []
+for raw_line in base_text.splitlines():
+    stripped = raw_line.strip()
+    if not stripped or stripped.startswith("#"):
+        lines.append(raw_line)
+        continue
+    try:
+        row = next(csv.reader([raw_line]))
+    except Exception:
+        lines.append(raw_line)
+        continue
+    if len(row) >= 2 and (row[0], row[1]) in override_keys:
+        continue
+    lines.append(raw_line)
+for key, metadata, value in overrides:
+    lines.append(f"{key},{metadata},{value}")
+
+metadata_text = "\n".join(lines)
+if metadata_text and not metadata_text.endswith("\n"):
+    metadata_text += "\n"
+
+insert_at = metadata_insert_at if metadata_insert_at is not None else 0
+files.insert(insert_at, ("splunk_metadata.csv", metadata_text))
+
+block_lines = ["  context_files:"]
+for name, text in files:
+    block_lines.append(f"    {name}: |-")
+    for line in text.splitlines():
+        block_lines.append(f"      {line}")
+    if not text:
+        block_lines.append("      ")
+
+print("\n".join(block_lines) + "\n", end="")
 PY
 }
 
@@ -1014,7 +1209,9 @@ render_host_assets() {
 
     mkdir -p "${host_dir}/local/context" "${host_dir}/local/config" "${host_dir}/archive" "${host_dir}/tls"
     if (( ${#CONTEXT_FILE_SPECS[@]} > 0 )); then
-        copy_named_files "${host_dir}/local/context" "${CONTEXT_FILE_SPECS[@]}"
+        copy_sc4s_context_files "${host_dir}/local/context" "${CONTEXT_FILE_SPECS[@]}"
+    else
+        copy_sc4s_context_files "${host_dir}/local/context"
     fi
     if (( ${#CONFIG_FILE_SPECS[@]} > 0 )); then
         copy_named_files "${host_dir}/local/config" "${CONFIG_FILE_SPECS[@]}"
@@ -1175,9 +1372,9 @@ render_k8s_assets() {
         vendor_block=""
     fi
     if (( ${#CONTEXT_FILE_SPECS[@]} > 0 )); then
-        context_block="$(yaml_file_block "context_files" "${CONTEXT_FILE_SPECS[@]}")"
+        context_block="$(sc4s_context_yaml_block "${CONTEXT_FILE_SPECS[@]}")"
     else
-        context_block=""
+        context_block="$(sc4s_context_yaml_block)"
     fi
     if (( ${#CONFIG_FILE_SPECS[@]} > 0 )); then
         config_block="$(yaml_file_block "config_files" "${CONFIG_FILE_SPECS[@]}")"
