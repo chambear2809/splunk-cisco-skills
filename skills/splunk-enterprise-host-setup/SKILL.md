@@ -72,6 +72,18 @@ Supported package formats:
 
 The skill caches downloaded packages in the repo-local `splunk-ta/` directory.
 
+Install behavior:
+
+- If the target host does not already have `SPLUNK_HOME/bin/splunk`, `install`
+  performs a fresh install.
+- If Splunk is already present and the package version differs, `install`
+  performs an in-place upgrade for `.rpm`, `.deb`, or `.tgz`.
+- If the installed version already matches the requested package version,
+  `install` succeeds as a no-op and skips package replacement.
+- Install-only upgrades do not require `--admin-password-file`. Password-based
+  auth is still required for later `configure` or `cluster` work that uses
+  authenticated Splunk CLI commands.
+
 ## Scripts
 
 ### setup.sh
@@ -93,11 +105,16 @@ bash skills/splunk-enterprise-host-setup/scripts/setup.sh \
 Useful phases:
 
 - `download` — fetch and checksum-verify the package into `splunk-ta/`
-- `install` — install the package, seed the admin user, start Splunk, and
-  optionally enable boot-start
+- `install` — fresh-install, upgrade, or same-version no-op; fresh installs
+  seed the admin user, upgrades stop Splunk before package replacement, and all
+  successful install paths start Splunk and can enable boot-start
 - `configure` — apply role-local configuration such as receiving or forwarding
 - `cluster` — apply clustered settings such as manager, peer, or SHC membership
 - `all` — run the full workflow
+
+Clustered-role upgrades are still **per-host only**. The script warns when you
+upgrade clustered roles, but it does not orchestrate rolling order or verify
+cluster health across multiple hosts.
 
 ### validate.sh
 

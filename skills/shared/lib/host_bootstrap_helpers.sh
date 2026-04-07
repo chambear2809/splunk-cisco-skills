@@ -93,6 +93,51 @@ hbs_detect_package_type() {
     esac
 }
 
+hbs_extract_splunk_package_version() {
+    local source_path="${1:-}"
+    HBS_PACKAGE_SOURCE="${source_path}" python3 -c '
+import os
+import re
+
+source = os.environ.get("HBS_PACKAGE_SOURCE", "")
+match = re.search(r"splunk-(\d+(?:\.\d+)+)-", os.path.basename(source))
+if match:
+    print(match.group(1), end="")
+'
+}
+
+hbs_extract_splunk_version() {
+    local raw_text="${1:-}"
+    HBS_VERSION_TEXT="${raw_text}" python3 -c '
+import os
+import re
+
+text = os.environ.get("HBS_VERSION_TEXT", "")
+match = re.search(r"(\d+(?:\.\d+)+)", text)
+if match:
+    print(match.group(1), end="")
+'
+}
+
+hbs_versions_equal() {
+    local left="${1:-}"
+    local right="${2:-}"
+
+    [[ -n "${left}" && -n "${right}" ]] || return 1
+
+    python3 - "${left}" "${right}" <<'PY'
+import sys
+
+def normalize(raw):
+    tokens = [int(token) for token in raw.split(".")]
+    while tokens and tokens[-1] == 0:
+        tokens.pop()
+    return tokens
+
+sys.exit(0 if normalize(sys.argv[1]) == normalize(sys.argv[2]) else 1)
+PY
+}
+
 hbs_require_enterprise_package_for_role() {
     local package_path="${1:-}"
     local role="${2:-}"

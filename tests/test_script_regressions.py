@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression tests for first-party shell entrypoints."""
 
+import getpass
 import json
 import hashlib
 import os
@@ -85,6 +86,96 @@ def write_mock_curl(path: Path) -> None:
             raise SystemExit(0)
 
         raise SystemExit(1)
+        """,
+    )
+
+
+def write_remote_shell_mocks(bin_dir: Path) -> None:
+    write_executable(
+        bin_dir / "sshpass",
+        """\
+        #!/usr/bin/env bash
+        shift 2
+        exec "$@"
+        """,
+    )
+    write_executable(
+        bin_dir / "sudo",
+        """\
+        #!/usr/bin/env bash
+        if [[ "${REMOTE_SUDO_MODE:-}" == "require_stdin" ]]; then
+            use_stdin=false
+            args=()
+            for arg in "$@"; do
+                if [[ "${arg}" == "-S" ]]; then
+                    use_stdin=true
+                    continue
+                fi
+                args+=("${arg}")
+            done
+            if [[ "${use_stdin}" != "true" ]]; then
+                echo "sudo: a terminal is required to read the password; either use the -S option to read from standard input or configure an askpass helper" >&2
+                echo "sudo: a password is required" >&2
+                exit 1
+            fi
+            cat >/dev/null
+            exec "${args[@]}"
+        fi
+        exec "$@"
+        """,
+    )
+    write_executable(
+        bin_dir / "chown",
+        """\
+        #!/usr/bin/env bash
+        exit 0
+        """,
+    )
+    write_executable(
+        bin_dir / "scp",
+        """\
+        #!/usr/bin/env bash
+        local_path="${@: -2:1}"
+        remote_spec="${@: -1}"
+        remote_path="${remote_spec#*:}"
+        destination="${REMOTE_ROOT}${remote_path}"
+        mkdir -p "$(dirname "${destination}")"
+        cp "${local_path}" "${destination}"
+        """,
+    )
+    write_executable(
+        bin_dir / "ssh",
+        """\
+        #!/usr/bin/env python3
+        import os
+        import re
+        import shlex
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        remote_root = os.environ["REMOTE_ROOT"]
+        remote_cmd = sys.argv[-1]
+        parts = shlex.split(remote_cmd)
+        if len(parts) >= 3 and parts[0] == "bash" and parts[1] == "-lc":
+            raw_cmd = parts[2]
+        else:
+            raw_cmd = remote_cmd
+
+        def remap_paths(text, source_path, target_path):
+            pattern = re.compile(
+                rf"(?P<prefix>(^|[\\s\\\"'=(:])){re.escape(source_path)}(?P<suffix>(?=$|[/\\s\\\"')]))"
+            )
+            return pattern.sub(lambda match: match.group("prefix") + target_path, text)
+
+        raw_cmd = remap_paths(raw_cmd, "/opt/splunk", f"{remote_root}/opt/splunk")
+        raw_cmd = remap_paths(raw_cmd, "/var/tmp", f"{remote_root}/var/tmp")
+        raw_cmd = remap_paths(raw_cmd, "/tmp", f"{remote_root}/tmp")
+
+        env = os.environ.copy()
+        env["PATH"] = f"{Path(sys.argv[0]).resolve().parent}:{env.get('PATH', '')}"
+        result = subprocess.run(["bash", "-c", raw_cmd], env=env, check=False)
+        raise SystemExit(result.returncode)
         """,
     )
 
@@ -561,6 +652,11 @@ class ShellScriptRegressionTests(unittest.TestCase):
             parsed = urlparse(url)
             path = parsed.path
 
+            log_path = os.environ.get("CURL_LOG", "")
+            if log_path and url:
+                with Path(log_path).open("a", encoding="utf-8") as handle:
+                    handle.write(url + "\\n")
+
             if "/services/auth/login" in path:
                 out("<response><sessionKey>test-session</sessionKey></response>")
 
@@ -783,6 +879,11 @@ class ShellScriptRegressionTests(unittest.TestCase):
 
             parsed = urlparse(url)
             path = parsed.path
+
+            log_path = os.environ.get("CURL_LOG", "")
+            if log_path and url:
+                with Path(log_path).open("a", encoding="utf-8") as handle:
+                    handle.write(url + "\\n")
 
             if "/services/auth/login" in path:
                 out("<response><sessionKey>test-session</sessionKey></response>")
@@ -1866,6 +1967,179 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertIn("HEC token 'sc4s' exists", validate_result.stdout)
             self.assertIn("SC4S startup event", validate_result.stdout)
 
+    def test_sc4s_setup_uses_ingest_profile_for_hec_management_and_rendering(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4s_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4s.token"
+            curl_log = tmp_path / "curl.log"
+
+            Path(env["SPLUNK_CREDENTIALS_FILE"]).write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://search.example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_INGEST_PROFILE="hf"
+                    PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
+                    PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.invalid:8089"
+                    PROFILE_hf__SPLUNK_URI="${PROFILE_hf__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_hf__SPLUNK_USER="user"
+                    PROFILE_hf__SPLUNK_PASS="pass"
+                    PROFILE_hf__SPLUNK_HEC_URL="https://hf-hec.example.invalid:8088/services/collector/event"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            env["CURL_LOG"] = str(curl_log)
+
+            result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--splunk-prep",
+                "--write-hec-token-file",
+                str(token_file),
+                "--render-host",
+                "--output-dir",
+                str(output_dir),
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("Detected SC4S HEC base URL: https://hf-hec.example.invalid:8088", output)
+            self.assertIn(
+                "SC4S_DEST_SPLUNK_HEC_DEFAULT_URL=https://hf-hec.example.invalid:8088",
+                (output_dir / "host" / "env_file").read_text(encoding="utf-8"),
+            )
+            curl_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn(
+                "https://hf.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                curl_requests,
+            )
+            self.assertNotIn(
+                "https://search.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                curl_requests,
+            )
+
+            curl_log.write_text("", encoding="utf-8")
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4s",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            validate_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn(
+                "https://hf.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                validate_requests,
+            )
+            self.assertNotIn(
+                "https://search.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                validate_requests,
+            )
+
+    def test_sc4s_clustered_ingest_uses_bundle_managed_hec(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4s_env(tmp_path)
+            token_file = tmp_path / "sc4s.token"
+            curl_log = tmp_path / "curl.log"
+            apply_log = tmp_path / "bundle-apply.log"
+            splunk_home = tmp_path / "cluster-manager"
+            (splunk_home / "bin").mkdir(parents=True)
+
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "${BUNDLE_APPLY_LOG}"
+                exit 0
+                """,
+            )
+
+            Path(env["SPLUNK_CREDENTIALS_FILE"]).write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://search.example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_INGEST_PROFILE="idx"
+                    SPLUNK_CLUSTER_MANAGER_PROFILE="cm"
+                    PROFILE_idx__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_idx__SPLUNK_TARGET_ROLE="indexer"
+                    PROFILE_idx__SPLUNK_SEARCH_API_URI="https://indexer.example.invalid:8089"
+                    PROFILE_idx__SPLUNK_URI="${PROFILE_idx__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_idx__SPLUNK_USER="user"
+                    PROFILE_idx__SPLUNK_PASS="pass"
+                    PROFILE_idx__SPLUNK_HEC_URL="https://idx-hec.example.invalid:8088/services/collector/event"
+                    PROFILE_cm__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_cm__SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    PROFILE_cm__SPLUNK_URI="${PROFILE_cm__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_cm__SPLUNK_USER="cm-user"
+                    PROFILE_cm__SPLUNK_PASS="cm-pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env["CURL_LOG"] = str(curl_log)
+            env["SPLUNK_HOME"] = str(splunk_home)
+            env["SPLUNK_LOCAL_SUDO"] = "false"
+            env["SPLUNK_BUNDLE_OS_USER"] = getpass.getuser()
+            env["BUNDLE_APPLY_LOG"] = str(apply_log)
+
+            result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+                "--splunk-prep",
+                "--hec-only",
+                "--write-hec-token-file",
+                str(token_file),
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("Created HEC token 'sc4s' via cluster-manager bundle.", output)
+            token_value = token_file.read_text(encoding="utf-8").strip()
+            self.assertRegex(token_value, r"^[0-9a-f-]{36}$")
+
+            inputs_conf = (
+                splunk_home
+                / "etc"
+                / "manager-apps"
+                / "ZZZ_cisco_skills_hec"
+                / "local"
+                / "inputs.conf"
+            ).read_text(encoding="utf-8")
+            self.assertIn("[http]", inputs_conf)
+            self.assertIn("[http://sc4s]", inputs_conf)
+            self.assertIn("index = sc4s", inputs_conf)
+            self.assertIn(f"token = {token_value}", inputs_conf)
+            self.assertIn("disabled = 0", inputs_conf)
+            self.assertIn("apply cluster-bundle -auth cm-user:cm-pass", apply_log.read_text(encoding="utf-8"))
+            if curl_log.exists():
+                self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
+
+            curl_log.write_text("", encoding="utf-8")
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-syslog-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4s",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertIn("HEC token 'sc4s' exists", validate_result.stdout)
+            self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
+
     def test_sc4s_validate_reports_wrong_metrics_index_type(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1974,6 +2248,10 @@ class ShellScriptRegressionTests(unittest.TestCase):
     def test_gitignore_excludes_default_sc4s_render_output(self):
         gitignore_text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("/sc4s-rendered/", gitignore_text)
+
+    def test_gitignore_excludes_pytest_cache(self):
+        gitignore_text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn(".pytest_cache/", gitignore_text)
 
     def test_sc4s_apply_host_compose_pulls_before_up(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2224,6 +2502,14 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertIn("published: 162", compose_file)
             self.assertIn("192.0.2.10,161,2c,public", compose_inventory)
             self.assertEqual(compose_hec_token, "generated-sc4snmp-token\n")
+            self.assertEqual(
+                stat.S_IMODE((output_dir / "compose" / "secrets" / "hec_token").stat().st_mode),
+                0o644,
+            )
+            self.assertEqual(
+                stat.S_IMODE((output_dir / "compose" / "secrets" / "secrets.json.example").stat().st_mode),
+                0o644,
+            )
 
             self.assertIn('host: "example.invalid"', k8s_values)
             self.assertIn('port: "8088"', k8s_values)
@@ -2254,6 +2540,220 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
             self.assertIn("HEC token 'sc4snmp' exists", validate_result.stdout)
             self.assertIn("SC4SNMP event", validate_result.stdout)
+
+    def test_sc4snmp_setup_uses_ingest_profile_for_hec_management_and_rendering(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4snmp.token"
+            inventory_file = tmp_path / "inventory.csv"
+            scheduler_file = tmp_path / "scheduler-config.yaml"
+            traps_file = tmp_path / "traps-config.yaml"
+            curl_log = tmp_path / "curl.log"
+
+            inventory_file.write_text(
+                "address,port,version,community,secret,security_engine,walk_interval,profiles,smart_profiles,delete\n"
+                "192.0.2.10,161,2c,public,,,300,if_mib,,false\n",
+                encoding="utf-8",
+            )
+            scheduler_file.write_text(
+                textwrap.dedent(
+                    """\
+                    groups:
+                      campus_switches:
+                        - address: 192.0.2.10
+                          port: 161
+                    profiles:
+                      if_mib:
+                        frequency: 300
+                        varBinds:
+                          - ['IF-MIB', 'ifDescr']
+                    """
+                ),
+                encoding="utf-8",
+            )
+            traps_file.write_text(
+                textwrap.dedent(
+                    """\
+                    communities:
+                      2c:
+                        - public
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            Path(env["SPLUNK_CREDENTIALS_FILE"]).write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://search.example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_INGEST_PROFILE="hf"
+                    PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
+                    PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.invalid:8089"
+                    PROFILE_hf__SPLUNK_URI="${PROFILE_hf__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_hf__SPLUNK_USER="user"
+                    PROFILE_hf__SPLUNK_PASS="pass"
+                    PROFILE_hf__SPLUNK_HEC_URL="https://hf-hec.example.invalid:8088/services/collector/event"
+                    """
+                ),
+                encoding="utf-8",
+            )
+            env["CURL_LOG"] = str(curl_log)
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--splunk-prep",
+                "--write-hec-token-file",
+                str(token_file),
+                "--render-compose",
+                "--output-dir",
+                str(output_dir),
+                "--inventory-file",
+                str(inventory_file),
+                "--scheduler-file",
+                str(scheduler_file),
+                "--traps-file",
+                str(traps_file),
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("Detected SC4SNMP HEC base URL: https://hf-hec.example.invalid:8088", output)
+            self.assertIn(
+                "SPLUNK_HEC_HOST=hf-hec.example.invalid",
+                (output_dir / "compose" / ".env").read_text(encoding="utf-8"),
+            )
+            curl_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn(
+                "https://hf.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                curl_requests,
+            )
+            self.assertNotIn(
+                "https://search.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                curl_requests,
+            )
+
+            curl_log.write_text("", encoding="utf-8")
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4snmp",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            validate_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn(
+                "https://hf.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                validate_requests,
+            )
+            self.assertNotIn(
+                "https://search.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                validate_requests,
+            )
+
+    def test_sc4snmp_clustered_ingest_uses_bundle_managed_hec(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
+            token_file = tmp_path / "sc4snmp.token"
+            curl_log = tmp_path / "curl.log"
+            apply_log = tmp_path / "bundle-apply.log"
+            splunk_home = tmp_path / "cluster-manager"
+            (splunk_home / "bin").mkdir(parents=True)
+
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "${BUNDLE_APPLY_LOG}"
+                exit 0
+                """,
+            )
+
+            Path(env["SPLUNK_CREDENTIALS_FILE"]).write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://search.example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_INGEST_PROFILE="idx"
+                    SPLUNK_CLUSTER_MANAGER_PROFILE="cm"
+                    PROFILE_idx__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_idx__SPLUNK_TARGET_ROLE="indexer"
+                    PROFILE_idx__SPLUNK_SEARCH_API_URI="https://indexer.example.invalid:8089"
+                    PROFILE_idx__SPLUNK_URI="${PROFILE_idx__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_idx__SPLUNK_USER="user"
+                    PROFILE_idx__SPLUNK_PASS="pass"
+                    PROFILE_idx__SPLUNK_HEC_URL="https://idx-hec.example.invalid:8088/services/collector/event"
+                    PROFILE_cm__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_cm__SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    PROFILE_cm__SPLUNK_URI="${PROFILE_cm__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_cm__SPLUNK_USER="cm-user"
+                    PROFILE_cm__SPLUNK_PASS="cm-pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env["CURL_LOG"] = str(curl_log)
+            env["SPLUNK_HOME"] = str(splunk_home)
+            env["SPLUNK_LOCAL_SUDO"] = "false"
+            env["SPLUNK_BUNDLE_OS_USER"] = getpass.getuser()
+            env["BUNDLE_APPLY_LOG"] = str(apply_log)
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--splunk-prep",
+                "--hec-only",
+                "--write-hec-token-file",
+                str(token_file),
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("Created HEC token 'sc4snmp' via cluster-manager bundle.", output)
+            token_value = token_file.read_text(encoding="utf-8").strip()
+            self.assertRegex(token_value, r"^[0-9a-f-]{36}$")
+
+            inputs_conf = (
+                splunk_home
+                / "etc"
+                / "manager-apps"
+                / "ZZZ_cisco_skills_hec"
+                / "local"
+                / "inputs.conf"
+            ).read_text(encoding="utf-8")
+            self.assertIn("[http]", inputs_conf)
+            self.assertIn("[http://sc4snmp]", inputs_conf)
+            self.assertIn("index = netops", inputs_conf)
+            self.assertIn(f"token = {token_value}", inputs_conf)
+            self.assertIn("disabled = 0", inputs_conf)
+            self.assertIn("apply cluster-bundle -auth cm-user:cm-pass", apply_log.read_text(encoding="utf-8"))
+            if curl_log.exists():
+                self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
+
+            curl_log.write_text("", encoding="utf-8")
+            validate_result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+                "--hec-token-name",
+                "sc4snmp",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertIn("HEC token 'sc4snmp' exists", validate_result.stdout)
+            self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
 
     def test_sc4snmp_validate_reports_wrong_metrics_index_type(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2424,6 +2924,49 @@ class ShellScriptRegressionTests(unittest.TestCase):
             placeholder = output_dir / "compose" / "secrets" / "hec_token.example"
             self.assertTrue(placeholder.exists(), msg="Expected placeholder token file")
             self.assertIn("<replace-with-hec-token>", placeholder.read_text(encoding="utf-8"))
+            self.assertEqual(stat.S_IMODE(placeholder.stat().st_mode), 0o644)
+
+    def test_sc4snmp_render_compose_with_snmpv3_secrets_file_makes_bind_secret_readable(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
+            output_dir = tmp_path / "rendered"
+            token_file = tmp_path / "sc4snmp.token"
+            snmpv3_secrets_file = tmp_path / "secrets.json"
+
+            token_file.write_text("existing-token\n", encoding="utf-8")
+            snmpv3_secrets_file.write_text(
+                textwrap.dedent(
+                    """\
+                    {
+                      "lab-user": {
+                        "username": "lab-user",
+                        "authprotocol": "SHA",
+                        "authkey": "secret"
+                      }
+                    }
+                    """
+                ),
+                encoding="utf-8",
+            )
+            snmpv3_secrets_file.chmod(0o600)
+
+            result = self.run_script(
+                "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+                "--render-compose",
+                "--output-dir",
+                str(output_dir),
+                "--hec-token-file",
+                str(token_file),
+                "--snmpv3-secrets-file",
+                str(snmpv3_secrets_file),
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+
+            rendered_secrets = output_dir / "compose" / "secrets" / "secrets.json"
+            self.assertEqual(rendered_secrets.read_text(encoding="utf-8"), snmpv3_secrets_file.read_text(encoding="utf-8"))
+            self.assertEqual(stat.S_IMODE(rendered_secrets.stat().st_mode), 0o644)
 
     def test_sc4snmp_hec_token_yaml_special_characters_escaped(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3443,6 +3986,103 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertIn("Usage:", result.stdout)
             self.assertNotIn("Multiple credential profiles are defined", output)
 
+    def test_install_app_uses_deployer_bundle_for_search_head_cluster_targets(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            package_root = tmp_path / "package-root" / "TestApp" / "default"
+            package_root.mkdir(parents=True)
+            (package_root / "app.conf").write_text("[ui]\nis_visible = false\n", encoding="utf-8")
+            package_file = tmp_path / "TestApp.tgz"
+            apply_log = tmp_path / "bundle-apply.log"
+            splunk_home = tmp_path / "splunk"
+            (splunk_home / "bin").mkdir(parents=True)
+
+            with tarfile.open(package_file, "w:gz") as archive:
+                archive.add(package_root.parent.parent / "TestApp", arcname="TestApp")
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import sys
+                from urllib.parse import urlparse
+
+                args = sys.argv[1:]
+                url = ""
+                for arg in args:
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+
+                path = urlparse(url).path
+                if path.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                    raise SystemExit(0)
+                if "/services/apps/local/TestApp" in path:
+                    sys.stdout.write(json.dumps({"entry": [{"name": "TestApp", "content": {"version": "1.0.0"}}]}))
+                    raise SystemExit(0)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "${BUNDLE_APPLY_LOG}"
+                exit 0
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_DEPLOYER_PROFILE="deployer"
+                    PROFILE_deployer__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_deployer__SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    PROFILE_deployer__SPLUNK_URI="${PROFILE_deployer__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_deployer__SPLUNK_USER="user"
+                    PROFILE_deployer__SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_HOME"] = str(splunk_home)
+            env["SPLUNK_LOCAL_SUDO"] = "false"
+            env["SPLUNK_BUNDLE_OS_USER"] = getpass.getuser()
+            env["BUNDLE_APPLY_LOG"] = str(apply_log)
+
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "local",
+                "--file",
+                str(package_file),
+                "--no-update",
+                "--no-restart",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("deployer bundle delivery", output)
+            self.assertTrue(
+                (splunk_home / "etc" / "shcluster" / "apps" / "TestApp" / "default" / "app.conf").exists()
+            )
+            self.assertIn("apply shcluster-bundle", apply_log.read_text(encoding="utf-8"))
+
     def test_configure_streams_help_does_not_require_profile_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -3618,7 +4258,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 curl_requests,
             )
 
-    def test_stream_setup_install_prefers_splunkbase_before_local_fallback(self):
+    def test_stream_setup_install_prefers_splunkbase_before_local_fallback_in_legacy_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -3724,6 +4364,7 @@ class ShellScriptRegressionTests(unittest.TestCase):
             result = self.run_script(
                 "skills/splunk-stream-setup/scripts/setup.sh",
                 "--install",
+                "--legacy-all-in-one",
                 env=env,
             )
 
@@ -3739,6 +4380,73 @@ class ShellScriptRegressionTests(unittest.TestCase):
                     "--source splunkbase --app-id 5234 --no-update --no-restart",
                 ],
             )
+
+    def test_stream_setup_install_requires_declared_role_by_default(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            ta_cache = tmp_path / "splunk-ta"
+            ta_cache.mkdir()
+            credentials_file = tmp_path / "credentials"
+            registry_file = tmp_path / "app_registry.json"
+
+            for filename in (
+                "splunk-app-for-stream_816.tgz",
+                "splunk-add-on-for-stream-forwarders_816.tgz",
+                "splunk-add-on-for-stream-wire-data_816.tgz",
+            ):
+                (ta_cache / filename).write_text("placeholder", encoding="utf-8")
+
+            registry_file.write_text('{"apps": []}', encoding="utf-8")
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_SEARCH_API_URI="https://example.invalid:8089"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import sys
+
+                args = " ".join(sys.argv[1:])
+                if "/services/auth/login" in args and "-d @-" in args:
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                elif "/services/server/info" in args and "%{http_code}" in args:
+                    sys.stdout.write("200")
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "nc",
+                """\
+                #!/usr/bin/env bash
+                exit 0
+                """,
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["TA_CACHE"] = str(ta_cache)
+            env["REGISTRY_FILE"] = str(registry_file)
+
+            result = self.run_script(
+                "skills/splunk-stream-setup/scripts/setup.sh",
+                "--install",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 1, msg=output)
+            self.assertIn("requires a declared deployment role", output)
 
     def test_stream_setup_install_scopes_packages_to_declared_search_tier_role(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3907,12 +4615,289 @@ class ShellScriptRegressionTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1, msg=output)
             self.assertIn("Full Stream setup spans multiple runtime roles", output)
 
+    def test_thousandeyes_hec_management_uses_ingest_profile_on_enterprise(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            state_file = tmp_path / "thousandeyes_state.json"
+            curl_log = tmp_path / "curl.log"
+
+            state_file.write_text(json.dumps({"hec_tokens": {}}), encoding="utf-8")
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://search.example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_INGEST_PROFILE="hf"
+                    PROFILE_hf__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_hf__SPLUNK_TARGET_ROLE="heavy-forwarder"
+                    PROFILE_hf__SPLUNK_SEARCH_API_URI="https://hf.example.invalid:8089"
+                    PROFILE_hf__SPLUNK_URI="${PROFILE_hf__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_hf__SPLUNK_USER="user"
+                    PROFILE_hf__SPLUNK_PASS="pass"
+                    PROFILE_hf__SPLUNK_HEC_URL="https://hf-hec.example.invalid:8088/services/collector/event"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+                from urllib.parse import parse_qs, urlparse
+
+                state_path = Path(os.environ["TE_STATE_FILE"])
+                state = json.loads(state_path.read_text(encoding="utf-8"))
+                args = sys.argv[1:]
+                method = "GET"
+                data = ""
+                url = ""
+                write_code = False
+                output_target = None
+
+                def save() -> None:
+                    state_path.write_text(json.dumps(state), encoding="utf-8")
+
+                def out(body: str = "", code: int | None = None) -> None:
+                    if output_target == "/dev/null" and write_code and code is not None:
+                        sys.stdout.write(str(code))
+                        raise SystemExit(0)
+                    if body:
+                        sys.stdout.write(body)
+                    if write_code and code is not None:
+                        sys.stdout.write(f"\\n{code}")
+                    raise SystemExit(0)
+
+                i = 0
+                while i < len(args):
+                    arg = args[i]
+                    if arg == "-X" and i + 1 < len(args):
+                        method = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-d" and i + 1 < len(args):
+                        if args[i + 1] == "@-":
+                            data = sys.stdin.read()
+                        else:
+                            data = args[i + 1]
+                        if method == "GET":
+                            method = "POST"
+                        i += 2
+                        continue
+                    if arg == "-o" and i + 1 < len(args):
+                        output_target = args[i + 1]
+                        i += 2
+                        continue
+                    if "%{http_code}" in arg:
+                        write_code = True
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                    i += 1
+
+                if url:
+                    with Path(os.environ["CURL_LOG"]).open("a", encoding="utf-8") as handle:
+                        handle.write(url + "\\n")
+
+                parsed = urlparse(url)
+                path = parsed.path
+
+                if path.endswith("/services/auth/login"):
+                    out("<response><sessionKey>test-session</sessionKey></response>")
+
+                if "/services/apps/local/ta_cisco_thousandeyes" in path:
+                    if write_code:
+                        out(code=200)
+                    out(json.dumps({"entry": [{"name": "ta_cisco_thousandeyes", "content": {"version": "1.0.0"}}]}))
+
+                if path.endswith("/services/data/inputs/http") and method == "POST":
+                    body = parse_qs(data, keep_blank_values=True)
+                    name = body.get("name", ["thousandeyes"])[-1]
+                    state["hec_tokens"][name] = {"default_index": "thousandeyes_metrics"}
+                    save()
+                    out("", 201)
+
+                if path.endswith("/services/data/inputs/http"):
+                    entries = [
+                        {
+                            "name": f"http://{name}",
+                            "content": {
+                                "default_index": token.get("default_index", "thousandeyes_metrics"),
+                                "index": token.get("default_index", "thousandeyes_metrics"),
+                            },
+                        }
+                        for name, token in sorted(state["hec_tokens"].items())
+                    ]
+                    out(json.dumps({"entry": entries}))
+
+                out("", 200)
+                """,
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["TE_STATE_FILE"] = str(state_file)
+            env["CURL_LOG"] = str(curl_log)
+
+            result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                "--hec-only",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("HEC token 'thousandeyes' created via REST.", output)
+            curl_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn(
+                "https://hf.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                curl_requests,
+            )
+            self.assertNotIn(
+                "https://search.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                curl_requests,
+            )
+
+            curl_log.write_text("", encoding="utf-8")
+            validate_result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/validate.sh",
+                env=env,
+            )
+            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            validate_requests = curl_log.read_text(encoding="utf-8")
+            self.assertIn(
+                "https://hf.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                validate_requests,
+            )
+            self.assertNotIn(
+                "https://search.example.invalid:8089/services/data/inputs/http?output_mode=json",
+                validate_requests,
+            )
+
+    def test_thousandeyes_clustered_ingest_uses_bundle_managed_hec(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            curl_log = tmp_path / "curl.log"
+            apply_log = tmp_path / "bundle-apply.log"
+            splunk_home = tmp_path / "cluster-manager"
+            (splunk_home / "bin").mkdir(parents=True)
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://search.example.invalid:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_INGEST_PROFILE="idx"
+                    SPLUNK_CLUSTER_MANAGER_PROFILE="cm"
+                    PROFILE_idx__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_idx__SPLUNK_TARGET_ROLE="indexer"
+                    PROFILE_idx__SPLUNK_SEARCH_API_URI="https://indexer.example.invalid:8089"
+                    PROFILE_idx__SPLUNK_URI="${PROFILE_idx__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_idx__SPLUNK_USER="user"
+                    PROFILE_idx__SPLUNK_PASS="pass"
+                    PROFILE_idx__SPLUNK_HEC_URL="https://idx-hec.example.invalid:8088/services/collector/event"
+                    PROFILE_cm__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_cm__SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    PROFILE_cm__SPLUNK_URI="${PROFILE_cm__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_cm__SPLUNK_USER="cm-user"
+                    PROFILE_cm__SPLUNK_PASS="cm-pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+                from urllib.parse import urlparse
+
+                args = sys.argv[1:]
+                url = ""
+                for arg in args:
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+
+                if url:
+                    with Path(os.environ["CURL_LOG"]).open("a", encoding="utf-8") as handle:
+                        handle.write(url + "\\n")
+
+                if urlparse(url).path.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                    raise SystemExit(0)
+
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "${BUNDLE_APPLY_LOG}"
+                exit 0
+                """,
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["CURL_LOG"] = str(curl_log)
+            env["SPLUNK_HOME"] = str(splunk_home)
+            env["SPLUNK_LOCAL_SUDO"] = "false"
+            env["SPLUNK_BUNDLE_OS_USER"] = getpass.getuser()
+            env["BUNDLE_APPLY_LOG"] = str(apply_log)
+
+            result = self.run_script(
+                "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+                "--hec-only",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("HEC token 'thousandeyes' created via cluster-manager bundle.", output)
+            inputs_conf = (
+                splunk_home
+                / "etc"
+                / "manager-apps"
+                / "ZZZ_cisco_skills_hec"
+                / "local"
+                / "inputs.conf"
+            ).read_text(encoding="utf-8")
+            self.assertIn("[http://thousandeyes]", inputs_conf)
+            self.assertIn("index = thousandeyes_metrics", inputs_conf)
+            self.assertIn("indexes = thousandeyes_metrics,thousandeyes_traces,thousandeyes_events,thousandeyes_activity,thousandeyes_alerts,thousandeyes_pathvis", inputs_conf)
+            self.assertIn("apply cluster-bundle -auth cm-user:cm-pass", apply_log.read_text(encoding="utf-8"))
+            self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
+
     def test_thousandeyes_setup_enables_path_visualization_by_default(self):
         script_text = (REPO_ROOT / "skills/cisco-thousandeyes-setup/scripts/setup.sh").read_text(encoding="utf-8")
 
         self.assertIn("PATHVIS_ENABLED=true", script_text)
         self.assertIn('related_paths "1"', script_text)
         self.assertIn("--no-pathvis", script_text)
+        self.assertIn("--hec-url", script_text)
 
     def test_thousandeyes_configure_account_avoids_eval_for_network_data(self):
         script_text = (
@@ -4812,6 +5797,109 @@ class ShellScriptRegressionTests(unittest.TestCase):
                 "https://example-stack.stg.splunkcloud.com:8089/services/auth/login",
                 curl_log.read_text(encoding="utf-8"),
             )
+
+    def test_uninstall_app_uses_deployer_bundle_for_search_head_cluster_targets(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            splunk_home = tmp_path / "splunk"
+            app_dir = splunk_home / "etc" / "shcluster" / "apps" / "TestApp"
+            (splunk_home / "bin").mkdir(parents=True)
+            (app_dir / "default").mkdir(parents=True)
+            (app_dir / "default" / "app.conf").write_text("[ui]\nis_visible = false\n", encoding="utf-8")
+            apply_log = tmp_path / "bundle-apply.log"
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import sys
+                from urllib.parse import urlparse
+
+                args = sys.argv[1:]
+                url = ""
+                output_target = None
+                write_format = ""
+
+                i = 0
+                while i < len(args):
+                    arg = args[i]
+                    if arg == "-o" and i + 1 < len(args):
+                        output_target = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-w" and i + 1 < len(args):
+                        write_format = args[i + 1]
+                        i += 2
+                        continue
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                    i += 1
+
+                path = urlparse(url).path
+                if path.endswith("/services/auth/login"):
+                    sys.stdout.write("<response><sessionKey>test-session</sessionKey></response>")
+                    raise SystemExit(0)
+                if "/services/apps/local/TestApp" in path and output_target == "/dev/null" and "%{http_code}" in write_format:
+                    sys.stdout.write("200")
+                    raise SystemExit(0)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "${BUNDLE_APPLY_LOG}"
+                exit 0
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SPLUNK_PLATFORM="enterprise"
+                    SPLUNK_TARGET_ROLE="search-tier"
+                    SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+                    SPLUNK_USER="user"
+                    SPLUNK_PASS="pass"
+                    SPLUNK_DEPLOYER_PROFILE="deployer"
+                    PROFILE_deployer__SPLUNK_PLATFORM="enterprise"
+                    PROFILE_deployer__SPLUNK_SEARCH_API_URI="https://localhost:8089"
+                    PROFILE_deployer__SPLUNK_URI="${PROFILE_deployer__SPLUNK_SEARCH_API_URI}"
+                    PROFILE_deployer__SPLUNK_USER="user"
+                    PROFILE_deployer__SPLUNK_PASS="pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["SPLUNK_HOME"] = str(splunk_home)
+            env["SPLUNK_LOCAL_SUDO"] = "false"
+            env["SPLUNK_BUNDLE_OS_USER"] = getpass.getuser()
+            env["BUNDLE_APPLY_LOG"] = str(apply_log)
+
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/uninstall_app.sh",
+                "--app-name",
+                "TestApp",
+                "--no-restart",
+                env=env,
+                input_text="yes\n",
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+            self.assertIn("deployer bundle removal", output)
+            self.assertFalse(app_dir.exists())
+            self.assertTrue(list((splunk_home / "etc" / "shcluster" / "apps").glob("TestApp.removed.*")))
+            self.assertIn("apply shcluster-bundle", apply_log.read_text(encoding="utf-8"))
 
     def test_enterprise_uninstall_treats_delete_timeout_after_removal_as_success(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -5968,7 +7056,7 @@ EOF
             )
 
             result = subprocess.run(
-                ["bash", "-lc", helper_script],
+                ["bash", "-c", helper_script],
                 cwd=REPO_ROOT,
                 env=env,
                 capture_output=True,
@@ -5988,6 +7076,65 @@ EOF
             self.assertIn("install -m 600 /tmp/pkg.tgz.stage.", cmd_text)
             self.assertIn("/var/tmp/splunk/pkg.tgz", cmd_text)
 
+    def test_host_bootstrap_remote_staging_reports_noninteractive_sudo_requirement(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            local_file = tmp_path / "pkg.tgz"
+            local_file.write_text("package", encoding="utf-8")
+            bin_dir = tmp_path / "bin"
+            remote_root = tmp_path / "remote-root"
+            bin_dir.mkdir()
+
+            write_remote_shell_mocks(bin_dir)
+            write_executable(
+                bin_dir / "sshpass",
+                """\
+                #!/usr/bin/env bash
+                shift 2
+                if [[ "${1:-}" == "scp" ]]; then
+                    exit 0
+                fi
+                if [[ "${1:-}" == "ssh" ]]; then
+                    shift
+                    exec "$(dirname "$0")/ssh" "$@"
+                fi
+                exec "$@"
+                """,
+            )
+
+            helper_script = textwrap.dedent(
+                f"""\
+                source "{REPO_ROOT / 'skills/shared/lib/host_bootstrap_helpers.sh'}"
+                load_splunk_ssh_credentials() {{ :; }}
+                export SPLUNK_SSH_USER="bootstrap"
+                export SPLUNK_SSH_HOST="hf.example.com"
+                export SPLUNK_SSH_PORT="22"
+                export SPLUNK_SSH_PASS="secret"
+                export REMOTE_ROOT="{remote_root}"
+                hbs_stage_file_for_execution ssh "{local_file}" "pkg.tgz"
+                """
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "REMOTE_ROOT": str(remote_root),
+                    "REMOTE_SUDO_MODE": "require_stdin",
+                }
+            )
+
+            result = subprocess.run(
+                ["bash", "-lc", helper_script],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("either use the -S option", result.stdout + result.stderr)
+
     def test_host_bootstrap_install_preserves_local_package_and_cleans_user_seed_artifacts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -5996,7 +7143,7 @@ EOF
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
             credentials_file = tmp_path / "credentials"
             password_file = tmp_path / "admin_password"
-            package_file = tmp_path / "splunk-package.tgz"
+            package_file = tmp_path / "splunk-10.0.0-linux-x86_64.tgz"
             splunk_home = tmp_path / "installed-splunk"
             package_root = tmp_path / "package-root" / "splunk"
             (package_root / "bin").mkdir(parents=True)
@@ -6025,6 +7172,7 @@ EOF
                 case "$1" in
                     start|restart) echo "started"; exit 0 ;;
                     status) echo "splunkd is running"; exit 0 ;;
+                    version) echo "Splunk 10.0.0"; exit 0 ;;
                     enable) exit 0 ;;
                     *) exit 0 ;;
                 esac
@@ -6068,6 +7216,7 @@ EOF
             stale_backup = splunk_home / "etc/system/local/user-seed.conf.bak.stale"
             stale_backup.parent.mkdir(parents=True, exist_ok=True)
             stale_backup.write_text("stale", encoding="utf-8")
+            package_file.write_text("not-a-tarball\n", encoding="utf-8")
 
             second_result = self.run_script(
                 "skills/splunk-enterprise-host-setup/scripts/setup.sh",
@@ -6076,6 +7225,435 @@ EOF
             )
             self.assertEqual(second_result.returncode, 0, msg=second_result.stdout + second_result.stderr)
             self.assertTrue(package_file.exists(), msg="Local package should remain after repeated install runs")
+            self.assertIn("already matches the requested package", second_result.stdout)
+            self.assertFalse(stale_backup.exists(), msg="Repeated same-version install should clean stale user-seed backups")
+
+    def test_host_bootstrap_install_upgrades_tgz_without_admin_password_and_preserves_local_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "splunk-10.1.0-linux-x86_64.tgz"
+            splunk_home = tmp_path / "installed-splunk"
+            package_root = tmp_path / "package-root" / "splunk"
+            cmd_log = tmp_path / "splunk.log"
+
+            credentials_file.write_text("", encoding="utf-8")
+            (splunk_home / "bin").mkdir(parents=True)
+            (splunk_home / "etc/test").mkdir(parents=True)
+            (package_root / "bin").mkdir(parents=True)
+            (package_root / "etc/test").mkdir(parents=True)
+
+            (splunk_home / "etc/test/default.txt").write_text("old-default\n", encoding="utf-8")
+            (splunk_home / "etc/test/local-only.conf").write_text("keep-me\n", encoding="utf-8")
+            (package_root / "etc/test/default.txt").write_text("new-default\n", encoding="utf-8")
+
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                command = sys.argv[1] if len(sys.argv) > 1 else ""
+                with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(f"old:{command}\\n")
+                if command == "version":
+                    sys.stdout.write("Splunk 10.0.0")
+                elif command == "status":
+                    sys.stdout.write("splunkd is running")
+                elif command in {"stop", "start", "restart"}:
+                    sys.stdout.write(command)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                package_root / "bin" / "splunk",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                command = sys.argv[1] if len(sys.argv) > 1 else ""
+                with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(f"new:{command}\\n")
+                if command == "version":
+                    sys.stdout.write("Splunk 10.1.0")
+                elif command == "status":
+                    sys.stdout.write("splunkd is running")
+                elif command in {"stop", "start", "restart"}:
+                    sys.stdout.write(command)
+                raise SystemExit(0)
+                """,
+            )
+
+            with tarfile.open(package_file, "w:gz") as archive:
+                archive.add(package_root, arcname="splunk")
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_LOCAL_SUDO": "false",
+                    "SPLUNK_CMD_LOG": str(cmd_log),
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--no-boot-start",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Upgrading Splunk from 10.0.0 to 10.1.0", result.stdout)
+            self.assertEqual((splunk_home / "etc/test/default.txt").read_text(encoding="utf-8"), "new-default\n")
+            self.assertEqual((splunk_home / "etc/test/local-only.conf").read_text(encoding="utf-8"), "keep-me\n")
+
+            commands = cmd_log.read_text(encoding="utf-8").splitlines()
+            self.assertIn("old:version", commands)
+            self.assertIn("old:stop", commands)
+            self.assertIn("new:start", commands)
+            self.assertLess(commands.index("old:stop"), commands.index("new:start"))
+
+    def test_host_bootstrap_install_warns_that_clustered_upgrades_are_per_host_only(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "splunk-10.1.0-linux-x86_64.tgz"
+            splunk_home = tmp_path / "cluster-manager"
+            package_root = tmp_path / "package-root" / "splunk"
+
+            credentials_file.write_text("", encoding="utf-8")
+            (splunk_home / "bin").mkdir(parents=True)
+            (package_root / "bin").mkdir(parents=True)
+
+            write_executable(
+                splunk_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    version) echo "Splunk 10.0.0"; exit 0 ;;
+                    status) echo "splunkd is running"; exit 0 ;;
+                    stop|start|restart) echo "$1"; exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+            write_executable(
+                package_root / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    version) echo "Splunk 10.1.0"; exit 0 ;;
+                    status) echo "splunkd is running"; exit 0 ;;
+                    stop|start|restart) echo "$1"; exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+
+            with tarfile.open(package_file, "w:gz") as archive:
+                archive.add(package_root, arcname="splunk")
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_LOCAL_SUDO": "false",
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "cluster-manager",
+                "--deployment-mode", "clustered",
+                "--source", "local",
+                "--file", str(package_file),
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--no-boot-start",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Clustered upgrades are per-host only", result.stdout)
+
+    def test_host_bootstrap_install_upgrades_remote_rpm_without_admin_password(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            remote_root = tmp_path / "remote-root"
+            remote_home = remote_root / "opt/splunk"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "splunk-10.1.0-linux-x86_64.rpm"
+            cmd_log = tmp_path / "splunk.log"
+            install_log = tmp_path / "rpm.log"
+            new_splunk = tmp_path / "new-rpm-splunk"
+
+            bin_dir.mkdir()
+            (remote_home / "bin").mkdir(parents=True)
+            credentials_file.write_text("", encoding="utf-8")
+            package_file.write_text("rpm-package-placeholder", encoding="utf-8")
+
+            write_remote_shell_mocks(bin_dir)
+            write_executable(
+                remote_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                command = sys.argv[1] if len(sys.argv) > 1 else ""
+                with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(f"old:{command}\\n")
+                if command == "version":
+                    sys.stdout.write("Splunk 10.0.0")
+                elif command == "status":
+                    sys.stdout.write("splunkd is running")
+                elif command in {"stop", "start", "restart"}:
+                    sys.stdout.write(command)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                new_splunk,
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                command = sys.argv[1] if len(sys.argv) > 1 else ""
+                with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(f"new:{command}\\n")
+                if command == "version":
+                    sys.stdout.write("Splunk 10.1.0")
+                elif command == "status":
+                    sys.stdout.write("splunkd is running")
+                elif command in {"stop", "start", "restart"}:
+                    sys.stdout.write(command)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "rpm",
+                f"""\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "{install_log}"
+                install -m 755 "{new_splunk}" "${{REMOTE_ROOT}}/opt/splunk/bin/splunk"
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "REMOTE_ROOT": str(remote_root),
+                    "SPLUNK_CMD_LOG": str(cmd_log),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_SSH_HOST": "idx01.example.com",
+                    "SPLUNK_SSH_PORT": "22",
+                    "SPLUNK_SSH_USER": current_user,
+                    "SPLUNK_SSH_PASS": "ssh-password",
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "ssh",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--package-type", "rpm",
+                "--advertise-host", "idx01.example.com",
+                "--service-user", current_user,
+                "--no-boot-start",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Upgrading Splunk from 10.0.0 to 10.1.0", result.stdout)
+            self.assertIn("-Uvh", install_log.read_text(encoding="utf-8"))
+
+            commands = cmd_log.read_text(encoding="utf-8").splitlines()
+            self.assertIn("old:stop", commands)
+            self.assertIn("new:start", commands)
+
+    def test_host_bootstrap_install_upgrades_remote_deb_without_admin_password(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            remote_root = tmp_path / "remote-root"
+            remote_home = remote_root / "opt/splunk"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "splunk-10.1.0-linux-amd64.deb"
+            cmd_log = tmp_path / "splunk.log"
+            install_log = tmp_path / "dpkg.log"
+            new_splunk = tmp_path / "new-deb-splunk"
+
+            bin_dir.mkdir()
+            (remote_home / "bin").mkdir(parents=True)
+            credentials_file.write_text("", encoding="utf-8")
+            package_file.write_text("deb-package-placeholder", encoding="utf-8")
+
+            write_remote_shell_mocks(bin_dir)
+            write_executable(
+                remote_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                command = sys.argv[1] if len(sys.argv) > 1 else ""
+                with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(f"old:{command}\\n")
+                if command == "version":
+                    sys.stdout.write("Splunk 10.0.0")
+                elif command == "status":
+                    sys.stdout.write("splunkd is running")
+                elif command in {"stop", "start", "restart"}:
+                    sys.stdout.write(command)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                new_splunk,
+                """\
+                #!/usr/bin/env python3
+                import os
+                import sys
+                from pathlib import Path
+
+                command = sys.argv[1] if len(sys.argv) > 1 else ""
+                with Path(os.environ["SPLUNK_CMD_LOG"]).open("a", encoding="utf-8") as handle:
+                    handle.write(f"new:{command}\\n")
+                if command == "version":
+                    sys.stdout.write("Splunk 10.1.0")
+                elif command == "status":
+                    sys.stdout.write("splunkd is running")
+                elif command in {"stop", "start", "restart"}:
+                    sys.stdout.write(command)
+                raise SystemExit(0)
+                """,
+            )
+            write_executable(
+                bin_dir / "dpkg",
+                f"""\
+                #!/usr/bin/env bash
+                printf '%s\\n' "$*" >> "{install_log}"
+                install -m 755 "{new_splunk}" "${{REMOTE_ROOT}}/opt/splunk/bin/splunk"
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "REMOTE_ROOT": str(remote_root),
+                    "SPLUNK_CMD_LOG": str(cmd_log),
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_SSH_HOST": "sh01.example.com",
+                    "SPLUNK_SSH_PORT": "22",
+                    "SPLUNK_SSH_USER": current_user,
+                    "SPLUNK_SSH_PASS": "ssh-password",
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "ssh",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--package-type", "deb",
+                "--advertise-host", "sh01.example.com",
+                "--service-user", current_user,
+                "--no-boot-start",
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertIn("Upgrading Splunk from 10.0.0 to 10.1.0", result.stdout)
+            self.assertIn("-i", install_log.read_text(encoding="utf-8"))
+
+            commands = cmd_log.read_text(encoding="utf-8").splitlines()
+            self.assertIn("old:stop", commands)
+            self.assertIn("new:start", commands)
+
+    def test_host_bootstrap_install_remote_deb_reports_noninteractive_sudo_requirement(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            remote_root = tmp_path / "remote-root"
+            remote_home = remote_root / "opt/splunk"
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file = tmp_path / "credentials"
+            package_file = tmp_path / "splunk-10.1.0-linux-amd64.deb"
+
+            bin_dir.mkdir()
+            (remote_home / "bin").mkdir(parents=True)
+            credentials_file.write_text("", encoding="utf-8")
+            package_file.write_text("deb-package-placeholder", encoding="utf-8")
+
+            write_remote_shell_mocks(bin_dir)
+            write_executable(
+                remote_home / "bin" / "splunk",
+                """\
+                #!/usr/bin/env bash
+                case "$1" in
+                    version) echo "Splunk 10.0.0"; exit 0 ;;
+                    status) echo "splunkd is running"; exit 0 ;;
+                    stop|start|restart) echo "$1"; exit 0 ;;
+                    *) exit 0 ;;
+                esac
+                """,
+            )
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "PATH": f"{bin_dir}:{env['PATH']}",
+                    "REMOTE_ROOT": str(remote_root),
+                    "REMOTE_SUDO_MODE": "require_stdin",
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_SSH_HOST": "sh01.example.com",
+                    "SPLUNK_SSH_PORT": "22",
+                    "SPLUNK_SSH_USER": current_user,
+                    "SPLUNK_SSH_PASS": "ssh-password",
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "ssh",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--package-type", "deb",
+                "--advertise-host", "sh01.example.com",
+                "--service-user", current_user,
+                "--no-boot-start",
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("assumes", result.stdout)
+            self.assertIn("either use the -S option", result.stdout + result.stderr)
 
     def test_sc4x_live_smoke_help(self):
         result = self.run_script_no_env(

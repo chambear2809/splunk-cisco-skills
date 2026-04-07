@@ -9,6 +9,7 @@ APP_NAME="ta_cisco_thousandeyes"
 PASS=0
 FAIL=0
 WARN=0
+INGEST_SK=""
 
 pass() { log "  PASS: $*"; PASS=$((PASS + 1)); }
 fail() { log "  FAIL: $*"; FAIL=$((FAIL + 1)); }
@@ -28,6 +29,46 @@ if [[ ${FAIL} -eq 0 ]] && ! SK=$(get_session_key "${SPLUNK_URI}"); then
     fail "Could not authenticate to Splunk REST API — check credentials"
 fi
 
+ensure_ingest_session() {
+    local saved_user saved_pass
+
+    if ! load_splunk_credentials; then
+        fail "Could not load Splunk credentials — check credentials file"
+        return 1
+    fi
+    load_ingest_connection_settings
+
+    saved_user="${SPLUNK_USER:-}"
+    saved_pass="${SPLUNK_PASS:-}"
+    SPLUNK_USER="${INGEST_SPLUNK_USER:-${SPLUNK_USER:-}}"
+    SPLUNK_PASS="${INGEST_SPLUNK_PASS:-${SPLUNK_PASS:-}}"
+    if ! INGEST_SK=$(get_session_key "${INGEST_SPLUNK_URI}"); then
+        SPLUNK_USER="${saved_user}"
+        SPLUNK_PASS="${saved_pass}"
+        fail "Could not authenticate to the ingest-tier Splunk REST API — check ingest credentials"
+        return 1
+    fi
+    SPLUNK_USER="${saved_user}"
+    SPLUNK_PASS="${saved_pass}"
+    return 0
+}
+
+inspect_hec_token_state() {
+    local token_name="$1"
+
+    if is_splunk_cloud; then
+        rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown"
+        return 0
+    fi
+    if type deployment_should_manage_ingest_hec_via_bundle >/dev/null 2>&1 \
+        && deployment_should_manage_ingest_hec_via_bundle; then
+        deployment_get_bundle_hec_token_state "${token_name}" 2>/dev/null || echo "unknown"
+        return 0
+    fi
+    ensure_ingest_session || return 1
+    rest_get_hec_token_state "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown"
+}
+
 if [[ ${FAIL} -gt 0 ]]; then
     log ""
     log "=== Validation Summary ==="
@@ -44,7 +85,7 @@ fi
 
 log ""
 log "--- HEC Token ---"
-hec_state=$(rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "thousandeyes" 2>/dev/null || echo "unknown")
+hec_state=$(inspect_hec_token_state "thousandeyes" 2>/dev/null || echo "unknown")
 case "${hec_state}" in
     enabled) pass "HEC token 'thousandeyes' exists" ;;
     disabled) warn "HEC token 'thousandeyes' exists but is disabled" ;;

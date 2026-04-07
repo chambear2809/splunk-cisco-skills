@@ -82,6 +82,12 @@
 # -----------------------------------------------------------------------------
 # - Use Splunk Enterprise packages for search-tier, indexer, cluster-manager,
 #   search head cluster, and heavy-forwarder roles.
+# - The install phase auto-detects fresh install vs upgrade vs same-version
+#   no-op from the existing target and the requested package version.
+# - Install-only upgrades stop Splunk first and do not need
+#   ADMIN_PASSWORD_FILE unless later configure or cluster phases need auth.
 # - Heavy forwarders should set indexAndForward=false unless you intentionally
 #   need local indexing on that host.
+# - Clustered-role upgrades are per-host only; sequence hosts and verify
+#   cluster health outside this skill.
 # - Single-site clustering only in v1.

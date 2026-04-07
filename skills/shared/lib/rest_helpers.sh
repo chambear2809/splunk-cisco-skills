@@ -493,6 +493,13 @@ rest_create_index() {
 rest_set_conf() {
     local sk="$1" uri="$2" app="$3" conf="$4" stanza="$5" body="$6"
     local create_body encoded_stanza http_code resp
+
+    if type deployment_should_manage_search_config_via_bundle >/dev/null 2>&1 \
+        && deployment_should_manage_search_config_via_bundle; then
+        deployment_bundle_set_conf_for_current_target "${app}" "${conf}" "${stanza}" "${body}"
+        return $?
+    fi
+
     encoded_stanza=$(_urlencode "${stanza}")
     resp=$(splunk_curl_post "${sk}" "${body}" \
         "${uri}/servicesNS/nobody/${app}/configs/conf-${conf}/${encoded_stanza}" \

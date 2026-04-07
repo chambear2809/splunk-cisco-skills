@@ -1036,6 +1036,46 @@ install_app() {
     file_name="$(basename "${abs_file_path}")"
     expected_app_name="$(guess_app_name_from_package "${abs_file_path}")"
 
+    if deployment_should_use_bundle_for_current_target; then
+        local bundle_kind
+        bundle_kind="$(deployment_bundle_kind_for_current_target)"
+        case "${bundle_kind}" in
+            shc)
+                log "Installing via search-head-cluster deployer bundle delivery..."
+                ;;
+            idxc)
+                log "Installing via indexer-cluster manager bundle delivery..."
+                ;;
+            *)
+                log "Installing via bundle delivery..."
+                ;;
+        esac
+
+        if ! deployment_install_app_via_bundle "${abs_file_path}" "${expected_app_name}"; then
+            log "ERROR: Bundle-managed app installation failed."
+            exit 1
+        fi
+
+        if [[ -n "${expected_app_name}" ]]; then
+            if ! deployment_bundle_app_exists_for_current_target "${expected_app_name}"; then
+                log "ERROR: Bundle-managed app installation could not be verified on the control plane for '${expected_app_name}'."
+                exit 1
+            fi
+            http_code="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${expected_app_name}")"
+            if [[ "${http_code}" != "200" ]]; then
+                log "WARNING: Bundle delivery completed, but current-target REST verification returned HTTP ${http_code} for '${expected_app_name}'."
+                log "WARNING: The bundle may still be propagating through the clustered deployment plane."
+            fi
+        else
+            log "WARNING: Bundle delivery completed, but the app name could not be inferred for post-apply verification."
+        fi
+
+        INSTALL_HTTP_CODE="200"
+        INSTALL_BODY=""
+        INSTALL_INCOMPLETE_BUT_PRESENT=false
+        http_code="${INSTALL_HTTP_CODE}"
+        body="${INSTALL_BODY}"
+    else
     log "Installing to ${SPLUNK_URI} ..."
 
     # Detect whether Splunk is local or remote.
@@ -1071,8 +1111,9 @@ install_app() {
         cleanup_remote_stage_file "${remote_tmp}"
     fi
 
-    http_code="${INSTALL_HTTP_CODE:-000}"
-    body="${INSTALL_BODY:-}"
+        http_code="${INSTALL_HTTP_CODE:-000}"
+        body="${INSTALL_BODY:-}"
+    fi
 
     local app_name error_msg
     app_name=$(echo "${body}" | python3 -c "

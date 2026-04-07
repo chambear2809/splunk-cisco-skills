@@ -482,6 +482,13 @@ platform_check_index() {
     if is_splunk_cloud; then
         cloud_check_index "${idx}"
     else
+        if type deployment_prepare_index_rest_context >/dev/null 2>&1; then
+            if ! deployment_prepare_index_rest_context "${sk}" "${uri}"; then
+                return 1
+            fi
+            rest_check_index "${DEPLOYMENT_REST_SK}" "${DEPLOYMENT_REST_URI}" "${idx}"
+            return $?
+        fi
         rest_check_index "${sk}" "${uri}" "${idx}"
     fi
 }
@@ -491,6 +498,11 @@ platform_get_index_datatype() {
     if is_splunk_cloud; then
         cloud_get_index_datatype "${idx}"
     else
+        if type deployment_prepare_index_rest_context >/dev/null 2>&1; then
+            deployment_prepare_index_rest_context "${sk}" "${uri}" || return 1
+            rest_get_index_datatype "${DEPLOYMENT_REST_SK}" "${DEPLOYMENT_REST_URI}" "${idx}"
+            return $?
+        fi
         rest_get_index_datatype "${sk}" "${uri}" "${idx}"
     fi
 }
@@ -500,6 +512,15 @@ platform_create_index() {
     if is_splunk_cloud; then
         cloud_create_index "${idx}" "${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}" "${index_type}"
     else
+        if type deployment_index_bundle_profile >/dev/null 2>&1; then
+            if deployment_index_bundle_profile >/dev/null 2>&1; then
+                deployment_create_cluster_bundle_index "${idx}" "${max_size}" "${index_type}"
+                return $?
+            fi
+            deployment_prepare_index_rest_context "${sk}" "${uri}" || return 1
+            rest_create_index "${DEPLOYMENT_REST_SK}" "${DEPLOYMENT_REST_URI}" "${idx}" "${max_size}" "${index_type}"
+            return $?
+        fi
         rest_create_index "${sk}" "${uri}" "${idx}" "${max_size}" "${index_type}"
     fi
 }

@@ -25,6 +25,7 @@ PASS=0
 WARN=0
 FAIL=0
 SK=""
+INGEST_SK=""
 
 usage() {
     local exit_code="${1:-0}"
@@ -80,6 +81,62 @@ ensure_search_session() {
     return 0
 }
 
+ensure_ingest_session() {
+    local saved_user saved_pass
+
+    if ! load_splunk_credentials; then
+        fail "Could not load Splunk credentials — check credentials file"
+        return 1
+    fi
+    load_ingest_connection_settings
+
+    saved_user="${SPLUNK_USER:-}"
+    saved_pass="${SPLUNK_PASS:-}"
+    SPLUNK_USER="${INGEST_SPLUNK_USER:-${SPLUNK_USER:-}}"
+    SPLUNK_PASS="${INGEST_SPLUNK_PASS:-${SPLUNK_PASS:-}}"
+    if ! INGEST_SK=$(get_session_key "${INGEST_SPLUNK_URI}"); then
+        SPLUNK_USER="${saved_user}"
+        SPLUNK_PASS="${saved_pass}"
+        fail "Could not authenticate to the ingest-tier Splunk REST API — check ingest credentials"
+        return 1
+    fi
+    SPLUNK_USER="${saved_user}"
+    SPLUNK_PASS="${saved_pass}"
+    return 0
+}
+
+inspect_hec_token_state() {
+    local token_name="$1"
+
+    if is_splunk_cloud; then
+        rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown"
+        return 0
+    fi
+    if type deployment_should_manage_ingest_hec_via_bundle >/dev/null 2>&1 \
+        && deployment_should_manage_ingest_hec_via_bundle; then
+        deployment_get_bundle_hec_token_state "${token_name}" 2>/dev/null || echo "unknown"
+        return 0
+    fi
+    ensure_ingest_session || return 1
+    rest_get_hec_token_state "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown"
+}
+
+inspect_hec_token_record() {
+    local token_name="$1"
+
+    if is_splunk_cloud; then
+        rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}"
+        return 0
+    fi
+    if type deployment_should_manage_ingest_hec_via_bundle >/dev/null 2>&1 \
+        && deployment_should_manage_ingest_hec_via_bundle; then
+        deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}"
+        return 0
+    fi
+    ensure_ingest_session || return 1
+    rest_get_hec_token_record "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}"
+}
+
 validate_indexes() {
     local idx datatype
     log "--- Indexes ---"
@@ -116,7 +173,7 @@ validate_hec_token() {
     # when the token exists and is functional.
     local token_state token_record ack_state restricted_indexes default_index
     log "--- HEC Token ---"
-    token_state="$(rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+    token_state="$(inspect_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
     case "${token_state}" in
         enabled) pass "HEC token '${HEC_TOKEN_NAME}' exists" ;;
         disabled) fail "HEC token '${HEC_TOKEN_NAME}' exists but is disabled" ;;
@@ -124,7 +181,7 @@ validate_hec_token() {
         *) warn "Could not determine HEC token '${HEC_TOKEN_NAME}' status" ;;
     esac
 
-    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${HEC_TOKEN_NAME}" 2>/dev/null || echo "{}")"
+    token_record="$(inspect_hec_token_record "${HEC_TOKEN_NAME}" 2>/dev/null || echo "{}")"
     ack_state="$(rest_json_field "${token_record}" "useACK")"
     restricted_indexes="$(rest_json_field "${token_record}" "indexes")"
     default_index="$(rest_json_field "${token_record}" "default_index")"

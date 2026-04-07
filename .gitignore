@@ -18,6 +18,7 @@ splunk-ta/_unpacked/
 # --- Python cache ---
 **/__pycache__/
 **/*.pyc
+.pytest_cache/
 
 # --- macOS ---
 .DS_Store

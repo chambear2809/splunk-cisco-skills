@@ -45,6 +45,8 @@ SNMPV3_SECRETS_FILE=""
 
 SK=""
 SESSION_READY=false
+INGEST_SK=""
+INGEST_SESSION_READY=false
 INDEXES_CREATED=0
 _ACS_HEC_CMD_GROUP=""
 
@@ -203,6 +205,14 @@ write_secret_file() {
     umask "${previous_umask}"
 }
 
+write_compose_bind_secret_file() {
+    local path="$1" content="$2"
+    # SC4SNMP Compose mounts these files into non-root containers, so owner-only
+    # permissions from the render host can make them unreadable at runtime.
+    write_secret_file "${path}" "${content}"
+    chmod 644 "${path}"
+}
+
 make_executable() {
     chmod 755 "$1"
 }
@@ -291,6 +301,11 @@ ensure_splunk_context() {
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
 }
 
+ensure_ingest_context() {
+    ensure_splunk_context
+    load_ingest_connection_settings
+}
+
 ensure_search_session() {
     ensure_splunk_context
     if [[ "${SESSION_READY}" == "true" ]]; then
@@ -309,6 +324,52 @@ maybe_start_search_session() {
         SESSION_READY=true
         return 0
     fi
+    return 1
+}
+
+ensure_ingest_session() {
+    local saved_user saved_pass
+
+    ensure_ingest_context
+    if [[ "${INGEST_SESSION_READY}" == "true" ]]; then
+        return 0
+    fi
+
+    saved_user="${SPLUNK_USER:-}"
+    saved_pass="${SPLUNK_PASS:-}"
+    SPLUNK_USER="${INGEST_SPLUNK_USER:-${SPLUNK_USER:-}}"
+    SPLUNK_PASS="${INGEST_SPLUNK_PASS:-${SPLUNK_PASS:-}}"
+    INGEST_SK="$(get_session_key "${INGEST_SPLUNK_URI}")" || {
+        SPLUNK_USER="${saved_user}"
+        SPLUNK_PASS="${saved_pass}"
+        log "ERROR: Could not authenticate to the ingest-tier Splunk REST API."
+        exit 1
+    }
+    SPLUNK_USER="${saved_user}"
+    SPLUNK_PASS="${saved_pass}"
+    INGEST_SESSION_READY=true
+}
+
+maybe_start_ingest_session() {
+    local saved_user saved_pass
+
+    ensure_ingest_context
+    if [[ "${INGEST_SESSION_READY}" == "true" ]]; then
+        return 0
+    fi
+
+    saved_user="${SPLUNK_USER:-}"
+    saved_pass="${SPLUNK_PASS:-}"
+    SPLUNK_USER="${INGEST_SPLUNK_USER:-${SPLUNK_USER:-}}"
+    SPLUNK_PASS="${INGEST_SPLUNK_PASS:-${SPLUNK_PASS:-}}"
+    if INGEST_SK="$(get_session_key "${INGEST_SPLUNK_URI}" 2>/dev/null)"; then
+        INGEST_SESSION_READY=true
+        SPLUNK_USER="${saved_user}"
+        SPLUNK_PASS="${saved_pass}"
+        return 0
+    fi
+    SPLUNK_USER="${saved_user}"
+    SPLUNK_PASS="${saved_pass}"
     return 1
 }
 
@@ -409,14 +470,14 @@ image_tag() {
 }
 
 detect_hec_base_url() {
-    local stack host
+    local stack host ingest_role
 
     if [[ -n "${HEC_URL}" ]]; then
         normalize_hec_base_url "${HEC_URL}"
         return 0
     fi
 
-    ensure_splunk_context
+    ensure_ingest_context
     if is_splunk_cloud; then
         stack="${SPLUNK_CLOUD_STACK:-}"
         if [[ -z "${stack}" ]]; then
@@ -431,15 +492,61 @@ detect_hec_base_url() {
         return 0
     fi
 
-    host="$(splunk_host_from_uri "${SPLUNK_URI}")"
+    if [[ -n "${INGEST_SPLUNK_HEC_URL:-}" ]]; then
+        normalize_hec_base_url "${INGEST_SPLUNK_HEC_URL}"
+        return 0
+    fi
+
+    ingest_role="$(resolve_ingest_target_role 2>/dev/null || true)"
+    if [[ "${ingest_role}" == "indexer" ]] && deployment_index_bundle_profile >/dev/null 2>&1; then
+        log "ERROR: Clustered indexer-tier ingest requires an explicit HEC URL."
+        log "ERROR: Set --hec-url or configure SPLUNK_HEC_URL on the ingest profile."
+        exit 1
+    fi
+
+    host="$(splunk_host_from_uri "${INGEST_SPLUNK_URI}")"
     if [[ -z "${host}" ]]; then
-        host="${SPLUNK_HOST:-}"
+        host="${INGEST_SPLUNK_HOST:-${SPLUNK_HOST:-}}"
     fi
     if [[ -z "${host}" ]]; then
-        log "ERROR: Could not determine the Enterprise HEC host. Pass --hec-url or configure SPLUNK_URI."
+        log "ERROR: Could not determine the Enterprise ingest HEC host. Pass --hec-url or configure SPLUNK_INGEST_PROFILE."
         exit 1
     fi
     printf 'https://%s:8088' "${host}"
+}
+
+enterprise_hec_uses_bundle() {
+    if is_splunk_cloud; then
+        return 1
+    fi
+    type deployment_should_manage_ingest_hec_via_bundle >/dev/null 2>&1 \
+        && deployment_should_manage_ingest_hec_via_bundle
+}
+
+enterprise_hec_token_state() {
+    local token_name="$1"
+
+    if enterprise_hec_uses_bundle; then
+        deployment_get_bundle_hec_token_state "${token_name}" 2>/dev/null || echo "unknown"
+        return 0
+    fi
+    if ! maybe_start_ingest_session; then
+        return 1
+    fi
+    rest_get_hec_token_state "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown"
+}
+
+enterprise_hec_token_record() {
+    local token_name="$1"
+
+    if enterprise_hec_uses_bundle; then
+        deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}"
+        return 0
+    fi
+    if ! maybe_start_ingest_session; then
+        return 1
+    fi
+    rest_get_hec_token_record "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}"
 }
 
 rest_create_hec_token() {
@@ -449,8 +556,8 @@ rest_create_hec_token() {
         index "netops" \
         disabled "false" \
         useACK "0") || return 1
-    resp=$(splunk_curl_post "${SK}" "${body}" \
-        "${SPLUNK_URI}/services/data/inputs/http?output_mode=json" \
+    resp=$(splunk_curl_post "${INGEST_SK}" "${body}" \
+        "${INGEST_SPLUNK_URI}/services/data/inputs/http?output_mode=json" \
         -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     case "${http_code}" in
@@ -539,8 +646,8 @@ cloud_enable_hec_token_via_acs() {
 rest_enable_hec_token() {
     local token_name="$1" encoded_name resp http_code
     encoded_name="$(_urlencode "http://${token_name}")"
-    resp=$(splunk_curl_post "${SK}" "" \
-        "${SPLUNK_URI}/services/data/inputs/http/${encoded_name}/enable" \
+    resp=$(splunk_curl_post "${INGEST_SK}" "" \
+        "${INGEST_SPLUNK_URI}/services/data/inputs/http/${encoded_name}/enable" \
         -w '\n%{http_code}' 2>/dev/null)
     http_code=$(echo "${resp}" | tail -1)
     case "${http_code}" in
@@ -553,8 +660,8 @@ rest_update_hec_token_default_index() {
     local token_name="$1" target_index="$2" encoded_name body resp http_code
     encoded_name="$(_urlencode "http://${token_name}")"
     body="$(form_urlencode_pairs index "${target_index}")" || return 1
-    resp="$(splunk_curl_post "${SK}" "${body}" \
-        "${SPLUNK_URI}/services/data/inputs/http/${encoded_name}?output_mode=json" \
+    resp="$(splunk_curl_post "${INGEST_SK}" "${body}" \
+        "${INGEST_SPLUNK_URI}/services/data/inputs/http/${encoded_name}?output_mode=json" \
         -w '\n%{http_code}' 2>/dev/null)"
     http_code="$(echo "${resp}" | tail -1)"
     case "${http_code}" in
@@ -576,16 +683,19 @@ cloud_update_hec_token_default_index_via_acs() {
 ensure_expected_hec_default_index() {
     local token_name="$1" expected_index="$2" token_record default_index
 
-    if ! maybe_start_search_session; then
-        if is_splunk_cloud; then
+    if is_splunk_cloud; then
+        if ! maybe_start_search_session; then
             log "WARN: Could not inspect the default index for HEC token '${token_name}' over Splunk REST."
             return 0
         fi
-        log "ERROR: Could not inspect the default index for HEC token '${token_name}'."
-        exit 1
+        token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
+    else
+        if ! token_record="$(enterprise_hec_token_record "${token_name}")"; then
+            log "ERROR: Could not inspect the default index for HEC token '${token_name}' on the ingest tier."
+            exit 1
+        fi
     fi
 
-    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
     default_index="$(rest_json_field "${token_record}" "default_index")"
     if [[ -z "${default_index}" ]]; then
         default_index="$(rest_json_field "${token_record}" "index")"
@@ -604,13 +714,22 @@ ensure_expected_hec_default_index() {
         return 0
     fi
 
-    log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via Splunk REST..."
-    if ! rest_update_hec_token_default_index "${token_name}" "${expected_index}"; then
-        log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via Splunk REST."
-        exit 1
+    if enterprise_hec_uses_bundle; then
+        log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via cluster-manager bundle..."
+        if ! deployment_update_cluster_bundle_hec_token_default_index "${token_name}" "${expected_index}"; then
+            log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via cluster-manager bundle."
+            exit 1
+        fi
+        token_record="$(deployment_get_bundle_hec_token_record "${token_name}" 2>/dev/null || echo "{}")"
+    else
+        log "HEC token '${token_name}' default index is '${default_index:-unknown}'. Updating it to '${expected_index}' via Splunk REST..."
+        if ! rest_update_hec_token_default_index "${token_name}" "${expected_index}"; then
+            log "ERROR: Failed to update HEC token '${token_name}' default index to '${expected_index}' via Splunk REST."
+            exit 1
+        fi
+        token_record="$(enterprise_hec_token_record "${token_name}" 2>/dev/null || echo "{}")"
     fi
 
-    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
     default_index="$(rest_json_field "${token_record}" "default_index")"
     if [[ -z "${default_index}" ]]; then
         default_index="$(rest_json_field "${token_record}" "index")"
@@ -625,12 +744,19 @@ write_hec_token_file_if_requested() {
     local token_name="$1" token_record token_value
     [[ -n "${WRITE_HEC_TOKEN_FILE}" ]] || return 0
 
-    if ! maybe_start_search_session; then
-        log "WARN: Could not open a Splunk REST session to retrieve the HEC token value."
-        return 0
+    if is_splunk_cloud; then
+        if ! maybe_start_search_session; then
+            log "WARN: Could not open a Splunk REST session to retrieve the HEC token value."
+            return 0
+        fi
+        token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
+    else
+        if ! token_record="$(enterprise_hec_token_record "${token_name}")"; then
+            log "WARN: Could not inspect the ingest-tier HEC token value."
+            return 0
+        fi
     fi
 
-    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
     token_value="$(rest_json_field "${token_record}" "token")"
     if [[ -z "${token_value}" ]]; then
         log "WARN: Splunk did not return a clear HEC token value for '${token_name}'. Write the token to a local file manually."
@@ -645,12 +771,19 @@ write_hec_token_file_if_requested() {
 warn_about_hec_token_details() {
     local token_name="$1" token_record ack_state indexes_value default_index
 
-    if ! maybe_start_search_session; then
-        log "WARN: Could not inspect detailed HEC token settings over Splunk REST."
-        return 0
+    if is_splunk_cloud; then
+        if ! maybe_start_search_session; then
+            log "WARN: Could not inspect detailed HEC token settings over Splunk REST."
+            return 0
+        fi
+        token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
+    else
+        if ! token_record="$(enterprise_hec_token_record "${token_name}")"; then
+            log "WARN: Could not inspect detailed ingest-tier HEC token settings."
+            return 0
+        fi
     fi
 
-    token_record="$(rest_get_hec_token_record "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "{}")"
     ack_state="$(rest_json_field "${token_record}" "useACK")"
     indexes_value="$(rest_json_field "${token_record}" "indexes")"
     default_index="$(rest_json_field "${token_record}" "default_index")"
@@ -709,27 +842,55 @@ ensure_hec_token() {
                 ;;
         esac
     else
-        ensure_search_session
-        state="$(rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+        state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
         case "${state}" in
             enabled)
                 log "HEC token '${HEC_TOKEN_NAME}' already exists."
                 ;;
             disabled)
-                log "HEC token '${HEC_TOKEN_NAME}' exists but is disabled. Enabling it via Splunk REST..."
-                if ! rest_enable_hec_token "${HEC_TOKEN_NAME}"; then
-                    log "ERROR: Failed to enable disabled HEC token '${HEC_TOKEN_NAME}' via Splunk REST."
+                if enterprise_hec_uses_bundle; then
+                    log "HEC token '${HEC_TOKEN_NAME}' exists but is disabled. Enabling it via cluster-manager bundle..."
+                    if ! deployment_enable_cluster_bundle_hec_token "${HEC_TOKEN_NAME}"; then
+                        log "ERROR: Failed to enable disabled HEC token '${HEC_TOKEN_NAME}' via cluster-manager bundle."
+                        exit 1
+                    fi
+                else
+                    ensure_ingest_session
+                    log "HEC token '${HEC_TOKEN_NAME}' exists but is disabled. Enabling it via Splunk REST..."
+                    if ! rest_enable_hec_token "${HEC_TOKEN_NAME}"; then
+                        log "ERROR: Failed to enable disabled HEC token '${HEC_TOKEN_NAME}' via Splunk REST."
+                        exit 1
+                    fi
+                fi
+                state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+                if [[ "${state}" != "enabled" ]]; then
+                    log "ERROR: HEC token '${HEC_TOKEN_NAME}' is still not enabled after the update."
                     exit 1
                 fi
                 log "Enabled HEC token '${HEC_TOKEN_NAME}'."
                 ;;
             *)
-                log "Creating HEC token '${HEC_TOKEN_NAME}' via Splunk REST..."
-                if ! rest_create_hec_token "${HEC_TOKEN_NAME}"; then
-                    log "ERROR: Failed to create HEC token '${HEC_TOKEN_NAME}' via Splunk REST."
-                    exit 1
+                if enterprise_hec_uses_bundle; then
+                    log "Creating HEC token '${HEC_TOKEN_NAME}' via cluster-manager bundle..."
+                    if ! deployment_create_cluster_bundle_hec_token "${HEC_TOKEN_NAME}" "netops" "" "0"; then
+                        log "ERROR: Failed to create HEC token '${HEC_TOKEN_NAME}' via cluster-manager bundle."
+                        exit 1
+                    fi
+                    state="$(enterprise_hec_token_state "${HEC_TOKEN_NAME}" 2>/dev/null || echo "unknown")"
+                    if [[ "${state}" != "enabled" ]]; then
+                        log "ERROR: HEC token '${HEC_TOKEN_NAME}' could not be verified after the cluster-manager bundle update."
+                        exit 1
+                    fi
+                    log "Created HEC token '${HEC_TOKEN_NAME}' via cluster-manager bundle."
+                else
+                    ensure_ingest_session
+                    log "Creating HEC token '${HEC_TOKEN_NAME}' via Splunk REST..."
+                    if ! rest_create_hec_token "${HEC_TOKEN_NAME}"; then
+                        log "ERROR: Failed to create HEC token '${HEC_TOKEN_NAME}' via Splunk REST."
+                        exit 1
+                    fi
+                    log "Created HEC token '${HEC_TOKEN_NAME}'."
                 fi
-                log "Created HEC token '${HEC_TOKEN_NAME}'."
                 ;;
         esac
     fi
@@ -932,16 +1093,16 @@ render_compose_assets() {
     mkdir -p "${compose_dir}/config" "${compose_dir}/secrets" "${compose_dir}/mibs"
     if [[ -n "${HEC_TOKEN_FILE}" ]]; then
         assert_secret_output_dir_is_safe "${compose_dir}"
-        write_secret_file "${compose_dir}/secrets/hec_token" "$(read_secret_file "${HEC_TOKEN_FILE}")"$'\n'
+        write_compose_bind_secret_file "${compose_dir}/secrets/hec_token" "$(read_secret_file "${HEC_TOKEN_FILE}")"$'\n'
     else
-        write_secret_file "${compose_dir}/secrets/hec_token.example" "<replace-with-hec-token>"$'\n'
+        write_compose_bind_secret_file "${compose_dir}/secrets/hec_token.example" "<replace-with-hec-token>"$'\n'
         log "WARN: No --hec-token-file provided. Rendering a placeholder token file."
     fi
     if [[ -n "${SNMPV3_SECRETS_FILE}" ]]; then
         cp "${SNMPV3_SECRETS_FILE}" "${compose_dir}/secrets/secrets.json"
-        chmod 600 "${compose_dir}/secrets/secrets.json"
+        chmod 644 "${compose_dir}/secrets/secrets.json"
     else
-        write_secret_file "${compose_dir}/secrets/secrets.json.example" $'{\n  "example": {\n    "username": "snmp-user",\n    "authprotocol": "SHA",\n    "authkey": "replace-me"\n  }\n}\n'
+        write_compose_bind_secret_file "${compose_dir}/secrets/secrets.json.example" $'{\n  "example": {\n    "username": "snmp-user",\n    "authprotocol": "SHA",\n    "authkey": "replace-me"\n  }\n}\n'
     fi
 
     inventory_content="$(load_config_content "${INVENTORY_FILE}" "inventory")"

@@ -9,6 +9,8 @@ setup() {
     export _ACS_HELPERS_LOADED=""
     export _SPLUNKBASE_HELPERS_LOADED=""
     export _CONFIGURE_ACCOUNT_HELPERS_LOADED=""
+    export _HOST_BOOTSTRAP_HELPERS_LOADED=""
+    export _DEPLOYMENT_HELPERS_LOADED=""
     export SPLUNK_USER="testuser"
     export SPLUNK_PASS="testpass"
     export SPLUNK_VERIFY_SSL="false"
@@ -302,6 +304,24 @@ setup() {
     run platform_create_index "sk" "https://uri" "myindex" "512000" "metric"
     [ "$status" -eq 0 ]
     [[ "$output" == *"rest_create_index myindex 512000 metric"* ]]
+}
+
+@test "platform_create_index uses cluster-manager bundle workflow for clustered ingest" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    source "${LIB_DIR}/deployment_helpers.sh"
+    source "${LIB_DIR}/acs_helpers.sh"
+
+    is_splunk_cloud() { return 1; }
+    deployment_index_bundle_profile() { echo "cluster-manager"; }
+    deployment_create_cluster_bundle_index() {
+        echo "bundle_index $1 $2 $3"
+    }
+    export -f is_splunk_cloud deployment_index_bundle_profile deployment_create_cluster_bundle_index
+
+    run platform_create_index "sk" "https://uri" "myindex" "512000" "metric"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"bundle_index myindex 512000 metric"* ]]
 }
 
 @test "platform_create_index defaults index_type to event" {

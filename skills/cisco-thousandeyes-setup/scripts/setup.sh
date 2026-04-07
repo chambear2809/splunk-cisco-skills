@@ -16,9 +16,12 @@ ACCOUNT_GROUP=""
 INDEX=""
 INPUT_TYPE=""
 HEC_TOKEN=""
+HEC_URL=""
 PATHVIS_ENABLED=true
 PATHVIS_INDEX="thousandeyes_pathvis"
 PATHVIS_INTERVAL="3600"
+SK=""
+INGEST_SK=""
 
 usage() {
     cat >&2 <<EOF
@@ -35,6 +38,7 @@ Options:
   --index INDEX           Target index for polling inputs
   --input-type TYPE       Input group: all, metrics, traces, events, activity, alerts
   --hec-token NAME        HEC token name (default: thousandeyes)
+  --hec-url URL           HEC URL override; may include /services/collector/event
   --pathvis-index INDEX   Path visualization index (default: thousandeyes_pathvis)
   --pathvis-interval SEC  Path visualization poll interval (default: 3600)
   --no-pathvis            Disable path visualization on metrics inputs
@@ -55,6 +59,7 @@ while [[ $# -gt 0 ]]; do
         --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
         --input-type) require_arg "$1" $# || exit 1; INPUT_TYPE="$2"; shift 2 ;;
         --hec-token) require_arg "$1" $# || exit 1; HEC_TOKEN="$2"; shift 2 ;;
+        --hec-url) require_arg "$1" $# || exit 1; HEC_URL="$2"; shift 2 ;;
         --pathvis-index) require_arg "$1" $# || exit 1; PATHVIS_INDEX="$2"; shift 2 ;;
         --pathvis-interval) require_arg "$1" $# || exit 1; PATHVIS_INTERVAL="$2"; shift 2 ;;
         --no-pathvis) PATHVIS_ENABLED=false; shift ;;
@@ -76,6 +81,26 @@ ensure_search_api_session() {
     SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk. Check credentials."; exit 1; }
 }
 
+ensure_ingest_api_session() {
+    local saved_user saved_pass
+
+    load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+    load_ingest_connection_settings
+
+    saved_user="${SPLUNK_USER:-}"
+    saved_pass="${SPLUNK_PASS:-}"
+    SPLUNK_USER="${INGEST_SPLUNK_USER:-${SPLUNK_USER:-}}"
+    SPLUNK_PASS="${INGEST_SPLUNK_PASS:-${SPLUNK_PASS:-}}"
+    INGEST_SK="$(get_session_key "${INGEST_SPLUNK_URI}")" || {
+        SPLUNK_USER="${saved_user}"
+        SPLUNK_PASS="${saved_pass}"
+        log "ERROR: Could not authenticate to the ingest-tier Splunk REST API. Check ingest credentials."
+        exit 1
+    }
+    SPLUNK_USER="${saved_user}"
+    SPLUNK_PASS="${saved_pass}"
+}
+
 check_prereqs() {
     ensure_search_api_session
     if ! rest_check_app "${SK}" "${SPLUNK_URI}" "${APP_NAME}"; then
@@ -84,7 +109,22 @@ check_prereqs() {
     fi
 }
 
+normalize_hec_base_url() {
+    local url="${1%/}"
+    url="${url%/services/collector/event}"
+    url="${url%/services/collector/raw}"
+    printf '%s' "${url}"
+}
+
 detect_hec_target() {
+    local host ingest_role
+
+    if [[ -n "${HEC_URL}" ]]; then
+        normalize_hec_base_url "${HEC_URL}"
+        return 0
+    fi
+
+    load_ingest_connection_settings
     if is_splunk_cloud; then
         local stack="${SPLUNK_CLOUD_STACK:-}"
         if [[ -n "${stack}" ]]; then
@@ -100,9 +140,48 @@ detect_hec_target() {
         log "  which is incorrect for Splunk Cloud. Set SPLUNK_CLOUD_STACK" >&2
         log "  in your credentials file." >&2
     fi
-    local host
-    host=$(splunk_host_from_uri "${SPLUNK_URI}")
+
+    if [[ -n "${INGEST_SPLUNK_HEC_URL:-}" ]]; then
+        normalize_hec_base_url "${INGEST_SPLUNK_HEC_URL}"
+        return 0
+    fi
+
+    ingest_role="$(resolve_ingest_target_role 2>/dev/null || true)"
+    if [[ "${ingest_role}" == "indexer" ]] && deployment_index_bundle_profile >/dev/null 2>&1; then
+        log "ERROR: Clustered indexer-tier ingest requires an explicit HEC URL."
+        log "ERROR: Set --hec-url or configure SPLUNK_HEC_URL on the ingest profile."
+        exit 1
+    fi
+
+    host=$(splunk_host_from_uri "${INGEST_SPLUNK_URI}")
+    if [[ -z "${host}" ]]; then
+        host="${INGEST_SPLUNK_HOST:-}"
+    fi
+    if [[ -z "${host}" ]]; then
+        log "ERROR: Could not determine the Enterprise ingest HEC host. Pass --hec-url or configure SPLUNK_INGEST_PROFILE."
+        exit 1
+    fi
     printf 'https://%s:8088' "${host}"
+}
+
+enterprise_hec_uses_bundle() {
+    if is_splunk_cloud; then
+        return 1
+    fi
+    type deployment_should_manage_ingest_hec_via_bundle >/dev/null 2>&1 \
+        && deployment_should_manage_ingest_hec_via_bundle
+}
+
+enterprise_hec_token_state() {
+    local token_name="$1"
+
+    if enterprise_hec_uses_bundle; then
+        deployment_get_bundle_hec_token_state "${token_name}" 2>/dev/null || echo "unknown"
+        return 0
+    fi
+
+    ensure_ingest_api_session
+    rest_get_hec_token_state "${INGEST_SK}" "${INGEST_SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown"
 }
 
 _ACS_HEC_CMD_GROUP=""
@@ -187,8 +266,8 @@ rest_create_hec_token() {
         index "thousandeyes_metrics" \
         indexes "${indexes_str}" \
         disabled "false") || return 1
-    resp=$(splunk_curl_post "${SK}" "${body}" \
-        "${SPLUNK_URI}/services/data/inputs/http?output_mode=json" \
+    resp=$(splunk_curl_post "${INGEST_SK}" "${body}" \
+        "${INGEST_SPLUNK_URI}/services/data/inputs/http?output_mode=json" \
         -w '\n%{http_code}' 2>/dev/null)
     hec_code=$(echo "${resp}" | tail -1)
     case "${hec_code}" in
@@ -198,7 +277,7 @@ rest_create_hec_token() {
 }
 
 ensure_hec_token() {
-    local token_name="${1:-${HEC_TOKEN}}" state
+    local token_name="${1:-${HEC_TOKEN}}" state indexes_csv
     log "Checking HEC token '${token_name}'..."
 
     if is_splunk_cloud; then
@@ -246,19 +325,31 @@ ensure_hec_token() {
         log "ERROR: Failed to verify or create HEC token '${token_name}'."
         exit 1
     else
-        ensure_search_api_session
-        state="$(rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown")"
+        state="$(enterprise_hec_token_state "${token_name}" 2>/dev/null || echo "unknown")"
         if [[ "${state}" == "enabled" || "${state}" == "disabled" ]]; then
             log "  HEC token '${token_name}' already exists."
             return 0
         fi
 
-        log "  Creating HEC token '${token_name}' via REST..."
-        if rest_create_hec_token "${token_name}"; then
-            state="$(rest_get_hec_token_state "${SK}" "${SPLUNK_URI}" "${token_name}" 2>/dev/null || echo "unknown")"
-            if [[ "${state}" == "enabled" || "${state}" == "disabled" ]]; then
-                log "  HEC token '${token_name}' created via REST."
-                return 0
+        indexes_csv="$(IFS=,; echo "${DEFAULT_INDEXES[*]}")"
+        if enterprise_hec_uses_bundle; then
+            log "  Creating HEC token '${token_name}' via cluster-manager bundle..."
+            if deployment_create_cluster_bundle_hec_token "${token_name}" "thousandeyes_metrics" "${indexes_csv}" "0"; then
+                state="$(enterprise_hec_token_state "${token_name}" 2>/dev/null || echo "unknown")"
+                if [[ "${state}" == "enabled" || "${state}" == "disabled" ]]; then
+                    log "  HEC token '${token_name}' created via cluster-manager bundle."
+                    return 0
+                fi
+            fi
+        else
+            ensure_ingest_api_session
+            log "  Creating HEC token '${token_name}' via REST..."
+            if rest_create_hec_token "${token_name}"; then
+                state="$(enterprise_hec_token_state "${token_name}" 2>/dev/null || echo "unknown")"
+                if [[ "${state}" == "enabled" || "${state}" == "disabled" ]]; then
+                    log "  HEC token '${token_name}' created via REST."
+                    return 0
+                fi
             fi
         fi
 

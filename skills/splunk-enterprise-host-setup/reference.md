@@ -57,6 +57,20 @@ Out of scope in v1:
 Existing target-side config files that this skill rewrites are backed up as
 `*.bak.<timestamp>` before replacement.
 
+## Upgrade Behavior
+
+- `--phase install` and `--phase all` automatically choose between fresh
+  install, upgrade, or same-version no-op.
+- `.rpm` and `.deb` upgrades reuse the platform package manager semantics.
+- `.tgz` upgrades stop Splunk first, then overlay the extracted `splunk/` tree
+  onto the existing `SPLUNK_HOME` so packaged defaults are replaced while
+  unique local files remain in place.
+- If the package version cannot be parsed, the script treats the run as an
+  upgrade instead of a no-op.
+- Install-only upgrades are per-host only. For clustered roles, the operator
+  still owns sequencing, health checks, and rollback planning outside this
+  skill.
+
 ## Secrets
 
 Use file-based secret inputs only:

@@ -302,7 +302,40 @@ if [[ "${check_response}" -ne 200 ]]; then
 fi
 
 log "Removing app '${APP_NAME}'..."
-delete_app_via_rest "${SK}" "${SPLUNK_URI}" "${APP_NAME}"
+if deployment_should_use_bundle_for_current_target; then
+    bundle_kind=""
+    bundle_kind="$(deployment_bundle_kind_for_current_target)"
+    case "${bundle_kind}" in
+        shc)
+            log "Using search-head-cluster deployer bundle removal."
+            ;;
+        idxc)
+            log "Using indexer-cluster manager bundle removal."
+            ;;
+    esac
+
+    if ! deployment_uninstall_app_via_bundle "${APP_NAME}"; then
+        log "ERROR: Bundle-managed app removal failed."
+        exit 1
+    fi
+
+    if deployment_bundle_app_exists_for_current_target "${APP_NAME}"; then
+        log "ERROR: Bundle-managed app removal could not be verified on the control plane for '${APP_NAME}'."
+        exit 1
+    fi
+
+    delete_check="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"
+    if [[ "${delete_check}" != "404" ]]; then
+        log "WARNING: Bundle removal completed, but current-target REST verification returned HTTP ${delete_check} for '${APP_NAME}'."
+        log "WARNING: The cluster may still be applying the updated bundle state."
+    fi
+
+    DELETE_HTTP_CODE="200"
+    DELETE_BODY=""
+    DELETE_INCOMPLETE_BUT_ABSENT=false
+else
+    delete_app_via_rest "${SK}" "${SPLUNK_URI}" "${APP_NAME}"
+fi
 http_code="${DELETE_HTTP_CODE:-000}"
 body="${DELETE_BODY:-}"
 

@@ -169,9 +169,7 @@ except Exception:
 
     if [[ "${visible}" == "False" ]]; then
         log "Setting ${APP_NAME} visible=true..."
-        splunk_curl "${SK}" -X POST \
-            "${SPLUNK_URI}/services/apps/local/${APP_NAME}" \
-            -d "visible=true" -d "output_mode=json" >/dev/null 2>&1 || true
+        deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" >/dev/null 2>&1 || true
     fi
 }
 

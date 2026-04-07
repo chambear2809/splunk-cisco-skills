@@ -27,13 +27,18 @@ selected_profile = sys.argv[2].strip()
 allowed_keys = [
     "SPLUNK_PROFILE",
     "SPLUNK_SEARCH_PROFILE",
+    "SPLUNK_INGEST_PROFILE",
+    "SPLUNK_DEPLOYER_PROFILE",
+    "SPLUNK_CLUSTER_MANAGER_PROFILE",
     "SPLUNK_PLATFORM",
+    "SPLUNK_DELIVERY_PLANE",
     "SPLUNK_TARGET_ROLE",
     "SPLUNK_SEARCH_TARGET_ROLE",
     "SPLUNK_SEARCH_API_URI",
     "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT",
     "SPLUNK_URI",
+    "SPLUNK_HEC_URL",
     "SPLUNK_SSH_HOST",
     "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER",
@@ -167,9 +172,12 @@ import sys
 
 path = sys.argv[1]
 flat_target_keys = {
-    "SPLUNK_PLATFORM", "SPLUNK_TARGET_ROLE", "SPLUNK_SEARCH_TARGET_ROLE",
+    "SPLUNK_PLATFORM", "SPLUNK_DELIVERY_PLANE",
+    "SPLUNK_TARGET_ROLE", "SPLUNK_SEARCH_TARGET_ROLE",
+    "SPLUNK_INGEST_PROFILE", "SPLUNK_DEPLOYER_PROFILE", "SPLUNK_CLUSTER_MANAGER_PROFILE",
     "SPLUNK_SEARCH_API_URI", "SPLUNK_HOST",
-    "SPLUNK_MGMT_PORT", "SPLUNK_URI", "SPLUNK_SSH_HOST", "SPLUNK_SSH_PORT",
+    "SPLUNK_MGMT_PORT", "SPLUNK_URI", "SPLUNK_HEC_URL",
+    "SPLUNK_SSH_HOST", "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS", "SPLUNK_REMOTE_TMPDIR", "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER", "SPLUNK_PASS",
     "SPLUNK_CA_CERT",
@@ -319,6 +327,27 @@ resolve_search_credential_profile() {
     return 0
 }
 
+resolve_ingest_credential_profile() {
+    _load_credential_values_from_file "${_CRED_FILE}"
+    if [[ -n "${SPLUNK_INGEST_PROFILE:-}" ]]; then
+        printf '%s' "${SPLUNK_INGEST_PROFILE}"
+    fi
+}
+
+resolve_deployer_credential_profile() {
+    _load_credential_values_from_file "${_CRED_FILE}"
+    if [[ -n "${SPLUNK_DEPLOYER_PROFILE:-}" ]]; then
+        printf '%s' "${SPLUNK_DEPLOYER_PROFILE}"
+    fi
+}
+
+resolve_cluster_manager_credential_profile() {
+    _load_credential_values_from_file "${_CRED_FILE}"
+    if [[ -n "${SPLUNK_CLUSTER_MANAGER_PROFILE:-}" ]]; then
+        printf '%s' "${SPLUNK_CLUSTER_MANAGER_PROFILE}"
+    fi
+}
+
 _search_profile_overrides_key() {
     case "${1:-}" in
         SPLUNK_HOST|SPLUNK_MGMT_PORT|SPLUNK_SEARCH_API_URI|SPLUNK_URI|SPLUNK_SSH_HOST|SPLUNK_SSH_PORT|SPLUNK_SSH_USER|SPLUNK_SSH_PASS|SPLUNK_REMOTE_TMPDIR|SPLUNK_REMOTE_SUDO|SPLUNK_USER|SPLUNK_PASS)
@@ -398,6 +427,68 @@ _search_profile_credential_value() {
     [[ -n "${search_profile}" ]] || return 0
 
     _credential_value_for_profile_key "${search_profile}" "${1:-}" "${2:-${_CRED_FILE}}"
+}
+
+_profile_value_or_current() {
+    local profile_name="${1:-}"
+    local target_key="${2:-}"
+    local profile_value=""
+
+    if [[ -n "${profile_name}" ]]; then
+        profile_value="$(_credential_value_for_profile_key "${profile_name}" "${target_key}")"
+        if [[ -n "${profile_value}" ]]; then
+            printf '%s' "${profile_value}"
+            return 0
+        fi
+    fi
+
+    printf '%s' "${!target_key-}"
+}
+
+load_ingest_connection_settings() {
+    local ingest_profile=""
+
+    load_splunk_connection_settings
+    ingest_profile="$(resolve_ingest_credential_profile 2>/dev/null || true)"
+
+    INGEST_SPLUNK_PROFILE="${ingest_profile}"
+    INGEST_SPLUNK_HOST="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_HOST")"
+    INGEST_SPLUNK_MGMT_PORT="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_MGMT_PORT")"
+    INGEST_SPLUNK_SEARCH_API_URI="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_SEARCH_API_URI")"
+    INGEST_SPLUNK_URI="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_URI")"
+    INGEST_SPLUNK_USER="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_USER")"
+    INGEST_SPLUNK_PASS="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_PASS")"
+    INGEST_SPLUNK_HEC_URL="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_HEC_URL")"
+    INGEST_SPLUNK_TARGET_ROLE="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_TARGET_ROLE")"
+
+    if [[ -z "${INGEST_SPLUNK_MGMT_PORT:-}" ]]; then
+        INGEST_SPLUNK_MGMT_PORT="${SPLUNK_MGMT_PORT:-8089}"
+    fi
+
+    if [[ -n "${INGEST_SPLUNK_SEARCH_API_URI:-}" ]]; then
+        INGEST_SPLUNK_URI="${INGEST_SPLUNK_SEARCH_API_URI}"
+    elif [[ -n "${INGEST_SPLUNK_URI:-}" ]]; then
+        INGEST_SPLUNK_SEARCH_API_URI="${INGEST_SPLUNK_URI}"
+    elif [[ -n "${INGEST_SPLUNK_HOST:-}" ]]; then
+        INGEST_SPLUNK_SEARCH_API_URI="https://${INGEST_SPLUNK_HOST}:${INGEST_SPLUNK_MGMT_PORT}"
+        INGEST_SPLUNK_URI="${INGEST_SPLUNK_SEARCH_API_URI}"
+    else
+        INGEST_SPLUNK_SEARCH_API_URI="${SPLUNK_SEARCH_API_URI:-}"
+        INGEST_SPLUNK_URI="${SPLUNK_URI:-${INGEST_SPLUNK_SEARCH_API_URI}}"
+    fi
+}
+
+resolve_delivery_plane() {
+    case "${SPLUNK_DELIVERY_PLANE:-auto}" in
+        auto|rest|bundle)
+            printf '%s' "${SPLUNK_DELIVERY_PLANE:-auto}"
+            ;;
+        *)
+            _warn_once "_WARNED_INVALID_SPLUNK_DELIVERY_PLANE" \
+                "WARNING: Ignoring invalid SPLUNK_DELIVERY_PLANE value '${SPLUNK_DELIVERY_PLANE}'. Supported values: auto, rest, bundle."
+            printf '%s' "auto"
+            ;;
+    esac
 }
 
 load_splunk_connection_settings() {
@@ -744,6 +835,31 @@ resolve_search_splunk_target_role() {
     fi
 
     return 0
+}
+
+resolve_ingest_target_role() {
+    local candidate=""
+    local normalized=""
+
+    load_ingest_connection_settings
+
+    candidate="${INGEST_SPLUNK_TARGET_ROLE:-}"
+    if [[ -n "${candidate}" ]]; then
+        if ! normalized="$(_normalize_target_role "${candidate}")"; then
+            _warn_invalid_target_role_once "${candidate}" "SPLUNK_INGEST_PROFILE target role"
+            return 0
+        fi
+        printf '%s' "${normalized}"
+        return 0
+    fi
+
+    candidate="$(resolve_search_splunk_target_role)"
+    if [[ -n "${candidate}" ]]; then
+        printf '%s' "${candidate}"
+        return 0
+    fi
+
+    resolve_splunk_target_role
 }
 
 resolve_splunk_target_role() {

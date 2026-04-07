@@ -58,6 +58,9 @@ DISCOVERY_SECRET=""
 SHC_SECRET=""
 LATEST_ENTERPRISE_METADATA=""
 LATEST_ENTERPRISE_METADATA_LIVE=false
+INSTALL_ACTION=""
+INSTALLED_VERSION=""
+PACKAGE_VERSION=""
 
 usage() {
     local exit_code="${1:-0}"
@@ -248,7 +251,9 @@ load_secret_values() {
 }
 
 admin_password_required() {
-    if phase_includes_install; then
+    local install_action="${INSTALL_ACTION:-fresh-install}"
+
+    if phase_includes_install && [[ "${install_action}" == "fresh-install" ]]; then
         return 0
     fi
 
@@ -393,6 +398,66 @@ pick_package_path() {
     hbs_verify_checksum "${PACKAGE_PATH}" "${CHECKSUM}"
 }
 
+target_has_splunk_install() {
+    hbs_run_target_cmd "${EXECUTION_MODE}" "$(hbs_shell_join test -x "${SPLUNK_HOME}/bin/splunk")" >/dev/null 2>&1
+}
+
+resolve_requested_package_version() {
+    local package_version=""
+
+    if [[ -n "${LATEST_ENTERPRISE_METADATA}" ]]; then
+        package_version="$(hbs_latest_enterprise_metadata_field "${LATEST_ENTERPRISE_METADATA}" "version" 2>/dev/null || true)"
+    fi
+    if [[ -z "${package_version}" && -n "${PACKAGE_PATH}" ]]; then
+        package_version="$(hbs_extract_splunk_package_version "${PACKAGE_PATH}")"
+    fi
+
+    printf '%s' "${package_version}"
+}
+
+capture_installed_splunk_version() {
+    local version_output version
+    version_output="$(hbs_capture_target_cmd "${EXECUTION_MODE}" "$(splunk_cli_cmd version)" 2>/dev/null || true)"
+    version="$(hbs_extract_splunk_version "${version_output}")"
+    printf '%s' "${version}"
+}
+
+determine_install_action() {
+    PACKAGE_VERSION="$(resolve_requested_package_version)"
+    INSTALLED_VERSION=""
+    INSTALL_ACTION="fresh-install"
+
+    if ! target_has_splunk_install; then
+        return 0
+    fi
+
+    INSTALL_ACTION="upgrade"
+    INSTALLED_VERSION="$(capture_installed_splunk_version)"
+
+    if [[ -n "${INSTALLED_VERSION}" && -n "${PACKAGE_VERSION}" ]] && hbs_versions_equal "${INSTALLED_VERSION}" "${PACKAGE_VERSION}"; then
+        INSTALL_ACTION="same-version"
+    fi
+}
+
+host_bootstrap_role_is_clustered() {
+    case "${HOST_BOOTSTRAP_ROLE:-}" in
+        cluster-manager|indexer-peer|shc-deployer|shc-member)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+warn_clustered_upgrade_scope() {
+    [[ "${INSTALL_ACTION}" == "upgrade" ]] || return 0
+
+    if [[ "${DEPLOYMENT_MODE}" == "clustered" ]] || host_bootstrap_role_is_clustered; then
+        log "WARN: Clustered upgrades are per-host only; sequence hosts and verify cluster health outside this script."
+    fi
+}
+
 ensure_role_defaults() {
     if phase_includes_install || phase_includes_configure || phase_includes_cluster; then
         ensure_prompted_value HOST_BOOTSTRAP_ROLE "Host bootstrap role"
@@ -467,7 +532,7 @@ ensure_splunk_ownership() {
 }
 
 install_package_to_target() {
-    local install_parent install_cmd sudo_prefix tmp_root
+    local install_action install_parent install_cmd sudo_prefix tmp_root
 
     PACKAGE_ON_TARGET="$(hbs_stage_file_for_execution "${EXECUTION_MODE}" "${PACKAGE_PATH}" "$(basename "${PACKAGE_PATH}")")"
     PACKAGE_STAGED=false
@@ -475,6 +540,7 @@ install_package_to_target() {
         PACKAGE_STAGED=true
     fi
     register_install_cleanup
+    install_action="${INSTALL_ACTION:-fresh-install}"
 
     case "${PACKAGE_TYPE}" in
         tgz)
@@ -489,6 +555,7 @@ install_parent=$(hbs_shell_join "${install_parent}")
 package_path=$(hbs_shell_join "${PACKAGE_ON_TARGET}")
 tmp_root=$(hbs_shell_join "${tmp_root}")
 sudo_prefix=$(hbs_shell_join "${sudo_prefix}")
+install_action=$(hbs_shell_join "${install_action}")
 
 run_privileged() {
     if [[ -n "\${sudo_prefix}" ]]; then
@@ -498,17 +565,23 @@ run_privileged() {
     fi
 }
 
-if [[ -x "\${target_home}/bin/splunk" ]]; then
-    echo "Existing Splunk install detected at \${target_home}; skipping extract."
-    exit 0
-fi
-
-if [[ -e "\${target_home}" ]]; then
-    echo "ERROR: Target path \${target_home} already exists but is not a Splunk install." >&2
+if [[ "\${install_action}" == "fresh-install" ]]; then
+    if [[ -e "\${target_home}" ]]; then
+        echo "ERROR: Target path \${target_home} already exists but is not a Splunk install." >&2
+        exit 1
+    fi
+    run_privileged mkdir -p "\${install_parent}" "\${tmp_root}"
+elif [[ "\${install_action}" == "upgrade" ]]; then
+    if [[ ! -x "\${target_home}/bin/splunk" ]]; then
+        echo "ERROR: Expected an existing Splunk install at \${target_home} for tgz upgrade." >&2
+        exit 1
+    fi
+    run_privileged mkdir -p "\${tmp_root}"
+else
+    echo "ERROR: Unsupported install action '\${install_action}' for tgz package." >&2
     exit 1
 fi
 
-run_privileged mkdir -p "\${install_parent}" "\${tmp_root}"
 extract_dir=\$(run_privileged mktemp -d "\${tmp_root%/}/splunk-install.XXXXXX")
 cleanup() {
     run_privileged rm -rf "\${extract_dir}"
@@ -520,7 +593,12 @@ if [[ ! -d "\${extract_dir}/splunk" ]]; then
     echo "ERROR: Extracted package did not contain a splunk/ directory." >&2
     exit 1
 fi
-run_privileged mv "\${extract_dir}/splunk" "\${target_home}"
+
+if [[ "\${install_action}" == "fresh-install" ]]; then
+    run_privileged mv "\${extract_dir}/splunk" "\${target_home}"
+else
+    run_privileged cp -a "\${extract_dir}/splunk/." "\${target_home}/"
+fi
 EOF
             )
             hbs_run_target_cmd "${EXECUTION_MODE}" "${install_cmd}"
@@ -607,6 +685,15 @@ enable_boot_start() {
 enable_web_if_needed() {
     [[ "${ENABLE_WEB}" == "true" ]] || return 0
     run_splunk_authenticated "$(splunk_cli_cmd enable webserver)"
+}
+
+stop_splunk_if_running() {
+    if capture_splunk_as_service_user "$(splunk_cli_cmd status)" >/dev/null 2>&1; then
+        log "Stopping existing Splunk instance before upgrade"
+        run_splunk_as_service_user "$(splunk_cli_cmd stop)"
+    else
+        log "INFO: Splunk was not running before upgrade; proceeding with package upgrade."
+    fi
 }
 
 render_inputs_conf() {
@@ -824,6 +911,52 @@ finalize_install() {
     fi
 }
 
+finalize_upgrade() {
+    ensure_service_user_exists
+    ensure_splunk_ownership
+    start_splunk
+    if [[ "${BOOT_START}" == "true" ]]; then
+        enable_boot_start
+    fi
+}
+
+perform_install_phase() {
+    case "${INSTALL_ACTION}" in
+        fresh-install)
+            validate_install_constraints
+            log "Installing ${PACKAGE_TYPE} package for role ${HOST_BOOTSTRAP_ROLE}"
+            install_package_to_target
+            finalize_install
+            ;;
+        upgrade)
+            validate_install_constraints
+            if [[ -n "${INSTALLED_VERSION}" && -n "${PACKAGE_VERSION}" ]]; then
+                log "Upgrading Splunk from ${INSTALLED_VERSION} to ${PACKAGE_VERSION} for role ${HOST_BOOTSTRAP_ROLE}"
+            elif [[ -n "${INSTALLED_VERSION}" ]]; then
+                log "Upgrading existing Splunk ${INSTALLED_VERSION} with ${PACKAGE_TYPE} package for role ${HOST_BOOTSTRAP_ROLE}"
+            else
+                log "Upgrading existing Splunk install with ${PACKAGE_TYPE} package for role ${HOST_BOOTSTRAP_ROLE}"
+            fi
+            warn_clustered_upgrade_scope
+            stop_splunk_if_running
+            install_package_to_target
+            finalize_upgrade
+            ;;
+        same-version)
+            if [[ -n "${INSTALLED_VERSION}" ]]; then
+                log "Installed Splunk version ${INSTALLED_VERSION} already matches the requested package; skipping package install."
+            else
+                log "Requested package matches the installed Splunk version; skipping package install."
+            fi
+            cleanup_user_seed_artifacts
+            ;;
+        *)
+            log "ERROR: Unsupported install action '${INSTALL_ACTION}'."
+            exit 1
+            ;;
+    esac
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --phase) require_arg "$1" $# || exit 1; PHASE="$2"; shift 2 ;;
@@ -872,7 +1005,6 @@ done
 
 ensure_role_defaults
 validate_inputs
-load_secret_values
 
 if [[ "${EXECUTION_MODE}" == "ssh" ]]; then
     load_splunk_ssh_credentials
@@ -894,10 +1026,13 @@ if phase_includes_install; then
     if [[ -z "${PACKAGE_PATH}" ]]; then
         pick_package_path
     fi
-    validate_install_constraints
-    log "Installing ${PACKAGE_TYPE} package for role ${HOST_BOOTSTRAP_ROLE}"
-    install_package_to_target
-    finalize_install
+    determine_install_action
+fi
+
+load_secret_values
+
+if phase_includes_install; then
+    perform_install_phase
 fi
 
 if phase_includes_configure; then

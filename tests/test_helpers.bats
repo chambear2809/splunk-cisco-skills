@@ -12,9 +12,12 @@ setup() {
     export _SPLUNKBASE_HELPERS_LOADED=""
     export _CONFIGURE_ACCOUNT_HELPERS_LOADED=""
     export _REGISTRY_HELPERS_LOADED=""
+    export _HOST_BOOTSTRAP_HELPERS_LOADED=""
+    export _DEPLOYMENT_HELPERS_LOADED=""
     export _RESOLVED_SPLUNK_TARGET_ROLE=""
     export _RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE=""
     export _RESOLVED_SEARCH_SPLUNK_TARGET_ROLE=""
+    export _RESOLVED_SEARCH_CREDENTIAL_PROFILE=""
     export _WARNED_INVALID_SPLUNK_TARGET_ROLE=""
     export SPLUNK_USER="testuser"
     export SPLUNK_PASS="testpass"
@@ -199,6 +202,98 @@ setup() {
     [[ "$captured" == *"default"* ]]
     [[ "$captured" == *"verify_ssl"* ]]
     [[ "$captured" == *"False"* ]]
+}
+
+@test "load_ingest_connection_settings resolves ingest profile URI and HEC URL" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_SEARCH_API_URI="https://search.example.com:8089"
+SPLUNK_USER="search-user"
+SPLUNK_PASS="search-pass"
+SPLUNK_INGEST_PROFILE="ingest"
+PROFILE_ingest__SPLUNK_TARGET_ROLE="heavy-forwarder"
+PROFILE_ingest__SPLUNK_SEARCH_API_URI="https://hf.example.com:8089"
+PROFILE_ingest__SPLUNK_USER="ingest-user"
+PROFILE_ingest__SPLUNK_PASS="ingest-pass"
+PROFILE_ingest__SPLUNK_HEC_URL="https://hf-ingest.example.com:8088/services/collector/event"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+    load_ingest_connection_settings
+
+    rm -f "${credentials_file}"
+    [ "${INGEST_SPLUNK_URI}" = "https://hf.example.com:8089" ]
+    [ "${INGEST_SPLUNK_USER}" = "ingest-user" ]
+    [ "${INGEST_SPLUNK_TARGET_ROLE}" = "heavy-forwarder" ]
+    [ "${INGEST_SPLUNK_HEC_URL}" = "https://hf-ingest.example.com:8088/services/collector/event" ]
+}
+
+@test "rest_set_conf uses bundle helper for clustered search-tier config writes" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_TARGET_ROLE="search-tier"
+SPLUNK_DEPLOYER_PROFILE="deployer"
+PROFILE_deployer__SPLUNK_SEARCH_API_URI="https://deployer.example.com:8089"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+
+    deployment_bundle_set_conf_for_current_target() {
+        echo "$*"
+    }
+    export -f deployment_bundle_set_conf_for_current_target
+
+    output="$(rest_set_conf "sk" "https://search.example.com:8089" "MyApp" "macros" "stanza" "definition=index")"
+    status=$?
+
+    rm -f "${credentials_file}"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"MyApp macros stanza definition=index"* ]]
+}
+
+@test "deployment_bundle_apply_on_profile uses profile credentials for cluster-manager auth" {
+    credentials_file=$(mktemp)
+    cat > "${credentials_file}" <<'EOF'
+SPLUNK_USER="global-user"
+SPLUNK_PASS="global-pass"
+PROFILE_cluster__SPLUNK_SEARCH_API_URI="https://localhost:8089"
+PROFILE_cluster__SPLUNK_URI="${PROFILE_cluster__SPLUNK_SEARCH_API_URI}"
+PROFILE_cluster__SPLUNK_USER="cluster-user"
+PROFILE_cluster__SPLUNK_PASS="cluster-pass"
+EOF
+    export SPLUNK_CREDENTIALS_FILE="${credentials_file}"
+    export SPLUNK_HOME="${BATS_TMPDIR}/splunk-${BASHPID}"
+    mkdir -p "${SPLUNK_HOME}/bin"
+
+    source "${LIB_DIR}/credential_helpers.sh"
+
+    hbs_run_as_user_cmd() {
+        echo "$3"
+    }
+    export -f hbs_run_as_user_cmd
+
+    run deployment_bundle_apply_on_profile "cluster" "idxc" "" "" ""
+
+    rm -f "${credentials_file}"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"apply cluster-bundle -auth cluster-user:cluster-pass -answer-yes"* ]]
+}
+
+@test "deployment_hec_token_record_from_conf parses bundle-managed inputs stanzas" {
+    source "${LIB_DIR}/credential_helpers.sh"
+
+    conf_content=$'[http]\ndisabled = 0\n\n[http://sc4s]\ndisabled = 0\nindex = sc4s\ntoken = abc-123\nuseACK = 0\n'
+
+    run deployment_hec_token_record_from_conf "${conf_content}" "sc4s"
+
+    [ "$status" -eq 0 ]
+    [[ "$output" == *'"default_index": "sc4s"'* ]]
+    [[ "$output" == *'"token": "abc-123"'* ]]
+    [[ "$output" == *'"disabled": "0"'* ]]
 }
 
 # --- deployment-role helpers ---

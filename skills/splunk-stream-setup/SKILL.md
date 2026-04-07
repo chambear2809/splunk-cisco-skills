@@ -131,8 +131,9 @@ matrix to scope the package set:
 - `heavy-forwarder`: `Splunk_TA_stream` plus forwarder-compatible Stream support
 - `universal-forwarder`: `Splunk_TA_stream`
 
-When no role is declared, the script keeps the legacy all-in-one Enterprise
-behavior and tries all three Stream packages on the active target.
+When no role is declared, the normal setup path now fails fast instead of
+guessing an all-in-one placement. Use `--legacy-all-in-one` only when you
+explicitly want the older single-target behavior.
 
 On Splunk Cloud, do **not** run the combined install path against the cloud
 search tier. Splunk documents Stream on Cloud as a hybrid deployment:

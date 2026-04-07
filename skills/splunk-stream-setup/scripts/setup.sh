@@ -13,6 +13,7 @@ INSTALL=false
 INDEXES_ONLY=false
 CONFIGURE_STREAMFWD=false
 FULL_SETUP=false
+LEGACY_ALL_IN_ONE=false
 
 IP_ADDR=""
 PORT="8889"
@@ -33,6 +34,7 @@ Operations:
   --install                Install missing Stream apps (Splunkbase first, local fallback)
   --indexes-only           Create indexes only
   --configure-streamfwd    Configure the stream forwarder
+  --legacy-all-in-one      Allow the legacy no-role install fallback
   (no flags)               Full setup: install + indexes + configure
 
 Stream Forwarder Options (used with --configure-streamfwd or full setup):
@@ -61,6 +63,7 @@ while [[ $# -gt 0 ]]; do
         --install) INSTALL=true; shift ;;
         --indexes-only) INDEXES_ONLY=true; shift ;;
         --configure-streamfwd) CONFIGURE_STREAMFWD=true; shift ;;
+        --legacy-all-in-one) LEGACY_ALL_IN_ONE=true; shift ;;
         --ip-addr) require_arg "$1" $# || exit 1; IP_ADDR="$2"; shift 2 ;;
         --port) require_arg "$1" $# || exit 1; PORT="$2"; shift 2 ;;
         --splunk-web-url) require_arg "$1" $# || exit 1; SPLUNK_WEB_URL="$2"; shift 2 ;;
@@ -171,6 +174,11 @@ stream_install_targets() {
     )
 
     if [[ -z "${role}" ]]; then
+        if [[ "${LEGACY_ALL_IN_ONE}" != "true" ]]; then
+            log "ERROR: Stream app installation requires a declared deployment role." >&2
+            log "Set SPLUNK_TARGET_ROLE for the target, or pass --legacy-all-in-one to keep the old compatibility behavior." >&2
+            return 1
+        fi
         printf '%s\n' "${all_apps[@]}"
         return 0
     fi
@@ -178,9 +186,14 @@ stream_install_targets() {
     for app_name in "${all_apps[@]}"; do
         support="$(stream_role_support_for_app "${app_name}" "${role}")"
         if [[ -z "${support}" ]]; then
-            log "WARNING: Stream role metadata is unavailable for '${app_name}' on role '${role}'. Falling back to the legacy all-in-one install set." >&2
-            printf '%s\n' "${all_apps[@]}"
-            return 0
+            if [[ "${LEGACY_ALL_IN_ONE}" == "true" ]]; then
+                log "WARNING: Stream role metadata is unavailable for '${app_name}' on role '${role}'. Falling back to the legacy all-in-one install set." >&2
+                printf '%s\n' "${all_apps[@]}"
+                return 0
+            fi
+            log "ERROR: Stream role metadata is unavailable for '${app_name}' on role '${role}'." >&2
+            log "ERROR: Fix the role metadata or rerun with --legacy-all-in-one for the old compatibility behavior." >&2
+            return 1
         fi
         if [[ "${support}" != "none" ]]; then
             selected_apps+=("${app_name}")
@@ -254,8 +267,10 @@ install_apps() {
     role="$(stream_setup_role)"
     if [[ -n "${role}" ]]; then
         log "Active deployment role: ${role}"
+    elif [[ "${LEGACY_ALL_IN_ONE}" == "true" ]]; then
+        log "No deployment role declared; using the explicit legacy all-in-one Stream install set."
     else
-        log "No deployment role declared; using the legacy all-in-one Stream install set."
+        log "No deployment role declared for Stream app installation."
     fi
 
     install_targets_output="$(stream_install_targets "${role}")" || exit 1
