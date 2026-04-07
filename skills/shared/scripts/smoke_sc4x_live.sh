@@ -106,15 +106,19 @@ REMOTE_USER="${SPLUNK_SSH_USER}"
 
 run_remote_root() {
     local remote_cmd="$1"
-    local escaped_pass remote_payload
+    local escaped_pass remote_payload pass_file rc
     escaped_pass="${SPLUNK_SSH_PASS//\'/\'\\\'\'}"
     remote_payload="$(printf '%q' "${remote_cmd}")"
-    sshpass -p "${SPLUNK_SSH_PASS}" ssh \
+    pass_file="$(hbs_make_sshpass_file)"
+    sshpass -f "${pass_file}" ssh \
         -p "${REMOTE_PORT}" \
         -o StrictHostKeyChecking=no \
         -o UserKnownHostsFile=/dev/null \
         "${REMOTE_USER}@${REMOTE_HOST}" \
         "printf '%s\n' '${escaped_pass}' | sudo -S -p '' sh -lc ${remote_payload}"
+    rc=$?
+    rm -f "${pass_file}"
+    return "${rc}"
 }
 
 search_marker_count() {

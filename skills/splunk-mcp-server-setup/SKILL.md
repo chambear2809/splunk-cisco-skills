@@ -11,7 +11,7 @@ description: >-
 
 # Splunk MCP Server Setup
 
-Automates setup of the **Splunk MCP Server** app (`Splunk_MCP_Server` v1.1.0).
+Automates setup of the **Splunk MCP Server** app (`Splunk_MCP_Server`).
 
 ## What This Skill Covers
 

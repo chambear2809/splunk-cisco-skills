@@ -25,7 +25,7 @@ SC4SNMP is not a Splunkbase app install. The skill handles two separate areas:
    - Docker Compose for a simple host-managed deployment
    - Kubernetes with Helm for the supported clustered deployment model
 
-## Agent Behavior
+## Agent Behavior — Credentials
 
 **The agent must NEVER ask for HEC tokens, SNMPv3 credentials, or other
 secrets in chat.**

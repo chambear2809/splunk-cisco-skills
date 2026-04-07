@@ -12,7 +12,7 @@ description: >-
 # Cisco AppDynamics Setup Automation
 
 Automates the **Cisco Splunk Add-on for AppDynamics**
-(`Splunk_TA_AppDynamics` v3.2.0).
+(`Splunk_TA_AppDynamics`).
 
 This package is a **combined add-on plus built-in dashboards** bundle. There is
 no separate companion Splunk app in the local package cache for this workflow.
@@ -48,14 +48,14 @@ temporary file:
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-echo "the_appd_client_secret" > /tmp/appd_client_secret && chmod 600 /tmp/appd_client_secret
+printf '%s' "the_appd_client_secret" > /tmp/appd_client_secret && chmod 600 /tmp/appd_client_secret
 ```
 
 For the optional AppDynamics analytics secret:
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-echo "the_appd_analytics_secret" > /tmp/appd_analytics_secret && chmod 600 /tmp/appd_analytics_secret
+printf '%s' "the_appd_analytics_secret" > /tmp/appd_analytics_secret && chmod 600 /tmp/appd_analytics_secret
 ```
 
 Then the agent passes `--client-secret-file` or `--analytics-secret-file` to
@@ -99,7 +99,7 @@ Scripts read Splunk credentials from the project-root `credentials` file
 (falls back to `~/.splunk/credentials`) automatically.
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-appdynamics-setup/scripts/validate.sh
 ```
 
 ## Setup Workflow
@@ -189,7 +189,7 @@ Input groups:
 Analytics example:
 
 ```bash
-bash scripts/setup.sh --enable-inputs \
+bash skills/cisco-appdynamics-setup/scripts/setup.sh --enable-inputs \
   --index appdynamics \
   --input-type analytics \
   --analytics-account "PROD_ANALYTICS" \
@@ -199,7 +199,7 @@ bash scripts/setup.sh --enable-inputs \
 Custom metrics example:
 
 ```bash
-bash scripts/setup.sh --enable-inputs \
+bash skills/cisco-appdynamics-setup/scripts/setup.sh --enable-inputs \
   --account "PROD" \
   --index appdynamics \
   --input-type custom \
@@ -261,7 +261,7 @@ the `Splunk_TA_AppDynamics` package and its built-in dashboards.
 Load custom tools into the MCP Server:
 
 ```bash
-bash scripts/load_mcp_tools.sh
+bash skills/cisco-appdynamics-setup/scripts/load_mcp_tools.sh
 ```
 
 ## Key Learnings / Known Issues

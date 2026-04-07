@@ -31,7 +31,7 @@ This applies to both Splunk Cloud and Splunk Enterprise targets.
 - `_unpacked` app directories are for review only and are not part of the
   normal install workflow.
 
-## Agent Behavior — Credentials & Prompting
+## Agent Behavior — Credentials
 
 **The agent must NEVER ask for passwords or secrets in chat.**
 
@@ -95,7 +95,7 @@ Installs a Splunk app from one of three sources.
 bash skills/splunk-app-install/scripts/install_app.sh
 ```
 
-Prompts for: source type (Local/Remote/Splunkbase), file/URL/app-ID, version, upgrade y/n. Credentials
+Prompts for: source type (Local/Remote/Splunkbase), file/URL/app-ID, upgrade y/n. Credentials
 are read from the project-root `credentials` file (falls back to `~/.splunk/credentials`).
 After a successful install, the script either:
 
@@ -122,7 +122,7 @@ For Splunk Cloud:
 To skip prompts, supply values via flags:
 
 ```bash
-bash scripts/install_app.sh \
+bash skills/splunk-app-install/scripts/install_app.sh \
   --source local --file splunk-ta/my_app.tgz --update
 ```
 
@@ -132,7 +132,7 @@ bash scripts/install_app.sh \
 | `--file PATH` | Local file path |
 | `--url URL` | Remote download URL |
 | `--app-id ID` | Splunkbase app ID |
-| `--app-version VER` | Splunkbase version (blank = latest) |
+| `--app-version VER` | Pin a specific Splunkbase version; omit for latest |
 | `--update` | Upgrade an existing app |
 | `--no-update` | Fresh install (skip upgrade prompt) |
 | `--no-restart` | Skip the automatic restart after install |
@@ -187,9 +187,18 @@ Prompts for: app selection and confirmation. Credentials are read from the proje
 
 ## Post-Install Notes
 
+- `install_app.sh` installs the package only. It does not create indexes,
+  macros, accounts, inputs, saved searches, or custom dashboard state beyond
+  the app content already bundled in the package.
+- For Cisco apps/TAs, follow the product-specific setup skill after install to
+  configure accounts, enable inputs, and wire any dashboard macros.
 - The install and uninstall scripts restart Splunk automatically by default on
   Enterprise, and perform an ACS restart check by default on Splunk Cloud.
 - Use `--no-restart` only when intentionally batching multiple changes before a single final restart.
 - If the app has a setup page, the user configures it via Splunk Web or a
   dedicated setup skill (e.g., `cisco-catalyst-ta-setup`).
 - Downloaded files are cached locally (path varies by environment) for reuse.
+
+## Additional Resources
+
+- [reference.md](reference.md) — CLI flags, platform behaviors, registry integration

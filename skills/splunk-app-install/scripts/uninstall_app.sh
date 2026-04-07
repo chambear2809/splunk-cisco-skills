@@ -107,7 +107,7 @@ if is_splunk_cloud; then
     if [[ -z "${APP_NAME}" ]]; then
         echo ""
         echo "Fetching installed apps from Splunk Cloud..."
-        response=$(acs_command apps list --count 100 2>/dev/null | acs_extract_http_response_json)
+        response=$(acs_apps_list_all_json | acs_extract_http_response_json)
 
         app_list=()
         while IFS= read -r app_name; do

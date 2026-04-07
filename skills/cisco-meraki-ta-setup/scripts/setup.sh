@@ -148,12 +148,20 @@ enable_devices_inputs() {
 
     log "Enabling device inputs for account='${account}' index='${index}'..."
 
-    local types=(devices device_availabilities_change_history device_uplink_addresses_by_device power_modules_statuses_by_device firmware_upgrades)
+    local types=(
+        devices
+        devices_availabilities
+        device_availabilities_change_history
+        device_uplink_addresses_by_device
+        devices_uplinks_loss_and_latency
+        power_modules_statuses_by_device
+        firmware_upgrades
+    )
 
     for t in "${types[@]}"; do
         add_input "${t}" "${t}" "${account}" "${index}"
     done
-    log "Device inputs enabled (5 inputs)."
+    log "Device inputs enabled (7 inputs)."
 }
 
 enable_wireless_inputs() {
@@ -303,7 +311,7 @@ enable_all_inputs() {
     enable_sensor_inputs "${account}" "${index}"
     enable_webhook_log_inputs "${account}" "${index}"
 
-    log "All inputs enabled (39 inputs)."
+    log "All inputs enabled (42 inputs, including webhook_logs)."
 }
 
 main() {
@@ -364,7 +372,7 @@ main() {
 
     log ""
     log "Write your Meraki Dashboard API key to a temp file:"
-    log "  echo \"YOUR_API_KEY\" > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key"
+    log "  printf '%s\\n' 'YOUR_API_KEY' > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key"
     log ""
     read -rp "Path to API key file (default: /tmp/meraki_api_key): " api_key_file
     api_key_file="${api_key_file:-/tmp/meraki_api_key}"

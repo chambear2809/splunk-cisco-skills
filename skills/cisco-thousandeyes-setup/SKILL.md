@@ -11,7 +11,7 @@ description: >-
 
 # Cisco ThousandEyes App Setup Automation
 
-Automates the **Cisco ThousandEyes App for Splunk** (`ta_cisco_thousandeyes` v0.6.0).
+Automates the **Cisco ThousandEyes App for Splunk** (`ta_cisco_thousandeyes`).
 
 ## How This App Differs From Other Cisco TAs
 

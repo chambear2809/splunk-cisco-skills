@@ -11,7 +11,7 @@ description: >-
 
 # Cisco Intersight TA Setup Automation
 
-Automates the **Cisco Intersight Add-On for Splunk** (`Splunk_TA_Cisco_Intersight` v3.1.0).
+Automates the **Cisco Intersight Add-On for Splunk** (`Splunk_TA_Cisco_Intersight`).
 
 ## Package Model
 
@@ -40,10 +40,10 @@ secret to a temporary file:
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-echo "the_client_secret" > /tmp/client_secret && chmod 600 /tmp/client_secret
+printf '%s\n' '<intersight_client_secret>' > /tmp/intersight_client_secret && chmod 600 /tmp/intersight_client_secret
 ```
 
-Then the agent passes `--client-secret-file /tmp/client_secret` to the configure
+Then the agent passes `--client-secret-file /tmp/intersight_client_secret` to the configure
 script. After the account is created, delete the temp file.
 
 The agent may freely ask for non-secret values: account names, hostnames, client IDs, etc.
@@ -81,7 +81,7 @@ Scripts read Splunk credentials from the project-root `credentials` file (falls 
 No environment variables or command-line password arguments are needed:
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-intersight-setup/scripts/validate.sh
 ```
 
 If credentials are not yet configured, run the setup script first:
@@ -126,11 +126,17 @@ Accounts are created via the Splunk REST API, which handles credential encryptio
 automatically through the TA's custom REST handlers:
 
 ```bash
-bash scripts/configure_account.sh \
+bash skills/cisco-intersight-setup/scripts/configure_account.sh \
   --name "MY_INTERSIGHT" \
   --hostname "intersight.com" \
   --client-id "YOUR_CLIENT_ID" \
-  --client-secret-file /tmp/client_secret
+  --client-secret-file /tmp/intersight_client_secret
+```
+
+Copy/paste secret-file prep command:
+
+```bash
+printf '%s\n' '<intersight_client_secret>' > /tmp/intersight_client_secret && chmod 600 /tmp/intersight_client_secret
 ```
 
 REST endpoint: `/servicesNS/nobody/Splunk_TA_Cisco_Intersight/Splunk_TA_Cisco_Intersight_account`
@@ -138,7 +144,7 @@ REST endpoint: `/servicesNS/nobody/Splunk_TA_Cisco_Intersight/Splunk_TA_Cisco_In
 ### Step 3: Enable Inputs
 
 ```bash
-bash scripts/setup.sh --enable-inputs \
+bash skills/cisco-intersight-setup/scripts/setup.sh --enable-inputs \
   --account "MY_INTERSIGHT" --index "intersight" --input-type all
 ```
 
@@ -149,6 +155,10 @@ bash scripts/setup.sh --enable-inputs \
 | `metrics` | 2 (device metrics, network metrics) | `intersight` |
 | `all` | 7 (all of the above) | `intersight` |
 
+The app package provides its own dashboards. This setup flow creates the index,
+macro, account, and inputs needed for those dashboards to populate; it does not
+generate separate custom dashboards.
+
 ### Step 4: Restart If Required
 
 On Splunk Enterprise, restart Splunk after new index creation.
@@ -158,7 +168,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 5: Validate
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-intersight-setup/scripts/validate.sh
 ```
 
 Checks: app installation, indexes, macros, accounts, inputs, data flow, settings.
@@ -187,7 +197,7 @@ Checks: app installation, indexes, macros, accounts, inputs, data flow, settings
 Load custom tools into the MCP Server (credentials read from the project-root `credentials` file, falls back to `~/.splunk/credentials`):
 
 ```bash
-bash scripts/load_mcp_tools.sh
+bash skills/cisco-intersight-setup/scripts/load_mcp_tools.sh
 ```
 
 ## Key Learnings / Known Issues

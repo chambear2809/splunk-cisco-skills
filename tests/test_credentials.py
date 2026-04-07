@@ -14,13 +14,18 @@ import unittest
 ALLOWED_KEYS = [
     "SPLUNK_PROFILE",
     "SPLUNK_SEARCH_PROFILE",
+    "SPLUNK_INGEST_PROFILE",
+    "SPLUNK_DEPLOYER_PROFILE",
+    "SPLUNK_CLUSTER_MANAGER_PROFILE",
     "SPLUNK_PLATFORM",
+    "SPLUNK_DELIVERY_PLANE",
     "SPLUNK_TARGET_ROLE",
     "SPLUNK_SEARCH_TARGET_ROLE",
     "SPLUNK_SEARCH_API_URI",
     "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT",
     "SPLUNK_URI",
+    "SPLUNK_HEC_URL",
     "SPLUNK_SSH_HOST",
     "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER",
@@ -181,6 +186,17 @@ class TestCredentialParsing(unittest.TestCase):
         result = parse_credential_file(text, "cloud")
         self.assertEqual(result["SPLUNK_USER"], "admin")
 
+    def test_profile_can_derive_uri_from_profile_host(self):
+        text = textwrap.dedent("""\
+            PROFILE_onprem__SPLUNK_HOST="10.110.253.5"
+            PROFILE_onprem__SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:8089"
+            PROFILE_onprem__SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
+        """)
+        result = parse_credential_file(text, "onprem")
+        self.assertEqual(result["SPLUNK_HOST"], "10.110.253.5")
+        self.assertEqual(result["SPLUNK_SEARCH_API_URI"], "https://10.110.253.5:8089")
+        self.assertEqual(result["SPLUNK_URI"], "https://10.110.253.5:8089")
+
     def test_circular_reference_does_not_loop(self):
         text = textwrap.dedent("""\
             SPLUNK_HOST="${SPLUNK_URI}"
@@ -272,6 +288,170 @@ class TestCredentialFileRoundtrip(unittest.TestCase):
         result = parse_credential_file(text)
         self.assertIn("SPLUNK_HOST", result)
         self.assertEqual(result["SPLUNK_HOST"], "your-splunk-host")
+
+
+class TestCredentialParserParity(unittest.TestCase):
+    """Verify the Python reimplementation in this file matches the embedded
+    Python in skills/shared/lib/credentials.sh."""
+
+    CREDENTIALS_SH = os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "skills",
+        "shared",
+        "lib",
+        "credentials.sh",
+    )
+
+    @classmethod
+    def _extract_embedded_python(cls) -> str:
+        """Extract the heredoc Python from _read_credential_file_entries."""
+        with open(cls.CREDENTIALS_SH, encoding="utf-8") as f:
+            content = f.read()
+
+        start = content.index("python3 - \"$file_path\" \"$selected_profile\" <<'PY'\n")
+        start = content.index("\n", start) + 1
+        end = content.index("\nPY\n", start)
+        return content[start:end]
+
+    def _run_embedded_parser(
+        self, cred_text: str, profile: str = ""
+    ) -> dict[str, str]:
+        import subprocess
+        import tempfile
+
+        embedded_py = self._extract_embedded_python()
+        wrapper = (
+            "import ast\n"
+            "import os\n"
+            "import re\n"
+            "import sys\n"
+            "path = sys.argv[1]\n"
+            "selected_profile = sys.argv[2].strip()\n"
+        )
+        body = embedded_py.split("selected_profile = sys.argv[2].strip()\n", 1)[-1]
+        script = wrapper + body
+
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".credentials", delete=False, encoding="utf-8"
+        ) as cred_f:
+            cred_f.write(cred_text)
+            cred_path = cred_f.name
+
+        try:
+            result = subprocess.run(
+                ["python3", "-c", script, cred_path, profile],
+                capture_output=True,
+                check=True,
+            )
+            pairs = result.stdout.split(b"\0")
+            parsed = {}
+            i = 0
+            while i + 1 < len(pairs):
+                key = pairs[i].decode("utf-8")
+                value = pairs[i + 1].decode("utf-8")
+                if key:
+                    parsed[key] = value
+                i += 2
+            return parsed
+        finally:
+            os.unlink(cred_path)
+
+    PARITY_CASES = [
+        (
+            "flat keys",
+            textwrap.dedent("""\
+                SPLUNK_HOST="myhost"
+                SPLUNK_MGMT_PORT="8089"
+                SPLUNK_USER="admin"
+            """),
+            "",
+        ),
+        (
+            "profile override",
+            textwrap.dedent("""\
+                SPLUNK_HOST="default-host"
+                PROFILE_prod__SPLUNK_HOST="prod-host"
+                PROFILE_prod__SPLUNK_USER="admin"
+            """),
+            "prod",
+        ),
+        (
+            "variable references",
+            textwrap.dedent("""\
+                SPLUNK_HOST="myhost"
+                SPLUNK_MGMT_PORT="8089"
+                SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:${SPLUNK_MGMT_PORT}"
+            """),
+            "",
+        ),
+        (
+            "single quotes",
+            textwrap.dedent("""\
+                SPLUNK_HOST='quoted-host'
+                SPLUNK_USER='admin'
+            """),
+            "",
+        ),
+        (
+            "unquoted values",
+            textwrap.dedent("""\
+                SPLUNK_HOST=barehost
+                SPLUNK_MGMT_PORT=8089
+            """),
+            "",
+        ),
+        (
+            "comments and blanks",
+            textwrap.dedent("""\
+                # This is a comment
+                SPLUNK_HOST="myhost"
+
+                # Another comment
+                SPLUNK_USER="admin"
+            """),
+            "",
+        ),
+        (
+            "profile with cross-references",
+            textwrap.dedent("""\
+                SPLUNK_HOST="global-host"
+                PROFILE_lab__SPLUNK_HOST="lab-host"
+                PROFILE_lab__SPLUNK_SEARCH_API_URI="https://${SPLUNK_HOST}:8089"
+            """),
+            "lab",
+        ),
+    ]
+
+    def test_parity_across_cases(self):
+        if not os.path.exists(self.CREDENTIALS_SH):
+            self.skipTest("credentials.sh not found")
+
+        for label, cred_text, profile in self.PARITY_CASES:
+            with self.subTest(case=label):
+                embedded_result = self._run_embedded_parser(cred_text, profile)
+                reimpl_result = parse_credential_file(cred_text, profile)
+                self.assertEqual(
+                    reimpl_result,
+                    embedded_result,
+                    f"Parity mismatch for case '{label}'",
+                )
+
+    def test_example_file_parity(self):
+        example_path = os.path.join(
+            os.path.dirname(__file__), "..", "credentials.example"
+        )
+        if not os.path.exists(example_path):
+            self.skipTest("credentials.example not found")
+        if not os.path.exists(self.CREDENTIALS_SH):
+            self.skipTest("credentials.sh not found")
+
+        with open(example_path, encoding="utf-8") as f:
+            text = f.read()
+
+        embedded_result = self._run_embedded_parser(text)
+        reimpl_result = parse_credential_file(text)
+        self.assertEqual(reimpl_result, embedded_result)
 
 
 if __name__ == "__main__":

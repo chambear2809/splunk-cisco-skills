@@ -60,6 +60,102 @@ json.dump(payload or {}, sys.stdout)
 '
 }
 
+acs_apps_list_all_json() {
+    local offset=0 count=100 page app_count tmp_file rc
+    local -a extra_args=() cmd
+
+    if (( $# > 0 )); then
+        extra_args=("$@")
+    fi
+
+    tmp_file="$(mktemp)"
+    printf '[]' > "${tmp_file}"
+
+    while true; do
+        cmd=(apps list)
+        if (( ${#extra_args[@]} > 0 )); then
+            cmd+=("${extra_args[@]}")
+        fi
+        cmd+=(--count "${count}" --offset "${offset}")
+
+        page="$(acs_command "${cmd[@]}" 2>/dev/null | acs_extract_http_response_json)" || {
+            rm -f "${tmp_file}"
+            return 1
+        }
+
+        app_count="$(ACS_APPS_PAGE="${page}" ACS_APPS_STATE_FILE="${tmp_file}" python3 - <<'PY'
+import json
+import os
+import sys
+
+state_path = os.environ["ACS_APPS_STATE_FILE"]
+page_text = os.environ.get("ACS_APPS_PAGE", "{}")
+
+try:
+    with open(state_path, encoding="utf-8") as handle:
+        apps = json.load(handle)
+except Exception:
+    apps = []
+
+if not isinstance(apps, list):
+    apps = []
+
+try:
+    page = json.loads(page_text)
+except Exception:
+    page = {}
+
+page_apps = page.get("apps", []) if isinstance(page, dict) else []
+if not isinstance(page_apps, list):
+    page_apps = []
+
+apps.extend(page_apps)
+
+with open(state_path, "w", encoding="utf-8") as handle:
+    json.dump(apps, handle)
+
+print(len(page_apps), end="")
+PY
+)" || {
+            rm -f "${tmp_file}"
+            return 1
+        }
+
+        [[ "${app_count}" =~ ^[0-9]+$ ]] || {
+            rm -f "${tmp_file}"
+            return 1
+        }
+
+        if (( app_count < count )); then
+            break
+        fi
+
+        offset=$((offset + count))
+    done
+
+    ACS_APPS_STATE_FILE="${tmp_file}" python3 - <<'PY'
+import json
+import os
+import sys
+
+state_path = os.environ["ACS_APPS_STATE_FILE"]
+
+try:
+    with open(state_path, encoding="utf-8") as handle:
+        apps = json.load(handle)
+except Exception:
+    apps = []
+
+if not isinstance(apps, list):
+    apps = []
+
+json.dump({"apps": apps}, sys.stdout)
+PY
+    rc=$?
+    rm -f "${tmp_file}"
+    return "${rc}"
+}
+
 acs_stack_status_snapshot() {
     local payload
     acs_prepare_context || return 1

@@ -10,7 +10,7 @@ description: >-
 # Cisco Catalyst Enhanced Netflow Add-on Setup
 
 Automates installation and validation of the **Cisco Catalyst Enhanced Netflow
-Add-on for Splunk** (`splunk_app_stream_ipfix_cisco_hsl` v2.1.0).
+Add-on for Splunk** (`splunk_app_stream_ipfix_cisco_hsl`).
 
 ## Package Model
 

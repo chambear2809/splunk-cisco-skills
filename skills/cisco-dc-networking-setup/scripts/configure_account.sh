@@ -80,6 +80,16 @@ fi
 load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
 SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 
+if [[ -n "${SET_VERIFY_SSL}" ]]; then
+    if rest_set_verify_ssl "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
+        "cisco_dc_networking_app_for_splunk_settings" "additional_parameters" "verify_ssl" "${SET_VERIFY_SSL}"; then
+        log "Set verify_ssl=${SET_VERIFY_SSL} in cisco_dc_networking_app_for_splunk_settings.conf."
+    else
+        log "ERROR: Failed to set verify_ssl in cisco_dc_networking_app_for_splunk_settings.conf."
+        exit 1
+    fi
+fi
+
 configure_aci_account() {
     if [[ -z "${HOSTNAME}" ]]; then
         log "ERROR: --hostname is required for ACI accounts"
@@ -186,16 +196,6 @@ case "${ACCT_TYPE}" in
     nexus9k) configure_nexus9k_account ;;
     *) log "ERROR: Unknown account type '${ACCT_TYPE}'. Use: aci, nd, nexus9k"; exit 1 ;;
 esac
-
-if [[ -n "${SET_VERIFY_SSL}" ]]; then
-    if rest_set_verify_ssl "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
-        "cisco_dc_networking_app_for_splunk_settings" "additional_parameters" "verify_ssl" "${SET_VERIFY_SSL}"; then
-        log "Set verify_ssl=${SET_VERIFY_SSL} in cisco_dc_networking_app_for_splunk_settings.conf."
-    else
-        log "ERROR: Failed to set verify_ssl in cisco_dc_networking_app_for_splunk_settings.conf."
-        exit 1
-    fi
-fi
 
 log "Account configuration complete."
 log "$(log_platform_restart_guidance "account changes")"

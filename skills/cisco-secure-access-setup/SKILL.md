@@ -10,7 +10,7 @@ description: >-
 # Cisco Secure Access Setup
 
 Automates installation and core account configuration of the **Cisco Secure
-Access App for Splunk** (`cisco-cloud-security` v1.0.53).
+Access App for Splunk** (`cisco-cloud-security`).
 
 ## Package Model
 
@@ -22,7 +22,7 @@ installer falls back to the local package
 This repo’s local package is the **App for Splunk** (`cisco-cloud-security`),
 not the separate Splunkbase add-on package.
 
-## Agent Behavior
+## Agent Behavior — Credentials
 
 **The agent must NEVER ask for API keys, secrets, or tokens in chat.**
 
@@ -37,8 +37,8 @@ bash skills/shared/scripts/setup_credentials.sh
 For Secure Access API secrets, instruct the user to write them to temp files:
 
 ```bash
-echo "the_api_key" > /tmp/secure_access_api_key && chmod 600 /tmp/secure_access_api_key
-echo "the_api_secret" > /tmp/secure_access_api_secret && chmod 600 /tmp/secure_access_api_secret
+printf '%s' "the_api_key" > /tmp/secure_access_api_key && chmod 600 /tmp/secure_access_api_key
+printf '%s' "the_api_secret" > /tmp/secure_access_api_secret && chmod 600 /tmp/secure_access_api_secret
 ```
 
 ## Environment

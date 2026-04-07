@@ -11,7 +11,7 @@ description: >-
 
 # Cisco Catalyst TA Setup Automation
 
-Automates the **Cisco Catalyst Add-on for Splunk** (`TA_cisco_catalyst` v3.0.0).
+Automates the **Cisco Catalyst Add-on for Splunk** (`TA_cisco_catalyst`).
 
 ## Package Model
 
@@ -40,10 +40,13 @@ Cyber Vision API token), instruct the user to write the secret to a temporary fi
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-echo "the_device_password" > /tmp/device_pass && chmod 600 /tmp/device_pass
+printf '%s\n' '<catalyst_center_password>' > /tmp/catalyst_center_password && chmod 600 /tmp/catalyst_center_password
+printf '%s\n' '<ise_password>' > /tmp/ise_password && chmod 600 /tmp/ise_password
+printf '%s\n' '<sdwan_password>' > /tmp/sdwan_password && chmod 600 /tmp/sdwan_password
+printf '%s\n' '<cybervision_api_token>' > /tmp/cybervision_api_token && chmod 600 /tmp/cybervision_api_token
 ```
 
-Then the agent passes `--password-file /tmp/device_pass` or `--api-token-file /tmp/token`
+Then the agent passes the matching `--password-file` or `--api-token-file`
 to the configure script. After the account is created, delete the temp file.
 
 The agent may freely ask for non-secret values: account names, hostnames, account types, etc.
@@ -81,7 +84,7 @@ Scripts read Splunk credentials from the project-root `credentials` file (falls 
 No environment variables or command-line password arguments are needed:
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-catalyst-ta-setup/scripts/validate.sh
 ```
 
 If credentials are not yet configured, run the setup script first:
@@ -122,12 +125,21 @@ Accounts are created via the Splunk REST API, which handles password encryption
 automatically through the TA's custom REST handlers:
 
 ```bash
-bash scripts/configure_account.sh \
+bash skills/cisco-catalyst-ta-setup/scripts/configure_account.sh \
   --type catalyst_center \
   --name "MY_CATC" \
   --host "https://10.100.0.60" \
   --username "device_user" \
   --password-file /tmp/device_pass
+```
+
+Copy/paste secret-file prep commands:
+
+```bash
+printf '%s\n' '<catalyst_center_password>' > /tmp/catalyst_center_password && chmod 600 /tmp/catalyst_center_password
+printf '%s\n' '<ise_password>' > /tmp/ise_password && chmod 600 /tmp/ise_password
+printf '%s\n' '<sdwan_password>' > /tmp/sdwan_password && chmod 600 /tmp/sdwan_password
+printf '%s\n' '<cybervision_api_token>' > /tmp/cybervision_api_token && chmod 600 /tmp/cybervision_api_token
 ```
 
 Account types and their required fields:
@@ -148,7 +160,7 @@ REST endpoints used (password encryption handled automatically):
 ### Step 3: Enable Inputs
 
 ```bash
-bash scripts/setup.sh --enable-inputs \
+bash skills/cisco-catalyst-ta-setup/scripts/setup.sh --enable-inputs \
   --account "MY_CATC" --index "catalyst" --input-type catalyst_center
 ```
 
@@ -168,7 +180,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 5: Validate
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-catalyst-ta-setup/scripts/validate.sh
 ```
 
 Checks: app installation, indexes, accounts, inputs, data flow, settings.
@@ -199,7 +211,7 @@ ISE and SD-WAN sourcetypes vary by data type and are prefixed `cisco:ise*` and
 ## MCP Server Integration
 
 ```bash
-bash scripts/load_mcp_tools.sh
+bash skills/cisco-catalyst-ta-setup/scripts/load_mcp_tools.sh
 ```
 
 ## Key Learnings / Known Issues

@@ -11,7 +11,7 @@ description: >-
 
 # Splunk Stream Setup Automation
 
-Automates installation and configuration of the **Splunk Stream** stack (v8.1.6):
+Automates installation and configuration of the **Splunk Stream** stack:
 
 | App | Package ID | Purpose |
 |-----|-----------|---------|
@@ -49,7 +49,7 @@ For Splunk Cloud, the normal workflow is hybrid:
 Any `splunk-ta/_unpacked/` copy is review-only and not part of the normal
 deployment workflow.
 
-## Agent Behavior — Prompting
+## Agent Behavior
 
 **The agent must NEVER ask for passwords or secrets in chat.**
 
@@ -286,3 +286,7 @@ All stream sourcetypes follow the pattern `stream:<protocol>`:
    permissions using your standard deployment process if raw capture is required.
 7. **KV Store**: Stream app uses KV Store for stream definitions. Ensure KV
    Store is healthy before configuration.
+
+## Additional Resources
+
+- [reference.md](reference.md) — Package IDs, deployment roles, indexes, ports, validation

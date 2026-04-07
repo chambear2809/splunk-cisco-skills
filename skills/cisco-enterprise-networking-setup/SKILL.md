@@ -11,7 +11,7 @@ description: >-
 # Cisco Enterprise Networking App Setup Automation
 
 Automates the **Cisco Enterprise Networking for Splunk Platform**
-(`cisco-catalyst-app` v3.0.0).
+(`cisco-catalyst-app`).
 
 ## Package Model
 
@@ -77,7 +77,7 @@ REST endpoints.
 |------|-------|
 | Search-tier API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs (`SPLUNK_PLATFORM` is only an override for hybrid runs) |
-| TA app name | `cisco-catalyst-app` |
+| App name | `cisco-catalyst-app` |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/cisco-enterprise-networking-setup/scripts/` (relative to repo root) |
 

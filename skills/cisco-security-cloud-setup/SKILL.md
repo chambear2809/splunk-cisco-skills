@@ -10,7 +10,7 @@ description: >-
 # Cisco Security Cloud Setup
 
 Automates installation and input configuration of **Cisco Security Cloud**
-(`CiscoSecurityCloud` v3.6.3).
+(`CiscoSecurityCloud`).
 
 ## Package Model
 
@@ -23,7 +23,7 @@ This package is a multi-input Cisco Security app. It supports many product
 integrations through app-managed custom REST handlers rather than simple flat
 conf-file edits.
 
-## Agent Behavior
+## Agent Behavior — Credentials
 
 **The agent must NEVER ask for passwords, API keys, client secrets, refresh
 tokens, certificates, or other secrets in chat.**

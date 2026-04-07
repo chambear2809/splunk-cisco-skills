@@ -29,7 +29,7 @@ Bootstraps Linux hosts that should run **full Splunk Enterprise**.
   - search head cluster deployer
   - search head cluster member
 
-## Agent Behavior
+## Agent Behavior — Credentials
 
 **Never ask for passwords or shared secrets in chat.**
 

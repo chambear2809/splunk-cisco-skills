@@ -52,13 +52,15 @@ Configured in `splunk_ta_cisco_meraki_organization.conf`:
 | `cisco_meraki_securityappliances://<name>` | `meraki:securityappliances` | 360s | MX appliance data |
 | `cisco_meraki_switches://<name>` | `meraki:switches` | 86400s | Switch data |
 
-## Device Inputs (5)
+## Device Inputs (7)
 
 | Input Stanza | Sourcetype | Default Interval | Description |
 |---|---|---|---|
 | `cisco_meraki_devices://<name>` | `meraki:devices` | 86400s | Device inventory |
+| `cisco_meraki_devices_availabilities://<name>` | `meraki:devicesavailabilities` | 86400s | Device availability snapshot |
 | `cisco_meraki_device_availabilities_change_history://<name>` | `meraki:devicesavailabilitieschangehistory` | 3600s | Availability history |
 | `cisco_meraki_device_uplink_addresses_by_device://<name>` | `meraki:devicesuplinksaddressesbydevice` | 86400s | Uplink addresses |
+| `cisco_meraki_devices_uplinks_loss_and_latency://<name>` | `meraki:devicesuplinkslossandlatency` | 86400s | Uplink loss and latency |
 | `cisco_meraki_power_modules_statuses_by_device://<name>` | `meraki:powermodulesstatusesbydevice` | 3600s | Power module status |
 | `cisco_meraki_firmware_upgrades://<name>` | `meraki:firmwareupgrades` | 86400s | Firmware upgrades |
 
@@ -70,7 +72,7 @@ Configured in `splunk_ta_cisco_meraki_organization.conf`:
 | `cisco_meraki_wireless_packet_loss_by_device://<name>` | `meraki:wirelessdevicespacketlossbydevice` | 86400s | Packet loss per device |
 | `cisco_meraki_wireless_controller_availabilities_change_history://<name>` | `meraki:wirelesscontrolleravailabilitieschangehistory` | 86400s | Controller availability |
 | `cisco_meraki_wireless_controller_devices_interfaces_usage_history_by_interval://<name>` | `meraki:wirelesscontrollerdevicesinterfacesusagehistorybyinterval` | 86400s | Interface usage |
-| `cisco_meraki_wireless_controller_devices_interfaces_packets_overview_by_device://<name>` | `meraki:wirelesscontrollerdevicesinterfacespackets overviewbydevice` | 86400s | Interface packets |
+| `cisco_meraki_wireless_controller_devices_interfaces_packets_overview_by_device://<name>` | `meraki:wirelesscontrollerdevicesinterfacespacketoverviewbydevice` | 86400s | Interface packets |
 | `cisco_meraki_wireless_devices_wireless_controllers_by_device://<name>` | `meraki:wirelessdeviceswirelesscontrollersbydevice` | 86400s | Device-controller mapping |
 
 ## Summary Inputs (5)
@@ -129,15 +131,17 @@ Configured in `splunk_ta_cisco_meraki_organization.conf`:
 |---|---|---|---|
 | `cisco_meraki_sensor_readings_history://<name>` | `meraki:sensorreadingshistory` | 86400s | Sensor readings |
 
-## Webhook Inputs (special)
+## Webhook Inputs
 
 | Input Stanza | Sourcetype | Description |
 |---|---|---|
 | `cisco_meraki_webhook_logs://<name>` | `meraki:webhooklogs:api` | Webhook logs via API polling |
 | `cisco_meraki_webhook://<name>` | `meraki:webhook` | Webhook events via HEC (requires HEC setup) |
 
-The webhook input requires HEC token configuration and is not part of the standard
-polling inputs. Use the TA's UI to configure webhooks.
+`webhook_logs` is an API-polled input and is included in the scripted `all`
+enablement path. The separate `webhook` input requires HEC token
+configuration and is not part of the scripted setup flow. Use the TA's UI to
+configure HEC webhooks.
 
 ## Common Input Fields
 

@@ -228,12 +228,26 @@ registry_local_package_for_app_id() {
     local app_id="${1:-}"
     [[ -f "${REGISTRY_FILE}" ]] || return 0
     python3 -c "
-import json, sys, fnmatch
+import fnmatch
+import json
+import re
+import sys
 from pathlib import Path
 
 registry_path = sys.argv[1]
 target = sys.argv[2]
 search_dirs = [Path(raw) for raw in sys.argv[3:] if raw]
+
+def package_version(name):
+    lowered = name.lower()
+    for suffix in ('.tar.gz', '.tgz', '.spl'):
+        if lowered.endswith(suffix):
+            name = name[:-len(suffix)]
+            break
+    matches = re.findall(r'\d+(?:\.\d+)+', name)
+    if not matches:
+        return None
+    return tuple(int(part) for part in matches[-1].split('.'))
 
 with open(registry_path) as f:
     registry = json.load(f)
@@ -247,7 +261,7 @@ for app in registry.get('apps', []):
 if not patterns:
     raise SystemExit(0)
 
-seen = set()
+candidates = []
 for directory in search_dirs:
     if not directory.is_dir():
         continue
@@ -257,13 +271,22 @@ for directory in search_dirs:
         name = child.name.lower()
         if not (name.endswith('.tgz') or name.endswith('.spl') or name.endswith('.tar.gz')):
             continue
-        resolved = str(child.resolve())
-        if resolved in seen:
-            continue
-        seen.add(resolved)
         if any(fnmatch.fnmatch(name, pattern) for pattern in patterns):
-            print(resolved, end='')
-            raise SystemExit(0)
+            version = package_version(child.name)
+            candidates.append(
+                (
+                    version is not None,
+                    version or (),
+                    child.stat().st_mtime_ns,
+                    child.name.lower(),
+                    str(child.resolve()),
+                )
+            )
+
+if not candidates:
+    raise SystemExit(0)
+
+print(max(candidates)[-1], end='')
 " "${REGISTRY_FILE}" "${app_id}" "${PROJECT_TA_DIR}" "${TA_CACHE}" 2>/dev/null || true
 }
 
@@ -346,9 +369,6 @@ install_dependency_with_current_script() {
         cmd+=(--source splunkbase --app-id "${dep_id}")
     fi
 
-    if [[ -n "${APP_VERSION}" ]]; then
-        cmd+=(--app-version "${APP_VERSION}")
-    fi
     cmd+=(--no-update --no-restart)
 
     current_target_id="$(registry_target_app_id)"
@@ -428,7 +448,7 @@ Optional flags (skip the corresponding prompt):
   --file PATH           Local app file path
   --url URL             Remote download URL
   --app-id ID           Splunkbase app ID
-  --app-version VER     Splunkbase version
+  --app-version VER     Pin a specific Splunkbase version (default: latest)
   --license-ack-url URL Third-party Splunkbase license URL for ACS installs
   --update              Upgrade mode
   --no-update           Fresh install (skip upgrade prompt)
@@ -549,12 +569,6 @@ prompt_splunkbase() {
         log "Using app ID: ${APP_ID}"
     fi
 
-    if [[ -z "${APP_VERSION}" ]]; then
-        if is_interactive; then
-            echo ""
-            safe_read "--app-version" -rp "App version (leave blank for latest): " APP_VERSION
-        fi
-    fi
     cloud_apply_known_splunkbase_defaults
 }
 
@@ -608,7 +622,7 @@ cloud_restart_or_exit() {
 cloud_resolve_splunkbase_app_name() {
     local splunkbase_id="$1"
     acs_prepare_context || return 1
-    acs_command apps list --splunkbase --count 100 2>/dev/null \
+    acs_apps_list_all_json --splunkbase \
         | acs_extract_http_response_json \
         | python3 -c "
 import json, sys

@@ -10,7 +10,7 @@ description: >-
 
 # Cisco DC Networking TA Setup Automation
 
-Automates the **Cisco DC Networking App for Splunk** (`cisco_dc_networking_app_for_splunk` v1.2.0).
+Automates the **Cisco DC Networking App for Splunk** (`cisco_dc_networking_app_for_splunk`).
 
 ## Package Model
 
@@ -39,10 +39,12 @@ instruct the user to write the secret to a temporary file:
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-echo "the_device_password" > /tmp/device_pass && chmod 600 /tmp/device_pass
+printf '%s\n' '<aci_or_apic_password>' > /tmp/dc_aci_password && chmod 600 /tmp/dc_aci_password
+printf '%s\n' '<nexus_dashboard_password>' > /tmp/dc_nd_password && chmod 600 /tmp/dc_nd_password
+printf '%s\n' '<nexus9k_password>' > /tmp/dc_nexus9k_password && chmod 600 /tmp/dc_nexus9k_password
 ```
 
-Then the agent passes `--password-file /tmp/device_pass` to the configure script.
+Then the agent passes the matching `--password-file` path to the configure script.
 After the account is created, delete the temp file.
 
 The agent may freely ask for non-secret values: account names, hostnames, account types, etc.
@@ -80,7 +82,7 @@ Scripts read Splunk credentials from the project-root `credentials` file (falls 
 No environment variables or command-line password arguments are needed:
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-dc-networking-setup/scripts/validate.sh
 ```
 
 If credentials are not yet configured, run the setup script first:
@@ -120,7 +122,7 @@ Before running, the agent must obtain from the user (non-secret values only):
 The configure script stores credentials securely via Splunk's encrypted credential manager:
 
 ```bash
-bash scripts/configure_account.sh \
+bash skills/cisco-dc-networking-setup/scripts/configure_account.sh \
   --type aci \
   --name "MY_FABRIC" \
   --hostname "10.0.0.1,10.0.0.2,10.0.0.3" \
@@ -130,12 +132,20 @@ bash scripts/configure_account.sh \
   --password-file /tmp/device_pass
 ```
 
+Copy/paste secret-file prep commands:
+
+```bash
+printf '%s\n' '<aci_or_apic_password>' > /tmp/dc_aci_password && chmod 600 /tmp/dc_aci_password
+printf '%s\n' '<nexus_dashboard_password>' > /tmp/dc_nd_password && chmod 600 /tmp/dc_nd_password
+printf '%s\n' '<nexus9k_password>' > /tmp/dc_nexus9k_password && chmod 600 /tmp/dc_nexus9k_password
+```
+
 Account types: `aci` (uses `--hostname`), `nd` (uses `--hostname`), `nexus9k` (uses `--device-ip`).
 
 ### Step 3: Enable Inputs
 
 ```bash
-bash scripts/setup.sh --enable-inputs --account "MY_FABRIC" --index "cisco_aci" --input-type aci
+bash skills/cisco-dc-networking-setup/scripts/setup.sh --enable-inputs --account "MY_FABRIC" --index "cisco_aci" --input-type aci
 ```
 
 | Input Type | Inputs Enabled | Index |
@@ -153,7 +163,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 5: Validate
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-dc-networking-setup/scripts/validate.sh
 ```
 
 Checks: app installation, indexes, macros, accounts, inputs, data flow, settings.
@@ -169,7 +179,7 @@ Checks: app installation, indexes, macros, accounts, inputs, data flow, settings
 ## MCP Server Integration
 
 ```bash
-bash scripts/load_mcp_tools.sh
+bash skills/cisco-dc-networking-setup/scripts/load_mcp_tools.sh
 ```
 
 Tools: `cisco_dc_check_health`, `cisco_dc_list_inputs`, `cisco_dc_aci_faults`,

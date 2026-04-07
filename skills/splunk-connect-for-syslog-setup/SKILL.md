@@ -25,7 +25,7 @@ areas:
    - host-based Linux with Docker/Podman plus compose or systemd
    - Kubernetes with Helm
 
-## Agent Behavior
+## Agent Behavior — Credentials
 
 **The agent must NEVER ask for HEC tokens or other secrets in chat.**
 

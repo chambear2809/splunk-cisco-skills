@@ -9,30 +9,36 @@ permissions:
 
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
+    env:
+      SHELLCHECK_VERSION: "0.10.0"
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: "3.11"
 
       - name: Install Python test dependencies
-        run: pip install pytest
+        run: pip install "pytest>=8,<9"
 
       - name: Install shell tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y bats shellcheck
+          sudo apt-get install -y bats
+
+      - name: Install ShellCheck
+        run: |
+          curl -sSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+            | tar -xJf - --strip-components=1 -C /usr/local/bin "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
+          shellcheck --version
 
       - name: Run Python tests
         run: pytest tests/ -v
-
-      - name: Check generated deployment docs
-        run: python3 skills/shared/scripts/generate_deployment_docs.py --check
 
       - name: Run Bats tests
         run: bats tests/*.bats

@@ -10,7 +10,7 @@ description: >-
 
 # Cisco Meraki TA Setup Automation
 
-Automates the **Splunk Add-on for Cisco Meraki** (`Splunk_TA_cisco_meraki` v3.3.0).
+Automates the **Splunk Add-on for Cisco Meraki** (`Splunk_TA_cisco_meraki`).
 
 ## Package Model
 
@@ -38,7 +38,7 @@ For the Meraki Dashboard API key, instruct the user to write it to a temporary f
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-echo "the_meraki_api_key" > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key
+printf '%s\n' '<meraki_dashboard_api_key>' > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key
 ```
 
 Then the agent passes `--api-key-file /tmp/meraki_api_key` to the configure script.
@@ -79,7 +79,7 @@ Scripts read Splunk credentials from the project-root `credentials` file (falls 
 No environment variables or command-line password arguments are needed:
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-meraki-ta-setup/scripts/validate.sh
 ```
 
 If credentials are not yet configured, run the setup script first:
@@ -99,6 +99,8 @@ bash skills/cisco-meraki-ta-setup/scripts/setup.sh
 Creates the index, sets the `meraki_index` dashboard macro, and ensures the app
 is visible in Splunk Web. When run interactively (TTY), the script prompts to
 continue with account configuration after the initial setup completes.
+The app package provides its own dashboards; this step wires the macro and app
+visibility so those dashboards resolve against the right index.
 
 No `sudo` required when running as the `splunk` user.
 In Splunk Cloud, the setup script creates the index through ACS.
@@ -124,13 +126,19 @@ Accounts are created via the Splunk REST API, which handles API key encryption
 automatically through the TA's custom REST handlers:
 
 ```bash
-bash scripts/configure_account.sh \
+bash skills/cisco-meraki-ta-setup/scripts/configure_account.sh \
   --name "MY_ORG" \
   --api-key-file /tmp/meraki_api_key \
   --org-id "123456789" \
   --region global \
   --auto-inputs \
   --index meraki
+```
+
+Copy/paste secret-file prep command:
+
+```bash
+printf '%s\n' '<meraki_dashboard_api_key>' > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key
 ```
 
 REST endpoint used (API key encryption handled automatically):
@@ -154,15 +162,15 @@ If `--auto-inputs` was used in Step 2, all inputs are created automatically.
 Otherwise, enable manually:
 
 ```bash
-bash scripts/setup.sh --enable-inputs \
+bash skills/cisco-meraki-ta-setup/scripts/setup.sh --enable-inputs \
   --account "MY_ORG" --index "meraki" --input-type all
 ```
 
 | Input Type | Inputs Enabled | Description |
 |------------|---------------|-------------|
-| `all` | 39 | All standard polling inputs |
+| `all` | 42 | All scripted polling inputs plus `webhook_logs` API polling |
 | `core` | 7 | AP, Air Marshal, audit, cameras, org security, MX, switches |
-| `devices` | 5 | Devices, availability, uplinks, power, firmware |
+| `devices` | 7 | Devices, availability, uplinks, uplink loss/latency, power, firmware |
 | `wireless` | 6 | Wireless ethernet, packet loss, controllers |
 | `summary` | 5 | Top appliances, devices, clients, switches, power history |
 | `api` | 4 | API request history, response codes, overview, assurance |
@@ -171,6 +179,10 @@ bash scripts/setup.sh --enable-inputs \
 | `switches` | 3 | Port overview, transceivers, ports by switch |
 | `organization` | 2 | Networks and organizations |
 | `sensor` | 1 | Sensor readings history |
+
+`webhook_logs` is API polling and is included in `all`. The separate HEC-based
+`webhook` input still requires its own HEC configuration and is not created by
+this setup flow.
 
 ### Step 4: Restart If Required
 
@@ -181,7 +193,7 @@ On Splunk Cloud, check `acs status current-stack` and only run
 ### Step 5: Validate
 
 ```bash
-bash scripts/validate.sh
+bash skills/cisco-meraki-ta-setup/scripts/validate.sh
 ```
 
 Checks: app installation, index, account, inputs, data flow, settings.
@@ -212,7 +224,7 @@ See [reference.md](reference.md) for the full sourcetype catalog (35+).
 Load custom tools into the MCP Server (credentials read from the project-root `credentials` file, falls back to `~/.splunk/credentials`):
 
 ```bash
-bash scripts/load_mcp_tools.sh
+bash skills/cisco-meraki-ta-setup/scripts/load_mcp_tools.sh
 ```
 
 ## Key Learnings / Known Issues
@@ -228,8 +240,9 @@ bash scripts/load_mcp_tools.sh
 5. **Region determines base URL**: `global`→`api.meraki.com`,
    `india`→`api.meraki.in`, `canada`→`api.meraki.ca`, `china`→`api.meraki.cn`,
    `fedramp`→`api.gov-meraki.com`.
-6. **Webhook input is special**: The webhook input requires HEC configuration
-   and is not part of the standard polling inputs.
+6. **Webhook inputs split in two**: `webhook_logs` is API polling and is
+   included in the scripted `all` enablement path. The separate `webhook`
+   input requires HEC configuration and is not created by this setup flow.
 7. **Rate limiting**: The `max_api_calls_per_second` field controls API rate
    limiting (default 5, max 10).
 8. **ACS deployment verification**: After ACS install, verify the app identity
