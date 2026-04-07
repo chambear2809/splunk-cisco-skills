@@ -1,6 +1,6 @@
 services:
   redis:
-    image: bitnami/redis:7
+    image: ${REDIS_IMAGE}:${REDIS_TAG}
     container_name: SC4SNMP-redis
     environment:
       # Local-only lab default; set REDIS_PASSWORD for shared/production hosts
@@ -9,7 +9,7 @@ services:
       - redis-data:/bitnami/redis/data
 
   mongo:
-    image: bitnami/mongodb:6.0
+    image: ${MONGO_IMAGE}:${MONGO_TAG}
     container_name: SC4SNMP-mongo
     environment:
       # Local-only lab default; set MONGODB_ROOT_PASSWORD for shared/production hosts
@@ -18,18 +18,41 @@ services:
       - mongo-data:/bitnami/mongodb
 
   mibserver:
-    image: ghcr.io/pysnmp/mibs/container:latest
+    image: ${MIBSERVER_IMAGE}:${MIBSERVER_TAG}
     container_name: SC4SNMP-mibserver
+    networks:
+      default:
+        aliases:
+          - snmp-mibserver
+
+  inventory:
+    image: {{SC4SNMP_IMAGE}}
+    container_name: SC4SNMP-inventory
+    command: [inventory]
+    restart: on-failure
+    env_file:
+      - .env
+    volumes:
+      - ./config/inventory.csv:/app/inventory/inventory.csv:ro
+      - ./config/scheduler-config.yaml:/app/config/config.yaml:ro
+      - ./secrets:/app/secrets/tmp:ro
+      - ./mibs:/app/new_mibs/src/vendor:ro
+    depends_on:
+      - redis
+      - mongo
+      - mibserver
 
   scheduler:
     image: {{SC4SNMP_IMAGE}}
     container_name: SC4SNMP-scheduler
+    command: [celery, beat]
+    restart: on-failure
     env_file:
       - .env
     volumes:
-      - ./config:/opt/sc4snmp/config:ro
-      - ./secrets:/opt/sc4snmp/secrets:ro
-      - ./mibs:/opt/sc4snmp/mibs:ro
+      - ./config/scheduler-config.yaml:/app/config/config.yaml:ro
+      - ./secrets:/app/secrets/tmp:ro
+      - ./mibs:/app/new_mibs/src/vendor:ro
     depends_on:
       - redis
       - mongo
@@ -38,50 +61,59 @@ services:
   worker-poller:
     image: {{SC4SNMP_IMAGE}}
     container_name: SC4SNMP-worker-poller
+    command: [celery, worker-poller]
+    restart: on-failure
     env_file:
       - .env
     volumes:
-      - ./config:/opt/sc4snmp/config:ro
-      - ./secrets:/opt/sc4snmp/secrets:ro
-      - ./mibs:/opt/sc4snmp/mibs:ro
+      - ./config/scheduler-config.yaml:/app/config/config.yaml:ro
+      - ./secrets:/app/secrets/tmp:ro
+      - ./mibs:/app/new_mibs/src/vendor:ro
     depends_on:
       - scheduler
 
   worker-sender:
     image: {{SC4SNMP_IMAGE}}
     container_name: SC4SNMP-worker-sender
+    command: [celery, worker-sender]
+    restart: on-failure
     env_file:
       - .env
     volumes:
-      - ./secrets:/opt/sc4snmp/secrets:ro
+      - ./config/scheduler-config.yaml:/app/config/config.yaml:ro
+      - ./secrets:/app/secrets/tmp:ro
     depends_on:
       - scheduler
 
   worker-trap:
     image: {{SC4SNMP_IMAGE}}
     container_name: SC4SNMP-worker-trap
+    command: [celery, worker-trap]
+    restart: on-failure
     env_file:
       - .env
     volumes:
-      - ./config:/opt/sc4snmp/config:ro
-      - ./secrets:/opt/sc4snmp/secrets:ro
-      - ./mibs:/opt/sc4snmp/mibs:ro
+      - ./config/traps-config.yaml:/app/config/config.yaml:ro
+      - ./secrets:/app/secrets/tmp:ro
+      - ./mibs:/app/new_mibs/src/vendor:ro
     depends_on:
       - scheduler
 
   trap:
     image: {{SC4SNMP_IMAGE}}
     container_name: SC4SNMP-trap
+    command: [trap]
+    restart: on-failure
     env_file:
       - .env
     volumes:
-      - ./config:/opt/sc4snmp/config:ro
-      - ./secrets:/opt/sc4snmp/secrets:ro
-      - ./mibs:/opt/sc4snmp/mibs:ro
+      - ./config/traps-config.yaml:/app/config/config.yaml:ro
+      - ./secrets:/app/secrets/tmp:ro
+      - ./mibs:/app/new_mibs/src/vendor:ro
     depends_on:
       - worker-trap
     ports:
-      - target: {{TRAPS_PORT}}
+      - target: 2162
         published: {{TRAPS_PORT}}
         protocol: udp
 
