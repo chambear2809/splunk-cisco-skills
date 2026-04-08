@@ -92,6 +92,7 @@ skill-specific details.
 | `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex bridge bundles |
+| `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure the Splunk AI Assistant with onboarding and activation |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
@@ -458,26 +459,43 @@ export SPLUNK_SEARCH_API_URI="https://splunk-host:8089"
 
 ### SSL Verification
 
-By default, Splunk REST calls keep compatibility mode and skip TLS certificate
-verification (`curl -k`) because on-prem Splunk deployments often use
-self-signed certificates. To enable strict verification with system trust,
-set:
+By default, Splunk REST calls skip TLS certificate verification (`curl -k`)
+because lab and on-prem Splunk deployments often use self-signed certificates.
+This is the safest default for first-run onboarding in self-signed labs.
+
+**Recommended for self-signed labs**: export your Splunk CA certificate and
+point the scripts at it. This gives you verified TLS without requiring a
+publicly trusted certificate:
 
 ```bash
-export SPLUNK_VERIFY_SSL="true"
+# In your credentials file (or export as an env var):
+SPLUNK_CA_CERT="/path/to/splunk-ca.pem"
 ```
 
-If you need secure verification with a private CA instead of the system trust
-store, set:
+To enable strict verification using the system trust store instead (for
+environments with publicly trusted certificates), set:
 
 ```bash
-export SPLUNK_CA_CERT="/path/to/splunk-ca.pem"
+SPLUNK_VERIFY_SSL="true"
 ```
 
-Splunkbase uses certificate verification by default. Remote app downloads keep
-compatibility with the Splunk TLS setting unless you override them separately
+Both settings can be placed in your `credentials` file so they apply to every
+run automatically.
+
+Splunkbase downloads use certificate verification by default since
+`splunkbase.splunk.com` has a publicly trusted certificate. Remote app
+downloads inherit the Splunk TLS setting unless you override them separately
 with `APP_DOWNLOAD_VERIFY_SSL`, `APP_DOWNLOAD_CA_CERT`,
 `SPLUNKBASE_VERIFY_SSL`, or `SPLUNKBASE_CA_CERT`.
+
+| Setting | Default | Scope |
+|---------|---------|-------|
+| `SPLUNK_VERIFY_SSL` | `false` | Splunk REST API |
+| `SPLUNK_CA_CERT` | (none) | Splunk REST API (overrides `SPLUNK_VERIFY_SSL`) |
+| `APP_DOWNLOAD_VERIFY_SSL` | inherits `SPLUNK_VERIFY_SSL` | Remote app/package downloads |
+| `APP_DOWNLOAD_CA_CERT` | inherits `SPLUNK_CA_CERT` | Remote app/package downloads |
+| `SPLUNKBASE_VERIFY_SSL` | `true` | Splunkbase API |
+| `SPLUNKBASE_CA_CERT` | (none) | Splunkbase API |
 
 You can also define `SPLUNK_SEARCH_API_URI` in the `credentials` file so you do
 not have to export it each session. The helper still accepts `SPLUNK_URI` as a
@@ -513,7 +531,7 @@ Safe patterns used in this repo:
 Example:
 
 ```bash
-echo "device_secret_here" > /tmp/device_secret
+printf '%s' "device_secret_here" > /tmp/device_secret
 chmod 600 /tmp/device_secret
 
 bash skills/cisco-catalyst-ta-setup/scripts/configure_account.sh \
@@ -535,40 +553,46 @@ rules/credential-handling.mdc
 ## Repository Layout
 
 ```text
-splunk-cloud-skills/
+splunk-cisco-skills/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml              # shell/unit test checks for first-party scripts
 ├── README.md
 ├── ARCHITECTURE.md
+├── CONTRIBUTING.md
 ├── CLOUD_DEPLOYMENT_MATRIX.md
 ├── DEMO_SCRIPTS.md
+├── Makefile                     # make check-all runs the full CI suite locally
 ├── credentials.example
 ├── credentials                  # local only, gitignored
 ├── .shellcheckrc
+├── pytest.ini
+├── requirements.txt             # Python test dependencies
+├── ruff.toml                    # Python linter/formatter configuration
 ├── splunk-ta/                   # local package cache; binaries ignored by git
 │   └── _unpacked/              # review-only extracted copies
 ├── skills/
 │   ├── shared/
 │   │   ├── app_registry.json   # single source of truth for Splunkbase IDs
 │   │   ├── lib/
-│   │   │   ├── credential_helpers.sh    # shim that sources all modules
-│   │   │   ├── credentials.sh           # profile resolution and loading
-│   │   │   ├── rest_helpers.sh          # Splunk REST API wrappers
-│   │   │   ├── acs_helpers.sh           # ACS CLI wrappers
-│   │   │   ├── splunkbase_helpers.sh    # Splunkbase auth and downloads
-│   │   │   ├── host_bootstrap_helpers.sh # SSH/bootstrap helper functions
-│   │   │   └── configure_account_helpers.sh  # create-or-update pattern
+│   │   │   ├── credential_helpers.sh          # shim that sources all modules
+│   │   │   ├── credentials.sh                 # profile resolution and loading
+│   │   │   ├── credential_platform_helpers.sh # platform detection, cloud/staging
+│   │   │   ├── credential_role_helpers.sh     # deployment role resolution
+│   │   │   ├── rest_helpers.sh                # Splunk REST API wrappers
+│   │   │   ├── acs_helpers.sh                 # ACS CLI wrappers
+│   │   │   ├── splunkbase_helpers.sh          # Splunkbase auth and downloads
+│   │   │   ├── host_bootstrap_helpers.sh      # SSH/bootstrap helper functions
+│   │   │   ├── deployment_helpers.sh          # bundle/cluster delivery plane
+│   │   │   ├── registry_helpers.sh            # app registry lookups and warnings
+│   │   │   ├── configure_account_helpers.sh   # create-or-update pattern
+│   │   │   ├── mcp_helpers.sh                 # MCP KV store tool upload
+│   │   │   └── shell_helpers.py               # Python helpers (URL encode, sanitize)
 │   │   └── scripts/
 │   │       ├── setup_credentials.sh
 │   │       ├── cloud_batch_install.sh
 │   │       └── cloud_batch_uninstall.sh
-│   ├── splunk-app-install/
-│   ├── splunk-enterprise-host-setup/
-│   ├── splunk-connect-for-syslog-setup/
-│   ├── splunk-connect-for-snmp-setup/
-│   ├── splunk-itsi-setup/
-│   ├── splunk-stream-setup/
+│   ├── cisco-product-setup/
 │   ├── cisco-appdynamics-setup/
 │   ├── cisco-catalyst-ta-setup/
 │   ├── cisco-catalyst-enhanced-netflow-setup/
@@ -578,7 +602,15 @@ splunk-cloud-skills/
 │   ├── cisco-meraki-ta-setup/
 │   ├── cisco-secure-access-setup/
 │   ├── cisco-security-cloud-setup/
-│   └── cisco-thousandeyes-setup/
+│   ├── cisco-thousandeyes-setup/
+│   ├── splunk-ai-assistant-setup/
+│   ├── splunk-app-install/
+│   ├── splunk-connect-for-syslog-setup/
+│   ├── splunk-connect-for-snmp-setup/
+│   ├── splunk-enterprise-host-setup/
+│   ├── splunk-itsi-setup/
+│   ├── splunk-mcp-server-setup/
+│   └── splunk-stream-setup/
 ├── tests/                       # bats and Python test suites
 ├── plans/                       # design notes and implementation plans
 └── rules/

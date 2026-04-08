@@ -80,7 +80,7 @@ delete_app_via_rest() {
     delete_rc=$?
     set -e
 
-    http_code=$(echo "${delete_response}" | tail -1)
+    http_code=$(_extract_http_code "${delete_response}")
     body=$(printf '%s\n' "${delete_response}" | sed '$d')
 
     if [[ -z "${http_code}" ]] || (( delete_rc != 0 )) || [[ "${http_code}" == "000" ]]; then

@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/../lib/credential_helpers.sh"
 REGISTRY_FILE="${REGISTRY_FILE:-${_PROJECT_ROOT}/skills/shared/app_registry.json}"
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Batch-install Splunkbase apps on Splunk Cloud via ACS.
 
@@ -23,7 +24,7 @@ Options:
 Example:
   $(basename "$0") 7777 7828 5580
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 APP_IDS=()
@@ -35,14 +36,14 @@ while [[ $# -gt 0 ]]; do
         --version) require_arg "$1" $# || exit 1; APP_VERSION="$2"; shift 2 ;;
         --no-restart) RESTART=false; shift ;;
         --help) usage ;;
-        --*) log "Unknown option: $1"; usage ;;
+        --*) log "Unknown option: $1"; usage 1 ;;
         *) APP_IDS+=("$1"); shift ;;
     esac
 done
 
 if (( ${#APP_IDS[@]} == 0 )); then
     log "ERROR: At least one Splunkbase app ID is required."
-    usage
+    usage 1
 fi
 
 if ! is_splunk_cloud; then

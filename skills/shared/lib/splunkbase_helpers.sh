@@ -12,6 +12,7 @@ get_splunkbase_session() {
 
     _set_splunkbase_curl_tls_args || return 1
     response_file="$(mktemp)"
+    chmod 600 "${response_file}"
     cookie_file="$(mktemp)"
     chmod 600 "${cookie_file}"
 

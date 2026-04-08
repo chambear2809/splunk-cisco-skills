@@ -1,6 +1,6 @@
 ---
-name: Secure Credential Handling
-overview: Eliminate plain-text credential exposure across all three layers (agent chat, environment variables, process arguments) by introducing a secure credential file, a shared helper library, and updated scripts/skills that never pass secrets on the command line.
+name: "Secure Credential Handling (ARCHIVED)"
+overview: "ARCHIVED: This plan has been fully implemented. The current credential system uses project-root `credentials` with fallback to `~/.splunk/credentials`, managed by `skills/shared/lib/credential_helpers.sh` and documented in `rules/credential-handling.mdc`. See CONTRIBUTING.md for the current credential handling policy."
 todos:
   - id: shared-lib
     content: Create shared/lib/credential_helpers.sh with load_splunk_credentials, get_session_key, splunk_curl, splunk_curl_post, read_secret_from_file_or_prompt functions
@@ -33,7 +33,7 @@ todos:
     content: Update all 7 SKILL.md files to remove env var credential patterns and add credential file guidance
     status: completed
   - id: workspace-rule
-    content: Create .cursor/rules/credential-handling.mdc workspace rule to enforce no-plaintext-in-chat policy
+    content: Create rules/credential-handling.mdc workspace rule to enforce no-plaintext-in-chat policy
     status: completed
 isProject: false
 ---
@@ -73,7 +73,7 @@ flowchart LR
 ## Key Design Decisions
 
 - **Credential file**: `~/.splunk/credentials` with `chmod 600`, shell-sourceable format
-- **Shared library**: `/home/splunk/.cursor/skills/shared/lib/credential_helpers.sh` sourced by all scripts
+- **Shared library**: `skills/shared/lib/credential_helpers.sh` sourced by all scripts
 - **curl hardening**: POST data via `curl -d @-` (stdin), headers via `curl -K <(...)` (process substitution / fd)
 - **Device credentials**: Read from temp file (`--password-file`) or stdin (`--password -`), never CLI args
 - **Agent behavior**: Never ask for passwords in chat; guide user to populate the credential file
@@ -128,7 +128,7 @@ Replace agent behavior section across all skills with:
 ```
 The agent must NEVER ask for passwords, API keys, or secrets in chat.
 Instead, guide the user to run:
-  bash ~/.cursor/skills/shared/scripts/setup_credentials.sh
+  bash skills/shared/scripts/setup_credentials.sh
 Then run scripts normally -- they read credentials from ~/.splunk/credentials.
 For device credentials, instruct the user to create a temp file and pass --password-file.
 ```
@@ -150,7 +150,7 @@ Each script gets these changes:
 **a) Source the shared library** (replaces the credential-loading boilerplate):
 
 ```bash
-source "/home/splunk/.cursor/skills/shared/lib/credential_helpers.sh"
+source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 load_splunk_credentials
 SK=$(get_session_key "${SPLUNK_URI}")
 ```
@@ -216,10 +216,10 @@ With a redaction helper that strips known sensitive fields before printing.
 
 ### 6. Create a workspace rule for credential handling
 
-New rule file `.cursor/rules/credential-handling.mdc` that instructs the agent:
+Rule file `rules/credential-handling.mdc` that instructs the agent:
 
 - Never ask for passwords, API keys, tokens, or secrets in conversation
-- Always direct users to `~/.splunk/credentials` for Splunk creds
+- Always direct users to the project-root `credentials` file (or `~/.splunk/credentials`) for Splunk creds
 - Always direct users to use `--password-file` for device credentials
 - Never pass `SPLUNK_PASS` or similar as environment variables in shell commands
 

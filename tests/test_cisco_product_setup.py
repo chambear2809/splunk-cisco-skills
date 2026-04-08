@@ -12,7 +12,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BUILD_SCRIPT = REPO_ROOT / "skills/cisco-product-setup/scripts/build_catalog.py"
 RESOLVE_SCRIPT = REPO_ROOT / "skills/cisco-product-setup/scripts/resolve_product.sh"
@@ -183,14 +182,14 @@ class CiscoProductSetupTests(unittest.TestCase):
 
     def test_effective_auto_inputs_defaults_false_when_unset(self) -> None:
         result = self.run_setup_shell(
-            'USER_KEYS=(); USER_VALUES=(); if effective_auto_inputs; then echo true; else echo false; fi'
+            "USER_KEYS=(); USER_VALUES=(); if effective_auto_inputs; then echo true; else echo false; fi"
         )
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertEqual(result.stdout.strip(), "false")
 
     def test_effective_create_defaults_defaults_false_when_unset(self) -> None:
         result = self.run_setup_shell(
-            'USER_KEYS=(); USER_VALUES=(); if effective_create_defaults; then echo true; else echo false; fi'
+            "USER_KEYS=(); USER_VALUES=(); if effective_create_defaults; then echo true; else echo false; fi"
         )
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertEqual(result.stdout.strip(), "false")

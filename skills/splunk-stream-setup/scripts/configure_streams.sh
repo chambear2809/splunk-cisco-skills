@@ -13,6 +13,7 @@ STREAM_API_BASE=""
 STREAM_CONFIGURE_ROLE=""
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Splunk Stream Protocol Configuration
 
@@ -40,7 +41,7 @@ Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
 
 This script manages search-tier Stream protocol definitions only.
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -50,7 +51,7 @@ while [[ $# -gt 0 ]]; do
         --index) require_arg "$1" $# || exit 1; TARGET_INDEX="$2"; shift 2 ;;
         --list) LIST_STREAMS=true; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1"; usage 1 ;;
     esac
 done
 
@@ -116,7 +117,7 @@ check_stream_api() {
 
     # Try KV Store first (uses management port 8089, works with session key)
     resp=$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/nobody/splunk_app_stream/storage/collections/data/streams?output_mode=json" -w '\n%{http_code}' 2>/dev/null) || true
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     if [[ "${http_code}" == "200" ]]; then
         streams_json=$(echo "${resp}" | sed '$d')
         if echo "${streams_json}" | python3 -c "import json,sys; d=json.load(sys.stdin); isinstance(d, list) or isinstance(d, dict)" 2>/dev/null; then
@@ -126,7 +127,7 @@ check_stream_api() {
 
     # Try Stream Web API (session key may work with some Splunk setups)
     resp=$(splunk_curl "${SK}" "${STREAM_API_BASE}/streams?output_mode=json" -w '\n%{http_code}' 2>/dev/null) || true
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     if [[ "${http_code}" == "200" ]]; then
         streams_json=$(echo "${resp}" | sed '$d')
         if echo "${streams_json}" | python3 -c "import json,sys; json.load(sys.stdin)" 2>/dev/null; then
@@ -259,12 +260,20 @@ enable_streams() {
         exit 1
     fi
 
+    local failures=0
     IFS=',' read -ra protocols <<< "${ENABLE_LIST}"
     for proto in "${protocols[@]}"; do
         proto=$(echo "${proto}" | tr -d ' ')
         [[ -z "${proto}" ]] && continue
-        stream_enable_disable "${proto}" "true" "${TARGET_INDEX}" || true
+        if ! stream_enable_disable "${proto}" "true" "${TARGET_INDEX}"; then
+            log "WARNING: Failed to enable stream '${proto}'"
+            failures=$((failures + 1))
+        fi
     done
+    if (( failures > 0 )); then
+        log "Stream enablement complete with ${failures} failure(s)."
+        return 1
+    fi
     log "Stream enablement complete."
 }
 
@@ -275,12 +284,20 @@ disable_streams() {
         exit 1
     fi
 
+    local failures=0
     IFS=',' read -ra protocols <<< "${DISABLE_LIST}"
     for proto in "${protocols[@]}"; do
         proto=$(echo "${proto}" | tr -d ' ')
         [[ -z "${proto}" ]] && continue
-        stream_enable_disable "${proto}" "false" "" || true
+        if ! stream_enable_disable "${proto}" "false" ""; then
+            log "WARNING: Failed to disable stream '${proto}'"
+            failures=$((failures + 1))
+        fi
     done
+    if (( failures > 0 )); then
+        log "Stream disablement complete with ${failures} failure(s)."
+        return 1
+    fi
     log "Stream disablement complete."
 }
 
@@ -296,7 +313,7 @@ main() {
 
     if [[ -z "${ENABLE_LIST}" && -z "${DISABLE_LIST}" ]]; then
         log "ERROR: Specify --enable, --disable, or --list"
-        usage
+        usage 1
     fi
 
     if [[ -n "${ENABLE_LIST}" ]]; then

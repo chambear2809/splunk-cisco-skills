@@ -20,6 +20,11 @@ splunk-ta/_unpacked/
 **/*.pyc
 .pytest_cache/
 
+# --- Coverage reports ---
+coverage-html/
+htmlcov/
+.coverage
+
 # --- macOS ---
 .DS_Store
 

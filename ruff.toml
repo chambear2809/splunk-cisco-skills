@@ -1,0 +1,23 @@
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # pyflakes
+    "I",      # isort
+    "UP",     # pyupgrade
+    "B",      # flake8-bugbear
+    "SIM",    # flake8-simplify
+    "RUF",    # ruff-specific rules
+]
+ignore = [
+    "E501",    # line too long (handled by formatter)
+    "SIM108",  # ternary operator suggestion (readability preference)
+    "RUF012",  # mutable class attribute default (unittest test data pattern)
+    "RUF059",  # unpacked variable never used (common in test destructuring)
+]
+
+[lint.isort]
+known-first-party = ["regression_helpers", "shell_helpers"]

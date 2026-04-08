@@ -600,7 +600,7 @@ rest_create_hec_token() {
     resp=$(splunk_curl_post "${INGEST_SK}" "${body}" \
         "${INGEST_SPLUNK_URI}/services/data/inputs/http?output_mode=json" \
         -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     case "${http_code}" in
         201|200|409) return 0 ;;
         *) return 1 ;;
@@ -691,7 +691,7 @@ rest_enable_hec_token() {
     resp=$(splunk_curl_post "${INGEST_SK}" "" \
         "${INGEST_SPLUNK_URI}/services/data/inputs/http/${encoded_name}/enable" \
         -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     case "${http_code}" in
         200|201|409) return 0 ;;
         *) return 1 ;;
@@ -705,7 +705,7 @@ rest_update_hec_token_default_index() {
     resp="$(splunk_curl_post "${INGEST_SK}" "${body}" \
         "${INGEST_SPLUNK_URI}/services/data/inputs/http/${encoded_name}?output_mode=json" \
         -w '\n%{http_code}' 2>/dev/null)"
-    http_code="$(echo "${resp}" | tail -1)"
+    http_code="$(_extract_http_code "${resp}")"
     case "${http_code}" in
         200|201|409) return 0 ;;
         *) return 1 ;;

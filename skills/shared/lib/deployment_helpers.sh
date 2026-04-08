@@ -178,6 +178,7 @@ deployment_prepare_rest_context() {
     SPLUNK_PASS="${saved_pass}"
 
     [[ -n "${DEPLOYMENT_REST_SK}" ]] || return 1
+    # shellcheck disable=SC2034
     DEPLOYMENT_REST_URI="${target_uri}"
 }
 
@@ -757,13 +758,15 @@ deployment_set_app_visible() {
     local uri="${2:-}"
     local app_name="${3:-}"
     local visible_value="${4:-true}"
+    local encoded_app_name
 
     if deployment_should_manage_search_config_via_bundle; then
         deployment_bundle_set_conf_for_current_target "${app_name}" "app" "ui" "is_visible=${visible_value}"
         return $?
     fi
 
+    encoded_app_name=$(_urlencode "${app_name}")
     splunk_curl "${sk}" -X POST \
-        "${uri}/services/apps/local/${app_name}" \
+        "${uri}/services/apps/local/${encoded_app_name}" \
         -d "visible=${visible_value}" -d "output_mode=json" >/dev/null 2>&1
 }

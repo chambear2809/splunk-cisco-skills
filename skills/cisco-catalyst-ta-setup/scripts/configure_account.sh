@@ -16,6 +16,7 @@ USE_CA_CERT="false"
 SET_VERIFY_SSL=""
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Configure a Cisco Catalyst TA account via Splunk REST API.
 
@@ -51,7 +52,7 @@ Cyber Vision:
 
 Splunk credentials are read from the project-root credentials file (falls back to ~/.splunk/credentials) automatically.
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -68,7 +69,7 @@ while [[ $# -gt 0 ]]; do
         --no-verify-ssl) SET_VERIFY_SSL="False"; shift ;;
         --verify-ssl) SET_VERIFY_SSL="True"; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1"; usage 1 ;;
     esac
 done
 

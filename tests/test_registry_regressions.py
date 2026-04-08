@@ -8,16 +8,10 @@ from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase
 
 class RegistryRegressionTests(ShellScriptRegressionBase):
     def test_enterprise_networking_registry_declares_companion_ta_dependency(self):
-        registry = json.loads(
-            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
-        )
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
 
-        enterprise_entry = next(
-            app for app in registry.get("apps", []) if app.get("splunkbase_id") == "7539"
-        )
-        enhanced_netflow_entry = next(
-            app for app in registry.get("apps", []) if app.get("splunkbase_id") == "6872"
-        )
+        enterprise_entry = next(app for app in registry.get("apps", []) if app.get("splunkbase_id") == "7539")
+        enhanced_netflow_entry = next(app for app in registry.get("apps", []) if app.get("splunkbase_id") == "6872")
 
         self.assertEqual(enterprise_entry["app_name"], "cisco-catalyst-app")
         self.assertEqual(enterprise_entry.get("install_requires"), ["7538"])
@@ -28,11 +22,8 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             enhanced_netflow_entry.get("package_patterns", []),
         )
 
-
     def test_app_registry_declares_deployment_roles_and_complete_role_support(self):
-        registry = json.loads(
-            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
-        )
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
 
         expected_roles = [
             "search-tier",
@@ -52,11 +43,8 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
                 self.assertEqual(sorted(role_support.keys()), sorted(expected_roles))
                 self.assertTrue(set(role_support.values()).issubset(allowed_values))
 
-
     def test_app_registry_declares_capabilities_for_every_app(self):
-        registry = json.loads(
-            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
-        )
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
 
         expected_capabilities = {
             "needs_custom_rest",
@@ -67,10 +55,7 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             "uf_safe",
         }
 
-        apps_by_id = {
-            app["splunkbase_id"]: app
-            for app in registry.get("apps", [])
-        }
+        apps_by_id = {app["splunkbase_id"]: app for app in registry.get("apps", [])}
 
         for app in registry.get("apps", []):
             with self.subTest(app=app.get("app_name")):
@@ -113,18 +98,12 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             },
         )
 
-
     def test_skill_topologies_cover_registry_skills_and_special_cases(self):
-        registry = json.loads(
-            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
-        )
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
 
         expected_roles = set(registry["deployment_roles"])
         allowed_values = {"required", "supported", "none"}
-        skill_topologies = {
-            entry["skill"]: entry
-            for entry in registry.get("skill_topologies", [])
-        }
+        skill_topologies = {entry["skill"]: entry for entry in registry.get("skill_topologies", [])}
 
         for app_skill in {app["skill"] for app in registry.get("apps", [])}:
             self.assertIn(app_skill, skill_topologies)
@@ -147,16 +126,10 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         sc4snmp = skill_topologies["splunk-connect-for-snmp-setup"]
         self.assertEqual(sc4snmp["role_support"]["external-collector"], "required")
 
-
     def test_role_matrix_keeps_search_tier_only_and_collector_defaults_explicit(self):
-        registry = json.loads(
-            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
-        )
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
 
-        entries_by_id = {
-            app["splunkbase_id"]: app
-            for app in registry.get("apps", [])
-        }
+        entries_by_id = {app["splunkbase_id"]: app for app in registry.get("apps", [])}
         self.assertEqual(
             entries_by_id["7539"]["role_support"],
             {
@@ -177,18 +150,11 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
                 self.assertEqual(role_support["indexer"], "none")
                 self.assertEqual(role_support["universal-forwarder"], "none")
 
-
     def test_cisco_security_registry_entries_are_present(self):
-        registry = json.loads(
-            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
-        )
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
 
-        security_cloud_entry = next(
-            app for app in registry.get("apps", []) if app.get("splunkbase_id") == "7404"
-        )
-        secure_access_entry = next(
-            app for app in registry.get("apps", []) if app.get("splunkbase_id") == "5558"
-        )
+        security_cloud_entry = next(app for app in registry.get("apps", []) if app.get("splunkbase_id") == "7404")
+        secure_access_entry = next(app for app in registry.get("apps", []) if app.get("splunkbase_id") == "5558")
 
         self.assertEqual(security_cloud_entry["skill"], "cisco-security-cloud-setup")
         self.assertEqual(security_cloud_entry["app_name"], "CiscoSecurityCloud")

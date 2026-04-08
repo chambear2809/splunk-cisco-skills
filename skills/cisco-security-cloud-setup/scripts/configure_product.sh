@@ -2,6 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+
 CONFIGURE_INPUT_SCRIPT="${SCRIPT_DIR}/configure_input.sh"
 PRODUCTS_FILE="${SCRIPT_DIR}/../products.json"
 
@@ -16,14 +18,8 @@ USER_VALUES=()
 USER_SECRET_KEYS=()
 USER_SECRET_PATHS=()
 
-require_value() {
-    if [[ "$2" -lt 2 ]]; then
-        echo "ERROR: Option '$1' requires a value."
-        exit 1
-    fi
-}
-
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Cisco Security Cloud Product Setup
 
@@ -50,7 +46,7 @@ Example:
     --set xdr_import_time_range "7 days ago" \\
     --secret-file refresh_token /tmp/xdr_refresh_token
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 append_kv() {
@@ -127,11 +123,11 @@ PY
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --product) require_value "$1" $#; PRODUCT="$2"; shift 2 ;;
-        --name) require_value "$1" $#; INPUT_NAME="$2"; shift 2 ;;
+        --product) require_arg "$1" $#; PRODUCT="$2"; shift 2 ;;
+        --name) require_arg "$1" $#; INPUT_NAME="$2"; shift 2 ;;
         --set)
             if [[ $# -lt 3 ]]; then
-                echo "ERROR: Option '--set' requires KEY and VALUE."
+                log "ERROR: Option '--set' requires KEY and VALUE."
                 exit 1
             fi
             append_kv "$2" "$3"
@@ -139,7 +135,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --secret-file)
             if [[ $# -lt 3 ]]; then
-                echo "ERROR: Option '--secret-file' requires KEY and PATH."
+                log "ERROR: Option '--secret-file' requires KEY and PATH."
                 exit 1
             fi
             append_secret "$2" "$3"
@@ -149,7 +145,7 @@ while [[ $# -gt 0 ]]; do
         --no-create-index) CREATE_INDEX=false; shift ;;
         --list-products) LIST_PRODUCTS=true; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) log "ERROR: Unknown option: $1"; usage 1 ;;
     esac
 done
 
@@ -158,13 +154,13 @@ if ${LIST_PRODUCTS}; then
     exit 0
 fi
 
-[[ -n "${PRODUCT}" ]] || { echo "ERROR: --product is required."; exit 1; }
+[[ -n "${PRODUCT}" ]] || { log "ERROR: --product is required."; exit 1; }
 
 metadata_lines=()
 while IFS= read -r line || [[ -n "${line}" ]]; do
     metadata_lines+=("${line}")
 done < <(read_product_metadata) || {
-    echo "ERROR: Unknown product '${PRODUCT}'. Use --list-products."
+    log "ERROR: Unknown product '${PRODUCT}'. Use --list-products."
     exit 1
 }
 

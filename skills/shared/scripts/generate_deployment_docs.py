@@ -8,7 +8,6 @@ import json
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 REGISTRY_PATH = REPO_ROOT / "skills/shared/app_registry.json"
 CLOUD_DOC_PATH = REPO_ROOT / "CLOUD_DEPLOYMENT_MATRIX.md"
@@ -96,7 +95,13 @@ def validate_registry(registry: dict) -> None:
     known_skills = {entry["skill"] for entry in registry.get("skill_topologies", [])}
 
     for row in registry.get("documentation", {}).get("cloud_matrix_rows", []):
-        for key in ("kind", "label", "cloud_install_path", "cloud_config_path", "notes"):
+        for key in (
+            "kind",
+            "label",
+            "cloud_install_path",
+            "cloud_config_path",
+            "notes",
+        ):
             if not row.get(key):
                 raise ValueError(f"Cloud matrix row is missing required key: {key}")
         kind = row["kind"]
@@ -271,10 +276,7 @@ def render_cloud_matrix(registry: dict) -> str:
 
 
 def render_role_matrix(registry: dict) -> str:
-    role_rows = [
-        [f"`{role}`", registry["deployment_role_descriptions"][role]]
-        for role in registry["deployment_roles"]
-    ]
+    role_rows = [[f"`{role}`", registry["deployment_role_descriptions"][role]] for role in registry["deployment_roles"]]
 
     skill_rows = []
     for entry in registry["skill_topologies"]:

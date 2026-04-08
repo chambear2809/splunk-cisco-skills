@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Credential file loading, profile resolution, and Splunk connection settings.
+# Credential file parsing, profile resolution, and Splunk connection settings.
 # Sourced by credential_helpers.sh; not intended for direct use.
 #
+# Platform detection lives in credential_platform_helpers.sh and target role
+# resolution lives in credential_role_helpers.sh (both sourced separately).
 # See credential_helpers.sh for the sourcing contract.
 
 [[ -n "${_CREDENTIALS_LOADED:-}" ]] && return 0
@@ -9,9 +11,6 @@ _CREDENTIALS_LOADED=true
 
 _RESOLVED_CREDENTIAL_PROFILE=""
 _RESOLVED_SEARCH_CREDENTIAL_PROFILE=""
-_RESOLVED_SPLUNK_TARGET_ROLE=""
-_RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE=""
-_RESOLVED_SEARCH_SPLUNK_TARGET_ROLE=""
 
 _read_credential_file_entries() {
     local file_path="$1"
@@ -43,6 +42,7 @@ allowed_keys = [
     "SPLUNK_SSH_PORT",
     "SPLUNK_SSH_USER",
     "SPLUNK_SSH_PASS",
+    "SPLUNK_SSH_STRICT_HOST_KEY",
     "SPLUNK_REMOTE_TMPDIR",
     "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER",
@@ -178,7 +178,8 @@ flat_target_keys = {
     "SPLUNK_SEARCH_API_URI", "SPLUNK_HOST",
     "SPLUNK_MGMT_PORT", "SPLUNK_URI", "SPLUNK_HEC_URL",
     "SPLUNK_SSH_HOST", "SPLUNK_SSH_PORT",
-    "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS", "SPLUNK_REMOTE_TMPDIR", "SPLUNK_REMOTE_SUDO",
+    "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS", "SPLUNK_SSH_STRICT_HOST_KEY",
+    "SPLUNK_REMOTE_TMPDIR", "SPLUNK_REMOTE_SUDO",
     "SPLUNK_USER", "SPLUNK_PASS",
     "SPLUNK_CA_CERT",
     "SPLUNK_CLOUD_STACK", "SPLUNK_CLOUD_SEARCH_HEAD",
@@ -451,14 +452,19 @@ load_ingest_connection_settings() {
     load_splunk_connection_settings
     ingest_profile="$(resolve_ingest_credential_profile 2>/dev/null || true)"
 
+    # shellcheck disable=SC2034
     INGEST_SPLUNK_PROFILE="${ingest_profile}"
     INGEST_SPLUNK_HOST="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_HOST")"
     INGEST_SPLUNK_MGMT_PORT="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_MGMT_PORT")"
     INGEST_SPLUNK_SEARCH_API_URI="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_SEARCH_API_URI")"
     INGEST_SPLUNK_URI="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_URI")"
+    # shellcheck disable=SC2034
     INGEST_SPLUNK_USER="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_USER")"
+    # shellcheck disable=SC2034
     INGEST_SPLUNK_PASS="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_PASS")"
+    # shellcheck disable=SC2034
     INGEST_SPLUNK_HEC_URL="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_HEC_URL")"
+    # shellcheck disable=SC2034
     INGEST_SPLUNK_TARGET_ROLE="$(_profile_value_or_current "${ingest_profile}" "SPLUNK_TARGET_ROLE")"
 
     if [[ -z "${INGEST_SPLUNK_MGMT_PORT:-}" ]]; then
@@ -507,399 +513,6 @@ load_splunk_connection_settings() {
         SPLUNK_SEARCH_API_URI="https://localhost:8089"
         SPLUNK_URI="${SPLUNK_SEARCH_API_URI}"
     fi
-}
-
-splunk_host_from_uri() {
-    local uri="${1:-${SPLUNK_URI:-}}"
-    uri="${uri#http://}"
-    uri="${uri#https://}"
-    uri="${uri%%/*}"
-    printf '%s' "${uri%%:*}"
-}
-
-_is_staging_splunk_cloud_host() {
-    local value="${1:-}" host
-    value="${value#http://}"
-    value="${value#https://}"
-    host="${value%%/*}"
-    host="${host%%:*}"
-    [[ "${host}" == *.stg.splunkcloud.com ]]
-}
-
-_is_splunk_cloud_host() {
-    local value="${1:-}" host
-    value="${value#http://}"
-    value="${value#https://}"
-    host="${value%%/*}"
-    host="${host%%:*}"
-    [[ "${host}" == *.splunkcloud.com ]]
-}
-
-_normalize_cloud_stack_name() {
-    local value="${1:-}" host
-    value="${value#http://}"
-    value="${value#https://}"
-    host="${value%%/*}"
-    host="${host%%:*}"
-    case "${host}" in
-        *.stg.splunkcloud.com) printf '%s' "${host%.stg.splunkcloud.com}" ;;
-        *.splunkcloud.com) printf '%s' "${host%.splunkcloud.com}" ;;
-        *) printf '%s' "${host}" ;;
-    esac
-}
-
-_extract_acs_search_head_prefix() {
-    local value="${1:-}" host
-    value="${value#http://}"
-    value="${value#https://}"
-    host="${value%%/*}"
-    host="${host%%:*}"
-    case "${host}" in
-        sh-i-*.*|shc[0-9]*.*|sh[0-9]*.*) printf '%s' "${host%%.*}" ;;
-        sh-i-*|shc[0-9]*|sh[0-9]*) printf '%s' "${host}" ;;
-        *) printf '%s' "" ;;
-    esac
-}
-
-_is_default_local_splunk_uri() {
-    [[ "${SPLUNK_URI:-}" == "https://localhost:8089" && -z "${SPLUNK_HOST:-}" ]]
-}
-
-_has_cloud_target_config() {
-    [[ -n "${SPLUNK_CLOUD_STACK:-}" || -n "${STACK_TOKEN:-}" || -n "${STACK_USERNAME:-}" || -n "${STACK_TOKEN_USER:-}" ]]
-}
-
-_is_hybrid_target_config() {
-    _has_cloud_target_config && [[ -n "${SPLUNK_URI:-}" ]] && ! _is_default_local_splunk_uri && [[ "${SPLUNK_URI:-}" != *".splunkcloud.com"* ]]
-}
-
-_prompt_for_splunk_platform() {
-    local choice
-
-    [[ -t 0 ]] || return 1
-
-    echo ""
-    echo "Hybrid deployment configuration detected."
-    echo "  1) Enterprise / forwarder target (${SPLUNK_URI})"
-    echo "  2) Splunk Cloud stack (${SPLUNK_CLOUD_STACK})"
-    while true; do
-        read -rp "Choose the target for this run [1/2]: " choice
-        case "${choice}" in
-            1|enterprise|Enterprise)
-                _RESOLVED_SPLUNK_PLATFORM="enterprise"
-                return 0
-                ;;
-            2|cloud|Cloud)
-                _RESOLVED_SPLUNK_PLATFORM="cloud"
-                return 0
-                ;;
-        esac
-    done
-}
-
-resolve_splunk_platform() {
-    load_splunk_platform_settings
-
-    if [[ -n "${_RESOLVED_SPLUNK_PLATFORM:-}" ]]; then
-        printf '%s' "${_RESOLVED_SPLUNK_PLATFORM}"
-        return 0
-    fi
-
-    if [[ -n "${SPLUNK_PLATFORM:-}" ]]; then
-        _RESOLVED_SPLUNK_PLATFORM="${SPLUNK_PLATFORM}"
-    elif [[ "${SPLUNK_URI:-}" == *".splunkcloud.com"* ]]; then
-        _RESOLVED_SPLUNK_PLATFORM="cloud"
-    elif _has_cloud_target_config && _is_default_local_splunk_uri; then
-        _RESOLVED_SPLUNK_PLATFORM="cloud"
-    elif _is_hybrid_target_config; then
-        if ! _prompt_for_splunk_platform; then
-            echo "ERROR: Hybrid deployment configuration is ambiguous in non-interactive mode." >&2
-            echo "Set SPLUNK_PLATFORM=cloud or SPLUNK_PLATFORM=enterprise for this run." >&2
-            return 1
-        fi
-    else
-        _RESOLVED_SPLUNK_PLATFORM="enterprise"
-    fi
-
-    printf '%s' "${_RESOLVED_SPLUNK_PLATFORM}"
-}
-
-load_splunk_platform_settings() {
-    local raw_stack raw_search_head default_acs_server normalized_search_head
-    local selected_search_api_uri selected_uri selected_host
-    load_splunk_connection_settings
-
-    selected_search_api_uri="$(_selected_profile_credential_value "SPLUNK_SEARCH_API_URI")"
-    selected_uri="$(_selected_profile_credential_value "SPLUNK_URI")"
-    selected_host="$(_selected_profile_credential_value "SPLUNK_HOST")"
-    raw_stack="${SPLUNK_CLOUD_STACK:-}"
-    raw_search_head="${SPLUNK_CLOUD_SEARCH_HEAD:-}"
-
-    default_acs_server="https://admin.splunk.com"
-    if _is_staging_splunk_cloud_host "${selected_search_api_uri}" \
-        || _is_staging_splunk_cloud_host "${selected_uri}" \
-        || _is_staging_splunk_cloud_host "${selected_host}" \
-        || _is_staging_splunk_cloud_host "${SPLUNK_URI:-}" \
-        || _is_staging_splunk_cloud_host "${SPLUNK_HOST:-}" \
-        || _is_staging_splunk_cloud_host "${raw_stack}" \
-        || _is_staging_splunk_cloud_host "${raw_search_head}"; then
-        default_acs_server="https://staging.admin.splunk.com"
-    fi
-
-    ACS_SERVER="${ACS_SERVER:-${default_acs_server}}"
-    if [[ -n "${raw_stack}" ]]; then
-        SPLUNK_CLOUD_STACK="$(_normalize_cloud_stack_name "${raw_stack}")"
-    fi
-    if [[ -n "${raw_search_head}" ]]; then
-        normalized_search_head="$(_extract_acs_search_head_prefix "${raw_search_head}")"
-        if [[ -n "${normalized_search_head}" ]]; then
-            SPLUNK_CLOUD_SEARCH_HEAD="${normalized_search_head}"
-        elif [[ "${raw_search_head}" == *".splunkcloud.com"* ]]; then
-            SPLUNK_CLOUD_SEARCH_HEAD=""
-        fi
-    fi
-    SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS="${SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS:-90}"
-}
-
-is_splunk_cloud() {
-    resolve_splunk_platform >/dev/null || return 1
-    [[ "${_RESOLVED_SPLUNK_PLATFORM:-}" == "cloud" ]]
-}
-
-_primary_cloud_search_api_uri() {
-    local configured_uri configured_host configured_port stack suffix host
-
-    load_splunk_platform_settings
-
-    configured_uri="$(_selected_profile_credential_value "SPLUNK_SEARCH_API_URI")"
-    [[ -z "${configured_uri}" ]] && configured_uri="$(_selected_profile_credential_value "SPLUNK_URI")"
-    if _is_splunk_cloud_host "${configured_uri}"; then
-        printf '%s' "${configured_uri}"
-        return 0
-    fi
-
-    configured_host="$(_selected_profile_credential_value "SPLUNK_HOST")"
-    configured_port="$(_selected_profile_credential_value "SPLUNK_MGMT_PORT")"
-    configured_port="${configured_port:-${SPLUNK_MGMT_PORT:-8089}}"
-    if _is_splunk_cloud_host "${configured_host}"; then
-        host="$(splunk_host_from_uri "${configured_host}")"
-        printf 'https://%s:%s' "${host}" "${configured_port}"
-        return 0
-    fi
-
-    stack="${SPLUNK_CLOUD_STACK:-$(_selected_profile_credential_value "SPLUNK_CLOUD_STACK")}"
-    stack="$(_normalize_cloud_stack_name "${stack}")"
-    [[ -n "${stack}" ]] || return 1
-
-    if [[ "${ACS_SERVER:-}" == "https://staging.admin.splunk.com" ]] \
-        || _is_staging_splunk_cloud_host "${configured_uri}" \
-        || _is_staging_splunk_cloud_host "${configured_host}" \
-        || _is_staging_splunk_cloud_host "${stack}" \
-        || _is_staging_splunk_cloud_host "${SPLUNK_CLOUD_SEARCH_HEAD:-}"; then
-        suffix=".stg.splunkcloud.com"
-    else
-        suffix=".splunkcloud.com"
-    fi
-
-    printf 'https://%s%s:8089' "${stack}" "${suffix}"
-}
-
-_normalize_target_role() {
-    case "${1:-}" in
-        search-tier|indexer|heavy-forwarder|universal-forwarder|external-collector)
-            printf '%s' "${1}"
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-_search_profile_role_is_active() {
-    local selected_profile search_profile
-
-    selected_profile="$(resolve_credential_profile 2>/dev/null || true)"
-    search_profile="$(resolve_search_credential_profile 2>/dev/null || true)"
-
-    [[ -n "${search_profile}" && "${search_profile}" != "${selected_profile}" ]]
-}
-
-_warn_invalid_target_role_once() {
-    local role_value="${1:-}"
-    local role_key="${2:-SPLUNK_TARGET_ROLE}"
-
-    _warn_once "_WARNED_INVALID_SPLUNK_TARGET_ROLE" \
-        "WARNING: Ignoring invalid ${role_key} value '${role_value}'. Supported roles: search-tier, indexer, heavy-forwarder, universal-forwarder, external-collector."
-}
-
-_resolve_target_role_platform_hint() {
-    load_splunk_connection_settings
-
-    if [[ -n "${SPLUNK_PLATFORM:-}" ]]; then
-        printf '%s' "${SPLUNK_PLATFORM}"
-        return 0
-    fi
-
-    if [[ "${SPLUNK_URI:-}" == *".splunkcloud.com"* ]]; then
-        printf '%s' "cloud"
-        return 0
-    fi
-
-    if _has_cloud_target_config && _is_default_local_splunk_uri; then
-        printf '%s' "cloud"
-        return 0
-    fi
-
-    if [[ -n "${SPLUNK_SEARCH_TARGET_ROLE:-}" ]] && _is_hybrid_target_config; then
-        printf '%s' "enterprise"
-        return 0
-    fi
-
-    if _is_hybrid_target_config; then
-        return 0
-    fi
-
-    printf '%s' "enterprise"
-}
-
-resolve_primary_splunk_target_role() {
-    local candidate=""
-    local normalized=""
-    local platform_hint=""
-
-    if [[ -n "${_RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE:-}" ]]; then
-        printf '%s' "${_RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE}"
-        return 0
-    fi
-
-    _load_credential_values_from_file "${_CRED_FILE}"
-    candidate="${SPLUNK_TARGET_ROLE:-}"
-
-    if [[ -n "${candidate}" ]]; then
-        if ! normalized="$(_normalize_target_role "${candidate}")"; then
-            _warn_invalid_target_role_once "${candidate}" "SPLUNK_TARGET_ROLE"
-            return 0
-        fi
-        _RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE="${normalized}"
-        printf '%s' "${_RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE}"
-        return 0
-    fi
-
-    platform_hint="$(_resolve_target_role_platform_hint)"
-    if [[ "${platform_hint}" == "cloud" ]]; then
-        _RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE="search-tier"
-        printf '%s' "${_RESOLVED_PRIMARY_SPLUNK_TARGET_ROLE}"
-        return 0
-    fi
-
-    return 0
-}
-
-resolve_search_splunk_target_role() {
-    local candidate=""
-    local normalized=""
-
-    if [[ -n "${_RESOLVED_SEARCH_SPLUNK_TARGET_ROLE:-}" ]]; then
-        printf '%s' "${_RESOLVED_SEARCH_SPLUNK_TARGET_ROLE}"
-        return 0
-    fi
-
-    _load_credential_values_from_file "${_CRED_FILE}"
-
-    if [[ -n "${SPLUNK_SEARCH_TARGET_ROLE:-}" ]]; then
-        candidate="${SPLUNK_SEARCH_TARGET_ROLE}"
-        if ! normalized="$(_normalize_target_role "${candidate}")"; then
-            _warn_invalid_target_role_once "${candidate}" "SPLUNK_SEARCH_TARGET_ROLE"
-            return 0
-        fi
-        _RESOLVED_SEARCH_SPLUNK_TARGET_ROLE="${normalized}"
-        printf '%s' "${_RESOLVED_SEARCH_SPLUNK_TARGET_ROLE}"
-        return 0
-    fi
-
-    if ! _search_profile_role_is_active; then
-        return 0
-    fi
-
-    candidate="$(_search_profile_credential_value "SPLUNK_TARGET_ROLE")"
-
-    if [[ -n "${candidate}" ]]; then
-        if ! normalized="$(_normalize_target_role "${candidate}")"; then
-            _warn_invalid_target_role_once "${candidate}" "SPLUNK_TARGET_ROLE"
-            return 0
-        fi
-        _RESOLVED_SEARCH_SPLUNK_TARGET_ROLE="${normalized}"
-        printf '%s' "${_RESOLVED_SEARCH_SPLUNK_TARGET_ROLE}"
-        return 0
-    fi
-
-    return 0
-}
-
-resolve_ingest_target_role() {
-    local candidate=""
-    local normalized=""
-
-    load_ingest_connection_settings
-
-    candidate="${INGEST_SPLUNK_TARGET_ROLE:-}"
-    if [[ -n "${candidate}" ]]; then
-        if ! normalized="$(_normalize_target_role "${candidate}")"; then
-            _warn_invalid_target_role_once "${candidate}" "SPLUNK_INGEST_PROFILE target role"
-            return 0
-        fi
-        printf '%s' "${normalized}"
-        return 0
-    fi
-
-    candidate="$(resolve_search_splunk_target_role)"
-    if [[ -n "${candidate}" ]]; then
-        printf '%s' "${candidate}"
-        return 0
-    fi
-
-    resolve_splunk_target_role
-}
-
-resolve_splunk_target_role() {
-    local active_role=""
-    local platform_hint=""
-
-    load_splunk_connection_settings
-
-    if [[ -n "${_RESOLVED_SPLUNK_TARGET_ROLE:-}" ]]; then
-        printf '%s' "${_RESOLVED_SPLUNK_TARGET_ROLE}"
-        return 0
-    fi
-
-    platform_hint="$(_resolve_target_role_platform_hint)"
-
-    case "${platform_hint}" in
-        cloud)
-            active_role="$(resolve_primary_splunk_target_role)"
-            ;;
-        enterprise|"")
-            if _search_profile_role_is_active || { [[ -n "${SPLUNK_SEARCH_TARGET_ROLE:-}" ]] && _is_hybrid_target_config; }; then
-                active_role="$(resolve_search_splunk_target_role)"
-                if [[ -z "${active_role}" ]]; then
-                    active_role="$(resolve_primary_splunk_target_role)"
-                fi
-            else
-                active_role="$(resolve_primary_splunk_target_role)"
-            fi
-            ;;
-        *)
-            active_role="$(resolve_primary_splunk_target_role)"
-            ;;
-    esac
-
-    if [[ -n "${active_role}" ]]; then
-        _RESOLVED_SPLUNK_TARGET_ROLE="${active_role}"
-        printf '%s' "${_RESOLVED_SPLUNK_TARGET_ROLE}"
-    fi
-
-    return 0
 }
 
 load_splunk_credentials() {

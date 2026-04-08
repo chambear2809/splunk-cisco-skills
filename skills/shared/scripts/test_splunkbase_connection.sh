@@ -5,7 +5,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-CRED_FILE="${PROJECT_ROOT}/credentials"
+
+if [[ -n "${SPLUNK_CREDENTIALS_FILE:-}" ]]; then
+    CRED_FILE="${SPLUNK_CREDENTIALS_FILE}"
+elif [[ -f "${PROJECT_ROOT}/credentials" ]]; then
+    CRED_FILE="${PROJECT_ROOT}/credentials"
+else
+    CRED_FILE="${HOME}/.splunk/credentials"
+fi
 
 if [[ ! -f "${CRED_FILE}" ]]; then
     echo "ERROR: Credentials file not found: ${CRED_FILE}" >&2

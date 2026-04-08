@@ -9,7 +9,6 @@ import sys
 import unittest
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REGISTRY_PATH = REPO_ROOT / "skills/shared/app_registry.json"
 GENERATOR_PATH = REPO_ROOT / "skills/shared/scripts/generate_deployment_docs.py"
@@ -24,12 +23,8 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         cls.credentials_example = (REPO_ROOT / "credentials.example").read_text(encoding="utf-8")
         cls.cloud_matrix = (REPO_ROOT / "CLOUD_DEPLOYMENT_MATRIX.md").read_text(encoding="utf-8")
         cls.role_matrix = (REPO_ROOT / "DEPLOYMENT_ROLE_MATRIX.md").read_text(encoding="utf-8")
-        cls.install_skill = (
-            REPO_ROOT / "skills/splunk-app-install/SKILL.md"
-        ).read_text(encoding="utf-8")
-        cls.stream_skill = (
-            REPO_ROOT / "skills/splunk-stream-setup/SKILL.md"
-        ).read_text(encoding="utf-8")
+        cls.install_skill = (REPO_ROOT / "skills/splunk-app-install/SKILL.md").read_text(encoding="utf-8")
+        cls.stream_skill = (REPO_ROOT / "skills/splunk-stream-setup/SKILL.md").read_text(encoding="utf-8")
         cls.package_cache_doc = (REPO_ROOT / "splunk-ta/README.md").read_text(encoding="utf-8")
 
     def test_generator_check_matches_committed_docs(self) -> None:
@@ -60,7 +55,13 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         workflow_rows = []
         for row in rows:
             with self.subTest(label=row["label"]):
-                for key in ("kind", "label", "cloud_install_path", "cloud_config_path", "notes"):
+                for key in (
+                    "kind",
+                    "label",
+                    "cloud_install_path",
+                    "cloud_config_path",
+                    "notes",
+                ):
                     self.assertTrue(row.get(key))
 
                 if row["kind"] == "app":
@@ -85,7 +86,9 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("splunk-enterprise-host-setup", workflow_rows)
         self.assertIn("splunk-mcp-server-setup", workflow_rows)
 
-    def test_generated_docs_cover_appdynamics_sc4s_host_bootstrap_and_numeric_stream_ids(self) -> None:
+    def test_generated_docs_cover_appdynamics_sc4s_host_bootstrap_and_numeric_stream_ids(
+        self,
+    ) -> None:
         self.assertIn("| `cisco-appdynamics-setup` | 3471 |", self.cloud_matrix)
         self.assertIn("| `cisco-product-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-connect-for-syslog-setup` | N/A |", self.cloud_matrix)
@@ -97,10 +100,19 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("| `splunk-stream-setup` wire-data add-on | 5234 |", self.cloud_matrix)
         self.assertIn("| `splunk-stream-setup` forwarder add-on | 5238 |", self.cloud_matrix)
         self.assertIn("| `cisco-appdynamics-setup` | Supported |", self.role_matrix)
-        self.assertIn("| `splunk-ai-assistant-setup` | Required | None | None | None | None |", self.role_matrix)
+        self.assertIn(
+            "| `splunk-ai-assistant-setup` | Required | None | None | None | None |",
+            self.role_matrix,
+        )
         self.assertIn("| `cisco-product-setup` | Supported | None | Supported |", self.role_matrix)
-        self.assertIn("| `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required |", self.role_matrix)
-        self.assertIn("| `splunk-enterprise-host-setup` | Supported | Supported | Supported |", self.role_matrix)
+        self.assertIn(
+            "| `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required |",
+            self.role_matrix,
+        )
+        self.assertIn(
+            "| `splunk-enterprise-host-setup` | Supported | Supported | Supported |",
+            self.role_matrix,
+        )
 
     def test_enterprise_install_docs_match_ssh_staging_behavior(self) -> None:
         stale_phrases = (
@@ -153,7 +165,10 @@ class DeploymentDocRegressionTests(unittest.TestCase):
     def test_package_cache_readme_matches_cloud_policy(self) -> None:
         self.assertIn("public apps are installed from Splunkbase", self.package_cache_doc)
         self.assertIn("through ACS", self.package_cache_doc)
-        self.assertIn("Use local/private uploads only for genuinely private or", self.package_cache_doc)
+        self.assertIn(
+            "Use local/private uploads only for genuinely private or",
+            self.package_cache_doc,
+        )
 
 
 if __name__ == "__main__":

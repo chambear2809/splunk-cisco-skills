@@ -548,7 +548,11 @@ main() {
             --index "${INDEX}"
     fi
 
-    rm -f "${secret_file}" 2>/dev/null || true
+    if [[ "${secret_file}" == /tmp/* ]]; then
+        rm -f "${secret_file}" 2>/dev/null || true
+    else
+        log "NOTE: Secret file '${secret_file}' retained (only /tmp/ files are auto-deleted)."
+    fi
 
     log ""
     read -rp "Would you like to configure an AppDynamics analytics connection now? [y/N]: " analytics_yn
@@ -615,7 +619,11 @@ main() {
         bash "${analytics_args[@]}"
     fi
 
-    rm -f "${analytics_secret_file}" 2>/dev/null || true
+    if [[ "${analytics_secret_file}" == /tmp/* ]]; then
+        rm -f "${analytics_secret_file}" 2>/dev/null || true
+    else
+        log "NOTE: Secret file '${analytics_secret_file}' retained (only /tmp/ files are auto-deleted)."
+    fi
     log ""
     log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
 }

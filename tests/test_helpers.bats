@@ -62,39 +62,6 @@ setup() {
     [ "$result" = "" ]
 }
 
-# --- _curl_ssl_flags ---
-
-@test "_curl_ssl_flags returns -sk when SPLUNK_VERIFY_SSL is false" {
-    source "${LIB_DIR}/rest_helpers.sh"
-    export SPLUNK_VERIFY_SSL="false"
-    result=$(_curl_ssl_flags)
-    [ "$result" = "-sk" ]
-}
-
-@test "_curl_ssl_flags returns -s when SPLUNK_VERIFY_SSL is true" {
-    source "${LIB_DIR}/rest_helpers.sh"
-    export SPLUNK_VERIFY_SSL="true"
-    result=$(_curl_ssl_flags)
-    [ "$result" = "-s" ]
-}
-
-@test "_curl_ssl_flags defaults to -sk when unset" {
-    source "${LIB_DIR}/rest_helpers.sh"
-    unset SPLUNK_VERIFY_SSL
-    result=$(_curl_ssl_flags)
-    [ "$result" = "-sk" ]
-}
-
-@test "_curl_ssl_flags returns -s when SPLUNK_CA_CERT is set" {
-    source "${LIB_DIR}/rest_helpers.sh"
-    tmpfile=$(mktemp)
-    export SPLUNK_CA_CERT="$tmpfile"
-    result=$(_curl_ssl_flags)
-    rm -f "$tmpfile"
-    unset SPLUNK_CA_CERT
-    [ "$result" = "-s" ]
-}
-
 @test "_set_splunk_curl_tls_args adds cacert when configured" {
     source "${LIB_DIR}/rest_helpers.sh"
     tmpfile=$(mktemp)

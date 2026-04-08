@@ -9,14 +9,19 @@ import re
 import tarfile
 import tempfile
 import textwrap
-import time
 from pathlib import Path
 
-from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write_executable
+from tests.regression_helpers import (
+    REPO_ROOT,
+    ShellScriptRegressionBase,
+    write_executable,
+)
 
 
 class InstallRegressionTests(ShellScriptRegressionBase):
-    def test_splunk_ai_assistant_cloud_install_uses_acs_without_preinstall_rest_auth(self):
+    def test_splunk_ai_assistant_cloud_install_uses_acs_without_preinstall_rest_auth(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -139,8 +144,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 curl_output,
             )
 
-
-    def test_splunk_ai_assistant_enterprise_install_uses_rest_precheck_and_passes_update(self):
+    def test_splunk_ai_assistant_enterprise_install_uses_rest_precheck_and_passes_update(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -242,7 +248,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("/services/auth/login", curl_output)
             self.assertIn("/services/apps/local/Splunk_AI_Assistant_Cloud", curl_output)
 
-
     def test_splunk_ai_assistant_submit_onboarding_posts_expected_json_and_header(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -250,15 +255,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             bin_dir.mkdir()
             credentials_file = tmp_path / "credentials"
             request_log = tmp_path / "requests.jsonl"
-            onboarding_blob = base64.urlsafe_b64encode(
-                json.dumps(
-                    {
-                        "tenant_name": "example-prod",
-                        "region": "usa",
-                        "email": "ops@example.com",
-                    }
-                ).encode("utf-8")
-            ).decode("utf-8").rstrip("=")
 
             write_executable(
                 bin_dir / "curl",
@@ -381,7 +377,11 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             requests = [json.loads(line) for line in request_log.read_text(encoding="utf-8").splitlines()]
             submit_request = next(
-                item for item in requests if item["url"].endswith("/servicesNS/nobody/Splunk_AI_Assistant_Cloud/submitonboardingform?output_mode=json")
+                item
+                for item in requests
+                if item["url"].endswith(
+                    "/servicesNS/nobody/Splunk_AI_Assistant_Cloud/submitonboardingform?output_mode=json"
+                )
             )
             self.assertEqual(submit_request["method"], "POST")
             self.assertIn("Source-App-ID: Splunk_AI_Assistant_Cloud", submit_request["headers"])
@@ -396,9 +396,14 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
             self.assertIn("Normalizing onboarding region 'us' to 'usa'.", result.stdout)
             self.assertIn("Validation will now confirm the pending setup state.", result.stdout)
-            self.assertIn("Onboarding form has been submitted but activation is still pending", result.stdout)
-            self.assertIn("Remaining blocker: apply the Splunk-issued activation code/token", result.stdout)
-
+            self.assertIn(
+                "Onboarding form has been submitted but activation is still pending",
+                result.stdout,
+            )
+            self.assertIn(
+                "Remaining blocker: apply the Splunk-issued activation code/token",
+                result.stdout,
+            )
 
     def test_splunk_ai_assistant_set_proxy_posts_expected_json_and_header(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -519,7 +524,11 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             requests = [json.loads(line) for line in request_log.read_text(encoding="utf-8").splitlines()]
             proxy_request = next(
-                item for item in requests if item["url"].endswith("/servicesNS/nobody/Splunk_AI_Assistant_Cloud/cloudconnectedproxysettings?output_mode=json")
+                item
+                for item in requests
+                if item["url"].endswith(
+                    "/servicesNS/nobody/Splunk_AI_Assistant_Cloud/cloudconnectedproxysettings?output_mode=json"
+                )
             )
             self.assertEqual(proxy_request["method"], "POST")
             self.assertIn("Source-App-ID: Splunk_AI_Assistant_Cloud", proxy_request["headers"])
@@ -535,10 +544,14 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     }
                 },
             )
-            self.assertIn("Configured cloud-connected proxy: https://proxy.example.com:8443 with auth.", result.stdout)
+            self.assertIn(
+                "Configured cloud-connected proxy: https://proxy.example.com:8443 with auth.",
+                result.stdout,
+            )
 
-
-    def test_splunk_ai_assistant_complete_onboarding_reads_activation_code_file_and_auto_validates(self):
+    def test_splunk_ai_assistant_complete_onboarding_reads_activation_code_file_and_auto_validates(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -712,7 +725,11 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             requests = [json.loads(line) for line in request_log.read_text(encoding="utf-8").splitlines()]
             activation_request = next(
-                item for item in requests if item["url"].endswith("/servicesNS/nobody/Splunk_AI_Assistant_Cloud/completeonboarding?output_mode=json")
+                item
+                for item in requests
+                if item["url"].endswith(
+                    "/servicesNS/nobody/Splunk_AI_Assistant_Cloud/completeonboarding?output_mode=json"
+                )
             )
             self.assertEqual(
                 json.loads(activation_request["data"]),
@@ -722,23 +739,28 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("configured state matches expected state (true)", result.stdout)
             self.assertIn("onboarded state matches expected state (true)", result.stdout)
 
-
-    def test_splunk_ai_assistant_validate_reports_pending_onboarding_state_and_expectations(self):
+    def test_splunk_ai_assistant_validate_reports_pending_onboarding_state_and_expectations(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
             bin_dir.mkdir()
             credentials_file = tmp_path / "credentials"
             request_log = tmp_path / "requests.jsonl"
-            onboarding_blob = base64.urlsafe_b64encode(
-                json.dumps(
-                    {
-                        "tenant_name": "example-prod",
-                        "region": "usa",
-                        "email": "ops@example.com",
-                    }
-                ).encode("utf-8")
-            ).decode("utf-8").rstrip("=")
+            onboarding_blob = (
+                base64.urlsafe_b64encode(
+                    json.dumps(
+                        {
+                            "tenant_name": "example-prod",
+                            "region": "usa",
+                            "email": "ops@example.com",
+                        }
+                    ).encode("utf-8")
+                )
+                .decode("utf-8")
+                .rstrip("=")
+            )
 
             write_executable(
                 bin_dir / "curl",
@@ -849,8 +871,14 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Onboarding form has been submitted but activation is still pending", result.stdout)
-            self.assertIn("Remaining blocker: apply the Splunk-issued activation code/token", result.stdout)
+            self.assertIn(
+                "Onboarding form has been submitted but activation is still pending",
+                result.stdout,
+            )
+            self.assertIn(
+                "Remaining blocker: apply the Splunk-issued activation code/token",
+                result.stdout,
+            )
             self.assertIn("Pending onboarding tenant: example-prod", result.stdout)
             self.assertIn("Pending onboarding region: usa", result.stdout)
             self.assertIn("configured state matches expected state (false)", result.stdout)
@@ -862,11 +890,12 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 item
                 for item in requests
                 if item["url"].endswith("/servicesNS/nobody/Splunk_AI_Assistant_Cloud/version?output_mode=json")
-                or item["url"].endswith("/servicesNS/nobody/Splunk_AI_Assistant_Cloud/cloudconnectedproxysettings?output_mode=json")
+                or item["url"].endswith(
+                    "/servicesNS/nobody/Splunk_AI_Assistant_Cloud/cloudconnectedproxysettings?output_mode=json"
+                )
             ]
             for request in custom_requests:
                 self.assertIn("Source-App-ID: Splunk_AI_Assistant_Cloud", request["headers"])
-
 
     def test_validators_report_auth_failures_without_unbound_variable_crashes(self):
         validator_scripts = [
@@ -935,7 +964,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                     self.assertIn("Validation Summary", output)
                     self.assertNotIn("unbound variable", output.lower())
 
-
     def test_cloud_batch_scripts_use_local_scope_when_search_head_is_pinned(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1003,7 +1031,11 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "1234",
                 env=env,
             )
-            self.assertEqual(install_result.returncode, 0, msg=install_result.stdout + install_result.stderr)
+            self.assertEqual(
+                install_result.returncode,
+                0,
+                msg=install_result.stdout + install_result.stderr,
+            )
 
             uninstall_result = self.run_script(
                 "skills/shared/scripts/cloud_batch_uninstall.sh",
@@ -1011,17 +1043,19 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "example_app",
                 env=env,
             )
-            self.assertEqual(uninstall_result.returncode, 0, msg=uninstall_result.stdout + uninstall_result.stderr)
+            self.assertEqual(
+                uninstall_result.returncode,
+                0,
+                msg=uninstall_result.stdout + uninstall_result.stderr,
+            )
 
             acs_output = acs_log.read_text(encoding="utf-8")
             self.assertIn("apps install splunkbase --splunkbase-id 1234 --scope local", acs_output)
             self.assertIn("apps uninstall example_app --scope local", acs_output)
 
-
     def test_gitignore_excludes_pytest_cache(self):
         gitignore_text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn(".pytest_cache/", gitignore_text)
-
 
     def test_cloud_batch_install_expands_enterprise_networking_dependency(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1094,9 +1128,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
             install_lines = [
-                line
-                for line in acs_log.read_text(encoding="utf-8").splitlines()
-                if "apps install splunkbase" in line
+                line for line in acs_log.read_text(encoding="utf-8").splitlines() if "apps install splunkbase" in line
             ]
             install_ids = [
                 re.search(r"--splunkbase-id (\d+)", line).group(1)
@@ -1105,8 +1137,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             ]
             self.assertEqual(install_ids, ["7538", "7539"])
 
-
-    def test_cloud_batch_install_hybrid_uses_search_tier_role_and_cloud_verification(self):
+    def test_cloud_batch_install_hybrid_uses_search_tier_role_and_cloud_verification(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -1233,7 +1266,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 curl_log.read_text(encoding="utf-8"),
             )
 
-
     def test_cloud_batch_install_returns_nonzero_when_any_install_fails(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1310,7 +1342,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
             self.assertIn("1 app(s) failed to install", result.stdout)
 
-
     def test_install_app_auto_installs_enterprise_networking_dependency(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1367,9 +1398,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
             install_lines = [
-                line
-                for line in acs_log.read_text(encoding="utf-8").splitlines()
-                if "apps install splunkbase" in line
+                line for line in acs_log.read_text(encoding="utf-8").splitlines() if "apps install splunkbase" in line
             ]
             install_ids = [
                 re.search(r"--splunkbase-id (\d+)", line).group(1)
@@ -1380,7 +1409,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertNotIn("--version 3.0.0", install_lines[0])
             self.assertIn("--version 3.0.0", install_lines[1])
 
-    def test_install_app_cloud_update_finds_existing_splunkbase_app_on_later_acs_page(self):
+    def test_install_app_cloud_update_finds_existing_splunkbase_app_on_later_acs_page(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -1561,8 +1592,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 output,
             )
 
-
-    def test_install_app_remote_splunkbase_download_stages_package_on_enterprise_target(self):
+    def test_install_app_remote_splunkbase_download_stages_package_on_enterprise_target(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -1742,8 +1774,14 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=output)
             self.assertIn("Resolved version: 1.2.3", output)
             self.assertIn("Downloading app 99999 v1.2.3 from Splunkbase...", output)
-            self.assertIn("Source URL: https://splunkbase.splunk.com/app/99999/release/1.2.3/download/", output)
-            self.assertIn("Resolved URL: https://cdn.splunkbase.invalid/remote-test-app_123.tgz", output)
+            self.assertIn(
+                "Source URL: https://splunkbase.splunk.com/app/99999/release/1.2.3/download/",
+                output,
+            )
+            self.assertIn(
+                "Resolved URL: https://cdn.splunkbase.invalid/remote-test-app_123.tgz",
+                output,
+            )
             self.assertIn("Copying package to splunk@10.110.253.5:/tmp/", output)
             self.assertIn("Installing staged package from /tmp/", output)
             self.assertIn("Version: 1.2.3", output)
@@ -1761,7 +1799,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("splunk@10.110.253.5:/tmp/", sshpass_text)
             self.assertIn("ssh", sshpass_text)
 
-
     def test_install_app_reuses_cached_latest_package_before_splunkbase_download(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1778,7 +1815,10 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             package_root.mkdir(parents=True)
             (package_root / "app.conf").write_text("[launcher]\nversion = 1.2.3\n", encoding="utf-8")
             with tarfile.open(cached_package, "w:gz") as archive:
-                archive.add(package_root.parent.parent / "remote_test_app", arcname="remote_test_app")
+                archive.add(
+                    package_root.parent.parent / "remote_test_app",
+                    arcname="remote_test_app",
+                )
 
             write_executable(
                 bin_dir / "curl",
@@ -1927,7 +1967,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("scp", sshpass_text)
             self.assertIn("ssh", sshpass_text)
 
-
     def test_install_app_warns_for_known_unsupported_role_but_continues(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1956,7 +1995,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("not modeled for role 'universal-forwarder'", output)
             self.assertIn("search-time knowledge objects", output)
 
-
     def test_install_app_skips_role_warning_for_supported_role(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1984,7 +2022,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=output)
             self.assertNotIn("not modeled for role", output)
 
-
     def test_install_app_reports_missing_role_metadata_for_unknown_package(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -2011,7 +2048,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, msg=output)
             self.assertIn("No deployment-role metadata found for the requested package", output)
-
 
     def test_install_app_returns_nonzero_on_http_failure_without_error_payload(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2066,7 +2102,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
             self.assertIn("Installation failed (HTTP 401)", result.stdout + result.stderr)
             self.assertNotIn("Skipping Splunk restart", result.stdout)
-
 
     def test_install_app_treats_timeout_after_presence_as_success(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2184,7 +2219,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("SUCCESS: App 'Splunk_MCP_Server' installed (HTTP 200)", output)
             self.assertIn("Skipping Splunk restart (--no-restart)", output)
 
-
     def test_install_app_help_does_not_require_profile_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -2216,7 +2250,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=output)
             self.assertIn("Usage:", result.stdout)
             self.assertNotIn("Multiple credential profiles are defined", output)
-
 
     def test_install_app_uses_deployer_bundle_for_search_head_cluster_targets(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2310,24 +2343,21 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, msg=output)
             self.assertIn("deployer bundle delivery", output)
-            self.assertTrue(
-                (splunk_home / "etc" / "shcluster" / "apps" / "TestApp" / "default" / "app.conf").exists()
-            )
+            self.assertTrue((splunk_home / "etc" / "shcluster" / "apps" / "TestApp" / "default" / "app.conf").exists())
             self.assertIn("apply shcluster-bundle", apply_log.read_text(encoding="utf-8"))
-
 
     def test_cloud_uninstall_script_no_longer_uses_top_level_local_keyword(self):
         script_text = (REPO_ROOT / "skills/splunk-app-install/scripts/uninstall_app.sh").read_text(encoding="utf-8")
         self.assertNotIn("local delete_code", script_text)
-
 
     def test_install_app_defaults_splunkbase_to_latest_without_version_prompt(self):
         script_text = (REPO_ROOT / "skills/splunk-app-install/scripts/install_app.sh").read_text(encoding="utf-8")
         self.assertNotIn("App version (leave blank for latest):", script_text)
         self.assertIn("Pin a specific Splunkbase version (default: latest)", script_text)
 
-
-    def test_cloud_batch_uninstall_returns_nonzero_when_failures_cannot_be_verified(self):
+    def test_cloud_batch_uninstall_returns_nonzero_when_failures_cannot_be_verified(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -2386,8 +2416,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
             self.assertIn("verification skipped", (result.stdout + result.stderr).lower())
 
-
-    def test_cloud_batch_uninstall_resolves_search_uri_from_cloud_only_credentials(self):
+    def test_cloud_batch_uninstall_resolves_search_uri_from_cloud_only_credentials(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -2505,7 +2536,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "https://shc1.example-stack.stg.splunkcloud.com:8089/services/auth/login",
                 curl_output,
             )
-
 
     def test_cloud_batch_uninstall_uses_cloud_search_verification_in_hybrid_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2632,7 +2662,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 curl_log.read_text(encoding="utf-8"),
             )
 
-
     def test_cloud_uninstall_resolves_search_uri_from_cloud_only_credentials(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -2752,7 +2781,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 "https://shc1.example-stack.stg.splunkcloud.com:8089/services/auth/login",
                 curl_output,
             )
-
 
     def test_cloud_uninstall_uses_cloud_search_verification_in_hybrid_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2881,8 +2909,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 curl_log.read_text(encoding="utf-8"),
             )
 
-
-    def test_cloud_uninstall_falls_back_to_stack_search_uri_when_current_search_head_lookup_fails(self):
+    def test_cloud_uninstall_falls_back_to_stack_search_uri_when_current_search_head_lookup_fails(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -3012,7 +3041,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
                 curl_log.read_text(encoding="utf-8"),
             )
 
-
     def test_uninstall_app_uses_deployer_bundle_for_search_head_cluster_targets(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -3116,7 +3144,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertTrue(list((splunk_home / "etc" / "shcluster" / "apps").glob("TestApp.removed.*")))
             self.assertIn("apply shcluster-bundle", apply_log.read_text(encoding="utf-8"))
 
-
     def test_enterprise_uninstall_treats_delete_timeout_after_removal_as_success(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -3212,11 +3239,15 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("did not finish cleanly, but the app is no longer present", result.stdout)
+            self.assertIn(
+                "did not finish cleanly, but the app is no longer present",
+                result.stdout,
+            )
             self.assertIn("SUCCESS: App 'example_app' has been removed", result.stdout)
 
-
-    def test_cloud_uninstall_treats_fallback_delete_timeout_after_removal_as_success(self):
+    def test_cloud_uninstall_treats_fallback_delete_timeout_after_removal_as_success(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -3332,9 +3363,11 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Search-tier REST DELETE did not finish cleanly, but the app is no longer present", result.stdout)
+            self.assertIn(
+                "Search-tier REST DELETE did not finish cleanly, but the app is no longer present",
+                result.stdout,
+            )
             self.assertIn("has been removed from Splunk Cloud", result.stdout)
-
 
     def test_list_apps_defaults_to_all_apps_in_noninteractive_mode(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -3460,7 +3493,9 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("late-app", result.stdout)
             self.assertIn("Total: 101 app(s)", result.stdout)
 
-    def test_uninstall_app_cloud_interactive_list_reads_apps_beyond_first_acs_page(self):
+    def test_uninstall_app_cloud_interactive_list_reads_apps_beyond_first_acs_page(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"

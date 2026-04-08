@@ -48,7 +48,7 @@ bash skills/cisco-product-setup/scripts/setup.sh \
   --secret-file password /tmp/aci_password
 ```
 
-## Agent Behavior
+## Agent Behavior — Credentials
 
 The agent must never ask for secrets in chat. Use the routed family skill's
 secret-file pattern instead.

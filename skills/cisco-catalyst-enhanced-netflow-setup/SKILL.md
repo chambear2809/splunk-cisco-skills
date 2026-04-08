@@ -24,7 +24,7 @@ This add-on is **optional**. It adds Cisco HSL/IPFIX element mappings for extra
 NetFlow-focused dashboards in Cisco Enterprise Networking. It does **not**
 create accounts, inputs, or indexes of its own.
 
-## Agent Behavior
+## Agent Behavior — Credentials
 
 **The agent must NEVER ask for passwords or secrets in chat.**
 

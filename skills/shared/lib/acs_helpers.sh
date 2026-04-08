@@ -388,6 +388,10 @@ cloud_current_search_api_uri() {
 
 _SEARCH_API_ALLOWLIST_CHECKED=false
 
+# Privacy note: _detect_public_ip contacts external services
+# (checkip.amazonaws.com, api.ipify.org) to determine the caller's public IP.
+# This IP is then added to the Splunk Cloud search-api allowlist via ACS.
+# Set SPLUNK_SKIP_ALLOWLIST=true to disable this behavior entirely.
 _detect_public_ip() {
     local ip
     ip=$(curl -sS --connect-timeout 5 --max-time 10 \

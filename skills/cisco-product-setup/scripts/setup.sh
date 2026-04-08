@@ -852,7 +852,7 @@ print_list_or_none() {
 }
 
 print_variants() {
-    local variant option product_key
+    local option product_key
     echo "Available ${EFFECTIVE_VARIANT_KEY}:"
     while IFS= read -r option || [[ -n "${option}" ]]; do
         [[ -n "${option}" ]] || continue
@@ -875,12 +875,12 @@ print_effective_defaults() {
 }
 
 print_install_apps() {
-    local app_name app_id label skill info
+    local app_name app_id label info
     echo "Install apps:"
     while IFS= read -r app_name || [[ -n "${app_name}" ]]; do
         [[ -n "${app_name}" ]] || continue
         info="$(registry_app_info "${app_name}")"
-        IFS=$'\t' read -r app_id label skill <<< "${info}"
+        IFS=$'\t' read -r app_id label _ <<< "${info}"
         if [[ -n "${app_id}" || -n "${label}" ]]; then
             echo "  - ${app_name}${app_id:+ [${app_id}]}${label:+ ${label}}"
         else
@@ -1047,9 +1047,9 @@ require_configuration_ready() {
 }
 
 install_app_by_name() {
-    local app_name="$1" app_id label skill info
+    local app_name="$1" app_id label info
     info="$(registry_app_info "${app_name}")"
-    IFS=$'\t' read -r app_id label skill <<< "${info}"
+    IFS=$'\t' read -r app_id label _ <<< "${info}"
     if [[ -z "${app_id}" ]]; then
         log "ERROR: Could not resolve Splunkbase ID for ${app_name} from the app registry."
         exit 1

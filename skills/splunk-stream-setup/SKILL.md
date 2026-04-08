@@ -49,7 +49,7 @@ For Splunk Cloud, the normal workflow is hybrid:
 Any `splunk-ta/_unpacked/` copy is review-only and not part of the normal
 deployment workflow.
 
-## Agent Behavior
+## Agent Behavior — Credentials
 
 **The agent must NEVER ask for passwords or secrets in chat.**
 

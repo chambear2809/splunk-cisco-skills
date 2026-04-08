@@ -8,7 +8,11 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write_executable
+from tests.regression_helpers import (
+    REPO_ROOT,
+    ShellScriptRegressionBase,
+    write_executable,
+)
 
 
 class SC4xRegressionTests(ShellScriptRegressionBase):
@@ -51,7 +55,11 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 f"app-workaround.conf={config_file}",
                 env=env,
             )
-            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
+            self.assertEqual(
+                setup_result.returncode,
+                0,
+                msg=setup_result.stdout + setup_result.stderr,
+            )
             self.assertTrue(token_file.exists(), msg="Expected the SC4S token file to be written")
             self.assertEqual(token_file.read_text(encoding="utf-8"), "generated-sc4s-token\n")
 
@@ -60,17 +68,25 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             k8s_values = (output_dir / "k8s" / "values.yaml").read_text(encoding="utf-8")
             k8s_secret = (output_dir / "k8s" / "values.secret.yaml").read_text(encoding="utf-8")
 
-            self.assertIn("SC4S_DEST_SPLUNK_HEC_DEFAULT_URL=https://example.invalid:8088", host_env)
+            self.assertIn(
+                "SC4S_DEST_SPLUNK_HEC_DEFAULT_URL=https://example.invalid:8088",
+                host_env,
+            )
             self.assertIn("SC4S_DEST_SPLUNK_HEC_DEFAULT_TOKEN=generated-sc4s-token", host_env)
             self.assertIn("SC4S_LISTEN_CHECKPOINT_TCP_PORT=9000", host_env)
             self.assertIn("- ./env_file", host_compose)
             self.assertIn("- ./local:/etc/syslog-ng/conf.d/local:z", host_compose)
-            rendered_context = (output_dir / "host" / "local" / "context" / "splunk_metadata.csv").read_text(encoding="utf-8")
+            rendered_context = (output_dir / "host" / "local" / "context" / "splunk_metadata.csv").read_text(
+                encoding="utf-8"
+            )
             self.assertIn("splunk_sc4s_events,index,sc4s", rendered_context)
             self.assertIn("splunk_sc4s_fallback,index,sc4s", rendered_context)
             self.assertIn("cisco_asa,index,netfw", rendered_context)
 
-            self.assertIn('hec_url: "https://example.invalid:8088/services/collector/event"', k8s_values)
+            self.assertIn(
+                'hec_url: "https://example.invalid:8088/services/collector/event"',
+                k8s_values,
+            )
             self.assertIn("vendor_product:", k8s_values)
             self.assertIn("name: checkpoint", k8s_values)
             self.assertIn("tcp: [9000]", k8s_values)
@@ -101,10 +117,13 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4s",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
             self.assertIn("HEC token 'sc4s' exists", validate_result.stdout)
             self.assertIn("SC4S startup event", validate_result.stdout)
-
 
     def test_sc4s_setup_uses_ingest_profile_for_hec_management_and_rendering(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -150,7 +169,10 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
 
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, msg=output)
-            self.assertIn("Detected SC4S HEC base URL: https://hf-hec.example.invalid:8088", output)
+            self.assertIn(
+                "Detected SC4S HEC base URL: https://hf-hec.example.invalid:8088",
+                output,
+            )
             self.assertIn(
                 "SC4S_DEST_SPLUNK_HEC_DEFAULT_URL=https://hf-hec.example.invalid:8088",
                 (output_dir / "host" / "env_file").read_text(encoding="utf-8"),
@@ -172,7 +194,11 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4s",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
             validate_requests = curl_log.read_text(encoding="utf-8")
             self.assertIn(
                 "https://hf.example.invalid:8089/services/data/inputs/http?output_mode=json",
@@ -182,7 +208,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "https://search.example.invalid:8089/services/data/inputs/http?output_mode=json",
                 validate_requests,
             )
-
 
     def test_sc4s_clustered_ingest_uses_bundle_managed_hec(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -253,19 +278,17 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertRegex(token_value, r"^[0-9a-f-]{36}$")
 
             inputs_conf = (
-                splunk_home
-                / "etc"
-                / "manager-apps"
-                / "ZZZ_cisco_skills_hec"
-                / "local"
-                / "inputs.conf"
+                splunk_home / "etc" / "manager-apps" / "ZZZ_cisco_skills_hec" / "local" / "inputs.conf"
             ).read_text(encoding="utf-8")
             self.assertIn("[http]", inputs_conf)
             self.assertIn("[http://sc4s]", inputs_conf)
             self.assertIn("index = sc4s", inputs_conf)
             self.assertIn(f"token = {token_value}", inputs_conf)
             self.assertIn("disabled = 0", inputs_conf)
-            self.assertIn("apply cluster-bundle -auth cm-user:cm-pass", apply_log.read_text(encoding="utf-8"))
+            self.assertIn(
+                "apply cluster-bundle -auth cm-user:cm-pass",
+                apply_log.read_text(encoding="utf-8"),
+            )
             if curl_log.exists():
                 self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
 
@@ -276,10 +299,13 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4s",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
             self.assertIn("HEC token 'sc4s' exists", validate_result.stdout)
             self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
-
 
     def test_sc4s_validate_reports_wrong_metrics_index_type(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -304,9 +330,12 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4s",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 1, msg=validate_result.stdout + validate_result.stderr)
+            self.assertEqual(
+                validate_result.returncode,
+                1,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
             self.assertIn("exists but is an event index", validate_result.stdout)
-
 
     def test_sc4s_setup_enables_existing_disabled_hec_token(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -330,15 +359,21 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-only",
                 env=env,
             )
-            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
-            self.assertIn("exists but is disabled. Enabling it via Splunk REST", setup_result.stdout)
+            self.assertEqual(
+                setup_result.returncode,
+                0,
+                msg=setup_result.stdout + setup_result.stderr,
+            )
+            self.assertIn(
+                "exists but is disabled. Enabling it via Splunk REST",
+                setup_result.stdout,
+            )
             self.assertIn("Enabled HEC token 'sc4s'.", setup_result.stdout)
             self.assertIn("Updating it to 'sc4s' via Splunk REST", setup_result.stdout)
 
             state = json.loads(state_file.read_text(encoding="utf-8"))
             self.assertEqual(state["hec_tokens"]["sc4s"]["disabled"], "false")
             self.assertEqual(state["hec_tokens"]["sc4s"]["default_index"], "sc4s")
-
 
     def test_sc4s_validate_fails_when_default_index_is_main(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -363,9 +398,12 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4s",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 1, msg=validate_result.stdout + validate_result.stderr)
+            self.assertEqual(
+                validate_result.returncode,
+                1,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
             self.assertIn("default index is 'main', expected 'sc4s'", validate_result.stdout)
-
 
     def test_sc4s_setup_blocks_custom_in_repo_secret_output_dir(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -387,13 +425,14 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 env=env,
             )
             self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
-            self.assertIn("Refusing to render secret-bearing SC4S outputs inside the repo", result.stdout + result.stderr)
-
+            self.assertIn(
+                "Refusing to render secret-bearing SC4S outputs inside the repo",
+                result.stdout + result.stderr,
+            )
 
     def test_gitignore_excludes_default_sc4s_render_output(self):
         gitignore_text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("/sc4s-rendered/", gitignore_text)
-
 
     def test_sc4s_apply_host_compose_pulls_before_up(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -426,7 +465,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                     "docker compose -f docker-compose.yml up -d",
                 ],
             )
-
 
     def test_sc4s_apply_host_systemd_syncs_runtime_and_restarts_service(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -491,7 +529,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 ],
             )
 
-
     def test_sc4s_apply_k8s_runs_helm_upgrade_install(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -513,7 +550,13 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
             commands = Path(env["SC4S_COMMAND_LOG"]).read_text(encoding="utf-8").splitlines()
-            self.assertEqual(commands[:2], ["helm repo add splunk-connect-for-syslog https://splunk.github.io/splunk-connect-for-syslog", "helm repo update"])
+            self.assertEqual(
+                commands[:2],
+                [
+                    "helm repo add splunk-connect-for-syslog https://splunk.github.io/splunk-connect-for-syslog",
+                    "helm repo update",
+                ],
+            )
             self.assertTrue(
                 any(
                     "helm upgrade --install sc4s splunk-connect-for-syslog/splunk-connect-for-syslog --namespace sc4s --create-namespace -f values.yaml"
@@ -522,7 +565,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 ),
                 msg=f"Expected helm upgrade --install in command log, got: {commands}",
             )
-
 
     def test_sc4snmp_setup_smoke_flow(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -587,7 +629,11 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 str(traps_file),
                 env=env,
             )
-            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
+            self.assertEqual(
+                setup_result.returncode,
+                0,
+                msg=setup_result.stdout + setup_result.stderr,
+            )
             self.assertTrue(token_file.exists(), msg="Expected the SC4SNMP token file to be written")
             self.assertEqual(token_file.read_text(encoding="utf-8"), "generated-sc4snmp-token\n")
 
@@ -618,7 +664,10 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertIn("TRAPS_PORT=162", compose_env)
             self.assertIn("DNS_SERVER=10.10.10.53", compose_env)
             self.assertIn("INVENTORY_FILE_ABSOLUTE_PATH=/app/inventory/inventory.csv", compose_env)
-            self.assertIn("SCHEDULER_CONFIG_FILE_ABSOLUTE_PATH=/app/config/config.yaml", compose_env)
+            self.assertIn(
+                "SCHEDULER_CONFIG_FILE_ABSOLUTE_PATH=/app/config/config.yaml",
+                compose_env,
+            )
             self.assertIn("TRAPS_CONFIG_FILE_ABSOLUTE_PATH=/app/config/config.yaml", compose_env)
             self.assertIn("SECRET_FOLDER_PATH=/app/secrets/tmp", compose_env)
             self.assertIn("LOCAL_MIBS_PATH=/app/new_mibs/src/vendor", compose_env)
@@ -638,7 +687,10 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertIn("container_name: SC4SNMP-trap", compose_file)
             self.assertIn("command: [trap]", compose_file)
             self.assertIn("./config/inventory.csv:/app/inventory/inventory.csv:ro", compose_file)
-            self.assertIn("./config/scheduler-config.yaml:/app/config/config.yaml:ro", compose_file)
+            self.assertIn(
+                "./config/scheduler-config.yaml:/app/config/config.yaml:ro",
+                compose_file,
+            )
             self.assertIn("./config/traps-config.yaml:/app/config/config.yaml:ro", compose_file)
             self.assertIn("./secrets:/app/secrets/tmp:ro", compose_file)
             self.assertIn("./mibs:/app/new_mibs/src/vendor:ro", compose_file)
@@ -682,10 +734,13 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4snmp",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
             self.assertIn("HEC token 'sc4snmp' exists", validate_result.stdout)
             self.assertIn("SC4SNMP event", validate_result.stdout)
-
 
     def test_sc4snmp_setup_uses_ingest_profile_for_hec_management_and_rendering(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -772,7 +827,10 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
 
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 0, msg=output)
-            self.assertIn("Detected SC4SNMP HEC base URL: https://hf-hec.example.invalid:8088", output)
+            self.assertIn(
+                "Detected SC4SNMP HEC base URL: https://hf-hec.example.invalid:8088",
+                output,
+            )
             self.assertIn(
                 "SPLUNK_HEC_HOST=hf-hec.example.invalid",
                 (output_dir / "compose" / ".env").read_text(encoding="utf-8"),
@@ -794,7 +852,11 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4snmp",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
             validate_requests = curl_log.read_text(encoding="utf-8")
             self.assertIn(
                 "https://hf.example.invalid:8089/services/data/inputs/http?output_mode=json",
@@ -804,7 +866,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "https://search.example.invalid:8089/services/data/inputs/http?output_mode=json",
                 validate_requests,
             )
-
 
     def test_sc4snmp_clustered_ingest_uses_bundle_managed_hec(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -875,19 +936,17 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertRegex(token_value, r"^[0-9a-f-]{36}$")
 
             inputs_conf = (
-                splunk_home
-                / "etc"
-                / "manager-apps"
-                / "ZZZ_cisco_skills_hec"
-                / "local"
-                / "inputs.conf"
+                splunk_home / "etc" / "manager-apps" / "ZZZ_cisco_skills_hec" / "local" / "inputs.conf"
             ).read_text(encoding="utf-8")
             self.assertIn("[http]", inputs_conf)
             self.assertIn("[http://sc4snmp]", inputs_conf)
             self.assertIn("index = netops", inputs_conf)
             self.assertIn(f"token = {token_value}", inputs_conf)
             self.assertIn("disabled = 0", inputs_conf)
-            self.assertIn("apply cluster-bundle -auth cm-user:cm-pass", apply_log.read_text(encoding="utf-8"))
+            self.assertIn(
+                "apply cluster-bundle -auth cm-user:cm-pass",
+                apply_log.read_text(encoding="utf-8"),
+            )
             if curl_log.exists():
                 self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
 
@@ -898,10 +957,13 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4snmp",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 0, msg=validate_result.stdout + validate_result.stderr)
+            self.assertEqual(
+                validate_result.returncode,
+                0,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
             self.assertIn("HEC token 'sc4snmp' exists", validate_result.stdout)
             self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
-
 
     def test_sc4snmp_validate_reports_wrong_metrics_index_type(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -926,9 +988,15 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "sc4snmp",
                 env=env,
             )
-            self.assertEqual(validate_result.returncode, 1, msg=validate_result.stdout + validate_result.stderr)
-            self.assertIn("Index 'netmetrics' exists but is an event index", validate_result.stdout)
-
+            self.assertEqual(
+                validate_result.returncode,
+                1,
+                msg=validate_result.stdout + validate_result.stderr,
+            )
+            self.assertIn(
+                "Index 'netmetrics' exists but is an event index",
+                validate_result.stdout,
+            )
 
     def test_sc4snmp_setup_enables_existing_disabled_hec_token(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -952,15 +1020,21 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 "--hec-only",
                 env=env,
             )
-            self.assertEqual(setup_result.returncode, 0, msg=setup_result.stdout + setup_result.stderr)
-            self.assertIn("exists but is disabled. Enabling it via Splunk REST", setup_result.stdout)
+            self.assertEqual(
+                setup_result.returncode,
+                0,
+                msg=setup_result.stdout + setup_result.stderr,
+            )
+            self.assertIn(
+                "exists but is disabled. Enabling it via Splunk REST",
+                setup_result.stdout,
+            )
             self.assertIn("Enabled HEC token 'sc4snmp'.", setup_result.stdout)
             self.assertIn("Updating it to 'netops' via Splunk REST", setup_result.stdout)
 
             state = json.loads(state_file.read_text(encoding="utf-8"))
             self.assertEqual(state["hec_tokens"]["sc4snmp"]["disabled"], "false")
             self.assertEqual(state["hec_tokens"]["sc4snmp"]["default_index"], "netops")
-
 
     def test_sc4snmp_setup_blocks_custom_in_repo_secret_output_dir(self):
         with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmpdir:
@@ -982,13 +1056,14 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 env=env,
             )
             self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
-            self.assertIn("Refusing to render secret-bearing SC4SNMP outputs inside the repo", result.stdout + result.stderr)
-
+            self.assertIn(
+                "Refusing to render secret-bearing SC4SNMP outputs inside the repo",
+                result.stdout + result.stderr,
+            )
 
     def test_gitignore_excludes_default_sc4snmp_render_output(self):
         gitignore_text = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
         self.assertIn("/sc4snmp-rendered/", gitignore_text)
-
 
     def test_sc4snmp_apply_compose_pulls_before_up(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1021,7 +1096,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                     "docker compose -f docker-compose.yml up -d",
                 ],
             )
-
 
     def test_sc4snmp_apply_k8s_runs_helm_upgrade_install(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1060,7 +1134,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
                 msg=f"Expected helm upgrade --install in command log, got: {commands}",
             )
 
-
     def test_sc4snmp_render_compose_without_token_file_creates_placeholder(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1080,8 +1153,9 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertIn("<replace-with-hec-token>", placeholder.read_text(encoding="utf-8"))
             self.assertEqual(stat.S_IMODE(placeholder.stat().st_mode), 0o644)
 
-
-    def test_sc4snmp_render_compose_with_snmpv3_secrets_file_makes_bind_secret_readable(self):
+    def test_sc4snmp_render_compose_with_snmpv3_secrets_file_makes_bind_secret_readable(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
@@ -1120,9 +1194,11 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
             rendered_secrets = output_dir / "compose" / "secrets" / "secrets.json"
-            self.assertEqual(rendered_secrets.read_text(encoding="utf-8"), snmpv3_secrets_file.read_text(encoding="utf-8"))
+            self.assertEqual(
+                rendered_secrets.read_text(encoding="utf-8"),
+                snmpv3_secrets_file.read_text(encoding="utf-8"),
+            )
             self.assertEqual(stat.S_IMODE(rendered_secrets.stat().st_mode), 0o644)
-
 
     def test_sc4snmp_hec_token_yaml_special_characters_escaped(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1144,7 +1220,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             secret_yaml = (output_dir / "k8s" / "values.secret.yaml").read_text(encoding="utf-8")
             self.assertIn('token: "ab\\"cd\\\\ef"', secret_yaml)
-
 
     def test_sc4snmp_validate_unexpected_useack_value(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1175,7 +1250,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertIn("Could not determine HEC ACK state", output)
             self.assertNotIn("unbound variable", output.lower())
 
-
     def test_sc4snmp_validate_fails_when_default_index_is_main(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1205,7 +1279,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
             self.assertIn("default index is 'main', expected 'netops'", result.stdout)
 
-
     def test_sc4snmp_render_k8s_without_trap_listener_ip_uses_nodeport(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -1225,7 +1298,6 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertNotIn("loadBalancerIP", values_yaml)
             self.assertIn("usemetallb: false", values_yaml)
 
-
     def test_sc4x_live_smoke_help(self):
         result = self.run_script_no_env(
             "skills/shared/scripts/smoke_sc4x_live.sh",
@@ -1235,9 +1307,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
         self.assertIn("SC4S / SC4SNMP Live Smoke Test", result.stdout)
 
     def test_sc4x_live_smoke_uses_sshpass_file_instead_of_password_flag(self):
-        script_text = (
-            REPO_ROOT / "skills/shared/scripts/smoke_sc4x_live.sh"
-        ).read_text(encoding="utf-8")
+        script_text = (REPO_ROOT / "skills/shared/scripts/smoke_sc4x_live.sh").read_text(encoding="utf-8")
 
         self.assertIn("sshpass -f", script_text)
         self.assertNotIn("sshpass -p", script_text)

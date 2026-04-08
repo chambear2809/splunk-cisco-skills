@@ -35,7 +35,7 @@ rest_create_or_update_account() {
     resp=$(splunk_curl_post "${sk}" \
         "${create_body}" \
         "${endpoint}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
 
     case "${http_code}" in
         201|200)
@@ -55,7 +55,7 @@ rest_create_or_update_account() {
             resp=$(splunk_curl_post "${sk}" \
                 "${update_body}" \
                 "${endpoint}/${enc_name}?output_mode=json" -w '\n%{http_code}' 2>/dev/null)
-            http_code=$(echo "${resp}" | tail -1)
+            http_code=$(_extract_http_code "${resp}")
             case "${http_code}" in
                 200|201)
                     printf '%s' "${http_code}"

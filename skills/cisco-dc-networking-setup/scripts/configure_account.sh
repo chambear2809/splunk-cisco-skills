@@ -19,6 +19,7 @@ PROXY_ENABLED="0"
 SET_VERIFY_SSL=""
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Configure a Cisco DC Networking account in Splunk via REST API.
 
@@ -49,7 +50,7 @@ Common:
 
 Note: Use --password-file to avoid passing the password on the command line.
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -68,7 +69,7 @@ while [[ $# -gt 0 ]]; do
         --no-verify-ssl) SET_VERIFY_SSL="False"; shift ;;
         --verify-ssl) SET_VERIFY_SSL="True"; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1"; usage 1 ;;
     esac
 done
 

@@ -7,7 +7,11 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write_executable
+from tests.regression_helpers import (
+    REPO_ROOT,
+    ShellScriptRegressionBase,
+    write_executable,
+)
 
 
 class StreamRegressionTests(ShellScriptRegressionBase):
@@ -65,16 +69,11 @@ class StreamRegressionTests(ShellScriptRegressionBase):
             self.assertIn("indexes create --name netflow", acs_output)
             self.assertIn("indexes create --name stream", acs_output)
 
-
     def test_stream_role_topology_matches_split_package_model(self):
-        registry = json.loads(
-            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
-        )
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
 
         stream_topology = next(
-            entry
-            for entry in registry.get("skill_topologies", [])
-            if entry.get("skill") == "splunk-stream-setup"
+            entry for entry in registry.get("skill_topologies", []) if entry.get("skill") == "splunk-stream-setup"
         )
         self.assertEqual(
             stream_topology["role_support"],
@@ -127,11 +126,8 @@ class StreamRegressionTests(ShellScriptRegressionBase):
             },
         )
 
-
     def test_stream_app_registry_uses_current_splunkbase_ids(self):
-        registry = json.loads(
-            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
-        )
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
         stream_entries = {
             app["app_name"]: app["splunkbase_id"]
             for app in registry.get("apps", [])
@@ -141,7 +137,6 @@ class StreamRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(stream_entries["splunk_app_stream"], "1809")
         self.assertEqual(stream_entries["Splunk_TA_stream"], "5238")
         self.assertEqual(stream_entries["Splunk_TA_stream_wire_data"], "5234")
-
 
     def test_stream_validate_search_tier_downgrades_forwarder_checks(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -166,13 +161,20 @@ class StreamRegressionTests(ShellScriptRegressionBase):
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Splunk TA Stream (Forwarder) is not installed on this search-tier target", result.stdout)
-            self.assertIn("Forwarder-side streamfwd validation is skipped on the search tier", result.stdout)
+            self.assertIn(
+                "Splunk TA Stream (Forwarder) is not installed on this search-tier target",
+                result.stdout,
+            )
+            self.assertIn(
+                "Forwarder-side streamfwd validation is skipped on the search tier",
+                result.stdout,
+            )
             self.assertNotIn("FAIL: Splunk TA Stream (Forwarder) not installed", result.stdout)
             self.assertNotIn("FAIL: streamfwd.conf stanza not found", result.stdout)
 
-
-    def test_stream_validate_heavy_forwarder_downgrades_search_tier_app_requirement(self):
+    def test_stream_validate_heavy_forwarder_downgrades_search_tier_app_requirement(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             env = self._build_mock_stream_validate_env(
@@ -206,11 +208,13 @@ class StreamRegressionTests(ShellScriptRegressionBase):
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Splunk Stream search-tier app is not installed on this forwarder target", result.stdout)
+            self.assertIn(
+                "Splunk Stream search-tier app is not installed on this forwarder target",
+                result.stdout,
+            )
             self.assertIn("streamfwd.conf stanza exists", result.stdout)
             self.assertIn("KV Store check skipped on heavy-forwarder", result.stdout)
             self.assertNotIn("FAIL: Splunk Stream not installed", result.stdout)
-
 
     def test_stream_validate_indexer_focuses_on_wire_data_requirements(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -236,11 +240,16 @@ class StreamRegressionTests(ShellScriptRegressionBase):
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("Splunk TA Stream Wire Data installed", result.stdout)
-            self.assertIn("Splunk TA Stream (Forwarder) is not installed on this indexer target", result.stdout)
-            self.assertIn("Forwarder-side streamfwd validation is skipped on the indexer tier", result.stdout)
+            self.assertIn(
+                "Splunk TA Stream (Forwarder) is not installed on this indexer target",
+                result.stdout,
+            )
+            self.assertIn(
+                "Forwarder-side streamfwd validation is skipped on the indexer tier",
+                result.stdout,
+            )
             self.assertIn("KV Store check skipped on indexer", result.stdout)
             self.assertNotIn("FAIL: Splunk TA Stream (Forwarder) not installed", result.stdout)
-
 
     def test_stream_validate_hybrid_cloud_profile_stays_search_tier_focused(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -284,11 +293,19 @@ class StreamRegressionTests(ShellScriptRegressionBase):
             )
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Splunk TA Stream (Forwarder) is not installed on this search-tier target", result.stdout)
-            self.assertIn("Forwarder-side streamfwd validation is skipped on the search tier", result.stdout)
-            self.assertNotIn("search-tier app is not installed on this forwarder target", result.stdout)
+            self.assertIn(
+                "Splunk TA Stream (Forwarder) is not installed on this search-tier target",
+                result.stdout,
+            )
+            self.assertIn(
+                "Forwarder-side streamfwd validation is skipped on the search tier",
+                result.stdout,
+            )
+            self.assertNotIn(
+                "search-tier app is not installed on this forwarder target",
+                result.stdout,
+            )
             self.assertNotIn("KV Store check skipped on heavy-forwarder", result.stdout)
-
 
     def test_configure_streams_help_does_not_require_profile_selection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -322,7 +339,6 @@ class StreamRegressionTests(ShellScriptRegressionBase):
             self.assertIn("Usage:", result.stdout)
             self.assertNotIn("Multiple credential profiles are defined", output)
 
-
     def test_configure_streams_rejects_forwarder_roles(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -354,7 +370,6 @@ class StreamRegressionTests(ShellScriptRegressionBase):
             self.assertIn("search-tier only", output)
             self.assertIn("heavy-forwarder", output)
             self.assertNotIn("Could not authenticate", output)
-
 
     def test_configure_streams_uses_refreshed_cloud_stream_web_uri(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -467,8 +482,9 @@ class StreamRegressionTests(ShellScriptRegressionBase):
                 curl_requests,
             )
 
-
-    def test_stream_setup_install_prefers_splunkbase_before_local_fallback_in_legacy_mode(self):
+    def test_stream_setup_install_prefers_splunkbase_before_local_fallback_in_legacy_mode(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             bin_dir = tmp_path / "bin"
@@ -591,7 +607,6 @@ class StreamRegressionTests(ShellScriptRegressionBase):
                 ],
             )
 
-
     def test_stream_setup_install_requires_declared_role_by_default(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -658,7 +673,6 @@ class StreamRegressionTests(ShellScriptRegressionBase):
             output = result.stdout + result.stderr
             self.assertEqual(result.returncode, 1, msg=output)
             self.assertIn("requires a declared deployment role", output)
-
 
     def test_stream_setup_install_scopes_packages_to_declared_search_tier_role(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -799,7 +813,6 @@ class StreamRegressionTests(ShellScriptRegressionBase):
                     "--source splunkbase --app-id 5234 --no-update --no-restart",
                 ],
             )
-
 
     def test_stream_setup_full_setup_requires_split_phases_on_role_scoped_target(self):
         with tempfile.TemporaryDirectory() as tmpdir:

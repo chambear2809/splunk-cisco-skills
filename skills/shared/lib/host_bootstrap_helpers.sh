@@ -8,23 +8,25 @@ _HOST_BOOTSTRAP_HELPERS_LOADED=true
 HBS_ENTERPRISE_DOWNLOAD_PAGE_URL="${HBS_ENTERPRISE_DOWNLOAD_PAGE_URL:-https://www.splunk.com/en_us/download/splunk-enterprise.html}"
 HBS_LATEST_METADATA_MAX_AGE_SECONDS="${HBS_LATEST_METADATA_MAX_AGE_SECONDS:-2592000}"
 
+if ! declare -F _bool_is_true >/dev/null 2>&1; then
+    _bool_is_true() {
+        case "${1:-}" in
+            1|[Tt][Rr][Uu][Ee]|[Yy]|[Yy][Ee][Ss]|[Oo][Nn])
+                return 0
+                ;;
+            *)
+                return 1
+                ;;
+        esac
+    }
+fi
+
 hbs_is_interactive() {
     [[ -t 0 ]]
 }
 
-hbs_bool_is_true() {
-    case "${1:-}" in
-        1|[Tt][Rr][Uu][Ee]|[Yy]|[Yy][Ee][Ss]|[Oo][Nn])
-            return 0
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
 hbs_normalize_bool() {
-    if hbs_bool_is_true "${1:-}"; then
+    if _bool_is_true "${1:-}"; then
         printf '%s' "true"
     else
         printf '%s' "false"
@@ -690,7 +692,7 @@ hbs_download_file() {
 
 hbs_local_sudo_prefix() {
     if [[ -n "${SPLUNK_LOCAL_SUDO:-}" ]]; then
-        if hbs_bool_is_true "${SPLUNK_LOCAL_SUDO}"; then
+        if _bool_is_true "${SPLUNK_LOCAL_SUDO}"; then
             printf '%s' "sudo"
         fi
         return 0
@@ -710,7 +712,7 @@ hbs_target_sudo_prefix() {
         return 0
     fi
 
-    if hbs_bool_is_true "${SPLUNK_REMOTE_SUDO:-true}"; then
+    if _bool_is_true "${SPLUNK_REMOTE_SUDO:-true}"; then
         printf '%s' "sudo"
     fi
 }
@@ -735,6 +737,18 @@ hbs_load_ssh_for_execution() {
     load_splunk_ssh_credentials
 }
 
+hbs_ssh_host_key_policy() {
+    local policy="${SPLUNK_SSH_STRICT_HOST_KEY:-accept-new}"
+    case "${policy}" in
+        yes|no|accept-new) printf '%s' "${policy}" ;;
+        *)
+            _warn_once "_WARNED_INVALID_SSH_HOST_KEY_POLICY" \
+                "WARNING: Ignoring invalid SPLUNK_SSH_STRICT_HOST_KEY value '${policy}'. Using accept-new."
+            printf '%s' "accept-new"
+            ;;
+    esac
+}
+
 hbs_make_sshpass_file() {
     local pass_file
     pass_file="$(mktemp)"
@@ -747,6 +761,12 @@ hbs_run_target_cmd() {
     local execution_mode="${1:-local}"
     local raw_cmd="${2:-}"
     local quoted pass_file ssh_target
+
+    if [[ -z "${raw_cmd}" ]]; then
+        echo "ERROR: hbs_run_target_cmd requires a non-empty command string." >&2
+        echo "  Build commands with hbs_shell_join to prevent injection." >&2
+        return 1
+    fi
 
     if [[ "${execution_mode}" == "local" ]]; then
         bash -lc "${raw_cmd}"
@@ -766,7 +786,7 @@ hbs_run_target_cmd() {
     sshpass -f "${pass_file}" ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        -o "StrictHostKeyChecking=$(hbs_ssh_host_key_policy)" \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
         -q \
@@ -781,6 +801,12 @@ hbs_run_target_cmd_with_stdin() {
     local raw_cmd="${2:-}"
     local stdin_content="${3:-}"
     local quoted pass_file ssh_target
+
+    if [[ -z "${raw_cmd}" ]]; then
+        echo "ERROR: hbs_run_target_cmd_with_stdin requires a non-empty command string." >&2
+        echo "  Build commands with hbs_shell_join to prevent injection." >&2
+        return 1
+    fi
 
     if [[ -z "${stdin_content}" ]]; then
         hbs_run_target_cmd "${execution_mode}" "${raw_cmd}"
@@ -805,7 +831,7 @@ hbs_run_target_cmd_with_stdin() {
     sshpass -f "${pass_file}" ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        -o "StrictHostKeyChecking=$(hbs_ssh_host_key_policy)" \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
         -q \
@@ -819,6 +845,12 @@ hbs_capture_target_cmd() {
     local execution_mode="${1:-local}"
     local raw_cmd="${2:-}"
     local quoted pass_file ssh_target
+
+    if [[ -z "${raw_cmd}" ]]; then
+        echo "ERROR: hbs_capture_target_cmd requires a non-empty command string." >&2
+        echo "  Build commands with hbs_shell_join to prevent injection." >&2
+        return 1
+    fi
 
     if [[ "${execution_mode}" == "local" ]]; then
         bash -lc "${raw_cmd}"
@@ -838,7 +870,7 @@ hbs_capture_target_cmd() {
     sshpass -f "${pass_file}" ssh \
         -p "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        -o "StrictHostKeyChecking=$(hbs_ssh_host_key_policy)" \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
         -q \
@@ -886,7 +918,7 @@ hbs_stage_file_for_execution() {
     sshpass -f "${pass_file}" scp \
         -P "${SPLUNK_SSH_PORT}" \
         -o ConnectTimeout=15 \
-        -o StrictHostKeyChecking=accept-new \
+        -o "StrictHostKeyChecking=$(hbs_ssh_host_key_policy)" \
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
         -q \

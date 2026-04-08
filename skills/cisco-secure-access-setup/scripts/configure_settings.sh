@@ -33,6 +33,7 @@ DEST_LIST_NAMES=()
 DEST_LIST_ROLES=()
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Cisco Secure Access Settings Configuration
 
@@ -66,7 +67,7 @@ Options:
   --no-create-index              Do not auto-create supplied indexes
   --help                         Show this help
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 utc_now() {
@@ -309,7 +310,7 @@ while [[ $# -gt 0 ]]; do
         --ravpn-index) require_arg "$1" $# || exit 1; RAVPN_INDEX="$2"; shift 2 ;;
         --no-create-index) CREATE_INDEX=false; shift ;;
         --help) usage ;;
-        *) log "Unknown option: $1"; usage ;;
+        *) log "Unknown option: $1"; usage 1 ;;
     esac
 done
 

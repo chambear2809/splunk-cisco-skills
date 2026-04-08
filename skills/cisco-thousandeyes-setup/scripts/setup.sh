@@ -269,7 +269,7 @@ rest_create_hec_token() {
     resp=$(splunk_curl_post "${INGEST_SK}" "${body}" \
         "${INGEST_SPLUNK_URI}/services/data/inputs/http?output_mode=json" \
         -w '\n%{http_code}' 2>/dev/null)
-    hec_code=$(echo "${resp}" | tail -1)
+    hec_code=$(_extract_http_code "${resp}")
     case "${hec_code}" in
         201|200|409) return 0 ;;
         *) return 1 ;;
@@ -505,7 +505,7 @@ main() {
             events) enable_events_inputs "${ACCOUNT}" "${ACCOUNT_GROUP}" ;;
             activity) enable_activity_inputs "${ACCOUNT}" "${ACCOUNT_GROUP}" "${HEC_TOKEN}" ;;
             alerts) enable_alerts_inputs "${ACCOUNT}" "${ACCOUNT_GROUP}" "${HEC_TOKEN}" ;;
-            *) log "ERROR: Unknown input type '${INPUT_TYPE}'."; usage ;;
+            *) log "ERROR: Unknown input type '${INPUT_TYPE}'."; usage 1 ;;
         esac
         log_live_input_summary
         log "$(log_platform_restart_guidance "input changes")"

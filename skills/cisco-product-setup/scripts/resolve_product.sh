@@ -6,10 +6,10 @@ CATALOG_PATH="${SCRIPT_DIR}/../catalog.json"
 
 LIST_PRODUCTS=false
 JSON_OUTPUT=false
-SHOW_PRODUCT=false
 QUERY=""
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Cisco Product Resolver
 
@@ -22,19 +22,19 @@ Options:
   --catalog PATH           Override catalog.json path
   --help                   Show this help
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --list-products) LIST_PRODUCTS=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
-        --show-product) SHOW_PRODUCT=true; shift ;;
-        --catalog) [[ $# -ge 2 ]] || usage; CATALOG_PATH="$2"; shift 2 ;;
+        --show-product) shift ;;
+        --catalog) [[ $# -ge 2 ]] || usage 1; CATALOG_PATH="$2"; shift 2 ;;
         --help) usage ;;
         --*)
             echo "Unknown option: $1" >&2
-            usage
+            usage 1
             ;;
         *)
             if [[ -n "${QUERY}" ]]; then
@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if ! ${LIST_PRODUCTS} && [[ -z "${QUERY}" ]]; then
-    usage
+    usage 1
 fi
 
 python3 - "${CATALOG_PATH}" "${QUERY}" "$(${JSON_OUTPUT} && echo true || echo false)" "$(${LIST_PRODUCTS} && echo true || echo false)" <<'PY'

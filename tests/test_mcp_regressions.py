@@ -7,12 +7,17 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write_executable
+from tests.regression_helpers import (
+    REPO_ROOT,
+    ShellScriptRegressionBase,
+    write_executable,
+)
 
 
 class MCPRegressionTests(ShellScriptRegressionBase):
-    def test_mcp_loaders_follow_shared_tls_policy(self):
+    def test_mcp_loaders_use_shared_helper(self):
         loader_paths = [
+            "skills/cisco-appdynamics-setup/scripts/load_mcp_tools.sh",
             "skills/cisco-catalyst-ta-setup/scripts/load_mcp_tools.sh",
             "skills/cisco-dc-networking-setup/scripts/load_mcp_tools.sh",
             "skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh",
@@ -24,33 +29,32 @@ class MCPRegressionTests(ShellScriptRegressionBase):
         for rel_path in loader_paths:
             with self.subTest(script=rel_path):
                 script_text = (REPO_ROOT / rel_path).read_text(encoding="utf-8")
-                self.assertIn("splunk_export_python_tls_env", script_text)
-                self.assertNotIn("ssl.CERT_NONE", script_text)
-                self.assertNotIn("check_hostname = False", script_text)
+                self.assertIn("mcp_load_tools", script_text)
+                self.assertNotIn("ssl._create_unverified_context", script_text)
+                self.assertNotIn("PYEOF", script_text)
 
+        helper_text = (REPO_ROOT / "skills/shared/lib/mcp_helpers.sh").read_text(encoding="utf-8")
+        self.assertIn("splunk_export_python_tls_env", helper_text)
+        self.assertNotIn("ssl._create_unverified_context", helper_text)
 
     def test_sanitize_response_reads_bodies_from_stdin_instead_of_process_args(self):
         script_text = (REPO_ROOT / "skills/shared/lib/rest_helpers.sh").read_text(encoding="utf-8")
+        helper_text = (REPO_ROOT / "skills/shared/lib/shell_helpers.py").read_text(encoding="utf-8")
 
         self.assertIn('3<<<"${resp}"', script_text)
-        self.assertIn("os.fdopen(3", script_text)
+        self.assertIn("python3 \"${_SHELL_HELPERS_PY}\" sanitize_response", script_text)
+        self.assertIn("os.fdopen(3", helper_text)
         self.assertNotIn('python3 - "${max_lines}" "${resp}"', script_text)
         self.assertNotIn("text = sys.argv[2]", script_text)
 
-
     def test_splunk_mcp_setup_passes_response_body_directly_to_sanitize_response(self):
-        script_text = (
-            REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/setup.sh"
-        ).read_text(encoding="utf-8")
+        script_text = (REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/setup.sh").read_text(encoding="utf-8")
 
         self.assertIn('sanitize_response "${body}" 10 >&2', script_text)
-        self.assertNotIn('printf \'%s\\n\' "${body}" | sanitize_response 10 >&2', script_text)
-
+        self.assertNotIn("printf '%s\\n' \"${body}\" | sanitize_response 10 >&2", script_text)
 
     def test_splunk_mcp_validate_normalizes_boolean_expectations(self):
-        script_text = (
-            REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/validate.sh"
-        ).read_text(encoding="utf-8")
+        script_text = (REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/validate.sh").read_text(encoding="utf-8")
 
         self.assertIn("normalize_boolean_if_possible()", script_text)
         self.assertIn(
@@ -61,7 +65,6 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             'assert_equal "require_encrypted_token" "${EXPECT_REQUIRE_ENCRYPTED_TOKEN}" "${SERVER_REQUIRE_ENCRYPTED_TOKEN_NORMALIZED}"',
             script_text,
         )
-
 
     def test_splunk_mcp_rendered_client_name_is_json_and_shell_safe(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -131,14 +134,16 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 0,
                 msg=register_result.stdout + register_result.stderr,
             )
-            self.assertFalse(marker_path.exists(), "client-name command substitution should not execute")
+            self.assertFalse(
+                marker_path.exists(),
+                "client-name command substitution should not execute",
+            )
 
             codex_args = json.loads(codex_log.read_text(encoding="utf-8"))
             self.assertEqual(codex_args[:3], ["mcp", "add", client_name])
             self.assertEqual(codex_args[3], "--")
             self.assertTrue(codex_args[4].startswith(str(home_dir / ".codex" / "mcp-bridges")))
             self.assertTrue(codex_args[4].endswith("/run-splunk-mcp.sh"))
-
 
     def test_splunk_mcp_rendered_env_file_is_shell_safe(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -214,15 +219,11 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 ["--header", f"Authorization: Bearer {token_value}"],
             )
 
-
     def test_splunk_mcp_validate_uses_root_protected_resource_endpoint(self):
-        script_text = (
-            REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/validate.sh"
-        ).read_text(encoding="utf-8")
+        script_text = (REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/validate.sh").read_text(encoding="utf-8")
 
-        self.assertIn('/.well-known/oauth-protected-resource', script_text)
-        self.assertNotIn('/services/.well-known/oauth-protected-resource', script_text)
-
+        self.assertIn("/.well-known/oauth-protected-resource", script_text)
+        self.assertNotIn("/services/.well-known/oauth-protected-resource", script_text)
 
     def test_mcp_setup_merges_existing_cursor_workspace_config(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -285,8 +286,9 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["args"], [])
             self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["type"], "stdio")
 
-
-    def test_mcp_setup_uses_workspace_relative_cursor_command_when_bundle_is_inside_workspace(self):
+    def test_mcp_setup_uses_workspace_relative_cursor_command_when_bundle_is_inside_workspace(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             home_dir = tmp_path / "home"
@@ -329,7 +331,6 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(workspace_json["mcpServers"]["splunk-relative"]["args"], [])
             self.assertEqual(workspace_json["mcpServers"]["splunk-relative"]["type"], "stdio")
 
-
     def test_mcp_setup_rejects_invalid_cursor_workspace_config_after_render(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -369,7 +370,6 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             self.assertIn("not valid JSON", result.stdout + result.stderr)
             self.assertTrue((output_dir / "run-splunk-mcp.sh").exists())
             self.assertTrue((output_dir / ".cursor" / "mcp.json").exists())
-
 
     def test_mcp_setup_defaults_cursor_workspace_to_current_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -415,7 +415,6 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 Path(workspace_json["mcpServers"]["splunk-default-workspace"]["command"]).resolve(),
                 (output_dir / "run-splunk-mcp.sh").resolve(),
             )
-
 
     def test_mcp_setup_repeated_runs_update_codex_registration(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -517,7 +516,6 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 encoding="utf-8"
             )
             self.assertIn("https://splunk-two.example.invalid:8089/services/mcp", stable_env)
-
 
     def test_repo_cursor_config_tracks_workspace_relative_rendered_bundle(self):
         config = json.loads((REPO_ROOT / ".cursor" / "mcp.json").read_text(encoding="utf-8"))

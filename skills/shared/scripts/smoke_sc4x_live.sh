@@ -112,8 +112,7 @@ run_remote_root() {
     pass_file="$(hbs_make_sshpass_file)"
     sshpass -f "${pass_file}" ssh \
         -p "${REMOTE_PORT}" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=accept-new \
         "${REMOTE_USER}@${REMOTE_HOST}" \
         "printf '%s\n' '${escaped_pass}' | sudo -S -p '' sh -lc ${remote_payload}"
     rc=$?

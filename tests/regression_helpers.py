@@ -1,20 +1,14 @@
 #!/usr/bin/env python3
 """Regression tests for first-party shell entrypoints."""
 
-import getpass
-import json
 import hashlib
+import json
 import os
-import re
 import stat
 import subprocess
-import tarfile
-import tempfile
 import textwrap
-import time
 import unittest
 from pathlib import Path
-
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -180,8 +174,9 @@ def write_remote_shell_mocks(bin_dir: Path) -> None:
     )
 
 
-
 class ShellScriptRegressionBase(unittest.TestCase):
+    SCRIPT_TIMEOUT = 120
+
     def run_script(
         self,
         script_rel_path: str,
@@ -197,6 +192,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
+            timeout=self.SCRIPT_TIMEOUT,
         )
 
     def run_script_no_env(
@@ -210,6 +206,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
+            timeout=self.SCRIPT_TIMEOUT,
         )
 
     def build_mock_cisco_skill_env(self, tmp_path: Path) -> tuple[dict, Path, Path, Path, Path]:
@@ -1291,4 +1288,3 @@ class ShellScriptRegressionBase(unittest.TestCase):
         env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
         env["STREAM_STATE"] = str(state_file)
         return env
-

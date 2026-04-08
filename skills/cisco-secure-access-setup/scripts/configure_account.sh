@@ -19,6 +19,7 @@ CREATE_INDEX=true
 SK=""
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Cisco Secure Access Account Configuration
 
@@ -54,7 +55,7 @@ Examples:
     --api-key-file /tmp/secure_access_api_key \\
     --api-secret-file /tmp/secure_access_api_secret
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -71,7 +72,7 @@ while [[ $# -gt 0 ]]; do
         --appdiscovery-index) require_arg "$1" $# || exit 1; APPDISCOVERY_INDEX="$2"; shift 2 ;;
         --no-create-index) CREATE_INDEX=false; shift ;;
         --help) usage ;;
-        *) log "Unknown option: $1"; usage ;;
+        *) log "Unknown option: $1"; usage 1 ;;
     esac
 done
 

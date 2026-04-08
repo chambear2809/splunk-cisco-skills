@@ -11,7 +11,6 @@ import re
 import tarfile
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILL_ROOT = REPO_ROOT / "skills/cisco-product-setup"
 CATALOG_PATH = SKILL_ROOT / "catalog.json"
@@ -71,10 +70,7 @@ CATALYST_DEFAULT_INDEX = {
     "cybervision": "cybervision",
 }
 
-GENERATED_BANNER = (
-    "Generated from the packaged SCAN catalog plus "
-    "skills/cisco-product-setup/catalog_overrides.json."
-)
+GENERATED_BANNER = "Generated from the packaged SCAN catalog plus skills/cisco-product-setup/catalog_overrides.json."
 
 
 def parse_args() -> argparse.Namespace:
@@ -256,17 +252,13 @@ def normalize_secret_rules(rules: list[dict] | None) -> list[dict]:
     return normalized
 
 
-def build_security_cloud_product_route(
-    product_key: str, security_products: dict, override: dict
-) -> dict:
+def build_security_cloud_product_route(product_key: str, security_products: dict, override: dict) -> dict:
     meta = security_products[product_key]
     optional_keys = sorted_unique(list(meta.get("defaults", {}).keys()))
     accepted_non_secret = sorted_unique(["name", *meta.get("required_fields", []), *optional_keys])
     accepted_secret = sorted_unique(meta.get("secret_fields", []))
     required_secret = sorted_unique(meta.get("required_secret_fields", []))
-    conditional_required_secret_rules = normalize_secret_rules(
-        meta.get("conditional_required_secret_fields")
-    )
+    conditional_required_secret_rules = normalize_secret_rules(meta.get("conditional_required_secret_fields"))
     return {
         "route_type": "security_cloud_product",
         "primary_skill": "cisco-security-cloud-setup",
@@ -290,9 +282,7 @@ def build_security_cloud_product_route(
     }
 
 
-def build_security_cloud_variant_route(
-    override: dict, security_products: dict
-) -> dict:
+def build_security_cloud_variant_route(override: dict, security_products: dict) -> dict:
     variant_key = override.get("variant_key", "variant")
     variants: dict[str, dict] = {}
     accepted_non_secret = {variant_key}
@@ -309,17 +299,13 @@ def build_security_cloud_variant_route(
             "optional_non_secret_keys": optional_keys,
             "secret_keys": sorted_unique(meta.get("secret_fields", [])),
             "required_secret_keys": sorted_unique(meta.get("required_secret_fields", [])),
-            "conditional_required_secret_rules": normalize_secret_rules(
-                meta.get("conditional_required_secret_fields")
-            ),
+            "conditional_required_secret_rules": normalize_secret_rules(meta.get("conditional_required_secret_fields")),
         }
         accepted_non_secret.update(meta.get("required_fields", []))
         accepted_non_secret.update(optional_keys)
         accepted_non_secret.add("name")
         accepted_secret.update(meta.get("secret_fields", []))
-        template_checks = merge_template_checks(
-            template_checks, security_cloud_template_check(product_key)
-        )
+        template_checks = merge_template_checks(template_checks, security_cloud_template_check(product_key))
 
     return {
         "route_type": "security_cloud_variant",
@@ -330,8 +316,7 @@ def build_security_cloud_variant_route(
         "template_checks": merge_template_checks(template_checks, override.get("template_checks")),
         "required_non_secret_keys": [variant_key],
         "optional_non_secret_keys": sorted_unique(
-            override.get("extra_required_non_secret_keys", [])
-            + override.get("extra_optional_non_secret_keys", [])
+            override.get("extra_required_non_secret_keys", []) + override.get("extra_optional_non_secret_keys", [])
         ),
         "accepted_non_secret_keys": sorted_unique(
             list(accepted_non_secret)
@@ -398,9 +383,7 @@ def build_secure_access_route(override: dict) -> dict:
         "companion_skills": [],
         "install_apps": ["cisco-cloud-security"],
         "template_paths": [TEMPLATE_PATHS["secure_access"]],
-        "template_checks": merge_template_checks(
-            env_var_check(*template_vars), override.get("template_checks")
-        ),
+        "template_checks": merge_template_checks(env_var_check(*template_vars), override.get("template_checks")),
         "required_non_secret_keys": sorted_unique(base_required + extra_required),
         "optional_non_secret_keys": sorted_unique(base_optional + extra_optional),
         "accepted_non_secret_keys": sorted_unique(base_required + base_optional + extra_required + extra_optional),
@@ -415,7 +398,11 @@ def build_secure_access_route(override: dict) -> dict:
 
 def build_dc_networking_route(override: dict) -> dict:
     account_type = override["account_type"]
-    required = ["name", "username", "device_ip" if account_type == "nexus9k" else "hostname"]
+    required = [
+        "name",
+        "username",
+        "device_ip" if account_type == "nexus9k" else "hostname",
+    ]
     optional = ["port", "proxy_enabled", "verify_ssl"]
     if account_type in {"aci", "nd"}:
         optional.extend(["auth_type", "login_domain"])
@@ -478,9 +465,7 @@ def build_meraki_route(override: dict) -> dict:
     return {
         "route_type": "meraki",
         "primary_skill": "cisco-meraki-ta-setup",
-        "companion_skills": ["cisco-enterprise-networking-setup"]
-        if override.get("install_companion_app")
-        else [],
+        "companion_skills": ["cisco-enterprise-networking-setup"] if override.get("install_companion_app") else [],
         "install_apps": ["Splunk_TA_cisco_meraki"]
         + (["cisco-catalyst-app"] if override.get("install_companion_app") else []),
         "template_paths": [TEMPLATE_PATHS["meraki"]],
@@ -490,7 +475,14 @@ def build_meraki_route(override: dict) -> dict:
         ),
         "required_non_secret_keys": ["name", "org_id"],
         "optional_non_secret_keys": ["region", "max_api_rate", "auto_inputs", "index"],
-        "accepted_non_secret_keys": ["auto_inputs", "index", "max_api_rate", "name", "org_id", "region"],
+        "accepted_non_secret_keys": [
+            "auto_inputs",
+            "index",
+            "max_api_rate",
+            "name",
+            "org_id",
+            "region",
+        ],
         "secret_keys": ["api_key"],
         "route": {
             "default_name": "MERAKI_PROD",
@@ -513,7 +505,12 @@ def build_intersight_route(override: dict) -> dict:
         ),
         "required_non_secret_keys": ["name", "client_id"],
         "optional_non_secret_keys": ["hostname", "create_defaults"],
-        "accepted_non_secret_keys": ["client_id", "create_defaults", "hostname", "name"],
+        "accepted_non_secret_keys": [
+            "client_id",
+            "create_defaults",
+            "hostname",
+            "name",
+        ],
         "secret_keys": ["client_secret"],
         "route": {
             "default_name": "INTERSIGHT_PROD",
@@ -579,7 +576,13 @@ def build_appdynamics_route(override: dict) -> dict:
         ),
         "required_non_secret_keys": ["name", "controller_url", "client_name"],
         "optional_non_secret_keys": ["create_inputs", "index"],
-        "accepted_non_secret_keys": ["client_name", "controller_url", "create_inputs", "index", "name"],
+        "accepted_non_secret_keys": [
+            "client_name",
+            "controller_url",
+            "create_inputs",
+            "index",
+            "name",
+        ],
         "secret_keys": ["client_secret"],
         "route": {
             "default_name": "PROD",
@@ -620,10 +623,7 @@ def generic_manual_gap_reason(product: dict) -> str:
         detail.append(f"viz app {product['app_viz']}")
     if detail:
         joined = " and ".join(detail)
-        return (
-            f"No cisco-product-setup route is defined yet for this product's "
-            f"{joined}."
-        )
+        return f"No cisco-product-setup route is defined yet for this product's {joined}."
     return "No local setup route is defined for this product yet."
 
 
@@ -686,25 +686,17 @@ def build_catalog(scan_package: Path) -> dict:
                     "accepted_non_secret_keys": route_meta["accepted_non_secret_keys"],
                     "secret_keys": route_meta["secret_keys"],
                     "required_secret_keys": route_meta.get("required_secret_keys", []),
-                    "conditional_required_secret_rules": route_meta.get(
-                        "conditional_required_secret_rules", []
-                    ),
+                    "conditional_required_secret_rules": route_meta.get("conditional_required_secret_rules", []),
                     "route_type": route_meta["route_type"],
                     "route": route_meta["route"],
                 }
             )
         elif automation_state == "manual_gap":
-            entry["manual_gap_reason"] = override.get(
-                "manual_gap_reason", generic_manual_gap_reason(product)
-            )
+            entry["manual_gap_reason"] = override.get("manual_gap_reason", generic_manual_gap_reason(product))
         elif automation_state == "unsupported_legacy":
-            entry["manual_gap_reason"] = (
-                "This product is retired or deprecated in the SCAN catalog."
-            )
+            entry["manual_gap_reason"] = "This product is retired or deprecated in the SCAN catalog."
         elif automation_state == "unsupported_roadmap":
-            entry["manual_gap_reason"] = (
-                "This product is a roadmap / coverage-gap item in the SCAN catalog."
-            )
+            entry["manual_gap_reason"] = "This product is a roadmap / coverage-gap item in the SCAN catalog."
 
         for skill_name in [entry["primary_skill"], *entry["companion_skills"]]:
             if skill_name and skill_name not in known_skills:
@@ -748,9 +740,7 @@ def validate_contains(path: Path, snippets: list[str]) -> None:
     text = path.read_text(encoding="utf-8")
     for snippet in snippets:
         if snippet not in text:
-            raise ValueError(
-                f"Template {path.relative_to(REPO_ROOT)} missing marker {snippet!r}"
-            )
+            raise ValueError(f"Template {path.relative_to(REPO_ROOT)} missing marker {snippet!r}")
 
 
 def validate_catalog(catalog: dict) -> None:

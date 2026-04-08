@@ -15,6 +15,7 @@ PARAM_KEYS=()
 PARAM_VALUES=()
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Cisco Security Cloud Input Configuration
 
@@ -43,7 +44,7 @@ Example:
     --set index cisco_xdr \\
     --secret-file refresh_token /tmp/xdr_refresh_token
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 append_param() {
@@ -170,7 +171,7 @@ while [[ $# -gt 0 ]]; do
         --disable) DISABLED_FLAG="1"; shift ;;
         --no-create-index) CREATE_INDEX=false; shift ;;
         --help) usage ;;
-        *) log "Unknown option: $1"; usage ;;
+        *) log "Unknown option: $1"; usage 1 ;;
     esac
 done
 

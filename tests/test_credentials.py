@@ -4,12 +4,12 @@
 Run with: python3 -m unittest tests.test_credentials -v
     or:   python3 -m pytest tests/test_credentials.py -v  (if pytest is installed)
 """
+
 import ast
 import os
 import re
 import textwrap
 import unittest
-
 
 ALLOWED_KEYS = [
     "SPLUNK_PROFILE",
@@ -60,9 +60,7 @@ def parse_credential_file(text: str, selected_profile: str = "") -> dict:
     allowed = set(ALLOWED_KEYS)
     raw_values = {}
     profile_values = {}
-    profile_pattern = re.compile(
-        r"PROFILE_([A-Za-z0-9][A-Za-z0-9_-]*)__([A-Za-z_][A-Za-z0-9_]*)$"
-    )
+    profile_pattern = re.compile(r"PROFILE_([A-Za-z0-9][A-Za-z0-9_-]*)__([A-Za-z_][A-Za-z0-9_]*)$")
 
     for raw_line in text.splitlines():
         stripped = raw_line.strip()
@@ -77,7 +75,7 @@ def parse_credential_file(text: str, selected_profile: str = "") -> dict:
         if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
             try:
                 value = ast.literal_eval(value)
-            except Exception:
+            except (ValueError, SyntaxError):
                 value = value[1:-1]
 
         profile_match = profile_pattern.fullmatch(key)
@@ -100,12 +98,11 @@ def parse_credential_file(text: str, selected_profile: str = "") -> dict:
             if name in stack:
                 return match.group(0)
             if prof and name in profile_values.get(prof, {}):
-                return resolve_value(
-                    profile_values[prof][name], prof, stack | {name}
-                )
+                return resolve_value(profile_values[prof][name], prof, stack | {name})
             if name in raw_values:
                 return resolve_value(raw_values[name], prof, stack | {name})
             return os.environ.get(name, match.group(0))
+
         return ref_pattern.sub(repl, val)
 
     result = {}
@@ -115,9 +112,7 @@ def parse_credential_file(text: str, selected_profile: str = "") -> dict:
         for k in ALLOWED_KEYS:
             if k not in profile_values[selected_profile]:
                 continue
-            result[k] = resolve_value(
-                profile_values[selected_profile][k], selected_profile, {k}
-            )
+            result[k] = resolve_value(profile_values[selected_profile][k], selected_profile, {k})
             emitted.add(k)
 
     for k in ALLOWED_KEYS:
@@ -278,12 +273,10 @@ class TestCredentialFileRoundtrip(unittest.TestCase):
     """Test that the example credentials file parses without errors."""
 
     def test_example_file_parses(self):
-        example_path = os.path.join(
-            os.path.dirname(__file__), "..", "credentials.example"
-        )
+        example_path = os.path.join(os.path.dirname(__file__), "..", "credentials.example")
         if not os.path.exists(example_path):
             self.skipTest("credentials.example not found")
-        with open(example_path) as f:
+        with open(example_path, encoding="utf-8") as f:
             text = f.read()
         result = parse_credential_file(text)
         self.assertIn("SPLUNK_HOST", result)
@@ -309,32 +302,23 @@ class TestCredentialParserParity(unittest.TestCase):
         with open(cls.CREDENTIALS_SH, encoding="utf-8") as f:
             content = f.read()
 
-        start = content.index("python3 - \"$file_path\" \"$selected_profile\" <<'PY'\n")
+        start = content.index('python3 - "$file_path" "$selected_profile" <<\'PY\'\n')
         start = content.index("\n", start) + 1
         end = content.index("\nPY\n", start)
         return content[start:end]
 
-    def _run_embedded_parser(
-        self, cred_text: str, profile: str = ""
-    ) -> dict[str, str]:
+    def _run_embedded_parser(self, cred_text: str, profile: str = "") -> dict[str, str]:
         import subprocess
         import tempfile
 
         embedded_py = self._extract_embedded_python()
         wrapper = (
-            "import ast\n"
-            "import os\n"
-            "import re\n"
-            "import sys\n"
-            "path = sys.argv[1]\n"
-            "selected_profile = sys.argv[2].strip()\n"
+            "import ast\nimport os\nimport re\nimport sys\npath = sys.argv[1]\nselected_profile = sys.argv[2].strip()\n"
         )
         body = embedded_py.split("selected_profile = sys.argv[2].strip()\n", 1)[-1]
         script = wrapper + body
 
-        with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".credentials", delete=False, encoding="utf-8"
-        ) as cred_f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".credentials", delete=False, encoding="utf-8") as cred_f:
             cred_f.write(cred_text)
             cred_path = cred_f.name
 
@@ -438,9 +422,7 @@ class TestCredentialParserParity(unittest.TestCase):
                 )
 
     def test_example_file_parity(self):
-        example_path = os.path.join(
-            os.path.dirname(__file__), "..", "credentials.example"
-        )
+        example_path = os.path.join(os.path.dirname(__file__), "..", "credentials.example")
         if not os.path.exists(example_path):
             self.skipTest("credentials.example not found")
         if not os.path.exists(self.CREDENTIALS_SH):

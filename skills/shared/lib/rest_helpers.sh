@@ -7,6 +7,8 @@
 [[ -n "${_REST_HELPERS_LOADED:-}" ]] && return 0
 _REST_HELPERS_LOADED=true
 
+_SHELL_HELPERS_PY="${_SHELL_HELPERS_PY:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/shell_helpers.py}"
+
 # Shared Python helper for normalizing the Splunk 'disabled' field.
 # Safe for interpolation inside double-quoted python3 -c strings.
 _PY_NORMALIZE_DISABLED="
@@ -21,11 +23,14 @@ def _normalize_disabled(value):
     return text
 "
 
-_curl_ssl_flags() {
-    if [[ -n "${SPLUNK_CA_CERT:-}" || "${SPLUNK_VERIFY_SSL:-false}" == "true" ]]; then
-        printf '%s' "-s"
+_extract_http_code() {
+    local resp="$1"
+    local last_line
+    last_line="${resp##*$'\n'}"
+    if [[ "${last_line}" =~ ^[0-9]{3}$ ]]; then
+        printf '%s' "${last_line}"
     else
-        printf '%s' "-sk"
+        printf '%s' "000"
     fi
 }
 
@@ -88,7 +93,7 @@ _set_splunk_curl_tls_args() {
         "false" \
         "${SPLUNK_CA_CERT:-}" \
         "_WARNED_SPLUNK_INSECURE_TLS" \
-        "WARNING: TLS verification is disabled for Splunk REST connections. Set SPLUNK_VERIFY_SSL=true or SPLUNK_CA_CERT=/path/to/ca.pem to enable verification."
+        "WARNING: TLS verification is disabled for Splunk REST connections (curl -k). For self-signed labs, export your CA and add SPLUNK_CA_CERT=/path/to/ca.pem to your credentials file. To trust the system store, set SPLUNK_VERIFY_SSL=true."
 }
 
 _set_splunkbase_curl_tls_args() {
@@ -109,7 +114,7 @@ _set_app_download_curl_tls_args() {
         "false" \
         "${ca_cert}" \
         "_WARNED_APP_DOWNLOAD_INSECURE_TLS" \
-        "WARNING: TLS verification is disabled for remote app downloads. Set APP_DOWNLOAD_VERIFY_SSL=true or APP_DOWNLOAD_CA_CERT=/path/to/ca.pem to enable verification."
+        "WARNING: TLS verification is disabled for remote app downloads (curl -k). Set APP_DOWNLOAD_VERIFY_SSL=true or APP_DOWNLOAD_CA_CERT=/path/to/ca.pem in your credentials file to enable verification."
 }
 
 splunk_tls_mode() {
@@ -134,7 +139,7 @@ splunk_export_python_tls_env() {
     if [[ "${tls_mode}" == "insecure" ]]; then
         _warn_once \
             "_WARNED_SPLUNK_INSECURE_TLS" \
-            "WARNING: TLS verification is disabled for Splunk REST connections. Set SPLUNK_VERIFY_SSL=true or SPLUNK_CA_CERT=/path/to/ca.pem to enable verification."
+            "WARNING: TLS verification is disabled for Splunk REST connections (curl -k). For self-signed labs, export your CA and add SPLUNK_CA_CERT=/path/to/ca.pem to your credentials file. To trust the system store, set SPLUNK_VERIFY_SSL=true."
     fi
 
     export __SPLUNK_TLS_MODE="${tls_mode}"
@@ -157,8 +162,8 @@ verify_search_api_connectivity() {
     local uri="${1:-${SPLUNK_URI:-https://localhost:8089}}"
     local host port http_code
 
-    host="$(python3 -c "from urllib.parse import urlparse; p=urlparse('${uri}'); print(p.hostname or '')" 2>/dev/null || true)"
-    port="$(python3 -c "from urllib.parse import urlparse; p=urlparse('${uri}'); print(p.port or 8089)" 2>/dev/null || echo 8089)"
+    host="$(__PARSE_URI="${uri}" python3 -c "import os; from urllib.parse import urlparse; p=urlparse(os.environ['__PARSE_URI']); print(p.hostname or '')" 2>/dev/null || true)"
+    port="$(__PARSE_URI="${uri}" python3 -c "import os; from urllib.parse import urlparse; p=urlparse(os.environ['__PARSE_URI']); print(p.port or 8089)" 2>/dev/null || echo 8089)"
 
     if command -v nc >/dev/null 2>&1; then
         local nc_timeout_flag="-G 5"  # macOS
@@ -246,106 +251,21 @@ read_secret_file() {
 }
 
 _curl_config_escape() {
-    python3 - "$1" <<'PY'
-import sys
-print(sys.argv[1].replace('\\', '\\\\').replace('"', '\\"'))
-PY
+    python3 "${_SHELL_HELPERS_PY}" curl_config_escape "$1"
 }
 
 _is_splunk_package() {
-    python3 - "$1" <<'PY'
-import sys
-import tarfile
-
-sys.exit(0 if tarfile.is_tarfile(sys.argv[1]) else 1)
-PY
+    python3 "${_SHELL_HELPERS_PY}" is_splunk_package "$1"
 }
 
 sanitize_response() {
     local resp="$1"
     local max_lines="${2:-20}"
-    python3 - "${max_lines}" 3<<<"${resp}" <<'PY'
-import json
-import os
-import re
-import sys
-
-max_lines = int(sys.argv[1])
-with os.fdopen(3, encoding="utf-8", errors="replace") as handle:
-    text = handle.read()
-
-def is_sensitive_key(key):
-    normalized = re.sub(r"[^a-z0-9]+", "", str(key).lower())
-    return any(token in normalized for token in (
-        "password",
-        "secret",
-        "token",
-        "apikey",
-        "clientsecret",
-        "sessionkey",
-        "certificate",
-        "privatekey",
-        "jsontext",
-        "accesssecret",
-        "externalid",
-        "passphrase",
-    ))
-
-def redact_json(value):
-    if isinstance(value, dict):
-        return {
-            key: ("REDACTED" if is_sensitive_key(key) else redact_json(item))
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [redact_json(item) for item in value]
-    return value
-
-def redact_text(raw):
-    key_pattern = r"[A-Za-z0-9_.-]*?(?:password|secret|token|api[_-]?key|client[_-]?secret|sessionkey|certificate|private[_-]?key|json[_-]?text|access[_-]?secret|external[_-]?id|passphrase)[A-Za-z0-9_.-]*"
-
-    def replace_equals(match):
-        return f"{match.group(1)}{match.group(2)}REDACTED"
-
-    def replace_colon(match):
-        value = match.group(3)
-        if value.startswith('"') and value.endswith('"'):
-            replacement = '"REDACTED"'
-        elif value.startswith("'") and value.endswith("'"):
-            replacement = "'REDACTED'"
-        else:
-            replacement = "REDACTED"
-        return f"{match.group(1)}{match.group(2)}{replacement}"
-
-    raw = re.sub(
-        rf"(?i)\b({key_pattern})\b(\s*=\s*)([^&\s]+)",
-        replace_equals,
-        raw,
-    )
-    raw = re.sub(
-        rf"""(?ix)
-        (["']?\b{key_pattern}\b["']?)
-        (\s*:\s*)
-        ("[^"]*"|'[^']*'|[^,\}}\]\s]+)
-        """,
-        replace_colon,
-        raw,
-    )
-    return raw
-
-try:
-    sanitized = json.dumps(redact_json(json.loads(text)))
-except Exception:
-    sanitized = redact_text(text)
-
-lines = sanitized.splitlines() or [sanitized]
-for line in lines[:max_lines]:
-    print(line)
-PY
+    python3 "${_SHELL_HELPERS_PY}" sanitize_response "${max_lines}" 3<<<"${resp}"
 }
 
 _urlencode() {
-    python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$1"
+    python3 "${_SHELL_HELPERS_PY}" urlencode "$1"
 }
 
 form_urlencode_pairs() {
@@ -353,20 +273,7 @@ form_urlencode_pairs() {
         echo "ERROR: form_urlencode_pairs requires key/value pairs." >&2
         return 1
     fi
-
-    python3 - "$@" <<'PY'
-import sys
-from urllib.parse import quote_plus
-
-args = sys.argv[1:]
-parts = []
-for i in range(0, len(args), 2):
-    key = args[i]
-    value = args[i + 1]
-    parts.append(f"{quote_plus(key)}={quote_plus(value)}")
-
-print("&".join(parts), end="")
-PY
+    python3 "${_SHELL_HELPERS_PY}" form_urlencode_pairs "$@"
 }
 
 rest_check_app() {
@@ -427,7 +334,7 @@ rest_enable_saved_search() {
     resp=$(splunk_curl_post "${sk}" "" \
         "${uri}/servicesNS/nobody/${app}/saved/searches/${encoded_name}/enable" \
         -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     case "${http_code}" in
         200|201|409) return 0 ;;
         *) echo "ERROR: Enable saved search '${search_name}' failed (HTTP ${http_code})" >&2; return 1 ;;
@@ -482,7 +389,7 @@ rest_create_index() {
     resp=$(splunk_curl_post "${sk}" \
         "${body}" \
         "${uri}/services/data/indexes" -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     case "${http_code}" in
         201|200) return 0 ;;
         409) return 0 ;;
@@ -504,7 +411,7 @@ rest_set_conf() {
     resp=$(splunk_curl_post "${sk}" "${body}" \
         "${uri}/servicesNS/nobody/${app}/configs/conf-${conf}/${encoded_stanza}" \
         -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     [[ "${http_code}" == "200" ]] && return 0
     create_body=$(form_urlencode_pairs name "${stanza}") || return 1
     if [[ -n "${body}" ]]; then
@@ -513,7 +420,7 @@ rest_set_conf() {
     resp=$(splunk_curl_post "${sk}" "${create_body}" \
         "${uri}/servicesNS/nobody/${app}/configs/conf-${conf}" \
         -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     case "${http_code}" in
         201|200|409) return 0 ;;
         *) echo "ERROR: Set conf-${conf}/${stanza} failed (HTTP ${http_code})" >&2; return 1 ;;
@@ -724,13 +631,13 @@ rest_apply_input_enable_state() {
         0|false|False)
             resp=$(splunk_curl_post "${sk}" "" \
                 "${endpoint}/${encoded_name}/enable" -w '\n%{http_code}' 2>/dev/null)
-            http_code=$(echo "${resp}" | tail -1)
+            http_code=$(_extract_http_code "${resp}")
             [[ "${http_code}" == "200" ]] || { echo "ERROR: Enable ${input_type}://${input_name} failed (HTTP ${http_code})" >&2; return 1; }
             ;;
         1|true|True)
             resp=$(splunk_curl_post "${sk}" "" \
                 "${endpoint}/${encoded_name}/disable" -w '\n%{http_code}' 2>/dev/null)
-            http_code=$(echo "${resp}" | tail -1)
+            http_code=$(_extract_http_code "${resp}")
             [[ "${http_code}" == "200" ]] || { echo "ERROR: Disable ${input_type}://${input_name} failed (HTTP ${http_code})" >&2; return 1; }
             ;;
         *)
@@ -760,7 +667,7 @@ rest_create_input() {
         if [[ -n "${body_without_disabled}" ]]; then
             resp=$(splunk_curl_post "${sk}" "${body_without_disabled}" \
                 "${endpoint}/${encoded_name}" -w '\n%{http_code}' 2>/dev/null)
-            http_code=$(echo "${resp}" | tail -1)
+            http_code=$(_extract_http_code "${resp}")
             case "${http_code}" in
                 200) ;;
                 *)
@@ -782,7 +689,7 @@ rest_create_input() {
     fi
     resp=$(splunk_curl_post "${sk}" "${create_body}" \
         "${endpoint}" -w '\n%{http_code}' 2>/dev/null)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     case "${http_code}" in
         201|200|409)
             rest_apply_input_enable_state "${sk}" "${uri}" "${app}" "${input_type}" "${input_name}" "${enable_state}"

@@ -178,7 +178,7 @@ RATE_CIRCUIT_BREAKER_FAILURE_THRESHOLD="$(rest_get_conf_value "${SK}" "${SPLUNK_
 RATE_CIRCUIT_BREAKER_COOLDOWN_SECONDS="$(rest_get_conf_value "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "mcp" "rate_limits" "circuit_breaker_cooldown_seconds")"
 
 MCP_PING_RESP="$(post_json_with_code "${MCP_URL}" '{"jsonrpc":"2.0","id":"validate-ping","method":"ping"}')"
-MCP_PING_CODE="$(printf '%s\n' "${MCP_PING_RESP}" | tail -1)"
+MCP_PING_CODE="$(_extract_http_code "${MCP_PING_RESP}")"
 MCP_PING_BODY="$(printf '%s\n' "${MCP_PING_RESP}" | sed '$d')"
 MCP_PING_RESULT="$(
     printf '%s' "${MCP_PING_BODY}" | python3 -c '

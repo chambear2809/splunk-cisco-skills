@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../lib/credential_helpers.sh"
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Batch-uninstall apps from Splunk Cloud.
 
@@ -21,7 +22,7 @@ Options:
 Example:
   $(basename "$0") Splunk_TA_Cisco_Intersight cisco_dc_networking_app_for_splunk Splunk_TA_cisco_meraki
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 APP_NAMES=()
@@ -31,14 +32,14 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --no-restart) RESTART=false; shift ;;
         --help) usage ;;
-        --*) log "Unknown option: $1"; usage ;;
+        --*) log "Unknown option: $1"; usage 1 ;;
         *) APP_NAMES+=("$1"); shift ;;
     esac
 done
 
 if (( ${#APP_NAMES[@]} == 0 )); then
     log "ERROR: At least one app name is required."
-    usage
+    usage 1
 fi
 
 if ! is_splunk_cloud; then

@@ -31,11 +31,17 @@ compatibility shim over the focused shared modules:
 |--------|----------------|
 | `credential_helpers.sh` | Sources the shared modules and locates the active credentials file |
 | `credentials.sh` | Loads credential files, resolves profiles, and detects Cloud vs Enterprise vs hybrid targets |
-| `acs_helpers.sh` | ACS login/context, current search-head resolution, `search-api` allowlisting, and Cloud index/restart helpers |
+| `credential_platform_helpers.sh` | URI/host parsing, Splunk Cloud vs Enterprise detection, staging helpers |
+| `credential_role_helpers.sh` | Deployment role normalization and resolution for primary/search/ingest profiles |
 | `rest_helpers.sh` | Search-tier REST wrappers for apps, configs, inputs, saved searches, HEC, and validation |
+| `acs_helpers.sh` | ACS login/context, current search-head resolution, `search-api` allowlisting, and Cloud index/restart helpers |
 | `splunkbase_helpers.sh` | Splunkbase authentication and package download helpers |
 | `configure_account_helpers.sh` | Shared create-or-update flow for TA account endpoints |
 | `host_bootstrap_helpers.sh` | Shared SSH, package staging, checksum, and remote file helpers for first-install host automation |
+| `deployment_helpers.sh` | Deployment plane selection (REST vs bundle), SHC/IDXC paths, conf merge, and HEC token helpers |
+| `registry_helpers.sh` | App registry lookups for role support, capabilities, pairing, and deployment metadata |
+| `mcp_helpers.sh` | MCP KV store tool upload for Splunk MCP Server integration |
+| `shell_helpers.py` | Python helpers for URL encoding, response sanitization, and package validation |
 
 ### Skill Composition Pattern
 
@@ -106,14 +112,15 @@ The current skills fall into four architectural roles:
 - **Platform/package skills** — manage generic app delivery or multi-component
   app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`,
   `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup`,
-  `splunk-enterprise-host-setup`, `splunk-itsi-setup`, and
-  `splunk-mcp-server-setup`.
+  `splunk-enterprise-host-setup`, `splunk-itsi-setup`,
+  `splunk-ai-assistant-setup`, and `splunk-mcp-server-setup`.
 
 ### CI And Validation
 
 The repo treats the shared shell libraries as first-party code with regression
 coverage. `.github/workflows/ci.yml` runs:
 
+- `ruff` for Python linting and format checks
 - `pytest` for Python tests
 - `bats` for shell behavior tests
 - `bash -n` for shell syntax checks

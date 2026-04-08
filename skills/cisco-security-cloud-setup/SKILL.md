@@ -39,7 +39,7 @@ bash skills/shared/scripts/setup_credentials.sh
 For product secrets, instruct the user to write them to temporary files:
 
 ```bash
-echo "the_secret_value" > /tmp/secret.txt && chmod 600 /tmp/secret.txt
+printf '%s' "the_secret_value" > /tmp/secret.txt && chmod 600 /tmp/secret.txt
 ```
 
 Then pass those files with `--secret-file FIELD /tmp/secret.txt` to the

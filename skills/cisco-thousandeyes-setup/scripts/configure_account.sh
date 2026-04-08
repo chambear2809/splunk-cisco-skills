@@ -19,6 +19,7 @@ THOUSANDEYES_DEVICE_GRANT_TYPE="urn:ietf:params:oauth:grant-type:device_code"
 PARSE_FIELD_SEP=$'\x1f'
 
 usage() {
+    local exit_code="${1:-0}"
     cat <<EOF
 Authenticate a ThousandEyes account via OAuth 2.0 Device Code Flow.
 
@@ -40,7 +41,7 @@ No password or API key files are needed — the OAuth flow handles authenticatio
 Splunk credentials are read from the project-root credentials file (falls back
 to ~/.splunk/credentials) automatically.
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -49,7 +50,7 @@ while [[ $# -gt 0 ]]; do
         --poll-timeout) require_arg "$1" $# || exit 1; POLL_TIMEOUT="$2"; shift 2 ;;
         --account-output-file) require_arg "$1" $# || exit 1; ACCOUNT_OUTPUT_FILE="$2"; shift 2 ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "Unknown option: $1"; usage 1 ;;
     esac
 done
 
@@ -139,7 +140,7 @@ request_device_authorization_via_app() {
     resp=$(splunk_curl "${SK}" \
         "${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/authorize" \
         -w '\n%{http_code}' 2>/dev/null || true)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     resp_body=$(printf '%s\n' "${resp}" | sed '$d')
 
     case "${http_code}" in
@@ -154,7 +155,7 @@ request_device_authorization_direct() {
         client_id "${THOUSANDEYES_CLIENT_ID}" \
         scope "${THOUSANDEYES_AUTH_SCOPE}") || return 1
     resp=$(post_external_form "${THOUSANDEYES_DEVICE_AUTH_URL}" "${auth_body}" 2>/dev/null || true)
-    http_code=$(echo "${resp}" | tail -1)
+    http_code=$(_extract_http_code "${resp}")
     resp_body=$(printf '%s\n' "${resp}" | sed '$d')
 
     case "${http_code}" in
@@ -179,7 +180,7 @@ poll_for_oauth_tokens() {
             device_code "${device_code}" \
             grant_type "${THOUSANDEYES_DEVICE_GRANT_TYPE}") || continue
         token_response=$(post_external_form "${THOUSANDEYES_TOKEN_URL}" "${token_body}" 2>/dev/null || true)
-        token_http_code=$(echo "${token_response}" | tail -1)
+        token_http_code=$(_extract_http_code "${token_response}")
         token_resp_body=$(printf '%s\n' "${token_response}" | sed '$d')
 
         case "${token_http_code}" in
@@ -228,7 +229,7 @@ poll_for_oauth_tokens() {
 fetch_current_user_email() {
     local user_response user_http_code user_resp_body
     user_response=$(get_external_json "${THOUSANDEYES_CURRENT_USER_URL}" "${access_token}" 2>/dev/null || true)
-    user_http_code=$(echo "${user_response}" | tail -1)
+    user_http_code=$(_extract_http_code "${user_response}")
     user_resp_body=$(printf '%s\n' "${user_response}" | sed '$d')
 
     case "${user_http_code}" in

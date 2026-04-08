@@ -392,7 +392,7 @@ rotate_keys() {
 
     url="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_token?action=rotate&key_size=${ROTATE_KEY_SIZE}&output_mode=json"
     resp="$(splunk_curl "${SK}" -X POST "${url}" -w '\n%{http_code}' 2>/dev/null || true)"
-    http_code="$(printf '%s\n' "${resp}" | tail -1)"
+    http_code="$(_extract_http_code "${resp}")"
     body="$(printf '%s\n' "${resp}" | sed '$d')"
 
     if [[ "${http_code}" != "200" ]]; then
@@ -432,7 +432,7 @@ mint_token_to_file() {
     fi
 
     resp="$(splunk_curl "${SK}" "${url}" -w '\n%{http_code}' 2>/dev/null || true)"
-    http_code="$(printf '%s\n' "${resp}" | tail -1)"
+    http_code="$(_extract_http_code "${resp}")"
     body="$(printf '%s\n' "${resp}" | sed '$d')"
 
     if [[ "${http_code}" != "200" ]]; then
