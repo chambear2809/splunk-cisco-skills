@@ -52,6 +52,8 @@ For Cloud-specific install and API behavior, see
 | `splunk-ai-assistant-setup` | Required | None | None | None | None | None | Search-tier AI assistant app with cloud-backed inference, app UI settings, and KV Store-backed local chat state. |
 | `splunk-mcp-server-setup` | Required | None | None | None | None | None | Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays. |
 | `splunk-stream-setup` | Required | Supported | Required | Supported | None | HF or UF | Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects. |
+| `cisco-spaces-setup` | Supported | None | Supported | None | None | None | Cisco Spaces firehose collector app with UCC REST handlers for stream configuration and activation token encryption. |
+| `cisco-scan-setup` | Required | None | None | None | None | None | Search-head-only catalog and management app. No data ingestion — provides product catalog UI, ecosystem intelligence, and Splunkbase analytics. |
 
 ## App And Package Placement
 
@@ -73,6 +75,8 @@ For Cloud-specific install and API behavior, see
 | `SA-ITOA` | `splunk-itsi-setup` | Required | None | None | None | None |
 | `Splunk_AI_Assistant_Cloud` | `splunk-ai-assistant-setup` | Required | None | None | None | None |
 | `Splunk_MCP_Server` | `splunk-mcp-server-setup` | Required | None | None | None | None |
+| `ta_cisco_spaces` | `cisco-spaces-setup` | Supported | None | Supported | None | None |
+| `splunk-cisco-app-navigator` | `cisco-scan-setup` | Required | None | None | None | None |
 
 ## Notes On Split Deployments
 

@@ -180,6 +180,22 @@
         "cloud_install_path": "Not a Splunk Cloud install path; bootstraps customer-managed Enterprise hosts only",
         "cloud_config_path": "Local or SSH-driven Linux host bootstrap for search-tier, indexer, and heavy-forwarder roles",
         "notes": "Enterprise runtime bootstrap workflow for standalone or single-site clustered hosts."
+      },
+      {
+        "kind": "app",
+        "app_name": "ta_cisco_spaces",
+        "label": "`cisco-spaces-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "REST via UCC custom stream/input handlers",
+        "notes": "Cisco EULA license-ack required. Firehose streaming input for Cisco Spaces indoor location analytics."
+      },
+      {
+        "kind": "app",
+        "app_name": "splunk-cisco-app-navigator",
+        "label": "`cisco-scan-setup`",
+        "cloud_install_path": "ACS private app upload (no Splunkbase listing)",
+        "cloud_config_path": "No post-install REST config needed; catalog sync runs via scheduled search",
+        "notes": "No Splunkbase listing. Install from local package or private app upload. Product catalog and ecosystem intelligence app for the Cisco-Splunk portfolio."
       }
     ]
   },
@@ -421,6 +437,30 @@
         "universal-forwarder"
       ],
       "notes": "Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects."
+    },
+    {
+      "skill": "cisco-spaces-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Cisco Spaces firehose collector app with UCC REST handlers for stream configuration and activation token encryption."
+    },
+    {
+      "skill": "cisco-scan-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-head-only catalog and management app. No data ingestion — provides product catalog UI, ecosystem intelligence, and Splunkbase analytics."
     }
   ],
   "apps": [
@@ -788,6 +828,52 @@
         "needs_custom_rest": true,
         "needs_search_time_objects": false,
         "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "cisco-spaces-setup",
+      "app_name": "ta_cisco_spaces",
+      "splunkbase_id": "8485",
+      "label": "Cisco Spaces Add-on for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": ["spaces-add-on-for-splunk_*"],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "cisco-scan-setup",
+      "app_name": "splunk-cisco-app-navigator",
+      "splunkbase_id": "",
+      "label": "Splunk Cisco App Navigator",
+      "license_ack_url": "",
+      "package_patterns": ["splunk-cisco-app-navigator-*"],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
