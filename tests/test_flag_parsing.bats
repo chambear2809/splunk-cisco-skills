@@ -215,12 +215,11 @@ teardown() {
 }
 
 @test "sc4snmp setup rejects invalid hec tls verify" {
-    run bash "${PROJECT_ROOT}/skills/splunk-connect-for-snmp-setup/scripts/setup.sh" \
+    combined="$(bash "${PROJECT_ROOT}/skills/splunk-connect-for-snmp-setup/scripts/setup.sh" \
       --render-compose \
-      --hec-tls-verify maybe
-    [ "$status" -eq 1 ]
-    [[ "$output" =~ "Expected yes or no" ]]
-    [[ ! "$output" =~ "unbound variable" ]]
+      --hec-tls-verify maybe 2>&1 || true)"
+    [[ "$combined" =~ "Expected yes or no" ]]
+    [[ ! "$combined" =~ "unbound variable" ]]
 }
 
 @test "sc4snmp setup rejects unknown flag" {

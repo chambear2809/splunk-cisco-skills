@@ -163,10 +163,11 @@ def write_remote_shell_mocks(bin_dir: Path) -> None:
             )
             return pattern.sub(lambda match: match.group("prefix") + target_path, text)
 
+        raw_cmd = raw_cmd.replace(remote_root, "\\x00REMOTE\\x00")
         raw_cmd = remap_paths(raw_cmd, "/opt/splunk", f"{remote_root}/opt/splunk")
         raw_cmd = remap_paths(raw_cmd, "/var/tmp", f"{remote_root}/var/tmp")
-        if not remote_root.startswith("/tmp"):
-            raw_cmd = remap_paths(raw_cmd, "/tmp", f"{remote_root}/tmp")
+        raw_cmd = remap_paths(raw_cmd, "/tmp", f"{remote_root}/tmp")
+        raw_cmd = raw_cmd.replace("\\x00REMOTE\\x00", remote_root)
 
         env = os.environ.copy()
         env["PATH"] = f"{Path(sys.argv[0]).resolve().parent}:{env.get('PATH', '')}"

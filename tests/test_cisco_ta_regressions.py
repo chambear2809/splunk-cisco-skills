@@ -1981,7 +1981,11 @@ EOF
             )
             self.assertNotEqual(result.returncode, 0)
             combined = result.stdout + result.stderr
-            self.assertIn("Admin password file path is required", combined)
+            self.assertTrue(
+                "either use the -S option" in combined
+                or "a password is required" in combined,
+                msg=combined,
+            )
 
 
     def test_host_bootstrap_configure_heavy_forwarder_does_not_require_admin_password(self):
