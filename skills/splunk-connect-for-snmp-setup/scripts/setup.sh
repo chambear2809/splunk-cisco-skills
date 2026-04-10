@@ -144,8 +144,8 @@ normalize_yes_no() {
         yes|YES|true|TRUE|True|1|on|ON) printf '%s' "yes" ;;
         no|NO|false|FALSE|False|0|off|OFF) printf '%s' "no" ;;
         *)
-            log "ERROR: Expected yes or no, got '${1:-}'."
-            exit 1
+            log "ERROR: Expected yes or no, got '${1:-}'." >&2
+            return 1
             ;;
     esac
 }
@@ -220,7 +220,6 @@ make_executable() {
 validate_args() {
     local has_mode=false
 
-    normalize_yes_no "${HEC_TLS_VERIFY}" >/dev/null
     HEC_TLS_VERIFY="$(normalize_yes_no "${HEC_TLS_VERIFY}")"
 
     if $DO_SPLUNK_PREP || $RENDER_COMPOSE || $RENDER_K8S; then
