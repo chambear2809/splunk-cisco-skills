@@ -445,6 +445,7 @@ _profile_value_or_current() {
     printf '%s' "${!target_key-}"
 }
 
+# shellcheck disable=SC2034
 load_ingest_connection_settings() {
     local ingest_profile=""
 

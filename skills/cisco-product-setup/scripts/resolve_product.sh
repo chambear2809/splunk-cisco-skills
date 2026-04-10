@@ -25,6 +25,7 @@ EOF
     exit 0
 }
 
+# shellcheck disable=SC2034
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --list-products) LIST_PRODUCTS=true; shift ;;

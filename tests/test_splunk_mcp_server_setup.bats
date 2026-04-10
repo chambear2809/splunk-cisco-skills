@@ -34,6 +34,13 @@ else:
     sys.exit(1)
 PYEOF
     chmod +x "${MOCK_BIN}/codex"
+
+    cat > "${MOCK_BIN}/mcp-remote" <<'SHEOF'
+#!/usr/bin/env bash
+exec "$@"
+SHEOF
+    chmod +x "${MOCK_BIN}/mcp-remote"
+
     export PATH="${MOCK_BIN}:${PATH}"
 }
 

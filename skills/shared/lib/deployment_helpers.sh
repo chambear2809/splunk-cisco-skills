@@ -178,6 +178,7 @@ deployment_prepare_rest_context() {
     SPLUNK_PASS="${saved_pass}"
 
     [[ -n "${DEPLOYMENT_REST_SK}" ]] || return 1
+    # shellcheck disable=SC2034
     DEPLOYMENT_REST_URI="${target_uri}"
 }
 

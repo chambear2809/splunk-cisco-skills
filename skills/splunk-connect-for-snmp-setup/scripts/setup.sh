@@ -1218,8 +1218,10 @@ render_k8s_assets() {
         load_balancer_ip_line=""
     fi
 
-    export TPL_SC4SNMP_IMAGE_REPOSITORY="$(image_repository)"
-    export TPL_SC4SNMP_IMAGE_TAG="$(image_tag)"
+    TPL_SC4SNMP_IMAGE_REPOSITORY="$(image_repository)"
+    export TPL_SC4SNMP_IMAGE_REPOSITORY
+    TPL_SC4SNMP_IMAGE_TAG="$(image_tag)"
+    export TPL_SC4SNMP_IMAGE_TAG
     export TPL_SPLUNK_HEC_PROTOCOL="${hec_protocol}"
     export TPL_SPLUNK_HEC_HOST="${hec_host}"
     export TPL_SPLUNK_HEC_PORT="${hec_port}"

@@ -852,6 +852,7 @@ print_list_or_none() {
 }
 
 print_variants() {
+    # shellcheck disable=SC2034
     local variant option product_key
     echo "Available ${EFFECTIVE_VARIANT_KEY}:"
     while IFS= read -r option || [[ -n "${option}" ]]; do
@@ -880,6 +881,7 @@ print_install_apps() {
     while IFS= read -r app_name || [[ -n "${app_name}" ]]; do
         [[ -n "${app_name}" ]] || continue
         info="$(registry_app_info "${app_name}")"
+        # shellcheck disable=SC2034
         IFS=$'\t' read -r app_id label skill <<< "${info}"
         if [[ -n "${app_id}" || -n "${label}" ]]; then
             echo "  - ${app_name}${app_id:+ [${app_id}]}${label:+ ${label}}"
@@ -1049,6 +1051,7 @@ require_configuration_ready() {
 install_app_by_name() {
     local app_name="$1" app_id label skill info
     info="$(registry_app_info "${app_name}")"
+    # shellcheck disable=SC2034
     IFS=$'\t' read -r app_id label skill <<< "${info}"
     if [[ -z "${app_id}" ]]; then
         log "ERROR: Could not resolve Splunkbase ID for ${app_name} from the app registry."
