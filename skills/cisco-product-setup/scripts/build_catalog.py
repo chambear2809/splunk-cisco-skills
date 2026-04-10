@@ -30,6 +30,7 @@ TEMPLATE_PATHS = {
     "intersight": "skills/cisco-intersight-setup/template.example",
     "thousandeyes": "skills/cisco-thousandeyes-setup/template.example",
     "appdynamics": "skills/cisco-appdynamics-setup/template.example",
+    "spaces": "skills/cisco-spaces-setup/template.example",
 }
 
 DC_ACCOUNT_TEMPLATE_SECTION = {
@@ -589,6 +590,28 @@ def build_appdynamics_route(override: dict) -> dict:
     }
 
 
+def build_spaces_route(override: dict) -> dict:
+    return {
+        "route_type": "spaces",
+        "primary_skill": "cisco-spaces-setup",
+        "companion_skills": [],
+        "install_apps": ["ta_cisco_spaces"],
+        "template_paths": [TEMPLATE_PATHS["spaces"]],
+        "template_checks": merge_template_checks(
+            ini_section_check("meta_stream"),
+            override.get("template_checks"),
+        ),
+        "required_non_secret_keys": ["name", "region"],
+        "optional_non_secret_keys": ["location_updates_status", "index"],
+        "accepted_non_secret_keys": ["index", "location_updates_status", "name", "region"],
+        "secret_keys": ["activation_token"],
+        "route": {
+            "default_name": "production",
+            "default_index": "cisco_spaces",
+        },
+    }
+
+
 def build_route(product: dict, override: dict, security_products: dict) -> dict:
     route_type = override["route_type"]
     if route_type == "security_cloud_product":
@@ -609,6 +632,8 @@ def build_route(product: dict, override: dict, security_products: dict) -> dict:
         return build_thousandeyes_route(override)
     if route_type == "appdynamics":
         return build_appdynamics_route(override)
+    if route_type == "spaces":
+        return build_spaces_route(override)
     raise ValueError(f"Unknown route_type for {product['id']}: {route_type}")
 
 

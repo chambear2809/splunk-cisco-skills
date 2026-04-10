@@ -195,7 +195,7 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         self.assertEqual(result.stdout.strip(), "false")
 
-    def test_cisco_spaces_is_manual_gap(self) -> None:
+    def test_cisco_spaces_routes_to_spaces_skill(self) -> None:
         result = self.run_command(
             "bash",
             str(SETUP_SCRIPT),
@@ -205,9 +205,11 @@ class CiscoProductSetupTests(unittest.TestCase):
             "Cisco Spaces",
             "--dry-run",
         )
-        self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
-        self.assertIn("Automation state: manual_gap", result.stdout)
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("Route type: spaces", result.stdout)
+        self.assertIn("cisco-spaces-setup", result.stdout)
         self.assertIn("ta_cisco_spaces", result.stdout)
+        self.assertIn("activation_token", result.stdout)
 
     def test_cisco_hypershield_is_roadmap(self) -> None:
         result = self.run_command(

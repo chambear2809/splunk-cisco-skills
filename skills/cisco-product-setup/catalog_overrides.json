@@ -112,6 +112,9 @@
     "cisco_thousandeyes": {
       "route_type": "thousandeyes"
     },
+    "cisco_spaces": {
+      "route_type": "spaces"
+    },
     "cisco_appdynamics": {
       "route_type": "appdynamics"
     },

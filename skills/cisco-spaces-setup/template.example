@@ -1,0 +1,33 @@
+# Cisco Spaces meta stream intake template
+#
+# Copy this file to `template.local` in the same folder before entering real
+# values. Keep the completed file local only.
+#
+# Fill in non-secret values only. Do not store activation tokens or API keys
+# in `template.local`.
+#
+# Create the activation token temp file only when you are ready to run the
+# configure script:
+# printf '%s\n' '<activation_token>' > /tmp/spaces_token && chmod 600 /tmp/spaces_token
+#
+# Then pass:
+#   --token-file /tmp/spaces_token
+#
+# Duplicate the section when you need more than one meta stream.
+#
+# `stanza_name` is the stream name that will appear in Splunk.
+# `region` determines the Cisco Spaces API endpoint:
+# - io: https://partners.dnaspaces.io
+# - eu: https://partners.dnaspaces.eu
+# - sg: https://partners.dnaspaces.sg
+#
+# `location_updates_status` controls whether DEVICE_LOCATION_UPDATE events are
+# recorded. Setting this to 1 can significantly increase data volume.
+# Leave at 0 unless you specifically need device coordinate tracking.
+
+[meta_stream]
+stanza_name = production
+region = io
+location_updates_status = 0
+auto_create_input = 1
+auto_create_input_index = cisco_spaces

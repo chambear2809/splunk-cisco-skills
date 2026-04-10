@@ -6131,7 +6131,12 @@
       "value_proposition": "A future Splunk integration could surface firewall policy-change audit trails, compliance drift events, and orchestration job outcomes \u2014 enabling SecOps teams to correlate policy changes with security incidents across the entire firewall estate."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "index",
+        "location_updates_status",
+        "name",
+        "region"
+      ],
       "addon": "ta_cisco_spaces",
       "addon_label": "Spaces Add-On for Splunk",
       "addon_uid": "8485",
@@ -6140,7 +6145,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "automated",
       "category": "networking",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -6148,7 +6153,9 @@
       "description": "Cloud-based location services and IoT platform (successor to Cisco CMX/DNA Spaces) providing indoor positioning, asset tracking, environmental monitoring, and occupancy analytics for smart buildings and campus environments using Catalyst and Meraki AP infrastructure.",
       "display_name": "Cisco Spaces",
       "id": "cisco_spaces",
-      "install_apps": [],
+      "install_apps": [
+        "ta_cisco_spaces"
+      ],
       "keywords": [
         "cisco spaces",
         "dna spaces",
@@ -6159,7 +6166,7 @@
         "smart building"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/solutions/enterprise-networks/dna-spaces/index.html",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon ta_cisco_spaces.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco spaces",
         "dna spaces",
@@ -6170,14 +6177,23 @@
         "smart building"
       ],
       "notes": "",
-      "optional_non_secret_keys": [],
+      "optional_non_secret_keys": [
+        "location_updates_status",
+        "index"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
-      "required_non_secret_keys": [],
+      "primary_skill": "cisco-spaces-setup",
+      "required_non_secret_keys": [
+        "name",
+        "region"
+      ],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "default_index": "cisco_spaces",
+        "default_name": "production"
+      },
+      "route_type": "spaces",
       "search_terms": [
         "cisco_spaces",
         "cisco spaces",
@@ -6189,12 +6205,20 @@
         "occupancy analytics",
         "smart building"
       ],
-      "secret_keys": [],
+      "secret_keys": [
+        "activation_token"
+      ],
       "sourcetypes": [],
       "status": "active",
       "subcategory": "campus_wireless",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "meta_stream"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-spaces-setup/template.example"
+      ],
       "value_proposition": "Ingest Cisco Spaces location analytics, occupancy trends, and IoT sensor events into Splunk \u2014 enabling facilities and security teams to correlate physical-space intelligence with network and security data."
     },
     {
