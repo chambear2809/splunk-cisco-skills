@@ -165,7 +165,8 @@ def write_remote_shell_mocks(bin_dir: Path) -> None:
 
         raw_cmd = remap_paths(raw_cmd, "/opt/splunk", f"{remote_root}/opt/splunk")
         raw_cmd = remap_paths(raw_cmd, "/var/tmp", f"{remote_root}/var/tmp")
-        raw_cmd = remap_paths(raw_cmd, "/tmp", f"{remote_root}/tmp")
+        if not remote_root.startswith("/tmp"):
+            raw_cmd = remap_paths(raw_cmd, "/tmp", f"{remote_root}/tmp")
 
         env = os.environ.copy()
         env["PATH"] = f"{Path(sys.argv[0]).resolve().parent}:{env.get('PATH', '')}"

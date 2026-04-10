@@ -28,6 +28,10 @@ class CiscoProductSetupTests(unittest.TestCase):
         spec.loader.exec_module(module)
         cls.module = module
 
+        scan_glob = "splunk-cisco-app-navigator-*.tar.gz"
+        if not list((REPO_ROOT / "splunk-ta").glob(scan_glob)):
+            raise unittest.SkipTest(f"SCAN package ({scan_glob}) not in tree")
+
         cls._tmpdir = tempfile.TemporaryDirectory()
         cls.catalog_path = Path(cls._tmpdir.name) / "catalog.json"
         catalog = module.build_catalog(module.find_scan_package(""))

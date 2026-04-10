@@ -94,7 +94,7 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"splunk-shared\"" ]]
     [[ "$output" =~ "\"type\": \"stdio\"" ]]
-    [[ "$output" =~ "\\\$\\{workspaceFolder\\}/run-splunk-mcp.sh" ]]
+    [[ "$output" == *'${workspaceFolder}/run-splunk-mcp.sh'* ]]
 
     run cat "${workspace_dir}/.cursor/mcp.json"
     [ "$status" -eq 0 ]
