@@ -48,7 +48,6 @@ external collectors, see
 | `splunk-connect-for-snmp-setup` | N/A | No Splunk Cloud app install; SC4SNMP runtime is rendered for customer-managed Docker Compose or Kubernetes | ACS for indexes/HEC where available, search-tier REST for validation, rendered compose/Helm assets for runtime | External SNMP collector pattern. Modeled as a workflow row rather than a Splunk app package. |
 | `splunk-enterprise-host-setup` | N/A | Not a Splunk Cloud install path; bootstraps customer-managed Enterprise hosts only | Local or SSH-driven Linux host bootstrap for search-tier, indexer, and heavy-forwarder roles | Enterprise runtime bootstrap workflow for standalone or single-site clustered hosts. |
 | `cisco-spaces-setup` | 8485 | ACS Splunkbase | REST via UCC custom stream/input handlers | Cisco EULA license-ack required. Firehose streaming input for Cisco Spaces indoor location analytics. |
-| `cisco-scan-setup` |  | ACS private app upload (no Splunkbase listing) | No post-install REST config needed; catalog sync runs via scheduled search | No Splunkbase listing. Install from local package or private app upload. Product catalog and ecosystem intelligence app for the Cisco-Splunk portfolio. |
 
 ## Stream Heavy Forwarder Model
 

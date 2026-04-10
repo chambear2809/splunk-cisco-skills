@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 """Regression tests for first-party shell entrypoints."""
 
-import getpass
 import json
 import hashlib
 import os
-import re
 import stat
 import subprocess
-import tarfile
-import tempfile
 import textwrap
-import time
 import unittest
 from pathlib import Path
 

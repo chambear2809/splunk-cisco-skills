@@ -188,14 +188,6 @@
         "cloud_install_path": "ACS Splunkbase",
         "cloud_config_path": "REST via UCC custom stream/input handlers",
         "notes": "Cisco EULA license-ack required. Firehose streaming input for Cisco Spaces indoor location analytics."
-      },
-      {
-        "kind": "app",
-        "app_name": "splunk-cisco-app-navigator",
-        "label": "`cisco-scan-setup`",
-        "cloud_install_path": "ACS private app upload (no Splunkbase listing)",
-        "cloud_config_path": "No post-install REST config needed; catalog sync runs via scheduled search",
-        "notes": "No Splunkbase listing. Install from local package or private app upload. Product catalog and ecosystem intelligence app for the Cisco-Splunk portfolio."
       }
     ]
   },
@@ -850,29 +842,6 @@
       "capabilities": {
         "needs_custom_rest": true,
         "needs_search_time_objects": false,
-        "needs_kvstore": false,
-        "needs_python_runtime": true,
-        "needs_packet_capture": false,
-        "uf_safe": false
-      }
-    },
-    {
-      "skill": "cisco-scan-setup",
-      "app_name": "splunk-cisco-app-navigator",
-      "splunkbase_id": "",
-      "label": "Splunk Cisco App Navigator",
-      "license_ack_url": "",
-      "package_patterns": ["splunk-cisco-app-navigator-*"],
-      "role_support": {
-        "search-tier": "required",
-        "indexer": "none",
-        "heavy-forwarder": "none",
-        "universal-forwarder": "none",
-        "external-collector": "none"
-      },
-      "capabilities": {
-        "needs_custom_rest": false,
-        "needs_search_time_objects": true,
         "needs_kvstore": false,
         "needs_python_runtime": true,
         "needs_packet_capture": false,

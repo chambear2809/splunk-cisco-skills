@@ -9,7 +9,6 @@ import re
 import tarfile
 import tempfile
 import textwrap
-import time
 from pathlib import Path
 
 from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write_executable
@@ -250,7 +249,7 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             bin_dir.mkdir()
             credentials_file = tmp_path / "credentials"
             request_log = tmp_path / "requests.jsonl"
-            onboarding_blob = base64.urlsafe_b64encode(
+            _onboarding_blob = base64.urlsafe_b64encode(
                 json.dumps(
                     {
                         "tenant_name": "example-prod",

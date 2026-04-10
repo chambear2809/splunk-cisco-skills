@@ -76,7 +76,6 @@ For Cloud-specific install and API behavior, see
 | `Splunk_AI_Assistant_Cloud` | `splunk-ai-assistant-setup` | Required | None | None | None | None |
 | `Splunk_MCP_Server` | `splunk-mcp-server-setup` | Required | None | None | None | None |
 | `ta_cisco_spaces` | `cisco-spaces-setup` | Supported | None | Supported | None | None |
-| `splunk-cisco-app-navigator` | `cisco-scan-setup` | Required | None | None | None | None |
 
 ## Notes On Split Deployments
 

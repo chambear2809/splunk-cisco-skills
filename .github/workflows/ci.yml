@@ -8,12 +8,9 @@ permissions:
   contents: read
 
 jobs:
-  checks:
+  # ── Python tests ──────────────────────────────────────────────────────
+  python-tests:
     runs-on: ubuntu-24.04
-
-    env:
-      SHELLCHECK_VERSION: "0.10.0"
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4.2.2
@@ -22,26 +19,43 @@ jobs:
         uses: actions/setup-python@v5.6.0
         with:
           python-version: "3.11"
+          cache: "pip"
 
       - name: Install Python test dependencies
         run: pip install "pytest>=8,<9"
 
-      - name: Install shell tooling
+      - name: Run Python tests
+        run: pytest tests/ -v
+
+  # ── Bats tests ────────────────────────────────────────────────────────
+  bats-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Install Bats
         run: |
           sudo apt-get update
           sudo apt-get install -y bats
+
+      - name: Run Bats tests
+        run: bats tests/*.bats
+
+  # ── ShellCheck + syntax ───────────────────────────────────────────────
+  shellcheck:
+    runs-on: ubuntu-24.04
+    env:
+      SHELLCHECK_VERSION: "0.10.0"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
 
       - name: Install ShellCheck
         run: |
           curl -sSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
             | tar -xJf - --strip-components=1 -C /usr/local/bin "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
           shellcheck --version
-
-      - name: Run Python tests
-        run: pytest tests/ -v
-
-      - name: Run Bats tests
-        run: bats tests/*.bats
 
       - name: Syntax-check shell scripts
         run: |
@@ -69,3 +83,61 @@ jobs:
 
           subprocess.run(["shellcheck", "--severity=warning", *files], check=True)
           PY
+
+  # ── Validation (lints, schema checks, freshness) ─────────────────────
+  validation:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install validation tools
+        run: pip install "ruff>=0.11,<1" "yamllint>=1.35,<2"
+
+      - name: Validate JSON files
+        run: |
+          python3 - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          errors = []
+          json_files = sorted(Path("skills").rglob("*.json"))
+          if not json_files:
+              raise SystemExit("No JSON files found under skills/")
+
+          for path in json_files:
+              try:
+                  json.loads(path.read_text(encoding="utf-8"))
+              except json.JSONDecodeError as exc:
+                  errors.append(f"{path}: {exc}")
+
+          if errors:
+              print("JSON validation errors:", file=sys.stderr)
+              for err in errors:
+                  print(f"  - {err}", file=sys.stderr)
+              raise SystemExit(1)
+
+          print(f"All {len(json_files)} JSON files are valid.")
+          PY
+
+      - name: Lint YAML (workflow files)
+        run: yamllint -c .yamllint.yml .github/workflows/
+
+      - name: Lint Python with ruff
+        run: ruff check skills/ tests/
+
+      - name: Check catalog freshness
+        run: python3 skills/cisco-product-setup/scripts/build_catalog.py --check
+
+      - name: Check deployment docs freshness
+        run: python3 skills/shared/scripts/generate_deployment_docs.py --check
+
+      - name: Check SKILL.md frontmatter
+        run: python3 tests/check_skill_frontmatter.py
