@@ -220,6 +220,7 @@ make_executable() {
 validate_args() {
     local has_mode=false
 
+    normalize_yes_no "${HEC_TLS_VERIFY}" >/dev/null
     HEC_TLS_VERIFY="$(normalize_yes_no "${HEC_TLS_VERIFY}")"
 
     if $DO_SPLUNK_PREP || $RENDER_COMPOSE || $RENDER_K8S; then

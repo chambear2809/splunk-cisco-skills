@@ -136,7 +136,12 @@ jobs:
         run: ruff check skills/ tests/
 
       - name: Check catalog freshness
-        run: python3 skills/cisco-product-setup/scripts/build_catalog.py --check
+        run: |
+          if ls splunk-ta/splunk-cisco-app-navigator-*.tar.gz 1>/dev/null 2>&1; then
+            python3 skills/cisco-product-setup/scripts/build_catalog.py --check
+          else
+            echo "SCAN package not in tree (gitignored binary); skipping catalog freshness check."
+          fi
 
       - name: Check deployment docs freshness
         run: python3 skills/shared/scripts/generate_deployment_docs.py --check

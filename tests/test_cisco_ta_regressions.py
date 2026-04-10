@@ -1717,6 +1717,7 @@ EOF
             remote_home = remote_root / "opt/splunk"
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
             credentials_file = tmp_path / "credentials"
+            admin_password_file = tmp_path / "admin-password"
             package_file = tmp_path / "splunk-10.1.0-linux-x86_64.rpm"
             cmd_log = tmp_path / "splunk.log"
             install_log = tmp_path / "rpm.log"
@@ -1725,6 +1726,7 @@ EOF
             bin_dir.mkdir()
             (remote_home / "bin").mkdir(parents=True)
             credentials_file.write_text("", encoding="utf-8")
+            admin_password_file.write_text("changeme", encoding="utf-8")
             package_file.write_text("rpm-package-placeholder", encoding="utf-8")
 
             write_remote_shell_mocks(bin_dir)
@@ -1801,6 +1803,7 @@ EOF
                 "--package-type", "rpm",
                 "--advertise-host", "idx01.example.com",
                 "--service-user", current_user,
+                "--admin-password-file", str(admin_password_file),
                 "--no-boot-start",
                 env=env,
             )
@@ -1821,6 +1824,7 @@ EOF
             remote_home = remote_root / "opt/splunk"
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
             credentials_file = tmp_path / "credentials"
+            admin_password_file = tmp_path / "admin-password"
             package_file = tmp_path / "splunk-10.1.0-linux-amd64.deb"
             cmd_log = tmp_path / "splunk.log"
             install_log = tmp_path / "dpkg.log"
@@ -1829,6 +1833,7 @@ EOF
             bin_dir.mkdir()
             (remote_home / "bin").mkdir(parents=True)
             credentials_file.write_text("", encoding="utf-8")
+            admin_password_file.write_text("changeme", encoding="utf-8")
             package_file.write_text("deb-package-placeholder", encoding="utf-8")
 
             write_remote_shell_mocks(bin_dir)
@@ -1905,6 +1910,7 @@ EOF
                 "--package-type", "deb",
                 "--advertise-host", "sh01.example.com",
                 "--service-user", current_user,
+                "--admin-password-file", str(admin_password_file),
                 "--no-boot-start",
                 env=env,
             )
@@ -1974,8 +1980,8 @@ EOF
                 env=env,
             )
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("assumes", result.stdout)
-            self.assertIn("either use the -S option", result.stdout + result.stderr)
+            combined = result.stdout + result.stderr
+            self.assertIn("Admin password file path is required", combined)
 
 
     def test_host_bootstrap_configure_heavy_forwarder_does_not_require_admin_password(self):

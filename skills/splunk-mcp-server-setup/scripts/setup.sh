@@ -797,7 +797,10 @@ apply_client_setup() {
         return 0
     fi
 
-    ensure_command_available "mcp-remote" "Install it with: npm install -g mcp-remote"
+    if ! command -v mcp-remote >/dev/null 2>&1; then
+        log "WARNING: mcp-remote not found on PATH. Install it with: npm install -g mcp-remote"
+        log "         The rendered bridge requires mcp-remote at runtime."
+    fi
     wrapper_abs="$(resolve_abs_path "${OUTPUT_DIR}/run-splunk-mcp.sh")"
 
     if [[ "${CONFIGURE_CURSOR}" == "true" ]]; then
