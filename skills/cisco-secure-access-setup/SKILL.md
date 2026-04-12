@@ -121,6 +121,30 @@ To validate one specific org:
 bash skills/cisco-secure-access-setup/scripts/validate.sh --org-id example-org-id
 ```
 
+## Dashboards
+
+The app ships dashboards in the package. They appear in Splunk Web
+automatically after installation.
+
+To access them: **Apps → Cisco Secure Access App for Splunk**
+
+**Prerequisites for dashboards to show data:**
+
+1. Org account must be created (Step 2) so the app has a valid API connection.
+2. App settings must be configured for dashboard readiness (Step 3), including
+   terms acceptance and optional role bootstrap.
+3. Modular inputs must be running and delivering events to the configured indexes
+   (`investigate_index`, `privateapp_index`, `appdiscovery_index`).
+
+The `--apply-dashboard-defaults` flag in Step 3 initializes the app's stored
+dashboard settings (refresh rate, Cloudlock, destination lists, S3 index
+wiring) so the UI starts in a consistent state rather than falling back to
+defaults on first load.
+
+On **Splunk Cloud**, dashboards are available immediately after ACS installs
+the app. All post-install configuration (account creation, settings) runs over
+search-tier REST.
+
 ## What This Automation Covers
 
 The current skill automates:

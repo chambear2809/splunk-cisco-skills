@@ -173,6 +173,22 @@ bash skills/cisco-intersight-setup/scripts/validate.sh
 
 Checks: app installation, indexes, macros, accounts, inputs, data flow, settings.
 
+## Dashboards
+
+The app ships dashboards in the package. They appear in Splunk Web
+automatically after installation.
+
+To access them: **Apps → Splunk Add-on for Cisco Intersight**
+
+**Prerequisites for dashboards to show data:**
+
+1. The `cisco_intersight` index must exist and inputs must be enabled.
+2. The Intersight account must be configured and actively polling.
+3. The `setup.sh` macro update step must have run to wire the correct index.
+
+On **Splunk Cloud**, dashboards are available immediately after ACS installs
+the app. Macro updates run over search-tier REST.
+
 ## Sourcetypes
 
 | Sourcetype | Content |

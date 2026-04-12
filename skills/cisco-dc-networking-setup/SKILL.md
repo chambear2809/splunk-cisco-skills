@@ -168,6 +168,25 @@ bash skills/cisco-dc-networking-setup/scripts/validate.sh
 
 Checks: app installation, indexes, macros, accounts, inputs, data flow, settings.
 
+## Dashboards
+
+The app ships dashboards in the package. They appear in Splunk Web
+automatically after installation.
+
+To access them: **Apps → Cisco DC Networking App for Splunk**
+
+**Prerequisites for dashboards to show data:**
+
+1. Indexes (`cisco_aci`, `cisco_nd`, `cisco_nexus9k`) must exist and inputs
+   must be enabled.
+2. The `cisco_dc_index` macro family must be updated by the setup script
+   (Step 1) to point to the correct indexes.
+3. At least one account (APIC, Nexus Dashboard, or Nexus 9K) must be
+   configured and actively polling.
+
+On **Splunk Cloud**, dashboards are available immediately after ACS installs
+the app. Macro updates run over search-tier REST.
+
 ## Sourcetypes (from live ACI data)
 
 | Sourcetype | Source Example | Content |

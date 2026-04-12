@@ -171,6 +171,11 @@ index IN ("catalyst", "ise", "sdwan", "cybervision")
 
 ## Dashboards
 
+The app ships all dashboards in the package. No import or manual activation
+step is required — they appear in Splunk Web automatically after installation.
+
+To access them: **Apps → Cisco Enterprise Networking for Splunk Platform**
+
 | Dashboard | Description |
 |---|---|
 | Overview | High-level summary across all products |
@@ -181,6 +186,23 @@ index IN ("catalyst", "ise", "sdwan", "cybervision")
 | Users And Applications | User and application activity |
 | Performance | Network performance metrics |
 | Sensors | Sensor and device telemetry |
+
+**Prerequisites for dashboards to show data:**
+
+1. `cisco_catalyst_app_index` macro must be updated (Step 1 in the setup workflow).
+2. At least one of `catalyst`, `ise`, `sdwan`, or `cybervision` indexes must
+   be receiving data from the companion `TA_cisco_catalyst`.
+3. The 5 lookup-building saved searches (Step 2) must have run at least once.
+4. For NetFlow-focused dashboards, the optional Enhanced Netflow Add-on must
+   be installed and Splunk Stream must be configured as a NetFlow receiver.
+
+On **Splunk Cloud**, dashboards are immediately available after ACS installs
+the app. The macro update and saved search enablement happen over search-tier
+REST and require no additional Cloud-specific steps.
+
+Dashboard forms use the `cisco_catalyst_app_index` macro for index selection.
+If data is present but dashboards show no results, verify the macro value
+includes all data-bearing indexes.
 
 ## MCP Server Integration
 

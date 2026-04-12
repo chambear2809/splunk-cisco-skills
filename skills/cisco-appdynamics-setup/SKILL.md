@@ -208,7 +208,12 @@ bash skills/cisco-appdynamics-setup/scripts/setup.sh --enable-inputs \
 
 ### Step 5: Dashboards
 
-The package already includes dashboards and forms:
+The package already includes dashboards and forms. They appear in Splunk Web
+automatically after installation — no import or manual activation is needed.
+
+To access them: **Apps → Splunk Add-on for AppDynamics**
+
+Built-in dashboards:
 
 - `ingestion_statistics`
 - `status`
@@ -221,6 +226,9 @@ There is **no macro rewrite step** for this add-on. Dashboard forms use an
 inline `Index` text token that defaults to `appdynamics`. If the user chooses a
 different index, they must enter that index in the dashboard form when viewing
 the built-in dashboards.
+
+On **Splunk Cloud**, dashboards are available immediately after ACS installs
+the app. No additional activation step is required.
 
 ### Step 6: Validate
 

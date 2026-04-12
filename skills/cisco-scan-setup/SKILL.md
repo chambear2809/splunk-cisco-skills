@@ -135,6 +135,28 @@ sync job status.
 | 42+ saved searches | Catalog analysis, gap analysis, compatibility, migration |
 | Ecosystem Intelligence | Dashboard Studio analytics dashboard |
 
+## Dashboard
+
+The **Ecosystem Intelligence** dashboard is a Dashboard Studio view included in
+the package. It appears in Splunk Web automatically after installation — no
+import or manual activation step is needed.
+
+To access it: **Apps → Splunk Cisco App Navigator → Ecosystem Intelligence**
+
+SCAN does not collect data, so the dashboard visualizes catalog metadata
+rather than time-series events. It does not require index configuration or
+data input enablement.
+
+If the dashboard appears blank after installation, trigger an initial catalog
+sync:
+
+```bash
+bash skills/cisco-scan-setup/scripts/setup.sh --sync
+```
+
+On **Splunk Cloud**, the dashboard is available immediately after the ACS
+private app upload completes.
+
 ## Key Learnings / Known Issues
 
 1. **No indexes or inputs**: SCAN is a catalog/management app. It does not

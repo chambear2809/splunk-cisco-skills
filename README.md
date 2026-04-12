@@ -80,17 +80,20 @@ skill-specific details.
 | Skill | Target | Main purpose |
 |-------|--------|--------------|
 | `cisco-product-setup` | Cisco product catalog workflow | Resolve a Cisco product name from SCAN, classify gaps, and delegate install/configure/validate to the matching Cisco setup skill |
+| `cisco-scan-setup` | `splunk-cisco-app-navigator` | Install and validate the Splunk Cisco App Navigator (SCAN) catalog app; trigger catalog sync from S3 |
 | `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision inputs |
 | `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards |
 | `cisco-appdynamics-setup` | `Splunk_TA_AppDynamics` | Configure AppDynamics controller and analytics connections, inputs, and dashboards |
 | `cisco-security-cloud-setup` | `CiscoSecurityCloud` | Install and configure product-specific Cisco Security Cloud inputs with dashboard-ready defaults |
 | `cisco-secure-access-setup` | `cisco-cloud-security` | Install and configure Secure Access org accounts, app settings, and dashboard prerequisites |
+| `cisco-spaces-setup` | `ta_cisco_spaces` | Configure Cisco Spaces meta stream accounts, firehose inputs, and activation tokens |
 | `cisco-dc-networking-setup` | `cisco_dc_networking_app_for_splunk` | Configure ACI, Nexus Dashboard, and Nexus 9K data collection |
 | `cisco-intersight-setup` | `Splunk_TA_Cisco_Intersight` | Configure Cisco Intersight account, index, and inputs |
 | `cisco-meraki-ta-setup` | `Splunk_TA_cisco_meraki` | Configure Meraki organization account, index, and polling inputs |
 | `cisco-enterprise-networking-setup` | `cisco-catalyst-app` | Configure the visualization app’s macros and related app settings |
 | `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
+| `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant for SPL; drive Enterprise cloud-connected onboarding |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
@@ -564,10 +567,12 @@ splunk-cloud-skills/
 │   │       ├── cloud_batch_install.sh
 │   │       └── cloud_batch_uninstall.sh
 │   ├── splunk-app-install/
+│   ├── splunk-ai-assistant-setup/
 │   ├── splunk-enterprise-host-setup/
 │   ├── splunk-connect-for-syslog-setup/
 │   ├── splunk-connect-for-snmp-setup/
 │   ├── splunk-itsi-setup/
+│   ├── splunk-mcp-server-setup/
 │   ├── splunk-stream-setup/
 │   ├── cisco-appdynamics-setup/
 │   ├── cisco-catalyst-ta-setup/
@@ -576,8 +581,11 @@ splunk-cloud-skills/
 │   ├── cisco-enterprise-networking-setup/
 │   ├── cisco-intersight-setup/
 │   ├── cisco-meraki-ta-setup/
+│   ├── cisco-product-setup/
+│   ├── cisco-scan-setup/
 │   ├── cisco-secure-access-setup/
 │   ├── cisco-security-cloud-setup/
+│   ├── cisco-spaces-setup/
 │   └── cisco-thousandeyes-setup/
 ├── tests/                       # bats and Python test suites
 ├── plans/                       # design notes and implementation plans

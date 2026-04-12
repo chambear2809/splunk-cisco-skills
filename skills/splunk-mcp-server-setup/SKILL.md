@@ -254,6 +254,25 @@ See [reference.md](reference.md) for the exact implications.
 5. **The app needs search-tier placement**: it exposes `/services/mcp` and
    depends on custom REST handlers plus KV Store-backed tool metadata.
 
+## Cursor IDE Integration
+
+The repo's `.cursor/mcp.json` points to `splunk-mcp-rendered/run-splunk-mcp.sh`.
+**This path does not exist until the render step runs.** Cursor will silently
+skip the MCP server if the path is missing.
+
+To activate Splunk MCP in Cursor:
+
+1. Complete steps 1–5 above (install, configure, mint token, render bundle).
+2. Verify the rendered path exists:
+   ```bash
+   ls splunk-mcp-rendered/run-splunk-mcp.sh
+   ```
+3. Restart or reload Cursor so it picks up the new `.cursor/mcp.json` entry.
+
+If `--cursor-workspace` was used during render, the workspace's own
+`.cursor/mcp.json` was also updated. If it was omitted, the repo-root
+`.cursor/mcp.json` is the active registration.
+
 ## Additional Resources
 
 - [reference.md](reference.md) — endpoint map, config surface, and client notes

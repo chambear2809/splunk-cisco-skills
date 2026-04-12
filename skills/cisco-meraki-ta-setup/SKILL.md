@@ -198,6 +198,26 @@ bash skills/cisco-meraki-ta-setup/scripts/validate.sh
 
 Checks: app installation, index, account, inputs, data flow, settings.
 
+## Dashboards
+
+The app ships its dashboards in the package. They appear in Splunk Web
+automatically after installation — no import or manual activation is needed.
+
+To access them: **Apps → Splunk Add-on for Cisco Meraki**
+
+The `meraki_index` macro (set during Step 1) controls which index the
+dashboards query. If dashboards show no data after inputs are enabled and data
+is confirmed in the index, run:
+
+```bash
+bash skills/cisco-meraki-ta-setup/scripts/setup.sh
+```
+
+to re-apply the macro and visibility settings.
+
+On **Splunk Cloud**, dashboards are available immediately after ACS completes
+the app install. Macro updates run over search-tier REST.
+
 ## Sourcetypes
 
 | Sourcetype | Content |

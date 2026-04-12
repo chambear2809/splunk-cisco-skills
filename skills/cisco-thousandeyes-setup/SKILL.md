@@ -214,6 +214,31 @@ input, data inputs, data flow, settings, and optional ITSI status.
 | `cisco:thousandeyes:activity` | HEC stream | Activity/audit logs |
 | `cisco:thousandeyes:alerts` | HEC webhook | Alert notifications |
 
+## Dashboards
+
+The app ships dashboards in the package. They appear in Splunk Web
+automatically after installation.
+
+To access them: **Apps → Cisco ThousandEyes Add-On for Splunk**
+
+Built-in dashboards include: Network, Application, Voice, Alerts, Traces, and
+Configuration Status views.
+
+**Prerequisites for dashboards to show data:**
+
+1. The `thousandeyes` index must exist and inputs must be enabled (Steps 2–4).
+2. HEC must be reachable from ThousandEyes for streaming inputs (metrics,
+   traces, activity, alerts). Validate the HEC target URL format — see
+   Known Issue #6 below.
+3. At least one polling input (`events`) or streaming input must have data
+   flowing before dashboard panels populate.
+
+On **Splunk Cloud**, the HEC URL must use the cloud format
+(`https://http-inputs-{stack}.splunkcloud.com:443`). The setup script
+auto-detects this when `SPLUNK_CLOUD_STACK` is set. If streaming inputs were
+created with the wrong HEC URL, re-run `setup.sh --enable-inputs` to
+correct them.
+
 ## MCP Server Integration
 
 ```bash
