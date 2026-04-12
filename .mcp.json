@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "splunk-mcp": {
+      "type": "stdio",
+      "command": "./splunk-mcp-rendered/run-splunk-mcp.sh",
+      "args": []
+    }
+  }
+}

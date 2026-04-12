@@ -23,6 +23,7 @@ MCP_URL=""
 CURSOR_WORKSPACE=""
 REGISTER_CODEX=true
 CONFIGURE_CURSOR=true
+CONFIGURE_CLAUDE=true
 
 TOKEN_USER=""
 TOKEN_EXPIRES_ON="+30d"
@@ -67,13 +68,14 @@ Primary actions:
   --token-not-before VALUE               Optional not_before value for /mcp_token
   --write-token-file PATH                Write the encrypted bearer token to PATH (0600)
   --bearer-token-file PATH               Existing encrypted bearer token file to use when rendering clients
-  --render-clients                       Render a shared Cursor/Codex bridge bundle
+  --render-clients                       Render a shared Cursor/Codex/Claude Code bridge bundle
   --output-dir PATH                      Client bundle output directory (default: repo-root ./splunk-mcp-rendered)
   --client-name NAME                     Client registration name for Codex (default: splunk-mcp)
   --cursor-workspace PATH                Cursor workspace to update (default: current working directory)
   --client-insecure-tls                  Render SPLUNK_MCP_INSECURE_TLS=1 in the client env file
   --no-register-codex                    Render the bundle but skip codex mcp registration
   --no-configure-cursor                  Render the bundle but skip updating Cursor workspace config
+  --no-configure-claude                  Render the bundle but skip writing Claude Code .mcp.json
   --mcp-url URL                          Explicit MCP endpoint override for the client bundle
   --package-file PATH                    Override the local package path used with --install
 
@@ -650,8 +652,8 @@ EOF
         write_secret_file "${OUTPUT_DIR}/.env.splunk-mcp" "${env_live}"
     fi
 
-    log "Rendered shared Cursor/Codex MCP bridge bundle at ${output_abs}."
-    log "Open that directory as a Cursor workspace, or run ${output_abs}/register-codex-mcp.sh to sync a portable Codex bundle and register it."
+    log "Rendered shared Cursor/Codex/Claude Code MCP bridge bundle at ${output_abs}."
+    log "Open that directory as a Cursor workspace, run ${output_abs}/register-codex-mcp.sh for Codex, or use --render-clients to auto-write Claude Code .mcp.json."
 }
 
 ensure_command_available() {
@@ -789,11 +791,21 @@ write_cursor_workspace_config() {
     log "Configured Cursor MCP server '${CLIENT_NAME}' in ${workspace_dir}."
 }
 
+write_claude_workspace_config() {
+    local workspace_dir="$1" wrapper_command="$2"
+    local claude_config_path="${workspace_dir}/.mcp.json"
+    local claude_json
+
+    claude_json="$(build_cursor_workspace_json "${claude_config_path}" "${CLIENT_NAME}" "${wrapper_command}")" || exit 1
+    write_text_file "${claude_config_path}" "${claude_json}"
+    log "Configured Claude Code MCP server '${CLIENT_NAME}' in ${workspace_dir}."
+}
+
 apply_client_setup() {
     local wrapper_abs workspace_dir="" wrapper_command=""
 
-    if [[ "${REGISTER_CODEX}" != "true" && "${CONFIGURE_CURSOR}" != "true" ]]; then
-        log "Skipped Codex and Cursor auto-apply; rendered bundle only."
+    if [[ "${REGISTER_CODEX}" != "true" && "${CONFIGURE_CURSOR}" != "true" && "${CONFIGURE_CLAUDE}" != "true" ]]; then
+        log "Skipped Codex, Cursor, and Claude Code auto-apply; rendered bundle only."
         return 0
     fi
 
@@ -803,9 +815,12 @@ apply_client_setup() {
     fi
     wrapper_abs="$(resolve_abs_path "${OUTPUT_DIR}/run-splunk-mcp.sh")"
 
-    if [[ "${CONFIGURE_CURSOR}" == "true" ]]; then
+    if [[ "${CONFIGURE_CURSOR}" == "true" || "${CONFIGURE_CLAUDE}" == "true" ]]; then
         workspace_dir="$(resolve_cursor_workspace_dir)"
         wrapper_command="$(build_cursor_wrapper_command "${workspace_dir}" "${wrapper_abs}")"
+    fi
+
+    if [[ "${CONFIGURE_CURSOR}" == "true" ]]; then
         # Validate and prepare any existing Cursor config before mutating Codex registration.
         build_cursor_workspace_json "${workspace_dir}/.cursor/mcp.json" "${CLIENT_NAME}" "${wrapper_command}" >/dev/null || exit 1
     fi
@@ -816,6 +831,10 @@ apply_client_setup() {
 
     if [[ "${CONFIGURE_CURSOR}" == "true" ]]; then
         write_cursor_workspace_config "${workspace_dir}" "${wrapper_command}"
+    fi
+
+    if [[ "${CONFIGURE_CLAUDE}" == "true" ]]; then
+        write_claude_workspace_config "${workspace_dir}" "${wrapper_command}"
     fi
 }
 
@@ -833,6 +852,7 @@ while [[ $# -gt 0 ]]; do
         --client-insecure-tls) HAS_UNINSTALL_CONFLICT=true; CLIENT_INSECURE_TLS=true; shift ;;
         --no-register-codex) HAS_UNINSTALL_CONFLICT=true; REGISTER_CODEX=false; shift ;;
         --no-configure-cursor) HAS_UNINSTALL_CONFLICT=true; CONFIGURE_CURSOR=false; shift ;;
+        --no-configure-claude) HAS_UNINSTALL_CONFLICT=true; CONFIGURE_CLAUDE=false; shift ;;
         --mcp-url) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; MCP_URL="$2"; shift 2 ;;
         --token-user) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; TOKEN_USER="$2"; shift 2 ;;
         --token-expires-on) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; TOKEN_EXPIRES_ON="$2"; shift 2 ;;

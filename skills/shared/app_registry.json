@@ -128,7 +128,7 @@
         "splunkbase_id": "N/A",
         "cloud_install_path": "ACS private app upload or vetted local package",
         "cloud_config_path": "REST for mcp.conf settings, token policy, and rate limits; local JSON policy overlays remain package-content concerns",
-        "notes": "Search-tier MCP endpoint for Splunk with encrypted token issuance and shared Cursor/Codex bridge rendering."
+        "notes": "Search-tier MCP endpoint for Splunk with encrypted token issuance and shared Cursor/Codex/Claude Code bridge rendering."
       },
       {
         "kind": "app",

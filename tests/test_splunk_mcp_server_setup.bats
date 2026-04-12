@@ -56,6 +56,7 @@ teardown() {
     [[ "$output" =~ "--cursor-workspace" ]]
     [[ "$output" =~ "--no-register-codex" ]]
     [[ "$output" =~ "--no-configure-cursor" ]]
+    [[ "$output" =~ "--no-configure-claude" ]]
 }
 
 @test "splunk-mcp-server validate --help exits 0" {
@@ -171,6 +172,62 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"name\":\"splunk-no-cursor\"" || "$output" =~ "\"name\": \"splunk-no-cursor\"" ]]
     [[ "$output" == *"${home_dir}/.codex/mcp-bridges/splunk-no-cursor/run-splunk-mcp.sh"* ]]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup renders bundle and auto-applies Claude Code config" {
+    work_dir="$(mktemp -d)"
+    home_dir="${work_dir}/home"
+    token_file="${work_dir}/splunk.token"
+    output_dir="${work_dir}/rendered"
+    workspace_dir="${work_dir}/cursor-workspace"
+
+    mkdir -p "${home_dir}" "${workspace_dir}"
+    printf '%s' 'encrypted-token-value' > "${token_file}"
+    chmod 600 "${token_file}"
+
+    run env HOME="${home_dir}" bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
+      --bearer-token-file "${token_file}" \
+      --output-dir "${output_dir}" \
+      --client-name "splunk-claude" \
+      --cursor-workspace "${workspace_dir}"
+
+    [ "$status" -eq 0 ]
+    [ -f "${workspace_dir}/.mcp.json" ]
+
+    run cat "${workspace_dir}/.mcp.json"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "\"splunk-claude\"" ]]
+    [[ "$output" =~ "\"type\": \"stdio\"" ]]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup can skip Claude Code registration" {
+    work_dir="$(mktemp -d)"
+    home_dir="${work_dir}/home"
+    token_file="${work_dir}/splunk.token"
+    output_dir="${work_dir}/rendered"
+    workspace_dir="${work_dir}/cursor-workspace"
+
+    mkdir -p "${home_dir}" "${workspace_dir}"
+    printf '%s' 'encrypted-token-value' > "${token_file}"
+    chmod 600 "${token_file}"
+
+    run env HOME="${home_dir}" bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
+      --bearer-token-file "${token_file}" \
+      --output-dir "${output_dir}" \
+      --cursor-workspace "${workspace_dir}" \
+      --client-name "splunk-no-claude" \
+      --no-configure-claude
+
+    [ "$status" -eq 0 ]
+    [ ! -f "${workspace_dir}/.mcp.json" ]
 
     rm -rf "${work_dir}"
 }

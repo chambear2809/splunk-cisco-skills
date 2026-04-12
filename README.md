@@ -1,6 +1,6 @@
 # Splunk TA Skills
 
-This repository is a working library of Cursor and Codex agent skills plus
+This repository is a working library of Cursor, Codex, and Claude Code agent skills plus
 shell scripts for installing, configuring, and validating Splunk apps and
 Technology Add-ons on Splunk Cloud and self-managed Splunk Enterprise
 deployments, and for
@@ -20,7 +20,7 @@ to git.
 
 The repo is designed for two use cases:
 
-- **Agent-driven work in Cursor or Codex**: the agent reads the skill metadata
+- **Agent-driven work in Cursor, Codex, or Claude Code**: the agent reads the skill metadata
   in `skills/*/SKILL.md` and runs the matching scripts for you.
 - **Direct shell use**: you can run the scripts under each skill manually if you
   prefer to operate outside the agent.
@@ -94,7 +94,7 @@ skill-specific details.
 | `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant for SPL; drive Enterprise cloud-connected onboarding |
-| `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex bridge bundles |
+| `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
@@ -543,12 +543,21 @@ splunk-cloud-skills/
 │   └── workflows/
 │       └── ci.yml              # shell/unit test checks for first-party scripts
 ├── README.md
+├── CLAUDE.md                    # Claude Code project context (auto-loaded)
 ├── ARCHITECTURE.md
 ├── CLOUD_DEPLOYMENT_MATRIX.md
 ├── DEMO_SCRIPTS.md
 ├── credentials.example
 ├── credentials                  # local only, gitignored
 ├── .shellcheckrc
+├── .mcp.json                    # Claude Code MCP server config
+├── .cursor/
+│   ├── mcp.json                # Cursor MCP server config
+│   └── skills/                 # Cursor skill symlinks (one per skill)
+├── .claude/
+│   ├── commands/               # Claude Code slash commands (one per skill)
+│   └── rules/
+│       └── credential-handling.md
 ├── splunk-ta/                   # local package cache; binaries ignored by git
 │   └── _unpacked/              # review-only extracted copies
 ├── skills/
@@ -612,7 +621,7 @@ Minimum expected environment:
 - `bash`
 - `curl`
 - `python3`
-- Cursor IDE if you want the agent-driven workflow
+- Cursor, Codex, or Claude Code if you want the agent-driven workflow
 - a `splunk.com` account for Splunkbase downloads
 
 For Splunk Cloud workflows, you should also install the ACS CLI:

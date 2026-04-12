@@ -104,6 +104,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 client_name,
                 "--no-register-codex",
                 "--no-configure-cursor",
+                "--no-configure-claude",
                 env=env,
             )
 
@@ -184,6 +185,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 str(output_dir),
                 "--no-register-codex",
                 "--no-configure-cursor",
+                "--no-configure-claude",
                 env=env,
             )
 
@@ -476,6 +478,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 "--client-name",
                 "splunk-repeat",
                 "--no-configure-cursor",
+                "--no-configure-claude",
                 env=env,
             )
             self.assertEqual(first.returncode, 0, msg=first.stdout + first.stderr)
@@ -492,6 +495,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 "--client-name",
                 "splunk-repeat",
                 "--no-configure-cursor",
+                "--no-configure-claude",
                 env=env,
             )
             self.assertEqual(second.returncode, 0, msg=second.stdout + second.stderr)
@@ -529,6 +533,100 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                     "splunk-mcp": {
                         "type": "stdio",
                         "command": "${workspaceFolder}/splunk-mcp-rendered/run-splunk-mcp.sh",
+                        "args": [],
+                    }
+                }
+            },
+        )
+
+    def test_mcp_setup_writes_claude_mcp_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            workspace_dir = tmp_path / "workspace"
+            workspace_dir.mkdir()
+            output_dir = tmp_path / "rendered"
+
+            env = os.environ.copy()
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                "https://splunk.example:8089/services/mcp",
+                "--output-dir",
+                str(output_dir),
+                "--client-name",
+                "splunk-claude-test",
+                "--no-register-codex",
+                "--no-configure-cursor",
+                "--cursor-workspace",
+                str(workspace_dir),
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+
+            claude_config_path = workspace_dir / ".mcp.json"
+            self.assertTrue(claude_config_path.exists(), ".mcp.json should be written to workspace")
+
+            config = json.loads(claude_config_path.read_text(encoding="utf-8"))
+            self.assertIn("splunk-claude-test", config["mcpServers"])
+            self.assertEqual(config["mcpServers"]["splunk-claude-test"]["type"], "stdio")
+
+    def test_mcp_setup_merges_existing_claude_mcp_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            workspace_dir = tmp_path / "workspace"
+            workspace_dir.mkdir()
+            output_dir = tmp_path / "rendered"
+
+            existing_config = {
+                "mcpServers": {
+                    "other-server": {
+                        "type": "stdio",
+                        "command": "/usr/local/bin/other-mcp",
+                        "args": [],
+                    }
+                }
+            }
+            (workspace_dir / ".mcp.json").write_text(
+                json.dumps(existing_config, indent=2), encoding="utf-8"
+            )
+
+            env = os.environ.copy()
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--mcp-url",
+                "https://splunk.example:8089/services/mcp",
+                "--output-dir",
+                str(output_dir),
+                "--client-name",
+                "splunk-merged",
+                "--no-register-codex",
+                "--no-configure-cursor",
+                "--cursor-workspace",
+                str(workspace_dir),
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+
+            config = json.loads((workspace_dir / ".mcp.json").read_text(encoding="utf-8"))
+            self.assertIn("other-server", config["mcpServers"], "existing entry should be preserved")
+            self.assertIn("splunk-merged", config["mcpServers"], "new entry should be added")
+
+    def test_repo_claude_mcp_config_tracks_rendered_bundle(self):
+        config = json.loads((REPO_ROOT / ".mcp.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            config,
+            {
+                "mcpServers": {
+                    "splunk-mcp": {
+                        "type": "stdio",
+                        "command": "./splunk-mcp-rendered/run-splunk-mcp.sh",
                         "args": [],
                     }
                 }

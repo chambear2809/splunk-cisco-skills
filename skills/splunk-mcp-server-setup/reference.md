@@ -67,11 +67,11 @@ The packaged app includes:
 - built-in tool definitions from `default/builtin_tools.json`
 - safe-SPL enforcement from `safe_spl.json`
 
-## Cursor And Codex Compatibility Model
+## Cursor, Codex, And Claude Code Compatibility Model
 
 The setup skill renders a shared bridge bundle and can then apply that bundle to
-both Codex and a real Cursor workspace instead of relying on each IDE’s HTTP
-transport details directly.
+Codex, a real Cursor workspace, and a Claude Code project instead of relying on
+each tool’s HTTP transport details directly.
 
 Rendered files:
 
@@ -87,11 +87,12 @@ When `--render-clients` is used, the skill:
 - renders the reusable bundle above
 - registers a stable home-local wrapper copy with Codex by default
 - merges the Splunk MCP entry into `<cursor-workspace>/.cursor/mcp.json` by default
-- defaults the Cursor workspace target to the current working directory when
+- writes the Splunk MCP entry into `<workspace>/.mcp.json` for Claude Code by default
+- defaults the workspace target to the current working directory when
   `--cursor-workspace` is omitted
 
-Use `--no-register-codex` or `--no-configure-cursor` to skip either auto-apply
-step while still rendering the bundle.
+Use `--no-register-codex`, `--no-configure-cursor`, or `--no-configure-claude` to
+skip any auto-apply step while still rendering the bundle.
 
 This approach is useful because:
 
@@ -99,6 +100,7 @@ This approach is useful because:
   rendered wrapper through `${workspaceFolder}` when the bundle lives inside the
   workspace, or through an absolute path otherwise
 - Codex can keep using stdio MCP registration without pinning the command to a repo checkout path
+- Claude Code reads `.mcp.json` at the project root and uses the same stdio wrapper
 - the same wrapper can handle `SPLUNK_MCP_INSECURE_TLS=1` for lab certificates
 
 ## Wrapper Prerequisite
