@@ -4,34 +4,15 @@
 import base64
 import json
 import os
-import stat
-import subprocess
 import tempfile
 import textwrap
 import unittest
 from pathlib import Path
 
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-
-
-def write_executable(path: Path, content: str) -> None:
-    path.write_text(textwrap.dedent(content), encoding="utf-8")
-    path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+from tests.regression_helpers import ShellScriptRegressionBase, write_executable
 
 
-def run_script(script_rel_path: str, *args: str, env: dict[str, str]) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["bash", str(REPO_ROOT / script_rel_path), *args],
-        cwd=REPO_ROOT,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
-class SplunkAIAssistantRegressionTests(unittest.TestCase):
+class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
     def test_cloud_install_uses_acs_without_preinstall_rest_auth(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -132,7 +113,7 @@ class SplunkAIAssistantRegressionTests(unittest.TestCase):
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
             env["SPLUNK_SKIP_ALLOWLIST"] = "true"
 
-            result = run_script(
+            result = self.run_script(
                 "skills/splunk-ai-assistant-setup/scripts/setup.sh",
                 "--install",
                 env=env,
@@ -265,7 +246,7 @@ class SplunkAIAssistantRegressionTests(unittest.TestCase):
             env["REQUEST_LOG"] = str(request_log)
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
 
-            result = run_script(
+            result = self.run_script(
                 "skills/splunk-ai-assistant-setup/scripts/setup.sh",
                 "--submit-onboarding-form",
                 "--email",
@@ -463,7 +444,7 @@ class SplunkAIAssistantRegressionTests(unittest.TestCase):
             env["STATE_FILE"] = str(state_file)
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
 
-            result = run_script(
+            result = self.run_script(
                 "skills/splunk-ai-assistant-setup/scripts/setup.sh",
                 "--complete-onboarding",
                 "--activation-code-file",
@@ -596,7 +577,7 @@ class SplunkAIAssistantRegressionTests(unittest.TestCase):
             env["REQUEST_LOG"] = str(request_log)
             env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
 
-            result = run_script(
+            result = self.run_script(
                 "skills/splunk-ai-assistant-setup/scripts/validate.sh",
                 "--expect-configured",
                 "false",

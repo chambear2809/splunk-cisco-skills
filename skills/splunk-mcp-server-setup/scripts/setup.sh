@@ -526,8 +526,8 @@ payload = {
     "mcpServers": {
         sys.argv[1]: {
             "type": "stdio",
-            "command": "${workspaceFolder}/run-splunk-mcp.sh",
-            "args": [],
+            "command": "node",
+            "args": ["${workspaceFolder}/run-splunk-mcp.js"],
         }
     }
 }
@@ -578,6 +578,105 @@ exec mcp-remote "${SPLUNK_MCP_URL}" --header "Authorization: Bearer ${SPLUNK_MCP
 EOF
 )"
 
+    js_wrapper_script="$(cat <<'JSEOF'
+#!/usr/bin/env node
+"use strict";
+
+// Cross-platform MCP bridge for Splunk MCP Server.
+// Works on macOS, Linux, and Windows (Git Bash, native cmd/PowerShell).
+// Requires: node (comes with mcp-remote) and npx mcp-remote.
+
+const fs = require("fs");
+const path = require("path");
+const { execFileSync, spawn } = require("child_process");
+
+const scriptDir = __dirname;
+const envFile = path.join(scriptDir, ".env.splunk-mcp");
+
+// Load .env.splunk-mcp if present (KEY=VALUE lines, no export, no quoting needed).
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq === -1) continue;
+    const key = trimmed.slice(0, eq).trim();
+    let val = trimmed.slice(eq + 1).trim();
+    // Strip surrounding single or double quotes.
+    if ((val.startsWith("'") && val.endsWith("'")) ||
+        (val.startsWith('"') && val.endsWith('"'))) {
+      val = val.slice(1, -1);
+    }
+    // Pre-existing env vars take precedence.
+    if (!(key in process.env)) {
+      process.env[key] = val;
+    }
+  }
+}
+
+loadEnvFile(envFile);
+
+const mcpUrl = process.env.SPLUNK_MCP_URL;
+const mcpToken = process.env.SPLUNK_MCP_TOKEN;
+
+if (!mcpUrl) {
+  process.stderr.write("splunk-mcp: set SPLUNK_MCP_URL in " + envFile + "\n");
+  process.exit(1);
+}
+if (!mcpToken) {
+  process.stderr.write("splunk-mcp: set SPLUNK_MCP_TOKEN in " + envFile + "\n");
+  process.exit(1);
+}
+
+if (process.env.SPLUNK_MCP_INSECURE_TLS === "1") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
+// Resolve mcp-remote: prefer global install, fall back to npx.
+function findMcpRemote() {
+  try {
+    // On Windows `where`, on Unix `which` -- execFileSync with a
+    // try/catch is cross-platform without requiring a shell.
+    const result = execFileSync(
+      process.platform === "win32" ? "where" : "which",
+      ["mcp-remote"],
+      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }
+    ).trim().split(/\r?\n/)[0].trim();
+    if (result) return { cmd: result, args: [] };
+  } catch (_) {
+    // not found on PATH
+  }
+  // Fall back to npx (always available if Node.js is installed).
+  return { cmd: process.platform === "win32" ? "npx.cmd" : "npx", args: ["mcp-remote"] };
+}
+
+const { cmd, args: prefixArgs } = findMcpRemote();
+const child = spawn(
+  cmd,
+  [...prefixArgs, mcpUrl, "--header", "Authorization: Bearer " + mcpToken],
+  { stdio: "inherit" }
+);
+
+child.on("error", function(err) {
+  process.stderr.write(
+    "splunk-mcp: failed to start mcp-remote: " + err.message + "\n" +
+    "  Install it with: npm install -g mcp-remote\n"
+  );
+  process.exit(1);
+});
+
+child.on("exit", function(code, signal) {
+  if (signal) {
+    process.kill(process.pid, signal);
+  } else {
+    process.exit(code !== null ? code : 0);
+  }
+});
+JSEOF
+)"
+
     codex_script="$(cat <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -604,6 +703,8 @@ CODEX_BUNDLE_DIR="\${CODEX_HOME_DIR}/mcp-bridges/\${SAFE_SERVER_NAME}"
 mkdir -p "\${CODEX_BUNDLE_DIR}"
 cp "\${SCRIPT_DIR}/run-splunk-mcp.sh" "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.sh"
 chmod 755 "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.sh"
+cp "\${SCRIPT_DIR}/run-splunk-mcp.js" "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.js"
+chmod 755 "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.js"
 
 if [[ -f "\${SCRIPT_DIR}/.env.splunk-mcp" ]]; then
   cp "\${SCRIPT_DIR}/.env.splunk-mcp" "\${CODEX_BUNDLE_DIR}/.env.splunk-mcp"
@@ -615,7 +716,7 @@ if [[ -f "\${SCRIPT_DIR}/.env.splunk-mcp.example" ]]; then
   chmod 644 "\${CODEX_BUNDLE_DIR}/.env.splunk-mcp.example"
 fi
 
-exec codex mcp add "\${SERVER_NAME}" -- "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.sh"
+exec codex mcp add "\${SERVER_NAME}" -- node "\${CODEX_BUNDLE_DIR}/run-splunk-mcp.js"
 EOF
 )"
 
@@ -634,6 +735,8 @@ EOF
     write_text_file "${OUTPUT_DIR}/.cursor/mcp.json" "${cursor_json}"
     write_text_file "${OUTPUT_DIR}/run-splunk-mcp.sh" "${wrapper_script}"
     chmod 755 "${OUTPUT_DIR}/run-splunk-mcp.sh"
+    write_text_file "${OUTPUT_DIR}/run-splunk-mcp.js" "${js_wrapper_script}"
+    chmod 755 "${OUTPUT_DIR}/run-splunk-mcp.js"
     write_text_file "${OUTPUT_DIR}/register-codex-mcp.sh" "${codex_script}"
     chmod 755 "${OUTPUT_DIR}/register-codex-mcp.sh"
     write_text_file "${OUTPUT_DIR}/.env.splunk-mcp.example" "${env_example}"
@@ -698,8 +801,11 @@ build_cursor_wrapper_command() {
 }
 
 build_cursor_workspace_json() {
-    local config_path="$1" server_name="$2" wrapper_command="$3"
-    python3 - "${config_path}" "${server_name}" "${wrapper_command}" <<'PY'
+    # Args: config_path server_name wrapper_command [wrapper_arg]
+    # When wrapper_arg is provided, wrapper_command becomes the executable (e.g. "node")
+    # and wrapper_arg becomes the first element of "args" (e.g. the .js path).
+    local config_path="$1" server_name="$2" wrapper_command="$3" wrapper_arg="${4:-}"
+    python3 - "${config_path}" "${server_name}" "${wrapper_command}" "${wrapper_arg}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -707,11 +813,12 @@ from pathlib import Path
 config_path = Path(sys.argv[1])
 server_name = sys.argv[2]
 wrapper_command = sys.argv[3]
+wrapper_arg = sys.argv[4] if len(sys.argv) > 4 else ""
 
 entry = {
     "type": "stdio",
     "command": wrapper_command,
-    "args": [],
+    "args": [wrapper_arg] if wrapper_arg else [],
 }
 
 data = {}
@@ -748,17 +855,19 @@ PY
 register_codex_client() {
     local wrapper_abs="$1"
     local codex_output codex_rc
-    local codex_bundle_dir stable_wrapper stable_env stable_env_example source_dir
+    local codex_bundle_dir stable_wrapper stable_js stable_env stable_env_example source_dir
 
     ensure_command_available "codex" "Install the Codex CLI or rerun with --no-register-codex."
     source_dir="$(dirname "${wrapper_abs}")"
     codex_bundle_dir="$(resolve_codex_bundle_dir "${CLIENT_NAME}")"
     stable_wrapper="${codex_bundle_dir}/run-splunk-mcp.sh"
+    stable_js="${codex_bundle_dir}/run-splunk-mcp.js"
     stable_env="${codex_bundle_dir}/.env.splunk-mcp"
     stable_env_example="${codex_bundle_dir}/.env.splunk-mcp.example"
 
     mkdir -p "${codex_bundle_dir}"
     copy_file_with_mode "${wrapper_abs}" "${stable_wrapper}" 755
+    copy_file_with_mode "${source_dir}/run-splunk-mcp.js" "${stable_js}" 755
 
     if [[ -f "${source_dir}/.env.splunk-mcp" ]]; then
         copy_file_with_mode "${source_dir}/.env.splunk-mcp" "${stable_env}" 600
@@ -768,7 +877,7 @@ register_codex_client() {
     fi
 
     set +e
-    codex_output="$(codex mcp add "${CLIENT_NAME}" -- "${stable_wrapper}" 2>&1)"
+    codex_output="$(codex mcp add "${CLIENT_NAME}" -- node "${stable_js}" 2>&1)"
     codex_rc=$?
     set -e
 
@@ -778,31 +887,31 @@ register_codex_client() {
         exit 1
     fi
 
-    log "Registered Codex MCP server '${CLIENT_NAME}' using portable bundle ${stable_wrapper}."
+    log "Registered Codex MCP server '${CLIENT_NAME}' using portable bundle ${stable_js}."
 }
 
 write_cursor_workspace_config() {
-    local workspace_dir="$1" wrapper_command="$2"
+    local workspace_dir="$1" js_arg="$2"
     local cursor_config_path="${workspace_dir}/.cursor/mcp.json"
     local cursor_json
 
-    cursor_json="$(build_cursor_workspace_json "${cursor_config_path}" "${CLIENT_NAME}" "${wrapper_command}")" || exit 1
+    cursor_json="$(build_cursor_workspace_json "${cursor_config_path}" "${CLIENT_NAME}" "node" "${js_arg}")" || exit 1
     write_text_file "${cursor_config_path}" "${cursor_json}"
     log "Configured Cursor MCP server '${CLIENT_NAME}' in ${workspace_dir}."
 }
 
 write_claude_workspace_config() {
-    local workspace_dir="$1" wrapper_command="$2"
+    local workspace_dir="$1" js_arg="$2"
     local claude_config_path="${workspace_dir}/.mcp.json"
     local claude_json
 
-    claude_json="$(build_cursor_workspace_json "${claude_config_path}" "${CLIENT_NAME}" "${wrapper_command}")" || exit 1
+    claude_json="$(build_cursor_workspace_json "${claude_config_path}" "${CLIENT_NAME}" "node" "${js_arg}")" || exit 1
     write_text_file "${claude_config_path}" "${claude_json}"
     log "Configured Claude Code MCP server '${CLIENT_NAME}' in ${workspace_dir}."
 }
 
 apply_client_setup() {
-    local wrapper_abs workspace_dir="" wrapper_command=""
+    local wrapper_abs js_abs workspace_dir="" js_arg=""
 
     if [[ "${REGISTER_CODEX}" != "true" && "${CONFIGURE_CURSOR}" != "true" && "${CONFIGURE_CLAUDE}" != "true" ]]; then
         log "Skipped Codex, Cursor, and Claude Code auto-apply; rendered bundle only."
@@ -814,15 +923,16 @@ apply_client_setup() {
         log "         The rendered bridge requires mcp-remote at runtime."
     fi
     wrapper_abs="$(resolve_abs_path "${OUTPUT_DIR}/run-splunk-mcp.sh")"
+    js_abs="$(resolve_abs_path "${OUTPUT_DIR}/run-splunk-mcp.js")"
 
     if [[ "${CONFIGURE_CURSOR}" == "true" || "${CONFIGURE_CLAUDE}" == "true" ]]; then
         workspace_dir="$(resolve_cursor_workspace_dir)"
-        wrapper_command="$(build_cursor_wrapper_command "${workspace_dir}" "${wrapper_abs}")"
+        js_arg="$(build_cursor_wrapper_command "${workspace_dir}" "${js_abs}")"
     fi
 
     if [[ "${CONFIGURE_CURSOR}" == "true" ]]; then
         # Validate and prepare any existing Cursor config before mutating Codex registration.
-        build_cursor_workspace_json "${workspace_dir}/.cursor/mcp.json" "${CLIENT_NAME}" "${wrapper_command}" >/dev/null || exit 1
+        build_cursor_workspace_json "${workspace_dir}/.cursor/mcp.json" "${CLIENT_NAME}" "node" "${js_arg}" >/dev/null || exit 1
     fi
 
     if [[ "${REGISTER_CODEX}" == "true" ]]; then
@@ -830,11 +940,11 @@ apply_client_setup() {
     fi
 
     if [[ "${CONFIGURE_CURSOR}" == "true" ]]; then
-        write_cursor_workspace_config "${workspace_dir}" "${wrapper_command}"
+        write_cursor_workspace_config "${workspace_dir}" "${js_arg}"
     fi
 
     if [[ "${CONFIGURE_CLAUDE}" == "true" ]]; then
-        write_claude_workspace_config "${workspace_dir}" "${wrapper_command}"
+        write_claude_workspace_config "${workspace_dir}" "${js_arg}"
     fi
 }
 

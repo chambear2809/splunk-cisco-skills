@@ -982,6 +982,8 @@ stage_file_via_ssh() {
     pass_file="$(mktemp)"
     chmod 600 "${pass_file}"
     printf '%s' "${SPLUNK_SSH_PASS}" > "${pass_file}"
+    # shellcheck disable=SC2064  # intentional: trap value captured at registration time.
+    trap "rm -f '${pass_file}'" EXIT INT TERM
 
     sshpass -f "${pass_file}" scp \
         -P "${SPLUNK_SSH_PORT}" \
@@ -1010,6 +1012,8 @@ cleanup_remote_stage_file() {
     pass_file="$(mktemp)"
     chmod 600 "${pass_file}"
     printf '%s' "${SPLUNK_SSH_PASS}" > "${pass_file}"
+    # shellcheck disable=SC2064  # intentional: trap value captured at registration time.
+    trap "rm -f '${pass_file}'" EXIT INT TERM
 
     sshpass -f "${pass_file}" ssh \
         -p "${SPLUNK_SSH_PORT}" \

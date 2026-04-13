@@ -740,6 +740,9 @@ hbs_make_sshpass_file() {
     pass_file="$(mktemp)"
     chmod 600 "${pass_file}"
     printf '%s' "${SPLUNK_SSH_PASS}" > "${pass_file}"
+    # Register cleanup so the password file is removed even if the script is interrupted.
+    # shellcheck disable=SC2064  # intentional: trap value captured at registration time.
+    trap "rm -f '${pass_file}'" EXIT INT TERM
     printf '%s' "${pass_file}"
 }
 

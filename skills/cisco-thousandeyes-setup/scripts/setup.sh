@@ -505,7 +505,7 @@ main() {
             events) enable_events_inputs "${ACCOUNT}" "${ACCOUNT_GROUP}" ;;
             activity) enable_activity_inputs "${ACCOUNT}" "${ACCOUNT_GROUP}" "${HEC_TOKEN}" ;;
             alerts) enable_alerts_inputs "${ACCOUNT}" "${ACCOUNT_GROUP}" "${HEC_TOKEN}" ;;
-            *) log "ERROR: Unknown input type '${INPUT_TYPE}'."; usage ;;
+            *) log "ERROR: Unknown input type '${INPUT_TYPE}'." >&2; usage 1 ;;
         esac
         log_live_input_summary
         log "$(log_platform_restart_guidance "input changes")"

@@ -336,7 +336,7 @@ main() {
             switches) enable_switches_inputs "${ACCOUNT}" "${INDEX}" ;;
             organization) enable_organization_inputs "${ACCOUNT}" "${INDEX}" ;;
             sensor) enable_sensor_inputs "${ACCOUNT}" "${INDEX}" ;;
-            *) log "ERROR: Unknown input type '${INPUT_TYPE}'."; usage ;;
+            *) log "ERROR: Unknown input type '${INPUT_TYPE}'." >&2; usage 1 ;;
         esac
         log_live_input_summary
         log "$(log_platform_restart_guidance "input changes")"

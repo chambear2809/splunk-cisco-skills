@@ -14,13 +14,15 @@ get_splunkbase_session() {
     response_file="$(mktemp)"
     cookie_file="$(mktemp)"
     chmod 600 "${cookie_file}"
+    trap 'rm -f "${cookie_file}" "${response_file}"' EXIT INT TERM
 
     if [[ -n "${SB_COOKIE_JAR:-}" && -f "${SB_COOKIE_JAR}" ]]; then
         rm -f "${SB_COOKIE_JAR}"
     fi
 
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    http_code=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+    http_code=$(curl -s --connect-timeout 30 --max-time 120 \
+        ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
         -X POST "https://splunkbase.splunk.com/api/account:login" \
         -K <(
             printf 'form-string = "username=%s"\n' "$(_curl_config_escape "${SB_USER}")"
@@ -56,7 +58,8 @@ get_splunkbase_release_metadata() {
     _set_splunkbase_curl_tls_args || return 1
 
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
-    metadata=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" 2>/dev/null \
+    metadata=$(curl -s --connect-timeout 30 --max-time 120 \
+        ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" 2>/dev/null \
         | python3 -c "
 import json
 import sys

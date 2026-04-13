@@ -40,7 +40,7 @@ Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
 
 This script manages search-tier Stream protocol definitions only.
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -50,7 +50,7 @@ while [[ $# -gt 0 ]]; do
         --index) require_arg "$1" $# || exit 1; TARGET_INDEX="$2"; shift 2 ;;
         --list) LIST_STREAMS=true; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

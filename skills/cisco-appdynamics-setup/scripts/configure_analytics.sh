@@ -41,7 +41,7 @@ Splunk credentials are read from the project-root credentials file
 (falls back to ~/.splunk/credentials) automatically.
 Set SPLUNK_URI for remote Splunk (default: https://localhost:8089).
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
         --source-name) require_arg "$1" $# || exit 1; SOURCE_NAME="$2"; shift 2 ;;
         --input-name) require_arg "$1" $# || exit 1; INPUT_NAME="$2"; shift 2 ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

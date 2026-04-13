@@ -171,7 +171,7 @@ normalize_yes_no() {
         no|NO|false|FALSE|False|0|off|OFF) printf '%s' "no" ;;
         *)
             log "ERROR: Expected yes or no, got '${1:-}'."
-            exit 1
+            return 1
             ;;
     esac
 }

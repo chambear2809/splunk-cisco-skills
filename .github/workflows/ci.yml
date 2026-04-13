@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
 
 permissions:
@@ -23,7 +24,7 @@ jobs:
           cache-dependency-path: requirements-dev.txt
 
       - name: Install Python test dependencies
-        run: pip install "pytest>=8,<9"
+        run: pip install -r requirements-dev.txt
 
       - name: Run Python tests
         run: pytest tests/ -v

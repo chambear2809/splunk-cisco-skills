@@ -23,7 +23,7 @@ Options:
 Example:
   $(basename "$0") 7777 7828 5580
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 APP_IDS=()
@@ -35,7 +35,7 @@ while [[ $# -gt 0 ]]; do
         --version) require_arg "$1" $# || exit 1; APP_VERSION="$2"; shift 2 ;;
         --no-restart) RESTART=false; shift ;;
         --help) usage ;;
-        --*) log "Unknown option: $1"; usage ;;
+        --*) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
         *) APP_IDS+=("$1"); shift ;;
     esac
 done

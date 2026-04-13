@@ -66,7 +66,7 @@ Options:
   --no-create-index              Do not auto-create supplied indexes
   --help                         Show this help
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 utc_now() {
@@ -309,7 +309,7 @@ while [[ $# -gt 0 ]]; do
         --ravpn-index) require_arg "$1" $# || exit 1; RAVPN_INDEX="$2"; shift 2 ;;
         --no-create-index) CREATE_INDEX=false; shift ;;
         --help) usage ;;
-        *) log "Unknown option: $1"; usage ;;
+        *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

@@ -51,7 +51,7 @@ Cyber Vision:
 
 Splunk credentials are read from the project-root credentials file (falls back to ~/.splunk/credentials) automatically.
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
         --no-verify-ssl) SET_VERIFY_SSL="False"; shift ;;
         --verify-ssl) SET_VERIFY_SSL="True"; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 
@@ -85,7 +85,7 @@ log "Authenticated to Splunk REST API."
 
 if [[ -n "${SET_VERIFY_SSL}" ]]; then
     if rest_set_verify_ssl "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
-        "ta_cisco_catalyst_settings" "additional_parameters" "verify_ssl" "${SET_VERIFY_SSL}"; then
+        "ta_cisco_catalyst_settings" "additional_parameters" "${SET_VERIFY_SSL}" "verify_ssl"; then
         log "Set verify_ssl=${SET_VERIFY_SSL} in ta_cisco_catalyst_settings.conf."
     else
         log "ERROR: Failed to set verify_ssl in ta_cisco_catalyst_settings.conf."

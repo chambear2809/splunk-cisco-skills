@@ -18,6 +18,14 @@ setup() {
     TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
     PROJECT_ROOT="$(cd "${TEST_DIR}/.." && pwd)"
     LIB_DIR="${PROJECT_ROOT}/skills/shared/lib"
+
+    TEST_TEMP_FILES=()
+}
+
+teardown() {
+    for f in "${TEST_TEMP_FILES[@]+"${TEST_TEMP_FILES[@]}"}"; do
+        rm -rf "${f}"
+    done
 }
 
 # ---------------------------------------------------------------------------

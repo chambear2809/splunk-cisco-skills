@@ -43,7 +43,7 @@ Example:
     --set index cisco_xdr \\
     --secret-file refresh_token /tmp/xdr_refresh_token
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 append_param() {
@@ -170,7 +170,7 @@ while [[ $# -gt 0 ]]; do
         --disable) DISABLED_FLAG="1"; shift ;;
         --no-create-index) CREATE_INDEX=false; shift ;;
         --help) usage ;;
-        *) log "Unknown option: $1"; usage ;;
+        *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

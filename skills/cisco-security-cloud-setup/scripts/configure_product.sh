@@ -50,7 +50,7 @@ Example:
     --set xdr_import_time_range "7 days ago" \\
     --secret-file refresh_token /tmp/xdr_refresh_token
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 append_kv() {
@@ -149,7 +149,7 @@ while [[ $# -gt 0 ]]; do
         --no-create-index) CREATE_INDEX=false; shift ;;
         --list-products) LIST_PRODUCTS=true; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

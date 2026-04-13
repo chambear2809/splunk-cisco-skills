@@ -26,6 +26,17 @@ setup() {
     TEST_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")" && pwd)"
     PROJECT_ROOT="$(cd "${TEST_DIR}/.." && pwd)"
     LIB_DIR="${PROJECT_ROOT}/skills/shared/lib"
+
+    # Track temp files/dirs created during this test for cleanup on failure.
+    TEST_TEMP_FILES=()
+}
+
+teardown() {
+    # Clean up any temp files/dirs that the test may have leaked on failure.
+    for f in "${TEST_TEMP_FILES[@]+"${TEST_TEMP_FILES[@]}"}"; do
+        rm -rf "${f}"
+    done
+    rm -rf "${BATS_TMPDIR}"/set_conf_args_* 2>/dev/null || true
 }
 
 # --- form_urlencode_pairs ---
@@ -60,39 +71,6 @@ setup() {
     source "${LIB_DIR}/rest_helpers.sh"
     result=$(_urlencode "")
     [ "$result" = "" ]
-}
-
-# --- _curl_ssl_flags ---
-
-@test "_curl_ssl_flags returns -sk when SPLUNK_VERIFY_SSL is false" {
-    source "${LIB_DIR}/rest_helpers.sh"
-    export SPLUNK_VERIFY_SSL="false"
-    result=$(_curl_ssl_flags)
-    [ "$result" = "-sk" ]
-}
-
-@test "_curl_ssl_flags returns -s when SPLUNK_VERIFY_SSL is true" {
-    source "${LIB_DIR}/rest_helpers.sh"
-    export SPLUNK_VERIFY_SSL="true"
-    result=$(_curl_ssl_flags)
-    [ "$result" = "-s" ]
-}
-
-@test "_curl_ssl_flags defaults to -sk when unset" {
-    source "${LIB_DIR}/rest_helpers.sh"
-    unset SPLUNK_VERIFY_SSL
-    result=$(_curl_ssl_flags)
-    [ "$result" = "-sk" ]
-}
-
-@test "_curl_ssl_flags returns -s when SPLUNK_CA_CERT is set" {
-    source "${LIB_DIR}/rest_helpers.sh"
-    tmpfile=$(mktemp)
-    export SPLUNK_CA_CERT="$tmpfile"
-    result=$(_curl_ssl_flags)
-    rm -f "$tmpfile"
-    unset SPLUNK_CA_CERT
-    [ "$result" = "-s" ]
 }
 
 @test "_set_splunk_curl_tls_args adds cacert when configured" {
@@ -256,6 +234,7 @@ EOF
 
 @test "deployment_bundle_apply_on_profile uses profile credentials for cluster-manager auth" {
     credentials_file=$(mktemp)
+    TEST_TEMP_FILES+=("${credentials_file}")
     cat > "${credentials_file}" <<'EOF'
 SPLUNK_USER="global-user"
 SPLUNK_PASS="global-pass"
@@ -270,17 +249,26 @@ EOF
 
     source "${LIB_DIR}/credential_helpers.sh"
 
-    hbs_run_as_user_cmd() {
+    # Credentials are now passed via a temp file read inside the script, not on the CLI.
+    # Mock hbs_run_target_cmd_with_stdin to capture the script content (arg $3).
+    hbs_run_target_cmd_with_stdin() {
         echo "$3"
     }
-    export -f hbs_run_as_user_cmd
+    export -f hbs_run_target_cmd_with_stdin
+    # Also mock hbs_prefix_with_sudo since it's called to build the command arg.
+    hbs_prefix_with_sudo() {
+        echo "$2"
+    }
+    export -f hbs_prefix_with_sudo
 
     run deployment_bundle_apply_on_profile "cluster" "idxc" "" "" ""
 
-    rm -f "${credentials_file}"
-
     [ "$status" -eq 0 ]
-    [[ "$output" == *"apply cluster-bundle -auth cluster-user:cluster-pass -answer-yes"* ]]
+    # The script content should invoke apply cluster-bundle with credentials read
+    # from a temp file (not inline), and should not contain the literal password.
+    [[ "$output" == *"apply cluster-bundle"* ]]
+    [[ "$output" == *"-answer-yes"* ]]
+    [[ "$output" != *"cluster-pass"* ]]
 }
 
 @test "deployment_hec_token_record_from_conf parses bundle-managed inputs stanzas" {

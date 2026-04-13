@@ -33,7 +33,7 @@ Optional:
 
 Splunk credentials are read from the project-root credentials file (falls back to ~/.splunk/credentials) automatically.
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -46,7 +46,7 @@ while [[ $# -gt 0 ]]; do
         --auto-inputs) AUTO_INPUTS=true; shift ;;
         --index) require_arg "$1" $# || exit 1; AUTO_INDEX="$2"; shift 2 ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 

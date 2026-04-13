@@ -49,7 +49,7 @@ Common:
 
 Note: Use --password-file to avoid passing the password on the command line.
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -68,7 +68,7 @@ while [[ $# -gt 0 ]]; do
         --no-verify-ssl) SET_VERIFY_SSL="False"; shift ;;
         --verify-ssl) SET_VERIFY_SSL="True"; shift ;;
         --help) usage ;;
-        *) echo "Unknown option: $1"; usage ;;
+        *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
 done
 
@@ -82,7 +82,7 @@ SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to
 
 if [[ -n "${SET_VERIFY_SSL}" ]]; then
     if rest_set_verify_ssl "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
-        "cisco_dc_networking_app_for_splunk_settings" "additional_parameters" "verify_ssl" "${SET_VERIFY_SSL}"; then
+        "cisco_dc_networking_app_for_splunk_settings" "additional_parameters" "${SET_VERIFY_SSL}" "verify_ssl"; then
         log "Set verify_ssl=${SET_VERIFY_SSL} in cisco_dc_networking_app_for_splunk_settings.conf."
     else
         log "ERROR: Failed to set verify_ssl in cisco_dc_networking_app_for_splunk_settings.conf."

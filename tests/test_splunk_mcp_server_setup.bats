@@ -95,23 +95,27 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"splunk-shared\"" ]]
     [[ "$output" =~ "\"type\": \"stdio\"" ]]
-    [[ "$output" == *'${workspaceFolder}/run-splunk-mcp.sh'* ]]
+    [[ "$output" =~ "\"command\": \"node\"" ]]
+    [[ "$output" == *'${workspaceFolder}/run-splunk-mcp.js'* ]]
+
+    [ -f "${output_dir}/run-splunk-mcp.js" ]
 
     run cat "${workspace_dir}/.cursor/mcp.json"
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"splunk-shared\"" ]]
     [[ "$output" =~ "\"type\": \"stdio\"" ]]
-    [[ "$output" == *"${output_dir}/run-splunk-mcp.sh"* ]]
+    [[ "$output" =~ "\"command\": \"node\"" ]]
+    [[ "$output" == *"${output_dir}/run-splunk-mcp.js"* ]]
 
     run cat "${output_dir}/register-codex-mcp.sh"
     [ "$status" -eq 0 ]
     [[ "$output" =~ "codex mcp add" ]]
-    [[ "$output" =~ "run-splunk-mcp.sh" ]]
+    [[ "$output" =~ "run-splunk-mcp.js" ]]
 
     run env HOME="${home_dir}" codex mcp get "splunk-shared" --json
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"name\":\"splunk-shared\"" || "$output" =~ "\"name\": \"splunk-shared\"" ]]
-    [[ "$output" == *"${home_dir}/.codex/mcp-bridges/splunk-shared/run-splunk-mcp.sh"* ]]
+    [[ "$output" == *"${home_dir}/.codex/mcp-bridges/splunk-shared/run-splunk-mcp.js"* ]]
 
     rm -rf "${work_dir}"
 }
@@ -171,7 +175,7 @@ teardown() {
     run env HOME="${home_dir}" codex mcp get "splunk-no-cursor" --json
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"name\":\"splunk-no-cursor\"" || "$output" =~ "\"name\": \"splunk-no-cursor\"" ]]
-    [[ "$output" == *"${home_dir}/.codex/mcp-bridges/splunk-no-cursor/run-splunk-mcp.sh"* ]]
+    [[ "$output" == *"${home_dir}/.codex/mcp-bridges/splunk-no-cursor/run-splunk-mcp.js"* ]]
 
     rm -rf "${work_dir}"
 }

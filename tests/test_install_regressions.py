@@ -249,15 +249,6 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             bin_dir.mkdir()
             credentials_file = tmp_path / "credentials"
             request_log = tmp_path / "requests.jsonl"
-            _onboarding_blob = base64.urlsafe_b64encode(
-                json.dumps(
-                    {
-                        "tenant_name": "example-prod",
-                        "region": "usa",
-                        "email": "ops@example.com",
-                    }
-                ).encode("utf-8")
-            ).decode("utf-8").rstrip("=")
 
             write_executable(
                 bin_dir / "curl",

@@ -115,8 +115,10 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             self.assertIn(client_name, rendered_config["mcpServers"])
             self.assertEqual(
                 rendered_config["mcpServers"][client_name]["command"],
-                "${workspaceFolder}/run-splunk-mcp.sh",
+                "node",
             )
+            self.assertEqual(len(rendered_config["mcpServers"][client_name]["args"]), 1)
+            self.assertIn("run-splunk-mcp.js", rendered_config["mcpServers"][client_name]["args"][0])
 
             register_result = subprocess.run(
                 ["bash", str(output_dir / "register-codex-mcp.sh")],
@@ -137,8 +139,9 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             codex_args = json.loads(codex_log.read_text(encoding="utf-8"))
             self.assertEqual(codex_args[:3], ["mcp", "add", client_name])
             self.assertEqual(codex_args[3], "--")
-            self.assertTrue(codex_args[4].startswith(str(home_dir / ".codex" / "mcp-bridges")))
-            self.assertTrue(codex_args[4].endswith("/run-splunk-mcp.sh"))
+            self.assertEqual(codex_args[4], "node")
+            self.assertTrue(codex_args[5].startswith(str(home_dir / ".codex" / "mcp-bridges")))
+            self.assertTrue(codex_args[5].endswith("/run-splunk-mcp.js"))
 
 
     def test_splunk_mcp_rendered_env_file_is_shell_safe(self):
@@ -280,11 +283,12 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             workspace_json = json.loads((cursor_dir / "mcp.json").read_text(encoding="utf-8"))
             self.assertEqual(workspace_json["notes"], {"keep": True})
             self.assertEqual(workspace_json["mcpServers"]["existing"]["command"], "/bin/echo")
+            self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["command"], "node")
+            self.assertEqual(len(workspace_json["mcpServers"]["splunk-merge"]["args"]), 1)
             self.assertEqual(
-                Path(workspace_json["mcpServers"]["splunk-merge"]["command"]).resolve(),
-                (output_dir / "run-splunk-mcp.sh").resolve(),
+                Path(workspace_json["mcpServers"]["splunk-merge"]["args"][0]).resolve(),
+                (output_dir / "run-splunk-mcp.js").resolve(),
             )
-            self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["args"], [])
             self.assertEqual(workspace_json["mcpServers"]["splunk-merge"]["type"], "stdio")
 
 
@@ -324,11 +328,11 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
             workspace_json = json.loads((workspace_dir / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
+            self.assertEqual(workspace_json["mcpServers"]["splunk-relative"]["command"], "node")
             self.assertEqual(
-                workspace_json["mcpServers"]["splunk-relative"]["command"],
-                "${workspaceFolder}/rendered/run-splunk-mcp.sh",
+                workspace_json["mcpServers"]["splunk-relative"]["args"],
+                ["${workspaceFolder}/rendered/run-splunk-mcp.js"],
             )
-            self.assertEqual(workspace_json["mcpServers"]["splunk-relative"]["args"], [])
             self.assertEqual(workspace_json["mcpServers"]["splunk-relative"]["type"], "stdio")
 
 
@@ -413,9 +417,11 @@ class MCPRegressionTests(ShellScriptRegressionBase):
 
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             workspace_json = json.loads((workspace_dir / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
+            self.assertEqual(workspace_json["mcpServers"]["splunk-default-workspace"]["command"], "node")
+            self.assertEqual(len(workspace_json["mcpServers"]["splunk-default-workspace"]["args"]), 1)
             self.assertEqual(
-                Path(workspace_json["mcpServers"]["splunk-default-workspace"]["command"]).resolve(),
-                (output_dir / "run-splunk-mcp.sh").resolve(),
+                Path(workspace_json["mcpServers"]["splunk-default-workspace"]["args"][0]).resolve(),
+                (output_dir / "run-splunk-mcp.js").resolve(),
             )
 
 
@@ -441,7 +447,8 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 if len(args) >= 4 and args[0] == "mcp" and args[1] == "add":
                     name = args[2]
                     cmd = args[4] if len(args) > 4 else ""
-                    data = {"name": name, "transport": {"type": "stdio", "command": cmd, "args": []}}
+                    cmd_args = args[5:] if len(args) > 5 else []
+                    data = {"name": name, "transport": {"type": "stdio", "command": cmd, "args": cmd_args}}
                     with open(os.path.join(store, name + ".json"), "w") as f:
                         json.dump(data, f)
                 elif len(args) >= 3 and args[0] == "mcp" and args[1] == "get":
@@ -512,11 +519,12 @@ class MCPRegressionTests(ShellScriptRegressionBase):
 
             data = json.loads(registered.stdout)
             self.assertEqual(data["transport"]["type"], "stdio")
+            self.assertEqual(data["transport"]["command"], "node")
+            self.assertEqual(len(data["transport"]["args"]), 1)
             self.assertEqual(
-                Path(data["transport"]["command"]).resolve(),
-                (home_dir / ".codex" / "mcp-bridges" / "splunk-repeat" / "run-splunk-mcp.sh").resolve(),
+                Path(data["transport"]["args"][0]).resolve(),
+                (home_dir / ".codex" / "mcp-bridges" / "splunk-repeat" / "run-splunk-mcp.js").resolve(),
             )
-            self.assertEqual(data["transport"]["args"], [])
             stable_env = (home_dir / ".codex" / "mcp-bridges" / "splunk-repeat" / ".env.splunk-mcp").read_text(
                 encoding="utf-8"
             )
@@ -532,8 +540,8 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 "mcpServers": {
                     "splunk-mcp": {
                         "type": "stdio",
-                        "command": "${workspaceFolder}/splunk-mcp-rendered/run-splunk-mcp.sh",
-                        "args": [],
+                        "command": "node",
+                        "args": ["${workspaceFolder}/splunk-mcp-rendered/run-splunk-mcp.js"],
                     }
                 }
             },
@@ -626,8 +634,8 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 "mcpServers": {
                     "splunk-mcp": {
                         "type": "stdio",
-                        "command": "./splunk-mcp-rendered/run-splunk-mcp.sh",
-                        "args": [],
+                        "command": "node",
+                        "args": ["./splunk-mcp-rendered/run-splunk-mcp.js"],
                     }
                 }
             },

@@ -2,8 +2,8 @@
   "mcpServers": {
     "splunk-mcp": {
       "type": "stdio",
-      "command": "${workspaceFolder}/splunk-mcp-rendered/run-splunk-mcp.sh",
-      "args": []
+      "command": "node",
+      "args": ["${workspaceFolder}/splunk-mcp-rendered/run-splunk-mcp.js"]
     }
   }
 }

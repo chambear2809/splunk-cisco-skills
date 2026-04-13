@@ -21,7 +21,7 @@ Options:
 Example:
   $(basename "$0") Splunk_TA_Cisco_Intersight cisco_dc_networking_app_for_splunk Splunk_TA_cisco_meraki
 EOF
-    exit 0
+    exit "${1:-0}"
 }
 
 APP_NAMES=()
@@ -31,7 +31,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --no-restart) RESTART=false; shift ;;
         --help) usage ;;
-        --*) log "Unknown option: $1"; usage ;;
+        --*) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
         *) APP_NAMES+=("$1"); shift ;;
     esac
 done

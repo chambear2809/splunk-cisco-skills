@@ -326,10 +326,11 @@ cloud_restart_if_required() {
         return 0
     fi
 
-    set +e
-    restart_output=$(acs_command restart current-stack 2>&1)
-    rc=$?
-    set -e
+    if ! restart_output=$(acs_command restart current-stack 2>&1); then
+        rc=$?
+    else
+        rc=0
+    fi
 
     if (( rc != 0 )) && [[ "${restart_output}" != *"another restart is already in progress"* ]]; then
         printf '%s\n' "${restart_output}" >&2

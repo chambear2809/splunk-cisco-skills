@@ -21,14 +21,6 @@ def _normalize_disabled(value):
     return text
 "
 
-_curl_ssl_flags() {
-    if [[ -n "${SPLUNK_CA_CERT:-}" || "${SPLUNK_VERIFY_SSL:-false}" == "true" ]]; then
-        printf '%s' "-s"
-    else
-        printf '%s' "-sk"
-    fi
-}
-
 _tls_verify_args=()
 
 _bool_is_true() {
@@ -157,8 +149,8 @@ verify_search_api_connectivity() {
     local uri="${1:-${SPLUNK_URI:-https://localhost:8089}}"
     local host port http_code
 
-    host="$(python3 -c "from urllib.parse import urlparse; p=urlparse('${uri}'); print(p.hostname or '')" 2>/dev/null || true)"
-    port="$(python3 -c "from urllib.parse import urlparse; p=urlparse('${uri}'); print(p.port or 8089)" 2>/dev/null || echo 8089)"
+    host="$(python3 -c "import sys; from urllib.parse import urlparse; p=urlparse(sys.argv[1]); print(p.hostname or '')" -- "${uri}" 2>/dev/null || true)"
+    port="$(python3 -c "import sys; from urllib.parse import urlparse; p=urlparse(sys.argv[1]); print(p.port or 8089)" -- "${uri}" 2>/dev/null || echo 8089)"
 
     if command -v nc >/dev/null 2>&1; then
         local nc_timeout_flag="-G 5"  # macOS
@@ -521,7 +513,7 @@ rest_set_conf() {
 }
 
 rest_set_verify_ssl() {
-    local sk="$1" uri="$2" app="$3" conf="$4" stanza="$5" field="${6:-verify_ssl}" value="$7"
+    local sk="$1" uri="$2" app="$3" conf="$4" stanza="$5" value="$6" field="${7:-verify_ssl}"
     local body
     body=$(form_urlencode_pairs "${field}" "${value}") || return 1
     rest_set_conf "${sk}" "${uri}" "${app}" "${conf}" "${stanza}" "${body}"
@@ -679,11 +671,11 @@ try:
         }
         print(json.dumps(record), end='')
         raise SystemExit(0)
-except Exception:
-    pass
+except Exception as e:
+    print(f'WARNING: rest_get_hec_token_record: {e}', file=sys.stderr)
 
 print('{}', end='')
-" "${token_name}" 2>/dev/null
+" "${token_name}"
 }
 
 rest_json_field() {

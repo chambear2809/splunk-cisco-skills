@@ -194,6 +194,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
+            timeout=120,
         )
 
     def run_script_no_env(
@@ -207,6 +208,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
             capture_output=True,
             text=True,
             check=False,
+            timeout=120,
         )
 
     def build_mock_cisco_skill_env(self, tmp_path: Path) -> tuple[dict, Path, Path, Path, Path]:
