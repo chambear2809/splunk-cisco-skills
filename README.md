@@ -597,7 +597,6 @@ splunk-cloud-skills/
 │   ├── cisco-spaces-setup/
 │   └── cisco-thousandeyes-setup/
 ├── tests/                       # bats and Python test suites
-├── plans/                       # design notes and implementation plans
 └── rules/
     └── credential-handling.mdc
 ```
