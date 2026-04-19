@@ -16,8 +16,28 @@ os.makedirs(store, exist_ok=True)
 args = sys.argv[1:]
 if len(args) >= 4 and args[0] == "mcp" and args[1] == "add":
     name = args[2]
+    if args[3] != "--":
+        print(f"mock codex: unsupported add args: {args}", file=sys.stderr)
+        sys.exit(1)
     cmd = args[4] if len(args) > 4 else ""
-    data = {"name": name, "transport": {"type": "stdio", "command": cmd, "args": []}}
+    cmd_args = args[5:] if len(args) > 5 else []
+    data = {
+        "name": name,
+        "enabled": True,
+        "disabled_reason": None,
+        "transport": {
+            "type": "stdio",
+            "command": cmd,
+            "args": cmd_args,
+            "env": None,
+            "env_vars": [],
+            "cwd": None,
+        },
+        "enabled_tools": None,
+        "disabled_tools": None,
+        "startup_timeout_sec": None,
+        "tool_timeout_sec": None,
+    }
     with open(os.path.join(store, name + ".json"), "w") as f:
         json.dump(data, f)
 elif len(args) >= 3 and args[0] == "mcp" and args[1] == "get":
