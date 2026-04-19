@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5.6.0
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.11"
           cache: "pip"
@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
 
       - name: Install Bats
         run: |
@@ -51,7 +51,7 @@ jobs:
       SHELLCHECK_VERSION: "0.10.0"
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
 
       - name: Install ShellCheck
         run: |
@@ -91,10 +91,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
 
       - name: Set up Python
-        uses: actions/setup-python@v5.6.0
+        uses: actions/setup-python@v6.2.0
         with:
           python-version: "3.11"
           cache: "pip"
