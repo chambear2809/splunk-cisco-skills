@@ -1,0 +1,106 @@
+connection:
+  base_url: https://splunk.example.com:8089
+  session_key_env: SPLUNK_SESSION_KEY
+  verify_ssl: false
+  platform: enterprise
+
+itsi:
+  require_present: true
+  install_if_missing: true
+  source: splunkbase
+  app_id: "1841"
+
+content_library:
+  require_present: true
+  install_if_missing: true
+  source: splunkbase
+  app_id: "5391"
+
+packs:
+  - profile: aws
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    summary_indexes:
+      - summary
+
+  - profile: cisco_data_center
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+
+  - profile: cisco_enterprise_networks
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+
+  - profile: cisco_thousandeyes
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    index_macro_value: index="thousandeyes"
+
+  - profile: linux
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    event_indexes:
+      - os
+
+  - profile: splunk_appdynamics
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    index_macro_value: index="appdynamics"
+
+  - profile: splunk_observability_cloud
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    metrics_indexes:
+      - sim_metrics
+    custom_subdomain: your-observability-subdomain
+
+  - profile: vmware
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    metrics_indexes:
+      - vmware-perf-metrics
+
+  - profile: windows
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    event_indexes:
+      - windows
+      - perfmon
+    metrics_indexes:
+      - itsi_im_metrics

@@ -1,0 +1,85 @@
+connection:
+  base_url: https://splunk.example.com:8089
+  username_env: SPLUNK_USERNAME
+  password_env: SPLUNK_PASSWORD
+  session_key_env: SPLUNK_SESSION_KEY
+  verify_ssl: false
+
+defaults:
+  sec_grp: default_itsi_security_group
+
+entities:
+  - title: edge-sw-01
+    description: Example edge switch entity
+    identifier_fields:
+      - field: host
+        value: edge-sw-01
+      - field: ip
+        value: 10.20.30.40
+    informational_fields:
+      - field: location
+        value: dc-1
+
+services:
+  - title: WAN Core
+    description: Example dependency service
+    enabled: false
+    entity_rules:
+      - field: host
+        field_type: alias
+        value: core-*
+    kpis:
+      - title: Availability
+        search: index=network sourcetype=heartbeat | stats count as availability by host
+        threshold_field: availability
+        aggregate_statop: avg
+        entity_statop: avg
+        entity_id_fields: host
+        entity_breakdown_id_field: host
+        thresholds:
+          aggregate:
+            baseSeverityLabel: normal
+            baseSeverityValue: 2
+            metricField: availability
+            thresholdLevels:
+              - severityLabel: high
+                severityValue: 5
+                thresholdValue: 1
+  - title: Network Edge
+    description: Example service managed by this skill
+    enabled: false
+    entity_rules:
+      - field: host
+        field_type: alias
+        value: edge-sw-*
+    kpis:
+      - title: Interface Errors
+        search: index=network sourcetype=interface_errors | stats sum(errors) as errors by host
+        threshold_field: errors
+        aggregate_statop: sum
+        entity_statop: sum
+        entity_id_fields: host
+        entity_breakdown_id_field: host
+        thresholds:
+          aggregate:
+            baseSeverityLabel: normal
+            baseSeverityValue: 2
+            metricField: errors
+            thresholdLevels:
+              - severityLabel: high
+                severityValue: 5
+                thresholdValue: 10
+              - severityLabel: critical
+                severityValue: 6
+                thresholdValue: 20
+    depends_on:
+      - service: WAN Core
+        kpis:
+          - Availability
+
+neaps:
+  - title: Example NEAP
+    description: Replace payload fields with your custom NEAP definition.
+    payload:
+      rule_type: custom
+

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKFLOW=""
+SPEC_PATH=""
+
+usage() {
+  cat <<'EOF'
+Usage: validate.sh --workflow native|content-packs --spec PATH
+
+Examples:
+  bash scripts/validate.sh --workflow native --spec templates/native.example.yaml
+  bash scripts/validate.sh --workflow content-packs --spec templates/content_packs.example.yaml
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --workflow)
+      WORKFLOW="${2:-}"
+      shift 2
+      ;;
+    --spec)
+      SPEC_PATH="${2:-}"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "${WORKFLOW}" || -z "${SPEC_PATH}" ]]; then
+  usage >&2
+  exit 1
+fi
+
+SPEC_JSON="$(mktemp)"
+trap 'rm -f "${SPEC_JSON}"' EXIT
+
+ruby "${SCRIPT_DIR}/spec_to_json.rb" --spec "${SPEC_PATH}" --output "${SPEC_JSON}"
+
+case "${WORKFLOW}" in
+  native)
+    python3 "${SCRIPT_DIR}/run_native.py" --spec-json "${SPEC_JSON}" --mode validate
+    ;;
+  content-packs)
+    python3 "${SCRIPT_DIR}/run_content_packs.py" --spec-json "${SPEC_JSON}" --mode validate
+    ;;
+  *)
+    echo "Unsupported workflow: ${WORKFLOW}" >&2
+    exit 1
+    ;;
+esac

@@ -37,6 +37,9 @@ projects/tmp-*
 # --- Local TA intake templates ---
 **/template.local
 
+# --- Local ITSI config workflow reports ---
+/skills/splunk-itsi-config/reports/
+
 # --- Local SC4S rendered deployment assets ---
 /sc4s-rendered/
 /sc4snmp-rendered/

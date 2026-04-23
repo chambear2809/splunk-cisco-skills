@@ -856,7 +856,11 @@ download_from_splunkbase() {
     if ! download_splunkbase_release "${APP_ID}" "${requested_version}" "${temp_path}"; then
         rm -f "${temp_path}"
         log "ERROR: Splunkbase download failed."
-        log "Verify app ID (${APP_ID}), version (${requested_version:-latest}), and splunk.com credentials in your credentials file."
+        if [[ -n "${SB_DOWNLOAD_ERROR_HINT:-}" ]]; then
+            log "${SB_DOWNLOAD_ERROR_HINT}"
+        else
+            log "Verify app ID (${APP_ID}), version (${requested_version:-latest}), and splunk.com credentials in your credentials file."
+        fi
         exit 1
     fi
 

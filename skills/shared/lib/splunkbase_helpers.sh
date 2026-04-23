@@ -14,7 +14,7 @@ get_splunkbase_session() {
     response_file="$(mktemp)"
     cookie_file="$(mktemp)"
     chmod 600 "${cookie_file}"
-    trap 'rm -f "${cookie_file}" "${response_file}"' EXIT INT TERM
+    trap "rm -f '${cookie_file}' '${response_file}'" EXIT INT TERM
 
     if [[ -n "${SB_COOKIE_JAR:-}" && -f "${SB_COOKIE_JAR}" ]]; then
         rm -f "${SB_COOKIE_JAR}"
@@ -117,6 +117,9 @@ download_splunkbase_release() {
     local output_path="$3"
     local tmp_file meta http_code effective_url
 
+    SB_DOWNLOAD_HTTP_CODE=""
+    SB_DOWNLOAD_ERROR_HINT=""
+
     if [[ -z "${SB_SESSION_ID:-}" || -z "${SB_COOKIE_JAR:-}" || ! -f "${SB_COOKIE_JAR:-}" ]]; then
         get_splunkbase_session || return 1
     fi
@@ -154,7 +157,12 @@ download_splunkbase_release() {
         return 0
     fi
 
+    SB_DOWNLOAD_HTTP_CODE="${http_code}"
     rm -f "${tmp_file}"
+    if [[ "${http_code}" == "403" ]]; then
+        SB_DOWNLOAD_ERROR_HINT="Splunkbase denied download access for this app (HTTP 403). Confirm the Splunkbase account is entitled to the requested app."
+        echo "ERROR: ${SB_DOWNLOAD_ERROR_HINT}" >&2
+    fi
     echo "ERROR: Failed to download Splunkbase app ${app_id}${app_version:+ version ${app_version}}." >&2
     return 1
 }

@@ -1751,6 +1751,123 @@ class InstallRegressionTests(ShellScriptRegressionBase):
             self.assertIn("splunk@10.110.253.5:/tmp/", sshpass_text)
             self.assertIn("ssh", sshpass_text)
 
+    def test_install_app_reports_download_failure_without_unbound_cookie_trap(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            credentials_file = tmp_path / "credentials"
+            ta_cache = tmp_path / "ta-cache"
+            ta_cache.mkdir()
+
+            write_executable(
+                bin_dir / "curl",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import sys
+                from pathlib import Path
+                from urllib.parse import urlparse
+
+                args = sys.argv[1:]
+                url = ""
+                output_target = None
+                cookie_target = None
+                write_format = ""
+
+                i = 0
+                while i < len(args):
+                    arg = args[i]
+                    if arg == "-o" and i + 1 < len(args):
+                        output_target = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-c" and i + 1 < len(args):
+                        cookie_target = args[i + 1]
+                        i += 2
+                        continue
+                    if arg == "-w" and i + 1 < len(args):
+                        write_format = args[i + 1]
+                        i += 2
+                        continue
+                    if arg.startswith("http://") or arg.startswith("https://"):
+                        url = arg
+                    i += 1
+
+                def emit(body: str = "", code: int | None = None, effective_url: str = "") -> None:
+                    if output_target and output_target != "/dev/null" and body:
+                        Path(output_target).write_text(body, encoding="utf-8")
+                    elif body:
+                        sys.stdout.write(body)
+
+                    if write_format and code is not None:
+                        rendered = bytes(write_format, "utf-8").decode("unicode_escape")
+                        rendered = rendered.replace("%{http_code}", str(code)).replace(
+                            "%{url_effective}", effective_url
+                        )
+                        sys.stdout.write(rendered)
+                    raise SystemExit(0)
+
+                path = urlparse(url).path
+
+                if "/api/account:login" in path:
+                    if cookie_target:
+                        Path(cookie_target).write_text(
+                            "# Netscape HTTP Cookie File\\n"
+                            ".splunkbase.splunk.com\\tTRUE\\t/\\tFALSE\\t0\\tsessionid\\tdummy-session\\n",
+                            encoding="utf-8",
+                        )
+                    emit("<response><id>sb-session</id></response>", code=200)
+
+                if "/api/v1/app/99997/release/" in path:
+                    emit(json.dumps([{"name": "1.2.3", "filename": "broken-test-app_123.tgz"}]))
+
+                if "/app/99997/release/1.2.3/download/" in path:
+                    emit("", code=403, effective_url="https://cdn.splunkbase.invalid/broken-test-app_123.tgz")
+
+                emit("", code=200)
+                """,
+            )
+
+            credentials_file.write_text(
+                textwrap.dedent(
+                    """\
+                    SB_USER="sb-user"
+                    SB_PASS="sb-pass"
+                    """
+                ),
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
+            env["TA_CACHE"] = str(ta_cache)
+
+            result = self.run_script(
+                "skills/splunk-app-install/scripts/install_app.sh",
+                "--source",
+                "splunkbase",
+                "--app-id",
+                "99997",
+                "--no-update",
+                "--no-restart",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 1, msg=output)
+            self.assertIn("Resolved version: 1.2.3", output)
+            self.assertIn("Downloading app 99997 v1.2.3 from Splunkbase...", output)
+            self.assertIn("ERROR: Failed to download Splunkbase app 99997 version 1.2.3.", output)
+            self.assertIn("ERROR: Splunkbase download failed.", output)
+            self.assertIn(
+                "Splunkbase denied download access for this app (HTTP 403). Confirm the Splunkbase account is entitled to the requested app.",
+                output,
+            )
+            self.assertNotIn("cookie_file: unbound variable", output)
+            self.assertNotIn("response_file: unbound variable", output)
+
 
     def test_install_app_reuses_cached_latest_package_before_splunkbase_download(self):
         with tempfile.TemporaryDirectory() as tmpdir:
