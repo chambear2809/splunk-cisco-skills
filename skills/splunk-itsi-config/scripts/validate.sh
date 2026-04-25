@@ -7,11 +7,12 @@ SPEC_PATH=""
 
 usage() {
   cat <<'EOF'
-Usage: validate.sh --workflow native|content-packs --spec PATH
+Usage: validate.sh --workflow native|content-packs|topology --spec PATH
 
 Examples:
   bash scripts/validate.sh --workflow native --spec templates/native.example.yaml
   bash scripts/validate.sh --workflow content-packs --spec templates/content_packs.example.yaml
+  bash scripts/validate.sh --workflow topology --spec templates/topology.example.yaml
 EOF
 }
 
@@ -53,6 +54,9 @@ case "${WORKFLOW}" in
     ;;
   content-packs)
     python3 "${SCRIPT_DIR}/run_content_packs.py" --spec-json "${SPEC_JSON}" --mode validate
+    ;;
+  topology)
+    python3 "${SCRIPT_DIR}/run_topology.py" --spec-json "${SPEC_JSON}" --mode validate
     ;;
   *)
     echo "Unsupported workflow: ${WORKFLOW}" >&2

@@ -321,6 +321,94 @@ class NativeWorkflowTests(unittest.TestCase):
 
         self.assertEqual(result.validations, [{"status": "fail", "object_type": "service", "title": "Missing Service"}])
 
+    def test_apply_preserves_omitted_fields_for_existing_objects(self) -> None:
+        client = FakeNativeClient(
+            {
+                "entity": {
+                    "edge-sw-01": {
+                        "_key": "entity:1",
+                        "title": "edge-sw-01",
+                        "description": "Keep entity description",
+                        "sec_grp": "network_team",
+                        "identifier": {"fields": ["host"], "values": ["edge-sw-01"]},
+                    }
+                },
+                "service": {
+                    "API": {
+                        "_key": "service:api",
+                        "title": "API",
+                        "description": "Keep service description",
+                        "sec_grp": "app_team",
+                        "kpis": [],
+                    }
+                },
+                "notable_event_aggregation_policy": {
+                    "Example NEAP": {
+                        "_key": "neap:1",
+                        "title": "Example NEAP",
+                        "description": "Keep NEAP description",
+                        "sec_grp": "ops_team",
+                        "rule_type": "custom",
+                    }
+                },
+            }
+        )
+        spec = {
+            "entities": [{"title": "edge-sw-01"}],
+            "services": [{"title": "API"}],
+            "neaps": [{"title": "Example NEAP"}],
+        }
+
+        preview = NativeWorkflow(client).run(spec, "preview")
+        apply = NativeWorkflow(client).run(spec, "apply")
+
+        self.assertTrue(all(change.action == "noop" for change in preview.changes))
+        self.assertEqual(client.operations, [])
+        self.assertEqual(apply.summary()["unchanged"], 3)
+        self.assertEqual(client.objects["entity"]["edge-sw-01"]["description"], "Keep entity description")
+        self.assertEqual(client.objects["entity"]["edge-sw-01"]["sec_grp"], "network_team")
+        self.assertEqual(client.objects["service"]["API"]["description"], "Keep service description")
+        self.assertEqual(client.objects["service"]["API"]["sec_grp"], "app_team")
+        self.assertEqual(client.objects["notable_event_aggregation_policy"]["Example NEAP"]["description"], "Keep NEAP description")
+        self.assertEqual(client.objects["notable_event_aggregation_policy"]["Example NEAP"]["sec_grp"], "ops_team")
+
+    def test_apply_preserves_omitted_service_metadata_when_updating_kpis(self) -> None:
+        client = FakeNativeClient(
+            {
+                "service": {
+                    "API": {
+                        "_key": "service:api",
+                        "title": "API",
+                        "description": "Keep service description",
+                        "sec_grp": "app_team",
+                        "kpis": [],
+                    }
+                }
+            }
+        )
+        spec = {
+            "services": [
+                {
+                    "title": "API",
+                    "kpis": [
+                        {
+                            "title": "Error Rate",
+                            "search": "index=api | stats sum(errors) as error_rate by host",
+                            "threshold_field": "error_rate",
+                            "aggregate_statop": "sum",
+                        }
+                    ],
+                }
+            ]
+        }
+
+        NativeWorkflow(client).run(spec, "apply")
+
+        service = client.objects["service"]["API"]
+        self.assertEqual(service["description"], "Keep service description")
+        self.assertEqual(service["sec_grp"], "app_team")
+        self.assertEqual(service["kpis"][0]["title"], "Error Rate")
+
 
 if __name__ == "__main__":
     unittest.main()

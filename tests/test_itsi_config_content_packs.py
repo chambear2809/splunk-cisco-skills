@@ -26,12 +26,15 @@ from lib.content_packs import (
     validate_profile,
 )
 
+HEALTHY_ITSI_APPS = {ITSI_APP, "itsi", "SA-UserAccess", "SA-ITSI-Licensechecker"}
+
 
 class FakeContentPackClient:
     def __init__(
         self,
         *,
         apps: set[str] | None = None,
+        app_versions: dict[str, str] | None = None,
         catalog: list[dict] | None = None,
         previews: dict[tuple[str, str], object] | None = None,
         macros: dict[tuple[str, str], dict] | None = None,
@@ -39,8 +42,11 @@ class FakeContentPackClient:
         inputs: dict[str, list[dict]] | None = None,
         confs: dict[tuple[str, str, str], dict] | None = None,
         endpoints: dict[tuple[str, str], list[dict]] | None = None,
+        kvstore_status_value: str | None = "ready",
+        kvstore_collections: dict[tuple[str, str], dict[str, str]] | None = None,
     ):
         self.apps = set(apps or set())
+        self.app_versions = dict(app_versions or {})
         self.catalog = list(catalog or [])
         self.previews = dict(previews or {})
         self.macros = dict(macros or {})
@@ -48,10 +54,23 @@ class FakeContentPackClient:
         self.inputs = dict(inputs or {})
         self.confs = dict(confs or {})
         self.endpoints = dict(endpoints or {})
+        self.kvstore_status_value = kvstore_status_value
+        self.kvstore_collections = dict(kvstore_collections or {})
         self.install_requests: list[tuple[str, str, dict]] = []
+
+    def get_app(self, app_name: str):
+        if app_name not in self.apps:
+            return None
+        return {"name": app_name, "version": self.app_versions.get(app_name, "1.0.0")}
 
     def app_exists(self, app_name: str) -> bool:
         return app_name in self.apps
+
+    def get_app_version(self, app_name: str) -> str | None:
+        app = self.get_app(app_name)
+        if not app:
+            return None
+        return str(app["version"])
 
     def first_installed_app(self, candidates: list[str]) -> str | None:
         for candidate in candidates:
@@ -84,6 +103,12 @@ class FakeContentPackClient:
     def list_endpoint_entries(self, app_name: str, endpoint_name: str):
         return list(self.endpoints.get((app_name, endpoint_name), []))
 
+    def kvstore_status(self) -> str | None:
+        return self.kvstore_status_value
+
+    def kvstore_collection_health(self, app_name: str, collection_name: str) -> dict[str, str]:
+        return dict(self.kvstore_collections.get((app_name, collection_name), {"status": "ok", "message": "accessible"}))
+
 
 class FakeContentLibraryInstaller:
     def __init__(self, *, should_install: bool = True, message: str = "Installed via fake installer."):
@@ -113,7 +138,7 @@ class FakeItsiInstaller:
     def install(self, spec: dict, client: FakeContentPackClient):
         self.calls.append(spec)
         if self.should_install:
-            client.apps.add(ITSI_APP)
+            client.apps.update(HEALTHY_ITSI_APPS)
         return {
             "attempted": True,
             "installed": self.should_install,
@@ -233,6 +258,21 @@ class ContentPackTests(unittest.TestCase):
             self.assertIn("Triggered Splunk restart in background", commands[2][-1])
             self.assertIn("restart -auth", commands[2][-1])
 
+    def test_shell_installer_build_env_maps_supported_auth_variables(self) -> None:
+        client = SimpleNamespace(config=SimpleNamespace(username="admin", password="changeme", session_key="token-123"))
+        installer = ShellContentLibraryInstaller()
+        spec = {"connection": {"base_url": "https://example.com:8089", "verify_ssl": False, "session_key_env": "CUSTOM_SK"}}
+
+        env = installer._build_env(spec, client)
+
+        self.assertEqual(env["SPLUNK_SEARCH_API_URI"], "https://example.com:8089")
+        self.assertEqual(env["SPLUNK_URI"], "https://example.com:8089")
+        self.assertEqual(env["SPLUNK_USERNAME"], "admin")
+        self.assertEqual(env["SPLUNK_PASSWORD"], "changeme")
+        self.assertEqual(env["SPLUNK_USER"], "admin")
+        self.assertEqual(env["SPLUNK_PASS"], "changeme")
+        self.assertEqual(env["SPLUNK_SESSION_KEY"], "token-123")
+
     def test_resolve_catalog_entry_uses_exact_title_and_latest_version(self) -> None:
         catalog = [
             {"id": "DA-ITSI-CP-cisco-thousandeyes", "title": "Cisco ThousandEyes", "version": "1.0.0"},
@@ -267,7 +307,7 @@ class ContentPackTests(unittest.TestCase):
 
     def test_aws_profile_resolves_live_catalog_title_alias(self) -> None:
         client = FakeContentPackClient(
-            apps={ITSI_APP, CONTENT_LIBRARY_APP, "Splunk_TA_aws"},
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "Splunk_TA_aws"},
             catalog=[{"id": "DA-ITSI-CP-aws-dashboards", "title": "AWS Dashboards and Reports", "version": "1.6.1", "installed_versions": []}],
             previews={("DA-ITSI-CP-aws-dashboards", "1.6.1"): {"dashboards": [{"id": "aws-overview"}]}},
             macros={
@@ -312,14 +352,14 @@ class ContentPackTests(unittest.TestCase):
 
     def test_missing_content_library_guidance_differs_for_enterprise_and_cloud(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
-            enterprise_client = FakeContentPackClient(apps={ITSI_APP})
+            enterprise_client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS)
             enterprise_workflow = ContentPackWorkflow(enterprise_client, tempdir)
             enterprise_spec = {"connection": {"platform": "enterprise"}, "content_library": {"require_present": True}, "packs": []}
             with self.assertRaises(ValidationError) as enterprise_error:
                 enterprise_workflow.run(enterprise_spec, "preview")
             self.assertIn("--apply", str(enterprise_error.exception))
 
-            cloud_client = FakeContentPackClient(apps={ITSI_APP})
+            cloud_client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS)
             cloud_workflow = ContentPackWorkflow(cloud_client, tempdir)
             cloud_spec = {"connection": {"platform": "cloud"}, "content_library": {"require_present": True}, "packs": []}
             with self.assertRaises(ValidationError) as cloud_error:
@@ -387,7 +427,7 @@ class ContentPackTests(unittest.TestCase):
     def test_apply_bootstraps_missing_content_library_on_enterprise(self) -> None:
         installer = FakeContentLibraryInstaller(message="Installed content library for test.")
         client = FakeContentPackClient(
-            apps={ITSI_APP, "cisco_dc_networking_app_for_splunk"},
+            apps=HEALTHY_ITSI_APPS | {"cisco_dc_networking_app_for_splunk"},
             catalog=[{"id": "DA-ITSI-CP-cisco-data-center", "title": "Cisco Data Center", "version": "1.0.0", "installed_versions": []}],
             previews={("DA-ITSI-CP-cisco-data-center", "1.0.0"): {"service": [{"id": "svc-1"}]}},
             inputs={
@@ -410,7 +450,7 @@ class ContentPackTests(unittest.TestCase):
         self.assertEqual(len(client.install_requests), 1)
 
     def test_apply_missing_content_library_respects_disabled_bootstrap(self) -> None:
-        client = FakeContentPackClient(apps={ITSI_APP})
+        client = FakeContentPackClient(apps=HEALTHY_ITSI_APPS)
         spec = {
             "connection": {"platform": "enterprise"},
             "content_library": {"require_present": True, "install_if_missing": False},
@@ -423,6 +463,92 @@ class ContentPackTests(unittest.TestCase):
                 workflow.run(spec, "apply")
 
         self.assertIn("Automatic bootstrap is disabled", str(error.exception))
+
+    def test_workflow_reports_itsi_health_checks(self) -> None:
+        client = FakeContentPackClient(
+            apps={ITSI_APP, CONTENT_LIBRARY_APP},
+            kvstore_status_value="failed",
+            kvstore_collections={
+                (ITSI_APP, "itsi_services"): {"status": "ok", "message": "accessible"},
+                (ITSI_APP, "itsi_kpi_template"): {"status": "missing", "message": "not found"},
+                (ITSI_APP, "itsi_notable_event_group"): {"status": "error", "message": "HTTP 503"},
+            },
+        )
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run({"packs": []}, "preview")
+
+        checks = result["itsi"]["checks"]
+        self.assertTrue(any(check["status"] == "error" and "itsi is not installed" in check["message"] for check in checks), checks)
+        self.assertTrue(any(check["status"] == "warn" and "KVStore status is failed" in check["message"] for check in checks), checks)
+        self.assertTrue(any(check["status"] == "warn" and "itsi_kpi_template" in check["message"] for check in checks), checks)
+        self.assertTrue(any(check["status"] == "warn" and "itsi_notable_event_group" in check["message"] for check in checks), checks)
+
+    def test_apply_skips_pack_install_when_itsi_health_checks_fail(self) -> None:
+        client = FakeContentPackClient(
+            apps={ITSI_APP, CONTENT_LIBRARY_APP, "cisco_dc_networking_app_for_splunk"},
+            catalog=[{"id": "DA-ITSI-CP-cisco-data-center", "title": "Cisco Data Center", "version": "1.0.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-cisco-data-center", "1.0.0"): {"service": [{"id": "svc-1"}]}},
+            inputs={
+                "cisco_dc_networking_app_for_splunk": [
+                    {"title": "cisco_nexus_dashboard://advisories_prod", "disabled": 0},
+                    {"title": "cisco_nexus_dashboard://anomalies_prod", "disabled": 0},
+                    {"title": "cisco_nexus_dashboard://fabrics_prod", "disabled": 0},
+                    {"title": "cisco_nexus_dashboard://switches_prod", "disabled": 0},
+                ]
+            },
+        )
+        spec = {"content_library": {"require_present": True}, "packs": [{"profile": "cisco_data_center"}]}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        self.assertEqual(client.install_requests, [])
+        self.assertTrue(any(check["status"] == "error" for check in result["itsi"]["checks"]), result["itsi"]["checks"])
+
+    def test_preview_resolves_live_pack_app_name_from_bundle_candidates(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "Splunk_TA_nix", "DA-ITSI-CP-nix"},
+            catalog=[{"id": "DA-ITSI-CP-linux", "title": "Monitoring Unix and Linux", "version": "1.2.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-linux", "1.2.0"): {"service": [{"id": "svc-1"}]}},
+            macros={("DA-ITSI-CP-nix", "itsi-cp-nix-indexes"): {"definition": 'index="os"'}},
+            inputs={"Splunk_TA_nix": [{"title": "script://./bin/hardware.sh", "disabled": 0, "index": "os"}]},
+        )
+        spec = {"content_library": {"require_present": True}, "packs": [{"profile": "linux"}]}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "preview")
+
+        findings = result["runs"][0]["findings"]
+        self.assertFalse(any(finding["status"] == "error" for finding in findings), findings)
+        self.assertFalse(any("cannot be validated until content-pack app" in finding["message"] for finding in findings), findings)
+
+    def test_validate_warns_when_pack_companion_app_is_missing(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "Splunk_TA_windows", "DA-ITSI-CP-windows"},
+            catalog=[{"id": "DA-ITSI-CP-windows", "title": "Monitoring Microsoft Windows", "version": "1.0.0", "installed_versions": ["1.0.0"]}],
+            macros={
+                ("DA-ITSI-CP-windows", "itsi-cp-windows-indexes"): {"definition": "index=windows OR index=perfmon"},
+                ("DA-ITSI-CP-windows", "itsi-cp-windows-metrics-indexes"): {"definition": "index=itsi_im_metrics"},
+            },
+            inputs={
+                "Splunk_TA_windows": [
+                    {"title": "WinHostMon://Processor", "disabled": 0},
+                    {"title": "WinHostMon://OperatingSystem", "disabled": 0},
+                    {"title": "WinHostMon://Disk", "disabled": 0},
+                    {"title": "perfmon://CPU", "disabled": 0},
+                    {"title": "perfmon://LogicalDisk", "disabled": 0},
+                ]
+            },
+        )
+        spec = {"content_library": {"require_present": True}, "packs": [{"profile": "windows"}]}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "validate")
+
+        findings = result["runs"][0]["findings"]
+        self.assertTrue(any(finding["status"] == "pass" and "Primary content-pack app is installed as DA-ITSI-CP-windows" in finding["message"] for finding in findings), findings)
+        self.assertTrue(any(finding["status"] == "warn" and "Windows dashboards companion app is not installed" in finding["message"] for finding in findings), findings)
 
     def test_supported_profiles_pass_minimal_prerequisite_checks(self) -> None:
         cases = {
@@ -717,7 +843,7 @@ class ContentPackTests(unittest.TestCase):
                 raise AssertionError("validate should not call preview")
 
         client = NoPreviewClient(
-            apps={ITSI_APP, CONTENT_LIBRARY_APP, "cisco_dc_networking_app_for_splunk"},
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "cisco_dc_networking_app_for_splunk"},
             catalog=[{"id": "DA-ITSI-CP-cisco-data-center", "title": "Cisco Data Center", "version": "1.0.0", "installed_versions": ["1.0.0"]}],
             inputs={
                 "cisco_dc_networking_app_for_splunk": [
@@ -891,7 +1017,7 @@ class ContentPackTests(unittest.TestCase):
 
     def test_preview_warns_when_pack_owned_macro_is_unavailable_before_install(self) -> None:
         client = FakeContentPackClient(
-            apps={ITSI_APP, CONTENT_LIBRARY_APP, "Splunk_TA_nix"},
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "Splunk_TA_nix"},
             catalog=[{"id": "DA-ITSI-CP-linux", "title": "Monitoring Unix and Linux", "version": "1.2.0", "installed_versions": []}],
             previews={("DA-ITSI-CP-linux", "1.2.0"): {"service": [{"id": "svc-1"}]}},
             inputs={"Splunk_TA_nix": [{"title": "script://./bin/hardware.sh", "disabled": 0, "index": "os"}]},
@@ -909,7 +1035,7 @@ class ContentPackTests(unittest.TestCase):
         self.assertTrue(
             any(
                 finding["status"] == "warn"
-                and "cannot be validated until content-pack app DA-ITSI-CP-linux is installed" in finding["message"]
+                and "cannot be validated until content-pack app DA-ITSI-CP-nix is installed" in finding["message"]
                 for finding in findings
             ),
             findings,
@@ -918,7 +1044,7 @@ class ContentPackTests(unittest.TestCase):
 
     def test_preview_and_apply_generate_report_and_install_request(self) -> None:
         client = FakeContentPackClient(
-            apps={ITSI_APP, CONTENT_LIBRARY_APP, "cisco_dc_networking_app_for_splunk"},
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "cisco_dc_networking_app_for_splunk"},
             catalog=[{"id": "DA-ITSI-CP-cisco-data-center", "title": "Cisco Data Center", "version": "1.0.0", "installed_versions": []}],
             previews={
                 ("DA-ITSI-CP-cisco-data-center", "1.0.0"): {
@@ -961,7 +1087,7 @@ class ContentPackTests(unittest.TestCase):
                 }
 
         client = PartialFailureClient(
-            apps={ITSI_APP, CONTENT_LIBRARY_APP, "Splunk_TA_AppDynamics"},
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "Splunk_TA_AppDynamics"},
             catalog=[{"id": "DA-ITSI-CP-appdynamics", "title": "Splunk AppDynamics", "version": "1.0.1", "installed_versions": []}],
             previews={("DA-ITSI-CP-appdynamics", "1.0.1"): {"entity_types": [{"id": "entity-1"}]}},
             macros={("DA-ITSI-CP-appdynamics", "itsi_cp_appdynamics_index"): {"definition": 'index="appdynamics"'}},
@@ -982,7 +1108,7 @@ class ContentPackTests(unittest.TestCase):
 
     def test_report_contains_guided_handoff_steps_for_cisco_profiles(self) -> None:
         client = FakeContentPackClient(
-            apps={ITSI_APP, CONTENT_LIBRARY_APP, "cisco_dc_networking_app_for_splunk", "TA_cisco_catalyst", "Splunk_TA_cisco_meraki"},
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "cisco_dc_networking_app_for_splunk", "TA_cisco_catalyst", "Splunk_TA_cisco_meraki"},
             catalog=[
                 {"id": "DA-ITSI-CP-cisco-data-center", "title": "Cisco Data Center", "version": "1.0.0", "installed_versions": []},
                 {"id": "DA-ITSI-CP-enterprise-networking", "title": "Cisco Enterprise Networks", "version": "1.1.0", "installed_versions": []},

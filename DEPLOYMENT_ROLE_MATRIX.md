@@ -49,6 +49,7 @@ For Cloud-specific install and API behavior, see
 | `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets. |
 | `splunk-enterprise-host-setup` | Supported | Supported | Supported | None | None | None | Linux host bootstrap workflow for self-managed Splunk Enterprise search tiers, indexers, cluster managers, SHC members, and heavy forwarders. |
 | `splunk-itsi-setup` | Required | None | None | None | None | None | Premium search-tier app for ITSI dashboards and service analytics. |
+| `splunk-itsi-config` | Required | None | None | None | None | None | Search-tier workflow for ITSI content-pack bootstrap, validation, and service-topology automation. |
 | `splunk-ai-assistant-setup` | Required | None | None | None | None | None | Search-tier AI assistant app with cloud-backed inference, app UI settings, and KV Store-backed local chat state. |
 | `splunk-mcp-server-setup` | Required | None | None | None | None | None | Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays. |
 | `splunk-stream-setup` | Required | Supported | Required | Supported | None | HF or UF | Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects. |
@@ -73,6 +74,7 @@ For Cloud-specific install and API behavior, see
 | `Splunk_TA_stream_wire_data` | `splunk-stream-setup` | Supported | Required | Supported | None | None |
 | `ta_cisco_thousandeyes` | `cisco-thousandeyes-setup` | Supported | None | Supported | None | None |
 | `SA-ITOA` | `splunk-itsi-setup` | Required | None | None | None | None |
+| `DA-ITSI-ContentLibrary` | `splunk-itsi-config` | Required | None | None | None | None |
 | `Splunk_AI_Assistant_Cloud` | `splunk-ai-assistant-setup` | Required | None | None | None | None |
 | `Splunk_MCP_Server` | `splunk-mcp-server-setup` | Required | None | None | None | None |
 | `ta_cisco_spaces` | `cisco-spaces-setup` | Supported | None | Supported | None | None |

@@ -86,6 +86,8 @@ packs:
 - On Splunk Enterprise `--apply`, if `DA-ITSI-ContentLibrary` is missing and `content_library.install_if_missing` is left at its default `true`, the workflow bootstraps the Splunk App for Content Packs by calling the shared installer in `../splunk-app-install/scripts/install_app.sh`.
 - The default bootstrap source is Splunkbase app `5391`.
 - If the `5391` package is rejected by the REST app-install endpoint because it is a multi-app archive, the workflow falls back to a CLI-based install on the target Splunk host.
+- After ITSI bootstrap or validation, the workflow checks the bundled ITSI app set (`SA-ITOA`, `itsi`, `SA-UserAccess`, `SA-ITSI-Licensechecker`) plus KV Store readiness and key ITSI collections.
+- The CLI wrappers return a nonzero exit code when those prerequisite checks report errors, even if the pack-specific checks are otherwise clean.
 - For offline or pre-staged installs, set:
 
 ```yaml
@@ -104,6 +106,7 @@ content_library:
 
 - Preview and validate do not install prerequisites. They fail with guidance to rerun the same spec under `bash scripts/setup.sh --workflow content-packs --spec <path> --apply`.
 - `content_library.local_file` and `itsi.local_file` can point at either `.spl` or `.tgz` archives, as long as they are valid Splunk app bundles.
+- Pack validation resolves the live bundled pack app from profile-specific candidate app names, so bundle app names like `DA-ITSI-CP-vmware`, `DA-ITSI-CP-thousandeyes`, `DA-ITSI-CP-nix`, and `DA-ITSI-CP-appdynamics` are handled correctly even when the catalog ID differs.
 
 ### `aws`
 

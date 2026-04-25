@@ -594,6 +594,11 @@ prompt_splunkbase_creds() {
 # ── Core functions ──────────────────────────────────────────────────
 
 splunk_auth() {
+    if [[ -n "${SPLUNK_SESSION_KEY:-}" ]]; then
+        SK="${SPLUNK_SESSION_KEY}"
+        log "Authenticated to Splunk REST API with provided session key"
+        return 0
+    fi
     SK=$(get_session_key "${SPLUNK_URI}")
     log "Authenticated to Splunk REST API"
 }

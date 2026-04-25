@@ -25,6 +25,8 @@ from .common import (
     timestamp_slug,
     write_text,
 )
+from .native import NativeResult, NativeWorkflow
+from .topology import ServiceTopologyWorkflow, TopologyResult, compile_topology, validate_topology_pack_references
 
 ITSI_APP = "SA-ITOA"
 ITSI_APP_ID = "1841"
@@ -38,11 +40,45 @@ DEFAULT_APP_INSTALL_SCRIPT = (
     / "install_app.sh"
 )
 
+ITSI_HEALTH_APPS: list[dict[str, str]] = [
+    {
+        "app": ITSI_APP,
+        "label": "SA-ITOA",
+        "status": "error",
+        "message": "SA-ITOA is not installed. ITSI core REST endpoints are unavailable.",
+    },
+    {
+        "app": "itsi",
+        "label": "itsi",
+        "status": "error",
+        "message": "itsi is not installed. The ITSI UI bundle is incomplete on this search head.",
+    },
+    {
+        "app": "SA-UserAccess",
+        "label": "SA-UserAccess",
+        "status": "warn",
+        "message": "SA-UserAccess is not installed. Some supporting ITSI sharing and access workflows may be unavailable.",
+    },
+    {
+        "app": "SA-ITSI-Licensechecker",
+        "label": "SA-ITSI-Licensechecker",
+        "status": "warn",
+        "message": "SA-ITSI-Licensechecker is not installed. ITSI licensing checks may be degraded.",
+    },
+]
+
+ITSI_KVSTORE_COLLECTIONS = [
+    "itsi_services",
+    "itsi_kpi_template",
+    "itsi_notable_event_group",
+]
+
 
 PACK_PROFILES: dict[str, dict[str, Any]] = {
     "aws": {
         "title": "Amazon Web Services Dashboards and Reports",
         "catalog_titles": ["Amazon Web Services Dashboards and Reports", "AWS Dashboards and Reports"],
+        "pack_app_candidates": ["DA-ITSI-CP-aws-dashboards", "DA-ITSI-CP-aws"],
         "required_apps": [{"label": "Splunk Add-on for AWS", "candidates": ["Splunk_TA_aws"]}],
         "macro_checks": [
             {"macro": "aws-account-summary", "static_indexes_key": "summary_indexes", "default_indexes": ["summary"]},
@@ -58,6 +94,7 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     },
     "cisco_data_center": {
         "title": "Cisco Data Center",
+        "pack_app_candidates": ["DA-ITSI-CP-cisco-data-center"],
         "required_apps": [
             {
                 "label": "Cisco DC Networking App for Splunk",
@@ -81,6 +118,7 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     },
     "cisco_enterprise_networks": {
         "title": "Cisco Enterprise Networks",
+        "pack_app_candidates": ["DA-ITSI-CP-enterprise-networking"],
         "required_apps": [
             {"label": "Cisco Catalyst Add-on for Splunk", "candidates": ["TA_cisco_catalyst"]},
             {"label": "Cisco Meraki Add-on for Splunk", "candidates": ["Splunk_TA_cisco_meraki"]},
@@ -113,6 +151,7 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     },
     "cisco_thousandeyes": {
         "title": "Cisco ThousandEyes",
+        "pack_app_candidates": ["DA-ITSI-CP-thousandeyes", "DA-ITSI-CP-cisco-thousandeyes"],
         "required_apps": [{"label": "Cisco ThousandEyes App for Splunk", "candidates": ["ta_cisco_thousandeyes"]}],
         "required_inputs": [
             {"app": "ta_cisco_thousandeyes", "pattern": "event", "label": "ThousandEyes events input"},
@@ -126,6 +165,13 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     },
     "linux": {
         "title": "Monitoring Unix and Linux",
+        "pack_app_candidates": ["DA-ITSI-CP-nix", "DA-ITSI-CP-linux"],
+        "companion_app_checks": [
+            {
+                "label": "Unix and Linux dashboards companion app",
+                "candidates": ["DA-ITSI-CP-unix-dashboards"],
+            }
+        ],
         "required_apps": [{"label": "Splunk Add-on for Unix and Linux", "candidates": ["Splunk_TA_nix"]}],
         "macro_checks": [
             {"macro": "itsi-cp-nix-indexes", "static_indexes_key": "event_indexes", "default_indexes": ["os"]},
@@ -141,6 +187,7 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     },
     "splunk_appdynamics": {
         "title": "Splunk AppDynamics",
+        "pack_app_candidates": ["DA-ITSI-CP-appdynamics", "DA-ITSI-CP-APPDYNAMICS"],
         "required_apps": [{"label": "Splunk Add-on for AppDynamics", "candidates": ["Splunk_TA_AppDynamics"]}],
         "required_inputs": [
             {"app": "Splunk_TA_AppDynamics", "pattern": "appdynamics_status", "label": "AppDynamics status input"},
@@ -162,6 +209,7 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     },
     "splunk_observability_cloud": {
         "title": "Splunk Observability Cloud",
+        "pack_app_candidates": ["DA-ITSI-CP-splunk-observability"],
         "required_apps": [
             {
                 "label": "Splunk Infrastructure Monitoring Add-on",
@@ -179,6 +227,13 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     },
     "vmware": {
         "title": "VMware Monitoring",
+        "pack_app_candidates": ["DA-ITSI-CP-vmware", "DA-ITSI-CP-vmware-monitoring"],
+        "companion_app_checks": [
+            {
+                "label": "VMware dashboards companion app",
+                "candidates": ["DA-ITSI-CP-vmware-dashboards"],
+            }
+        ],
         "required_apps": [
             {
                 "label": "Splunk Add-on for VMware Metrics",
@@ -201,6 +256,13 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     },
     "windows": {
         "title": "Monitoring Microsoft Windows",
+        "pack_app_candidates": ["DA-ITSI-CP-windows"],
+        "companion_app_checks": [
+            {
+                "label": "Windows dashboards companion app",
+                "candidates": ["DA-ITSI-CP-windows-dashboards"],
+            }
+        ],
         "required_apps": [{"label": "Splunk Add-on for Windows", "candidates": ["Splunk_TA_windows"]}],
         "macro_checks": [
             {
@@ -262,14 +324,20 @@ class ShellContentLibraryInstaller:
         base_url = str(connection.get("base_url") or env.get("SPLUNK_SEARCH_API_URI") or env.get("SPLUNK_URI") or "").strip()
         if base_url:
             env["SPLUNK_SEARCH_API_URI"] = base_url
+            env["SPLUNK_URI"] = base_url
         verify_ssl = bool_from_any(connection.get("verify_ssl"), default=True)
         env["SPLUNK_VERIFY_SSL"] = "true" if verify_ssl else "false"
         username = getattr(getattr(client, "config", None), "username", None)
         password = getattr(getattr(client, "config", None), "password", None)
+        session_key = getattr(getattr(client, "config", None), "session_key", None)
         if username:
             env["SPLUNK_USERNAME"] = str(username)
+            env["SPLUNK_USER"] = str(username)
         if password:
             env["SPLUNK_PASSWORD"] = str(password)
+            env["SPLUNK_PASS"] = str(password)
+        if session_key:
+            env["SPLUNK_SESSION_KEY"] = str(session_key)
         credentials_file = str(spec.get(self.spec_key, {}).get("credentials_file") or "").strip()
         if credentials_file:
             env["SPLUNK_CREDENTIALS_FILE"] = credentials_file
@@ -649,6 +717,92 @@ def _installed_versions(entry: dict[str, Any]) -> list[str]:
     return []
 
 
+def _state_has_error(state: dict[str, Any]) -> bool:
+    return any(check.get("status") == "error" for check in state.get("checks", []))
+
+
+def _run_itsi_health_checks(client: Any) -> list[dict[str, str]]:
+    checks: list[dict[str, str]] = []
+    for app_meta in ITSI_HEALTH_APPS:
+        try:
+            version = client.get_app_version(app_meta["app"])
+        except ValidationError as exc:
+            checks.append(_finding("warn", "app", f"Could not inspect {app_meta['label']}: {exc}"))
+            continue
+        if version:
+            checks.append(_finding("pass", "app", f"{app_meta['label']} is installed (version: {version})."))
+        else:
+            checks.append(_finding(app_meta["status"], "app", app_meta["message"]))
+
+    try:
+        kvstore_status = client.kvstore_status()
+    except ValidationError as exc:
+        checks.append(_finding("warn", "kvstore", f"Could not inspect KVStore status: {exc}"))
+        kvstore_status = None
+    if kvstore_status == "ready":
+        checks.append(_finding("pass", "kvstore", "KVStore status is ready."))
+    elif kvstore_status:
+        checks.append(_finding("warn", "kvstore", f"KVStore status is {kvstore_status}. ITSI requires a healthy KVStore."))
+    else:
+        checks.append(_finding("warn", "kvstore", "KVStore status could not be determined."))
+
+    for collection_name in ITSI_KVSTORE_COLLECTIONS:
+        health = client.kvstore_collection_health(ITSI_APP, collection_name)
+        status = str(health.get("status") or "").strip()
+        message = str(health.get("message") or "").strip()
+        if status == "ok":
+            checks.append(_finding("pass", "kvstore", f"KVStore collection '{collection_name}' is accessible."))
+        elif status == "missing":
+            checks.append(
+                _finding(
+                    "warn",
+                    "kvstore",
+                    f"KVStore collection '{collection_name}' was not found. It may initialize after first use.",
+                )
+            )
+        else:
+            detail = f": {message}" if message else ""
+            checks.append(_finding("warn", "kvstore", f"KVStore collection '{collection_name}' could not be validated{detail}"))
+    return checks
+
+
+def _candidate_list(values: Any) -> list[str]:
+    return [str(item).strip() for item in listify(values) if str(item).strip()]
+
+
+def resolve_pack_app_name(client: Any, profile_meta: dict[str, Any], catalog_pack_id: str | None) -> str:
+    candidates = _candidate_list(profile_meta.get("pack_app_candidates"))
+    if catalog_pack_id and catalog_pack_id not in candidates:
+        candidates.append(catalog_pack_id)
+    installed = client.first_installed_app(candidates)
+    if installed:
+        return installed
+    if candidates:
+        return candidates[0]
+    return str(catalog_pack_id or "").strip()
+
+
+def _check_pack_bundle_visibility(
+    client: Any,
+    findings: list[dict[str, str]],
+    profile_meta: dict[str, Any],
+    *,
+    pack_app_name: str,
+) -> None:
+    if client.app_exists(pack_app_name):
+        findings.append(_finding("pass", "pack_app", f"Primary content-pack app is installed as {pack_app_name}."))
+    else:
+        checked = ", ".join(_candidate_list(profile_meta.get("pack_app_candidates")) or [pack_app_name])
+        findings.append(_finding("error", "pack_app", f"Primary content-pack app is not installed. Checked: {checked}."))
+    for companion in profile_meta.get("companion_app_checks", []):
+        installed = client.first_installed_app(_candidate_list(companion.get("candidates")))
+        if installed:
+            findings.append(_finding("pass", "pack_app", f"{companion['label']} is installed as {installed}."))
+        else:
+            checked = ", ".join(_candidate_list(companion.get("candidates")))
+            findings.append(_finding("warn", "pack_app", f"{companion['label']} is not installed. Checked: {checked}."))
+
+
 def _ensure_managed_app(
     client: Any,
     *,
@@ -671,6 +825,7 @@ def _ensure_managed_app(
         "installed_in_this_run": False,
         "source": None,
         "app_id": None,
+        "checks": [],
         "message": f"{display_name} presence checks are disabled.",
     }
     if not require_present:
@@ -713,7 +868,7 @@ def _ensure_itsi(
     spec: dict[str, Any],
     installer: Any,
 ) -> dict[str, Any]:
-    return _ensure_managed_app(
+    state = _ensure_managed_app(
         client,
         mode=mode,
         spec=spec,
@@ -727,6 +882,9 @@ def _ensure_itsi(
             "Set itsi.install_if_missing=true or install Splunkbase app 1841 before using content-pack automation."
         ),
     )
+    if state.get("required"):
+        state["checks"] = _run_itsi_health_checks(client)
+    return state
 
 
 def _ensure_content_library(
@@ -1230,6 +1388,10 @@ def _append_prerequisite_state(lines: list[str], label: str, state: dict[str, An
         lines.append(f"- {label} app ID: `{state['app_id']}`")
     if state.get("message"):
         lines.append(f"- {label} status: `{state['message']}`")
+    if state.get("checks"):
+        lines.append(f"- {label} checks:")
+        for check in state["checks"]:
+            lines.append(f"  - [{check['status']}] {check['check']}: {check['message']}")
 
 
 def _render_report(
@@ -1270,6 +1432,54 @@ def _render_report(
     return report_path
 
 
+def _render_topology_report(
+    mode: str,
+    runs: list[PackRun],
+    report_dir: Path,
+    itsi_state: dict[str, Any],
+    content_library_state: dict[str, Any],
+    native_result: Any,
+    topology_result: Any,
+) -> Path:
+    lines = [
+        "# ITSI Topology Summary",
+        "",
+        f"- Mode: `{mode}`",
+    ]
+    _append_prerequisite_state(lines, "ITSI", itsi_state)
+    _append_prerequisite_state(lines, "Content library", content_library_state)
+    lines.append("")
+    lines.append("## Content Packs")
+    lines.append("")
+    if not runs:
+        lines.append("- No content packs declared.")
+    for run in runs:
+        lines.append(f"- `{run.profile}` -> `{run.title}` ({run.version or 'unresolved'})")
+        for finding in run.findings:
+            lines.append(f"  - [{finding['status']}] {finding['check']}: {finding['message']}")
+    lines.append("")
+    lines.append("## Native")
+    lines.append("")
+    if mode == "validate":
+        for item in native_result.validations:
+            lines.append(f"- [{item['status']}] {item['object_type']}: {item['title']}")
+    else:
+        for change in native_result.changes:
+            lines.append(f"- [{change.status}] {change.object_type}: {change.title} -> {change.detail}")
+    lines.append("")
+    lines.append("## Topology")
+    lines.append("")
+    if mode == "validate":
+        for item in topology_result.validations:
+            lines.append(f"- [{item['status']}] {item['object_type']}: {item['title']}")
+    else:
+        for change in topology_result.changes:
+            lines.append(f"- [{change.status}] {change.object_type}: {change.title} -> {change.detail}")
+    report_path = report_dir / "topology-summary.md"
+    write_text(report_path, "\n".join(lines).rstrip() + "\n")
+    return report_path
+
+
 class ContentPackWorkflow:
     def __init__(
         self,
@@ -1302,6 +1512,7 @@ class ContentPackWorkflow:
         )
         report_dir = ensure_dir(self.report_root / timestamp_slug())
         catalog = self.client.content_pack_catalog()
+        prerequisite_errors = _state_has_error(itsi_state) or _state_has_error(content_library_state)
         runs: list[PackRun] = []
         for pack_spec in listify(spec.get("packs")):
             profile_key = pack_spec["profile"]
@@ -1311,7 +1522,8 @@ class ContentPackWorkflow:
             catalog_titles = profile_meta.get("catalog_titles") or [profile_meta["title"]]
             catalog_entry = resolve_catalog_entry(catalog, catalog_titles, pack_spec.get("version"))
             pack_title = str(catalog_entry.get("title") or profile_meta["title"])
-            findings = validate_profile(self.client, pack_spec, profile_meta, catalog_entry["id"])
+            pack_app_name = resolve_pack_app_name(self.client, profile_meta, str(catalog_entry.get("id") or ""))
+            findings = validate_profile(self.client, pack_spec, profile_meta, pack_app_name)
             preview_summary = None
             install_payload = None
             install_result = None
@@ -1320,6 +1532,7 @@ class ContentPackWorkflow:
                 installed_versions = _installed_versions(catalog_entry)
                 if catalog_entry["version"] in installed_versions:
                     findings.append(_finding("pass", "install", f"{pack_title} version {catalog_entry['version']} is installed."))
+                    _check_pack_bundle_visibility(self.client, findings, profile_meta, pack_app_name=pack_app_name)
                 else:
                     findings.append(_finding("error", "install", f"{pack_title} version {catalog_entry['version']} is not installed."))
             else:
@@ -1330,7 +1543,7 @@ class ContentPackWorkflow:
                         f"Preview is unavailable for content pack '{pack_title}' version {catalog_entry['version']}."
                     ) from exc
                 preview_summary = _preview_summary(preview)
-            if mode == "apply" and not _has_error(findings):
+            if mode == "apply" and not prerequisite_errors and not _has_error(findings):
                 install_payload = build_install_payload(pack_spec)
                 try:
                     install_result = self.client.install_content_pack(catalog_entry["id"], catalog_entry["version"], install_payload)
@@ -1341,6 +1554,7 @@ class ContentPackWorkflow:
                 installed = True
                 for failure_message in _install_failures(install_result):
                     findings.append(_finding("error", "install", failure_message))
+                _check_pack_bundle_visibility(self.client, findings, profile_meta, pack_app_name=pack_app_name)
             elif mode == "preview":
                 install_payload = build_install_payload(pack_spec)
             runs.append(
@@ -1363,4 +1577,199 @@ class ContentPackWorkflow:
             "content_library": content_library_state,
             "report_path": str(report_path),
             "runs": [run.__dict__ for run in runs],
+        }
+
+
+class TopologyWorkflow:
+    def __init__(
+        self,
+        client: Any,
+        report_root: str | Path,
+        content_library_installer: Any | None = None,
+        itsi_installer: Any | None = None,
+    ):
+        self.client = client
+        self.report_root = Path(report_root)
+        self.content_library_installer = content_library_installer or ShellContentLibraryInstaller()
+        self.itsi_installer = itsi_installer or ShellItsiInstaller()
+
+    def run(self, spec: dict[str, Any], mode: str) -> dict[str, Any]:
+        if mode not in {"preview", "apply", "validate"}:
+            raise ValidationError(f"Unsupported topology mode '{mode}'.")
+        platform = infer_platform(spec)
+        pack_specs = listify(spec.get("packs"))
+        if mode == "apply":
+            seen_profiles: set[str] = set()
+            for pack_spec in pack_specs:
+                if not isinstance(pack_spec, dict):
+                    raise ValidationError("Each topology pack entry must be a mapping.")
+                profile_key = str(pack_spec.get("profile") or "").strip()
+                if not profile_key:
+                    raise ValidationError("Each topology pack entry must define profile.")
+                if profile_key not in PACK_PROFILES:
+                    raise ValidationError(f"Unsupported content-pack profile '{profile_key}'.")
+                if profile_key in seen_profiles:
+                    raise ValidationError(f"Content-pack profile '{profile_key}' is declared more than once in this run.")
+                seen_profiles.add(profile_key)
+            compiled_topology = compile_topology(spec)
+            validate_topology_pack_references(
+                compiled_topology,
+                [str(pack_spec.get("profile") or "").strip() for pack_spec in pack_specs if isinstance(pack_spec, dict)],
+            )
+        itsi_state = _ensure_itsi(
+            self.client,
+            mode=mode,
+            spec=spec,
+            installer=self.itsi_installer,
+        )
+        if pack_specs:
+            content_library_state = _ensure_content_library(
+                self.client,
+                platform=platform,
+                mode=mode,
+                spec=spec,
+                installer=self.content_library_installer,
+            )
+            catalog = self.client.content_pack_catalog()
+        else:
+            content_library_state = {
+                "required": False,
+                "present_before": False,
+                "installed_in_this_run": False,
+                "source": None,
+                "app_id": None,
+                "checks": [],
+                "message": "Content library is not required because no content packs were declared.",
+            }
+            catalog = []
+        report_dir = ensure_dir(self.report_root / timestamp_slug())
+        prerequisite_errors = _state_has_error(itsi_state) or _state_has_error(content_library_state)
+        runs: list[PackRun] = []
+        pack_contexts: list[dict[str, Any]] = []
+        for pack_spec in pack_specs:
+            profile_key = pack_spec["profile"]
+            profile_meta = PACK_PROFILES.get(profile_key)
+            if not profile_meta:
+                raise ValidationError(f"Unsupported content-pack profile '{profile_key}'.")
+            catalog_titles = profile_meta.get("catalog_titles") or [profile_meta["title"]]
+            catalog_entry = resolve_catalog_entry(catalog, catalog_titles, pack_spec.get("version"))
+            pack_title = str(catalog_entry.get("title") or profile_meta["title"])
+            pack_app_name = resolve_pack_app_name(self.client, profile_meta, str(catalog_entry.get("id") or ""))
+            findings = validate_profile(self.client, pack_spec, profile_meta, pack_app_name)
+            preview_summary = None
+            preview_payload = None
+            install_payload = None
+            install_result = None
+            installed = False
+            if mode == "validate":
+                installed_versions = _installed_versions(catalog_entry)
+                if catalog_entry["version"] in installed_versions:
+                    findings.append(_finding("pass", "install", f"{pack_title} version {catalog_entry['version']} is installed."))
+                    _check_pack_bundle_visibility(self.client, findings, profile_meta, pack_app_name=pack_app_name)
+                else:
+                    findings.append(_finding("error", "install", f"{pack_title} version {catalog_entry['version']} is not installed."))
+            else:
+                try:
+                    preview_payload = self.client.preview_content_pack(catalog_entry["id"], catalog_entry["version"])
+                except KeyError as exc:
+                    raise ValidationError(
+                        f"Preview is unavailable for content pack '{pack_title}' version {catalog_entry['version']}."
+                    ) from exc
+                preview_summary = _preview_summary(preview_payload)
+            if mode == "apply" and not prerequisite_errors and not _has_error(findings):
+                install_payload = build_install_payload(pack_spec)
+            elif mode == "preview":
+                install_payload = build_install_payload(pack_spec)
+            runs.append(
+                PackRun(
+                    profile=profile_key,
+                    title=pack_title,
+                    pack_id=catalog_entry["id"],
+                    version=catalog_entry["version"],
+                    findings=findings,
+                    preview_summary=preview_summary,
+                    install_payload=install_payload,
+                    install_result=install_result,
+                    installed=installed,
+                )
+            )
+            pack_contexts.append(
+                {
+                    "profile": profile_key,
+                    "pack_spec": deepcopy(pack_spec),
+                    "catalog_entry": deepcopy(catalog_entry),
+                    "title": pack_title,
+                    "preview": deepcopy(preview_payload),
+                }
+            )
+
+        topology_workflow = ServiceTopologyWorkflow(self.client)
+        if mode == "apply" and not prerequisite_errors and not any(_has_error(run.findings) for run in runs):
+            native_preview = NativeWorkflow(self.client).run(spec, "preview")
+            topology_workflow.preflight_apply(
+                spec,
+                pack_contexts=pack_contexts,
+                native_service_snapshots=native_preview.service_snapshots,
+                require_live_templates=False,
+            )
+            for run in runs:
+                if not run.install_payload:
+                    continue
+                try:
+                    run.install_result = self.client.install_content_pack(run.pack_id or "", run.version or "", run.install_payload)
+                except KeyError as exc:
+                    raise ValidationError(
+                        f"Install failed because content pack '{run.title}' version {run.version} could not be resolved."
+                    ) from exc
+                run.installed = True
+                for failure_message in _install_failures(run.install_result):
+                    run.findings.append(_finding("error", "install", failure_message))
+                profile_meta = PACK_PROFILES[run.profile]
+                pack_app_name = resolve_pack_app_name(self.client, profile_meta, run.pack_id)
+                _check_pack_bundle_visibility(self.client, run.findings, profile_meta, pack_app_name=pack_app_name)
+            if not any(_has_error(run.findings) for run in runs):
+                native_preview = NativeWorkflow(self.client).run(spec, "preview")
+                topology_workflow.preflight_apply(
+                    spec,
+                    pack_contexts=pack_contexts,
+                    native_service_snapshots=native_preview.service_snapshots,
+                    require_live_templates=True,
+                )
+
+        if mode == "apply" and (prerequisite_errors or any(_has_error(run.findings) for run in runs)):
+            native_result = NativeResult(mode=mode)
+            topology_result = TopologyResult(mode=mode)
+        else:
+            native_result = NativeWorkflow(self.client).run(spec, mode)
+            topology_result = topology_workflow.run(
+                spec,
+                mode,
+                pack_contexts=pack_contexts,
+                native_service_snapshots=native_result.service_snapshots,
+            )
+        report_path = _render_topology_report(
+            mode,
+            runs,
+            report_dir,
+            itsi_state,
+            content_library_state,
+            native_result,
+            topology_result,
+        )
+        return {
+            "mode": mode,
+            "itsi": itsi_state,
+            "content_library": content_library_state,
+            "report_path": str(report_path),
+            "runs": [run.__dict__ for run in runs],
+            "native": {
+                "summary": native_result.summary(),
+                "changes": [change.__dict__ for change in native_result.changes],
+                "validations": native_result.validations,
+            },
+            "topology": {
+                "changes": [change.__dict__ for change in topology_result.changes],
+                "validations": topology_result.validations,
+                "resolved_nodes": topology_result.resolved_nodes,
+            },
         }

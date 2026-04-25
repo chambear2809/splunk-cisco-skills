@@ -915,6 +915,19 @@ load_splunk_credentials() {
         fi
     fi
 
+    if [[ -z "${SPLUNK_USER:-}" && -n "${SPLUNK_USERNAME:-}" ]]; then
+        SPLUNK_USER="${SPLUNK_USERNAME}"
+    fi
+    if [[ -z "${SPLUNK_PASS:-}" && -n "${SPLUNK_PASSWORD:-}" ]]; then
+        SPLUNK_PASS="${SPLUNK_PASSWORD}"
+    fi
+    if [[ -n "${SPLUNK_SESSION_KEY:-}" ]]; then
+        if type prefer_current_cloud_search_api_uri &>/dev/null; then
+            prefer_current_cloud_search_api_uri
+        fi
+        return 0
+    fi
+
     if [[ -z "${SPLUNK_USER:-}" ]]; then
         read -rp "Splunk username: " SPLUNK_USER
     fi

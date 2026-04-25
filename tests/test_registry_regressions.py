@@ -200,3 +200,17 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             "cisco-secure-access-app-for-splunk_*",
             secure_access_entry.get("package_patterns", []),
         )
+
+    def test_content_library_registry_entry_is_present(self):
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+
+        content_library_entry = next(
+            app for app in registry.get("apps", []) if app.get("splunkbase_id") == "5391"
+        )
+
+        self.assertEqual(content_library_entry["skill"], "splunk-itsi-config")
+        self.assertEqual(content_library_entry["app_name"], "DA-ITSI-ContentLibrary")
+        self.assertEqual(content_library_entry.get("install_requires"), ["1841"])
+        self.assertIn("splunk-app-for-content-packs_*", content_library_entry.get("package_patterns", []))

@@ -7,7 +7,7 @@ import ssl
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
@@ -24,6 +24,8 @@ class ClientConfig:
 
 
 class SplunkRestClient:
+    REQUEST_TIMEOUT_SECONDS = 30
+
     def __init__(self, config: ClientConfig):
         self.config = config
         self._ssl_context = None
@@ -86,13 +88,18 @@ class SplunkRestClient:
             headers["Content-Type"] = "application/json"
         request = Request(url, method=method.upper(), headers=headers, data=body)
         try:
-            with urlopen(request, context=self._ssl_context) as response:
+            with urlopen(request, context=self._ssl_context, timeout=self.REQUEST_TIMEOUT_SECONDS) as response:
                 raw = response.read()
         except HTTPError as exc:
             response_body = exc.read().decode("utf-8", errors="replace")
             if exc.code == 404:
                 raise KeyError(path) from exc
             raise ValidationError(f"Splunk REST request failed: {method} {path} -> HTTP {exc.code}: {response_body}") from exc
+        except URLError as exc:
+            reason = getattr(exc, "reason", exc)
+            raise ValidationError(f"Splunk REST request failed: {method} {path} -> {reason}") from exc
+        except OSError as exc:
+            raise ValidationError(f"Splunk REST request failed: {method} {path} -> {exc}") from exc
         if not raw:
             return {}
         content_type = response.headers.get("Content-Type", "")
@@ -126,18 +133,51 @@ class SplunkRestClient:
             return [deepcopy(response)]
         return []
 
-    def app_exists(self, app_name: str) -> bool:
+    def get_app(self, app_name: str) -> dict[str, Any] | None:
         try:
-            self._request("GET", f"/services/apps/local/{quote(app_name)}")
-            return True
+            response = self._request("GET", f"/services/apps/local/{quote(app_name)}")
         except KeyError:
-            return False
+            return None
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else None
+
+    def app_exists(self, app_name: str) -> bool:
+        return self.get_app(app_name) is not None
+
+    def get_app_version(self, app_name: str) -> str | None:
+        app = self.get_app(app_name)
+        if not app:
+            return None
+        version = str(app.get("version") or "").strip()
+        return version or None
 
     def first_installed_app(self, candidates: list[str]) -> str | None:
         for candidate in candidates:
             if self.app_exists(candidate):
                 return candidate
         return None
+
+    def kvstore_status(self) -> str | None:
+        response = self._request("GET", "/services/kvstore/status")
+        entries = self._normalize_entries(response)
+        if not entries:
+            return None
+        current = entries[0].get("current")
+        if isinstance(current, dict):
+            status = str(current.get("status") or "").strip()
+            return status or None
+        status = str(entries[0].get("status") or "").strip()
+        return status or None
+
+    def kvstore_collection_health(self, app_name: str, collection_name: str) -> dict[str, str]:
+        path = f"/servicesNS/nobody/{quote(app_name)}/storage/collections/data/{quote(collection_name)}"
+        try:
+            self._request("GET", path, params={"count": 1})
+            return {"status": "ok", "message": "accessible"}
+        except KeyError:
+            return {"status": "missing", "message": "not found"}
+        except ValidationError as exc:
+            return {"status": "error", "message": str(exc)}
 
     def list_macros(self, app_name: str) -> list[dict[str, Any]]:
         return self._normalize_entries(self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/admin/macros", params={"count": 0}))
@@ -193,6 +233,13 @@ class SplunkRestClient:
         entries = self._normalize_entries(response)
         return entries[0] if entries else None
 
+    def find_object_by_titles(self, object_type: str, titles: list[str]) -> dict[str, Any] | None:
+        for title in titles:
+            found = self.find_object_by_title(object_type, title)
+            if found:
+                return found
+        return None
+
     def get_object(self, object_type: str, key: str) -> dict[str, Any] | None:
         try:
             response = self._request("GET", f"/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/{quote(object_type)}/{quote(key)}")
@@ -218,6 +265,28 @@ class SplunkRestClient:
                 path,
                 payload=payload,
             )
+        except KeyError as exc:
+            raise ValidationError(
+                f"ITSI REST endpoint '{path}' is unavailable. Confirm Splunk IT Service Intelligence (SA-ITOA) is installed on this instance."
+            ) from exc
+
+    def get_service_template_link(self, service_key: str) -> str | None:
+        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/service/{quote(service_key)}/base_service_template"
+        try:
+            response = self._request("GET", path)
+        except KeyError as exc:
+            raise ValidationError(
+                f"ITSI REST endpoint '{path}' is unavailable. Confirm Splunk IT Service Intelligence (SA-ITOA) is installed on this instance."
+            ) from exc
+        if isinstance(response, dict):
+            template_key = str(response.get("_key") or "").strip()
+            return template_key or None
+        return None
+
+    def link_service_to_template(self, service_key: str, template_key: str) -> dict[str, Any]:
+        path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/service/{quote(service_key)}/base_service_template"
+        try:
+            return self._request("POST", path, payload={"_key": template_key})
         except KeyError as exc:
             raise ValidationError(
                 f"ITSI REST endpoint '{path}' is unavailable. Confirm Splunk IT Service Intelligence (SA-ITOA) is installed on this instance."

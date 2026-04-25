@@ -25,6 +25,7 @@ class NativeResult:
     mode: str
     changes: list[ChangeRecord] = field(default_factory=list)
     validations: list[dict[str, Any]] = field(default_factory=list)
+    service_snapshots: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     @property
     def failed(self) -> bool:
@@ -53,13 +54,18 @@ def _field_map(entries: list[dict[str, Any]]) -> dict[str, list[Any]]:
     }
 
 
-def _normalize_entity(entity_spec: dict[str, Any], default_team: str) -> dict[str, Any]:
-    payload: dict[str, Any] = {
-        "object_type": "entity",
-        "title": entity_spec["title"],
-        "description": entity_spec.get("description", ""),
-        "sec_grp": entity_spec.get("sec_grp", default_team),
-    }
+def _normalize_entity(
+    entity_spec: dict[str, Any],
+    default_team: str,
+    existing: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    payload = deepcopy(existing or {})
+    payload["object_type"] = "entity"
+    payload["title"] = entity_spec["title"]
+    if existing is None or "description" in entity_spec:
+        payload["description"] = entity_spec.get("description", "")
+    if existing is None or "sec_grp" in entity_spec:
+        payload["sec_grp"] = entity_spec.get("sec_grp", default_team)
     identifiers = listify(entity_spec.get("identifier_fields"))
     informational = listify(entity_spec.get("informational_fields"))
     if identifiers:
@@ -122,14 +128,12 @@ def _normalize_kpi(kpi_spec: dict[str, Any], existing: dict[str, Any] | None = N
 
 def _normalize_service(service_spec: dict[str, Any], existing: dict[str, Any] | None, default_team: str) -> dict[str, Any]:
     payload = deepcopy(existing or {})
-    payload.update(
-        {
-            "object_type": "service",
-            "title": service_spec["title"],
-            "description": service_spec.get("description", ""),
-            "sec_grp": service_spec.get("sec_grp", default_team),
-        }
-    )
+    payload["object_type"] = "service"
+    payload["title"] = service_spec["title"]
+    if existing is None or "description" in service_spec:
+        payload["description"] = service_spec.get("description", "")
+    if existing is None or "sec_grp" in service_spec:
+        payload["sec_grp"] = service_spec.get("sec_grp", default_team)
     if "enabled" in service_spec:
         payload["enabled"] = bool_from_any(service_spec.get("enabled"))
     if "entity_rules" in service_spec:
@@ -153,14 +157,12 @@ def _normalize_service(service_spec: dict[str, Any], existing: dict[str, Any] | 
 
 def _normalize_neap(neap_spec: dict[str, Any], existing: dict[str, Any] | None, default_team: str) -> dict[str, Any]:
     payload = deepcopy(existing or {})
-    payload.update(
-        {
-            "object_type": "notable_event_aggregation_policy",
-            "title": neap_spec["title"],
-            "description": neap_spec.get("description", ""),
-            "sec_grp": neap_spec.get("sec_grp", default_team),
-        }
-    )
+    payload["object_type"] = "notable_event_aggregation_policy"
+    payload["title"] = neap_spec["title"]
+    if existing is None or "description" in neap_spec:
+        payload["description"] = neap_spec.get("description", "")
+    if existing is None or "sec_grp" in neap_spec:
+        payload["sec_grp"] = neap_spec.get("sec_grp", default_team)
     payload = deep_merge(payload, neap_spec.get("payload", {}))
     return compact(payload)
 
@@ -317,8 +319,8 @@ class NativeWorkflow:
         defaults = spec.get("defaults", {})
         default_team = defaults.get("sec_grp", DEFAULT_TEAM)
         for entity_spec in listify(spec.get("entities")):
-            desired = _normalize_entity(entity_spec, default_team)
             existing = self.client.find_object_by_title("entity", entity_spec["title"])
+            desired = _normalize_entity(entity_spec, default_team, existing)
             if not existing:
                 detail = "Would create entity." if not apply else "Created entity."
                 if apply:
@@ -462,6 +464,7 @@ class NativeWorkflow:
                     key=existing.get("_key"),
                 )
             )
+        result.service_snapshots = {title: deepcopy(payload) for title, payload in services_by_title.items()}
         return result
 
     def _validate(self, spec: dict[str, Any]) -> NativeResult:
@@ -469,8 +472,8 @@ class NativeWorkflow:
         defaults = spec.get("defaults", {})
         default_team = defaults.get("sec_grp", DEFAULT_TEAM)
         for entity_spec in listify(spec.get("entities")):
-            desired = _normalize_entity(entity_spec, default_team)
             existing = self.client.find_object_by_title("entity", entity_spec["title"])
+            desired = _normalize_entity(entity_spec, default_team, existing) if existing else None
             status = "pass" if existing and _compare_entity(existing, desired) else "fail"
             result.validations.append({"status": status, "object_type": "entity", "title": entity_spec["title"]})
         services_by_title = {
@@ -508,4 +511,5 @@ class NativeWorkflow:
             result.validations.append(
                 {"status": status, "object_type": "notable_event_aggregation_policy", "title": neap_spec["title"]}
             )
+        result.service_snapshots = {title: deepcopy(payload) for title, payload in services_by_title.items() if payload}
         return result

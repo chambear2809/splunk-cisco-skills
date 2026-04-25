@@ -392,6 +392,18 @@
       "notes": "Premium search-tier app for ITSI dashboards and service analytics."
     },
     {
+      "skill": "splunk-itsi-config",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier workflow for ITSI content-pack bootstrap, validation, and service-topology automation."
+    },
+    {
       "skill": "splunk-ai-assistant-setup",
       "role_support": {
         "search-tier": "required",
@@ -774,6 +786,30 @@
         "needs_custom_rest": false,
         "needs_search_time_objects": true,
         "needs_kvstore": true,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-itsi-config",
+      "app_name": "DA-ITSI-ContentLibrary",
+      "splunkbase_id": "5391",
+      "label": "Splunk App for Content Packs",
+      "license_ack_url": "",
+      "package_patterns": ["splunk-app-for-content-packs_*"],
+      "install_requires": ["1841"],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
