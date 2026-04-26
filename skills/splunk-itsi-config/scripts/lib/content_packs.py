@@ -1463,6 +1463,19 @@ def _render_topology_report(
     if mode == "validate":
         for item in native_result.validations:
             lines.append(f"- [{item['status']}] {item['object_type']}: {item['title']}")
+        if native_result.diagnostics:
+            lines.append("")
+            lines.append("### Native Diagnostics")
+            lines.append("")
+            for diagnostic in native_result.diagnostics:
+                lines.append(
+                    f"- [{diagnostic.get('status', 'info')}] {diagnostic.get('object_type', 'object')}: "
+                    f"{diagnostic.get('title', 'unknown')} - {diagnostic.get('message', 'No detail')}"
+                )
+                for diff in listify(diagnostic.get("diffs"))[:5]:
+                    lines.append(
+                        f"  - `{diff.get('path', '$')}` expected `{diff.get('expected')}` actual `{diff.get('actual')}`"
+                    )
     else:
         for change in native_result.changes:
             lines.append(f"- [{change.status}] {change.object_type}: {change.title} -> {change.detail}")
@@ -1766,6 +1779,7 @@ class TopologyWorkflow:
                 "summary": native_result.summary(),
                 "changes": [change.__dict__ for change in native_result.changes],
                 "validations": native_result.validations,
+                "diagnostics": native_result.diagnostics,
             },
             "topology": {
                 "changes": [change.__dict__ for change in topology_result.changes],

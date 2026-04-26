@@ -48,13 +48,13 @@ if [[ -z "${WORKFLOW}" || -z "${SPEC_PATH}" ]]; then
 fi
 
 load_splunk_connection_settings >/dev/null 2>&1 || true
-if [[ -z "${SPLUNK_USERNAME:-}" && -n "${SPLUNK_USER:-}" ]]; then
+if [[ -n "${SPLUNK_USER:-}" ]]; then
   SPLUNK_USERNAME="${SPLUNK_USER}"
 fi
-if [[ -z "${SPLUNK_PASSWORD:-}" && -n "${SPLUNK_PASS:-}" ]]; then
+if [[ -n "${SPLUNK_PASS:-}" ]]; then
   SPLUNK_PASSWORD="${SPLUNK_PASS}"
 fi
-export SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_SESSION_KEY SPLUNK_USERNAME SPLUNK_PASSWORD
+export SPLUNK_PLATFORM SPLUNK_SEARCH_API_URI SPLUNK_URI SPLUNK_SESSION_KEY SPLUNK_USERNAME SPLUNK_PASSWORD
 
 SPEC_JSON="$(mktemp)"
 trap 'rm -f "${SPEC_JSON}"' EXIT

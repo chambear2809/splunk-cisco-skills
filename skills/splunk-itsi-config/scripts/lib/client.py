@@ -303,6 +303,11 @@ class SplunkRestClient:
                 return found
         return None
 
+    def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict[str, Any]]:
+        params: dict[str, Any] | None = {"count": 0} if interface in {"itoa", "content_pack_authorship"} else None
+        response = self._request_itsi_object("GET", interface, object_type, params=params)
+        return self._normalize_entries(response)
+
     def get_object(self, object_type: str, key: str, interface: str = "itoa") -> dict[str, Any] | None:
         try:
             response = self._request_itsi_object("GET", interface, object_type, key=key)
@@ -368,6 +373,12 @@ class SplunkRestClient:
             params=self._itsi_update_params(interface, object_type),
             payload=self._itsi_write_payload("update", interface, payload),
         )
+
+    def delete_object(self, object_type: str, key: str, interface: str = "itoa") -> dict[str, Any]:
+        if interface == "icon_collection":
+            raise ValidationError("Cleanup deletion for icon_collection is not supported by this skill.")
+        response = self._request_itsi_object("DELETE", interface, object_type, key=key)
+        return response if isinstance(response, dict) else {}
 
     def get_service_template_link(self, service_key: str) -> str | None:
         path = f"/servicesNS/nobody/SA-ITOA/itoa_interface/service/{quote(service_key)}/base_service_template"

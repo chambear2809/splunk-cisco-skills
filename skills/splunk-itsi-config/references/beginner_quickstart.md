@@ -21,7 +21,7 @@ service. Expand after preview and validation are clean.
 
 Ask for missing non-secret values only:
 
-- Splunk platform: `enterprise` or `cloud`.
+- Splunk platform: `enterprise`, `cloud`, or `auto` when the credential file URL should decide.
 - Splunk management URL, such as `https://splunk.example.com:8089`.
 - Whether ITSI and the Splunk App for Content Packs are already installed.
 - Business service name, such as `Branch Network`, `Payments`, or `Campus WiFi`.
@@ -100,7 +100,7 @@ Before preview, confirm:
 
 - `connection.base_url` points at the Splunk management API, usually port `8089`,
   or it is blank and `SPLUNK_SEARCH_API_URI` is set in the credential file.
-- `connection.platform` is set to `enterprise` or `cloud`.
+- `connection.platform` is set to `auto`, `enterprise`, or `cloud`.
 - New services have clear names and descriptions.
 - Each KPI has a search that returns the `threshold_field`.
 - Dependency edges point from the parent service to the service it depends on.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from copy import deepcopy
 from datetime import datetime, timezone
@@ -23,6 +24,73 @@ def load_json(path: str | Path) -> Any:
 
 def write_json(path: str | Path, payload: Any) -> None:
     Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _yaml_scalar(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    text = str(value)
+    if text == "":
+        return '""'
+    if re.fullmatch(r"[A-Za-z0-9_./:@-]+", text) and text.lower() not in {"true", "false", "null", "yes", "no", "on", "off"}:
+        return text
+    return json.dumps(text)
+
+
+def render_yaml(value: Any, indent: int = 0) -> str:
+    prefix = " " * indent
+    if isinstance(value, dict):
+        lines: list[str] = []
+        for key, child in value.items():
+            if isinstance(child, (dict, list)) and child:
+                lines.append(f"{prefix}{key}:")
+                lines.append(render_yaml(child, indent + 2))
+            elif child == {}:
+                lines.append(f"{prefix}{key}: {{}}")
+            elif child == []:
+                lines.append(f"{prefix}{key}: []")
+            else:
+                lines.append(f"{prefix}{key}: {_yaml_scalar(child)}")
+        return "\n".join(lines)
+    if isinstance(value, list):
+        if not value:
+            return f"{prefix}[]"
+        lines = []
+        for item in value:
+            if isinstance(item, dict):
+                if not item:
+                    lines.append(f"{prefix}- {{}}")
+                    continue
+                keys = list(item)
+                first_key = keys[0]
+                first_value = item[first_key]
+                if isinstance(first_value, (dict, list)) and first_value:
+                    lines.append(f"{prefix}- {first_key}:")
+                    lines.append(render_yaml(first_value, indent + 4))
+                elif first_value == {}:
+                    lines.append(f"{prefix}- {first_key}: {{}}")
+                elif first_value == []:
+                    lines.append(f"{prefix}- {first_key}: []")
+                else:
+                    lines.append(f"{prefix}- {first_key}: {_yaml_scalar(first_value)}")
+                remainder = {key: item[key] for key in keys[1:]}
+                if remainder:
+                    lines.append(render_yaml(remainder, indent + 2))
+            elif isinstance(item, list):
+                lines.append(f"{prefix}-")
+                lines.append(render_yaml(item, indent + 2))
+            else:
+                lines.append(f"{prefix}- {_yaml_scalar(item)}")
+        return "\n".join(lines)
+    return f"{prefix}{_yaml_scalar(value)}"
+
+
+def write_yaml(path: str | Path, payload: Any) -> None:
+    Path(path).write_text(render_yaml(payload) + "\n", encoding="utf-8")
 
 
 def write_text(path: str | Path, text: str) -> None:
@@ -122,7 +190,29 @@ def subset_matches(actual: Any, expected: Any) -> bool:
                 return False
             remaining.pop(match_index)
         return True
+    if _scalar_equivalent(actual, expected):
+        return True
     return actual == expected
+
+
+def _scalar_equivalent(actual: Any, expected: Any) -> bool:
+    if isinstance(actual, bool) or isinstance(expected, bool):
+        return False
+    if isinstance(actual, (int, float)) and isinstance(expected, str):
+        return _numeric_string_equals(actual, expected)
+    if isinstance(expected, (int, float)) and isinstance(actual, str):
+        return _numeric_string_equals(expected, actual)
+    return False
+
+
+def _numeric_string_equals(number: int | float, text: str) -> bool:
+    stripped = text.strip()
+    if not re.fullmatch(r"-?\d+(?:\.\d+)?", stripped):
+        return False
+    try:
+        return float(number) == float(stripped)
+    except ValueError:
+        return False
 
 
 def semver_key(version: str) -> tuple[Any, ...]:
@@ -140,7 +230,12 @@ def infer_platform(spec: dict[str, Any]) -> str:
     platform = str(connection.get("platform", "")).strip().lower()
     if platform in {"cloud", "enterprise"}:
         return platform
-    base_url = str(connection.get("base_url") or "").strip()
+    env_platform = str(os.environ.get("SPLUNK_PLATFORM") or "").strip().lower()
+    if env_platform in {"cloud", "enterprise"}:
+        return env_platform
+    base_url = str(
+        connection.get("base_url") or os.environ.get("SPLUNK_SEARCH_API_URI") or os.environ.get("SPLUNK_URI") or ""
+    ).strip()
     if not base_url:
         return "enterprise"
     hostname = urlparse(base_url).hostname or ""

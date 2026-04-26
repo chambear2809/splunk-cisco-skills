@@ -7,7 +7,7 @@ connection:
   base_url: ""
   session_key_env: SPLUNK_SESSION_KEY
   verify_ssl: false
-  platform: enterprise
+  platform: auto
 
 itsi:
   require_present: true

@@ -8,13 +8,14 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "skills" / "splunk-itsi-config" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from lib.common import ValidationError, macro_mentions_indexes
+from lib.common import ValidationError, infer_platform, macro_mentions_indexes
 from lib.content_packs import (
     CONTENT_LIBRARY_APP,
     ITSI_APP,
@@ -149,6 +150,18 @@ class FakeItsiInstaller:
 
 
 class ContentPackTests(unittest.TestCase):
+    def test_infer_platform_uses_credential_file_url_when_spec_is_auto(self) -> None:
+        with patch.dict(os.environ, {"SPLUNK_SEARCH_API_URI": "https://example.splunkcloud.com:8089"}, clear=True):
+            self.assertEqual(infer_platform({"connection": {"platform": "auto", "base_url": ""}}), "cloud")
+
+    def test_infer_platform_respects_explicit_platform_over_environment_url(self) -> None:
+        with patch.dict(os.environ, {"SPLUNK_SEARCH_API_URI": "https://example.splunkcloud.com:8089"}, clear=True):
+            self.assertEqual(infer_platform({"connection": {"platform": "enterprise", "base_url": ""}}), "enterprise")
+
+    def test_infer_platform_uses_environment_platform_when_spec_is_auto(self) -> None:
+        with patch.dict(os.environ, {"SPLUNK_PLATFORM": "cloud"}, clear=True):
+            self.assertEqual(infer_platform({"connection": {"platform": "auto", "base_url": ""}}), "cloud")
+
     def test_shell_installer_falls_back_to_cli_for_multi_app_bundle_after_rest_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             bundle_path = Path(tempdir) / "splunk-app-for-content-packs_250.spl"

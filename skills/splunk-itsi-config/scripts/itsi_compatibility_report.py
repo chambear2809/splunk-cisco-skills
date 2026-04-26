@@ -14,7 +14,7 @@ COMPATIBILITY_ROWS = [
         "area": "Native config upserts",
         "status": "supported",
         "coverage": "team, entity, entity_type, service, base_service_template, kpi_base_search, kpi_template, kpi_threshold_template, custom_threshold_windows, notable_event_aggregation_policy, event_management_state, correlation_search, notable_event_email_template, maintenance_calendar, backup_restore, deep_dive, glass_table, home_view, kpi_entity_threshold",
-        "notes": "Additive preview/apply/validate. Core entity/service/KPI objects accept typed fields plus top-level schema passthrough and payload; deep-dive updates preserve required owner fields.",
+        "notes": "Additive preview/apply/validate plus read-only export/inventory/prune-plan. Export and prune-plan skip optional route families that are unavailable on a live host and report warnings. Core entity/service/KPI objects accept typed fields plus top-level schema passthrough and payload; deep-dive updates preserve required owner fields.",
     },
     {
         "area": "Special route families",
@@ -35,6 +35,18 @@ COMPATIBILITY_ROWS = [
         "notes": "Install remains conservative: preview first, no destructive resolution defaults, post-install module work is reported as guided handoff.",
     },
     {
+        "area": "Drift and readiness reporting",
+        "status": "supported",
+        "coverage": "field-level validation diffs, KPI/correlation-search SPL preflight warnings, read-only app/object/KV Store inventory, offline native smoke harness",
+        "notes": "Diagnostics remain non-destructive. SPL checks are heuristic preflight warnings, not full Splunk parser validation. The smoke harness uses an in-memory client and exercises cleanup without connecting to Splunk.",
+    },
+    {
+        "area": "Topology visualization",
+        "status": "supported",
+        "coverage": "starter native glass-table spec generation from topology.roots",
+        "notes": "The generator emits a reviewable starter payload; operators should review visual layout before applying it to ITSI.",
+    },
+    {
         "area": "Operational helper actions",
         "status": "guarded",
         "coverage": "entity retire/restore/retire_retirable, custom threshold stop/disconnect, KPI/entity threshold recommendation application, bulk time-offset shift",
@@ -48,9 +60,9 @@ COMPATIBILITY_ROWS = [
     },
     {
         "area": "Deletes and destructive transitions",
-        "status": "excluded",
+        "status": "guarded",
         "coverage": "bulk/single DELETE endpoints, content_pack submit/download, icon delete, kpi_entity_threshold delete",
-        "notes": "No delete or prune behavior is implemented; destructive workflows need separate operator-specific approval and rollback design.",
+        "notes": "cleanup-apply deletes only supported candidates from a matching current prune-plan after explicit allow_destroy, confirmation text, max_deletes, candidate_ids, and a CLI backup export. Content-pack authorship objects, glass-table icons, and KPI entity thresholds remain manual-review only.",
     },
     {
         "area": "Unused or discovery/helper APIs",

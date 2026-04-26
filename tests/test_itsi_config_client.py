@@ -246,6 +246,42 @@ class SplunkRestClientTests(unittest.TestCase):
             ],
         )
 
+    def test_list_objects_uses_route_specific_pagination_params(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params))
+            return {"entry": [{"content": {"_key": "service:1", "title": "API"}}]}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        listed = client.list_objects("service")
+
+        self.assertEqual(listed, [{"_key": "service:1", "title": "API"}])
+        self.assertEqual(
+            calls,
+            [("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service", {"count": 0})],
+        )
+
+    def test_list_event_management_objects_omits_unsupported_count_param(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params))
+            return {"entry": [{"content": {"_key": "correlation:1", "name": "Alert"}}]}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        listed = client.list_objects("correlation_search", interface="event_management")
+
+        self.assertEqual(listed, [{"_key": "correlation:1", "name": "Alert"}])
+        self.assertEqual(
+            calls,
+            [("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/correlation_search", None)],
+        )
+
     def test_kpi_entity_threshold_uses_documented_put_endpoint(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
         calls: list[tuple[str, str, object, object]] = []
@@ -323,6 +359,26 @@ class SplunkRestClientTests(unittest.TestCase):
                     {"title": "Alert"},
                 ),
             ],
+        )
+
+    def test_delete_object_uses_keyed_delete_endpoint(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service/service%3Aorphan":
+                return {"_key": "service:orphan"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.delete_object("service", "service:orphan")
+
+        self.assertEqual(result, {"_key": "service:orphan"})
+        self.assertEqual(
+            calls,
+            [("DELETE", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service/service%3Aorphan", None, None)],
         )
 
     def test_content_pack_authorship_update_keeps_full_payload_semantics(self) -> None:

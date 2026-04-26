@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import re
 from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
@@ -57,6 +60,15 @@ POST_SERVICE_CONFIG_SECTIONS = (
     ConfigObjectSection("home_views", "home_view"),
     ConfigObjectSection("kpi_entity_thresholds", "kpi_entity_threshold"),
 )
+ALL_CONFIG_SECTIONS = PRE_SERVICE_CONFIG_SECTIONS + POST_SERVICE_CONFIG_SECTIONS
+CONFIG_SECTIONS_BY_SECTION = {section.section: section for section in ALL_CONFIG_SECTIONS}
+CONFIG_SECTIONS_BY_OBJECT_TYPE = {section.object_type: section for section in ALL_CONFIG_SECTIONS}
+UNSUPPORTED_CLEANUP_SECTIONS = {
+    "custom_content_packs": "content-pack authorship cleanup can remove packaged authoring state and is not supported by cleanup-apply.",
+    "glass_table_icons": "icon collection deletes use a special API and are not supported by cleanup-apply.",
+    "kpi_entity_thresholds": "KPI entity threshold deletes are excluded from cleanup-apply until rollback handling is implemented.",
+}
+CLEANUP_CONFIRMATION = "DELETE_UNMANAGED_ITSI_OBJECTS"
 
 CONFIG_OBJECT_RESERVED_KEYS = {"payload", "title", "description", "sec_grp", "object_type", "allow_restore"}
 ENTITY_RESERVED_KEYS = {
@@ -111,6 +123,9 @@ class NativeResult:
     diagnostics: list[dict[str, Any]] = field(default_factory=list)
     service_snapshots: dict[str, dict[str, Any]] = field(default_factory=dict)
     object_snapshots: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
+    exports: dict[str, Any] = field(default_factory=dict)
+    inventory: dict[str, Any] = field(default_factory=dict)
+    prune_plan: dict[str, Any] = field(default_factory=dict)
 
     @property
     def failed(self) -> bool:
@@ -209,23 +224,38 @@ def _existing_kpis_by_title(service_payload: dict[str, Any]) -> dict[str, dict[s
     return {kpi.get("title"): deepcopy(kpi) for kpi in listify(service_payload.get("kpis")) if kpi.get("title")}
 
 
-def _normalize_kpi(kpi_spec: dict[str, Any], existing: dict[str, Any] | None = None) -> dict[str, Any]:
+def _stable_kpi_key(service_title: str | None, kpi_title: str) -> str:
+    seed = f"{service_title or 'service'}::{kpi_title}".encode("utf-8")
+    return hashlib.sha1(seed).hexdigest()[:24]
+
+
+def _normalize_kpi(
+    kpi_spec: dict[str, Any],
+    existing: dict[str, Any] | None = None,
+    service_title: str | None = None,
+) -> dict[str, Any]:
     payload = deepcopy(existing or {})
     updates = {
         "title": kpi_spec["title"],
         "description": kpi_spec.get("description", ""),
+        "type": kpi_spec.get("type", "kpi_primary"),
         "search": kpi_spec.get("search"),
+        "base_search": kpi_spec.get("base_search") or kpi_spec.get("search"),
+        "search_type": kpi_spec.get("search_type"),
         "threshold_field": kpi_spec.get("threshold_field"),
         "aggregate_statop": kpi_spec.get("aggregate_statop"),
         "entity_statop": kpi_spec.get("entity_statop"),
         "entity_id_fields": kpi_spec.get("entity_id_fields"),
         "entity_breakdown_id_field": kpi_spec.get("entity_breakdown_id_field"),
-        "search_alert_earliest": kpi_spec.get("search_alert_earliest"),
+        "search_alert_earliest": kpi_spec.get("search_alert_earliest", "5"),
         "search_alert_latest": kpi_spec.get("search_alert_latest"),
         "threshold_direction": kpi_spec.get("threshold_direction"),
-        "urgency": kpi_spec.get("urgency"),
+        "urgency": kpi_spec.get("urgency", kpi_spec.get("importance", "5")),
         "unit": kpi_spec.get("unit"),
         "importance": kpi_spec.get("importance"),
+        "alert_on": kpi_spec.get("alert_on", "aggregate"),
+        "alert_period": kpi_spec.get("alert_period", "5"),
+        "alert_lag": kpi_spec.get("alert_lag", "30"),
         "kpi_threshold_template_id": kpi_spec.get("kpi_threshold_template_id"),
         "kpi_base_search_id": kpi_spec.get("kpi_base_search_id"),
         "base_search_id": kpi_spec.get("base_search_id"),
@@ -235,6 +265,13 @@ def _normalize_kpi(kpi_spec: dict[str, Any], existing: dict[str, Any] | None = N
         "adaptive_thresholding": kpi_spec.get("adaptive_thresholding"),
         "anomaly_detection": kpi_spec.get("anomaly_detection"),
     }
+    if (
+        updates["base_search"]
+        and not updates["search_type"]
+        and not kpi_spec.get("base_search_id")
+        and not kpi_spec.get("kpi_base_search_id")
+    ):
+        updates["search_type"] = "adhoc"
     payload.update({key: value for key, value in updates.items() if value is not None})
     if "enabled" in kpi_spec:
         payload["enabled"] = bool_from_any(kpi_spec.get("enabled"))
@@ -246,6 +283,8 @@ def _normalize_kpi(kpi_spec: dict[str, Any], existing: dict[str, Any] | None = N
     if entity:
         payload["entity_thresholds"] = _normalize_threshold_block(entity, kpi_spec.get("threshold_field"))
     payload = deep_merge(payload, _schema_overlay(kpi_spec, KPI_RESERVED_KEYS, label="kpi payload"))
+    if existing is None and not payload.get("_key"):
+        payload["_key"] = _stable_kpi_key(service_title, payload["title"])
     return compact(payload)
 
 
@@ -268,7 +307,7 @@ def _normalize_service(service_spec: dict[str, Any], existing: dict[str, Any] | 
     desired_titles: set[str] = set()
     for kpi_spec in listify(service_spec.get("kpis")):
         desired_titles.add(kpi_spec["title"])
-        desired_kpis.append(_normalize_kpi(kpi_spec, existing_kpis.get(kpi_spec["title"])))
+        desired_kpis.append(_normalize_kpi(kpi_spec, existing_kpis.get(kpi_spec["title"]), service_spec["title"]))
     for title, kpi in existing_kpis.items():
         if title not in desired_titles:
             desired_kpis.append(kpi)
@@ -523,6 +562,10 @@ def _validate_config_object_safety(object_spec: dict[str, Any], section: ConfigO
 
 
 def _compare_entity(existing: dict[str, Any], desired: dict[str, Any]) -> bool:
+    return subset_matches(canonicalize(existing), canonicalize(_expected_entity(desired)))
+
+
+def _expected_entity(desired: dict[str, Any]) -> dict[str, Any]:
     expected = compact(
         {
             "title": desired.get("title"),
@@ -537,19 +580,26 @@ def _compare_entity(existing: dict[str, Any], desired: dict[str, Any]) -> bool:
     for key in payload_keys:
         if key not in expected:
             expected[key] = deepcopy(desired[key])
-    return subset_matches(canonicalize(existing), canonicalize(expected))
+    return expected
 
 
 def _desired_kpi_subset(service_spec: dict[str, Any]) -> list[dict[str, Any]]:
     subset: list[dict[str, Any]] = []
     for kpi_spec in listify(service_spec.get("kpis")):
-        normalized = _normalize_kpi(kpi_spec)
+        normalized = _normalize_kpi(kpi_spec, service_title=service_spec.get("title"))
         normalized.pop("_key", None)
+        # ITSI rewrites the runtime search fields after save. base_search is the
+        # stable field that preserves the user's SPL for ad hoc KPIs.
+        normalized.pop("search", None)
         subset.append(compact(normalized))
     return subset
 
 
 def _compare_service(existing: dict[str, Any], desired: dict[str, Any], service_spec: dict[str, Any]) -> bool:
+    return subset_matches(canonicalize(existing), canonicalize(_expected_service(desired, service_spec)))
+
+
+def _expected_service(desired: dict[str, Any], service_spec: dict[str, Any]) -> dict[str, Any]:
     expected = compact(
         {
             "title": desired.get("title"),
@@ -565,10 +615,14 @@ def _compare_service(existing: dict[str, Any], desired: dict[str, Any], service_
     for key in payload_keys:
         if key not in expected:
             expected[key] = deepcopy(desired[key])
-    return subset_matches(canonicalize(existing), canonicalize(expected))
+    return expected
 
 
 def _compare_neap(existing: dict[str, Any], desired: dict[str, Any]) -> bool:
+    return subset_matches(canonicalize(existing), canonicalize(_expected_neap(desired)))
+
+
+def _expected_neap(desired: dict[str, Any]) -> dict[str, Any]:
     expected = compact(
         {
             "title": desired.get("title"),
@@ -579,7 +633,149 @@ def _compare_neap(existing: dict[str, Any], desired: dict[str, Any]) -> bool:
     payload_keys = set(desired.keys()) - {"_key", "title", "description", "object_type"}
     for key in payload_keys:
         expected[key] = deepcopy(desired[key])
-    return subset_matches(canonicalize(existing), canonicalize(expected))
+    return expected
+
+
+def _diff_subset(actual: Any, expected: Any, path: str = "") -> list[dict[str, Any]]:
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict):
+            return [{"path": path or "$", "expected": expected, "actual": actual}]
+        diffs: list[dict[str, Any]] = []
+        for key, value in expected.items():
+            child_path = f"{path}.{key}" if path else key
+            if key not in actual:
+                diffs.append({"path": child_path, "expected": value, "actual": None})
+                continue
+            diffs.extend(_diff_subset(actual[key], value, child_path))
+        return diffs
+    if isinstance(expected, list):
+        if not isinstance(actual, list):
+            return [{"path": path or "$", "expected": expected, "actual": actual}]
+        remaining = list(actual)
+        diffs = []
+        for index, expected_item in enumerate(expected):
+            match_index = next(
+                (candidate_index for candidate_index, actual_item in enumerate(remaining) if subset_matches(actual_item, expected_item)),
+                None,
+            )
+            if match_index is None:
+                diffs.append({"path": f"{path}[{index}]", "expected": expected_item, "actual": None})
+            else:
+                remaining.pop(match_index)
+        return diffs
+    if not subset_matches(actual, expected):
+        return [{"path": path or "$", "expected": expected, "actual": actual}]
+    return []
+
+
+def _clean_export_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    volatile_keys = {
+        "_key",
+        "acl",
+        "eai:acl.app",
+        "eai:acl.owner",
+        "eai:acl.sharing",
+        "eai:appName",
+        "eai:userName",
+        "mod_time",
+        "updated_at",
+    }
+    def clean_value(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: clean_value(child)
+                for key, child in value.items()
+                if key not in volatile_keys and child is not None
+            }
+        if isinstance(value, list):
+            return [clean_value(item) for item in value if item is not None]
+        return deepcopy(value)
+
+    return {
+        key: clean_value(value)
+        for key, value in payload.items()
+        if key not in volatile_keys and value is not None
+    }
+
+
+def _export_object_spec(payload: dict[str, Any], identity_field: str = "title") -> dict[str, Any]:
+    exported = _clean_export_payload(payload)
+    title = str(exported.get(identity_field) or exported.get("title") or exported.get("name") or "").strip()
+    for key in ("title", "name"):
+        exported.pop(key, None)
+    if identity_field != "title":
+        exported.pop(identity_field, None)
+    spec: dict[str, Any] = {"title": title} if title else {}
+    if exported:
+        spec["payload"] = exported
+    return spec
+
+
+def _search_preflight_warnings(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
+    for service_spec in listify(spec.get("services")):
+        service_title = str(service_spec.get("title") or "<unknown>")
+        for kpi_spec in listify(service_spec.get("kpis")):
+            title = str(kpi_spec.get("title") or "<unknown>")
+            search = str(kpi_spec.get("search") or "")
+            if not search:
+                continue
+            if not re.search(r"(?i)\bindex\s*=", search) and not re.search(r"(?i)\bindex\s+in\s*\(", search):
+                warnings.append(
+                    {
+                        "status": "warn",
+                        "object_type": "kpi_search",
+                        "title": f"{service_title} / {title}",
+                        "message": "KPI search does not explicitly constrain index=; preview/apply will not fail, but live performance and correctness should be reviewed.",
+                    }
+                )
+            threshold_field = str(kpi_spec.get("threshold_field") or "").strip()
+            if threshold_field and threshold_field not in search:
+                warnings.append(
+                    {
+                        "status": "warn",
+                        "object_type": "kpi_search",
+                        "title": f"{service_title} / {title}",
+                        "message": f"KPI threshold_field '{threshold_field}' is not visibly produced by the search string.",
+                    }
+                )
+            if bool_from_any(kpi_spec.get("is_entity_breakdown")) and not (
+                kpi_spec.get("entity_id_fields") or kpi_spec.get("entity_breakdown_id_field")
+            ):
+                warnings.append(
+                    {
+                        "status": "warn",
+                        "object_type": "kpi_search",
+                        "title": f"{service_title} / {title}",
+                        "message": "Entity-breakdown KPI is enabled but no entity ID/breakdown field is declared.",
+                    }
+                )
+    for correlation_spec in listify(spec.get("correlation_searches")):
+        title = str(correlation_spec.get("title") or correlation_spec.get("name") or "<unknown>")
+        payload = correlation_spec.get("payload") if isinstance(correlation_spec.get("payload"), dict) else {}
+        search = str(correlation_spec.get("search") or payload.get("search") or "")
+        if search and not re.search(r"(?i)\bindex\s*=", search) and not re.search(r"(?i)\bindex\s+in\s*\(", search):
+            warnings.append(
+                {
+                    "status": "warn",
+                    "object_type": "correlation_search",
+                    "title": title,
+                    "message": "Correlation search does not explicitly constrain index=; review before enabling in production.",
+                }
+            )
+    return warnings
+
+
+def _drift_diagnostic(object_type: str, title: str, message: str, diffs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    diagnostic: dict[str, Any] = {
+        "status": "error",
+        "object_type": object_type,
+        "title": title,
+        "message": message,
+    }
+    if diffs:
+        diagnostic["diffs"] = diffs
+    return diagnostic
 
 
 def _neap_is_managed(existing: dict[str, Any]) -> bool:
@@ -675,11 +871,336 @@ class NativeWorkflow:
         self.client = client
 
     def run(self, spec: dict[str, Any], mode: str) -> NativeResult:
-        if mode not in {"preview", "apply", "validate"}:
+        if mode not in {"preview", "apply", "validate", "export", "inventory", "prune-plan", "cleanup-apply"}:
             raise ValidationError(f"Unsupported native mode '{mode}'.")
+        if mode == "export":
+            return self._export(spec)
+        if mode == "inventory":
+            return self._inventory(spec)
+        if mode == "prune-plan":
+            return self._prune_plan(spec)
+        if mode == "cleanup-apply":
+            return self._cleanup_apply(spec)
         if mode == "validate":
             return self._validate(spec)
         return self._upsert(spec, apply=(mode == "apply"), mode=mode)
+
+    def _list_objects(self, section: ConfigObjectSection) -> list[dict[str, Any]]:
+        if hasattr(self.client, "list_objects"):
+            try:
+                return self.client.list_objects(section.object_type, interface=section.interface)
+            except TypeError:
+                return self.client.list_objects(section.object_type)
+        return []
+
+    @staticmethod
+    def _unavailable_section_diagnostic(section: ConfigObjectSection, exc: Exception) -> dict[str, Any]:
+        return {
+            "status": "warn",
+            "object_type": section.display_label,
+            "title": section.section,
+            "message": f"Could not list {section.section}; this section was skipped: {exc}",
+        }
+
+    @staticmethod
+    def _is_optional_list_unavailable(exc: Exception) -> bool:
+        return isinstance(exc, ValidationError) and "ITSI REST endpoint is unavailable" in str(exc)
+
+    def _list_objects_best_effort(
+        self,
+        section: ConfigObjectSection,
+        result: NativeResult | None = None,
+        unavailable_sections: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
+        try:
+            return self._list_objects(section)
+        except Exception as exc:
+            if not self._is_optional_list_unavailable(exc):
+                raise
+            skipped = {
+                "section": section.section,
+                "object_type": section.object_type,
+                "interface": section.interface,
+                "message": str(exc),
+            }
+            if unavailable_sections is not None:
+                unavailable_sections.append(skipped)
+            if result is not None:
+                result.diagnostics.append(self._unavailable_section_diagnostic(section, exc))
+            return []
+
+    def _add_preflight_diagnostics(self, spec: dict[str, Any], result: NativeResult) -> None:
+        result.diagnostics.extend(_search_preflight_warnings(spec))
+
+    def _export(self, spec: dict[str, Any]) -> NativeResult:
+        result = NativeResult(mode="export")
+        export_options = spec.get("export", {}) if isinstance(spec.get("export"), dict) else {}
+        sections = set(listify(export_options.get("sections")))
+        exported: dict[str, Any] = {}
+        unavailable_sections: list[dict[str, Any]] = []
+        for section in ALL_CONFIG_SECTIONS:
+            if sections and section.section not in sections and section.object_type not in sections:
+                continue
+            objects = [
+                _export_object_spec(item, section.identity_field)
+                for item in self._list_objects_best_effort(section, result, unavailable_sections)
+            ]
+            objects = [item for item in objects if item.get("title")]
+            if objects or bool_from_any(export_options.get("include_empty")):
+                exported[section.section] = objects
+        if not sections or "entities" in sections or "entity" in sections:
+            entities = [_export_object_spec(item) for item in self.client.list_objects("entity")] if hasattr(self.client, "list_objects") else []
+            if entities or bool_from_any(export_options.get("include_empty")):
+                exported["entities"] = [item for item in entities if item.get("title")]
+        services = self.client.list_objects("service") if hasattr(self.client, "list_objects") and (not sections or "services" in sections or "service" in sections) else []
+        service_titles_by_key = {str(service.get("_key")): str(service.get("title")) for service in services if service.get("_key") and service.get("title")}
+        if services or (not sections and bool_from_any(export_options.get("include_empty"))):
+            exported_services: list[dict[str, Any]] = []
+            for service in services:
+                service_spec = _export_object_spec(service)
+                payload = service_spec.setdefault("payload", {})
+                if not isinstance(payload, dict):
+                    continue
+                dependencies = []
+                for dependency in listify(service.get("services_depends_on")):
+                    service_id = str(dependency.get("service_id") or "").strip() if isinstance(dependency, dict) else ""
+                    dependency_title = service_titles_by_key.get(service_id)
+                    if not dependency_title:
+                        continue
+                    entry: dict[str, Any] = {"service": dependency_title}
+                    kpi_ids = listify(dependency.get("kpis_depending_on")) if isinstance(dependency, dict) else []
+                    if kpi_ids:
+                        entry["kpi_ids"] = kpi_ids
+                    dependencies.append(entry)
+                if dependencies:
+                    payload.pop("services_depends_on", None)
+                    service_spec["depends_on"] = dependencies
+                exported_services.append(service_spec)
+            exported["services"] = exported_services
+        if not sections or "neaps" in sections or "notable_event_aggregation_policy" in sections:
+            neap_objects = self._list_objects(NEAP_SECTION)
+            neaps = [_export_object_spec(item) for item in neap_objects]
+            if neaps or bool_from_any(export_options.get("include_empty")):
+                exported["neaps"] = [item for item in neaps if item.get("title")]
+        result.exports = {"native_spec": exported, "unavailable_sections": unavailable_sections}
+        result.changes.append(
+            ChangeRecord(
+                "native_export",
+                "live ITSI",
+                "export",
+                "ok",
+                "Exported live ITSI objects into a native spec skeleton.",
+            )
+        )
+        return result
+
+    def _inventory(self, spec: dict[str, Any]) -> NativeResult:
+        result = NativeResult(mode="inventory")
+        inventory: dict[str, Any] = {"apps": {}, "objects": {}}
+        for app in ("SA-ITOA", "itsi", "DA-ITSI-ContentLibrary"):
+            if hasattr(self.client, "get_app_version"):
+                inventory["apps"][app] = {"version": self.client.get_app_version(app)}
+        if hasattr(self.client, "kvstore_status"):
+            try:
+                inventory["kvstore_status"] = self.client.kvstore_status()
+            except Exception as exc:  # read-only report should keep going
+                inventory["kvstore_status"] = f"unavailable: {exc}"
+        for section in ALL_CONFIG_SECTIONS:
+            try:
+                objects = self._list_objects(section)
+                inventory["objects"][section.section] = {
+                    "object_type": section.object_type,
+                    "count": len(objects),
+                    "titles": sorted(str(item.get(section.identity_field) or item.get("title") or item.get("name")) for item in objects if item.get(section.identity_field) or item.get("title") or item.get("name")),
+                }
+            except Exception as exc:  # keep inventory best-effort
+                inventory["objects"][section.section] = {"object_type": section.object_type, "status": "unavailable", "message": str(exc)}
+        for section_name, object_type in (("entities", "entity"), ("services", "service")):
+            try:
+                objects = self.client.list_objects(object_type) if hasattr(self.client, "list_objects") else []
+                inventory["objects"][section_name] = {
+                    "object_type": object_type,
+                    "count": len(objects),
+                    "titles": sorted(str(item.get("title")) for item in objects if item.get("title")),
+                }
+            except Exception as exc:
+                inventory["objects"][section_name] = {"object_type": object_type, "status": "unavailable", "message": str(exc)}
+        if hasattr(self.client, "content_pack_catalog"):
+            try:
+                packs = self.client.content_pack_catalog()
+                inventory["content_packs"] = {
+                    "count": len(packs),
+                    "installed": sorted(str(pack.get("title") or pack.get("id")) for pack in packs if bool_from_any(pack.get("installed"))),
+                }
+            except Exception as exc:
+                inventory["content_packs"] = {"status": "unavailable", "message": str(exc)}
+        result.inventory = inventory
+        result.changes.append(ChangeRecord("inventory", "live ITSI", "read", "ok", "Collected read-only ITSI inventory."))
+        return result
+
+    @staticmethod
+    def _candidate_id(candidate: dict[str, Any]) -> str:
+        identity = {
+            "section": candidate.get("section"),
+            "object_type": candidate.get("object_type"),
+            "title": candidate.get("title"),
+            "key": candidate.get("key"),
+        }
+        return hashlib.sha256(json.dumps(identity, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _plan_id(candidates: list[dict[str, Any]]) -> str:
+        plan_identity = [
+            {
+                "candidate_id": candidate.get("candidate_id"),
+                "section": candidate.get("section"),
+                "object_type": candidate.get("object_type"),
+                "title": candidate.get("title"),
+                "key": candidate.get("key"),
+                "delete_supported": candidate.get("delete_supported"),
+            }
+            for candidate in candidates
+        ]
+        return hashlib.sha256(json.dumps(plan_identity, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+
+    @staticmethod
+    def _cleanup_support(section_name: str) -> tuple[bool, str | None]:
+        if section_name in UNSUPPORTED_CLEANUP_SECTIONS:
+            return False, UNSUPPORTED_CLEANUP_SECTIONS[section_name]
+        return True, None
+
+    def _build_prune_plan(self, spec: dict[str, Any], result: NativeResult | None = None) -> dict[str, Any]:
+        plan: dict[str, Any] = {
+            "destructive_apply_supported": True,
+            "cleanup_mode": "cleanup-apply",
+            "confirmation": CLEANUP_CONFIRMATION,
+            "candidates": [],
+            "unavailable_sections": [],
+        }
+        desired_by_section: dict[str, set[str]] = {}
+        for section in ALL_CONFIG_SECTIONS:
+            desired_by_section[section.section] = {
+                _config_object_title(item, section)
+                for item in listify(spec.get(section.section))
+                if isinstance(item, dict)
+            }
+            for live in self._list_objects_best_effort(section, result, plan["unavailable_sections"]):
+                title = str(live.get(section.identity_field) or live.get("title") or live.get("name") or "").strip()
+                if title and title not in desired_by_section[section.section]:
+                    supported, reason = self._cleanup_support(section.section)
+                    candidate = {
+                        "section": section.section,
+                        "object_type": section.object_type,
+                        "interface": section.interface,
+                        "title": title,
+                        "key": live.get("_key"),
+                        "delete_supported": supported,
+                        "unsupported_reason": reason,
+                        "action": "would_delete_if_cleanup_apply_is_confirmed" if supported else "manual_review_required",
+                    }
+                    candidate["candidate_id"] = self._candidate_id(candidate)
+                    plan["candidates"].append(candidate)
+        for section_name, object_type in (("entities", "entity"), ("services", "service")):
+            desired_titles = {str(item.get("title") or "").strip() for item in listify(spec.get(section_name)) if isinstance(item, dict)}
+            live_objects = self.client.list_objects(object_type) if hasattr(self.client, "list_objects") else []
+            for live in live_objects:
+                title = str(live.get("title") or "").strip()
+                if title and title not in desired_titles:
+                    candidate = {
+                        "section": section_name,
+                        "object_type": object_type,
+                        "interface": "itoa",
+                        "title": title,
+                        "key": live.get("_key"),
+                        "delete_supported": True,
+                        "unsupported_reason": None,
+                        "action": "would_delete_if_cleanup_apply_is_confirmed",
+                    }
+                    candidate["candidate_id"] = self._candidate_id(candidate)
+                    plan["candidates"].append(candidate)
+        plan["candidates"] = sorted(
+            plan["candidates"],
+            key=lambda item: (str(item.get("section")), str(item.get("title")), str(item.get("key"))),
+        )
+        plan["plan_id"] = self._plan_id(plan["candidates"])
+        plan["cleanup_spec_example"] = {
+            "cleanup": {
+                "allow_destroy": True,
+                "confirm": CLEANUP_CONFIRMATION,
+                "plan_id": plan["plan_id"],
+                "max_deletes": 1,
+                "candidate_ids": [candidate["candidate_id"] for candidate in plan["candidates"][:1] if candidate.get("delete_supported")],
+            }
+        }
+        return plan
+
+    def _prune_plan(self, spec: dict[str, Any]) -> NativeResult:
+        result = NativeResult(mode="prune-plan")
+        plan = self._build_prune_plan(spec, result)
+        result.prune_plan = plan
+        result.changes.append(ChangeRecord("prune_plan", "live ITSI", "plan", "ok", "Generated read-only prune candidate plan."))
+        return result
+
+    def _delete_cleanup_candidate(self, candidate: dict[str, Any]) -> None:
+        key = str(candidate.get("key") or "").strip()
+        if not key:
+            raise ValidationError(f"Cleanup candidate '{candidate.get('title')}' does not have a key.")
+        if not hasattr(self.client, "delete_object"):
+            raise ValidationError("The configured client does not support cleanup deletion.")
+        self.client.delete_object(str(candidate["object_type"]), key, interface=str(candidate.get("interface") or "itoa"))
+
+    def _cleanup_apply(self, spec: dict[str, Any]) -> NativeResult:
+        result = NativeResult(mode="cleanup-apply")
+        cleanup = spec.get("cleanup")
+        if not isinstance(cleanup, dict):
+            raise ValidationError("cleanup-apply requires a cleanup mapping in the spec.")
+        if not bool_from_any(cleanup.get("allow_destroy")):
+            raise ValidationError("cleanup-apply requires cleanup.allow_destroy: true.")
+        if str(cleanup.get("confirm") or "") != CLEANUP_CONFIRMATION:
+            raise ValidationError(f"cleanup-apply requires cleanup.confirm: {CLEANUP_CONFIRMATION}.")
+        plan = self._build_prune_plan(spec, result)
+        requested_plan_id = str(cleanup.get("plan_id") or "").strip()
+        if requested_plan_id != plan["plan_id"]:
+            raise ValidationError(
+                f"cleanup.plan_id '{requested_plan_id}' does not match the current prune plan '{plan['plan_id']}'. Rerun prune-plan and review candidates."
+            )
+        candidate_ids = set(_unique_nonblank_strings(cleanup.get("candidate_ids"), "cleanup.candidate_ids"))
+        for candidate in listify(cleanup.get("candidates")):
+            if not isinstance(candidate, dict):
+                raise ValidationError("cleanup.candidates entries must be mappings.")
+            candidate_id = str(candidate.get("candidate_id") or "").strip()
+            if candidate_id:
+                candidate_ids.add(candidate_id)
+        if not candidate_ids:
+            raise ValidationError("cleanup-apply requires at least one cleanup.candidate_ids entry.")
+        candidates_by_id = {candidate["candidate_id"]: candidate for candidate in plan["candidates"]}
+        unknown = sorted(candidate_id for candidate_id in candidate_ids if candidate_id not in candidates_by_id)
+        if unknown:
+            raise ValidationError(f"cleanup.candidate_ids contains candidates not present in the current prune plan: {', '.join(unknown)}.")
+        selected = [candidates_by_id[candidate_id] for candidate_id in sorted(candidate_ids)]
+        unsupported = [candidate for candidate in selected if not candidate.get("delete_supported")]
+        if unsupported:
+            titles = ", ".join(str(candidate.get("title")) for candidate in unsupported)
+            raise ValidationError(f"cleanup-apply selected unsupported cleanup candidates: {titles}.")
+        max_deletes = int(cleanup.get("max_deletes") or 0)
+        if max_deletes <= 0:
+            raise ValidationError("cleanup-apply requires cleanup.max_deletes to be a positive integer.")
+        if len(selected) > max_deletes:
+            raise ValidationError(f"cleanup selected {len(selected)} candidates, which exceeds cleanup.max_deletes={max_deletes}.")
+        result.prune_plan = plan
+        for candidate in selected:
+            self._delete_cleanup_candidate(candidate)
+            result.changes.append(
+                ChangeRecord(
+                    str(candidate["object_type"]),
+                    str(candidate["title"]),
+                    "delete",
+                    "ok",
+                    "Deleted unmanaged ITSI object selected from the confirmed prune plan.",
+                    key=str(candidate.get("key") or ""),
+                )
+            )
+        return result
 
     def _find_object(self, section: ConfigObjectSection, title: str) -> dict[str, Any] | None:
         if hasattr(self.client, "find_object_by_field"):
@@ -1039,6 +1560,22 @@ class NativeWorkflow:
                 _validate_config_object_safety(object_spec, section)
                 existing = self._find_object(section, title)
                 status = "pass" if existing and _compare_config_object(existing, object_spec, section, default_team) else "fail"
+                if status == "fail":
+                    if existing:
+                        expected = _expected_config_object(object_spec, section, default_team)
+                        diffs = _diff_subset(existing, expected)
+                        result.diagnostics.append(
+                            _drift_diagnostic(
+                                section.display_label,
+                                title,
+                                f"{section.display_label} does not match the requested configuration.",
+                                diffs,
+                            )
+                        )
+                    else:
+                        result.diagnostics.append(
+                            _drift_diagnostic(section.display_label, title, f"{section.display_label} was not found.")
+                        )
                 result.validations.append({"status": status, "object_type": section.display_label, "title": title})
                 if existing:
                     snapshots.setdefault(section.object_type, {})[title] = deepcopy(existing)
@@ -1349,6 +1886,7 @@ class NativeWorkflow:
 
     def _upsert(self, spec: dict[str, Any], apply: bool, mode: str) -> NativeResult:
         result = NativeResult(mode=mode)
+        self._add_preflight_diagnostics(spec, result)
         defaults = spec.get("defaults", {})
         default_team = defaults.get("sec_grp", DEFAULT_TEAM)
         pre_snapshots = self._upsert_config_sections(
@@ -1540,6 +2078,7 @@ class NativeWorkflow:
 
     def _validate(self, spec: dict[str, Any]) -> NativeResult:
         result = NativeResult(mode="validate")
+        self._add_preflight_diagnostics(spec, result)
         defaults = spec.get("defaults", {})
         default_team = defaults.get("sec_grp", DEFAULT_TEAM)
         pre_snapshots = self._validate_config_sections(
@@ -1555,23 +2094,19 @@ class NativeWorkflow:
                 desired = _normalize_entity(entity_spec, default_team, existing, entity_types_by_title) if existing else None
                 status = "pass" if existing and _compare_entity(existing, desired) else "fail"
                 if status == "fail":
+                    diffs = _diff_subset(existing, _expected_entity(desired)) if existing and desired else None
                     result.diagnostics.append(
-                        {
-                            "status": "error",
-                            "object_type": "entity",
-                            "title": entity_spec["title"],
-                            "message": "Entity was not found or does not match the requested configuration.",
-                        }
+                        _drift_diagnostic(
+                            "entity",
+                            entity_spec["title"],
+                            "Entity was not found or does not match the requested configuration.",
+                            diffs,
+                        )
                     )
             except ValidationError as exc:
                 status = "fail"
                 result.diagnostics.append(
-                    {
-                        "status": "error",
-                        "object_type": "entity",
-                        "title": entity_spec["title"],
-                        "message": str(exc),
-                    }
+                    _drift_diagnostic("entity", entity_spec["title"], str(exc))
                 )
             result.validations.append({"status": status, "object_type": "entity", "title": entity_spec["title"]})
         services_by_title = {
@@ -1593,13 +2128,14 @@ class NativeWorkflow:
             desired = _normalize_service(service_spec, existing, default_team) if existing else None
             service_status = "pass" if existing and desired and _compare_service(existing, desired, service_spec) else "fail"
             if service_status == "fail":
+                diffs = _diff_subset(existing, _expected_service(desired, service_spec)) if existing and desired else None
                 result.diagnostics.append(
-                    {
-                        "status": "error",
-                        "object_type": "service",
-                        "title": service_spec["title"],
-                        "message": "Service was not found or does not match the requested configuration.",
-                    }
+                    _drift_diagnostic(
+                        "service",
+                        service_spec["title"],
+                        "Service was not found or does not match the requested configuration.",
+                        diffs,
+                    )
                 )
             result.validations.append({"status": service_status, "object_type": "service", "title": service_spec["title"]})
         self._validate_service_template_links(
@@ -1650,6 +2186,16 @@ class NativeWorkflow:
                 if existing and desired and not _neap_is_managed(existing) and _compare_neap(existing, desired)
                 else "fail"
             )
+            if status == "fail":
+                diffs = _diff_subset(existing, _expected_neap(desired)) if existing and desired else None
+                result.diagnostics.append(
+                    _drift_diagnostic(
+                        "notable_event_aggregation_policy",
+                        neap_spec["title"],
+                        "NEAP was not found, is managed/default, or does not match the requested configuration.",
+                        diffs,
+                    )
+                )
             result.validations.append(
                 {"status": status, "object_type": "notable_event_aggregation_policy", "title": neap_spec["title"]}
             )

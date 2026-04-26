@@ -220,6 +220,11 @@ operational_actions:
 ## Notes
 
 - The workflow intentionally preserves unmanaged fields and extra live KPIs instead of pruning them.
+- Brownfield read-only modes are available via `setup.sh --workflow native --mode export|inventory|prune-plan`. Use `export --output exported.native.yaml --output-format yaml` to generate a native YAML skeleton from live ITSI, `inventory` for object/app/KV Store counts, and `prune-plan` to list unmanaged live objects without deleting them. Export and prune-plan skip optional ITSI route families that are not exposed by the live host and report warning diagnostics/unavailable sections instead of aborting the whole run.
+- Guarded cleanup is available via `setup.sh --workflow native --mode cleanup-apply --backup-output cleanup-backup.native.yaml`. A cleanup spec must copy the current `prune-plan` `plan_id` and selected `candidate_ids`, set `cleanup.allow_destroy: true`, set `cleanup.confirm: DELETE_UNMANAGED_ITSI_OBJECTS`, and set a positive `cleanup.max_deletes`. The CLI writes the backup export before any delete call.
+- `python3 scripts/native_offline_smoke.py --spec-json <path>` exercises native preview/apply/validate/export/inventory/prune-plan plus an in-memory cleanup delete and never connects to Splunk.
+- Validation diagnostics include field-level diffs for managed drift where the live object exists.
+- Preview/apply/validate emit warning diagnostics for obvious KPI/correlation-search preflight issues, such as searches without explicit index constraints or threshold fields not visible in the SPL text.
 - Core `entities`, `services`, and service `kpis` accept documented ITSI schema fields at the top level. Use `payload` for fields that need exact exported object shape or would conflict with local DSL keys.
 - Service dependencies are merged in a second pass because dependency services must exist before they can be referenced.
 - Keyed updates on the generic ITSI, Event Management, maintenance, and backup/restore route families set `is_partial_data=1` so unmanaged fields are preserved. Full-payload special routes such as `kpi_entity_threshold`, icon collection, and content-pack authorship do not use that parameter.
@@ -239,4 +244,5 @@ operational_actions:
 - `entity_retire` and `entity_restore` accept `entity_keys` as a convenience shorthand for the documented `payload.data` list.
 - Operational Event Analytics records and APIs such as notable events, notable event groups, notable event comments, ticket actions, and action execution are intentionally not modeled as idempotent upsert sections.
 - Unused object types and helper APIs such as entity discovery searches, `entity_filter_rule`, `entity_relationship`, `entity_relationship_rule`, content-pack submit/download, and destructive deletes are not modeled because they do not have a safe additive preview/apply/validate shape.
-- The validator compares only the fields this skill manages.
+- Cleanup deletes are intentionally narrower than the prune plan. Candidates for content-pack authorship objects, glass-table icons, and KPI entity thresholds are reported as manual-review candidates rather than deleted.
+- The validator compares only the fields this skill manages, but reports path-level diffs for those managed fields when possible.

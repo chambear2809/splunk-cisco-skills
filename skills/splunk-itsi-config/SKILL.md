@@ -49,6 +49,10 @@ Useful quickstart files:
 - Entry points:
   - `bash scripts/setup.sh --workflow native --spec <path>`
   - `bash scripts/setup.sh --workflow native --spec <path> --apply`
+  - `bash scripts/setup.sh --workflow native --spec <path> --mode export --output exported.native.yaml --output-format yaml`
+  - `bash scripts/setup.sh --workflow native --spec <path> --mode inventory --output inventory.json`
+  - `bash scripts/setup.sh --workflow native --spec <path> --mode prune-plan --output prune-plan.json`
+  - `bash scripts/setup.sh --workflow native --spec <path> --mode cleanup-apply --backup-output cleanup-backup.native.yaml`
   - `bash scripts/validate.sh --workflow native --spec <path>`
   - `bash scripts/setup.sh --workflow content-packs --spec <path>`
   - `bash scripts/setup.sh --workflow content-packs --spec <path> --apply`
@@ -56,6 +60,8 @@ Useful quickstart files:
   - `bash scripts/setup.sh --workflow topology --spec <path>`
   - `bash scripts/setup.sh --workflow topology --spec <path> --apply`
   - `bash scripts/validate.sh --workflow topology --spec <path>`
+  - `python3 scripts/topology_glass_table.py --spec-json <path> --output topology-glass.native.yaml --output-format yaml`
+  - `python3 scripts/native_offline_smoke.py --spec-json <path>`
   - `python3 scripts/itsi_compatibility_report.py --format markdown`
 
 ## Authentication
@@ -75,16 +81,22 @@ file/environment:
 - `connection.password_env` or `SPLUNK_PASSWORD`
 
 Use a session key when possible. If you use username/password, keep the secret
-values in the credential file; the wrappers bridge `SPLUNK_USER` / `SPLUNK_PASS`
-to `SPLUNK_USERNAME` / `SPLUNK_PASSWORD` for this client. Never put passwords,
-tokens, or API keys in an ITSI YAML spec or in chat.
+values in the credential file; the wrappers prefer Splunk REST credentials from
+`SPLUNK_USER` / `SPLUNK_PASS` and export them as `SPLUNK_USERNAME` /
+`SPLUNK_PASSWORD` for this client. Never put passwords, tokens, or API keys in
+an ITSI YAML spec or in chat.
 
 ## Native Workflow Rules
 
 - Preview is the default.
 - `--apply` is required for writes.
+- Native read-only modes are available through `setup.sh --workflow native --mode export|inventory|prune-plan`. `export` writes a brownfield native spec skeleton, `inventory` reports live ITSI object counts/app versions/KV Store status, and `prune-plan` reports unmanaged live objects without deleting anything.
+- Guarded cleanup is available through `setup.sh --workflow native --mode cleanup-apply --backup-output <path>`. It recomputes the current prune plan, requires `cleanup.allow_destroy: true`, `cleanup.confirm: DELETE_UNMANAGED_ITSI_OBJECTS`, a matching `cleanup.plan_id`, positive `cleanup.max_deletes`, and explicit `cleanup.candidate_ids`. The CLI writes a live export backup before deleting.
+- `python3 scripts/native_offline_smoke.py --spec-json <path>` runs native preview/apply/validate/export/inventory/prune-plan against an in-memory ITSI-shaped client. Use it for regression checks without touching a live ITSI instance.
 - Upserts are additive and idempotent for the managed fields in the spec.
-- No delete or prune behavior is implemented in v1.
+- Delete behavior is limited to guarded cleanup candidates from a fresh prune plan. Unsupported cleanup candidates, including content-pack authorship objects, glass-table icons, and KPI entity thresholds, are reported for manual review rather than deleted.
+- Validation diagnostics include field-level diffs for managed drift where the live object exists.
+- Preview/apply/validate emit warning diagnostics for obvious KPI/correlation-search preflight issues, such as searches without explicit index constraints or threshold fields not visible in the SPL text.
 - Core `entities`, `services`, and service `kpis` support typed convenience fields and also merge additional top-level ITSI schema fields plus `payload` into the REST body. Local DSL keys such as `depends_on`, `service_template`, and threshold helpers are not sent as raw schema fields.
 - Extended object sections set common ITSI fields (`title`, `description`, `sec_grp`, `object_type`) and merge additional top-level fields plus `payload` into the REST request body. Use exported ITSI payload fields when managing version-specific object shapes.
 - Keyed updates on the generic ITSI, Event Management, maintenance, and backup/restore route families set `is_partial_data=1` so unmanaged fields are preserved. Full-payload special routes such as `kpi_entity_threshold`, icon collection, and content-pack authorship do not use that parameter.
@@ -133,6 +145,7 @@ tokens, or API keys in an ITSI YAML spec or in chat.
 - Preview is the default. `--apply` is required for writes.
 - The workflow reuses the content-pack bootstrap, ITSI health checks, and pack validation path before native object upserts and topology materialization.
 - `topology.roots` uses a nested DSL that compiles to ITSI `services_depends_on` edges.
+- `python3 scripts/topology_glass_table.py --spec-json <path> --output <path>` generates a starter native `glass_tables` spec from the same topology tree for operator review and later apply.
 - A topology node must define either `service_ref` or `service`.
 - Template-backed nodes use `service` plus `from_template`, where `from_template` resolves a content-pack profile and logical template title.
 - Shared downstream services are expressed with `ref` nodes; duplicate materialized nodes that resolve to the same service title are rejected.

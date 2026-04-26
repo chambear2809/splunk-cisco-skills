@@ -314,7 +314,7 @@ def _build_service_payload(
         desired_titles: set[str] = set()
         for kpi_spec in listify(service_spec.get("kpis")):
             desired_titles.add(kpi_spec["title"])
-            desired_kpis.append(_normalize_kpi(kpi_spec, existing_kpis.get(kpi_spec["title"])))
+            desired_kpis.append(_normalize_kpi(kpi_spec, existing_kpis.get(kpi_spec["title"]), service_spec["title"]))
         for title, kpi in existing_kpis.items():
             if title not in desired_titles:
                 desired_kpis.append(kpi)
@@ -349,16 +349,22 @@ def _service_subset(
                 {
                     "title": kpi.get("title"),
                     "description": kpi.get("description", ""),
-                    "search": kpi.get("search"),
+                    "type": kpi.get("type"),
+                    "base_search": kpi.get("base_search"),
+                    "search_type": kpi.get("search_type"),
                     "threshold_field": kpi.get("threshold_field"),
                     "aggregate_statop": kpi.get("aggregate_statop"),
                     "entity_statop": kpi.get("entity_statop"),
                     "entity_id_fields": kpi.get("entity_id_fields"),
                     "entity_breakdown_id_field": kpi.get("entity_breakdown_id_field"),
+                    "search_alert_earliest": kpi.get("search_alert_earliest"),
                     "aggregate_thresholds": kpi.get("aggregate_thresholds"),
                     "entity_thresholds": kpi.get("entity_thresholds"),
                     "urgency": kpi.get("urgency"),
                     "unit": kpi.get("unit"),
+                    "alert_on": kpi.get("alert_on"),
+                    "alert_period": kpi.get("alert_period"),
+                    "alert_lag": kpi.get("alert_lag"),
                 }
             )
             for kpi in listify(desired.get("kpis"))
@@ -560,7 +566,10 @@ class ServiceTopologyWorkflow:
             return ResolvedNode(node["id"], live, preview_only=False)
         if mode != "preview":
             raise ValidationError(
-                f"Topology node '{node['id']}' could not resolve service reference '{reference['title']}'."
+                f"Topology node '{node['id']}' could not resolve service reference '{reference['title']}'. "
+                "In apply or validate mode, service_ref must point to an existing ITSI service or to a service "
+                "created elsewhere in this spec. For a new starter topology, run preview first, then apply to "
+                "create the services before running validate."
             )
 
         profile = str(reference.get("profile") or "").strip()

@@ -12,8 +12,11 @@ top-level service-tree DSL:
 - `bash scripts/setup.sh --workflow topology --spec <path>`
 - `bash scripts/setup.sh --workflow topology --spec <path> --apply`
 - `bash scripts/validate.sh --workflow topology --spec <path>`
+- `python3 scripts/topology_glass_table.py --spec-json <path> --output topology-glass.native.yaml --output-format yaml`
 
 Topology specs can include all native sections from `references/native_itsi.md`, including extended ITSI objects such as teams, entity types, KPI base searches, service templates, custom content packs, correlation searches, Event Analytics configuration, maintenance windows, backup jobs, glass tables/icons, deep dives, and home views.
+
+Use `topology_glass_table.py` to generate a starter native `glass_tables` section from `topology.roots`. The generated payload is intentionally a reviewable starter layout, not a replacement for the ITSI visual editor.
 
 ## Supported Spec Shape
 

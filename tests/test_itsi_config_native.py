@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import copy
 import json
+import os
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -82,6 +85,9 @@ class FakeNativeClient:
                 return copy.deepcopy(obj)
         return None
 
+    def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
+        return [copy.deepcopy(value) for value in self._object_store(object_type).values()]
+
     def create_object(self, object_type: str, payload: dict) -> dict:
         store = self._object_store(object_type)
         created = copy.deepcopy(payload)
@@ -104,6 +110,15 @@ class FakeNativeClient:
         store[label] = updated
         self.operations.append(("update", object_type, label))
         return {"_key": key}
+
+    def delete_object(self, object_type: str, key: str, interface: str = "itoa") -> dict:
+        store = self._object_store(object_type)
+        for label, value in list(store.items()):
+            if value.get("_key") == key:
+                del store[label]
+                self.operations.append(("delete", object_type, label))
+                return {"_key": key}
+        raise AssertionError(f"Unknown {object_type} key {key}")
 
     def get_service_template_link(self, service_key: str) -> str | None:
         service = self.get_object("service", service_key)
@@ -167,6 +182,23 @@ class FakeNativeClient:
     def shift_time_offset(self, payload: dict) -> dict:
         self.operations.append(("operational", "shift_time_offset", str(payload)))
         return {"status": "ok"}
+
+
+class OptionalEndpointUnavailableClient(FakeNativeClient):
+    def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
+        if object_type == "event_management_state":
+            raise ValidationError(
+                "ITSI REST endpoint is unavailable. Checked: "
+                "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/event_management_state"
+            )
+        return super().list_objects(object_type, interface=interface)
+
+
+class AuthFailureClient(FakeNativeClient):
+    def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
+        if object_type == "event_management_state":
+            raise ValidationError("Splunk REST request failed: GET /example -> HTTP 401: unauthorized")
+        return super().list_objects(object_type, interface=interface)
 
 
 class InterfaceRecordingNativeClient(FakeNativeClient):
@@ -246,9 +278,17 @@ class NativeWorkflowTests(unittest.TestCase):
                                 "_key": "service:1::kpi::1",
                                 "title": "Errors",
                                 "description": "",
+                                "type": "kpi_primary",
                                 "search": "index=net | stats sum(errors) as errors by host",
+                                "base_search": "index=net | stats sum(errors) as errors by host",
+                                "search_type": "adhoc",
                                 "threshold_field": "errors",
                                 "aggregate_statop": "sum",
+                                "search_alert_earliest": "5",
+                                "urgency": "5",
+                                "alert_on": "aggregate",
+                                "alert_period": "5",
+                                "alert_lag": "30",
                             }
                         ],
                     }
@@ -339,6 +379,8 @@ class NativeWorkflowTests(unittest.TestCase):
         )
         edge = client.find_object_by_title("service", "Network Edge")
         core = client.find_object_by_title("service", "WAN Core")
+        self.assertRegex(core["kpis"][0]["_key"], r"^[0-9a-f]{24}$")
+        self.assertRegex(edge["kpis"][0]["_key"], r"^[0-9a-f]{24}$")
         self.assertEqual(edge["services_depends_on"][0]["service_id"], core["_key"])
         self.assertEqual(edge["services_depends_on"][0]["kpis_depending_on"], [core["kpis"][0]["_key"]])
         self.assertTrue(any(change.object_type == "service_dependency" and change.action == "update" for change in result.changes))
@@ -1122,6 +1164,333 @@ class NativeWorkflowTests(unittest.TestCase):
         self.assertFalse(validate_result.failed, validate_result.diagnostics)
         self.assertTrue(validate_result.validations)
         self.assertTrue(all(item["status"] == "pass" for item in validate_result.validations), validate_result.validations)
+
+    def test_export_generates_native_spec_from_live_objects(self) -> None:
+        client = FakeNativeClient(
+            {
+                "entity": {
+                    "edge-sw-01": {"_key": "entity:1", "object_type": "entity", "title": "edge-sw-01", "identifier": {"fields": ["host"], "values": ["edge-sw-01"]}}
+                },
+                "service": {
+                    "API": {
+                        "_key": "service:api",
+                        "object_type": "service",
+                        "title": "API",
+                        "description": "API service",
+                        "kpis": [{"_key": "kpi:latency", "title": "Latency"}],
+                    },
+                    "Frontend": {
+                        "_key": "service:frontend",
+                        "object_type": "service",
+                        "title": "Frontend",
+                        "services_depends_on": [{"service_id": "service:api", "kpis_depending_on": ["kpi:latency"]}],
+                    },
+                },
+            }
+        )
+
+        result = NativeWorkflow(client).run({"export": {"sections": ["entities", "services"]}}, "export")
+
+        native_spec = result.exports["native_spec"]
+        self.assertEqual(native_spec["entities"][0]["title"], "edge-sw-01")
+        exported_frontend = next(item for item in native_spec["services"] if item["title"] == "Frontend")
+        self.assertEqual(exported_frontend["depends_on"], [{"service": "API", "kpi_ids": ["kpi:latency"]}])
+        self.assertNotIn("_key", exported_frontend.get("payload", {}))
+        exported_api = next(item for item in native_spec["services"] if item["title"] == "API")
+        self.assertNotIn("_key", exported_api["payload"]["kpis"][0])
+
+    def test_export_skips_unavailable_optional_sections_with_diagnostics(self) -> None:
+        client = OptionalEndpointUnavailableClient(
+            {"service": {"API": {"_key": "service:api", "title": "API"}}}
+        )
+
+        result = NativeWorkflow(client).run({}, "export")
+
+        self.assertFalse(result.failed, result.diagnostics)
+        self.assertEqual(result.exports["unavailable_sections"][0]["section"], "event_management_states")
+        self.assertTrue(
+            any(
+                item["status"] == "warn"
+                and item["object_type"] == "event_management_state"
+                and item["title"] == "event_management_states"
+                for item in result.diagnostics
+            )
+        )
+        self.assertEqual(result.exports["native_spec"]["services"][0]["title"], "API")
+
+    def test_export_does_not_swallow_auth_failures(self) -> None:
+        client = AuthFailureClient()
+
+        with self.assertRaisesRegex(ValidationError, "HTTP 401"):
+            NativeWorkflow(client).run({}, "export")
+
+    def test_inventory_counts_live_objects(self) -> None:
+        client = FakeNativeClient(
+            {
+                "entity": {"edge-sw-01": {"_key": "entity:1", "title": "edge-sw-01"}},
+                "service": {"API": {"_key": "service:api", "title": "API"}},
+            }
+        )
+
+        result = NativeWorkflow(client).run({}, "inventory")
+
+        self.assertEqual(result.inventory["objects"]["entities"]["count"], 1)
+        self.assertEqual(result.inventory["objects"]["services"]["titles"], ["API"])
+
+    def test_prune_plan_reports_unmanaged_candidates_without_deleting(self) -> None:
+        client = FakeNativeClient(
+            {
+                "service": {
+                    "API": {"_key": "service:api", "title": "API"},
+                    "Orphan": {"_key": "service:orphan", "title": "Orphan"},
+                }
+            }
+        )
+
+        result = NativeWorkflow(client).run({"services": [{"title": "API"}]}, "prune-plan")
+
+        candidates = result.prune_plan["candidates"]
+        orphan = next(candidate for candidate in candidates if candidate["title"] == "Orphan")
+        self.assertEqual(orphan["section"], "services")
+        self.assertEqual(orphan["object_type"], "service")
+        self.assertEqual(orphan["key"], "service:orphan")
+        self.assertTrue(orphan["delete_supported"])
+        self.assertEqual(orphan["action"], "would_delete_if_cleanup_apply_is_confirmed")
+        self.assertTrue(orphan["candidate_id"])
+        self.assertTrue(result.prune_plan["plan_id"])
+        self.assertEqual(client.operations, [])
+
+    def test_prune_plan_skips_unavailable_optional_sections_with_diagnostics(self) -> None:
+        client = OptionalEndpointUnavailableClient(
+            {"service": {"Orphan": {"_key": "service:orphan", "title": "Orphan"}}}
+        )
+
+        result = NativeWorkflow(client).run({}, "prune-plan")
+
+        self.assertFalse(result.failed, result.diagnostics)
+        self.assertEqual(result.prune_plan["unavailable_sections"][0]["section"], "event_management_states")
+        self.assertTrue(any(candidate["title"] == "Orphan" for candidate in result.prune_plan["candidates"]))
+        self.assertTrue(any(item["status"] == "warn" for item in result.diagnostics))
+
+    def test_cleanup_apply_deletes_only_confirmed_candidates_from_current_plan(self) -> None:
+        client = FakeNativeClient(
+            {
+                "service": {
+                    "API": {"_key": "service:api", "title": "API"},
+                    "Orphan": {"_key": "service:orphan", "title": "Orphan"},
+                    "Keep": {"_key": "service:keep", "title": "Keep"},
+                }
+            }
+        )
+        base_spec = {"services": [{"title": "API"}]}
+        plan = NativeWorkflow(client).run(base_spec, "prune-plan").prune_plan
+        orphan_id = next(candidate["candidate_id"] for candidate in plan["candidates"] if candidate["title"] == "Orphan")
+        spec = {
+            **base_spec,
+            "cleanup": {
+                "allow_destroy": True,
+                "confirm": "DELETE_UNMANAGED_ITSI_OBJECTS",
+                "plan_id": plan["plan_id"],
+                "max_deletes": 1,
+                "candidate_ids": [orphan_id],
+            },
+        }
+
+        result = NativeWorkflow(client).run(spec, "cleanup-apply")
+
+        self.assertFalse(result.failed)
+        self.assertIsNone(client.find_object_by_title("service", "Orphan"))
+        self.assertIsNotNone(client.find_object_by_title("service", "Keep"))
+        self.assertIn(("delete", "service", "Orphan"), client.operations)
+        self.assertEqual(result.changes[0].action, "delete")
+
+    def test_cleanup_apply_rejects_missing_guards(self) -> None:
+        client = FakeNativeClient({"service": {"Orphan": {"_key": "service:orphan", "title": "Orphan"}}})
+
+        with self.assertRaisesRegex(ValidationError, "allow_destroy"):
+            NativeWorkflow(client).run({"cleanup": {"confirm": "DELETE_UNMANAGED_ITSI_OBJECTS"}}, "cleanup-apply")
+
+    def test_cleanup_apply_rejects_stale_plan_id(self) -> None:
+        client = FakeNativeClient({"service": {"Orphan": {"_key": "service:orphan", "title": "Orphan"}}})
+        spec = {
+            "cleanup": {
+                "allow_destroy": True,
+                "confirm": "DELETE_UNMANAGED_ITSI_OBJECTS",
+                "plan_id": "stale",
+                "max_deletes": 1,
+                "candidate_ids": ["whatever"],
+            }
+        }
+
+        with self.assertRaisesRegex(ValidationError, "does not match the current prune plan"):
+            NativeWorkflow(client).run(spec, "cleanup-apply")
+
+    def test_cleanup_apply_rejects_unsupported_candidate(self) -> None:
+        client = FakeNativeClient({"icon": {"Old Icon": {"_key": "icon:old", "title": "Old Icon"}}})
+        base_spec: dict = {}
+        plan = NativeWorkflow(client).run(base_spec, "prune-plan").prune_plan
+        icon_id = next(candidate["candidate_id"] for candidate in plan["candidates"] if candidate["section"] == "glass_table_icons")
+        spec = {
+            "cleanup": {
+                "allow_destroy": True,
+                "confirm": "DELETE_UNMANAGED_ITSI_OBJECTS",
+                "plan_id": plan["plan_id"],
+                "max_deletes": 1,
+                "candidate_ids": [icon_id],
+            }
+        }
+
+        with self.assertRaisesRegex(ValidationError, "unsupported cleanup candidates"):
+            NativeWorkflow(client).run(spec, "cleanup-apply")
+
+    def test_validate_reports_field_level_drift(self) -> None:
+        client = FakeNativeClient({"service": {"API": {"_key": "service:api", "title": "API", "description": "Old"}}})
+        spec = {"services": [{"title": "API", "description": "New"}]}
+
+        result = NativeWorkflow(client).run(spec, "validate")
+
+        self.assertTrue(result.failed)
+        service_diagnostic = next(item for item in result.diagnostics if item["object_type"] == "service")
+        self.assertIn({"path": "description", "expected": "New", "actual": "Old"}, service_diagnostic["diffs"])
+
+    def test_validate_accepts_itsi_normalized_adhoc_kpi_fields(self) -> None:
+        search = "index=net | stats sum(errors) as errors"
+        client = FakeNativeClient(
+            {
+                "service": {
+                    "API": {
+                        "_key": "service:api",
+                        "title": "API",
+                        "description": "",
+                        "sec_grp": "default_itsi_security_group",
+                        "kpis": [
+                            {
+                                "_key": "service:api::kpi::errors",
+                                "title": "Errors",
+                                "description": "",
+                                "type": "kpi_primary",
+                                "search": search + " | `aggregate_raw_into_service(sum, errors)`",
+                                "base_search": search,
+                                "search_type": "adhoc",
+                                "threshold_field": "errors",
+                                "aggregate_statop": "sum",
+                                "search_alert_earliest": "5",
+                                "urgency": "5",
+                                "alert_on": "aggregate",
+                                "alert_period": 5,
+                                "alert_lag": "30",
+                            }
+                        ],
+                    }
+                }
+            }
+        )
+        spec = {
+            "services": [
+                {
+                    "title": "API",
+                    "kpis": [
+                        {
+                            "title": "Errors",
+                            "search": search,
+                            "threshold_field": "errors",
+                            "aggregate_statop": "sum",
+                        }
+                    ],
+                }
+            ]
+        }
+
+        result = NativeWorkflow(client).run(spec, "validate")
+
+        self.assertFalse(result.failed, result.diagnostics)
+        self.assertIn({"status": "pass", "object_type": "service", "title": "API"}, result.validations)
+
+    def test_preflight_warns_for_kpi_search_without_index(self) -> None:
+        client = FakeNativeClient()
+        spec = {"services": [{"title": "API", "kpis": [{"title": "Latency", "search": "| makeresults", "threshold_field": "latency"}]}]}
+
+        result = NativeWorkflow(client).run(spec, "preview")
+
+        self.assertTrue(any(item["status"] == "warn" and item["object_type"] == "kpi_search" for item in result.diagnostics))
+
+    def test_setup_wrapper_runs_native_preview_without_extra_args(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            bin_dir = Path(tempdir) / "bin"
+            bin_dir.mkdir()
+            args_file = Path(tempdir) / "run-native-args.txt"
+            ruby_stub = bin_dir / "ruby"
+            ruby_stub.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+out=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --output)
+      out="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '{}' > "${out}"
+""",
+                encoding="utf-8",
+            )
+            python_stub = bin_dir / "python3"
+            python_stub.write_text(
+                """#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$@" > "${RUN_NATIVE_ARGS_FILE}"
+printf '{"mode":"preview"}\n'
+""",
+                encoding="utf-8",
+            )
+            ruby_stub.chmod(0o755)
+            python_stub.chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["RUN_NATIVE_ARGS_FILE"] = str(args_file)
+
+            completed = subprocess.run(
+                [
+                    "bash",
+                    str(SCRIPTS_DIR / "setup.sh"),
+                    "--workflow",
+                    "native",
+                    "--spec",
+                    str(ROOT / "skills" / "splunk-itsi-config" / "templates" / "beginner.topology.yaml"),
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            run_native_args = args_file.read_text(encoding="utf-8")
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("--mode\npreview", run_native_args)
+
+    def test_native_offline_smoke_script_runs_fixture(self) -> None:
+        fixture = ROOT / "tests" / "fixtures" / "itsi" / "native_export_roundtrip.json"
+        script = SCRIPTS_DIR / "native_offline_smoke.py"
+
+        completed = subprocess.run(
+            [sys.executable, str(script), "--spec-json", str(fixture)],
+            cwd=ROOT,
+            check=True,
+            text=True,
+            capture_output=True,
+        )
+
+        payload = json.loads(completed.stdout)
+        self.assertFalse(payload["validate"]["failed"])
+        self.assertFalse(payload["cleanup-apply"]["failed"])
+        self.assertIn("services", payload["export"]["export_sections"])
+        self.assertEqual(payload["cleanup-apply"]["deleted"], ["Offline Cleanup Orphan"])
 
 
 if __name__ == "__main__":

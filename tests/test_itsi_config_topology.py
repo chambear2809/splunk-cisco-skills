@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -330,6 +332,8 @@ class TopologyWorkflowTests(unittest.TestCase):
         self.assertEqual(cluster["base_service_template_id"], "template:esxi")
         self.assertTrue(any(link == ("service:cluster", "template:esxi") for link in client.template_links))
         self.assertEqual(shared_db["kpis"][0]["title"], "Availability")
+        self.assertRegex(shared_db["kpis"][0]["_key"], r"^[0-9a-f]{24}$")
+        self.assertRegex(reporting["kpis"][0]["_key"], r"^[0-9a-f]{24}$")
         self.assertTrue(any(dep["service_id"] == shared_db["_key"] for dep in cluster["services_depends_on"]))
         self.assertTrue(any(dep["service_id"] == shared_db["_key"] for dep in reporting["services_depends_on"]))
         self.assertEqual(sorted(dep["service_id"] for dep in business["services_depends_on"]), sorted([cluster["_key"], reporting["_key"]]))
@@ -356,6 +360,19 @@ class TopologyWorkflowTests(unittest.TestCase):
 
         with self.assertRaises(ValidationError):
             compile_topology(spec)
+
+    def test_validate_unknown_service_ref_explains_starter_apply_flow(self) -> None:
+        client = FakeTopologyClient(apps=HEALTHY_ITSI_APPS)
+        spec = {"topology": {"roots": [{"id": "branch_network", "service_ref": "Branch Network"}]}}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            with self.assertRaises(ValidationError) as error:
+                TopologyWorkflow(client, tempdir).run(spec, "validate")
+
+        message = str(error.exception)
+        self.assertIn("could not resolve service reference 'Branch Network'", message)
+        self.assertIn("run preview first", message)
+        self.assertIn("before running validate", message)
 
     def test_apply_rejects_unknown_edge_kpis(self) -> None:
         client = FakeTopologyClient(
@@ -712,6 +729,66 @@ class TopologyWorkflowTests(unittest.TestCase):
         statuses = {(item["object_type"], item["title"]): item["status"] for item in result["topology"]["validations"]}
         self.assertEqual(statuses[("service_template_link", "Demo - VMware Cluster Health")], "fail")
         self.assertEqual(statuses[("service_dependency", "Business Platform")], "fail")
+
+    def test_topology_validate_returns_native_diagnostics(self) -> None:
+        client = FakeTopologyClient(
+            apps=HEALTHY_ITSI_APPS,
+            objects={"service": {"API": {"_key": "service:api", "title": "API", "description": "Old"}}},
+        )
+        spec = {"services": [{"title": "API", "description": "New"}]}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = TopologyWorkflow(client, tempdir).run(spec, "validate")
+
+        diagnostic = next(item for item in result["native"]["diagnostics"] if item["object_type"] == "service")
+        self.assertEqual(diagnostic["title"], "API")
+        self.assertIn({"path": "description", "expected": "New", "actual": "Old"}, diagnostic["diffs"])
+
+    def test_topology_glass_table_generator_outputs_native_glass_table(self) -> None:
+        script = SCRIPTS_DIR / "topology_glass_table.py"
+        spec = {
+            "topology": {
+                "roots": [
+                    {
+                        "id": "business",
+                        "service_ref": "Business Platform",
+                        "children": [
+                            {"id": "api", "service": {"title": "API"}, "children": [{"ref": "db", "kpis": ["Availability"]}]},
+                            {"id": "db", "service": {"title": "Database"}},
+                        ],
+                    }
+                ]
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            spec_path = Path(tempdir) / "topology.json"
+            output_path = Path(tempdir) / "glass.json"
+            spec_path.write_text(json.dumps(spec), encoding="utf-8")
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--spec-json",
+                    str(spec_path),
+                    "--title",
+                    "Business Map",
+                    "--output",
+                    str(output_path),
+                    "--output-format",
+                    "json",
+                ],
+                cwd=ROOT,
+                check=True,
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertIn("Business Map", completed.stdout)
+            payload = json.loads(output_path.read_text(encoding="utf-8"))
+            glass_table = payload["glass_tables"][0]
+            self.assertEqual(glass_table["title"], "Business Map")
+            self.assertIn({"source": "api", "target": "db", "kpis": ["Availability"]}, glass_table["payload"]["edges"])
 
 
 if __name__ == "__main__":
