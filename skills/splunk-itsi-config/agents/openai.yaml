@@ -1,4 +1,4 @@
 interface:
   display_name: "Splunk ITSI Config"
-  short_description: "Preview, apply, and validate native ITSI objects, service trees, and selected ITSI content packs"
-  default_prompt: "Use $splunk-itsi-config to preview, apply, or validate native ITSI objects, hybrid ITSI service-tree specs, and selected ITSI content packs from specs under skills/splunk-itsi-config/ or other repo-local YAML files."
+  short_description: "Guide beginners through ITSI content packs, service trees, KPIs, and validation"
+  default_prompt: "Use $splunk-itsi-config to guide a beginner-friendly ITSI setup. Start with references/beginner_quickstart.md, choose content-packs or topology unless the user provides exported ITSI payloads, create or adapt a repo-local YAML spec, preview first, apply only after confirmation, then validate and summarize the report."

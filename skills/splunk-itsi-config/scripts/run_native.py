@@ -33,6 +33,7 @@ def main() -> int:
             "summary": result.summary(),
             "changes": [change.__dict__ for change in result.changes],
             "validations": result.validations,
+            "diagnostics": result.diagnostics,
         }
         print(json.dumps(payload, indent=2, sort_keys=True))
         return 1 if result.failed else 0
@@ -43,4 +44,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -5,11 +5,33 @@ description: Skill for previewing, applying, and validating native ITSI objects,
 
 # Splunk ITSI Config
 
-This skill is rooted in `skills/splunk-itsi-config/` and supports three workflows:
+This skill is rooted in `skills/splunk-itsi-config/` and supports these workflow paths:
 
 - Native ITSI automation for entities, services, KPIs, service dependencies, and custom NEAPs.
+- Extended native ITSI automation for teams, entity types, service templates, KPI base searches, KPI templates, KPI threshold templates, custom threshold windows and service/KPI links, custom content packs, correlation searches, Event Analytics configuration, maintenance windows, backup jobs, glass tables/icons, deep dives, and home views through typed REST passthrough sections.
 - Content-pack automation for preview, install, validate, and guided handoff for selected ITSI content packs.
 - Hybrid topology automation for native objects, content packs, template-backed services, and ITSI service-tree dependencies in one run.
+
+## Beginner-First Operating Model
+
+When a user wants ITSI configured but does not already have an ITSI spec, start in guided preview mode:
+
+1. Translate the request into plain ITSI building blocks: business services, supporting technical services, KPIs, entities, dependencies, and optional content packs.
+2. Ask only for missing non-secret facts: Splunk platform, management URL, target app/domain, supported source products, index names, sourcetypes, service names, dependency order, and desired KPI signals.
+3. Do not ask the user for ITSI REST payload fields unless they are importing or editing exported ITSI objects.
+4. Pick the smallest workflow that gets the user to a useful preview:
+   - Use `content-packs` when the user has data for a supported packaged domain and wants Splunk-provided defaults quickly.
+   - Use `topology` when the user can name services, dependencies, and KPI searches but does not know ITSI object schemas.
+   - Use `native` only for direct ITSI object management, exported payloads, custom NEAPs, glass tables, maintenance windows, or other advanced objects.
+5. Create or adapt a repo-local YAML spec from the beginner templates, default new services to `enabled: false`, then run preview before any write.
+6. Summarize preview output in operator language: what will be created, what prerequisites are missing, which searches/macros/indexes need attention, and what will remain manual.
+7. Run `--apply` only when the user explicitly asks to apply or confirms the preview. After apply, run validate and point the user at the generated report.
+
+Useful quickstart files:
+
+- Beginner guide: `references/beginner_quickstart.md`
+- Beginner content-pack template: `templates/beginner.content-pack.yaml`
+- Beginner topology template: `templates/beginner.topology.yaml`
 
 ## Files
 
@@ -17,9 +39,13 @@ This skill is rooted in `skills/splunk-itsi-config/` and supports three workflow
 - Native template: `templates/native.example.yaml`
 - Content-pack template: `templates/content_packs.example.yaml`
 - Topology template: `templates/topology.example.yaml`
+- Beginner content-pack template: `templates/beginner.content-pack.yaml`
+- Beginner topology template: `templates/beginner.topology.yaml`
+- Beginner quickstart reference: `references/beginner_quickstart.md`
 - Native references: `references/native_itsi.md`
 - Content-pack references: `references/content_packs.md`
 - Topology references: `references/topology.md`
+- Offline compatibility report: `references/compatibility.md`
 - Entry points:
   - `bash scripts/setup.sh --workflow native --spec <path>`
   - `bash scripts/setup.sh --workflow native --spec <path> --apply`
@@ -30,19 +56,28 @@ This skill is rooted in `skills/splunk-itsi-config/` and supports three workflow
   - `bash scripts/setup.sh --workflow topology --spec <path>`
   - `bash scripts/setup.sh --workflow topology --spec <path> --apply`
   - `bash scripts/validate.sh --workflow topology --spec <path>`
+  - `python3 scripts/itsi_compatibility_report.py --format markdown`
 
 ## Authentication
 
 The scripts talk to the Splunk management port through the REST API.
 
-Provide connection data either directly in the spec or through environment variables:
+The shell wrappers load the repository credential file first, then fall back to
+`~/.splunk/credentials` or `SPLUNK_CREDENTIALS_FILE` through the shared credential
+helper. They export only the variables needed by the Python client.
+
+Provide non-secret connection data directly in the spec or through the credential
+file/environment:
 
 - `connection.base_url` or `SPLUNK_SEARCH_API_URI`
 - `connection.session_key_env` or `SPLUNK_SESSION_KEY`
 - `connection.username_env` or `SPLUNK_USERNAME`
 - `connection.password_env` or `SPLUNK_PASSWORD`
 
-Use a session key when possible. If you use username/password, the skill reads them from environment variables only. It never asks for secrets in chat.
+Use a session key when possible. If you use username/password, keep the secret
+values in the credential file; the wrappers bridge `SPLUNK_USER` / `SPLUNK_PASS`
+to `SPLUNK_USERNAME` / `SPLUNK_PASSWORD` for this client. Never put passwords,
+tokens, or API keys in an ITSI YAML spec or in chat.
 
 ## Native Workflow Rules
 
@@ -50,8 +85,20 @@ Use a session key when possible. If you use username/password, the skill reads t
 - `--apply` is required for writes.
 - Upserts are additive and idempotent for the managed fields in the spec.
 - No delete or prune behavior is implemented in v1.
+- Core `entities`, `services`, and service `kpis` support typed convenience fields and also merge additional top-level ITSI schema fields plus `payload` into the REST body. Local DSL keys such as `depends_on`, `service_template`, and threshold helpers are not sent as raw schema fields.
+- Extended object sections set common ITSI fields (`title`, `description`, `sec_grp`, `object_type`) and merge additional top-level fields plus `payload` into the REST request body. Use exported ITSI payload fields when managing version-specific object shapes.
+- Keyed updates on the generic ITSI, Event Management, maintenance, and backup/restore route families set `is_partial_data=1` so unmanaged fields are preserved. Full-payload special routes such as `kpi_entity_threshold`, icon collection, and content-pack authorship do not use that parameter.
+- Service template links are applied through the ITSI service template link endpoint after services exist and before dependencies are validated or merged.
+- `custom_threshold_window_links` are applied after services exist by resolving window/service/KPI titles or live IDs and calling the ITSI custom-threshold-window service/KPI association endpoint only for missing links.
+- `entity_type_titles` on entities resolve against live entity types or entity types declared earlier in the same spec.
+- Custom content packs use the ITSI content pack authorship API. Backup jobs, maintenance windows, Event Analytics, and glass-table icons use their documented ITSI route families rather than the default object route.
+- Event Management sections (`event_management_states`, `correlation_searches`, `notable_event_email_templates`, and `neaps`) use the ITSI `event_management_interface` and its `filter_data` lookup parameter. Creates are wrapped in the documented `data` envelope; keyed updates send the object payload directly.
+- Deep dive updates preserve the existing owner fields in the payload because Splunk requires those fields on keyed deep-dive updates.
+- Operational Event Analytics records and append-only APIs, such as notable events, notable event groups, comments, and ticket/action execution, are intentionally excluded from the idempotent upsert model.
+- ITSI action/helper APIs such as entity retire/restore, threshold recommendations, custom threshold window stop/disconnect, and bulk time-offset shifts are intentionally excluded from the normal idempotent upsert model.
+- Guarded `operational_actions` can run selected non-idempotent helper APIs only when every action sets `allow_operational_action: true`. Use these for explicit operator-driven retire/restore, custom-threshold stop/disconnect, recommendation-apply, or time-offset-shift work; they are not part of normal config drift validation. Custom-threshold disconnect also requires `disconnect_all: true` because the documented endpoint has no selective request payload; `entity_retire_retirable` also requires `retire_all_retirable: true` because it retires every entity currently marked retirable.
 - Service dependencies are applied in a second pass after services exist.
-- Managed or packaged NEAPs are protected from overwrite in v1.
+- Custom NEAPs use the ITSI event management interface. Managed, packaged, and default NEAPs are protected from overwrite in v1.
 
 ## Content-Pack Workflow Rules
 

@@ -171,6 +171,271 @@ class SplunkRestClientTests(unittest.TestCase):
 
         self.assertIn("SA-ITOA", str(error.exception))
 
+    def test_update_object_uses_documented_post_for_keyed_itsi_updates(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service/service%3Aapi":
+                return {"_key": "service:api"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.update_object("service", "service:api", {"title": "API"})
+
+        self.assertEqual(result, {"_key": "service:api"})
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "POST",
+                    "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service/service%3Aapi",
+                    {"is_partial_data": 1},
+                    {"title": "API"},
+                )
+            ],
+        )
+
+    def test_find_object_by_field_uses_configured_identity_field(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params))
+            return {"entry": [{"content": {"_key": "correlation:1", "name": "Edge Device Down"}}]}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        found = client.find_object_by_field("correlation_search", "name", "Edge Device Down", interface="event_management")
+
+        self.assertEqual(found, {"_key": "correlation:1", "name": "Edge Device Down"})
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "GET",
+                    "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/correlation_search",
+                    {"filter_data": '{"name": "Edge Device Down"}'},
+                )
+            ],
+        )
+
+    def test_find_object_by_field_keeps_filter_for_default_itoa_interface(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params))
+            return {"entry": [{"content": {"_key": "service:1", "title": "API"}}]}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        found = client.find_object_by_field("service", "title", "API")
+
+        self.assertEqual(found, {"_key": "service:1", "title": "API"})
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "GET",
+                    "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service",
+                    {"count": 0, "filter": '{"title": "API"}'},
+                )
+            ],
+        )
+
+    def test_kpi_entity_threshold_uses_documented_put_endpoint(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/kpi_entity_threshold":
+                return {"_key": "threshold:1"}
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/kpi_entity_threshold/threshold%3A1":
+                return {"_key": "threshold:1"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        created = client.create_object("kpi_entity_threshold", {"title": "Threshold"})
+        updated = client.update_object("kpi_entity_threshold", "threshold:1", {"title": "Threshold"})
+
+        self.assertEqual(created, {"_key": "threshold:1"})
+        self.assertEqual(updated, {"_key": "threshold:1"})
+        self.assertEqual(
+            calls,
+            [
+                ("PUT", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/kpi_entity_threshold", None, {"title": "Threshold"}),
+                ("PUT", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/kpi_entity_threshold/threshold%3A1", None, {"title": "Threshold"}),
+            ],
+        )
+
+    def test_event_management_object_uses_event_management_interface(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/correlation_search":
+                raise KeyError(path)
+            if path == "/servicesNS/nobody/SA-ITOA/event_management_interface/correlation_search":
+                return {"_key": "correlation:1"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.create_object("correlation_search", {"title": "Alert"}, interface="event_management")
+
+        self.assertEqual(result, {"_key": "correlation:1"})
+        self.assertEqual(
+            calls,
+            [
+                ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/correlation_search", {"data": {"title": "Alert"}}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/correlation_search", {"data": {"title": "Alert"}}),
+            ],
+        )
+
+    def test_event_management_update_keeps_raw_keyed_payload(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/correlation_search/correlation%3A1":
+                return {"_key": "correlation:1"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.update_object("correlation_search", "correlation:1", {"title": "Alert"}, interface="event_management")
+
+        self.assertEqual(result, {"_key": "correlation:1"})
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "POST",
+                    "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/correlation_search/correlation%3A1",
+                    {"is_partial_data": 1},
+                    {"title": "Alert"},
+                ),
+            ],
+        )
+
+    def test_content_pack_authorship_update_keeps_full_payload_semantics(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object, object]] = []
+        payload = {"title": "Network Pack", "itsi_objects": {"service": []}}
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/pack%3A1":
+                raise KeyError(path)
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/content_pack/pack%3A1":
+                return {"_key": "pack:1"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.update_object("content_pack", "pack:1", payload, interface="content_pack_authorship")
+
+        self.assertEqual(result, {"_key": "pack:1"})
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "POST",
+                    "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/pack%3A1",
+                    None,
+                    payload,
+                ),
+                (
+                    "POST",
+                    "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/content_pack/pack%3A1",
+                    None,
+                    payload,
+                ),
+            ],
+        )
+
+    def test_backup_restore_object_uses_backup_restore_interface(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/backup_restore_interface/vLatest/backup_restore":
+                return {"_key": "backup:1"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.create_object("backup_restore", {"title": "Nightly Backup"}, interface="backup_restore")
+
+        self.assertEqual(result, {"_key": "backup:1"})
+        self.assertEqual(
+            calls,
+            [("POST", "/servicesNS/nobody/SA-ITOA/backup_restore_interface/vLatest/backup_restore", {"title": "Nightly Backup"})],
+        )
+
+    def test_custom_content_pack_uses_content_pack_authorship_interface(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack":
+                raise KeyError(path)
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/content_pack":
+                return {"_key": "pack:1"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.create_object("content_pack", {"title": "Network Pack"}, interface="content_pack_authorship")
+
+        self.assertEqual(result, {"_key": "pack:1"})
+        self.assertEqual(
+            calls,
+            [
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack", {"title": "Network Pack"}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/content_pack", {"title": "Network Pack"}),
+            ],
+        )
+
+    def test_glass_table_icons_use_icon_collection_route_and_result_normalizer(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params, payload))
+            if method == "GET" and path == "/services/SA-ITOA/v1/icon_collection":
+                return {"result": [{"_key": "icon:1", "title": "Router"}]}
+            if method == "PUT" and path == "/services/SA-ITOA/v1/icon_collection":
+                return ["icon:1"]
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        found = client.find_object_by_title("icon", "Router", interface="icon_collection")
+        created = client.create_object("icon", {"title": "Router", "svg_path": "M0 0h10v10H0z"}, interface="icon_collection")
+        updated = client.update_object("icon", "icon:1", {"title": "Router", "svg_path": "M1 1h8v8H1z"}, interface="icon_collection")
+
+        self.assertEqual(found, {"_key": "icon:1", "title": "Router"})
+        self.assertEqual(created, {"_key": "icon:1"})
+        self.assertEqual(updated, {"_key": "icon:1"})
+        self.assertEqual(
+            calls,
+            [
+                ("GET", "/services/SA-ITOA/v1/icon_collection", {"filter": '{"title": "Router"}'}, None),
+                ("PUT", "/services/SA-ITOA/v1/icon_collection", None, [{"title": "Router", "svg_path": "M0 0h10v10H0z"}]),
+                ("PUT", "/services/SA-ITOA/v1/icon_collection", None, [{"title": "Router", "svg_path": "M1 1h8v8H1z", "_key": "icon:1"}]),
+            ],
+        )
+
     def test_get_service_template_link_returns_linked_template_key(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
         calls: list[tuple[str, str, object]] = []
@@ -211,6 +476,92 @@ class SplunkRestClientTests(unittest.TestCase):
                     "/servicesNS/nobody/SA-ITOA/itoa_interface/service/service%3Acluster/base_service_template",
                     {"_key": "template:esxi"},
                 )
+            ],
+        )
+
+    def test_custom_threshold_window_linked_kpis_reads_all_links(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params, payload))
+            return {"linked_kpis": [{"service_key": "service:api", "kpi_key": "kpi:latency"}], "count": 1}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.custom_threshold_window_linked_kpis("ctw:business-hours")
+
+        self.assertEqual(result["count"], 1)
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "GET",
+                    "/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/linked_kpis",
+                    {"custom_threshold_window_id": "ctw:business-hours", "limit": 0},
+                    None,
+                )
+            ],
+        )
+
+    def test_associate_custom_threshold_window_kpis_posts_payload(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+        payload = {"services": [{"_key": "service:api", "kpi_ids": ["kpi:latency"]}]}
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            return {"services": [{"_key": "service:api", "kpi_ids": ["kpi:latency"]}]}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.associate_custom_threshold_window_kpis("ctw:business-hours", payload)
+
+        self.assertEqual(result, payload)
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "POST",
+                    "/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/ctw%3Abusiness-hours/associate_service_kpi",
+                    payload,
+                )
+            ],
+        )
+
+    def test_guarded_operational_helpers_use_documented_routes(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/entity/retire_retirable":
+                return ["entity:1"]
+            return {"status": "ok"}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        client.disconnect_custom_threshold_window_kpis("ctw:business-hours")
+        client.stop_custom_threshold_window("ctw:business-hours")
+        client.retire_entities({"data": ["entity:1"]})
+        client.restore_entities({"data": ["entity:1"]})
+        retired = client.retire_retirable_entities()
+        client.apply_kpi_threshold_recommendation({"itsi_service_id": "service:1", "itsi_kpi_id": "kpi:1"})
+        client.apply_kpi_entity_threshold_recommendation({"itsi_service_id": "service:1", "itsi_kpi_id": "kpi:1", "entity_key": "entity:1"})
+        client.shift_time_offset({"offset": 3600, "service": {"_keys": ["service:1"]}})
+
+        self.assertEqual(retired, ["entity:1"])
+        self.assertEqual(
+            calls,
+            [
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/ctw%3Abusiness-hours/disconnect_kpis", None),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/ctw%3Abusiness-hours/stop", None),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/entity/retire", {"data": ["entity:1"]}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/entity/restore", {"data": ["entity:1"]}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/entity/retire_retirable", None),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/kpi_threshold_recommendations", {"itsi_service_id": "service:1", "itsi_kpi_id": "kpi:1"}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/kpi_entity_threshold_recommendations", {"itsi_service_id": "service:1", "itsi_kpi_id": "kpi:1", "entity_key": "entity:1"}),
+                ("PUT", "/servicesNS/nobody/SA-ITOA/itoa_interface/shift_time_offset", {"offset": 3600, "service": {"_keys": ["service:1"]}}),
             ],
         )
 

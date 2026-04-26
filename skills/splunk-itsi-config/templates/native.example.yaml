@@ -8,9 +8,79 @@ connection:
 defaults:
   sec_grp: default_itsi_security_group
 
+teams:
+  - title: Network Operations
+    payload:
+      roles:
+        read:
+          - itoa_admin
+        write:
+          - itoa_admin
+
+entity_types:
+  - title: Network Device
+    description: Custom entity type for routers and switches
+    data_drilldowns:
+      - title: Network events
+        type: events
+        static_filter:
+          type: include
+          field: sourcetype
+          values:
+            - cisco:*
+
+kpi_base_searches:
+  - title: Interface Error Base Search
+    description: Reusable base search for interface error KPIs
+    search: index=network sourcetype=interface_errors | stats sum(errors) as errors by host
+    is_entity_breakdown: true
+
+kpi_threshold_templates:
+  - title: Interface Error Threshold Template
+    description: Example static threshold template; replace payload fields with your live ITSI schema.
+    payload:
+      thresholdLevels:
+        - severityLabel: high
+          severityValue: 5
+          thresholdValue: 10
+        - severityLabel: critical
+          severityValue: 6
+          thresholdValue: 20
+
+custom_threshold_windows:
+  - title: Business Hours
+    description: Example custom threshold window; replace schedule fields with your live ITSI schema.
+    payload:
+      recurrence: true
+      duration: 8
+      window_type: percentage
+      window_config_percentage: 10
+
+service_templates:
+  - title: Network Device Template
+    description: Template that can be linked to matching services
+    entity_rules:
+      - field: host
+        field_type: alias
+        value: "{{host_filter}}"
+    kpis:
+      - title: Interface Errors
+        kpi_base_search_id: replace-with-live-base-search-key
+        threshold_field: errors
+        importance: 7
+
+custom_content_packs:
+  - title: Network Operations Pack
+    description: Example custom content pack authored through the ITSI content pack authorship API
+    payload:
+      cp_version: 1.0.0
+      author: Platform Engineering
+
 entities:
   - title: edge-sw-01
     description: Example edge switch entity
+    entity_type_titles:
+      - Network Device
     identifier_fields:
       - field: host
         value: edge-sw-01
@@ -48,6 +118,11 @@ services:
   - title: Network Edge
     description: Example service managed by this skill
     enabled: false
+    service_template: Network Device Template
+    service_tags:
+      tags:
+        - network
+        - edge
     entity_rules:
       - field: host
         field_type: alias
@@ -60,6 +135,15 @@ services:
         entity_statop: sum
         entity_id_fields: host
         entity_breakdown_id_field: host
+        alert_period: 5
+        alert_lag: 30
+        importance: 9
+        adaptive_thresholds_is_enabled: false
+        gap_severity: critical
+        adaptive_thresholding:
+          enabled: false
+        anomaly_detection:
+          enabled: false
         thresholds:
           aggregate:
             baseSeverityLabel: normal
@@ -77,9 +161,93 @@ services:
         kpis:
           - Availability
 
+custom_threshold_window_links:
+  - window: Business Hours
+    services:
+      - service: Network Edge
+        kpis:
+          - Interface Errors
+
 neaps:
   - title: Example NEAP
     description: Replace payload fields with your custom NEAP definition.
     payload:
       rule_type: custom
 
+event_management_states:
+  - title: Example Episode Review View
+    description: Replace payload fields with an exported Episode Review custom view.
+    payload:
+      viewingOption: standard
+
+correlation_searches:
+  - title: Example Third-Party Alert Normalization
+    description: Replace payload fields with your correlation search definition.
+    search: index=alerts sourcetype=third_party_alerts | eval severity=case(status="critical",6,status="warning",4,true(),2)
+    payload:
+      enabled: false
+
+maintenance_windows:
+  - title: Example Network Maintenance
+    description: Replace object references and times with your maintenance calendar payload.
+    payload:
+      start_time: 1735689600
+      end_time: 1735693200
+      objects:
+        services:
+          - Network Edge
+
+backup_restore_jobs:
+  - title: Example ITSI Backup
+    description: Example ITSI backup job payload; use restore jobs only with explicit operator review.
+    payload:
+      job_type: Backup
+      include_lookup_files: true
+
+glass_tables:
+  - title: Network Operations Overview
+    description: Replace payload with an exported ITSI glass table definition.
+    payload:
+      layout:
+        type: absolute
+
+glass_table_icons:
+  - title: Network Router
+    svg_path: M0 0h24v24H0z
+    width: 24
+    height: 24
+    category: Network
+
+deep_dives:
+  - title: Network Edge Deep Dive
+    description: Replace payload with an exported ITSI deep dive definition.
+    payload:
+      lanes: []
+
+home_views:
+  - title: Network Service Analyzer
+    description: Replace payload with an exported ITSI home view definition.
+    payload:
+      services:
+        - Network Edge
+
+# Optional non-idempotent helper actions. Uncomment only after explicit operator review.
+# operational_actions:
+#   - action: custom_threshold_window_disconnect
+#     allow_operational_action: true
+#     disconnect_all: true
+#     window: Business Hours
+#   - action: shift_time_offset
+#     allow_operational_action: true
+#     payload:
+#       offset: 3600
+#       service:
+#         _keys:
+#           - replace-with-live-service-key
+#   - action: entity_retire
+#     allow_operational_action: true
+#     entity_keys:
+#       - replace-with-live-entity-key
+#   - action: entity_retire_retirable
+#     allow_operational_action: true
+#     retire_all_retirable: true

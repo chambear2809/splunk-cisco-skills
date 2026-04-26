@@ -1,5 +1,10 @@
 # Content-Pack Workflow
 
+For a first-time ITSI setup, start with `templates/beginner.content-pack.yaml`
+and keep only one profile enabled until preview and validation are clean. Use
+`references/beginner_quickstart.md` to translate the user's product/domain into
+the right profile and required index or macro values.
+
 Before catalog lookup, the workflow refreshes Content Library discovery through:
 
 - `POST /servicesNS/nobody/DA-ITSI-ContentLibrary/content_library/discovery`

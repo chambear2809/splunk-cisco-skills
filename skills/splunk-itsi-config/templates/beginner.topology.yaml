@@ -1,0 +1,132 @@
+# Beginner service-tree starter.
+# Replace service names, SPL searches, and threshold fields, then run:
+#   bash scripts/setup.sh --workflow topology --spec templates/beginner.topology.yaml
+
+connection:
+  # Leave blank to use SPLUNK_SEARCH_API_URI from the credentials file.
+  base_url: ""
+  session_key_env: SPLUNK_SESSION_KEY
+  verify_ssl: false
+  platform: enterprise
+
+itsi:
+  require_present: true
+  install_if_missing: true
+  source: splunkbase
+  app_id: "1841"
+
+defaults:
+  sec_grp: default_itsi_security_group
+
+# Keep starter services disabled until the user reviews health scores and thresholds.
+services:
+  - title: Branch Network
+    description: Top-level business service for branch connectivity.
+    enabled: false
+    service_tags:
+      tags:
+        - starter
+        - branch
+    kpis:
+      - title: Branch Critical Events
+        description: Replace this search with a top-level health signal for the branch.
+        search: index=network sourcetype=health status=critical | stats count as critical_events
+        threshold_field: critical_events
+        aggregate_statop: sum
+        thresholds:
+          aggregate:
+            baseSeverityLabel: normal
+            baseSeverityValue: 2
+            metricField: critical_events
+            thresholdLevels:
+              - severityLabel: high
+                severityValue: 5
+                thresholdValue: 5
+              - severityLabel: critical
+                severityValue: 6
+                thresholdValue: 15
+
+  - title: WAN Edge
+    description: Supporting service for WAN routers or SD-WAN edges.
+    enabled: false
+    entity_rules:
+      - field: host
+        field_type: alias
+        value: branch-wan-*
+    service_tags:
+      tags:
+        - starter
+        - network
+    kpis:
+      - title: WAN Down Events
+        search: index=network sourcetype=heartbeat host=branch-wan-* status=down | stats count as down_events
+        threshold_field: down_events
+        aggregate_statop: sum
+        thresholds:
+          aggregate:
+            baseSeverityLabel: normal
+            baseSeverityValue: 2
+            metricField: down_events
+            thresholdLevels:
+              - severityLabel: high
+                severityValue: 5
+                thresholdValue: 1
+              - severityLabel: critical
+                severityValue: 6
+                thresholdValue: 3
+      - title: Packet Loss
+        search: index=network sourcetype=wan_metrics host=branch-wan-* | stats avg(packet_loss_pct) as packet_loss_pct
+        threshold_field: packet_loss_pct
+        aggregate_statop: avg
+        thresholds:
+          aggregate:
+            baseSeverityLabel: normal
+            baseSeverityValue: 2
+            metricField: packet_loss_pct
+            thresholdLevels:
+              - severityLabel: high
+                severityValue: 5
+                thresholdValue: 3
+              - severityLabel: critical
+                severityValue: 6
+                thresholdValue: 8
+
+  - title: Secure Access
+    description: Supporting service for user access or security edge health.
+    enabled: false
+    service_tags:
+      tags:
+        - starter
+        - security
+    kpis:
+      - title: Authentication Failures
+        search: index=security sourcetype=auth_events | stats count(eval(action="failure")) as failures
+        threshold_field: failures
+        aggregate_statop: sum
+        thresholds:
+          aggregate:
+            baseSeverityLabel: normal
+            baseSeverityValue: 2
+            metricField: failures
+            thresholdLevels:
+              - severityLabel: high
+                severityValue: 5
+                thresholdValue: 25
+              - severityLabel: critical
+                severityValue: 6
+                thresholdValue: 100
+
+topology:
+  roots:
+    - id: branch_network
+      service_ref: Branch Network
+      children:
+        - id: wan_edge
+          service_ref: WAN Edge
+          kpis:
+            - WAN Down Events
+            - Packet Loss
+        - id: secure_access
+          service_ref: Secure Access
+          kpis:
+            - Authentication Failures

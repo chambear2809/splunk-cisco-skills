@@ -1,11 +1,19 @@
 # Topology Workflow
 
+For users who are new to ITSI, this is usually the safest starter workflow:
+they can describe services and dependencies in plain language, and the skill
+turns that into services, KPIs, and dependency edges. Start with
+`templates/beginner.topology.yaml` and `references/beginner_quickstart.md` before
+using exported or advanced ITSI payloads.
+
 The topology workflow combines the existing native and content-pack flows with a
 top-level service-tree DSL:
 
 - `bash scripts/setup.sh --workflow topology --spec <path>`
 - `bash scripts/setup.sh --workflow topology --spec <path> --apply`
 - `bash scripts/validate.sh --workflow topology --spec <path>`
+
+Topology specs can include all native sections from `references/native_itsi.md`, including extended ITSI objects such as teams, entity types, KPI base searches, service templates, custom content packs, correlation searches, Event Analytics configuration, maintenance windows, backup jobs, glass tables/icons, deep dives, and home views.
 
 ## Supported Spec Shape
 

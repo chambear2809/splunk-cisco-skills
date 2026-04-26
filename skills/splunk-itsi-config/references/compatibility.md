@@ -1,0 +1,18 @@
+# ITSI Compatibility Report
+
+This report summarizes the Splunk ITSI REST API areas covered by `splunk-itsi-config` without requiring a live ITSI run.
+
+Sources:
+- ITSI REST API reference: https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/leverage-rest-apis/4.21/itsi-rest-api-reference/itsi-rest-api-reference
+- ITSI REST API schema: https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/leverage-rest-apis/4.21/itsi-rest-api-schema/itsi-rest-api-schema
+
+| Area | Status | Coverage | Notes |
+| --- | --- | --- | --- |
+| Native config upserts | supported | team, entity, entity_type, service, base_service_template, kpi_base_search, kpi_template, kpi_threshold_template, custom_threshold_windows, notable_event_aggregation_policy, event_management_state, correlation_search, notable_event_email_template, maintenance_calendar, backup_restore, deep_dive, glass_table, home_view, kpi_entity_threshold | Additive preview/apply/validate. Core entity/service/KPI objects accept typed fields plus top-level schema passthrough and payload; deep-dive updates preserve required owner fields. |
+| Special route families | supported | event_management_interface, maintenance_services_interface, backup_restore_interface, content_pack_authorship, icon_collection | The client uses route-specific lookup parameters and write methods; Event Management lookups use filter_data and creates use the documented data envelope. Generic keyed updates use is_partial_data=1 where the route family supports it. |
+| Custom threshold links | supported | custom_threshold_windows/linked_kpis and custom_threshold_windows/<id>/associate_service_kpi | Links are additive and preserve unmanaged existing service/KPI associations. |
+| Content-pack installation | supported | content_pack catalog, preview, install, refresh, app/bootstrap checks | Install remains conservative: preview first, no destructive resolution defaults, post-install module work is reported as guided handoff. |
+| Operational helper actions | guarded | entity retire/restore/retire_retirable, custom threshold stop/disconnect, KPI/entity threshold recommendation application, bulk time-offset shift | Available only through operational_actions and blocked unless allow_operational_action: true is present on each action. Custom-threshold disconnect also requires disconnect_all: true because the documented endpoint has no selective payload; retire_retirable also requires retire_all_retirable: true. |
+| Episode records and actions | excluded | notable_event, notable_event_group, notable_event_comment, notable_event_actions, ticket/action execution | These are operational event records or action execution APIs, not declarative config upserts. |
+| Deletes and destructive transitions | excluded | bulk/single DELETE endpoints, content_pack submit/download, icon delete, kpi_entity_threshold delete | No delete or prune behavior is implemented; destructive workflows need separate operator-specific approval and rollback design. |
+| Unused or discovery/helper APIs | excluded | entity_filter_rule, entity_relationship, entity_relationship_rule, entity discovery-search helpers, count-only/list-only helpers | Splunk documents relationship/filter-rule object types as unused; list/count helpers are covered indirectly by lookup and validation paths where needed. |
