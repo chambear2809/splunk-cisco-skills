@@ -101,6 +101,24 @@ teardown() {
     [ "${_tls_verify_args[0]}" = "-k" ]
 }
 
+@test "hbs_make_curl_auth_config writes 0600 curl config without argv secrets" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+
+    escaped=$(hbs_curl_config_escape $'pa"ss\\word\r\n')
+    [ "$escaped" = 'pa\"ss\\word\r\n' ]
+
+    auth_config=$(hbs_make_curl_auth_config 'admin"user' $'pa"ss\\word')
+    TEST_TEMP_FILES+=("$auth_config")
+
+    [ -f "$auth_config" ]
+    mode=$(stat -c "%a" "$auth_config" 2>/dev/null || stat -f "%Lp" "$auth_config")
+    [ "$mode" = "600" ]
+
+    config_text=$(cat "$auth_config")
+    [ "$config_text" = 'user = "admin\"user:pa\"ss\\word"' ]
+}
+
 # --- log ---
 
 @test "log outputs timestamped message" {

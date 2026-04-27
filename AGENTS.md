@@ -43,7 +43,8 @@ The user can also invoke skills directly as slash commands (e.g. `/cisco-catalys
 ## Splunk MCP Server
 
 If `.mcp.json` exists at the project root, the Splunk MCP server is available as the
-`splunk-mcp` tool. This path (`splunk-mcp-rendered/run-splunk-mcp.sh`) only exists
+`splunk-mcp` tool through the tracked `splunk-mcp-rendered/run-splunk-mcp.js`
+bridge. The local token file (`splunk-mcp-rendered/.env.splunk-mcp`) only exists
 after running the `splunk-mcp-server-setup` skill. Use MCP search tools for live
 Splunk queries when available.
 

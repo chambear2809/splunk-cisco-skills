@@ -40,8 +40,9 @@ projects/tmp-*
 # --- Local ITSI config workflow reports ---
 /skills/splunk-itsi-config/reports/
 
-# --- Local SC4S rendered deployment assets ---
+# --- Local rendered deployment assets ---
 /sc4s-rendered/
 /sc4snmp-rendered/
-/splunk-mcp-rendered/
+/splunk-mcp-rendered/*
+!/splunk-mcp-rendered/run-splunk-mcp.js
 error.log

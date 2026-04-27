@@ -10,9 +10,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from lib.client import SplunkRestClient
-from lib.common import SkillError, load_json, write_json, write_yaml
-from lib.native import NativeWorkflow
+from lib.client import SplunkRestClient  # noqa: E402
+from lib.common import SkillError, load_json, write_json, write_yaml  # noqa: E402
+from lib.native import NativeWorkflow  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:

@@ -304,7 +304,7 @@ deployment_bundle_apply_current_profile() {
     local target_uri="${2:-}"
     local auth_user="${3:-}"
     local auth_pass="${4:-}"
-    local execution_mode splunk_home cred_file apply_script
+    local execution_mode splunk_home cred_file staged_cred_file apply_script
 
     execution_mode="$(deployment_execution_mode_for_profile "")"
     splunk_home="${SPLUNK_HOME:-/opt/splunk}"
@@ -312,31 +312,55 @@ deployment_bundle_apply_current_profile() {
     [[ -n "${auth_user}" ]] || auth_user="${SPLUNK_USER:-}"
     [[ -n "${auth_pass}" ]] || auth_pass="${SPLUNK_PASS:-}"
 
-    # Write credentials to a temp file so they never appear on the command line
-    # (which would be visible in the process table via ps).
+    case "${kind}" in
+        shc)
+            [[ -n "${target_uri}" && -n "${auth_user}" && -n "${auth_pass}" ]] || return 1
+            ;;
+        idxc)
+            [[ -n "${auth_user}" && -n "${auth_pass}" ]] || return 1
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+
+    # Stage credentials as a target-local file; SSH targets cannot read a local
+    # mktemp path from the remote shell.
     cred_file="$(mktemp)"
     chmod 600 "${cred_file}"
     printf '%s:%s' "${auth_user}" "${auth_pass}" > "${cred_file}"
-    # shellcheck disable=SC2064  # intentional: trap value captured at registration time.
-    trap "rm -f '${cred_file}'" EXIT INT TERM
+    staged_cred_file="$(hbs_stage_file_for_execution "${execution_mode}" "${cred_file}" "splunk-bundle-cred.$$")" || {
+        rm -f "${cred_file}"
+        return 1
+    }
 
     case "${kind}" in
         shc)
-            [[ -n "${target_uri}" && -n "${auth_user}" && -n "${auth_pass}" ]] || { rm -f "${cred_file}"; return 1; }
-            apply_script="$(printf 'set -euo pipefail\n%s apply shcluster-bundle -target %s -auth "$(cat %s)" -answer-yes\nrm -f %s\n' \
-                "$(printf '%q' "${splunk_home}/bin/splunk")" \
-                "$(printf '%q' "${target_uri}")" \
-                "$(printf '%q' "${cred_file}")" \
-                "$(printf '%q' "${cred_file}")")"
+            apply_script="$(cat <<EOF
+set -euo pipefail
+cred_file=$(printf '%q' "${staged_cred_file}")
+trap 'rm -f "\${cred_file}"' EXIT INT TERM
+auth_value="\$(cat "\${cred_file}")"
+auth_user="\${auth_value%%:*}"
+auth_pass="\${auth_value#*:}"
+printf '%s\n%s\n' "\${auth_user}" "\${auth_pass}" | $(printf '%q' "${splunk_home}/bin/splunk") apply shcluster-bundle -target $(printf '%q' "${target_uri}") -answer-yes
+EOF
+)"
             ;;
         idxc)
-            [[ -n "${auth_user}" && -n "${auth_pass}" ]] || { rm -f "${cred_file}"; return 1; }
-            apply_script="$(printf 'set -euo pipefail\n%s apply cluster-bundle -auth "$(cat %s)" -answer-yes\nrm -f %s\n' \
-                "$(printf '%q' "${splunk_home}/bin/splunk")" \
-                "$(printf '%q' "${cred_file}")" \
-                "$(printf '%q' "${cred_file}")")"
+            apply_script="$(cat <<EOF
+set -euo pipefail
+cred_file=$(printf '%q' "${staged_cred_file}")
+trap 'rm -f "\${cred_file}"' EXIT INT TERM
+auth_value="\$(cat "\${cred_file}")"
+auth_user="\${auth_value%%:*}"
+auth_pass="\${auth_value#*:}"
+printf '%s\n%s\n' "\${auth_user}" "\${auth_pass}" | $(printf '%q' "${splunk_home}/bin/splunk") apply cluster-bundle -answer-yes
+EOF
+)"
             ;;
         *)
+            hbs_remove_target_path "${execution_mode}" "${staged_cred_file}"
             rm -f "${cred_file}"
             return 1
             ;;
@@ -344,6 +368,7 @@ deployment_bundle_apply_current_profile() {
 
     hbs_run_target_cmd_with_stdin "${execution_mode}" "$(hbs_prefix_with_sudo "${execution_mode}" "bash -s --")" "${apply_script}"
     local rc=$?
+    hbs_remove_target_path "${execution_mode}" "${staged_cred_file}"
     rm -f "${cred_file}"
     return "${rc}"
 }

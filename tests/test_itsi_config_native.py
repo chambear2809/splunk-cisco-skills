@@ -14,8 +14,8 @@ SCRIPTS_DIR = ROOT / "skills" / "splunk-itsi-config" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from lib.common import ValidationError
-from lib.native import NativeWorkflow
+from lib.common import ValidationError  # noqa: E402
+from lib.native import NativeWorkflow  # noqa: E402
 
 
 class FakeNativeClient:
@@ -183,6 +183,49 @@ class FakeNativeClient:
         self.operations.append(("operational", "shift_time_offset", str(payload)))
         return {"status": "ok"}
 
+    def itsi_supported_object_types(self, interface: str = "itoa") -> list[dict]:
+        return [{"title": f"{interface}:service"}, {"title": f"{interface}:entity"}]
+
+    def itsi_alias_list(self) -> dict:
+        return {"items": ["host", "entity_title"]}
+
+    def notable_event_actions(self) -> list[dict]:
+        return [{"name": "create_ticket"}, {"name": "send_email"}]
+
+    def event_management_count(self, object_type: str, filter_data: dict | None = None) -> int | None:
+        if object_type == "notable_event_group":
+            return 7
+        return 0
+
+    def active_maintenance_window(self, object_key: str) -> dict:
+        return {"object_key": object_key, "active": False}
+
+    def maintenance_windows_for_object(self, object_key: str) -> list[dict]:
+        return [{"title": "Maintenance", "object_key": object_key}]
+
+    def maintenance_windows_count_for_object(self, object_key: str) -> int | None:
+        return 1
+
+    def update_notable_event_group(self, group_key: str, payload: dict) -> dict:
+        self.operations.append(("operational", "notable_event_group_update", group_key, str(payload)))
+        return {"status": "ok"}
+
+    def execute_notable_event_action(self, action_name: str, payload: dict) -> dict:
+        self.operations.append(("operational", "notable_event_action_execute", action_name, str(payload)))
+        return {"status": "ok"}
+
+    def link_episode_ticket(self, payload: dict, group_key: str | None = None) -> dict:
+        self.operations.append(("operational", "ticket_link", str(group_key), str(payload)))
+        return {"status": "ok"}
+
+    def unlink_episode_ticket(self, group_key: str, ticketing_system: str, ticket_id: str) -> dict:
+        self.operations.append(("operational", "ticket_unlink", group_key, ticketing_system, ticket_id))
+        return {"status": "ok"}
+
+    def create_episode_export(self, payload: dict) -> dict:
+        self.operations.append(("operational", "episode_export_create", str(payload)))
+        return {"status": "ok"}
+
 
 class OptionalEndpointUnavailableClient(FakeNativeClient):
     def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
@@ -190,6 +233,16 @@ class OptionalEndpointUnavailableClient(FakeNativeClient):
             raise ValidationError(
                 "ITSI REST endpoint is unavailable. Checked: "
                 "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/event_management_state"
+            )
+        return super().list_objects(object_type, interface=interface)
+
+
+class OptionalFeatureDisabledClient(FakeNativeClient):
+    def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
+        if object_type == "summarization":
+            raise ValidationError(
+                "Splunk REST request failed: GET /servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/summarization "
+                "-> HTTP 400: {\"message\":\"Summarization feature is not enabled\"}"
             )
         return super().list_objects(object_type, interface=interface)
 
@@ -701,6 +754,43 @@ class NativeWorkflowTests(unittest.TestCase):
             ],
         )
 
+    def test_new_passthrough_config_sections_preview_without_mutating(self) -> None:
+        client = FakeNativeClient()
+        spec = {
+            "entity_management_policies": [{"title": "Entity Discovery Policy", "enabled": False}],
+            "entity_management_rules": [{"title": "Entity Discovery Rule", "field": "host"}],
+            "data_integration_templates": [{"title": "Third-Party Integration Template", "source": "example"}],
+            "refresh_queue_jobs": [{"title": "Entity Refresh Job", "payload": {"status": "queued"}}],
+            "sandboxes": [{"title": "Network Sandbox", "payload": {"description": "Review imported services"}}],
+            "sandbox_services": [{"title": "Network Sandbox Service", "payload": {"service_title": "Network Edge"}}],
+            "sandbox_sync_logs": [{"title": "Network Sandbox Sync", "payload": {"status": "complete"}}],
+            "upgrade_readiness_prechecks": [{"title": "Upgrade Readiness Check", "payload": {"status": "ready"}}],
+            "summarizations": [{"title": "KPI Summary", "payload": {"window": "15m"}}],
+            "summarization_feedback": [{"title": "KPI Summary Feedback", "payload": {"rating": "useful"}}],
+            "user_preferences": [{"title": "NOC Preferences", "payload": {"landing_page": "service_analyzer"}}],
+        }
+
+        result = NativeWorkflow(client).run(spec, "preview")
+
+        self.assertEqual(client.operations, [])
+        self.assertEqual(result.summary()["created"], 11)
+        self.assertEqual(
+            [change.object_type for change in result.changes],
+            [
+                "entity_management_policy",
+                "entity_management_rule",
+                "data_integration_template",
+                "refresh_queue_job",
+                "sandbox",
+                "sandbox_service",
+                "sandbox_sync_log",
+                "upgrade_readiness_precheck",
+                "summarization",
+                "summarization_feedback",
+                "user_preference",
+            ],
+        )
+
     def test_event_management_sections_use_event_management_interface(self) -> None:
         client = InterfaceRecordingNativeClient()
         spec = {
@@ -1018,6 +1108,98 @@ class NativeWorkflowTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "payload.data"):
             NativeWorkflow(client).run(spec, "preview")
 
+    def test_apply_guarded_event_analytics_operational_actions(self) -> None:
+        client = FakeNativeClient()
+        spec = {
+            "operational_actions": [
+                {
+                    "action": "episode_update",
+                    "allow_operational_action": True,
+                    "allow_episode_field_change": True,
+                    "group_key": "episode:1",
+                    "payload": {"status": 5, "severity": "critical"},
+                },
+                {
+                    "action": "notable_event_action_execute",
+                    "allow_operational_action": True,
+                    "allow_notable_event_action_execute": True,
+                    "action_name": "send_email",
+                    "group_ids": ["episode:1"],
+                    "params": {"message": "investigate"},
+                },
+                {
+                    "action": "ticket_link",
+                    "allow_operational_action": True,
+                    "group_key": "episode:1",
+                    "ticketing_system": "jira",
+                    "ticket_id": "NET-1",
+                    "ticket_url": "https://jira.example/browse/NET-1",
+                },
+                {
+                    "action": "ticket_unlink",
+                    "allow_operational_action": True,
+                    "allow_ticket_unlink": True,
+                    "group_key": "episode:1",
+                    "ticketing_system": "jira",
+                    "ticket_id": "NET-1",
+                },
+                {
+                    "action": "episode_export_create",
+                    "allow_operational_action": True,
+                    "payload": {"filter_data": {"status": 5}},
+                },
+            ]
+        }
+
+        result = NativeWorkflow(client).run(spec, "apply")
+
+        self.assertFalse(result.failed, result.diagnostics)
+        self.assertTrue(any(operation[0:3] == ("operational", "notable_event_group_update", "episode:1") for operation in client.operations))
+        self.assertTrue(any(operation[0:3] == ("operational", "notable_event_action_execute", "send_email") for operation in client.operations))
+        self.assertTrue(any(operation[0:3] == ("operational", "ticket_link", "episode:1") for operation in client.operations))
+        self.assertIn(("operational", "ticket_unlink", "episode:1", "jira", "NET-1"), client.operations)
+        self.assertTrue(any(operation[0:2] == ("operational", "episode_export_create") for operation in client.operations))
+
+    def test_event_analytics_operational_actions_require_secondary_guards(self) -> None:
+        client = FakeNativeClient()
+        specs = [
+            {
+                "operational_actions": [
+                    {
+                        "action": "episode_update",
+                        "allow_operational_action": True,
+                        "group_key": "episode:1",
+                        "payload": {"status": 5},
+                    }
+                ]
+            },
+            {
+                "operational_actions": [
+                    {
+                        "action": "notable_event_action_execute",
+                        "allow_operational_action": True,
+                        "action_name": "send_email",
+                        "group_ids": ["episode:1"],
+                    }
+                ]
+            },
+            {
+                "operational_actions": [
+                    {
+                        "action": "ticket_unlink",
+                        "allow_operational_action": True,
+                        "group_key": "episode:1",
+                        "ticketing_system": "jira",
+                        "ticket_id": "NET-1",
+                    }
+                ]
+            },
+        ]
+
+        for spec in specs:
+            with self.assertRaises(ValidationError):
+                NativeWorkflow(client).run(spec, "preview")
+
     def test_validate_reports_unresolved_references_with_diagnostics(self) -> None:
         client = FakeNativeClient()
         spec = {"services": [{"title": "API", "service_template": "Missing Template"}]}
@@ -1232,10 +1414,15 @@ class NativeWorkflowTests(unittest.TestCase):
             }
         )
 
-        result = NativeWorkflow(client).run({}, "inventory")
+        result = NativeWorkflow(client).run({"inventory": {"maintenance_object_keys": ["service:api"]}}, "inventory")
 
         self.assertEqual(result.inventory["objects"]["entities"]["count"], 1)
         self.assertEqual(result.inventory["objects"]["services"]["titles"], ["API"])
+        self.assertEqual(result.inventory["discovery"]["aliases"]["fields"], ["entity_title", "host"])
+        self.assertEqual(result.inventory["discovery"]["notable_event_actions"]["count"], 2)
+        self.assertIn("itoa:entity", result.inventory["discovery"]["supported_object_types"]["itoa"]["titles"])
+        self.assertEqual(result.inventory["event_management_counts"]["notable_event_group"], 7)
+        self.assertEqual(result.inventory["maintenance_status"]["service:api"]["count"], 1)
 
     def test_prune_plan_reports_unmanaged_candidates_without_deleting(self) -> None:
         client = FakeNativeClient(
@@ -1260,6 +1447,82 @@ class NativeWorkflowTests(unittest.TestCase):
         self.assertTrue(result.prune_plan["plan_id"])
         self.assertEqual(client.operations, [])
 
+    def test_prune_plan_protects_system_objects_by_default(self) -> None:
+        client = FakeNativeClient(
+            {
+                "team": {
+                    "Global": {"_key": "default_itsi_security_group", "title": "Global"},
+                    "Lab Team": {"_key": "team:lab", "title": "Lab Team"},
+                },
+                "kpi_threshold_template": {
+                    "Stock Template": {"_key": "kpi_threshold_template_1", "title": "Work hours, off hours, weekends (static) (UTC-00:00)"},
+                    "Lab Template": {"_key": "threshold:lab", "title": "Lab Template"},
+                },
+                "kpi_template": {
+                    "Templates": {"_key": "itsi_example_kpi_collection", "title": "Templates"},
+                },
+            }
+        )
+
+        result = NativeWorkflow(client).run({}, "prune-plan")
+
+        candidates = result.prune_plan["candidates"]
+        global_team = next(candidate for candidate in candidates if candidate["title"] == "Global")
+        lab_team = next(candidate for candidate in candidates if candidate["title"] == "Lab Team")
+        stock_template = next(candidate for candidate in candidates if candidate["title"].startswith("Work hours"))
+        template_collection = next(candidate for candidate in candidates if candidate["title"] == "Templates")
+        self.assertFalse(global_team["delete_supported"])
+        self.assertFalse(stock_template["delete_supported"])
+        self.assertFalse(template_collection["delete_supported"])
+        self.assertIn("default ITSI", global_team["unsupported_reason"])
+        self.assertTrue(lab_team["delete_supported"])
+        self.assertFalse(result.prune_plan["system_object_cleanup_allowed"])
+
+    def test_prune_plan_can_explicitly_allow_system_object_candidates(self) -> None:
+        client = FakeNativeClient({"team": {"Global": {"_key": "default_itsi_security_group", "title": "Global"}}})
+
+        result = NativeWorkflow(client).run({"cleanup": {"allow_system_objects": True}}, "prune-plan")
+
+        global_team = next(candidate for candidate in result.prune_plan["candidates"] if candidate["title"] == "Global")
+        self.assertTrue(global_team["delete_supported"])
+        self.assertTrue(result.prune_plan["system_object_cleanup_allowed"])
+
+    def test_prune_plan_marks_keyless_candidates_manual_review(self) -> None:
+        client = FakeNativeClient({"correlation_search": {"Orphan Search": {"name": "Orphan Search"}}})
+
+        result = NativeWorkflow(client).run({}, "prune-plan")
+
+        candidate = next(candidate for candidate in result.prune_plan["candidates"] if candidate["title"] == "Orphan Search")
+        self.assertFalse(candidate["delete_supported"])
+        self.assertIn("stable object key", candidate["unsupported_reason"])
+
+    def test_prune_plan_marks_high_risk_candidates_manual_review_by_default(self) -> None:
+        client = FakeNativeClient(
+            {
+                "content_pack": {"Old Pack": {"_key": "pack:old", "title": "Old Pack"}},
+                "icon": {"Old Icon": {"_key": "icon:old", "title": "Old Icon"}},
+                "kpi_entity_threshold": {"Old Threshold": {"_key": "threshold:old", "title": "Old Threshold"}},
+            }
+        )
+
+        result = NativeWorkflow(client).run({}, "prune-plan")
+
+        candidates = result.prune_plan["candidates"]
+        expected = {
+            "Old Pack": "custom_content_packs",
+            "Old Icon": "glass_table_icons",
+            "Old Threshold": "kpi_entity_thresholds",
+        }
+        for title, section in expected.items():
+            candidate = next(candidate for candidate in candidates if candidate["title"] == title)
+            self.assertEqual(candidate["section"], section)
+            self.assertTrue(candidate["high_risk_delete"])
+            self.assertFalse(candidate["delete_supported"])
+            self.assertIn("allow_high_risk_deletes", candidate["unsupported_reason"])
+        self.assertFalse(result.prune_plan["high_risk_cleanup_allowed"])
+        self.assertEqual(result.prune_plan["cleanup_spec_example"]["cleanup"]["candidate_ids"], [])
+        self.assertEqual(result.prune_plan["cleanup_spec_example"]["cleanup"]["high_risk_candidate_ids"], [])
+
     def test_prune_plan_skips_unavailable_optional_sections_with_diagnostics(self) -> None:
         client = OptionalEndpointUnavailableClient(
             {"service": {"Orphan": {"_key": "service:orphan", "title": "Orphan"}}}
@@ -1271,6 +1534,18 @@ class NativeWorkflowTests(unittest.TestCase):
         self.assertEqual(result.prune_plan["unavailable_sections"][0]["section"], "event_management_states")
         self.assertTrue(any(candidate["title"] == "Orphan" for candidate in result.prune_plan["candidates"]))
         self.assertTrue(any(item["status"] == "warn" for item in result.diagnostics))
+
+    def test_prune_plan_skips_optional_feature_disabled_sections_with_diagnostics(self) -> None:
+        client = OptionalFeatureDisabledClient(
+            {"service": {"Orphan": {"_key": "service:orphan", "title": "Orphan"}}}
+        )
+
+        result = NativeWorkflow(client).run({}, "prune-plan")
+
+        self.assertFalse(result.failed, result.diagnostics)
+        self.assertEqual(result.prune_plan["unavailable_sections"][0]["section"], "summarizations")
+        self.assertTrue(any(candidate["title"] == "Orphan" for candidate in result.prune_plan["candidates"]))
+        self.assertTrue(any("feature is not enabled" in item["message"] for item in result.diagnostics))
 
     def test_cleanup_apply_deletes_only_confirmed_candidates_from_current_plan(self) -> None:
         client = FakeNativeClient(
@@ -1340,7 +1615,66 @@ class NativeWorkflowTests(unittest.TestCase):
             }
         }
 
-        with self.assertRaisesRegex(ValidationError, "unsupported cleanup candidates"):
+        with self.assertRaisesRegex(ValidationError, "allow_high_risk_deletes"):
+            NativeWorkflow(client).run(spec, "cleanup-apply")
+
+    def test_cleanup_apply_deletes_high_risk_candidates_with_double_confirmation(self) -> None:
+        client = FakeNativeClient(
+            {
+                "content_pack": {"Old Pack": {"_key": "pack:old", "title": "Old Pack"}},
+                "icon": {"Old Icon": {"_key": "icon:old", "title": "Old Icon"}},
+                "kpi_entity_threshold": {"Old Threshold": {"_key": "threshold:old", "title": "Old Threshold"}},
+            }
+        )
+        base_spec = {"cleanup": {"allow_high_risk_deletes": True, "confirm_high_risk": "DELETE_HIGH_RISK_ITSI_OBJECTS"}}
+        plan = NativeWorkflow(client).run(base_spec, "prune-plan").prune_plan
+        high_risk_ids = [
+            candidate["candidate_id"]
+            for candidate in plan["candidates"]
+            if candidate["section"] in {"custom_content_packs", "glass_table_icons", "kpi_entity_thresholds"}
+        ]
+        self.assertEqual(plan["cleanup_spec_example"]["cleanup"]["candidate_ids"], [])
+        spec = {
+            "cleanup": {
+                "allow_destroy": True,
+                "confirm": "DELETE_UNMANAGED_ITSI_OBJECTS",
+                "allow_high_risk_deletes": True,
+                "confirm_high_risk": "DELETE_HIGH_RISK_ITSI_OBJECTS",
+                "plan_id": plan["plan_id"],
+                "max_deletes": 3,
+                "candidate_ids": high_risk_ids,
+                "high_risk_candidate_ids": high_risk_ids,
+            }
+        }
+
+        result = NativeWorkflow(client).run(spec, "cleanup-apply")
+
+        self.assertFalse(result.failed)
+        self.assertIsNone(client.find_object_by_title("content_pack", "Old Pack"))
+        self.assertIsNone(client.find_object_by_title("icon", "Old Icon"))
+        self.assertIsNone(client.find_object_by_title("kpi_entity_threshold", "Old Threshold"))
+        self.assertIn(("delete", "content_pack", "Old Pack"), client.operations)
+        self.assertIn(("delete", "icon", "Old Icon"), client.operations)
+        self.assertIn(("delete", "kpi_entity_threshold", "Old Threshold"), client.operations)
+
+    def test_cleanup_apply_rejects_high_risk_candidate_missing_second_candidate_list(self) -> None:
+        client = FakeNativeClient({"icon": {"Old Icon": {"_key": "icon:old", "title": "Old Icon"}}})
+        base_spec = {"cleanup": {"allow_high_risk_deletes": True, "confirm_high_risk": "DELETE_HIGH_RISK_ITSI_OBJECTS"}}
+        plan = NativeWorkflow(client).run(base_spec, "prune-plan").prune_plan
+        icon_id = next(candidate["candidate_id"] for candidate in plan["candidates"] if candidate["section"] == "glass_table_icons")
+        spec = {
+            "cleanup": {
+                "allow_destroy": True,
+                "confirm": "DELETE_UNMANAGED_ITSI_OBJECTS",
+                "allow_high_risk_deletes": True,
+                "confirm_high_risk": "DELETE_HIGH_RISK_ITSI_OBJECTS",
+                "plan_id": plan["plan_id"],
+                "max_deletes": 1,
+                "candidate_ids": [icon_id],
+            }
+        }
+
+        with self.assertRaisesRegex(ValidationError, "high_risk_candidate_ids"):
             NativeWorkflow(client).run(spec, "cleanup-apply")
 
     def test_validate_reports_field_level_drift(self) -> None:

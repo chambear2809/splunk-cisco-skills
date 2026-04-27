@@ -207,10 +207,10 @@ write_secret_file() {
 
 write_compose_bind_secret_file() {
     local path="$1" content="$2"
-    # SC4SNMP Compose mounts these files into non-root containers, so owner-only
-    # permissions from the render host can make them unreadable at runtime.
+    # Keep rendered secrets out of the world-readable bit; operators can chgrp
+    # the secrets directory to the container runtime group when needed.
     write_secret_file "${path}" "${content}"
-    chmod 644 "${path}"
+    chmod 640 "${path}"
 }
 
 make_executable() {
@@ -1044,9 +1044,10 @@ This directory contains rendered SC4SNMP Docker Compose assets.
 ## Next steps
 
 1. Review the rendered config files and confirm the device inventory, profiles, and trap communities.
-2. Keep \`secrets/\` local-only.
-3. Run \`compose-up.sh\` to install or upgrade the stack, or use your standard compose workflow.
-4. Validate indexed data after the stack is running.
+2. Keep \`secrets/\` local-only; secret files render as group-readable but not world-readable.
+3. If your container runtime uses a non-owner group, run \`chgrp\` on \`secrets/\` before startup.
+4. Run \`compose-up.sh\` to install or upgrade the stack, or use your standard compose workflow.
+5. Validate indexed data after the stack is running.
 EOF
 )"
 }
@@ -1100,7 +1101,7 @@ render_compose_assets() {
     fi
     if [[ -n "${SNMPV3_SECRETS_FILE}" ]]; then
         cp "${SNMPV3_SECRETS_FILE}" "${compose_dir}/secrets/secrets.json"
-        chmod 644 "${compose_dir}/secrets/secrets.json"
+        chmod 640 "${compose_dir}/secrets/secrets.json"
     else
         write_compose_bind_secret_file "${compose_dir}/secrets/secrets.json.example" $'{\n  "example": {\n    "username": "snmp-user",\n    "authprotocol": "SHA",\n    "authkey": "replace-me"\n  }\n}\n'
     fi

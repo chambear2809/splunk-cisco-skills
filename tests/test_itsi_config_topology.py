@@ -13,9 +13,9 @@ SCRIPTS_DIR = ROOT / "skills" / "splunk-itsi-config" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from lib.common import ValidationError
-from lib.content_packs import CONTENT_LIBRARY_APP, ITSI_APP, TopologyWorkflow
-from lib.topology import compile_topology
+from lib.common import ValidationError  # noqa: E402
+from lib.content_packs import CONTENT_LIBRARY_APP, ITSI_APP, TopologyWorkflow  # noqa: E402
+from lib.topology import compile_topology  # noqa: E402
 
 HEALTHY_ITSI_APPS = {ITSI_APP, "itsi", "SA-UserAccess", "SA-ITSI-Licensechecker"}
 

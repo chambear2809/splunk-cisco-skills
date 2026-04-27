@@ -8,6 +8,13 @@ connection:
 defaults:
   sec_grp: default_itsi_security_group
 
+# Optional read-only inventory enrichment.
+# inventory:
+#   maintenance_object_keys:
+#     - replace-with-live-service-or-entity-key
+#   notable_event_group_filter:
+#     status: 5
+
 teams:
   - title: Network Operations
     payload:
@@ -28,6 +35,22 @@ entity_types:
           field: sourcetype
           values:
             - cisco:*
+
+entity_management_policies:
+  - title: Example Entity Discovery Policy
+    description: Replace payload fields with an exported entity-management policy.
+    enabled: false
+
+entity_management_rules:
+  - title: Example Entity Discovery Rule
+    description: Replace payload fields with an exported entity-management rule.
+    field: host
+
+data_integration_templates:
+  - title: Example Data Integration Template
+    description: Replace payload fields with an exported integration template.
+    payload:
+      source: third_party
 
 kpi_base_searches:
   - title: Interface Error Base Search
@@ -231,6 +254,66 @@ home_views:
       services:
         - Network Edge
 
+refresh_queue_jobs:
+  - title: Example Refresh Queue Job
+    description: Replace payload with an exported refresh queue job.
+    payload:
+      status: queued
+
+sandboxes:
+  - title: Example Imported Services Sandbox
+    description: Replace payload with an exported sandbox.
+    payload:
+      description: Review imported service tree before publish.
+
+sandbox_services:
+  - title: Example Sandbox Service
+    description: Replace payload with an exported sandbox service.
+    payload:
+      service_title: Network Edge
+
+sandbox_sync_logs:
+  - title: Example Sandbox Sync Log
+    description: Replace payload with an exported sandbox sync log.
+    payload:
+      status: complete
+
+upgrade_readiness_prechecks:
+  - title: Example Upgrade Readiness Precheck
+    description: Replace payload with an exported upgrade-readiness precheck.
+    payload:
+      status: ready
+
+summarizations:
+  - title: Example KPI Summary
+    description: Replace payload with an exported summarization object.
+    payload:
+      window: 15m
+
+summarization_feedback:
+  - title: Example KPI Summary Feedback
+    description: Replace payload with exported summarization feedback.
+    payload:
+      rating: useful
+
+user_preferences:
+  - title: Example ITSI User Preferences
+    description: Replace payload with exported user preferences.
+    payload:
+      landing_page: service_analyzer
+
+# Optional destructive cleanup. Always generate and review a fresh prune-plan first.
+# cleanup:
+#   allow_destroy: true
+#   confirm: DELETE_UNMANAGED_ITSI_OBJECTS
+#   plan_id: replace-with-current-prune-plan-id
+#   max_deletes: 1
+#   candidate_ids:
+#     - replace-with-reviewed-candidate-id
+#   allow_high_risk_deletes: false
+#   confirm_high_risk: DELETE_HIGH_RISK_ITSI_OBJECTS
+#   high_risk_candidate_ids: []
+
 # Optional non-idempotent helper actions. Uncomment only after explicit operator review.
 # operational_actions:
 #   - action: custom_threshold_window_disconnect
@@ -251,3 +334,17 @@ home_views:
 #   - action: entity_retire_retirable
 #     allow_operational_action: true
 #     retire_all_retirable: true
+#   - action: notable_event_action_execute
+#     allow_operational_action: true
+#     allow_notable_event_action_execute: true
+#     action_name: send_email
+#     group_ids:
+#       - replace-with-live-episode-key
+#     params:
+#       message: Review this episode.
+#   - action: ticket_link
+#     allow_operational_action: true
+#     group_key: replace-with-live-episode-key
+#     ticket_system: jira
+#     ticket_id: NET-123
+#     ticket_url: https://jira.example/browse/NET-123

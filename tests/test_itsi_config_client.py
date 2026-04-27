@@ -11,9 +11,9 @@ SCRIPTS_DIR = ROOT / "skills" / "splunk-itsi-config" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import lib.client as client_module
-from lib.client import ClientConfig, SplunkRestClient
-from lib.common import ValidationError
+import lib.client as client_module  # noqa: E402
+from lib.client import ClientConfig, SplunkRestClient  # noqa: E402
+from lib.common import ValidationError  # noqa: E402
 
 
 class SplunkRestClientTests(unittest.TestCase):
@@ -298,14 +298,17 @@ class SplunkRestClientTests(unittest.TestCase):
 
         created = client.create_object("kpi_entity_threshold", {"title": "Threshold"})
         updated = client.update_object("kpi_entity_threshold", "threshold:1", {"title": "Threshold"})
+        deleted = client.delete_object("kpi_entity_threshold", "threshold:1")
 
         self.assertEqual(created, {"_key": "threshold:1"})
         self.assertEqual(updated, {"_key": "threshold:1"})
+        self.assertEqual(deleted, {"_key": "threshold:1"})
         self.assertEqual(
             calls,
             [
                 ("PUT", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/kpi_entity_threshold", None, {"title": "Threshold"}),
                 ("PUT", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/kpi_entity_threshold/threshold%3A1", None, {"title": "Threshold"}),
+                ("DELETE", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/kpi_entity_threshold/threshold%3A1", None, None),
             ],
         )
 
@@ -417,6 +420,26 @@ class SplunkRestClientTests(unittest.TestCase):
             ],
         )
 
+    def test_delete_object_uses_content_pack_authorship_delete_route(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/pack%3A1":
+                return {"_key": "pack:1"}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        result = client.delete_object("content_pack", "pack:1", interface="content_pack_authorship")
+
+        self.assertEqual(result, {"_key": "pack:1"})
+        self.assertEqual(
+            calls,
+            [("DELETE", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/pack%3A1", None, None)],
+        )
+
     def test_backup_restore_object_uses_backup_restore_interface(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
         calls: list[tuple[str, str, object]] = []
@@ -472,6 +495,8 @@ class SplunkRestClientTests(unittest.TestCase):
                 return {"result": [{"_key": "icon:1", "title": "Router"}]}
             if method == "PUT" and path == "/services/SA-ITOA/v1/icon_collection":
                 return ["icon:1"]
+            if method == "DELETE" and path == "/services/SA-ITOA/v1/icon_collection/icon%3A1":
+                return {"_key": "icon:1"}
             raise AssertionError(path)
 
         client._request = fake_request  # type: ignore[attr-defined]
@@ -479,16 +504,19 @@ class SplunkRestClientTests(unittest.TestCase):
         found = client.find_object_by_title("icon", "Router", interface="icon_collection")
         created = client.create_object("icon", {"title": "Router", "svg_path": "M0 0h10v10H0z"}, interface="icon_collection")
         updated = client.update_object("icon", "icon:1", {"title": "Router", "svg_path": "M1 1h8v8H1z"}, interface="icon_collection")
+        deleted = client.delete_object("icon", "icon:1", interface="icon_collection")
 
         self.assertEqual(found, {"_key": "icon:1", "title": "Router"})
         self.assertEqual(created, {"_key": "icon:1"})
         self.assertEqual(updated, {"_key": "icon:1"})
+        self.assertEqual(deleted, {"_key": "icon:1"})
         self.assertEqual(
             calls,
             [
                 ("GET", "/services/SA-ITOA/v1/icon_collection", {"filter": '{"title": "Router"}'}, None),
                 ("PUT", "/services/SA-ITOA/v1/icon_collection", None, [{"title": "Router", "svg_path": "M0 0h10v10H0z"}]),
                 ("PUT", "/services/SA-ITOA/v1/icon_collection", None, [{"title": "Router", "svg_path": "M1 1h8v8H1z", "_key": "icon:1"}]),
+                ("DELETE", "/services/SA-ITOA/v1/icon_collection/icon%3A1", None, None),
             ],
         )
 
@@ -640,6 +668,99 @@ class SplunkRestClientTests(unittest.TestCase):
 
         self.assertIn("timed out", str(error.exception))
         self.assertIn("GET", str(error.exception))
+
+    def test_discovery_helpers_use_itsi_interfaces(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_supported_object_types":
+                return ["service", "entity"]
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_alias_list":
+                return {"items": ["host"]}
+            if path == "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions":
+                return {"entry": [{"name": "send_email", "content": {"name": "send_email"}}]}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        self.assertEqual(client.itsi_supported_object_types("itoa")[0]["title"], "service")
+        self.assertEqual(client.itsi_supported_object_types("itoa")[1]["name"], "entity")
+        self.assertEqual(client.itsi_alias_list(), {"items": ["host"]})
+        self.assertEqual(client.notable_event_actions()[0]["name"], "send_email")
+        self.assertEqual(
+            calls,
+            [
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_supported_object_types"),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_supported_object_types"),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_alias_list"),
+                ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions"),
+            ],
+        )
+
+    def test_event_analytics_helpers_use_documented_routes(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            return {"ok": True}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        client.update_notable_event_group("episode:1", {"status": 5})
+        client.execute_notable_event_action("send_email", {"ids": ["episode:1"], "params": {}})
+        client.link_episode_ticket({"ticket_id": "NET-1"}, group_key="episode:1")
+        client.unlink_episode_ticket("episode:1", "jira", "NET-1")
+        client.create_episode_export({"filter_data": {"status": 5}})
+        client.event_management_count("notable_event_group", {"status": 5})
+        client.active_maintenance_window("service:1")
+        client.maintenance_windows_for_object("service:1")
+        client.maintenance_windows_count_for_object("service:1")
+
+        self.assertEqual(
+            calls,
+            [
+                ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_group/episode%3A1", {"status": 5}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions/send_email", {"ids": ["episode:1"], "params": {}}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/ticketing/episode%3A1", {"ticket_id": "NET-1"}),
+                ("DELETE", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/ticketing/episode%3A1/jira/NET-1", None),
+                ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/episode_export", {"filter_data": {"status": 5}}),
+                ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_group/count", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/maintenance_services_interface/vLatest/get_active_maintenance_window/service%3A1", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/maintenance_services_interface/vLatest/get_maintenance_windows/service%3A1", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/maintenance_services_interface/vLatest/get_maintenance_windows/count/service%3A1", None),
+            ],
+        )
+
+    def test_from_spec_inherits_verify_ssl_from_environment(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "SPLUNK_SEARCH_API_URI": "https://example.com:8089",
+                "SPLUNK_SESSION_KEY": "token",
+                "SPLUNK_VERIFY_SSL": "false",
+            },
+            clear=True,
+        ):
+            client = SplunkRestClient.from_spec({"connection": {}})
+
+        self.assertFalse(client.config.verify_ssl)
+
+    def test_from_spec_verify_ssl_overrides_environment(self) -> None:
+        with patch.dict(
+            "os.environ",
+            {
+                "SPLUNK_SEARCH_API_URI": "https://example.com:8089",
+                "SPLUNK_SESSION_KEY": "token",
+                "SPLUNK_VERIFY_SSL": "false",
+            },
+            clear=True,
+        ):
+            client = SplunkRestClient.from_spec({"connection": {"verify_ssl": True}})
+
+        self.assertTrue(client.config.verify_ssl)
 
 
 if __name__ == "__main__":

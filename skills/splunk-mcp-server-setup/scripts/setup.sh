@@ -574,7 +574,7 @@ if ! command -v mcp-remote >/dev/null 2>&1; then
   exit 1
 fi
 
-exec mcp-remote "${SPLUNK_MCP_URL}" --header "Authorization: Bearer ${SPLUNK_MCP_TOKEN}"
+exec mcp-remote "${SPLUNK_MCP_URL}" --header 'Authorization: Bearer ${SPLUNK_MCP_TOKEN}'
 EOF
 )"
 
@@ -594,6 +594,62 @@ const scriptDir = __dirname;
 const envFile = path.join(scriptDir, ".env.splunk-mcp");
 
 // Load .env.splunk-mcp if present (KEY=VALUE lines, no export, no quoting needed).
+function parseShellWord(value) {
+  let result = "";
+  let state = "normal";
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    if (state === "single") {
+      if (ch === "'") {
+        state = "normal";
+      } else {
+        result += ch;
+      }
+      continue;
+    }
+    if (state === "double") {
+      if (ch === '"') {
+        state = "normal";
+      } else if (ch === "\\") {
+        i += 1;
+        if (i < value.length) result += value[i];
+      } else {
+        result += ch;
+      }
+      continue;
+    }
+    if (state === "ansi") {
+      if (ch === "'") {
+        state = "normal";
+      } else if (ch === "\\") {
+        i += 1;
+        const next = value[i];
+        if (next === "n") result += "\n";
+        else if (next === "r") result += "\r";
+        else if (next === "t") result += "\t";
+        else if (next !== undefined) result += next;
+      } else {
+        result += ch;
+      }
+      continue;
+    }
+    if (ch === "'") {
+      state = "single";
+    } else if (ch === '"') {
+      state = "double";
+    } else if (ch === "$" && value[i + 1] === "'") {
+      state = "ansi";
+      i += 1;
+    } else if (ch === "\\") {
+      i += 1;
+      if (i < value.length) result += value[i];
+    } else {
+      result += ch;
+    }
+  }
+  return result;
+}
+
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
@@ -603,12 +659,7 @@ function loadEnvFile(filePath) {
     const eq = trimmed.indexOf("=");
     if (eq === -1) continue;
     const key = trimmed.slice(0, eq).trim();
-    let val = trimmed.slice(eq + 1).trim();
-    // Strip surrounding single or double quotes.
-    if ((val.startsWith("'") && val.endsWith("'")) ||
-        (val.startsWith('"') && val.endsWith('"'))) {
-      val = val.slice(1, -1);
-    }
+    const val = parseShellWord(trimmed.slice(eq + 1).trim());
     // Pre-existing env vars take precedence.
     if (!(key in process.env)) {
       process.env[key] = val;
@@ -653,9 +704,10 @@ function findMcpRemote() {
 }
 
 const { cmd, args: prefixArgs } = findMcpRemote();
+const tokenHeader = "Authorization: Bearer ${SPLUNK_MCP_TOKEN}";
 const child = spawn(
   cmd,
-  [...prefixArgs, mcpUrl, "--header", "Authorization: Bearer " + mcpToken],
+  [...prefixArgs, mcpUrl, "--header", tokenHeader],
   { stdio: "inherit" }
 );
 

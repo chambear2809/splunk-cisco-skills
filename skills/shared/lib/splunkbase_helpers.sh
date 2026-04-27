@@ -14,6 +14,7 @@ get_splunkbase_session() {
     response_file="$(mktemp)"
     cookie_file="$(mktemp)"
     chmod 600 "${cookie_file}"
+    # shellcheck disable=SC2064  # intentional: temp paths are captured for exit cleanup.
     trap "rm -f '${cookie_file}' '${response_file}'" EXIT INT TERM
 
     if [[ -n "${SB_COOKIE_JAR:-}" && -f "${SB_COOKIE_JAR}" ]]; then
@@ -157,6 +158,7 @@ download_splunkbase_release() {
         return 0
     fi
 
+    # shellcheck disable=SC2034  # reserved for callers that need the raw failure status.
     SB_DOWNLOAD_HTTP_CODE="${http_code}"
     rm -f "${tmp_file}"
     if [[ "${http_code}" == "403" ]]; then

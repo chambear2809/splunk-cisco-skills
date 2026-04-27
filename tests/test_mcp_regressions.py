@@ -3,6 +3,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -155,7 +156,7 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             url_marker = tmp_path / "url-marker"
             token_marker = tmp_path / "token-marker"
             mcp_url = f"https://splunk.example:8089/services/mcp?target=$(touch {url_marker})"
-            token_value = f"token$(touch {token_marker})"
+            token_value = f"tok en'\"$(touch {token_marker})\\tail"
 
             token_file.write_text(token_value, encoding="utf-8")
             token_file.chmod(0o600)
@@ -169,7 +170,12 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 import sys
                 from pathlib import Path
 
-                Path(os.environ["MCP_REMOTE_LOG"]).write_text(json.dumps(sys.argv[1:]), encoding="utf-8")
+                payload = {
+                    "args": sys.argv[1:],
+                    "token": os.environ.get("SPLUNK_MCP_TOKEN"),
+                    "url": os.environ.get("SPLUNK_MCP_URL"),
+                }
+                Path(os.environ["MCP_REMOTE_LOG"]).write_text(json.dumps(payload), encoding="utf-8")
                 """,
             )
 
@@ -212,12 +218,45 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             self.assertFalse(url_marker.exists(), "MCP URL command substitution should not execute")
             self.assertFalse(token_marker.exists(), "token command substitution should not execute")
 
-            mcp_remote_args = json.loads(mcp_remote_log.read_text(encoding="utf-8"))
+            mcp_remote_payload = json.loads(mcp_remote_log.read_text(encoding="utf-8"))
+            mcp_remote_args = mcp_remote_payload["args"]
             self.assertEqual(mcp_remote_args[0], mcp_url)
+            self.assertEqual(mcp_remote_payload["token"], token_value)
+            self.assertEqual(mcp_remote_payload["url"], mcp_url)
             self.assertEqual(
                 mcp_remote_args[1:3],
-                ["--header", f"Authorization: Bearer {token_value}"],
+                ["--header", "Authorization: Bearer ${SPLUNK_MCP_TOKEN}"],
             )
+            self.assertNotIn(token_value, json.dumps(mcp_remote_args))
+
+            node_path = shutil.which("node")
+            if not node_path:
+                self.skipTest("node is required to exercise the rendered JS wrapper")
+            mcp_remote_log.unlink()
+            js_wrapper_result = subprocess.run(
+                [node_path, str(output_dir / "run-splunk-mcp.js")],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            self.assertEqual(
+                js_wrapper_result.returncode,
+                0,
+                msg=js_wrapper_result.stdout + js_wrapper_result.stderr,
+            )
+            mcp_remote_payload = json.loads(mcp_remote_log.read_text(encoding="utf-8"))
+            mcp_remote_args = mcp_remote_payload["args"]
+            self.assertEqual(mcp_remote_args[0], mcp_url)
+            self.assertEqual(mcp_remote_payload["token"], token_value)
+            self.assertEqual(mcp_remote_payload["url"], mcp_url)
+            self.assertEqual(
+                mcp_remote_args[1:3],
+                ["--header", "Authorization: Bearer ${SPLUNK_MCP_TOKEN}"],
+            )
+            self.assertNotIn(token_value, json.dumps(mcp_remote_args))
 
 
     def test_splunk_mcp_validate_uses_root_protected_resource_endpoint(self):
@@ -546,6 +585,17 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                 }
             },
         )
+
+    def test_repo_mcp_bridge_wrapper_exists_and_is_not_ignored(self):
+        bridge = REPO_ROOT / "splunk-mcp-rendered" / "run-splunk-mcp.js"
+        self.assertTrue(bridge.is_file(), "repo MCP configs must point at an available JS bridge")
+
+        result = subprocess.run(
+            ["git", "check-ignore", "--quiet", str(bridge.relative_to(REPO_ROOT))],
+            cwd=REPO_ROOT,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 1, "the root MCP bridge must be tracked, not gitignored")
 
     def test_mcp_setup_writes_claude_mcp_json(self):
         with tempfile.TemporaryDirectory() as tmpdir:

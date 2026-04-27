@@ -31,6 +31,7 @@
       "display_name": "Cisco Access Points (AP)",
       "id": "cisco_access_points",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -140,6 +141,7 @@
       "display_name": "Cisco Aggregation Services Routers (ASR)",
       "id": "cisco_asr",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -773,6 +775,7 @@
       "display_name": "Cisco Carrier Routing System (CRS)",
       "id": "cisco_crs",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -882,6 +885,7 @@
       "display_name": "Cisco Catalyst Center",
       "id": "cisco_catalyst_center",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -1000,6 +1004,7 @@
       "display_name": "Cisco Catalyst SD-WAN",
       "id": "cisco_catalyst_sdwan",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -1131,6 +1136,7 @@
       "display_name": "Cisco Catalyst Switches",
       "id": "cisco_catalyst_switches",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -1616,6 +1622,7 @@
       "display_name": "Cisco Cyber Vision (CCV)",
       "id": "cisco_cyber_vision",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -2615,6 +2622,7 @@
       "display_name": "Cisco Identity Services Engine (ISE)",
       "id": "cisco_ise",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -2900,6 +2908,7 @@
       "display_name": "Cisco Integrated Services Routers (ISR)",
       "id": "cisco_isr",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [
@@ -7227,6 +7236,7 @@
       "display_name": "Cisco Wireless LAN Controller (WLC)",
       "id": "cisco_wlc",
       "install_apps": [
+        "TA_cisco_catalyst",
         "cisco-catalyst-app"
       ],
       "keywords": [

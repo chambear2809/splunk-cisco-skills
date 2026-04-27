@@ -558,7 +558,10 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             self.assertIn("[http://thousandeyes]", inputs_conf)
             self.assertIn("index = thousandeyes_metrics", inputs_conf)
             self.assertIn("indexes = thousandeyes_metrics,thousandeyes_traces,thousandeyes_events,thousandeyes_activity,thousandeyes_alerts,thousandeyes_pathvis", inputs_conf)
-            self.assertIn("apply cluster-bundle -auth cm-user:cm-pass", apply_log.read_text(encoding="utf-8"))
+            apply_text = apply_log.read_text(encoding="utf-8")
+            self.assertIn("apply cluster-bundle", apply_text)
+            self.assertNotIn("-auth", apply_text)
+            self.assertNotIn("cm-pass", apply_text)
             self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
 
 

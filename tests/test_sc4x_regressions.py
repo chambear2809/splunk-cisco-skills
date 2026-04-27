@@ -265,7 +265,10 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertIn("index = sc4s", inputs_conf)
             self.assertIn(f"token = {token_value}", inputs_conf)
             self.assertIn("disabled = 0", inputs_conf)
-            self.assertIn("apply cluster-bundle -auth cm-user:cm-pass", apply_log.read_text(encoding="utf-8"))
+            apply_text = apply_log.read_text(encoding="utf-8")
+            self.assertIn("apply cluster-bundle", apply_text)
+            self.assertNotIn("-auth", apply_text)
+            self.assertNotIn("cm-pass", apply_text)
             if curl_log.exists():
                 self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
 
@@ -649,11 +652,11 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(compose_hec_token, "generated-sc4snmp-token\n")
             self.assertEqual(
                 stat.S_IMODE((output_dir / "compose" / "secrets" / "hec_token").stat().st_mode),
-                0o644,
+                0o640,
             )
             self.assertEqual(
                 stat.S_IMODE((output_dir / "compose" / "secrets" / "secrets.json.example").stat().st_mode),
-                0o644,
+                0o640,
             )
 
             self.assertIn('host: "example.invalid"', k8s_values)
@@ -887,7 +890,10 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertIn("index = netops", inputs_conf)
             self.assertIn(f"token = {token_value}", inputs_conf)
             self.assertIn("disabled = 0", inputs_conf)
-            self.assertIn("apply cluster-bundle -auth cm-user:cm-pass", apply_log.read_text(encoding="utf-8"))
+            apply_text = apply_log.read_text(encoding="utf-8")
+            self.assertIn("apply cluster-bundle", apply_text)
+            self.assertNotIn("-auth", apply_text)
+            self.assertNotIn("cm-pass", apply_text)
             if curl_log.exists():
                 self.assertNotIn("/services/data/inputs/http", curl_log.read_text(encoding="utf-8"))
 
@@ -1078,10 +1084,10 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             placeholder = output_dir / "compose" / "secrets" / "hec_token.example"
             self.assertTrue(placeholder.exists(), msg="Expected placeholder token file")
             self.assertIn("<replace-with-hec-token>", placeholder.read_text(encoding="utf-8"))
-            self.assertEqual(stat.S_IMODE(placeholder.stat().st_mode), 0o644)
+            self.assertEqual(stat.S_IMODE(placeholder.stat().st_mode), 0o640)
 
 
-    def test_sc4snmp_render_compose_with_snmpv3_secrets_file_makes_bind_secret_readable(self):
+    def test_sc4snmp_render_compose_with_snmpv3_secrets_file_keeps_bind_secret_private(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             env, _state_file = self.build_mock_sc4snmp_env(tmp_path)
@@ -1121,7 +1127,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
 
             rendered_secrets = output_dir / "compose" / "secrets" / "secrets.json"
             self.assertEqual(rendered_secrets.read_text(encoding="utf-8"), snmpv3_secrets_file.read_text(encoding="utf-8"))
-            self.assertEqual(stat.S_IMODE(rendered_secrets.stat().st_mode), 0o644)
+            self.assertEqual(stat.S_IMODE(rendered_secrets.stat().st_mode), 0o640)
 
 
     def test_sc4snmp_hec_token_yaml_special_characters_escaped(self):

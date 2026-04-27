@@ -454,7 +454,7 @@ def build_catalyst_stack_route(override: dict) -> dict:
         "route_type": "catalyst_stack",
         "primary_skill": "cisco-catalyst-ta-setup",
         "companion_skills": ["cisco-enterprise-networking-setup"],
-        "install_apps": ["cisco-catalyst-app"],
+        "install_apps": ["TA_cisco_catalyst", "cisco-catalyst-app"],
         "template_paths": [
             TEMPLATE_PATHS["catalyst"],
         ],

@@ -78,7 +78,8 @@ Rendered files:
 | File | Purpose |
 |------|---------|
 | `.cursor/mcp.json` | Cursor workspace MCP registration (`type: "stdio"`) |
-| `run-splunk-mcp.sh` | Stdio wrapper that runs `mcp-remote` against Splunk |
+| `run-splunk-mcp.sh` | Shell wrapper that runs `mcp-remote` against Splunk |
+| `run-splunk-mcp.js` | Node stdio wrapper used by Cursor, Codex, and Claude Code registrations |
 | `.env.splunk-mcp` | Local-only URL and token file consumed by the wrapper |
 | `register-codex-mcp.sh` | Syncs a portable launcher bundle into `~/.codex/mcp-bridges/<name>/` and registers that wrapper with Codex |
 
@@ -105,7 +106,9 @@ This approach is useful because:
 
 ## Wrapper Prerequisite
 
-The rendered wrapper expects `mcp-remote` on `PATH`.
+The shell wrapper expects `mcp-remote` on `PATH`. The Node wrapper used by Cursor,
+Codex, and Claude Code registrations prefers `mcp-remote` on `PATH` and falls
+back to `npx mcp-remote`.
 
 Typical install:
 

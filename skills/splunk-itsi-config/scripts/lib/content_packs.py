@@ -7,6 +7,7 @@ import re
 import shlex
 import subprocess
 import tarfile
+import tempfile
 import time
 from typing import Any
 from copy import deepcopy
@@ -325,7 +326,10 @@ class ShellContentLibraryInstaller:
         if base_url:
             env["SPLUNK_SEARCH_API_URI"] = base_url
             env["SPLUNK_URI"] = base_url
-        verify_ssl = bool_from_any(connection.get("verify_ssl"), default=True)
+        verify_ssl_source = connection.get("verify_ssl")
+        if verify_ssl_source is None:
+            verify_ssl_source = env.get("SPLUNK_VERIFY_SSL")
+        verify_ssl = bool_from_any(verify_ssl_source, default=True)
         env["SPLUNK_VERIFY_SSL"] = "true" if verify_ssl else "false"
         username = getattr(getattr(client, "config", None), "username", None)
         password = getattr(getattr(client, "config", None), "password", None)
@@ -355,25 +359,65 @@ class ShellContentLibraryInstaller:
         except OSError as exc:
             raise ValidationError(f"Failed to execute {' '.join(command[:2])}: {exc}") from exc
 
+    @staticmethod
+    def _without_secret_env(env: dict[str, str]) -> dict[str, str]:
+        safe_env = dict(env)
+        for key in (
+            "SPLUNK_PASSWORD",
+            "SPLUNK_PASS",
+            "SPLUNK_SESSION_KEY",
+            "SPLUNK_SSH_PASS",
+            "SPLUNK_MCP_TOKEN",
+        ):
+            safe_env.pop(key, None)
+        return safe_env
+
+    def _write_secret_file(self, *values: str) -> Path:
+        fd, raw_path = tempfile.mkstemp(prefix="codex-splunk-secret.")
+        path = Path(raw_path)
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                for value in values:
+                    handle.write(str(value))
+                    handle.write("\n")
+        except Exception:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            path.unlink(missing_ok=True)
+            raise
+        return path
+
     def _bundle_extract_install_command(
         self,
         archive_path: str,
         *,
         splunk_bin: str,
-        auth: str,
+        auth_file: str,
         cleanup_archive: bool,
+        cleanup_auth_file: bool,
         background_restart: bool = False,
     ) -> str:
         apps_dir = str(Path(splunk_bin).parent.parent / "etc" / "apps")
         cleanup_steps = ['rm -rf "$workdir"']
         if cleanup_archive:
             cleanup_steps.append('rm -f "$archive"')
+        if cleanup_auth_file:
+            cleanup_steps.append('rm -f "$auth_file"')
         cleanup_body = "; ".join(cleanup_steps)
-        restart_command = '"$splunk_bin" restart -auth ' + shlex.quote(auth)
+        restart_credentials = (
+            'auth_user=$(sed -n "1p" "$auth_file"); '
+            'auth_pass=$(sed -n "2p" "$auth_file"); '
+            'rm -f "$auth_file"; '
+        )
+        restart_command = restart_credentials + 'printf \'%s\\n%s\\n\' "$auth_user" "$auth_pass" | "$splunk_bin" restart'
         if background_restart:
             restart_command = (
                 'restart_log=/tmp/codex-splunk-restart.log; '
-                f'nohup {restart_command} >"$restart_log" 2>&1 </dev/null & '
+                + restart_credentials
+                + 'printf \'%s\\n%s\\n\' "$auth_user" "$auth_pass" | nohup "$splunk_bin" restart >"$restart_log" 2>&1 & '
                 'echo "Triggered Splunk restart in background: $restart_log"; '
                 'sleep 2'
             )
@@ -382,6 +426,8 @@ class ShellContentLibraryInstaller:
             f"archive={shlex.quote(archive_path)}; "
             f"apps_dir={shlex.quote(apps_dir)}; "
             f"splunk_bin={shlex.quote(splunk_bin)}; "
+            f"auth_file={shlex.quote(auth_file)}; "
+            'chmod 600 "$auth_file" 2>/dev/null || true; '
             "workdir=$(mktemp -d /tmp/codex-bundle.XXXXXX); "
             f'cleanup() {{ {cleanup_body}; }}; '
             "trap cleanup EXIT; "
@@ -426,21 +472,26 @@ class ShellContentLibraryInstaller:
 
         section = spec.get(self.spec_key, {})
         splunk_bin = str(section.get("remote_splunk_bin") or "/opt/splunk/bin/splunk")
+        auth_file = self._write_secret_file(str(username), str(password))
 
         if _is_local_target(base_url):
-            install_process = self._run_command(
-                [
-                    "bash",
-                    "-lc",
-                    self._bundle_extract_install_command(
-                        str(local_file),
-                        splunk_bin=splunk_bin,
-                        auth=auth,
-                        cleanup_archive=False,
-                    ),
-                ],
-                env,
-            )
+            try:
+                install_process = self._run_command(
+                    [
+                        "bash",
+                        "-lc",
+                        self._bundle_extract_install_command(
+                            str(local_file),
+                            splunk_bin=splunk_bin,
+                            auth_file=str(auth_file),
+                            cleanup_archive=False,
+                            cleanup_auth_file=True,
+                        ),
+                    ],
+                    self._without_secret_env(env),
+                )
+            finally:
+                auth_file.unlink(missing_ok=True)
             if install_process.returncode != 0:
                 raise ValidationError(
                     f"Automatic {self.display_name.lower()} bundle fallback failed: "
@@ -458,67 +509,108 @@ class ShellContentLibraryInstaller:
         ssh_user = str(env.get("SPLUNK_SSH_USER") or username or "splunk").strip() or "splunk"
         ssh_pass = str(env.get("SPLUNK_SSH_PASS") or password or "").strip()
         if not ssh_host or not ssh_pass:
+            auth_file.unlink(missing_ok=True)
             raise ValidationError(
                 f"Automatic {self.display_name.lower()} bundle fallback requires SSH credentials. Set SPLUNK_SSH_HOST/SPLUNK_SSH_USER/SPLUNK_SSH_PASS or provide matching Splunk credentials."
             )
 
         remote_tmp = f"/tmp/{local_file.stem}.{os.getpid()}.{self.default_app_id}{local_file.suffix}"
-        ssh_env = dict(env)
-        ssh_env["SSHPASS"] = ssh_pass
-        scp_process = self._run_command(
-            [
-                "sshpass",
-                "-e",
-                "scp",
-                "-P",
-                ssh_port,
-                "-o",
-                "ConnectTimeout=15",
-                "-o",
-                "StrictHostKeyChecking=accept-new",
-                "-o",
-                "PubkeyAuthentication=no",
-                "-o",
-                "PreferredAuthentications=password",
-                "-q",
-                str(local_file),
-                f"{ssh_user}@{ssh_host}:{remote_tmp}",
-            ],
-            ssh_env,
-        )
-        if scp_process.returncode != 0:
-            raise ValidationError(
-                f"Automatic {self.display_name.lower()} SSH staging failed: "
-                + _summarize_command_output(scp_process.stdout, scp_process.stderr)
+        remote_auth_file = f"/tmp/{local_file.stem}.{os.getpid()}.{self.default_app_id}.auth"
+        try:
+            ssh_pass_file = self._write_secret_file(ssh_pass)
+        except Exception:
+            auth_file.unlink(missing_ok=True)
+            raise
+        ssh_env = self._without_secret_env(env)
+        try:
+            scp_process = self._run_command(
+                [
+                    "sshpass",
+                    "-f",
+                    str(ssh_pass_file),
+                    "scp",
+                    "-P",
+                    ssh_port,
+                    "-o",
+                    "ConnectTimeout=15",
+                    "-o",
+                    "StrictHostKeyChecking=accept-new",
+                    "-o",
+                    "PubkeyAuthentication=no",
+                    "-o",
+                    "PreferredAuthentications=password",
+                    "-q",
+                    str(local_file),
+                    f"{ssh_user}@{ssh_host}:{remote_tmp}",
+                ],
+                ssh_env,
             )
+            if scp_process.returncode != 0:
+                raise ValidationError(
+                    f"Automatic {self.display_name.lower()} SSH staging failed: "
+                    + _summarize_command_output(scp_process.stdout, scp_process.stderr)
+                )
 
-        remote_command = self._bundle_extract_install_command(
-            remote_tmp,
-            splunk_bin=splunk_bin,
-            auth=auth,
-            cleanup_archive=True,
-            background_restart=True,
-        )
-        ssh_process = self._run_command(
-            [
-                "sshpass",
-                "-e",
-                "ssh",
-                "-p",
-                ssh_port,
-                "-o",
-                "ConnectTimeout=15",
-                "-o",
-                "StrictHostKeyChecking=accept-new",
-                "-o",
-                "PubkeyAuthentication=no",
-                "-o",
-                "PreferredAuthentications=password",
-                f"{ssh_user}@{ssh_host}",
-                remote_command,
-            ],
-            ssh_env,
-        )
+            scp_auth_process = self._run_command(
+                [
+                    "sshpass",
+                    "-f",
+                    str(ssh_pass_file),
+                    "scp",
+                    "-P",
+                    ssh_port,
+                    "-o",
+                    "ConnectTimeout=15",
+                    "-o",
+                    "StrictHostKeyChecking=accept-new",
+                    "-o",
+                    "PubkeyAuthentication=no",
+                    "-o",
+                    "PreferredAuthentications=password",
+                    "-q",
+                    str(auth_file),
+                    f"{ssh_user}@{ssh_host}:{remote_auth_file}",
+                ],
+                ssh_env,
+            )
+            if scp_auth_process.returncode != 0:
+                raise ValidationError(
+                    f"Automatic {self.display_name.lower()} SSH credential staging failed: "
+                    + _summarize_command_output(scp_auth_process.stdout, scp_auth_process.stderr)
+                )
+
+            remote_command = self._bundle_extract_install_command(
+                remote_tmp,
+                splunk_bin=splunk_bin,
+                auth_file=remote_auth_file,
+                cleanup_archive=True,
+                cleanup_auth_file=True,
+                background_restart=True,
+            )
+            ssh_process = self._run_command(
+                [
+                    "sshpass",
+                    "-f",
+                    str(ssh_pass_file),
+                    "ssh",
+                    "-p",
+                    ssh_port,
+                    "-o",
+                    "ConnectTimeout=15",
+                    "-o",
+                    "StrictHostKeyChecking=accept-new",
+                    "-o",
+                    "PubkeyAuthentication=no",
+                    "-o",
+                    "PreferredAuthentications=password",
+                    f"{ssh_user}@{ssh_host}",
+                    remote_command,
+                ],
+                ssh_env,
+            )
+        finally:
+            auth_file.unlink(missing_ok=True)
+            ssh_pass_file.unlink(missing_ok=True)
         if ssh_process.returncode != 0:
             raise ValidationError(
                 f"Automatic {self.display_name.lower()} bundle fallback failed after SSH staging: "
@@ -1402,7 +1494,7 @@ def _render_report(
     content_library_state: dict[str, Any],
 ) -> Path:
     lines = [
-        f"# Content Pack Summary",
+        "# Content Pack Summary",
         "",
         f"- Mode: `{mode}`",
     ]

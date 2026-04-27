@@ -11,7 +11,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from lib.common import SkillError, load_json, write_json, write_yaml
+from lib.common import SkillError, load_json, write_json, write_yaml  # noqa: E402
 
 
 def _node_service_title(node: dict[str, Any], refs: dict[str, str]) -> str:

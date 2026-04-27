@@ -124,6 +124,23 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertIn("fabric_dashboard", result.stdout)
         self.assertIn("skills/cisco-dc-networking-setup/scripts/validate.sh", result.stdout)
 
+    def test_dry_run_catalyst_center_installs_ta_before_visualization_app(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "Cisco Catalyst Center",
+            "--dry-run",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        ta_line = "  - TA_cisco_catalyst [7538] Cisco Catalyst Add-on for Splunk"
+        app_line = "  - cisco-catalyst-app [7539] Cisco Enterprise Networking for Splunk Platform"
+        self.assertIn(ta_line, result.stdout)
+        self.assertIn(app_line, result.stdout)
+        self.assertLess(result.stdout.index(ta_line), result.stdout.index(app_line))
+
     def test_dry_run_secure_firewall_requires_variant(self) -> None:
         result = self.run_command(
             "bash",

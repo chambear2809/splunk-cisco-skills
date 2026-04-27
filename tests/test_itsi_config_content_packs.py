@@ -15,8 +15,8 @@ SCRIPTS_DIR = ROOT / "skills" / "splunk-itsi-config" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from lib.common import ValidationError, infer_platform, macro_mentions_indexes
-from lib.content_packs import (
+from lib.common import ValidationError, infer_platform, macro_mentions_indexes  # noqa: E402
+from lib.content_packs import (  # noqa: E402
     CONTENT_LIBRARY_APP,
     ITSI_APP,
     PACK_PROFILES,
@@ -175,9 +175,11 @@ class ContentPackTests(unittest.TestCase):
                 archive.add(source_root / "DA-ITSI-CP-vmware-dashboards", arcname="DA-ITSI-CP-vmware-dashboards")
 
             commands: list[list[str]] = []
+            command_envs: list[dict[str, str]] = []
 
             def runner(command, **kwargs):
                 commands.append(command)
+                command_envs.append(dict(kwargs.get("env") or {}))
                 if command[:2] == ["bash", str(installer_script)]:
                     return subprocess.CompletedProcess(
                         command,
@@ -207,7 +209,12 @@ class ContentPackTests(unittest.TestCase):
             self.assertEqual(commands[1][:2], ["bash", "-lc"])
             self.assertIn("tar -xf", commands[1][2])
             self.assertIn("cp -R", commands[1][2])
-            self.assertIn("restart -auth", commands[1][2])
+            self.assertIn("printf '%s\\n%s\\n'", commands[1][2])
+            self.assertIn('"$splunk_bin" restart', commands[1][2])
+            self.assertNotIn("-auth", commands[1][2])
+            self.assertNotIn("changeme", commands[1][2])
+            self.assertNotIn("SPLUNK_PASSWORD", command_envs[1])
+            self.assertNotIn("SPLUNK_PASS", command_envs[1])
 
     def test_shell_installer_extracts_multi_app_bundle_over_ssh_after_rest_failure(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -222,9 +229,11 @@ class ContentPackTests(unittest.TestCase):
                 archive.add(source_root / "DA-ITSI-CP-vmware-dashboards", arcname="DA-ITSI-CP-vmware-dashboards")
 
             commands: list[list[str]] = []
+            command_envs: list[dict[str, str]] = []
 
             def runner(command, **kwargs):
                 commands.append(command)
+                command_envs.append(dict(kwargs.get("env") or {}))
                 if command[0] == "bash":
                     return subprocess.CompletedProcess(
                         command,
@@ -262,14 +271,25 @@ class ContentPackTests(unittest.TestCase):
 
             self.assertEqual(result["source"], "ssh-extract")
             self.assertEqual(commands[0][0], "bash")
-            self.assertEqual(commands[1][:3], ["sshpass", "-e", "scp"])
-            self.assertEqual(commands[2][:3], ["sshpass", "-e", "ssh"])
-            self.assertIn("tar -xf", commands[2][-1])
-            self.assertIn("cp -R", commands[2][-1])
-            self.assertNotIn("install app", commands[2][-1])
-            self.assertIn("nohup", commands[2][-1])
-            self.assertIn("Triggered Splunk restart in background", commands[2][-1])
-            self.assertIn("restart -auth", commands[2][-1])
+            self.assertEqual(commands[1][:2], ["sshpass", "-f"])
+            self.assertEqual(commands[1][3], "scp")
+            self.assertEqual(commands[2][:2], ["sshpass", "-f"])
+            self.assertEqual(commands[2][3], "scp")
+            self.assertEqual(commands[3][:2], ["sshpass", "-f"])
+            self.assertEqual(commands[3][3], "ssh")
+            self.assertIn("tar -xf", commands[3][-1])
+            self.assertIn("cp -R", commands[3][-1])
+            self.assertNotIn("install app", commands[3][-1])
+            self.assertIn("nohup", commands[3][-1])
+            self.assertIn("Triggered Splunk restart in background", commands[3][-1])
+            self.assertIn("printf '%s\\n%s\\n'", commands[3][-1])
+            self.assertNotIn("-auth", commands[3][-1])
+            command_text = "\n".join(" ".join(str(part) for part in command) for command in commands)
+            self.assertNotIn("changeme", command_text)
+            for command_env in command_envs[1:]:
+                self.assertNotIn("SPLUNK_PASSWORD", command_env)
+                self.assertNotIn("SPLUNK_PASS", command_env)
+                self.assertNotIn("SPLUNK_SSH_PASS", command_env)
 
     def test_shell_installer_build_env_maps_supported_auth_variables(self) -> None:
         client = SimpleNamespace(config=SimpleNamespace(username="admin", password="changeme", session_key="token-123"))
@@ -285,6 +305,17 @@ class ContentPackTests(unittest.TestCase):
         self.assertEqual(env["SPLUNK_USER"], "admin")
         self.assertEqual(env["SPLUNK_PASS"], "changeme")
         self.assertEqual(env["SPLUNK_SESSION_KEY"], "token-123")
+        self.assertEqual(env["SPLUNK_VERIFY_SSL"], "false")
+
+    def test_shell_installer_build_env_inherits_verify_ssl_from_environment(self) -> None:
+        client = SimpleNamespace(config=SimpleNamespace(username="admin", password="changeme", session_key=None))
+        installer = ShellContentLibraryInstaller()
+        spec = {"connection": {"base_url": "https://example.com:8089"}}
+
+        with patch.dict("os.environ", {"SPLUNK_VERIFY_SSL": "false"}, clear=False):
+            env = installer._build_env(spec, client)
+
+        self.assertEqual(env["SPLUNK_VERIFY_SSL"], "false")
 
     def test_resolve_catalog_entry_uses_exact_title_and_latest_version(self) -> None:
         catalog = [

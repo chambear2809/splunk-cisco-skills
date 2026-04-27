@@ -370,11 +370,32 @@ hbs_prepare_download_curl_args() {
     fi
 }
 
+hbs_curl_config_escape() {
+    local value="${1:-}"
+
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    printf '%s' "${value}"
+}
+
+hbs_make_curl_auth_config() {
+    local username="${1:-}"
+    local password="${2:-}"
+    local auth_config
+
+    auth_config="$(mktemp)"
+    chmod 600 "${auth_config}"
+    printf 'user = "%s:%s"\n' "$(hbs_curl_config_escape "${username}")" "$(hbs_curl_config_escape "${password}")" > "${auth_config}"
+    printf '%s' "${auth_config}"
+}
+
 hbs_fetch_url_text() {
     local url="${1:-}"
     local username="${2:-}"
     local password="${3:-}"
-    local page_text
+    local auth_config="" page_text
 
     [[ -n "${url}" ]] || {
         echo "ERROR: Download URL is required." >&2
@@ -383,13 +404,16 @@ hbs_fetch_url_text() {
 
     hbs_prepare_download_curl_args 180 || return 1
     if [[ -n "${username}" || -n "${password}" ]]; then
-        _hbs_download_curl_args+=(--user "${username}:${password}")
+        auth_config="$(hbs_make_curl_auth_config "${username}" "${password}")"
+        _hbs_download_curl_args+=(-K "${auth_config}")
     fi
 
     page_text="$(curl "${_hbs_download_curl_args[@]}" "${url}" 2>/dev/null)" || {
+        rm -f "${auth_config}"
         echo "ERROR: Failed to fetch ${url}." >&2
         return 1
     }
+    rm -f "${auth_config}"
 
     printf '%s' "${page_text}"
 }
@@ -659,7 +683,7 @@ hbs_download_file() {
     local output_path="${2:-}"
     local username="${3:-}"
     local password="${4:-}"
-    local output_dir tmp_file
+    local auth_config="" output_dir tmp_file
 
     [[ -n "${url}" ]] || {
         echo "ERROR: Download URL is required." >&2
@@ -675,15 +699,18 @@ hbs_download_file() {
         return 1
     }
     if [[ -n "${username}" || -n "${password}" ]]; then
-        _hbs_download_curl_args+=(--user "${username}:${password}")
+        auth_config="$(hbs_make_curl_auth_config "${username}" "${password}")"
+        _hbs_download_curl_args+=(-K "${auth_config}")
     fi
     _hbs_download_curl_args+=(-o "${tmp_file}")
 
     if ! curl "${_hbs_download_curl_args[@]}" "${url}"; then
+        rm -f "${auth_config}"
         rm -f "${tmp_file}"
         echo "ERROR: Failed to download ${url}." >&2
         return 1
     fi
+    rm -f "${auth_config}"
 
     mv -f "${tmp_file}" "${output_path}"
 }

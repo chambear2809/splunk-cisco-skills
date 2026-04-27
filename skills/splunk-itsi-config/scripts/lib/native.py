@@ -32,6 +32,9 @@ class ConfigObjectSection:
 PRE_SERVICE_CONFIG_SECTIONS = (
     ConfigObjectSection("teams", "team", default_sec_grp=False),
     ConfigObjectSection("entity_types", "entity_type"),
+    ConfigObjectSection("entity_management_policies", "entity_management_policies", label="entity_management_policy"),
+    ConfigObjectSection("entity_management_rules", "entity_management_rules", label="entity_management_rule"),
+    ConfigObjectSection("data_integration_templates", "data_integration_template"),
     ConfigObjectSection("kpi_base_searches", "kpi_base_search"),
     ConfigObjectSection("kpi_threshold_templates", "kpi_threshold_template"),
     ConfigObjectSection("kpi_templates", "kpi_template"),
@@ -59,16 +62,64 @@ POST_SERVICE_CONFIG_SECTIONS = (
     ),
     ConfigObjectSection("home_views", "home_view"),
     ConfigObjectSection("kpi_entity_thresholds", "kpi_entity_threshold"),
+    ConfigObjectSection("refresh_queue_jobs", "refresh_queue_job"),
+    ConfigObjectSection("sandboxes", "sandbox"),
+    ConfigObjectSection("sandbox_services", "sandbox_service"),
+    ConfigObjectSection("sandbox_sync_logs", "sandbox_sync_log"),
+    ConfigObjectSection("upgrade_readiness_prechecks", "upgrade_readiness_prechecks", label="upgrade_readiness_precheck"),
+    ConfigObjectSection("summarizations", "summarization"),
+    ConfigObjectSection("summarization_feedback", "summarization_feedback"),
+    ConfigObjectSection("user_preferences", "user_preference", default_sec_grp=False),
 )
 ALL_CONFIG_SECTIONS = PRE_SERVICE_CONFIG_SECTIONS + POST_SERVICE_CONFIG_SECTIONS
 CONFIG_SECTIONS_BY_SECTION = {section.section: section for section in ALL_CONFIG_SECTIONS}
 CONFIG_SECTIONS_BY_OBJECT_TYPE = {section.object_type: section for section in ALL_CONFIG_SECTIONS}
-UNSUPPORTED_CLEANUP_SECTIONS = {
-    "custom_content_packs": "content-pack authorship cleanup can remove packaged authoring state and is not supported by cleanup-apply.",
-    "glass_table_icons": "icon collection deletes use a special API and are not supported by cleanup-apply.",
-    "kpi_entity_thresholds": "KPI entity threshold deletes are excluded from cleanup-apply until rollback handling is implemented.",
+HIGH_RISK_CLEANUP_SECTIONS = {
+    "custom_content_packs": "content-pack authorship cleanup can remove packaged authoring state.",
+    "glass_table_icons": "icon collection deletes remove shared visual assets.",
+    "kpi_entity_thresholds": "KPI entity threshold deletes can remove per-entity alert tuning.",
 }
 CLEANUP_CONFIRMATION = "DELETE_UNMANAGED_ITSI_OBJECTS"
+HIGH_RISK_CLEANUP_CONFIRMATION = "DELETE_HIGH_RISK_ITSI_OBJECTS"
+PROTECTED_CLEANUP_KEYS = {
+    "default_itsi_security_group",
+    "itsi_example_kpi_collection",
+    "ItsiDefaultScheduledBackup",
+}
+PROTECTED_CLEANUP_KEY_PREFIXES = (
+    "da-itsi-",
+    "kpi_threshold_template_",
+    "sai-",
+    "vmware_",
+)
+PROTECTED_CLEANUP_TITLES_BY_SECTION = {
+    "backup_restore_jobs": {"Default Scheduled Backup"},
+    "correlation_searches": {
+        "BMC Remedy Bidirectional Ticketing",
+        "Bidirectional Ticketing",
+        "High Scale EA Backfill",
+        "Jira Bidirectional Ticketing",
+        "Monitor Critical Services Based on Health Score",
+        "Normalized Correlation Search",
+        "SNMP Traps",
+        "Splunk App for Infrastructure Alerts",
+    },
+    "entity_types": {
+        "*nix",
+        "Kubernetes Node",
+        "Kubernetes Pod",
+        "Unix/Linux Add-on",
+        "Windows",
+    },
+    "kpi_templates": {"Templates"},
+    "teams": {"Global"},
+}
+PROTECTED_CLEANUP_TITLE_PREFIXES = (
+    "DA-ITSI-",
+    "SAI:",
+    "Splunk AppDynamics ",
+    "VMware ",
+)
 
 CONFIG_OBJECT_RESERVED_KEYS = {"payload", "title", "description", "sec_grp", "object_type", "allow_restore"}
 ENTITY_RESERVED_KEYS = {
@@ -423,6 +474,20 @@ def _unique_nonblank_strings(values: Any, label: str) -> list[str]:
     return normalized
 
 
+def _nonempty_mapping(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or not value:
+        raise ValidationError(f"{label} must define a non-empty mapping.")
+    return deepcopy(value)
+
+
+def _first_nonblank_field(mapping: dict[str, Any], keys: tuple[str, ...], label: str) -> str:
+    for key in keys:
+        value = str(mapping.get(key) or "").strip()
+        if value:
+            return value
+    raise ValidationError(f"{label} must define one of: {', '.join(keys)}.")
+
+
 def _custom_threshold_window_ref(link_spec: dict[str, Any]) -> Any:
     for key in ("window", "custom_threshold_window"):
         if key in link_spec:
@@ -543,6 +608,15 @@ def _custom_threshold_payload_for_pairs(
         if kpi_ids:
             services.append({"_key": service_key, "kpi_ids": kpi_ids})
     return {"services": services}
+
+
+def _inventory_titles(items: list[dict[str, Any]]) -> list[str]:
+    titles = []
+    for item in items:
+        title = str(item.get("title") or item.get("name") or item.get("label") or item.get("id") or item.get("_key") or "").strip()
+        if title:
+            titles.append(title)
+    return sorted(titles)
 
 
 def _uses_preview_key(value: str) -> bool:
@@ -904,7 +978,10 @@ class NativeWorkflow:
 
     @staticmethod
     def _is_optional_list_unavailable(exc: Exception) -> bool:
-        return isinstance(exc, ValidationError) and "ITSI REST endpoint is unavailable" in str(exc)
+        if not isinstance(exc, ValidationError):
+            return False
+        message = str(exc)
+        return "ITSI REST endpoint is unavailable" in message or "feature is not enabled" in message.lower()
 
     def _list_objects_best_effort(
         self,
@@ -996,6 +1073,7 @@ class NativeWorkflow:
 
     def _inventory(self, spec: dict[str, Any]) -> NativeResult:
         result = NativeResult(mode="inventory")
+        inventory_options = spec.get("inventory", {}) if isinstance(spec.get("inventory"), dict) else {}
         inventory: dict[str, Any] = {"apps": {}, "objects": {}}
         for app in ("SA-ITOA", "itsi", "DA-ITSI-ContentLibrary"):
             if hasattr(self.client, "get_app_version"):
@@ -1034,6 +1112,66 @@ class NativeWorkflow:
                 }
             except Exception as exc:
                 inventory["content_packs"] = {"status": "unavailable", "message": str(exc)}
+        discovery: dict[str, Any] = {}
+        if hasattr(self.client, "itsi_supported_object_types"):
+            supported: dict[str, Any] = {}
+            for interface in ("itoa", "event_management", "maintenance", "backup_restore"):
+                try:
+                    items = self.client.itsi_supported_object_types(interface)
+                    supported[interface] = {"count": len(items), "titles": _inventory_titles(items)}
+                except Exception as exc:
+                    supported[interface] = {"status": "unavailable", "message": str(exc)}
+            discovery["supported_object_types"] = supported
+        if hasattr(self.client, "itsi_alias_list"):
+            try:
+                aliases = self.client.itsi_alias_list()
+                if isinstance(aliases, dict):
+                    alias_items = aliases.get("items") or aliases.get("aliases") or aliases.get("fields") or []
+                    discovery["aliases"] = {
+                        "count": len(alias_items) if isinstance(alias_items, list) else len(aliases),
+                        "fields": sorted(str(item) for item in alias_items) if isinstance(alias_items, list) else sorted(str(key) for key in aliases),
+                    }
+                else:
+                    discovery["aliases"] = {"count": 0, "fields": []}
+            except Exception as exc:
+                discovery["aliases"] = {"status": "unavailable", "message": str(exc)}
+        if hasattr(self.client, "notable_event_actions"):
+            try:
+                actions = self.client.notable_event_actions()
+                discovery["notable_event_actions"] = {"count": len(actions), "titles": _inventory_titles(actions)}
+            except Exception as exc:
+                discovery["notable_event_actions"] = {"status": "unavailable", "message": str(exc)}
+        if discovery:
+            inventory["discovery"] = discovery
+        if hasattr(self.client, "event_management_count"):
+            try:
+                inventory["event_management_counts"] = {
+                    "notable_event_group": self.client.event_management_count(
+                        "notable_event_group",
+                        inventory_options.get("notable_event_group_filter")
+                        if isinstance(inventory_options.get("notable_event_group_filter"), dict)
+                        else None,
+                    )
+                }
+            except Exception as exc:
+                inventory["event_management_counts"] = {"status": "unavailable", "message": str(exc)}
+        maintenance_keys = _unique_nonblank_strings(inventory_options.get("maintenance_object_keys"), "inventory.maintenance_object_keys")
+        if maintenance_keys:
+            maintenance_status: dict[str, Any] = {}
+            for object_key in maintenance_keys:
+                item: dict[str, Any] = {}
+                try:
+                    if hasattr(self.client, "active_maintenance_window"):
+                        item["active"] = self.client.active_maintenance_window(object_key)
+                    if hasattr(self.client, "maintenance_windows_count_for_object"):
+                        item["count"] = self.client.maintenance_windows_count_for_object(object_key)
+                    if hasattr(self.client, "maintenance_windows_for_object"):
+                        windows = self.client.maintenance_windows_for_object(object_key)
+                        item["titles"] = _inventory_titles(windows)
+                except Exception as exc:
+                    item = {"status": "unavailable", "message": str(exc)}
+                maintenance_status[object_key] = item
+            inventory["maintenance_status"] = maintenance_status
         result.inventory = inventory
         result.changes.append(ChangeRecord("inventory", "live ITSI", "read", "ok", "Collected read-only ITSI inventory."))
         return result
@@ -1064,16 +1202,56 @@ class NativeWorkflow:
         return hashlib.sha256(json.dumps(plan_identity, sort_keys=True).encode("utf-8")).hexdigest()[:16]
 
     @staticmethod
-    def _cleanup_support(section_name: str) -> tuple[bool, str | None]:
-        if section_name in UNSUPPORTED_CLEANUP_SECTIONS:
-            return False, UNSUPPORTED_CLEANUP_SECTIONS[section_name]
+    def _protected_cleanup_reason(section_name: str, candidate: dict[str, Any], allow_system_objects: bool) -> str | None:
+        if allow_system_objects:
+            return None
+        key = str(candidate.get("key") or "").strip()
+        title = str(candidate.get("title") or "").strip()
+        key_lower = key.lower()
+        if key in PROTECTED_CLEANUP_KEYS or key_lower in {item.lower() for item in PROTECTED_CLEANUP_KEYS}:
+            return "candidate looks like a default ITSI object; set cleanup.allow_system_objects: true only after manual review."
+        if any(key_lower.startswith(prefix) for prefix in PROTECTED_CLEANUP_KEY_PREFIXES):
+            return "candidate looks like shipped ITSI/content-pack content; set cleanup.allow_system_objects: true only after manual review."
+        if title in PROTECTED_CLEANUP_TITLES_BY_SECTION.get(section_name, set()):
+            return "candidate title matches known default ITSI content; set cleanup.allow_system_objects: true only after manual review."
+        if any(title.startswith(prefix) for prefix in PROTECTED_CLEANUP_TITLE_PREFIXES):
+            return "candidate title looks like shipped ITSI/content-pack content; set cleanup.allow_system_objects: true only after manual review."
+        return None
+
+    @classmethod
+    def _cleanup_support(
+        cls,
+        section_name: str,
+        candidate: dict[str, Any],
+        allow_system_objects: bool = False,
+        allow_high_risk: bool = False,
+    ) -> tuple[bool, str | None]:
+        if section_name in HIGH_RISK_CLEANUP_SECTIONS and not allow_high_risk:
+            return False, (
+                f"{HIGH_RISK_CLEANUP_SECTIONS[section_name]} "
+                f"Set cleanup.allow_high_risk_deletes: true and cleanup.confirm_high_risk: {HIGH_RISK_CLEANUP_CONFIRMATION} after manual review."
+            )
+        if not str(candidate.get("key") or "").strip():
+            return False, "cleanup-apply requires a stable object key; this live object did not expose one."
+        protected_reason = cls._protected_cleanup_reason(section_name, candidate, allow_system_objects)
+        if protected_reason:
+            return False, protected_reason
         return True, None
 
     def _build_prune_plan(self, spec: dict[str, Any], result: NativeResult | None = None) -> dict[str, Any]:
+        cleanup = spec.get("cleanup") if isinstance(spec.get("cleanup"), dict) else {}
+        allow_system_objects = bool_from_any(cleanup.get("allow_system_objects")) if isinstance(cleanup, dict) else False
+        allow_high_risk = (
+            bool_from_any(cleanup.get("allow_high_risk_deletes"))
+            and str(cleanup.get("confirm_high_risk") or "") == HIGH_RISK_CLEANUP_CONFIRMATION
+        ) if isinstance(cleanup, dict) else False
         plan: dict[str, Any] = {
             "destructive_apply_supported": True,
             "cleanup_mode": "cleanup-apply",
             "confirmation": CLEANUP_CONFIRMATION,
+            "high_risk_confirmation": HIGH_RISK_CLEANUP_CONFIRMATION,
+            "system_object_cleanup_allowed": allow_system_objects,
+            "high_risk_cleanup_allowed": allow_high_risk,
             "candidates": [],
             "unavailable_sections": [],
         }
@@ -1087,17 +1265,18 @@ class NativeWorkflow:
             for live in self._list_objects_best_effort(section, result, plan["unavailable_sections"]):
                 title = str(live.get(section.identity_field) or live.get("title") or live.get("name") or "").strip()
                 if title and title not in desired_by_section[section.section]:
-                    supported, reason = self._cleanup_support(section.section)
                     candidate = {
                         "section": section.section,
                         "object_type": section.object_type,
                         "interface": section.interface,
                         "title": title,
                         "key": live.get("_key"),
-                        "delete_supported": supported,
-                        "unsupported_reason": reason,
-                        "action": "would_delete_if_cleanup_apply_is_confirmed" if supported else "manual_review_required",
                     }
+                    supported, reason = self._cleanup_support(section.section, candidate, allow_system_objects, allow_high_risk)
+                    candidate["high_risk_delete"] = section.section in HIGH_RISK_CLEANUP_SECTIONS
+                    candidate["delete_supported"] = supported
+                    candidate["unsupported_reason"] = reason
+                    candidate["action"] = "would_delete_if_cleanup_apply_is_confirmed" if supported else "manual_review_required"
                     candidate["candidate_id"] = self._candidate_id(candidate)
                     plan["candidates"].append(candidate)
         for section_name, object_type in (("entities", "entity"), ("services", "service")):
@@ -1112,10 +1291,12 @@ class NativeWorkflow:
                         "interface": "itoa",
                         "title": title,
                         "key": live.get("_key"),
-                        "delete_supported": True,
-                        "unsupported_reason": None,
-                        "action": "would_delete_if_cleanup_apply_is_confirmed",
                     }
+                    supported, reason = self._cleanup_support(section_name, candidate, allow_system_objects, allow_high_risk)
+                    candidate["high_risk_delete"] = section_name in HIGH_RISK_CLEANUP_SECTIONS
+                    candidate["delete_supported"] = supported
+                    candidate["unsupported_reason"] = reason
+                    candidate["action"] = "would_delete_if_cleanup_apply_is_confirmed" if supported else "manual_review_required"
                     candidate["candidate_id"] = self._candidate_id(candidate)
                     plan["candidates"].append(candidate)
         plan["candidates"] = sorted(
@@ -1123,13 +1304,21 @@ class NativeWorkflow:
             key=lambda item: (str(item.get("section")), str(item.get("title")), str(item.get("key"))),
         )
         plan["plan_id"] = self._plan_id(plan["candidates"])
+        example_candidate_ids = [
+            candidate["candidate_id"]
+            for candidate in plan["candidates"]
+            if candidate.get("delete_supported") and not candidate.get("high_risk_delete")
+        ][:1]
         plan["cleanup_spec_example"] = {
             "cleanup": {
                 "allow_destroy": True,
                 "confirm": CLEANUP_CONFIRMATION,
                 "plan_id": plan["plan_id"],
                 "max_deletes": 1,
-                "candidate_ids": [candidate["candidate_id"] for candidate in plan["candidates"][:1] if candidate.get("delete_supported")],
+                "candidate_ids": example_candidate_ids,
+                "allow_high_risk_deletes": False,
+                "confirm_high_risk": HIGH_RISK_CLEANUP_CONFIRMATION,
+                "high_risk_candidate_ids": [],
             }
         }
         return plan
@@ -1178,10 +1367,26 @@ class NativeWorkflow:
         if unknown:
             raise ValidationError(f"cleanup.candidate_ids contains candidates not present in the current prune plan: {', '.join(unknown)}.")
         selected = [candidates_by_id[candidate_id] for candidate_id in sorted(candidate_ids)]
+        high_risk = [candidate for candidate in selected if candidate.get("high_risk_delete")]
+        if high_risk:
+            if not bool_from_any(cleanup.get("allow_high_risk_deletes")):
+                raise ValidationError("cleanup-apply selected high-risk candidates and requires cleanup.allow_high_risk_deletes: true.")
+            if str(cleanup.get("confirm_high_risk") or "") != HIGH_RISK_CLEANUP_CONFIRMATION:
+                raise ValidationError(
+                    f"cleanup-apply selected high-risk candidates and requires cleanup.confirm_high_risk: {HIGH_RISK_CLEANUP_CONFIRMATION}."
+                )
         unsupported = [candidate for candidate in selected if not candidate.get("delete_supported")]
         if unsupported:
             titles = ", ".join(str(candidate.get("title")) for candidate in unsupported)
             raise ValidationError(f"cleanup-apply selected unsupported cleanup candidates: {titles}.")
+        if high_risk:
+            high_risk_ids = set(_unique_nonblank_strings(cleanup.get("high_risk_candidate_ids"), "cleanup.high_risk_candidate_ids"))
+            missing_high_risk_ids = sorted(str(candidate["candidate_id"]) for candidate in high_risk if candidate["candidate_id"] not in high_risk_ids)
+            if missing_high_risk_ids:
+                raise ValidationError(
+                    "cleanup-apply high-risk deletes require each selected high-risk candidate id to also be listed in "
+                    f"cleanup.high_risk_candidate_ids: {', '.join(missing_high_risk_ids)}."
+                )
         max_deletes = int(cleanup.get("max_deletes") or 0)
         if max_deletes <= 0:
             raise ValidationError("cleanup-apply requires cleanup.max_deletes to be a positive integer.")
@@ -1689,6 +1894,18 @@ class NativeWorkflow:
             "kpi_entity_threshold_recommendations": "kpi_entity_threshold_recommendation",
             "retire_retirable_entities": "entity_retire_retirable",
             "entity_retire_all_retirable": "entity_retire_retirable",
+            "episode_update": "notable_event_group_update",
+            "notable_event_group": "notable_event_group_update",
+            "update_notable_event_group": "notable_event_group_update",
+            "episode_action_execute": "notable_event_action_execute",
+            "execute_notable_event_action": "notable_event_action_execute",
+            "notable_event_actions_execute": "notable_event_action_execute",
+            "episode_ticket_link": "ticket_link",
+            "link_episode_ticket": "ticket_link",
+            "episode_ticket_unlink": "ticket_unlink",
+            "unlink_episode_ticket": "ticket_unlink",
+            "episode_export": "episode_export_create",
+            "create_episode_export": "episode_export_create",
         }
         return aliases.get(action, action)
 
@@ -1699,6 +1916,10 @@ class NativeWorkflow:
             or action_spec.get("name")
             or action_spec.get("window")
             or action_spec.get("custom_threshold_window")
+            or action_spec.get("action_name")
+            or action_spec.get("ticket_id")
+            or action_spec.get("group_key")
+            or action_spec.get("episode_id")
             or action
         )
 
@@ -1724,6 +1945,81 @@ class NativeWorkflow:
         if not isinstance(payload, dict) or not payload:
             raise ValidationError(f"operational_actions '{action}' must define a non-empty payload mapping.")
         return deepcopy(payload)
+
+    @staticmethod
+    def _notable_event_group_update(action_spec: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        group_key = _first_nonblank_field(
+            action_spec,
+            ("group_key", "episode_key", "notable_event_group_key", "_key", "key"),
+            "notable_event_group_update",
+        )
+        payload = _nonempty_mapping(action_spec.get("payload"), "notable_event_group_update payload")
+        if any(field in payload for field in ("status", "state", "severity")) and not bool_from_any(action_spec.get("allow_episode_field_change")):
+            raise ValidationError(
+                "notable_event_group_update changes episode status/state/severity. "
+                "Set allow_episode_field_change: true after explicit operator review."
+            )
+        return group_key, payload
+
+    @staticmethod
+    def _notable_event_action(action_spec: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        if not bool_from_any(action_spec.get("allow_notable_event_action_execute")):
+            raise ValidationError(
+                "notable_event_action_execute can trigger ITSI actions. "
+                "Set allow_notable_event_action_execute: true after explicit operator review."
+            )
+        action_name = _first_nonblank_field(
+            action_spec,
+            ("action_name", "notable_event_action", "name"),
+            "notable_event_action_execute",
+        )
+        payload = deepcopy(action_spec.get("payload")) if isinstance(action_spec.get("payload"), dict) else {}
+        if "params" in action_spec:
+            if not isinstance(action_spec["params"], dict):
+                raise ValidationError("notable_event_action_execute params must be a mapping.")
+            payload["params"] = deepcopy(action_spec["params"])
+        payload.setdefault("params", {})
+        ids_source = action_spec.get("group_ids") or action_spec.get("episode_ids") or action_spec.get("notable_event_group_ids") or payload.get("ids")
+        ids = _unique_nonblank_strings(ids_source, "notable_event_action_execute ids")
+        if not ids:
+            raise ValidationError("notable_event_action_execute must define group_ids or payload.ids.")
+        payload["ids"] = ids
+        return action_name, payload
+
+    @staticmethod
+    def _ticket_link_payload(action_spec: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
+        payload = deepcopy(action_spec.get("payload")) if isinstance(action_spec.get("payload"), dict) else {}
+        group_key = str(action_spec.get("group_key") or action_spec.get("episode_key") or action_spec.get("notable_event_group_key") or "").strip() or None
+        for source, target in (
+            ("episode_id", "id"),
+            ("notable_event_group_id", "id"),
+            ("ticketing_system", "ticket_system"),
+            ("ticket_system", "ticket_system"),
+            ("ticket_id", "ticket_id"),
+            ("ticket_url", "ticket_url"),
+            ("ticket_title", "ticket_title"),
+            ("status", "status"),
+        ):
+            if action_spec.get(source) is not None:
+                payload[target] = action_spec[source]
+        if group_key and "id" not in payload and "ids" not in payload:
+            payload["id"] = group_key
+        if not payload:
+            raise ValidationError("ticket_link must define a payload or ticket fields.")
+        return group_key, payload
+
+    @staticmethod
+    def _ticket_unlink_fields(action_spec: dict[str, Any]) -> tuple[str, str, str]:
+        if not bool_from_any(action_spec.get("allow_ticket_unlink")):
+            raise ValidationError("ticket_unlink removes an ITSI ticket association. Set allow_ticket_unlink: true after explicit operator review.")
+        group_key = _first_nonblank_field(
+            action_spec,
+            ("group_key", "episode_key", "notable_event_group_key", "episode_id"),
+            "ticket_unlink",
+        )
+        ticketing_system = _first_nonblank_field(action_spec, ("ticketing_system", "ticket_system"), "ticket_unlink")
+        ticket_id = _first_nonblank_field(action_spec, ("ticket_id",), "ticket_unlink")
+        return group_key, ticketing_system, ticket_id
 
     def _apply_operational_actions(
         self,
@@ -1804,6 +2100,79 @@ class NativeWorkflow:
                     )
                 )
                 continue
+            if action == "notable_event_group_update":
+                group_key, payload = self._notable_event_group_update(action_spec)
+                if apply:
+                    self.client.update_notable_event_group(group_key, payload)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        "Updated notable event group." if apply else "Would update notable event group.",
+                        key=group_key,
+                    )
+                )
+                continue
+            if action == "notable_event_action_execute":
+                action_name, payload = self._notable_event_action(action_spec)
+                if apply:
+                    self.client.execute_notable_event_action(action_name, payload)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        f"Executed notable event action '{action_name}'." if apply else f"Would execute notable event action '{action_name}'.",
+                    )
+                )
+                continue
+            if action == "ticket_link":
+                group_key, payload = self._ticket_link_payload(action_spec)
+                if apply:
+                    self.client.link_episode_ticket(payload, group_key=group_key)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        "Linked ticket to ITSI episode." if apply else "Would link ticket to ITSI episode.",
+                        key=group_key,
+                    )
+                )
+                continue
+            if action == "ticket_unlink":
+                group_key, ticketing_system, ticket_id = self._ticket_unlink_fields(action_spec)
+                if apply:
+                    self.client.unlink_episode_ticket(group_key, ticketing_system, ticket_id)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        "Unlinked ticket from ITSI episode." if apply else "Would unlink ticket from ITSI episode.",
+                        key=group_key,
+                    )
+                )
+                continue
+            if action == "episode_export_create":
+                payload = _nonempty_mapping(action_spec.get("payload"), "episode_export_create payload")
+                if apply:
+                    self.client.create_episode_export(payload)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        "Created episode export job." if apply else "Would create episode export job.",
+                    )
+                )
+                continue
             dispatch = {
                 "entity_retire": self.client.retire_entities,
                 "entity_restore": self.client.restore_entities,
@@ -1866,6 +2235,16 @@ class NativeWorkflow:
                             "entity_retire_retirable retires every entity currently marked retirable. "
                             "Set retire_all_retirable: true after explicit operator review."
                         )
+                elif action == "notable_event_group_update":
+                    self._notable_event_group_update(action_spec)
+                elif action == "notable_event_action_execute":
+                    self._notable_event_action(action_spec)
+                elif action == "ticket_link":
+                    self._ticket_link_payload(action_spec)
+                elif action == "ticket_unlink":
+                    self._ticket_unlink_fields(action_spec)
+                elif action == "episode_export_create":
+                    _nonempty_mapping(action_spec.get("payload"), "episode_export_create payload")
                 elif action in {
                     "entity_retire",
                     "entity_restore",

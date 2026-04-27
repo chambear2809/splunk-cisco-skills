@@ -196,7 +196,8 @@ Default render target:
 
 The rendered bundle contains:
 - `.cursor/mcp.json` for Cursor
-- `run-splunk-mcp.sh` for the stdio-to-HTTP bridge
+- `run-splunk-mcp.sh` as a shell stdio-to-HTTP bridge
+- `run-splunk-mcp.js` as the Node bridge used by Cursor, Codex, and Claude Code registrations
 - `.env.splunk-mcp.example`
 - `.env.splunk-mcp` when a token file is supplied
 - `register-codex-mcp.sh` to sync a portable Codex launcher bundle under `~/.codex/mcp-bridges/`
@@ -211,8 +212,8 @@ When `--render-clients` runs, the skill also applies client setup by default:
 Use `--no-register-codex`, `--no-configure-cursor`, or `--no-configure-claude` to opt
 out of any client update while still rendering the bundle.
 
-`mcp-remote` must be on `PATH` for the wrapper script and auto-applied client
-registrations to work.
+The shell wrapper expects `mcp-remote` on `PATH`; the Node wrapper used by client
+registrations prefers `mcp-remote` on `PATH` and falls back to `npx mcp-remote`.
 
 ### Step 6: Validate
 
@@ -249,7 +250,7 @@ See [reference.md](reference.md) for the exact implications.
 2. **Token output is secret material**: write encrypted bearer tokens to local
    files, never to chat or tracked repo files.
 3. **The shared wrapper is the most portable client path**: Cursor, Codex, and
-   Claude Code can all use the rendered `run-splunk-mcp.sh` bridge via `mcp-remote`.
+   Claude Code can all use the rendered `run-splunk-mcp.js` bridge via `mcp-remote`.
 4. **`mcp.conf` is the supported remote configuration surface**: use it for
    runtime controls such as row limits, TLS verification, and token policy.
 5. **The app needs search-tier placement**: it exposes `/services/mcp` and
@@ -257,16 +258,16 @@ See [reference.md](reference.md) for the exact implications.
 
 ## Cursor IDE Integration
 
-The repo's `.cursor/mcp.json` points to `splunk-mcp-rendered/run-splunk-mcp.sh`.
-**This path does not exist until the render step runs.** Cursor will silently
-skip the MCP server if the path is missing.
+The repo's `.cursor/mcp.json` points to `splunk-mcp-rendered/run-splunk-mcp.js`.
+The bridge wrapper is tracked, but the live `.env.splunk-mcp` token file is
+local-only and does not exist until the render/token step runs.
 
 To activate Splunk MCP in Cursor:
 
 1. Complete steps 1–5 above (install, configure, mint token, render bundle).
-2. Verify the rendered path exists:
+2. Verify the local token env file exists:
    ```bash
-   ls splunk-mcp-rendered/run-splunk-mcp.sh
+   ls splunk-mcp-rendered/.env.splunk-mcp
    ```
 3. Restart or reload Cursor so it picks up the new `.cursor/mcp.json` entry.
 
@@ -276,16 +277,16 @@ If `--cursor-workspace` was used during render, the workspace's own
 
 ## Claude Code Integration
 
-The repo's `.mcp.json` points to `splunk-mcp-rendered/run-splunk-mcp.sh`.
-**This path does not exist until the render step runs.** Claude Code will not
-load the MCP server if the rendered script is missing.
+The repo's `.mcp.json` points to `splunk-mcp-rendered/run-splunk-mcp.js`.
+The bridge wrapper is tracked, but the live `.env.splunk-mcp` token file is
+local-only and does not exist until the render/token step runs.
 
 To activate Splunk MCP in Claude Code:
 
 1. Complete steps 1–5 above (install, configure, mint token, render bundle).
-2. Verify the rendered path exists:
+2. Verify the local token env file exists:
    ```bash
-   ls splunk-mcp-rendered/run-splunk-mcp.sh
+   ls splunk-mcp-rendered/.env.splunk-mcp
    ```
 3. Restart the Claude Code session so it picks up the `.mcp.json` entry.
 

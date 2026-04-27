@@ -40,7 +40,10 @@ class SplunkRestClient:
         base_url = str(connection.get("base_url") or os.environ.get("SPLUNK_SEARCH_API_URI") or os.environ.get("SPLUNK_URI") or "").strip()
         if not base_url:
             raise ValidationError("Missing Splunk base URL. Set connection.base_url or SPLUNK_SEARCH_API_URI.")
-        verify_ssl = bool_from_any(connection.get("verify_ssl"), default=True)
+        verify_ssl_source = connection.get("verify_ssl")
+        if verify_ssl_source is None:
+            verify_ssl_source = os.environ.get("SPLUNK_VERIFY_SSL")
+        verify_ssl = bool_from_any(verify_ssl_source, default=True)
         session_key = cls._read_secret(connection.get("session_key_env"), "SPLUNK_SESSION_KEY")
         username = cls._read_secret(connection.get("username_env"), "SPLUNK_USERNAME")
         password = cls._read_secret(connection.get("password_env"), "SPLUNK_PASSWORD")
@@ -264,6 +267,39 @@ class SplunkRestClient:
             f"Checked: {checked}. Confirm Splunk IT Service Intelligence (SA-ITOA) is installed on this instance."
         ) from last_missing
 
+    def _request_itsi_interface_path(
+        self,
+        method: str,
+        interface: str,
+        suffix: str,
+        params: dict[str, Any] | None = None,
+        payload: Any = None,
+    ) -> Any:
+        last_missing: KeyError | None = None
+        checked_paths: list[str] = []
+        normalized_suffix = suffix.lstrip("/")
+        for base_path in self._itsi_interface_base_candidates(interface):
+            path = f"{base_path}/{normalized_suffix}"
+            checked_paths.append(path)
+            try:
+                return self._request(method, path, params=params, payload=payload)
+            except KeyError as exc:
+                last_missing = exc
+        checked = ", ".join(checked_paths)
+        raise ValidationError(
+            "ITSI REST endpoint is unavailable. "
+            f"Checked: {checked}. Confirm Splunk IT Service Intelligence (SA-ITOA) is installed on this instance."
+        ) from last_missing
+
+    def _request_event_management_path(
+        self,
+        method: str,
+        suffix: str,
+        params: dict[str, Any] | None = None,
+        payload: Any = None,
+    ) -> Any:
+        return self._request_itsi_interface_path(method, "event_management", suffix, params=params, payload=payload)
+
     @staticmethod
     def _itsi_filter_param(interface: str) -> str:
         if interface == "event_management":
@@ -307,6 +343,31 @@ class SplunkRestClient:
         params: dict[str, Any] | None = {"count": 0} if interface in {"itoa", "content_pack_authorship"} else None
         response = self._request_itsi_object("GET", interface, object_type, params=params)
         return self._normalize_entries(response)
+
+    def itsi_supported_object_types(self, interface: str = "itoa") -> list[dict[str, Any]]:
+        response = self._request_itsi_object("GET", interface, "get_supported_object_types")
+        if isinstance(response, list):
+            return [
+                item if isinstance(item, dict) else {"name": str(item), "title": str(item)}
+                for item in response
+                if isinstance(item, dict) or str(item).strip()
+            ]
+        return self._normalize_entries(response)
+
+    def itsi_alias_list(self) -> dict[str, Any]:
+        response = self._request_itsi_object("GET", "itoa", "get_alias_list")
+        return response if isinstance(response, dict) else {"items": response}
+
+    def notable_event_actions(self) -> list[dict[str, Any]]:
+        response = self._request_itsi_object("GET", "event_management", "notable_event_actions")
+        return self._normalize_entries(response)
+
+    def event_management_count(self, object_type: str, filter_data: dict[str, Any] | None = None) -> int | None:
+        params = {"filter_data": json.dumps(filter_data)} if filter_data else None
+        response = self._request_event_management_path("GET", f"{quote(object_type)}/count", params=params)
+        if isinstance(response, dict) and "count" in response:
+            return int(response["count"])
+        return None
 
     def get_object(self, object_type: str, key: str, interface: str = "itoa") -> dict[str, Any] | None:
         try:
@@ -375,8 +436,6 @@ class SplunkRestClient:
         )
 
     def delete_object(self, object_type: str, key: str, interface: str = "itoa") -> dict[str, Any]:
-        if interface == "icon_collection":
-            raise ValidationError("Cleanup deletion for icon_collection is not supported by this skill.")
         response = self._request_itsi_object("DELETE", interface, object_type, key=key)
         return response if isinstance(response, dict) else {}
 
@@ -501,6 +560,57 @@ class SplunkRestClient:
                 f"ITSI REST endpoint '{path}' is unavailable. Confirm Splunk IT Service Intelligence (SA-ITOA) is installed on this instance."
             ) from exc
         return response if isinstance(response, dict) else {}
+
+    def update_notable_event_group(self, group_key: str, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request_itsi_object(
+            "POST",
+            "event_management",
+            "notable_event_group",
+            key=group_key,
+            params={"is_partial_data": 1},
+            payload=payload,
+        )
+        return response if isinstance(response, dict) else {}
+
+    def execute_notable_event_action(self, action_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request_itsi_object(
+            "POST",
+            "event_management",
+            "notable_event_actions",
+            key=action_name,
+            payload=payload,
+        )
+        return response if isinstance(response, dict) else {}
+
+    def link_episode_ticket(self, payload: dict[str, Any], group_key: str | None = None) -> dict[str, Any]:
+        suffix = "ticketing"
+        if group_key:
+            suffix = f"{suffix}/{quote(group_key)}"
+        response = self._request_event_management_path("POST", suffix, payload=payload)
+        return response if isinstance(response, dict) else {}
+
+    def unlink_episode_ticket(self, group_key: str, ticketing_system: str, ticket_id: str) -> dict[str, Any]:
+        suffix = f"ticketing/{quote(group_key)}/{quote(ticketing_system)}/{quote(ticket_id)}"
+        response = self._request_event_management_path("DELETE", suffix)
+        return response if isinstance(response, dict) else {}
+
+    def create_episode_export(self, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request_itsi_object("POST", "event_management", "episode_export", payload=payload)
+        return response if isinstance(response, dict) else {}
+
+    def active_maintenance_window(self, object_key: str) -> dict[str, Any]:
+        response = self._request_itsi_interface_path("GET", "maintenance", f"get_active_maintenance_window/{quote(object_key)}")
+        return response if isinstance(response, dict) else {"items": response}
+
+    def maintenance_windows_for_object(self, object_key: str) -> list[dict[str, Any]]:
+        response = self._request_itsi_interface_path("GET", "maintenance", f"get_maintenance_windows/{quote(object_key)}")
+        return self._normalize_entries(response)
+
+    def maintenance_windows_count_for_object(self, object_key: str) -> int | None:
+        response = self._request_itsi_interface_path("GET", "maintenance", f"get_maintenance_windows/count/{quote(object_key)}")
+        if isinstance(response, dict) and "count" in response:
+            return int(response["count"])
+        return None
 
     @staticmethod
     def _content_pack_base_candidates() -> list[str]:

@@ -12,8 +12,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from lib.common import SkillError, load_json
-from lib.native import NativeWorkflow
+from lib.common import SkillError, load_json  # noqa: E402
+from lib.native import NativeWorkflow  # noqa: E402
 
 
 class OfflineNativeClient:
