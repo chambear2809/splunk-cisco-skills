@@ -26,7 +26,6 @@ Usage: $(basename "$0") [OPTIONS]
 Required:
   --name NAME                   Analytics connection name
   --global-account-name NAME    AppDynamics global analytics account name
-  --analytics-secret SECRET     Analytics API secret
   --analytics-secret-file FILE  Read analytics API secret from FILE
 
 Optional:
@@ -48,7 +47,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --name) require_arg "$1" $# || exit 1; ANALYTICS_NAME="$2"; shift 2 ;;
         --global-account-name) require_arg "$1" $# || exit 1; GLOBAL_ACCOUNT_NAME="$2"; shift 2 ;;
-        --analytics-secret) require_arg "$1" $# || exit 1; echo "WARNING: --analytics-secret exposes secrets in process listings. Prefer --analytics-secret-file." >&2; ANALYTICS_SECRET="$2"; shift 2 ;;
+        --analytics-secret) require_arg "$1" $# || exit 1; reject_secret_arg "$1" "--analytics-secret-file" || exit 1 ;;
         --analytics-secret-file) require_arg "$1" $# || exit 1; ANALYTICS_SECRET=$(read_secret_file "$2"); shift 2 ;;
         --endpoint) require_arg "$1" $# || exit 1; ANALYTICS_ENDPOINT="$2"; shift 2 ;;
         --onprem-url) require_arg "$1" $# || exit 1; ONPREM_ANALYTICS_URL="$2"; shift 2 ;;
@@ -62,7 +61,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${ANALYTICS_NAME}" || -z "${GLOBAL_ACCOUNT_NAME}" || -z "${ANALYTICS_SECRET}" ]]; then
-    log "ERROR: --name, --global-account-name, and --analytics-secret (or --analytics-secret-file) are required"
+    log "ERROR: --name, --global-account-name, and --analytics-secret-file are required"
     exit 1
 fi
 

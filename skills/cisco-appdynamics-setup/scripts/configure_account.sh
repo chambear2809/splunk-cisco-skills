@@ -24,7 +24,6 @@ Required:
   --name NAME                Controller connection name
   --controller-url URL       AppDynamics controller URL
   --client-name NAME         AppDynamics API client name
-  --client-secret SECRET     AppDynamics API client secret
   --client-secret-file FILE  Read client secret from FILE
 
 Optional:
@@ -45,7 +44,7 @@ while [[ $# -gt 0 ]]; do
         --name) require_arg "$1" $# || exit 1; ACCT_NAME="$2"; shift 2 ;;
         --controller-url) require_arg "$1" $# || exit 1; CONTROLLER_URL="$2"; shift 2 ;;
         --client-name) require_arg "$1" $# || exit 1; CLIENT_NAME="$2"; shift 2 ;;
-        --client-secret) require_arg "$1" $# || exit 1; echo "WARNING: --client-secret exposes secrets in process listings. Prefer --client-secret-file." >&2; CLIENT_SECRET="$2"; shift 2 ;;
+        --client-secret) require_arg "$1" $# || exit 1; reject_secret_arg "$1" "--client-secret-file" || exit 1 ;;
         --client-secret-file) require_arg "$1" $# || exit 1; CLIENT_SECRET=$(read_secret_file "$2"); shift 2 ;;
         --create-inputs) require_arg "$1" $# || exit 1; CREATE_INPUTS="$2"; shift 2 ;;
         --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
@@ -55,7 +54,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${ACCT_NAME}" || -z "${CONTROLLER_URL}" || -z "${CLIENT_NAME}" || -z "${CLIENT_SECRET}" ]]; then
-    log "ERROR: --name, --controller-url, --client-name, and --client-secret (or --client-secret-file) are required"
+    log "ERROR: --name, --controller-url, --client-name, and --client-secret-file are required"
     exit 1
 fi
 

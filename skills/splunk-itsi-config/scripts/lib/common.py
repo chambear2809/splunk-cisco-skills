@@ -26,6 +26,17 @@ def write_json(path: str | Path, payload: Any) -> None:
     Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+_YAML_RESERVED_PLAIN_VALUES = {"true", "false", "null", "yes", "no", "on", "off", "y", "n"}
+
+
+def _yaml_plain_string_is_safe(text: str, pattern: str) -> bool:
+    return (
+        bool(re.fullmatch(pattern, text))
+        and bool(re.match(r"[A-Za-z_]", text))
+        and text.lower() not in _YAML_RESERVED_PLAIN_VALUES
+    )
+
+
 def _yaml_scalar(value: Any) -> str:
     if value is None:
         return "null"
@@ -36,18 +47,14 @@ def _yaml_scalar(value: Any) -> str:
     text = str(value)
     if text == "":
         return '""'
-    if (
-        text[:1] not in {"@", "`", ":"}
-        and re.fullmatch(r"[A-Za-z0-9_./:@-]+", text)
-        and text.lower() not in {"true", "false", "null", "yes", "no", "on", "off"}
-    ):
+    if _yaml_plain_string_is_safe(text, r"[A-Za-z0-9_./:@-]+"):
         return text
     return json.dumps(text)
 
 
 def _yaml_key(value: Any) -> str:
     text = str(value)
-    if re.fullmatch(r"[A-Za-z0-9_.-]+", text) and text.lower() not in {"true", "false", "null", "yes", "no", "on", "off"}:
+    if _yaml_plain_string_is_safe(text, r"[A-Za-z0-9_.-]+"):
         return text
     return json.dumps(text)
 

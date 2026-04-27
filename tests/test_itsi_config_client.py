@@ -513,7 +513,7 @@ class SplunkRestClientTests(unittest.TestCase):
         self.assertEqual(
             calls,
             [
-                ("GET", "/services/SA-ITOA/v1/icon_collection", {"filter": '{"title": "Router"}'}, None),
+                ("GET", "/services/SA-ITOA/v1/icon_collection", None, None),
                 ("PUT", "/services/SA-ITOA/v1/icon_collection", None, [{"title": "Router", "svg_path": "M0 0h10v10H0z"}]),
                 ("PUT", "/services/SA-ITOA/v1/icon_collection", None, [{"title": "Router", "svg_path": "M1 1h8v8H1z", "_key": "icon:1"}]),
                 ("DELETE", "/services/SA-ITOA/v1/icon_collection/icon%3A1", None, None),

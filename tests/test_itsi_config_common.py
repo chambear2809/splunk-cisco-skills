@@ -24,6 +24,13 @@ class ItsiCommonTests(unittest.TestCase):
                     "payload": {
                         "dispatch.latest_time": "@m",
                         "eai:acl": {"app": "SA-ITOA"},
+                        "date_key": "2024-01-01",
+                        "numeric_string": "123",
+                        "float_string": "1.5",
+                        "zero_string": "0",
+                        "ip_string": "192.0.2.10",
+                        "time_string": "12:34",
+                        "2024-01-01": "date-shaped key",
                     },
                 }
             ]

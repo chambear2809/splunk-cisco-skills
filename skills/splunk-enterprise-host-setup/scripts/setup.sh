@@ -771,6 +771,31 @@ shcluster_label = ${SHCLUSTER_LABEL}
 EOF
 }
 
+render_shc_member_server_conf() {
+    local local_mgmt_uri="$1"
+
+    cat <<EOF
+[shclustering]
+disabled = 0
+mgmt_uri = ${local_mgmt_uri}
+replication_port = ${SHC_REPLICATION_PORT}
+replication_factor = ${SHC_REPLICATION_FACTOR}
+conf_deploy_fetch_url = ${DEPLOYER_URI}
+pass4SymmKey = ${SHC_SECRET}
+shcluster_label = ${SHCLUSTER_LABEL}
+EOF
+
+    if [[ -n "${CLUSTER_MANAGER_URI}" ]]; then
+        cat <<EOF
+
+[clustering]
+mode = searchhead
+manager_uri = ${CLUSTER_MANAGER_URI}
+pass4SymmKey = ${IDXC_SECRET}
+EOF
+    fi
+}
+
 configure_base_role() {
     local needs_restart=false
 
@@ -844,20 +869,16 @@ configure_cluster_role() {
             ensure_prompted_value DEPLOYER_URI "Search head cluster deployer URI"
             local_mgmt_uri="https://${ADVERTISE_HOST}:${MGMT_PORT}"
 
-            run_splunk_authenticated \
-                "$(splunk_cli_cmd init shcluster-config -mgmt_uri "${local_mgmt_uri}" -replication_port "${SHC_REPLICATION_PORT}" -replication_factor "${SHC_REPLICATION_FACTOR}" -conf_deploy_fetch_url "${DEPLOYER_URI}" -secret "${SHC_SECRET}" -shcluster_label "${SHCLUSTER_LABEL}")"
-            restart_splunk
-
             if [[ -n "${CLUSTER_MANAGER_URI}" || -n "${IDXC_SECRET}" || -n "${IDXC_SECRET_FILE}" ]]; then
                 ensure_prompted_value CLUSTER_MANAGER_URI "Cluster manager URI"
                 if [[ -z "${IDXC_SECRET}" ]]; then
                     ensure_prompted_path IDXC_SECRET_FILE "Indexer cluster secret file path"
                     IDXC_SECRET="$(read_secret_file "${IDXC_SECRET_FILE}")"
                 fi
-                run_splunk_authenticated \
-                    "$(splunk_cli_cmd edit cluster-config -mode searchhead -manager_uri "${CLUSTER_MANAGER_URI}" -secret "${IDXC_SECRET}")"
-                restart_splunk
             fi
+
+            hbs_write_target_file "${EXECUTION_MODE}" "${SPLUNK_HOME}/etc/system/local/server.conf" "600" "$(render_shc_member_server_conf "${local_mgmt_uri}")"
+            restart_splunk
 
             if [[ "${BOOTSTRAP_SHC}" == "true" ]]; then
                 ensure_prompted_value SHC_MEMBERS "Search head cluster members list"

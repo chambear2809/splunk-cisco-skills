@@ -84,6 +84,28 @@ EOF
     [ "$status" -eq 1 ]
 }
 
+@test "_curl_config_escape keeps values off python argv" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    argv_log="${mock_dir}/python-argv.log"
+    cat > "${mock_dir}/python3" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${PYTHON_ARG_LOG}"
+exit 9
+EOF
+    chmod +x "${mock_dir}/python3"
+
+    export PYTHON_ARG_LOG="${argv_log}"
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+    result=$(_curl_config_escape $'tok"en\\value\r\n')
+    PATH="${old_path}"
+
+    [ "$result" = 'tok\"en\\value\r\n' ]
+    [ ! -e "${argv_log}" ]
+}
+
 # --- _urlencode ---
 
 @test "_urlencode encodes spaces and special chars" {

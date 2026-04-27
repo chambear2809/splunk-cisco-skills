@@ -145,6 +145,13 @@ require_arg() {
     fi
 }
 
+reject_secret_arg() {
+    local option="$1"
+    local file_option="$2"
+    log "ERROR: ${option} would expose a secret in process listings. Write the secret to a chmod 600 file and use ${file_option}."
+    return 1
+}
+
 verify_search_api_connectivity() {
     local uri="${1:-${SPLUNK_URI:-https://localhost:8089}}"
     local host port http_code
@@ -238,10 +245,12 @@ read_secret_file() {
 }
 
 _curl_config_escape() {
-    python3 - "$1" <<'PY'
-import sys
-print(sys.argv[1].replace('\\', '\\\\').replace('"', '\\"'))
-PY
+    local value="${1:-}"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    value="${value//$'\n'/\\n}"
+    value="${value//$'\r'/\\r}"
+    printf '%s' "${value}"
 }
 
 _is_splunk_package() {

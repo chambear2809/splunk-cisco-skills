@@ -602,6 +602,26 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
         self.assertIn('-K "${auth_config}"', script_text)
         self.assertIn('rm -f "${auth_config}"', script_text)
 
+    def test_configure_scripts_reject_direct_secret_cli_values(self):
+        cases = [
+            ("skills/cisco-catalyst-ta-setup/scripts/configure_account.sh", "--password", "--password-file"),
+            ("skills/cisco-catalyst-ta-setup/scripts/configure_account.sh", "--api-token", "--api-token-file"),
+            ("skills/cisco-dc-networking-setup/scripts/configure_account.sh", "--password", "--password-file"),
+            ("skills/cisco-appdynamics-setup/scripts/configure_account.sh", "--client-secret", "--client-secret-file"),
+            ("skills/cisco-appdynamics-setup/scripts/configure_analytics.sh", "--analytics-secret", "--analytics-secret-file"),
+            ("skills/cisco-intersight-setup/scripts/configure_account.sh", "--client-secret", "--client-secret-file"),
+            ("skills/cisco-meraki-ta-setup/scripts/configure_account.sh", "--api-key", "--api-key-file"),
+            ("skills/cisco-spaces-setup/scripts/configure_stream.sh", "--token", "--token-file"),
+        ]
+
+        for script, option, file_option in cases:
+            with self.subTest(script=script, option=option):
+                result = self.run_script_no_env(script, option, "not-a-real-secret")
+                self.assertNotEqual(result.returncode, 0)
+                output = result.stdout + result.stderr
+                self.assertIn(f"{option} would expose a secret in process listings", output)
+                self.assertIn(file_option, output)
+
 
     def test_catalyst_configure_account_no_verify_ssl(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1212,6 +1232,7 @@ EOF
             credentials_file = tmp_path / "credentials"
             password_file = tmp_path / "admin_password"
             shc_secret_file = tmp_path / "shc_secret"
+            idxc_secret_file = tmp_path / "idxc_secret"
             cmd_log = tmp_path / "splunk_args.log"
             stdin_log = tmp_path / "splunk_stdin.log"
             current_user = subprocess.check_output(["id", "-un"], text=True).strip()
@@ -1219,6 +1240,7 @@ EOF
             credentials_file.write_text("", encoding="utf-8")
             password_file.write_text("changeme\n", encoding="utf-8")
             shc_secret_file.write_text("shc-secret\n", encoding="utf-8")
+            idxc_secret_file.write_text("idxc-secret\n", encoding="utf-8")
 
             write_executable(
                 splunk_home / "bin" / "splunk",
@@ -1244,6 +1266,7 @@ EOF
             env.update(
                 {
                     "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_LOCAL_SUDO": "false",
                     "SPLUNK_CMD_LOG": str(cmd_log),
                     "SPLUNK_STDIN_LOG": str(stdin_log),
                 }
@@ -1259,25 +1282,32 @@ EOF
                 "--service-user", current_user,
                 "--admin-password-file", str(password_file),
                 "--shc-secret-file", str(shc_secret_file),
+                "--idxc-secret-file", str(idxc_secret_file),
                 "--deployer-uri", "https://deployer.example.com:8089",
+                "--cluster-manager-uri", "https://cm.example.com:8089",
                 "--current-shc-member-uri", "https://sh1.example.com:8089",
                 "--advertise-host", "sh2.example.com",
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
 
+            server_conf = splunk_home / "etc" / "system" / "local" / "server.conf"
+            self.assertTrue(server_conf.exists())
+            server_conf_text = server_conf.read_text(encoding="utf-8")
+            self.assertIn("mgmt_uri = https://sh2.example.com:8089", server_conf_text)
+            self.assertIn("conf_deploy_fetch_url = https://deployer.example.com:8089", server_conf_text)
+            self.assertIn("pass4SymmKey = shc-secret", server_conf_text)
+            self.assertIn("manager_uri = https://cm.example.com:8089", server_conf_text)
+            self.assertIn("pass4SymmKey = idxc-secret", server_conf_text)
+
             command_lines = cmd_log.read_text(encoding="utf-8").splitlines()
-            self.assertTrue(
-                any("init" in line and "shcluster-config" in line for line in command_lines),
-                msg=f"Expected init shcluster-config command, got: {command_lines}",
-            )
             self.assertTrue(
                 any("add" in line and "shcluster-member" in line for line in command_lines),
                 msg=f"Expected add shcluster-member command, got: {command_lines}",
             )
             self.assertTrue(
-                all("-auth" not in line for line in command_lines),
-                msg=f"Did not expect inline -auth arguments, got: {command_lines}",
+                all("-auth" not in line and "-secret" not in line and "shc-secret" not in line and "idxc-secret" not in line for line in command_lines),
+                msg=f"Did not expect inline auth or secret arguments, got: {command_lines}",
             )
 
             stdin_lines = stdin_log.read_text(encoding="utf-8")

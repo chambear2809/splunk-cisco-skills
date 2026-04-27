@@ -21,7 +21,6 @@ Usage: $(basename "$0") [OPTIONS]
 
 Required:
   --name NAME            Stream name (stanza identifier)
-  --token TOKEN          Cisco Spaces activation token
   --token-file FILE      Read activation token from FILE
   --region REGION        Region: io, eu, sg
 
@@ -39,7 +38,7 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --name) require_arg "$1" $# || exit 1; STREAM_NAME="$2"; shift 2 ;;
-        --token) require_arg "$1" $# || exit 1; echo "WARNING: --token exposes secrets in process listings. Prefer --token-file." >&2; ACTIVATION_TOKEN="$2"; shift 2 ;;
+        --token) require_arg "$1" $# || exit 1; reject_secret_arg "$1" "--token-file" || exit 1 ;;
         --token-file) require_arg "$1" $# || exit 1; ACTIVATION_TOKEN=$(read_secret_file "$2"); shift 2 ;;
         --region) require_arg "$1" $# || exit 1; REGION="$2"; shift 2 ;;
         --location-updates) LOCATION_UPDATES="1"; shift ;;
@@ -51,7 +50,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${STREAM_NAME}" || -z "${ACTIVATION_TOKEN}" || -z "${REGION}" ]]; then
-    log "ERROR: --name, --token (or --token-file), and --region are required"
+    log "ERROR: --name, --token-file, and --region are required"
     exit 1
 fi
 

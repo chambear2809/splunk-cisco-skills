@@ -28,24 +28,22 @@ Required:
 Catalyst Center:
   --host URL         Catalyst Center URL (e.g., https://10.100.0.60)
   --username USER    Username
-  --password PASS    Password
+  --password-file FILE Read device password from FILE
 
 ISE:
   --host URL         ISE URL (e.g., https://10.100.0.10/admin/login.jsp)
   --username USER    Username
-  --password PASS    Password
+  --password-file FILE Read device password from FILE
 
 SD-WAN:
   --host URL         SD-WAN portal URL
   --username USER    Username
-  --password PASS    Password
+  --password-file FILE Read device password from FILE
 
 Cyber Vision:
   --host URL         Cyber Vision portal URL (e.g., https://192.168.1.100)
-  --api-token TOKEN  API token
-
-  --password-file FILE Read device password from FILE
   --api-token-file FILE Read API token from FILE
+
   --no-verify-ssl    Disable SSL certificate verification for TA API calls
   --verify-ssl       Re-enable SSL certificate verification for TA API calls
 
@@ -60,9 +58,9 @@ while [[ $# -gt 0 ]]; do
         --name) require_arg "$1" $# || exit 1; ACCT_NAME="$2"; shift 2 ;;
         --host) require_arg "$1" $# || exit 1; HOST="$2"; shift 2 ;;
         --username) require_arg "$1" $# || exit 1; USERNAME="$2"; shift 2 ;;
-        --password) require_arg "$1" $# || exit 1; echo "WARNING: --password exposes secrets in process listings. Prefer --password-file." >&2; PASSWORD="$2"; shift 2 ;;
+        --password) require_arg "$1" $# || exit 1; reject_secret_arg "$1" "--password-file" || exit 1 ;;
         --password-file) require_arg "$1" $# || exit 1; PASSWORD=$(read_secret_file "$2"); shift 2 ;;
-        --api-token) require_arg "$1" $# || exit 1; echo "WARNING: --api-token exposes secrets in process listings. Prefer --api-token-file." >&2; API_TOKEN="$2"; shift 2 ;;
+        --api-token) require_arg "$1" $# || exit 1; reject_secret_arg "$1" "--api-token-file" || exit 1 ;;
         --api-token-file) require_arg "$1" $# || exit 1; API_TOKEN=$(read_secret_file "$2"); shift 2 ;;
         --use-ca-cert) USE_CA_CERT="true"; shift ;;
         --no-verify-ssl) SET_VERIFY_SSL="False"; shift ;;
@@ -95,7 +93,7 @@ fi
 
 configure_catalyst_center() {
     if [[ -z "${HOST}" || -z "${USERNAME}" || -z "${PASSWORD}" ]]; then
-        log "ERROR: --host, --username, --password required for catalyst_center"
+        log "ERROR: --host, --username, and --password-file are required for catalyst_center"
         exit 1
     fi
 
@@ -125,7 +123,7 @@ configure_catalyst_center() {
 
 configure_ise() {
     if [[ -z "${HOST}" || -z "${USERNAME}" || -z "${PASSWORD}" ]]; then
-        log "ERROR: --host, --username, --password required for ise"
+        log "ERROR: --host, --username, and --password-file are required for ise"
         exit 1
     fi
 
@@ -157,7 +155,7 @@ configure_ise() {
 
 configure_sdwan() {
     if [[ -z "${HOST}" || -z "${USERNAME}" || -z "${PASSWORD}" ]]; then
-        log "ERROR: --host, --username, --password required for sdwan"
+        log "ERROR: --host, --username, and --password-file are required for sdwan"
         exit 1
     fi
 
@@ -187,7 +185,7 @@ configure_sdwan() {
 
 configure_cybervision() {
     if [[ -z "${HOST}" || -z "${API_TOKEN}" ]]; then
-        log "ERROR: --host and --api-token required for cybervision"
+        log "ERROR: --host and --api-token-file are required for cybervision"
         exit 1
     fi
 

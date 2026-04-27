@@ -28,7 +28,6 @@ Usage: $(basename "$0") [OPTIONS]
 
 Required:
   --name NAME            Account name (stanza identifier)
-  --api-key KEY          Meraki Dashboard API key
   --api-key-file FILE    Read API key from FILE
   --org-id ID            Meraki organization ID
 
@@ -47,7 +46,7 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --name) require_arg "$1" $# || exit 1; ACCT_NAME="$2"; shift 2 ;;
-        --api-key) require_arg "$1" $# || exit 1; echo "WARNING: --api-key exposes secrets in process listings. Prefer --api-key-file." >&2; API_KEY="$2"; shift 2 ;;
+        --api-key) require_arg "$1" $# || exit 1; reject_secret_arg "$1" "--api-key-file" || exit 1 ;;
         --api-key-file) require_arg "$1" $# || exit 1; API_KEY=$(read_secret_file "$2"); shift 2 ;;
         --org-id) require_arg "$1" $# || exit 1; ORG_ID="$2"; shift 2 ;;
         --region) require_arg "$1" $# || exit 1; REGION="$2"; shift 2 ;;
@@ -60,7 +59,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${ACCT_NAME}" || -z "${API_KEY}" || -z "${ORG_ID}" ]]; then
-    log "ERROR: --name, --api-key (or --api-key-file), and --org-id are required"
+    log "ERROR: --name, --api-key-file, and --org-id are required"
     exit 1
 fi
 

@@ -22,7 +22,6 @@ Usage: $(basename "$0") [OPTIONS]
 Required:
   --name NAME                Account name (stanza identifier)
   --client-id ID             Intersight OAuth2 Client ID
-  --client-secret SECRET     Intersight OAuth2 Client Secret
   --client-secret-file FILE  Read client secret from FILE
 
 Optional:
@@ -40,7 +39,7 @@ while [[ $# -gt 0 ]]; do
         --name) require_arg "$1" $# || exit 1; ACCT_NAME="$2"; shift 2 ;;
         --hostname) require_arg "$1" $# || exit 1; HOSTNAME="$2"; shift 2 ;;
         --client-id) require_arg "$1" $# || exit 1; CLIENT_ID="$2"; shift 2 ;;
-        --client-secret) require_arg "$1" $# || exit 1; echo "WARNING: --client-secret exposes secrets in process listings. Prefer --client-secret-file." >&2; CLIENT_SECRET="$2"; shift 2 ;;
+        --client-secret) require_arg "$1" $# || exit 1; reject_secret_arg "$1" "--client-secret-file" || exit 1 ;;
         --client-secret-file) require_arg "$1" $# || exit 1; CLIENT_SECRET=$(read_secret_file "$2"); shift 2 ;;
         --create-defaults) CREATE_DEFAULTS="true"; shift ;;
         --help) usage ;;
@@ -49,7 +48,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${ACCT_NAME}" || -z "${CLIENT_ID}" || -z "${CLIENT_SECRET}" ]]; then
-    log "ERROR: --name, --client-id, and --client-secret (or --client-secret-file) are required"
+    log "ERROR: --name, --client-id, and --client-secret-file are required"
     exit 1
 fi
 

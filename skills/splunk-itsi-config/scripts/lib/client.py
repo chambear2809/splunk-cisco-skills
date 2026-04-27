@@ -320,6 +320,11 @@ class SplunkRestClient:
         value: str,
         interface: str = "itoa",
     ) -> dict[str, Any] | None:
+        if interface == "icon_collection":
+            for entry in self.list_objects(object_type, interface=interface):
+                if str(entry.get(field) or "") == value:
+                    return entry
+            return None
         response = self._request_itsi_object(
             "GET",
             interface,

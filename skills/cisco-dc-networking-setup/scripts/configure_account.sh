@@ -28,8 +28,7 @@ Required:
   --type TYPE        Account type: aci, nd, nexus9k
   --name NAME        Account name (stanza identifier)
   --username USER    Account username
-  --password PASS    Account password (or use --password-file)
-  --password-file F  Read password from file (alternative to --password)
+  --password-file F  Read account password from file
 
 ACI / ND specific:
   --hostname HOSTS   Comma-separated APIC or ND hostnames/IPs
@@ -47,7 +46,7 @@ Common:
   --verify-ssl       Re-enable SSL certificate verification for TA API calls
   --help             Show this help
 
-Note: Use --password-file to avoid passing the password on the command line.
+Note: passwords must be provided through --password-file.
 EOF
     exit "${1:-0}"
 }
@@ -60,7 +59,7 @@ while [[ $# -gt 0 ]]; do
         --port) require_arg "$1" $# || exit 1; PORT="$2"; shift 2 ;;
         --auth-type) require_arg "$1" $# || exit 1; AUTH_TYPE="$2"; shift 2 ;;
         --username) require_arg "$1" $# || exit 1; USERNAME="$2"; shift 2 ;;
-        --password) require_arg "$1" $# || exit 1; echo "WARNING: --password exposes secrets in process listings. Prefer --password-file." >&2; PASSWORD="$2"; shift 2 ;;
+        --password) require_arg "$1" $# || exit 1; reject_secret_arg "$1" "--password-file" || exit 1 ;;
         --password-file) require_arg "$1" $# || exit 1; PASSWORD=$(read_secret_file "$2"); shift 2 ;;
         --device-ip) require_arg "$1" $# || exit 1; DEVICE_IP="$2"; shift 2 ;;
         --login-domain) require_arg "$1" $# || exit 1; LOGIN_DOMAIN="$2"; shift 2 ;;
@@ -73,7 +72,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "${ACCT_TYPE}" || -z "${ACCT_NAME}" || -z "${USERNAME}" || -z "${PASSWORD}" ]]; then
-    log "ERROR: --type, --name, --username, and --password (or --password-file) are required"
+    log "ERROR: --type, --name, --username, and --password-file are required"
     exit 1
 fi
 
