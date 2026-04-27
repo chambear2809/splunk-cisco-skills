@@ -117,11 +117,13 @@ from urllib.parse import urlparse, urlunparse
 uri = os.environ.get("SPLUNK_URI", "")
 web_port = os.environ.get("SPLUNK_WEB_PORT", "8000")
 parsed = urlparse(uri)
-scheme = "https" if web_port == "443" else (parsed.scheme or "https")
+scheme = parsed.scheme or "https"
 hostname = parsed.hostname or ""
 if not hostname:
     raise SystemExit(1)
-netloc = f"{hostname}:{web_port}" if web_port != "443" else hostname
+# Always emit the explicit port so the rendered URL is unambiguous in
+# logs and easy to diff against the management URL it was derived from.
+netloc = f"{hostname}:{web_port}"
 print(urlunparse((scheme, netloc, "", "", "", "")), end="")
 PY
 )
