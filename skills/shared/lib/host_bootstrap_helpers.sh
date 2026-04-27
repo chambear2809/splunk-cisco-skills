@@ -798,12 +798,15 @@ hbs_load_ssh_for_execution() {
 }
 
 hbs_make_sshpass_file() {
+    # NOTE: This function is invoked via $(hbs_make_sshpass_file) in every
+    # call site, which forks a subshell. Any EXIT trap registered here would
+    # fire on subshell exit and delete the temp file BEFORE the caller can
+    # use it — so we deliberately do not register one. Each caller is
+    # responsible for `rm -f "${pass_file}"` after the sshpass call.
     local pass_file
     pass_file="$(mktemp)"
     chmod 600 "${pass_file}"
     printf '%s' "${SPLUNK_SSH_PASS}" > "${pass_file}"
-    # Register cleanup without replacing any caller cleanup that is already active.
-    hbs_append_cleanup_trap "rm -f $(printf '%q' "${pass_file}")" EXIT INT TERM
     printf '%s' "${pass_file}"
 }
 

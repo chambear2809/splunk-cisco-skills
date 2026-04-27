@@ -166,34 +166,47 @@ EOF
     [ "$config_text" = 'user = "admin\"user:pa\"ss\\word"' ]
 }
 
-@test "hbs_make_sshpass_file preserves existing cleanup trap" {
-    # Run in a subshell so the test's EXIT trap does not replace bats's own
-    # internal cleanup trap (which differs between bats-core versions).
+@test "hbs_make_sshpass_file returns a 0600 file containing the configured password" {
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    export SPLUNK_SSH_PASS="ssh-secret"
+
+    pass_file="$(hbs_make_sshpass_file)"
+    TEST_TEMP_FILES+=("${pass_file}")
+
+    # The file must persist after the function returns so the caller's
+    # subsequent `sshpass -f "${pass_file}"` can read it. Earlier versions
+    # registered an EXIT trap inside the function which fired on the
+    # $(...) subshell exit and deleted the file before the caller could
+    # use it — this test guards against that regression.
+    [ -f "${pass_file}" ]
+
+    [ "$(cat "${pass_file}")" = "ssh-secret" ]
+
+    mode=$(stat -c "%a" "${pass_file}" 2>/dev/null || stat -f "%Lp" "${pass_file}")
+    [ "${mode}" = "600" ]
+
+    rm -f "${pass_file}"
+}
+
+@test "hbs_append_cleanup_trap composes with an existing cleanup trap" {
+    # This helper still has a valid use case in get_splunkbase_session and
+    # other functions that are invoked WITHOUT command substitution. Verify
+    # the append-not-replace semantics independently of hbs_make_sshpass_file.
     captured="$(
         set -e
         source "${LIB_DIR}/host_bootstrap_helpers.sh"
-        export SPLUNK_SSH_PASS="ssh-secret"
         marker_file="$(mktemp)"
         rm -f "${marker_file}"
-        trap "printf old > $(printf '%q' "${marker_file}")" EXIT
-        pass_file="$(hbs_make_sshpass_file)"
+        trap "printf existing > $(printf '%q' "${marker_file}")" EXIT
+        hbs_append_cleanup_trap "printf added >> $(printf '%q' "${marker_file}")" EXIT
         trap_output="$(trap -p EXIT)"
-        printf 'PASS_FILE=%s\n' "${pass_file}"
         printf 'TRAP_OUTPUT=%s\n' "${trap_output}"
-        # Drop the test EXIT trap before the subshell exits so the marker file
-        # does not get written, and clean up the pass file we created.
-        rm -f "${pass_file}" "${marker_file}"
+        rm -f "${marker_file}"
         trap - EXIT
     )"
 
-    [[ "${captured}" == *"PASS_FILE="* ]]
-    pass_file_line="$(printf '%s\n' "${captured}" | grep '^PASS_FILE=' | head -n 1)"
-    pass_file="${pass_file_line#PASS_FILE=}"
-    TEST_TEMP_FILES+=("${pass_file}")
-
-    [[ "${captured}" == *"printf old"* ]]
-    [[ "${captured}" == *"rm -f"* ]]
-    [[ "${captured}" == *"${pass_file}"* ]]
+    [[ "${captured}" == *"printf existing"* ]]
+    [[ "${captured}" == *"printf added"* ]]
 }
 
 # --- log ---
