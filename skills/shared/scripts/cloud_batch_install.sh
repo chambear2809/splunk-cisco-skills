@@ -176,12 +176,46 @@ for app_id in "${APP_IDS[@]}"; do
 
     if (( rc == 0 )); then
         log "  Installed app ID ${app_id}."
-    elif printf '%s' "${output}" | grep -q '"statusCode": 409' 2>/dev/null; then
-        log "  App ID ${app_id} already installed (skipped)."
     else
-        log "  ERROR: Failed to install app ID ${app_id} (rc=${rc})."
-        [[ -n "${output}" ]] && log "  ${output}"
-        failures=$((failures + 1))
+        # Detect HTTP 409 conflict by parsing the structured ACS payload
+        # (acs_command sets --format structured) rather than grepping the
+        # human-readable string, which has shifted between ACS releases.
+        already_installed=$(printf '%s' "${output}" | python3 -c '
+import json
+import sys
+
+raw = sys.stdin.read()
+try:
+    data = json.loads(raw)
+except Exception:
+    sys.exit(0)
+items = data if isinstance(data, list) else [data]
+for item in items:
+    if not isinstance(item, dict):
+        continue
+    response = item.get("response")
+    if isinstance(response, str):
+        try:
+            response = json.loads(response)
+        except Exception:
+            response = {}
+    if isinstance(response, dict):
+        status = response.get("statusCode") or response.get("status_code") or response.get("status")
+        if str(status) == "409":
+            print("yes", end="")
+            sys.exit(0)
+    status = item.get("statusCode") or item.get("status_code") or item.get("status")
+    if str(status) == "409":
+        print("yes", end="")
+        sys.exit(0)
+' 2>/dev/null || true)
+        if [[ "${already_installed}" == "yes" ]]; then
+            log "  App ID ${app_id} already installed (skipped)."
+        else
+            log "  ERROR: Failed to install app ID ${app_id} (rc=${rc})."
+            [[ -n "${output}" ]] && log "  ${output}"
+            failures=$((failures + 1))
+        fi
     fi
 done
 

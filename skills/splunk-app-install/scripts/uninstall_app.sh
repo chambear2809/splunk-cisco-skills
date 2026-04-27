@@ -239,7 +239,15 @@ fi
 
 load_splunk_credentials
 
-SK=$(get_session_key "${SPLUNK_URI}")
+SK=$(get_session_key "${SPLUNK_URI}") || {
+    log "ERROR: Failed to obtain a Splunk session key for ${SPLUNK_URI}."
+    log "Check SPLUNK_USER/SPLUNK_PASS in the credentials file and management URL connectivity."
+    exit 1
+}
+if [[ -z "${SK}" ]]; then
+    log "ERROR: Splunk session key was empty for ${SPLUNK_URI}; cannot continue."
+    exit 1
+fi
 
 if [[ -z "${APP_NAME}" ]]; then
     echo ""

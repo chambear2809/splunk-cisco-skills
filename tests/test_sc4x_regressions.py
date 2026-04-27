@@ -652,11 +652,11 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             self.assertEqual(compose_hec_token, "generated-sc4snmp-token\n")
             self.assertEqual(
                 stat.S_IMODE((output_dir / "compose" / "secrets" / "hec_token").stat().st_mode),
-                0o640,
+                0o600,
             )
             self.assertEqual(
                 stat.S_IMODE((output_dir / "compose" / "secrets" / "secrets.json.example").stat().st_mode),
-                0o640,
+                0o600,
             )
 
             self.assertIn('host: "example.invalid"', k8s_values)
@@ -1084,7 +1084,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
             placeholder = output_dir / "compose" / "secrets" / "hec_token.example"
             self.assertTrue(placeholder.exists(), msg="Expected placeholder token file")
             self.assertIn("<replace-with-hec-token>", placeholder.read_text(encoding="utf-8"))
-            self.assertEqual(stat.S_IMODE(placeholder.stat().st_mode), 0o640)
+            self.assertEqual(stat.S_IMODE(placeholder.stat().st_mode), 0o600)
 
 
     def test_sc4snmp_render_compose_with_snmpv3_secrets_file_keeps_bind_secret_private(self):
@@ -1127,7 +1127,7 @@ class SC4xRegressionTests(ShellScriptRegressionBase):
 
             rendered_secrets = output_dir / "compose" / "secrets" / "secrets.json"
             self.assertEqual(rendered_secrets.read_text(encoding="utf-8"), snmpv3_secrets_file.read_text(encoding="utf-8"))
-            self.assertEqual(stat.S_IMODE(rendered_secrets.stat().st_mode), 0o640)
+            self.assertEqual(stat.S_IMODE(rendered_secrets.stat().st_mode), 0o600)
 
 
     def test_sc4snmp_hec_token_yaml_special_characters_escaped(self):

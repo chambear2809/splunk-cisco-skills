@@ -207,10 +207,13 @@ write_secret_file() {
 
 write_compose_bind_secret_file() {
     local path="$1" content="$2"
-    # Keep rendered secrets out of the world-readable bit; operators can chgrp
-    # the secrets directory to the container runtime group when needed.
+    # Default to owner-only readable secrets. If your container runtime
+    # needs group access (e.g. a non-root container UID mapped to a host
+    # group that is intentionally on the file), `chmod 640` and `chgrp
+    # <runtime-group>` the file after rendering, ideally as a documented
+    # post-step rather than in this generic helper.
     write_secret_file "${path}" "${content}"
-    chmod 640 "${path}"
+    chmod 600 "${path}"
 }
 
 make_executable() {
@@ -1101,7 +1104,7 @@ render_compose_assets() {
     fi
     if [[ -n "${SNMPV3_SECRETS_FILE}" ]]; then
         cp "${SNMPV3_SECRETS_FILE}" "${compose_dir}/secrets/secrets.json"
-        chmod 640 "${compose_dir}/secrets/secrets.json"
+        chmod 600 "${compose_dir}/secrets/secrets.json"
     else
         write_compose_bind_secret_file "${compose_dir}/secrets/secrets.json.example" $'{\n  "example": {\n    "username": "snmp-user",\n    "authprotocol": "SHA",\n    "authkey": "replace-me"\n  }\n}\n'
     fi

@@ -82,7 +82,11 @@ for raw_dir in sys.argv[2:]:
 }
 
 resolve_latest_version() {
-    _set_splunkbase_curl_tls_args || return 0
+    if ! _set_splunkbase_curl_tls_args; then
+        log "ERROR: Could not configure Splunkbase TLS settings for version resolution."
+        log "Check SPLUNKBASE_CA_CERT (must be a readable file) or unset it to use system roots."
+        return 1
+    fi
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
     curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
         "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \

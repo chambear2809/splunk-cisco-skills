@@ -75,12 +75,18 @@ _set_tls_verify_args() {
 }
 
 _set_splunk_curl_tls_args() {
+    # Default to verified TLS for Splunk management connections. Operators
+    # who need to talk to a Splunk instance with a self-signed certificate
+    # must opt out by setting SPLUNK_VERIFY_SSL=false (or point
+    # SPLUNK_CA_CERT at a trusted CA bundle). The previous default of
+    # `false` left every REST call exposed to MITM unless someone remembered
+    # to flip the flag.
     _set_tls_verify_args \
         "${SPLUNK_VERIFY_SSL:-}" \
-        "false" \
+        "true" \
         "${SPLUNK_CA_CERT:-}" \
         "_WARNED_SPLUNK_INSECURE_TLS" \
-        "WARNING: TLS verification is disabled for Splunk REST connections. Set SPLUNK_VERIFY_SSL=true or SPLUNK_CA_CERT=/path/to/ca.pem to enable verification."
+        "WARNING: TLS verification is disabled for Splunk REST connections (SPLUNK_VERIFY_SSL=false). For self-signed Splunk instances, point SPLUNK_CA_CERT at a trusted CA bundle instead of disabling verification."
 }
 
 _set_splunkbase_curl_tls_args() {
@@ -96,18 +102,22 @@ _set_app_download_curl_tls_args() {
     local verify_value="${APP_DOWNLOAD_VERIFY_SSL:-${SPLUNK_VERIFY_SSL:-}}"
     local ca_cert="${APP_DOWNLOAD_CA_CERT:-${SPLUNK_CA_CERT:-}}"
 
+    # Default to verified TLS for remote app/package downloads. Public
+    # mirrors and Splunkbase-style URLs always have valid CA certificates;
+    # operators who need to fetch through an internal mirror with a
+    # self-signed cert can point APP_DOWNLOAD_CA_CERT at the CA bundle.
     _set_tls_verify_args \
         "${verify_value}" \
-        "false" \
+        "true" \
         "${ca_cert}" \
         "_WARNED_APP_DOWNLOAD_INSECURE_TLS" \
-        "WARNING: TLS verification is disabled for remote app downloads. Set APP_DOWNLOAD_VERIFY_SSL=true or APP_DOWNLOAD_CA_CERT=/path/to/ca.pem to enable verification."
+        "WARNING: TLS verification is disabled for remote app downloads. For internal mirrors with private CAs, set APP_DOWNLOAD_CA_CERT=/path/to/ca.pem instead of disabling verification."
 }
 
 splunk_tls_mode() {
     if [[ -n "${SPLUNK_CA_CERT:-}" ]]; then
         printf '%s' "ca-cert"
-    elif _bool_is_true "${SPLUNK_VERIFY_SSL:-false}"; then
+    elif _bool_is_true "${SPLUNK_VERIFY_SSL:-true}"; then
         printf '%s' "verify"
     else
         printf '%s' "insecure"
@@ -217,6 +227,13 @@ get_session_key() {
     printf '%s' "${sk}"
 }
 
+# Known limitation: passing the session key via `-K <(printf ...)` keeps it
+# off curl's argv (so it does not show up in `ps aux` to other users), but
+# the FIFO file descriptor backing the process substitution is briefly
+# visible to the SAME user via /proc while the curl call runs. On
+# multi-tenant hosts where the calling UID is shared with untrusted code,
+# treat the session key as compromised; otherwise, this remains the most
+# practical way to feed the auth header without writing it to disk.
 splunk_curl() {
     local sk="$1"; shift
     _set_splunk_curl_tls_args || return 1

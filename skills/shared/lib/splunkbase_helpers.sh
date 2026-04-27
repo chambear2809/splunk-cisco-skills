@@ -67,10 +67,14 @@ get_splunkbase_session() {
 
     if [[ "${http_code}" != "200" || -z "${session}" ]]; then
         rm -f "${cookie_file}"
-        echo "ERROR: Failed to authenticate to Splunkbase session API." >&2
+        echo "ERROR: Failed to authenticate to Splunkbase session API (HTTP ${http_code:-unknown})." >&2
+        # Surface a short, sanitized snippet so operators can debug, but
+        # never dump the full body — failed responses can include sensitive
+        # data, attacker-influenced HTML, or markup that breaks log scrapers.
         if [[ -n "${response}" ]]; then
-            echo "Response: $(printf '%s' "${response}" | tr '\n' ' ' | sed 's/[[:space:]]\+/ /g')" >&2
+            sanitize_response "${response}" 5 >&2 || true
         fi
+        echo "Verify SB_USER and SB_PASS in the credentials file and retry." >&2
         return 1
     fi
 

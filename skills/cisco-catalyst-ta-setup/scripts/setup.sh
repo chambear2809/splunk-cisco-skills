@@ -68,10 +68,14 @@ create_indexes() {
 
     if ! is_splunk_cloud; then
         ensure_search_api_session
+        if [[ -z "${SK:-}" ]]; then
+            log "ERROR: ensure_search_api_session did not produce a session key; cannot create indexes."
+            return 1
+        fi
     fi
 
     for idx in catalyst ise sdwan cybervision; do
-        if platform_create_index "${SK-}" "$SPLUNK_URI" "${idx}" "512000"; then
+        if platform_create_index "${SK:-}" "$SPLUNK_URI" "${idx}" "512000"; then
             log "  Index '${idx}' created or already exists."
         else
             log "  ERROR: Failed to create index '${idx}'."

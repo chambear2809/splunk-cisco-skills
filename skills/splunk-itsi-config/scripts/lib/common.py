@@ -236,13 +236,57 @@ def _numeric_string_equals(number: int | float, text: str) -> bool:
 
 
 def semver_key(version: str) -> tuple[Any, ...]:
-    parts: list[Any] = []
-    for part in re.split(r"[.+-]", version or ""):
-        if part.isdigit():
-            parts.append(int(part))
+    """Build a sort key for semver-shaped version strings.
+
+    Follows semver 2.0 ordering rules:
+      - Numeric main components compare numerically (so `1.10.0 > 1.2.0`).
+      - A clean release sorts ABOVE any pre-release that shares the same
+        numeric prefix (so `1.0.0 > 1.0.0-rc1`).
+      - Pre-release identifiers compare with numeric ones below alphanumeric
+        ones, then alphanumerically — close enough for the catalog-version
+        cases this skill cares about.
+      - Build metadata (`+abc`) is ignored, per semver, so `1.0.0+build1`
+        compares equal to `1.0.0`.
+
+    Without the prerelease-rank step Python's tuple comparison would treat
+    the longer tuple `(1,0,0,'rc1')` as greater than `(1,0,0)`, which
+    `resolve_catalog_entry` (sorted reverse=True, [0]) would then pick as
+    the "newest" version, preferring an rc/beta over the actual GA.
+    """
+    text = (version or "").strip()
+    if not text:
+        return ((), 1, ())
+
+    # Strip build metadata; per semver it does not affect precedence.
+    main_part, _sep, _build = text.partition("+")
+    # Split on the FIRST `-` to separate main version from prerelease label.
+    main_text, _dash, prerelease_text = main_part.partition("-")
+
+    main_parts: list[int] = []
+    for token in main_text.split("."):
+        if token.isdigit():
+            main_parts.append(int(token))
         else:
-            parts.append(part)
-    return tuple(parts)
+            # Non-numeric main components are unusual; keep them as 0 so
+            # the comparison still produces a stable order.
+            main_parts.append(0)
+
+    pre_parts: list[Any] = []
+    if prerelease_text:
+        for token in prerelease_text.split("."):
+            if token.isdigit():
+                # Numeric prerelease ids compare numerically and rank below
+                # alphanumeric ones (per semver §11). The leading 0 in the
+                # tuple makes that rank explicit.
+                pre_parts.append((0, int(token)))
+            else:
+                pre_parts.append((1, token))
+
+    # `prerelease_rank` is 1 for a clean release (no pre-release suffix) and
+    # 0 for a pre-release. Tuple comparison then puts the GA release above
+    # any pre-release that shares the same numeric prefix.
+    prerelease_rank = 0 if pre_parts else 1
+    return (tuple(main_parts), prerelease_rank, tuple(pre_parts))
 
 
 def infer_platform(spec: dict[str, Any]) -> str:
@@ -258,8 +302,12 @@ def infer_platform(spec: dict[str, Any]) -> str:
     ).strip()
     if not base_url:
         return "enterprise"
-    hostname = urlparse(base_url).hostname or ""
-    if "splunkcloud" in hostname:
+    hostname = (urlparse(base_url).hostname or "").lower()
+    # Recognize both classic `*.splunkcloud.com` stack hostnames and the
+    # newer `*.cloud.splunk.com` style URLs that Splunk Cloud has been
+    # migrating toward. Without the second match, customers on the new URL
+    # scheme silently fell into the enterprise code path.
+    if "splunkcloud" in hostname or hostname.endswith(".cloud.splunk.com"):
         return "cloud"
     return "enterprise"
 

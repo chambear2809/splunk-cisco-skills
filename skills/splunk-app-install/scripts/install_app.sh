@@ -15,6 +15,7 @@ APP_ID=""
 APP_VERSION=""
 APP_PACKAGE_NAME=""
 LICENSE_ACK_URL=""
+EXPECTED_SHA256=""
 UPDATE=false
 UPDATE_SET=false
 RESTART_SPLUNK=true
@@ -427,6 +428,7 @@ while [[ $# -gt 0 ]]; do
         --source) require_arg "$1" $# || exit 1;       SOURCE="$2";      shift 2 ;;
         --file) require_arg "$1" $# || exit 1;         APP_FILE="$2";     shift 2 ;;
         --url) require_arg "$1" $# || exit 1;          APP_URL="$2";      shift 2 ;;
+        --expected-sha256) require_arg "$1" $# || exit 1; EXPECTED_SHA256="$2"; shift 2 ;;
         --app-id) require_arg "$1" $# || exit 1;       APP_ID="$2";       shift 2 ;;
         --app-version) require_arg "$1" $# || exit 1;  APP_VERSION="$2";  shift 2 ;;
         --license-ack-url) require_arg "$1" $# || exit 1; LICENSE_ACK_URL="$2"; shift 2 ;;
@@ -447,6 +449,8 @@ Optional flags (skip the corresponding prompt):
   --source local|remote|splunkbase
   --file PATH           Local app file path
   --url URL             Remote download URL
+  --expected-sha256 HEX 64-char hex SHA-256 of the package; required for non-Splunkbase URL
+                        downloads to be installed (defense against compromised mirrors).
   --app-id ID           Splunkbase app ID
   --app-version VER     Pin a specific Splunkbase version (default: latest)
   --license-ack-url URL Third-party Splunkbase license URL for ACS installs
@@ -765,8 +769,9 @@ resolve_splunkbase_release_metadata() {
     fi
 
     if ! _set_splunkbase_curl_tls_args; then
-        log "Could not configure Splunkbase TLS settings for release metadata lookup."
-        return 0
+        log "ERROR: Could not configure Splunkbase TLS settings for release metadata lookup."
+        log "Check SPLUNKBASE_CA_CERT (must be a readable file) or unset it to use system roots."
+        return 1
     fi
 
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
@@ -896,6 +901,18 @@ download_from_url() {
 
     local output_path="${TA_CACHE}/${filename}"
 
+    if [[ -z "${EXPECTED_SHA256}" ]]; then
+        log "ERROR: --expected-sha256 is required for --url downloads (supply the publisher's"
+        log "       SHA-256 of the package). Without an integrity check a compromised or swapped"
+        log "       mirror could ship a malicious app package. Pass --expected-sha256 <hex> or"
+        log "       use --source splunkbase for signed releases."
+        exit 1
+    fi
+    if ! [[ "${EXPECTED_SHA256}" =~ ^[A-Fa-f0-9]{64}$ ]]; then
+        log "ERROR: --expected-sha256 must be a 64-character hexadecimal SHA-256 digest."
+        exit 1
+    fi
+
     log "Downloading from: ${APP_URL}"
     local http_code
     _set_app_download_curl_tls_args || exit 1
@@ -909,6 +926,20 @@ download_from_url() {
         log "ERROR: Download failed (HTTP ${http_code}) from: ${APP_URL}"
         exit 1
     fi
+
+    local actual_sha
+    actual_sha="$(hbs_sha256_file "${output_path}")"
+    local expected_lower
+    expected_lower="$(printf '%s' "${EXPECTED_SHA256}" | tr '[:upper:]' '[:lower:]')"
+    if [[ -z "${actual_sha}" || "${actual_sha,,}" != "${expected_lower}" ]]; then
+        rm -f "${output_path}"
+        log "ERROR: SHA-256 mismatch for downloaded package."
+        log "       expected: ${expected_lower}"
+        log "       actual:   ${actual_sha:-<could not compute>}"
+        log "       Refusing to install a package whose integrity could not be verified."
+        exit 1
+    fi
+    log "Verified SHA-256 ${actual_sha} for ${filename}."
 
     log "Downloaded to: ${output_path} (HTTP ${http_code})"
     APP_FILE="${output_path}"

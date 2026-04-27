@@ -99,10 +99,36 @@ set_stream_api_base() {
 
     splunk_web_url="${SPLUNK_WEB_URL:-}"
     if [[ -z "${splunk_web_url}" ]]; then
+        # Derive the Web URL from the management URL via urllib.parse so we
+        # do not corrupt hostnames or non-default management ports that
+        # happen to contain the digits "8089". The previous string-replace
+        # approach broke for any deployment where the management port was
+        # not the default or where the hostname contained "8089".
+        local web_port
         if is_splunk_cloud; then
-            splunk_web_url="${SPLUNK_URI/8089/443}"
+            web_port="443"
         else
-            splunk_web_url="${SPLUNK_URI/8089/8000}"
+            web_port="${SPLUNK_WEB_PORT:-8000}"
+        fi
+        splunk_web_url=$(SPLUNK_URI="${SPLUNK_URI}" SPLUNK_WEB_PORT="${web_port}" python3 - <<'PY'
+import os
+from urllib.parse import urlparse, urlunparse
+
+uri = os.environ.get("SPLUNK_URI", "")
+web_port = os.environ.get("SPLUNK_WEB_PORT", "8000")
+parsed = urlparse(uri)
+scheme = "https" if web_port == "443" else (parsed.scheme or "https")
+hostname = parsed.hostname or ""
+if not hostname:
+    raise SystemExit(1)
+netloc = f"{hostname}:{web_port}" if web_port != "443" else hostname
+print(urlunparse((scheme, netloc, "", "", "", "")), end="")
+PY
+)
+        if [[ -z "${splunk_web_url}" ]]; then
+            log "ERROR: Could not derive Splunk Web URL from SPLUNK_URI=${SPLUNK_URI}."
+            log "Set SPLUNK_WEB_URL explicitly (e.g. https://splunk.example.com:8000) and rerun."
+            return 1
         fi
     fi
 
@@ -229,8 +255,14 @@ stream_enable_disable() {
     local action
     [[ "${enable}" == "true" ]] && action="enable" || action="disable"
 
+    # URL-encode the stream id before splicing it into the path segment so
+    # ids containing slashes, spaces, or other reserved characters do not
+    # break the request or be silently rerouted by the Splunk Web layer.
+    local encoded_stream_id
+    encoded_stream_id=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "${stream_id}" 2>/dev/null) || encoded_stream_id="${stream_id}"
+
     # Try Stream Web API first (may require cookies on some setups)
-    local endpoint="${STREAM_API_BASE}/streams/${stream_id}/${action}"
+    local endpoint="${STREAM_API_BASE}/streams/${encoded_stream_id}/${action}"
     local http_code
     http_code=$(splunk_curl "${SK}" -X PUT "${endpoint}" \
         -H "Content-Type: application/json" \
@@ -259,13 +291,25 @@ enable_streams() {
         exit 1
     fi
 
+    local total=0
+    local failures=0
+    local -a failed_protocols=()
     IFS=',' read -ra protocols <<< "${ENABLE_LIST}"
     for proto in "${protocols[@]}"; do
         proto=$(echo "${proto}" | tr -d ' ')
         [[ -z "${proto}" ]] && continue
-        stream_enable_disable "${proto}" "true" "${TARGET_INDEX}" || true
+        total=$((total + 1))
+        if ! stream_enable_disable "${proto}" "true" "${TARGET_INDEX}"; then
+            failures=$((failures + 1))
+            failed_protocols+=("${proto}")
+        fi
     done
-    log "Stream enablement complete."
+    if (( failures > 0 )); then
+        log "Stream enablement finished with ${failures}/${total} failures: ${failed_protocols[*]}"
+        return 1
+    fi
+    log "Stream enablement complete (${total}/${total} succeeded)."
+    return 0
 }
 
 disable_streams() {
@@ -275,13 +319,25 @@ disable_streams() {
         exit 1
     fi
 
+    local total=0
+    local failures=0
+    local -a failed_protocols=()
     IFS=',' read -ra protocols <<< "${DISABLE_LIST}"
     for proto in "${protocols[@]}"; do
         proto=$(echo "${proto}" | tr -d ' ')
         [[ -z "${proto}" ]] && continue
-        stream_enable_disable "${proto}" "false" "" || true
+        total=$((total + 1))
+        if ! stream_enable_disable "${proto}" "false" ""; then
+            failures=$((failures + 1))
+            failed_protocols+=("${proto}")
+        fi
     done
-    log "Stream disablement complete."
+    if (( failures > 0 )); then
+        log "Stream disablement finished with ${failures}/${total} failures: ${failed_protocols[*]}"
+        return 1
+    fi
+    log "Stream disablement complete (${total}/${total} succeeded)."
+    return 0
 }
 
 main() {
@@ -299,15 +355,17 @@ main() {
         usage
     fi
 
+    local exit_code=0
     if [[ -n "${ENABLE_LIST}" ]]; then
-        enable_streams
+        enable_streams || exit_code=1
     fi
 
     if [[ -n "${DISABLE_LIST}" ]]; then
-        disable_streams
+        disable_streams || exit_code=1
     fi
 
     log "$(log_platform_restart_guidance "stream definition changes")"
+    exit "${exit_code}"
 }
 
 main

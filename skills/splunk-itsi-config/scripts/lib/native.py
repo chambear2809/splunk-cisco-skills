@@ -1835,6 +1835,15 @@ class NativeWorkflow:
         default_team: str,
         bulk_apply_options: dict[str, Any],
     ) -> dict[str, dict[str, dict[str, Any]]]:
+        # NOTE on bulk-apply snapshots: the non-bulk apply path re-reads the
+        # object via `get_object` after `update_object`, so the snapshot
+        # contains live ITSI server state (server-side normalizations,
+        # timestamps, etc.). The bulk-apply path stores `desired` directly
+        # because re-reading every object would defeat the perf benefit of
+        # `bulk_update`. Downstream consumers in this module use only
+        # `_key`/`title`, which are equivalent across both paths; if a
+        # future caller needs server-side fields, opt out of bulk_apply for
+        # that section or add a re-read step here.
         snapshots: dict[str, dict[str, dict[str, Any]]] = {}
         for section in sections:
             seen_titles: set[str] = set()

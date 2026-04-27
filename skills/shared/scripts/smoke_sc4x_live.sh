@@ -110,10 +110,15 @@ run_remote_root() {
     escaped_pass="${SPLUNK_SSH_PASS//\'/\'\\\'\'}"
     remote_payload="$(printf '%q' "${remote_cmd}")"
     pass_file="$(hbs_make_sshpass_file)"
+    # Use accept-new + a per-smoke-run known_hosts file so the host key is
+    # pinned for the duration of the run. SMOKE_KNOWN_HOSTS_FILE may be
+    # pre-populated by the operator to lock the run to a specific key.
+    local known_hosts_file="${SMOKE_KNOWN_HOSTS_FILE:-${HOME}/.ssh/sc4x-smoke-known-hosts}"
+    mkdir -p "$(dirname "${known_hosts_file}")"
     sshpass -f "${pass_file}" ssh \
         -p "${REMOTE_PORT}" \
-        -o StrictHostKeyChecking=no \
-        -o UserKnownHostsFile=/dev/null \
+        -o StrictHostKeyChecking=accept-new \
+        -o UserKnownHostsFile="${known_hosts_file}" \
         "${REMOTE_USER}@${REMOTE_HOST}" \
         "printf '%s\n' '${escaped_pass}' | sudo -S -p '' sh -lc ${remote_payload}"
     rc=$?

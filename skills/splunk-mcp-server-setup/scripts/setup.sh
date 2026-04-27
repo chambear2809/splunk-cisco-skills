@@ -417,23 +417,30 @@ except Exception:
 
 mint_token_to_file() {
     local target_file="$1"
-    local encoded_user encoded_exp encoded_not_before url resp http_code body token
+    local url body_form resp http_code body token
 
     if [[ -z "${TOKEN_USER}" ]]; then
         log "ERROR: --token-user is required with --write-token-file."
         exit 1
     fi
 
-    encoded_user="$(_urlencode "${TOKEN_USER}")"
-    encoded_exp="$(_urlencode "${TOKEN_EXPIRES_ON}")"
-    url="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_token?output_mode=json&username=${encoded_user}&expires_on=${encoded_exp}"
-
+    # Send the username/expiry/not_before fields in the POST body (form-urlencoded)
+    # rather than as URL query parameters so they do not appear in proxy/web/access
+    # logs that record full request URLs.
+    url="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/mcp_token?output_mode=json"
     if [[ -n "${TOKEN_NOT_BEFORE}" ]]; then
-        encoded_not_before="$(_urlencode "${TOKEN_NOT_BEFORE}")"
-        url="${url}&not_before=${encoded_not_before}"
+        body_form="$(form_urlencode_pairs username "${TOKEN_USER}" expires_on "${TOKEN_EXPIRES_ON}" not_before "${TOKEN_NOT_BEFORE}")" || {
+            log "ERROR: Failed to encode token mint payload."
+            exit 1
+        }
+    else
+        body_form="$(form_urlencode_pairs username "${TOKEN_USER}" expires_on "${TOKEN_EXPIRES_ON}")" || {
+            log "ERROR: Failed to encode token mint payload."
+            exit 1
+        }
     fi
 
-    resp="$(splunk_curl "${SK}" "${url}" -w '\n%{http_code}' 2>/dev/null || true)"
+    resp="$(splunk_curl_post "${SK}" "${body_form}" "${url}" -X POST -w '\n%{http_code}' 2>/dev/null || true)"
     http_code="$(printf '%s\n' "${resp}" | tail -1)"
     body="$(printf '%s\n' "${resp}" | sed '$d')"
 
