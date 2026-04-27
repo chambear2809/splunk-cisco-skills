@@ -9,10 +9,23 @@ import textwrap
 import unittest
 from pathlib import Path
 
-from tests.regression_helpers import ShellScriptRegressionBase, write_executable
+from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write_executable
 
 
 class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
+    def test_activation_code_is_not_passed_to_python_argv(self) -> None:
+        script_text = (REPO_ROOT / "skills/splunk-ai-assistant-setup/scripts/setup.sh").read_text(encoding="utf-8")
+
+        self.assertNotIn('python3 - "${activation_code}"', script_text)
+        self.assertIn('python3 - 3<<<"${activation_code}"', script_text)
+
+    def test_proxy_password_is_not_passed_to_python_argv(self) -> None:
+        script_text = (REPO_ROOT / "skills/splunk-ai-assistant-setup/scripts/setup.sh").read_text(encoding="utf-8")
+
+        self.assertNotIn('python3 - "${PROXY_URL}" "${PROXY_USERNAME}" "${proxy_password}"', script_text)
+        self.assertIn('python3 - "${PROXY_URL}" "${PROXY_USERNAME}" 3<<<"${proxy_password}"', script_text)
+        self.assertIn("os.fdopen(3", script_text)
+
     def test_cloud_install_uses_acs_without_preinstall_rest_auth(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

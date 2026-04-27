@@ -283,6 +283,15 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
             )
             self.assertTrue(curl_log.exists(), msg="Expected mock curl log to be written")
 
+    def test_secure_access_json_payload_keeps_secrets_off_python_argv(self):
+        script_text = (
+            REPO_ROOT / "skills/cisco-secure-access-setup/scripts/configure_account.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn('python3 - "$@"', script_text)
+        self.assertIn('printf \'%s\\0\' "${arg}"', script_text)
+        self.assertIn('chmod 600 "${args_file}"', script_text)
+
 
     def test_thousandeyes_hec_management_uses_ingest_profile_on_enterprise(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -582,6 +591,16 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
         self.assertNotIn('eval "$(parse_device_authorization_response', script_text)
         self.assertNotIn('eval "$(parse_token_success_response', script_text)
         self.assertNotIn('eval "$(parse_token_error_response', script_text)
+
+    def test_thousandeyes_configure_account_does_not_put_bearer_token_on_curl_argv(self):
+        script_text = (
+            REPO_ROOT / "skills/cisco-thousandeyes-setup/scripts/configure_account.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertNotIn('-H "Authorization: Bearer ${bearer_token}"', script_text)
+        self.assertIn('chmod 600 "${auth_config}"', script_text)
+        self.assertIn('-K "${auth_config}"', script_text)
+        self.assertIn('rm -f "${auth_config}"', script_text)
 
 
     def test_catalyst_configure_account_no_verify_ssl(self):

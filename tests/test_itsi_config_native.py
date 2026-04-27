@@ -229,10 +229,10 @@ class FakeNativeClient:
 
 class OptionalEndpointUnavailableClient(FakeNativeClient):
     def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
-        if object_type == "event_management_state":
+        if object_type == "data_integration_template":
             raise ValidationError(
                 "ITSI REST endpoint is unavailable. Checked: "
-                "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/event_management_state"
+                "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/data_integration_template"
             )
         return super().list_objects(object_type, interface=interface)
 
@@ -249,7 +249,7 @@ class OptionalFeatureDisabledClient(FakeNativeClient):
 
 class AuthFailureClient(FakeNativeClient):
     def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
-        if object_type == "event_management_state":
+        if object_type == "data_integration_template":
             raise ValidationError("Splunk REST request failed: GET /example -> HTTP 401: unauthorized")
         return super().list_objects(object_type, interface=interface)
 
@@ -791,7 +791,7 @@ class NativeWorkflowTests(unittest.TestCase):
             ],
         )
 
-    def test_event_management_sections_use_event_management_interface(self) -> None:
+    def test_event_management_sections_use_expected_interfaces(self) -> None:
         client = InterfaceRecordingNativeClient()
         spec = {
             "event_management_states": [{"title": "Network Episode View", "viewingOption": "standard"}],
@@ -802,8 +802,8 @@ class NativeWorkflowTests(unittest.TestCase):
 
         NativeWorkflow(client).run(spec, "apply")
 
-        self.assertIn(("find", "event_management_state", "event_management"), client.interfaces)
-        self.assertIn(("create", "event_management_state", "event_management"), client.interfaces)
+        self.assertIn(("find", "event_management_state", "itoa"), client.interfaces)
+        self.assertIn(("create", "event_management_state", "itoa"), client.interfaces)
         self.assertIn(("find", "correlation_search", "event_management"), client.interfaces)
         self.assertIn(("create", "correlation_search", "event_management"), client.interfaces)
         self.assertIn(("find", "notable_event_email_template", "event_management"), client.interfaces)
@@ -1389,12 +1389,12 @@ class NativeWorkflowTests(unittest.TestCase):
         result = NativeWorkflow(client).run({}, "export")
 
         self.assertFalse(result.failed, result.diagnostics)
-        self.assertEqual(result.exports["unavailable_sections"][0]["section"], "event_management_states")
+        self.assertEqual(result.exports["unavailable_sections"][0]["section"], "data_integration_templates")
         self.assertTrue(
             any(
                 item["status"] == "warn"
-                and item["object_type"] == "event_management_state"
-                and item["title"] == "event_management_states"
+                and item["object_type"] == "data_integration_template"
+                and item["title"] == "data_integration_templates"
                 for item in result.diagnostics
             )
         )
@@ -1531,7 +1531,7 @@ class NativeWorkflowTests(unittest.TestCase):
         result = NativeWorkflow(client).run({}, "prune-plan")
 
         self.assertFalse(result.failed, result.diagnostics)
-        self.assertEqual(result.prune_plan["unavailable_sections"][0]["section"], "event_management_states")
+        self.assertEqual(result.prune_plan["unavailable_sections"][0]["section"], "data_integration_templates")
         self.assertTrue(any(candidate["title"] == "Orphan" for candidate in result.prune_plan["candidates"]))
         self.assertTrue(any(item["status"] == "warn" for item in result.diagnostics))
 

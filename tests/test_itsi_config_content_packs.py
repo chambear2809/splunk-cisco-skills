@@ -291,6 +291,57 @@ class ContentPackTests(unittest.TestCase):
                 self.assertNotIn("SPLUNK_PASS", command_env)
                 self.assertNotIn("SPLUNK_SSH_PASS", command_env)
 
+    def test_shell_installer_cleans_remote_secrets_when_ssh_extract_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tempdir:
+            bundle_path = Path(tempdir) / "splunk-app-for-content-packs_250.spl"
+            bundle_path.write_text("placeholder", encoding="utf-8")
+            commands: list[list[str]] = []
+
+            def runner(command, **kwargs):
+                commands.append(command)
+                if command[0] == "bash":
+                    return subprocess.CompletedProcess(command, 1, stdout=f"Existing package found: {bundle_path}\n", stderr="")
+                if len(command) > 3 and command[0] == "sshpass" and command[1] == "-f" and command[3] == "scp":
+                    return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+                if (
+                    len(command) > 3
+                    and command[0] == "sshpass"
+                    and command[1] == "-f"
+                    and command[3] == "ssh"
+                    and str(command[-1]).startswith("rm -f ")
+                ):
+                    return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+                return subprocess.CompletedProcess(command, 255, stdout="", stderr="connection lost")
+
+            installer_script = Path(tempdir) / "install_app.sh"
+            installer_script.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            client = SimpleNamespace(config=SimpleNamespace(username="splunk", password="changeme"))
+            installer = ShellContentLibraryInstaller(script_path=installer_script, runner=runner)
+            spec = {
+                "connection": {"base_url": "https://10.110.253.20:8089", "verify_ssl": False},
+                "content_library": {"require_present": True, "source": "splunkbase", "app_id": "5391"},
+            }
+
+            previous_env = {key: os.environ.get(key) for key in ("SPLUNK_SSH_HOST", "SPLUNK_SSH_USER", "SPLUNK_SSH_PASS")}
+            os.environ["SPLUNK_SSH_HOST"] = "10.110.253.20"
+            os.environ["SPLUNK_SSH_USER"] = "splunk"
+            os.environ["SPLUNK_SSH_PASS"] = "changeme"
+            try:
+                with self.assertRaises(ValidationError):
+                    installer._cli_install_bundle(bundle_path, spec, client, installer._build_env(spec, client))
+            finally:
+                for key, value in previous_env.items():
+                    if value is None:
+                        os.environ.pop(key, None)
+                    else:
+                        os.environ[key] = value
+
+            self.assertEqual(commands[-1][3], "ssh")
+            self.assertTrue(str(commands[-1][-1]).startswith("rm -f "))
+            self.assertIn(".auth", commands[-1][-1])
+            command_text = "\n".join(" ".join(str(part) for part in command) for command in commands)
+            self.assertNotIn("changeme", command_text)
+
     def test_shell_installer_build_env_maps_supported_auth_variables(self) -> None:
         client = SimpleNamespace(config=SimpleNamespace(username="admin", password="changeme", session_key="token-123"))
         installer = ShellContentLibraryInstaller()

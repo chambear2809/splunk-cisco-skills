@@ -20,7 +20,7 @@ COMPATIBILITY_ROWS = [
         "area": "Special route families",
         "status": "supported",
         "coverage": "event_management_interface, maintenance_services_interface, backup_restore_interface, content_pack_authorship, icon_collection",
-        "notes": "The client uses route-specific lookup parameters and write methods; Event Management lookups use filter_data and creates use the documented data envelope. Generic keyed updates use is_partial_data=1 where the route family supports it.",
+        "notes": "The client uses route-specific lookup parameters and write methods; correlation searches, email templates, and NEAPs use Event Management filter_data while event_management_state uses the core object route on tested ITSI 4.21.2 hosts. Generic keyed updates use is_partial_data=1 where the route family supports it.",
     },
     {
         "area": "Custom threshold links",

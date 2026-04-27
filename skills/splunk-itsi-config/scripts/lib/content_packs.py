@@ -522,6 +522,8 @@ class ShellContentLibraryInstaller:
             auth_file.unlink(missing_ok=True)
             raise
         ssh_env = self._without_secret_env(env)
+        remote_cleanup_needed = False
+        ssh_process: subprocess.CompletedProcess[str] | None = None
         try:
             scp_process = self._run_command(
                 [
@@ -550,6 +552,7 @@ class ShellContentLibraryInstaller:
                     f"Automatic {self.display_name.lower()} SSH staging failed: "
                     + _summarize_command_output(scp_process.stdout, scp_process.stderr)
                 )
+            remote_cleanup_needed = True
 
             scp_auth_process = self._run_command(
                 [
@@ -609,6 +612,32 @@ class ShellContentLibraryInstaller:
                 ssh_env,
             )
         finally:
+            if remote_cleanup_needed and (ssh_process is None or ssh_process.returncode != 0):
+                cleanup_command = f"rm -f {shlex.quote(remote_tmp)} {shlex.quote(remote_auth_file)}"
+                try:
+                    self._run_command(
+                        [
+                            "sshpass",
+                            "-f",
+                            str(ssh_pass_file),
+                            "ssh",
+                            "-p",
+                            ssh_port,
+                            "-o",
+                            "ConnectTimeout=15",
+                            "-o",
+                            "StrictHostKeyChecking=accept-new",
+                            "-o",
+                            "PubkeyAuthentication=no",
+                            "-o",
+                            "PreferredAuthentications=password",
+                            f"{ssh_user}@{ssh_host}",
+                            cleanup_command,
+                        ],
+                        ssh_env,
+                    )
+                except ValidationError:
+                    pass
             auth_file.unlink(missing_ok=True)
             ssh_pass_file.unlink(missing_ok=True)
         if ssh_process.returncode != 0:

@@ -53,6 +53,31 @@ teardown() {
     [ "$result" = "user=hello+world&pass=a%26b%3Dc" ]
 }
 
+@test "form_urlencode_pairs keeps values off python argv" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    real_python="$(command -v python3)"
+    mock_dir="$(mktemp -d)"
+    TEST_TEMP_FILES+=("${mock_dir}")
+    argv_log="${mock_dir}/python-argv.log"
+    cat > "${mock_dir}/python3" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${PYTHON_ARG_LOG}"
+exec "${REAL_PYTHON}" "$@"
+EOF
+    chmod +x "${mock_dir}/python3"
+
+    export REAL_PYTHON="${real_python}"
+    export PYTHON_ARG_LOG="${argv_log}"
+    old_path="${PATH}"
+    PATH="${mock_dir}:${PATH}"
+    result=$(form_urlencode_pairs user "secret value" token "tok&n")
+    PATH="${old_path}"
+
+    [ "$result" = "user=secret+value&token=tok%26n" ]
+    ! grep -q "secret value" "${argv_log}"
+    ! grep -q "tok&n" "${argv_log}"
+}
+
 @test "form_urlencode_pairs rejects odd number of args" {
     source "${LIB_DIR}/rest_helpers.sh"
     run form_urlencode_pairs key1

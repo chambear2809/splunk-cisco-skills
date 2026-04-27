@@ -81,11 +81,30 @@ ensure_session() {
 }
 
 json_payload_from_pairs() {
-    python3 - "$@" <<'PY'
+    local args_file output rc restore_errexit=false
+
+    args_file="$(mktemp)"
+    chmod 600 "${args_file}"
+    for arg in "$@"; do
+        printf '%s\0' "${arg}"
+    done > "${args_file}"
+
+    case $- in
+        *e*)
+            restore_errexit=true
+            set +e
+            ;;
+    esac
+    output=$(python3 - "${args_file}" <<'PY'
 import json
 import sys
+from pathlib import Path
 
-args = sys.argv[1:]
+raw = Path(sys.argv[1]).read_bytes()
+args = raw.split(b"\0")
+if args and args[-1] == b"":
+    args.pop()
+args = [value.decode("utf-8") for value in args]
 payload = {}
 for i in range(0, len(args), 2):
     key = args[i]
@@ -95,6 +114,14 @@ for i in range(0, len(args), 2):
 
 print(json.dumps(payload), end="")
 PY
+)
+    rc=$?
+    if [[ "${restore_errexit}" == "true" ]]; then
+        set -e
+    fi
+    rm -f "${args_file}"
+    [[ "${rc}" -eq 0 ]] || return "${rc}"
+    printf '%s' "${output}"
 }
 
 org_accounts_request() {

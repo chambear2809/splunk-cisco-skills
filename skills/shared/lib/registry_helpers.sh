@@ -209,7 +209,7 @@ PY
 
 warn_if_cloud_pairing_missing_for_skill() {
     local skill_name="${1:-}"
-    local pairing_json primary_role paired_role pairing_summary platform_hint
+    local declared_roles pairing_json primary_role paired_role pairing_summary platform_hint
 
     [[ -n "${skill_name}" ]] || return 0
     platform_hint="$(_resolve_target_role_platform_hint 2>/dev/null || true)"
@@ -228,7 +228,11 @@ warn_if_cloud_pairing_missing_for_skill() {
     pairing_summary="$(_registry_role_list_summary "${pairing_json}")"
     log "WARNING: Skill '${skill_name}' expects a paired Cloud runtime role: ${pairing_summary:-declared in the registry}."
     if [[ -n "${primary_role}" || -n "${paired_role}" ]]; then
-        log "         Declared roles: primary='${primary_role:-unknown}'${paired_role:+, paired='${paired_role}'}."
+        declared_roles="primary='${primary_role:-unknown}'"
+        if [[ -n "${paired_role}" ]]; then
+            declared_roles+=", paired='${paired_role}'"
+        fi
+        log "         Declared roles: ${declared_roles}."
     else
         log "         No runtime roles are declared for the paired side of this Cloud workflow."
     fi
@@ -276,7 +280,11 @@ warn_if_role_unsupported_for_app_name() {
     fi
     [[ "${support}" != "none" ]] || {
         label="$(shared_registry_app_label_by_name "${app_name}")"
-        subject="${label:-App '${app_name}'}"
+        if [[ -n "${label}" ]]; then
+            subject="${label}"
+        else
+            subject="App '${app_name}'"
+        fi
         reasons="$(_registry_capability_summary "$(shared_registry_app_capabilities_json_by_name "${app_name}")" "${role}")"
         _warn_role_unsupported "${subject}" "${role}" "${reasons}"
         return 0

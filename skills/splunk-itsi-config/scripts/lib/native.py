@@ -44,7 +44,7 @@ PRE_SERVICE_CONFIG_SECTIONS = (
 )
 
 POST_SERVICE_CONFIG_SECTIONS = (
-    ConfigObjectSection("event_management_states", "event_management_state", interface="event_management"),
+    ConfigObjectSection("event_management_states", "event_management_state"),
     ConfigObjectSection("correlation_searches", "correlation_search", interface="event_management", identity_field="name"),
     ConfigObjectSection("notable_event_email_templates", "notable_event_email_template", interface="event_management"),
     ConfigObjectSection("maintenance_windows", "maintenance_calendar", interface="maintenance"),

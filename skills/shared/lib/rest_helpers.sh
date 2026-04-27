@@ -341,16 +341,35 @@ _urlencode() {
 }
 
 form_urlencode_pairs() {
+    local args_file output rc restore_errexit=false
+
     if (( $# % 2 != 0 )); then
         echo "ERROR: form_urlencode_pairs requires key/value pairs." >&2
         return 1
     fi
 
-    python3 - "$@" <<'PY'
+    args_file="$(mktemp)"
+    chmod 600 "${args_file}"
+    for arg in "$@"; do
+        printf '%s\0' "${arg}"
+    done > "${args_file}"
+
+    case $- in
+        *e*)
+            restore_errexit=true
+            set +e
+            ;;
+    esac
+    output=$(python3 - "${args_file}" <<'PY'
 import sys
 from urllib.parse import quote_plus
+from pathlib import Path
 
-args = sys.argv[1:]
+raw = Path(sys.argv[1]).read_bytes()
+args = raw.split(b"\0")
+if args and args[-1] == b"":
+    args.pop()
+args = [value.decode("utf-8") for value in args]
 parts = []
 for i in range(0, len(args), 2):
     key = args[i]
@@ -359,6 +378,14 @@ for i in range(0, len(args), 2):
 
 print("&".join(parts), end="")
 PY
+)
+    rc=$?
+    if [[ "${restore_errexit}" == "true" ]]; then
+        set -e
+    fi
+    rm -f "${args_file}"
+    [[ "${rc}" -eq 0 ]] || return "${rc}"
+    printf '%s' "${output}"
 }
 
 rest_check_app() {

@@ -66,12 +66,32 @@ post_external_form() {
 
 get_external_json() {
     local url="$1" bearer_token="$2"
-    curl -sS \
+    local auth_config response curl_rc restore_errexit=false
+
+    auth_config="$(mktemp)"
+    chmod 600 "${auth_config}"
+    printf 'header = "Authorization: Bearer %s"\n' "$(_curl_config_escape "${bearer_token}")" > "${auth_config}"
+
+    case $- in
+        *e*)
+            restore_errexit=true
+            set +e
+            ;;
+    esac
+    response=$(curl -sS \
         "${url}" \
-        -H "Authorization: Bearer ${bearer_token}" \
+        -K "${auth_config}" \
         --connect-timeout 10 \
         --max-time 120 \
-        -w '\n%{http_code}'
+        -w '\n%{http_code}')
+    curl_rc=$?
+    if [[ "${restore_errexit}" == "true" ]]; then
+        set -e
+    fi
+
+    rm -f "${auth_config}"
+    printf '%s' "${response}"
+    return "${curl_rc}"
 }
 
 parse_device_authorization_response() {

@@ -255,22 +255,31 @@ PY
 
 build_activation_payload() {
     local activation_code="$1"
-    python3 - "${activation_code}" <<'PY'
+    python3 - 3<<<"${activation_code}" <<'PY'
 import json
-import sys
+import os
 
-print(json.dumps({"activation_code": sys.argv[1]}), end="")
+with os.fdopen(3, encoding="utf-8") as handle:
+    activation_code = handle.read()
+if activation_code.endswith("\n"):
+    activation_code = activation_code[:-1]
+print(json.dumps({"activation_code": activation_code}), end="")
 PY
 }
 
 build_proxy_payload() {
     local proxy_password="$1"
-    python3 - "${PROXY_URL}" "${PROXY_USERNAME}" "${proxy_password}" <<'PY'
+    python3 - "${PROXY_URL}" "${PROXY_USERNAME}" 3<<<"${proxy_password}" <<'PY'
 from urllib.parse import urlsplit
 import json
+import os
 import sys
 
-proxy_url, username, password = sys.argv[1:]
+proxy_url, username = sys.argv[1:]
+with os.fdopen(3, encoding="utf-8") as handle:
+    password = handle.read()
+if password.endswith("\n"):
+    password = password[:-1]
 parts = urlsplit(proxy_url)
 
 if parts.scheme not in ("http", "https"):

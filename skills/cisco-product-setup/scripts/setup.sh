@@ -137,7 +137,7 @@ append_user_value() {
     value="${2:-}"
     for i in "${!USER_KEYS[@]}"; do
         if [[ "${USER_KEYS[$i]}" == "${normalized}" ]]; then
-            USER_VALUES[$i]="${value}"
+            USER_VALUES[i]="${value}"
             return 0
         fi
     done
@@ -168,7 +168,7 @@ append_secret_file() {
     path="${2:-}"
     for i in "${!SECRET_KEYS[@]}"; do
         if [[ "${SECRET_KEYS[$i]}" == "${normalized}" ]]; then
-            SECRET_PATHS[$i]="${path}"
+            SECRET_PATHS[i]="${path}"
             return 0
         fi
     done
@@ -217,7 +217,7 @@ append_default_pair() {
     [[ -n "${key}" ]] || return 0
     for i in "${!EFFECTIVE_DEFAULT_KEYS[@]}"; do
         if [[ "${EFFECTIVE_DEFAULT_KEYS[$i]}" == "${key}" ]]; then
-            EFFECTIVE_DEFAULT_VALUES[$i]="${value}"
+            EFFECTIVE_DEFAULT_VALUES[i]="${value}"
             return 0
         fi
     done
