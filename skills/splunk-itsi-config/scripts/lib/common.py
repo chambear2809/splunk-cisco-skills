@@ -36,7 +36,18 @@ def _yaml_scalar(value: Any) -> str:
     text = str(value)
     if text == "":
         return '""'
-    if re.fullmatch(r"[A-Za-z0-9_./:@-]+", text) and text.lower() not in {"true", "false", "null", "yes", "no", "on", "off"}:
+    if (
+        text[:1] not in {"@", "`", ":"}
+        and re.fullmatch(r"[A-Za-z0-9_./:@-]+", text)
+        and text.lower() not in {"true", "false", "null", "yes", "no", "on", "off"}
+    ):
+        return text
+    return json.dumps(text)
+
+
+def _yaml_key(value: Any) -> str:
+    text = str(value)
+    if re.fullmatch(r"[A-Za-z0-9_.-]+", text) and text.lower() not in {"true", "false", "null", "yes", "no", "on", "off"}:
         return text
     return json.dumps(text)
 
@@ -46,15 +57,16 @@ def render_yaml(value: Any, indent: int = 0) -> str:
     if isinstance(value, dict):
         lines: list[str] = []
         for key, child in value.items():
+            rendered_key = _yaml_key(key)
             if isinstance(child, (dict, list)) and child:
-                lines.append(f"{prefix}{key}:")
+                lines.append(f"{prefix}{rendered_key}:")
                 lines.append(render_yaml(child, indent + 2))
             elif child == {}:
-                lines.append(f"{prefix}{key}: {{}}")
+                lines.append(f"{prefix}{rendered_key}: {{}}")
             elif child == []:
-                lines.append(f"{prefix}{key}: []")
+                lines.append(f"{prefix}{rendered_key}: []")
             else:
-                lines.append(f"{prefix}{key}: {_yaml_scalar(child)}")
+                lines.append(f"{prefix}{rendered_key}: {_yaml_scalar(child)}")
         return "\n".join(lines)
     if isinstance(value, list):
         if not value:
@@ -68,15 +80,16 @@ def render_yaml(value: Any, indent: int = 0) -> str:
                 keys = list(item)
                 first_key = keys[0]
                 first_value = item[first_key]
+                rendered_key = _yaml_key(first_key)
                 if isinstance(first_value, (dict, list)) and first_value:
-                    lines.append(f"{prefix}- {first_key}:")
+                    lines.append(f"{prefix}- {rendered_key}:")
                     lines.append(render_yaml(first_value, indent + 4))
                 elif first_value == {}:
-                    lines.append(f"{prefix}- {first_key}: {{}}")
+                    lines.append(f"{prefix}- {rendered_key}: {{}}")
                 elif first_value == []:
-                    lines.append(f"{prefix}- {first_key}: []")
+                    lines.append(f"{prefix}- {rendered_key}: []")
                 else:
-                    lines.append(f"{prefix}- {first_key}: {_yaml_scalar(first_value)}")
+                    lines.append(f"{prefix}- {rendered_key}: {_yaml_scalar(first_value)}")
                 remainder = {key: item[key] for key in keys[1:]}
                 if remainder:
                     lines.append(render_yaml(remainder, indent + 2))
