@@ -2,6 +2,7 @@
 """Regression tests for Cisco TA and host bootstrap shell scripts."""
 
 import getpass
+import io
 import json
 import os
 import subprocess
@@ -1596,6 +1597,50 @@ EOF
             self.assertTrue(package_file.exists(), msg="Local package should remain after repeated install runs")
             self.assertIn("already matches the requested package", second_result.stdout)
             self.assertFalse(stale_backup.exists(), msg="Repeated same-version install should clean stale user-seed backups")
+
+    def test_host_bootstrap_install_rejects_unsafe_tgz_members(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            current_user = subprocess.check_output(["id", "-un"], text=True).strip()
+            credentials_file = tmp_path / "credentials"
+            password_file = tmp_path / "admin_password"
+            package_file = tmp_path / "splunk-10.0.0-linux-x86_64.tgz"
+            splunk_home = tmp_path / "installed-splunk"
+            escape_path = tmp_path / "escaped.txt"
+
+            credentials_file.write_text("", encoding="utf-8")
+            password_file.write_text("changeme\n", encoding="utf-8")
+            with tarfile.open(package_file, "w:gz") as archive:
+                data = b"escape"
+                info = tarfile.TarInfo("../escaped.txt")
+                info.size = len(data)
+                archive.addfile(info, io.BytesIO(data))
+
+            env = os.environ.copy()
+            env.update(
+                {
+                    "SPLUNK_CREDENTIALS_FILE": str(credentials_file),
+                    "SPLUNK_LOCAL_SUDO": "false",
+                }
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--source", "local",
+                "--file", str(package_file),
+                "--splunk-home", str(splunk_home),
+                "--service-user", current_user,
+                "--admin-password-file", str(password_file),
+                "--no-boot-start",
+                env=env,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unsafe package archive member", result.stdout + result.stderr)
+            self.assertFalse(escape_path.exists())
 
 
     def test_host_bootstrap_install_upgrades_tgz_without_admin_password_and_preserves_local_files(self):

@@ -7,6 +7,34 @@
 [[ -n "${_SPLUNKBASE_HELPERS_LOADED:-}" ]] && return 0
 _SPLUNKBASE_HELPERS_LOADED=true
 
+_splunkbase_append_cleanup_trap() {
+    if declare -F hbs_append_cleanup_trap >/dev/null 2>&1; then
+        hbs_append_cleanup_trap "$@"
+        return
+    fi
+
+    local cleanup_cmd="${1:-}"
+    shift || true
+    local signal trap_output body existing
+    [[ -n "${cleanup_cmd}" ]] || return 0
+    for signal in "$@"; do
+        trap_output="$(trap -p "${signal}" || true)"
+        existing=""
+        if [[ -n "${trap_output}" ]]; then
+            body="${trap_output#trap -- }"
+            body="${body%" ${signal}"}"
+            existing="$(eval "printf '%s' ${body}")"
+        fi
+        if [[ -n "${existing}" ]]; then
+            # shellcheck disable=SC2064  # intentional: cleanup paths are captured at registration time.
+            trap "${existing}; ${cleanup_cmd}" "${signal}"
+        else
+            # shellcheck disable=SC2064  # intentional: cleanup paths are captured at registration time.
+            trap "${cleanup_cmd}" "${signal}"
+        fi
+    done
+}
+
 get_splunkbase_session() {
     local response_file cookie_file http_code response session
 
@@ -14,8 +42,7 @@ get_splunkbase_session() {
     response_file="$(mktemp)"
     cookie_file="$(mktemp)"
     chmod 600 "${cookie_file}"
-    # shellcheck disable=SC2064  # intentional: temp paths are captured for exit cleanup.
-    trap "rm -f '${cookie_file}' '${response_file}'" EXIT INT TERM
+    _splunkbase_append_cleanup_trap "rm -f $(printf '%q' "${cookie_file}") $(printf '%q' "${response_file}")" EXIT INT TERM
 
     if [[ -n "${SB_COOKIE_JAR:-}" && -f "${SB_COOKIE_JAR}" ]]; then
         rm -f "${SB_COOKIE_JAR}"

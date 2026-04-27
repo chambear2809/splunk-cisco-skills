@@ -588,7 +588,47 @@ cleanup() {
 }
 trap cleanup EXIT
 
-run_privileged tar -xzf "\${package_path}" -C "\${extract_dir}"
+run_privileged python3 - "\${package_path}" "\${extract_dir}" <<'PY'
+import os
+from pathlib import PurePosixPath
+import sys
+import tarfile
+
+
+def fail(message):
+    print(f"ERROR: Unsafe package archive member: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def safe_relative_path(value):
+    normalized = str(value or "").replace("\\\\", "/").strip()
+    path = PurePosixPath(normalized)
+    return bool(normalized) and not path.is_absolute() and ".." not in path.parts
+
+
+archive_path, destination = sys.argv[1], sys.argv[2]
+destination = os.path.abspath(destination)
+with tarfile.open(archive_path, "r:*") as archive:
+    members = archive.getmembers()
+    for member in members:
+        if not safe_relative_path(member.name):
+            fail(member.name)
+        target = os.path.abspath(os.path.join(destination, member.name))
+        if os.path.commonpath([destination, target]) != destination:
+            fail(member.name)
+        if member.isdev() or member.isfifo():
+            fail(f"{member.name} uses a special file type")
+        if member.issym() or member.islnk():
+            if not safe_relative_path(member.linkname):
+                fail(f"{member.name} -> {member.linkname}")
+            link_target = os.path.abspath(os.path.join(os.path.dirname(target), member.linkname))
+            if os.path.commonpath([destination, link_target]) != destination:
+                fail(f"{member.name} -> {member.linkname}")
+    try:
+        archive.extractall(destination, members=members, filter="data")
+    except TypeError:
+        archive.extractall(destination, members=members)
+PY
 if [[ ! -d "\${extract_dir}/splunk" ]]; then
     echo "ERROR: Extracted package did not contain a splunk/ directory." >&2
     exit 1

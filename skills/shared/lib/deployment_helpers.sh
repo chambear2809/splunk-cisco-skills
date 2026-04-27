@@ -738,11 +738,56 @@ deployment_install_app_via_bundle() {
     execution_mode="$(deployment_execution_mode_for_profile "${profile_name}")"
     staged_path="$(deployment_run_with_profile "${profile_name}" hbs_stage_file_for_execution "${execution_mode}" "${file_path}" "$(basename "${file_path}").bundle.$$")" || return 1
 
+    # The heredoc body and the EOF terminator must remain at column 0; the body is delivered
+    # verbatim to a remote bash interpreter via hbs_run_target_cmd_with_stdin.
     script_content="$(cat <<EOF
 set -euo pipefail
 tmp_dir="\$(mktemp -d)"
 trap 'rm -rf "\${tmp_dir}" $(printf '%q' "${staged_path}")' EXIT
-tar -xf $(printf '%q' "${staged_path}") -C "\${tmp_dir}"
+safe_extract_tar() {
+  python3 - "\$1" "\$2" <<'PY'
+import os
+from pathlib import PurePosixPath
+import sys
+import tarfile
+
+
+def fail(message):
+    print(f"ERROR: Unsafe archive member: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def safe_relative_path(value):
+    normalized = str(value or "").replace("\\\\", "/").strip()
+    path = PurePosixPath(normalized)
+    return bool(normalized) and not path.is_absolute() and ".." not in path.parts
+
+
+archive_path, destination = sys.argv[1], sys.argv[2]
+destination = os.path.abspath(destination)
+with tarfile.open(archive_path, "r:*") as archive:
+    members = archive.getmembers()
+    for member in members:
+        if not safe_relative_path(member.name):
+            fail(member.name)
+        target = os.path.abspath(os.path.join(destination, member.name))
+        if os.path.commonpath([destination, target]) != destination:
+            fail(member.name)
+        if member.isdev() or member.isfifo():
+            fail(f"{member.name} uses a special file type")
+        if member.issym() or member.islnk():
+            if not safe_relative_path(member.linkname):
+                fail(f"{member.name} -> {member.linkname}")
+            link_target = os.path.abspath(os.path.join(os.path.dirname(target), member.linkname))
+            if os.path.commonpath([destination, link_target]) != destination:
+                fail(f"{member.name} -> {member.linkname}")
+    try:
+        archive.extractall(destination, members=members, filter="data")
+    except TypeError:
+        archive.extractall(destination, members=members)
+PY
+}
+safe_extract_tar $(printf '%q' "${staged_path}") "\${tmp_dir}"
 bundle_root=$(printf '%q' "${target_root}")
 requested_app_name=$(printf '%q' "${app_name}")
 source_dir="\${tmp_dir}/\${requested_app_name}"

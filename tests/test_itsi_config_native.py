@@ -85,8 +85,31 @@ class FakeNativeClient:
                 return copy.deepcopy(obj)
         return None
 
-    def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
-        return [copy.deepcopy(value) for value in self._object_store(object_type).values()]
+    def list_objects(
+        self,
+        object_type: str,
+        interface: str = "itoa",
+        *,
+        fields=None,
+        filter_data=None,
+        limit=None,
+        offset=None,
+    ) -> list[dict]:
+        values = [copy.deepcopy(value) for value in self._object_store(object_type).values()]
+        if filter_data:
+            values = [
+                value
+                for value in values
+                if all(str(value.get(key) or "") == str(expected) for key, expected in filter_data.items())
+            ]
+        if fields:
+            field_names = [str(field).strip() for field in fields if str(field).strip()] if not isinstance(fields, str) else [field.strip() for field in fields.split(",") if field.strip()]
+            values = [{key: value[key] for key in field_names if key in value} for value in values]
+        if offset is not None:
+            values = values[int(offset):]
+        if limit is not None:
+            values = values[: int(limit)]
+        return values
 
     def create_object(self, object_type: str, payload: dict) -> dict:
         store = self._object_store(object_type)
@@ -171,6 +194,16 @@ class FakeNativeClient:
         self.operations.append(("operational", "entity_retire_retirable"))
         return {"status": "ok"}
 
+    def count_retirable_entities(self) -> int:
+        return 3
+
+    def retirable_entities(self) -> list[dict]:
+        return [
+            {"_key": "entity:retirable:1", "title": "Retirable 1"},
+            {"_key": "entity:retirable:2", "title": "Retirable 2"},
+            {"_key": "entity:retirable:3", "title": "Retirable 3"},
+        ]
+
     def apply_kpi_threshold_recommendation(self, payload: dict) -> dict:
         self.operations.append(("operational", "kpi_threshold_recommendation", str(payload)))
         return {"status": "ok"}
@@ -192,10 +225,49 @@ class FakeNativeClient:
     def notable_event_actions(self) -> list[dict]:
         return [{"name": "create_ticket"}, {"name": "send_email"}]
 
+    def get_notable_event_action(self, action_name: str) -> dict:
+        return {"name": action_name, "required_params": ["message"] if action_name == "send_email" else []}
+
+    def entity_discovery_searches(self, entity_id: str) -> list[dict]:
+        return [{"name": "ITSI Import Objects - Perfmon", "entity_id": entity_id, "entity_count": 1}]
+
     def event_management_count(self, object_type: str, filter_data: dict | None = None) -> int | None:
         if object_type == "notable_event_group":
             return 7
+        if object_type == "notable_event":
+            return 11
         return 0
+
+    def count_objects(self, object_type: str, interface: str = "itoa", filter_data: dict | None = None) -> int | None:
+        return len(self.list_objects(object_type, interface=interface))
+
+    def bulk_update_objects(self, object_type: str, payloads: list[dict], interface: str = "itoa", *, partial: bool = True) -> dict:
+        self.operations.append(("operational", "bulk_update_objects", object_type, interface, str(partial), str(payloads)))
+        store = self._object_store(object_type)
+        for payload in payloads:
+            updated = copy.deepcopy(payload)
+            if object_type == "service":
+                existing = next((value for value in store.values() if value.get("_key") == updated.get("_key")), None)
+                updated = self._sync_service_template(updated, existing=existing)
+            label = self._object_label(updated)
+            store[label] = updated
+        return {"updated": len(payloads)}
+
+    def list_event_management_objects(
+        self,
+        object_type: str,
+        filter_data: dict | None = None,
+        *,
+        limit: int | None = None,
+        fields: str | None = None,
+    ) -> list[dict]:
+        self.operations.append(("operational", "list_event_management_objects", object_type, str(filter_data), str(limit), str(fields)))
+        items = [{"_key": "notable:1", "object_type": object_type, "status": "5"}]
+        return items[:limit] if limit is not None else items
+
+    def templatize_object(self, object_type: str, key: str) -> dict:
+        self.operations.append(("operational", "templatize_object", object_type, key))
+        return {"object_type": object_type, "source_key": key, "title": "Generated Template"}
 
     def active_maintenance_window(self, object_key: str) -> dict:
         return {"object_key": object_key, "active": False}
@@ -212,11 +284,15 @@ class FakeNativeClient:
 
     def execute_notable_event_action(self, action_name: str, payload: dict) -> dict:
         self.operations.append(("operational", "notable_event_action_execute", action_name, str(payload)))
-        return {"status": "ok"}
+        return [{"action_name": action_name, "ids": payload.get("ids", []), "sid": "search:1"}]
 
     def link_episode_ticket(self, payload: dict, group_key: str | None = None) -> dict:
         self.operations.append(("operational", "ticket_link", str(group_key), str(payload)))
-        return {"status": "ok"}
+        return ["ticket-link:1"]
+
+    def get_episode_tickets(self, group_key: str) -> list[dict]:
+        self.operations.append(("operational", "ticket_read", group_key))
+        return [{"ticket_system": "jira", "ticket_id": "NET-1", "event_id": group_key}]
 
     def unlink_episode_ticket(self, group_key: str, ticketing_system: str, ticket_id: str) -> dict:
         self.operations.append(("operational", "ticket_unlink", group_key, ticketing_system, ticket_id))
@@ -225,6 +301,42 @@ class FakeNativeClient:
     def create_episode_export(self, payload: dict) -> dict:
         self.operations.append(("operational", "episode_export_create", str(payload)))
         return {"status": "ok"}
+
+    def list_episode_exports(self, filter_data: dict | None = None) -> list[dict]:
+        self.operations.append(("operational", "episode_export_list", str(filter_data)))
+        return [{"_key": "export:1", "status": "COMPLETED", "export_filename": "episodes.csv"}]
+
+    def get_episode_export(self, export_key: str) -> dict | None:
+        self.operations.append(("operational", "episode_export_get", export_key))
+        return {"_key": export_key, "status": "COMPLETED", "export_filename": "episodes.csv"}
+
+    def delete_episode_exports(self, filter_data: dict) -> dict:
+        self.operations.append(("operational", "episode_export_delete_filter", str(filter_data)))
+        return {"status": "ok"}
+
+    def delete_episode_export(self, export_key: str) -> dict:
+        self.operations.append(("operational", "episode_export_delete", export_key))
+        return {"status": "ok"}
+
+    def download_episode_export_file(self, filename: str) -> bytes:
+        self.operations.append(("operational", "episode_export_file_download", filename))
+        return b"episode csv"
+
+    def delete_episode_export_file(self, filename: str) -> dict:
+        self.operations.append(("operational", "episode_export_file_delete", filename))
+        return {"status": "ok"}
+
+    def create_notable_event_comment(self, payload: dict) -> dict:
+        self.operations.append(("operational", "notable_event_comment_create", str(payload)))
+        return {"status": "ok"}
+
+    def submit_custom_content_pack(self, key: str) -> dict:
+        self.operations.append(("operational", "custom_content_pack_submit", key))
+        return {"status": "ok"}
+
+    def download_custom_content_pack(self, key: str) -> bytes:
+        self.operations.append(("operational", "custom_content_pack_download", key))
+        return b"custom-content-pack"
 
 
 class OptionalEndpointUnavailableClient(FakeNativeClient):
@@ -388,6 +500,52 @@ class NativeWorkflowTests(unittest.TestCase):
         self.assertTrue(all(change.action == "noop" for change in result.changes))
         self.assertEqual(result.summary()["unchanged"], 3)
 
+    def test_apply_can_batch_existing_native_updates_with_bulk_apply(self) -> None:
+        client = FakeNativeClient(
+            {
+                "entity": {
+                    "edge-sw-01": {
+                        "_key": "entity:1",
+                        "title": "edge-sw-01",
+                        "description": "old",
+                        "sec_grp": "default_itsi_security_group",
+                    }
+                },
+                "service": {
+                    "Network Edge": {
+                        "_key": "service:1",
+                        "title": "Network Edge",
+                        "description": "old",
+                        "sec_grp": "default_itsi_security_group",
+                    }
+                },
+                "kpi_base_search": {
+                    "CPU Base": {
+                        "_key": "base:1",
+                        "title": "CPU Base",
+                        "description": "old",
+                        "sec_grp": "default_itsi_security_group",
+                    }
+                },
+            }
+        )
+        spec = {
+            "bulk_apply": {"enabled": True, "sections": ["entities", "services", "kpi_base_searches"]},
+            "entities": [{"title": "edge-sw-01", "description": "new"}],
+            "services": [{"title": "Network Edge", "description": "new"}],
+            "kpi_base_searches": [{"title": "CPU Base", "description": "new"}],
+        }
+
+        result = NativeWorkflow(client).run(spec, "apply")
+
+        self.assertFalse(result.failed, result.diagnostics)
+        bulk_updates = [operation for operation in client.operations if operation[0:2] == ("operational", "bulk_update_objects")]
+        self.assertEqual([operation[2] for operation in bulk_updates], ["kpi_base_search", "entity", "service"])
+        self.assertEqual(client.objects["entity"]["edge-sw-01"]["description"], "new")
+        self.assertEqual(client.objects["service"]["Network Edge"]["description"], "new")
+        self.assertEqual(client.objects["kpi_base_search"]["CPU Base"]["description"], "new")
+        self.assertTrue(any(change.detail.startswith("Bulk-updated") for change in result.changes))
+
     def test_dependencies_are_applied_in_second_pass(self) -> None:
         client = FakeNativeClient()
         spec = {
@@ -503,6 +661,88 @@ class NativeWorkflowTests(unittest.TestCase):
                 {"status": "pass", "object_type": "service", "title": "API"},
                 {"status": "pass", "object_type": "service_dependency", "title": "API"},
             ],
+        )
+
+    def test_validate_accepts_exported_dependency_kpi_ids(self) -> None:
+        client = FakeNativeClient(
+            {
+                "service": {
+                    "External DB": {
+                        "_key": "service:db",
+                        "title": "External DB",
+                        "description": "",
+                        "sec_grp": "default_itsi_security_group",
+                        "kpis": [
+                            {"_key": "service:db::kpi::1", "title": "Availability", "threshold_field": "availability"},
+                            {"_key": "service:db::kpi::2", "title": "Latency", "threshold_field": "latency"},
+                        ],
+                    },
+                    "API": {
+                        "_key": "service:api",
+                        "title": "API",
+                        "description": "",
+                        "sec_grp": "default_itsi_security_group",
+                        "kpis": [],
+                        "services_depends_on": [{"service_id": "service:db", "kpis_depending_on": ["service:db::kpi::2"]}],
+                    },
+                }
+            }
+        )
+        spec = {"services": [{"title": "API", "depends_on": [{"service": "External DB", "kpi_ids": ["service:db::kpi::2"]}]}]}
+
+        result = NativeWorkflow(client).run(spec, "validate")
+
+        self.assertIn(
+            {"status": "pass", "object_type": "service_dependency", "title": "API"},
+            result.validations,
+        )
+        self.assertFalse(result.failed, result.diagnostics)
+
+    def test_validate_rejects_dependency_kpi_ids_from_other_services(self) -> None:
+        client = FakeNativeClient(
+            {
+                "service": {
+                    "External DB": {
+                        "_key": "service:db",
+                        "title": "External DB",
+                        "description": "",
+                        "sec_grp": "default_itsi_security_group",
+                        "kpis": [
+                            {"_key": "service:db::kpi::1", "title": "Availability", "threshold_field": "availability"},
+                        ],
+                    },
+                    "Other": {
+                        "_key": "service:other",
+                        "title": "Other",
+                        "description": "",
+                        "sec_grp": "default_itsi_security_group",
+                        "kpis": [
+                            {"_key": "service:other::kpi::1", "title": "Latency", "threshold_field": "latency"},
+                        ],
+                    },
+                    "API": {
+                        "_key": "service:api",
+                        "title": "API",
+                        "description": "",
+                        "sec_grp": "default_itsi_security_group",
+                        "kpis": [],
+                    },
+                }
+            }
+        )
+        spec = {"services": [{"title": "API", "depends_on": [{"service": "External DB", "kpi_ids": ["service:other::kpi::1"]}]}]}
+
+        result = NativeWorkflow(client).run(spec, "validate")
+
+        self.assertTrue(result.failed)
+        self.assertIn(
+            {
+                "status": "error",
+                "object_type": "service_dependency",
+                "title": "API",
+                "message": "Dependency service 'External DB' is missing KPI id(s): service:other::kpi::1.",
+            },
+            result.diagnostics,
         )
 
     def test_managed_neap_is_protected(self) -> None:
@@ -757,6 +997,7 @@ class NativeWorkflowTests(unittest.TestCase):
     def test_new_passthrough_config_sections_preview_without_mutating(self) -> None:
         client = FakeNativeClient()
         spec = {
+            "entity_filter_rules": [{"title": "Network Entity Filter", "payload": {"filter": '{"title":{"$regex":"edge-.*"}}'}}],
             "entity_management_policies": [{"title": "Entity Discovery Policy", "enabled": False}],
             "entity_management_rules": [{"title": "Entity Discovery Rule", "field": "host"}],
             "data_integration_templates": [{"title": "Third-Party Integration Template", "source": "example"}],
@@ -773,10 +1014,11 @@ class NativeWorkflowTests(unittest.TestCase):
         result = NativeWorkflow(client).run(spec, "preview")
 
         self.assertEqual(client.operations, [])
-        self.assertEqual(result.summary()["created"], 11)
+        self.assertEqual(result.summary()["created"], 12)
         self.assertEqual(
             [change.object_type for change in result.changes],
             [
+                "entity_filter_rule",
                 "entity_management_policy",
                 "entity_management_rule",
                 "data_integration_template",
@@ -1036,6 +1278,25 @@ class NativeWorkflowTests(unittest.TestCase):
         self.assertIn(("operational", "custom_threshold_window_stop", "ctw:business-hours"), client.operations)
         self.assertTrue(any(operation[0:2] == ("operational", "shift_time_offset") for operation in client.operations))
         self.assertIn(("operational", "entity_retire_retirable"), client.operations)
+        self.assertTrue(any(change.detail == "Retired 3 retirable entities." for change in result.changes))
+
+    def test_preview_retire_retirable_reports_count(self) -> None:
+        client = FakeNativeClient()
+        spec = {
+            "operational_actions": [
+                {
+                    "action": "entity_retire_retirable",
+                    "allow_operational_action": True,
+                    "retire_all_retirable": True,
+                }
+            ]
+        }
+
+        result = NativeWorkflow(client).run(spec, "preview")
+
+        self.assertFalse(result.failed)
+        self.assertTrue(any(change.detail == "Would retire 3 retirable entities." for change in result.changes))
+        self.assertNotIn(("operational", "entity_retire_retirable"), client.operations)
 
     def test_custom_threshold_disconnect_requires_disconnect_all(self) -> None:
         client = FakeNativeClient(
@@ -1128,12 +1389,23 @@ class NativeWorkflowTests(unittest.TestCase):
                     "params": {"message": "investigate"},
                 },
                 {
+                    "action": "notable_event_comment",
+                    "allow_operational_action": True,
+                    "group_key": "episode:1",
+                    "comment": "Reviewed by platform engineering.",
+                },
+                {
                     "action": "ticket_link",
                     "allow_operational_action": True,
                     "group_key": "episode:1",
                     "ticketing_system": "jira",
                     "ticket_id": "NET-1",
                     "ticket_url": "https://jira.example/browse/NET-1",
+                },
+                {
+                    "action": "ticket_read",
+                    "allow_operational_action": True,
+                    "group_key": "episode:1",
                 },
                 {
                     "action": "ticket_unlink",
@@ -1148,6 +1420,16 @@ class NativeWorkflowTests(unittest.TestCase):
                     "allow_operational_action": True,
                     "payload": {"filter_data": {"status": 5}},
                 },
+                {
+                    "action": "episode_export_get",
+                    "allow_operational_action": True,
+                    "export_key": "export:1",
+                },
+                {
+                    "action": "episode_export_list",
+                    "allow_operational_action": True,
+                    "filter_data": {"status": "COMPLETED"},
+                },
             ]
         }
 
@@ -1156,9 +1438,113 @@ class NativeWorkflowTests(unittest.TestCase):
         self.assertFalse(result.failed, result.diagnostics)
         self.assertTrue(any(operation[0:3] == ("operational", "notable_event_group_update", "episode:1") for operation in client.operations))
         self.assertTrue(any(operation[0:3] == ("operational", "notable_event_action_execute", "send_email") for operation in client.operations))
+        self.assertTrue(any(operation[0:2] == ("operational", "notable_event_comment_create") for operation in client.operations))
         self.assertTrue(any(operation[0:3] == ("operational", "ticket_link", "episode:1") for operation in client.operations))
+        self.assertIn(("operational", "ticket_read", "episode:1"), client.operations)
         self.assertIn(("operational", "ticket_unlink", "episode:1", "jira", "NET-1"), client.operations)
         self.assertTrue(any(operation[0:2] == ("operational", "episode_export_create") for operation in client.operations))
+        self.assertIn(("operational", "episode_export_get", "export:1"), client.operations)
+        self.assertIn(("operational", "episode_export_list", "{'status': 'COMPLETED'}"), client.operations)
+        action_results = [
+            diagnostic
+            for diagnostic in result.diagnostics
+            if diagnostic.get("object_type") == "operational_action_result"
+        ]
+        self.assertEqual(len(action_results), 3)
+        results_by_action = {diagnostic["action"]: diagnostic["result"] for diagnostic in action_results}
+        self.assertEqual(results_by_action["notable_event_action_detail"]["name"], "send_email")
+        self.assertEqual(results_by_action["notable_event_action_execute"][0]["sid"], "search:1")
+        self.assertEqual(results_by_action["ticket_link"], ["ticket-link:1"])
+
+    def test_apply_guarded_episode_export_file_and_template_actions(self) -> None:
+        client = FakeNativeClient()
+        with tempfile.TemporaryDirectory() as tempdir:
+            csv_path = Path(tempdir) / "episodes.csv"
+            template_path = Path(tempdir) / "service-template.json"
+            spec = {
+                "operational_actions": [
+                    {
+                        "action": "episode_export_download",
+                        "allow_operational_action": True,
+                        "filename": "episodes.csv",
+                        "output_path": str(csv_path),
+                    },
+                    {
+                        "action": "episode_export_file_delete",
+                        "allow_operational_action": True,
+                        "allow_episode_export_delete": True,
+                        "filename": "episodes.csv",
+                    },
+                    {
+                        "action": "episode_export_delete",
+                        "allow_operational_action": True,
+                        "allow_episode_export_delete": True,
+                        "export_key": "export:1",
+                    },
+                    {
+                        "action": "episode_export_delete",
+                        "allow_operational_action": True,
+                        "allow_episode_export_delete": True,
+                        "allow_episode_export_bulk_delete": True,
+                        "filter_data": {"status": "FAILED"},
+                    },
+                    {
+                        "action": "templatize_object",
+                        "allow_operational_action": True,
+                        "object_type": "service",
+                        "key": "service:1",
+                        "output_path": str(template_path),
+                    },
+                    {
+                        "action": "bulk_update",
+                        "allow_operational_action": True,
+                        "allow_bulk_update": True,
+                        "object_type": "entity",
+                        "payloads": [{"_key": "entity:1", "title": "Entity"}],
+                    },
+                ]
+            }
+
+            result = NativeWorkflow(client).run(spec, "apply")
+
+            self.assertEqual(csv_path.read_bytes(), b"episode csv")
+            self.assertIn("Generated Template", template_path.read_text(encoding="utf-8"))
+
+        self.assertFalse(result.failed, result.diagnostics)
+        self.assertIn(("operational", "episode_export_file_download", "episodes.csv"), client.operations)
+        self.assertIn(("operational", "episode_export_file_delete", "episodes.csv"), client.operations)
+        self.assertIn(("operational", "episode_export_delete", "export:1"), client.operations)
+        self.assertIn(("operational", "episode_export_delete_filter", "{'status': 'FAILED'}"), client.operations)
+        self.assertIn(("operational", "templatize_object", "service", "service:1"), client.operations)
+        self.assertTrue(any(operation[0:3] == ("operational", "bulk_update_objects", "entity") for operation in client.operations))
+
+    def test_apply_guarded_custom_content_pack_lifecycle_actions(self) -> None:
+        client = FakeNativeClient()
+        with tempfile.TemporaryDirectory() as tempdir:
+            output_path = Path(tempdir) / "custom-pack.tar.gz"
+            spec = {
+                "operational_actions": [
+                    {
+                        "action": "custom_content_pack_submit",
+                        "allow_operational_action": True,
+                        "content_pack_key": "cp:network",
+                    },
+                    {
+                        "action": "custom_content_pack_download",
+                        "allow_operational_action": True,
+                        "content_pack_key": "cp:network",
+                        "output_path": str(output_path),
+                    },
+                ]
+            }
+
+            result = NativeWorkflow(client).run(spec, "apply")
+
+            self.assertEqual(output_path.read_bytes(), b"custom-content-pack")
+
+        self.assertFalse(result.failed, result.diagnostics)
+        self.assertIn(("operational", "custom_content_pack_submit", "cp:network"), client.operations)
+        self.assertIn(("operational", "custom_content_pack_download", "cp:network"), client.operations)
 
     def test_event_analytics_operational_actions_require_secondary_guards(self) -> None:
         client = FakeNativeClient()
@@ -1191,6 +1577,35 @@ class NativeWorkflowTests(unittest.TestCase):
                         "group_key": "episode:1",
                         "ticketing_system": "jira",
                         "ticket_id": "NET-1",
+                    }
+                ]
+            },
+            {
+                "operational_actions": [
+                    {
+                        "action": "episode_export_delete",
+                        "allow_operational_action": True,
+                        "export_key": "export:1",
+                    }
+                ]
+            },
+            {
+                "operational_actions": [
+                    {
+                        "action": "episode_export_delete",
+                        "allow_operational_action": True,
+                        "allow_episode_export_delete": True,
+                        "filter_data": {"status": "FAILED"},
+                    }
+                ]
+            },
+            {
+                "operational_actions": [
+                    {
+                        "action": "bulk_update",
+                        "allow_operational_action": True,
+                        "object_type": "entity",
+                        "payloads": [{"title": "Entity"}],
                     }
                 ]
             },
@@ -1381,6 +1796,34 @@ class NativeWorkflowTests(unittest.TestCase):
         exported_api = next(item for item in native_spec["services"] if item["title"] == "API")
         self.assertNotIn("_key", exported_api["payload"]["kpis"][0])
 
+    def test_export_skips_managed_neaps_by_default(self) -> None:
+        client = FakeNativeClient(
+            {
+                "notable_event_aggregation_policy": {
+                    "Custom NEAP": {"_key": "neap:custom", "title": "Custom NEAP", "rule_type": "custom"},
+                    "Managed NEAP": {
+                        "_key": "neap:managed",
+                        "title": "Managed NEAP",
+                        "rule_type": "custom",
+                        "source_itsi_da": "DA-ITSI",
+                    },
+                    "Default NEAP": {"_key": "neap:default", "title": "Default NEAP", "rule_type": "custom", "is_default": "1"},
+                }
+            }
+        )
+
+        default_export = NativeWorkflow(client).run({"export": {"sections": ["neaps"]}}, "export")
+        managed_export = NativeWorkflow(client).run({"export": {"sections": ["neaps"], "include_managed_neaps": True}}, "export")
+
+        self.assertEqual(
+            [item["title"] for item in default_export.exports["native_spec"]["neaps"]],
+            ["Custom NEAP"],
+        )
+        self.assertEqual(
+            sorted(item["title"] for item in managed_export.exports["native_spec"]["neaps"]),
+            ["Custom NEAP", "Default NEAP", "Managed NEAP"],
+        )
+
     def test_export_skips_unavailable_optional_sections_with_diagnostics(self) -> None:
         client = OptionalEndpointUnavailableClient(
             {"service": {"API": {"_key": "service:api", "title": "API"}}}
@@ -1414,15 +1857,52 @@ class NativeWorkflowTests(unittest.TestCase):
             }
         )
 
-        result = NativeWorkflow(client).run({"inventory": {"maintenance_object_keys": ["service:api"]}}, "inventory")
+        result = NativeWorkflow(client).run(
+            {
+                "inventory": {
+                    "maintenance_object_keys": ["service:api"],
+                    "use_count_endpoints": True,
+                    "ticket_episode_keys": ["episode:1"],
+                    "episode_export_keys": ["export:1"],
+                    "episode_export_filter": {"status": "COMPLETED"},
+                    "notable_event_filter": {"status": "5"},
+                    "notable_event_limit": 1,
+                    "notable_event_fields": ["_key", "status"],
+                    "notable_event_action_names": ["send_email"],
+                    "entity_discovery_entity_keys": ["entity:1"],
+                    "templatize_objects": [{"object_type": "service", "key": "service:api"}],
+                }
+            },
+            "inventory",
+        )
 
         self.assertEqual(result.inventory["objects"]["entities"]["count"], 1)
+        self.assertEqual(result.inventory["objects"]["entities"]["count_endpoint"], 1)
         self.assertEqual(result.inventory["objects"]["services"]["titles"], ["API"])
         self.assertEqual(result.inventory["discovery"]["aliases"]["fields"], ["entity_title", "host"])
         self.assertEqual(result.inventory["discovery"]["notable_event_actions"]["count"], 2)
+        self.assertEqual(result.inventory["discovery"]["notable_event_action_details"]["send_email"]["required_params"], ["message"])
         self.assertIn("itoa:entity", result.inventory["discovery"]["supported_object_types"]["itoa"]["titles"])
+        self.assertEqual(result.inventory["retirable_entities"]["count"], 3)
+        self.assertEqual(result.inventory["retirable_entities"]["items"][0]["title"], "Retirable 1")
+        self.assertEqual(result.inventory["entity_discovery_searches"]["entity:1"]["items"][0]["entity_count"], 1)
         self.assertEqual(result.inventory["event_management_counts"]["notable_event_group"], 7)
+        self.assertEqual(result.inventory["event_management_counts"]["notable_event"], 11)
+        self.assertEqual(result.inventory["notable_events"]["items"][0]["_key"], "notable:1")
         self.assertEqual(result.inventory["maintenance_status"]["service:api"]["count"], 1)
+        self.assertEqual(result.inventory["episode_tickets"]["episode:1"]["count"], 1)
+        self.assertEqual(result.inventory["episode_exports"]["count"], 1)
+        self.assertEqual(result.inventory["episode_export_status"]["export:1"]["status"], "COMPLETED")
+        self.assertEqual(result.inventory["templatized_objects"]["service:service:api"]["source_key"], "service:api")
+
+    def test_inventory_count_only_uses_count_endpoint_without_titles(self) -> None:
+        client = FakeNativeClient({"entity": {"edge-sw-01": {"_key": "entity:1", "title": "edge-sw-01"}}})
+
+        result = NativeWorkflow(client).run({"inventory": {"count_only": True}}, "inventory")
+
+        self.assertEqual(result.inventory["objects"]["entities"]["count"], 1)
+        self.assertEqual(result.inventory["objects"]["entities"]["count_source"], "count_endpoint")
+        self.assertNotIn("titles", result.inventory["objects"]["entities"])
 
     def test_prune_plan_reports_unmanaged_candidates_without_deleting(self) -> None:
         client = FakeNativeClient(
@@ -1486,6 +1966,29 @@ class NativeWorkflowTests(unittest.TestCase):
         global_team = next(candidate for candidate in result.prune_plan["candidates"] if candidate["title"] == "Global")
         self.assertTrue(global_team["delete_supported"])
         self.assertTrue(result.prune_plan["system_object_cleanup_allowed"])
+
+    def test_prune_plan_protects_content_pack_source_metadata(self) -> None:
+        client = FakeNativeClient(
+            {
+                "service": {
+                    "Exchange Mailbox": {
+                        "_key": "service:exchange-mailbox",
+                        "title": "Exchange Mailbox",
+                        "source_content_pack": "DA-ITSI-CP-microsoft-exchange",
+                    },
+                    "Lab Service": {"_key": "service:lab", "title": "Lab Service"},
+                }
+            }
+        )
+
+        result = NativeWorkflow(client).run({}, "prune-plan")
+
+        exchange = next(candidate for candidate in result.prune_plan["candidates"] if candidate["title"] == "Exchange Mailbox")
+        lab = next(candidate for candidate in result.prune_plan["candidates"] if candidate["title"] == "Lab Service")
+        self.assertFalse(exchange["delete_supported"])
+        self.assertEqual(exchange["source"]["source_content_pack"], "DA-ITSI-CP-microsoft-exchange")
+        self.assertIn("source metadata", exchange["unsupported_reason"])
+        self.assertTrue(lab["delete_supported"])
 
     def test_prune_plan_marks_keyless_candidates_manual_review(self) -> None:
         client = FakeNativeClient({"correlation_search": {"Orphan Search": {"name": "Orphan Search"}}})

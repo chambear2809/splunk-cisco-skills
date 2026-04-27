@@ -988,11 +988,7 @@ stage_file_via_ssh() {
         return 1
     fi
 
-    pass_file="$(mktemp)"
-    chmod 600 "${pass_file}"
-    printf '%s' "${SPLUNK_SSH_PASS}" > "${pass_file}"
-    # shellcheck disable=SC2064  # intentional: trap value captured at registration time.
-    trap "rm -f '${pass_file}'" EXIT INT TERM
+    pass_file="$(hbs_make_sshpass_file)"
 
     sshpass -f "${pass_file}" scp \
         -P "${SPLUNK_SSH_PORT}" \
@@ -1010,7 +1006,7 @@ stage_file_via_ssh() {
 cleanup_remote_stage_file() {
     local remote_path="$1"
     local ssh_target="${SPLUNK_SSH_USER}@${SPLUNK_SSH_HOST}"
-    local pass_file
+    local pass_file remote_quoted
 
     [[ -z "${remote_path}" ]] && return 0
 
@@ -1018,11 +1014,11 @@ cleanup_remote_stage_file() {
         return 0
     fi
 
-    pass_file="$(mktemp)"
-    chmod 600 "${pass_file}"
-    printf '%s' "${SPLUNK_SSH_PASS}" > "${pass_file}"
-    # shellcheck disable=SC2064  # intentional: trap value captured at registration time.
-    trap "rm -f '${pass_file}'" EXIT INT TERM
+    pass_file="$(hbs_make_sshpass_file)"
+
+    # Use printf '%q' so any shell metacharacters (including single quotes)
+    # in the staged filename are safely escaped before remote shell expansion.
+    remote_quoted="$(printf '%q' "${remote_path}")"
 
     sshpass -f "${pass_file}" ssh \
         -p "${SPLUNK_SSH_PORT}" \
@@ -1031,7 +1027,7 @@ cleanup_remote_stage_file() {
         -o PubkeyAuthentication=no \
         -o PreferredAuthentications=password \
         -q \
-        "${ssh_target}" "rm -f '${remote_path}'" >/dev/null 2>&1 || true
+        "${ssh_target}" "rm -f ${remote_quoted}" >/dev/null 2>&1 || true
 
     rm -f "${pass_file}"
 }

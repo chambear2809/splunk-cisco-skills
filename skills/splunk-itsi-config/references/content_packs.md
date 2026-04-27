@@ -1,9 +1,10 @@
 # Content-Pack Workflow
 
 For a first-time ITSI setup, start with `templates/beginner.content-pack.yaml`
-and keep only one profile enabled until preview and validation are clean. Use
+and keep only one pack enabled until preview and validation are clean. Use
 `references/beginner_quickstart.md` to translate the user's product/domain into
-the right profile and required index or macro values.
+the right profile, exact catalog title, pack ID, and required index or macro
+values.
 
 Before catalog lookup, the workflow refreshes Content Library discovery through:
 
@@ -18,6 +19,9 @@ Preview and install use the matching route family with the same suffixes:
 
 - `/<id>/<version>/preview`
 - `/<id>/<version>/install`
+- `/status`
+- `/<id>/<version>`
+- `/refresh`
 
 ## Supported Spec Shape
 
@@ -39,6 +43,7 @@ content_library:
   install_if_missing: true
   source: splunkbase
   app_id: "5391"
+  refresh_catalog: true
 
 packs:
   - profile: aws
@@ -79,6 +84,34 @@ packs:
       - perfmon
     metrics_indexes:
       - itsi_im_metrics
+
+  # Any live Content Library pack can also be managed without a named profile.
+  # Use an exact catalog title or pack_id from the live catalog.
+  - title: Microsoft 365
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    configured_outcome:
+      macros:
+        - app: DA-ITSI-CP-microsoft-365
+          name: itsi-cp-microsoft-365-indexes
+          definition: index="o365"
+      saved_searches:
+        - app: DA-ITSI-CP-microsoft-365
+          name: Microsoft 365 Entity Discovery
+          enabled: false
+
+  - pack_id: DA-ITSI-CP-third-party-apm
+    version: 1.4.0
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
 ```
 
 ## Supported Profiles
@@ -112,6 +145,10 @@ content_library:
 - Preview and validate do not install prerequisites. They fail with guidance to rerun the same spec under `bash scripts/setup.sh --workflow content-packs --spec <path> --apply`.
 - `content_library.local_file` and `itsi.local_file` can point at either `.spl` or `.tgz` archives, as long as they are valid Splunk app bundles.
 - Pack validation resolves the live bundled pack app from profile-specific candidate app names, so bundle app names like `DA-ITSI-CP-vmware`, `DA-ITSI-CP-thousandeyes`, `DA-ITSI-CP-nix`, and `DA-ITSI-CP-appdynamics` are handled correctly even when the catalog ID differs.
+- Any live Content Library pack can be declared by `title`, `catalog_title`, or `pack_id` without a named profile. Generic catalog entries automate catalog resolution, preview, install, installed-version validation, and app visibility checks when the app name is discoverable from the catalog ID. They emit `automation_scope`, `follow_up_required`, and `follow_up_steps` in the JSON result and generated report.
+- Generic catalog validation is intentionally conservative. It reports pack-specific data, macro, service-import, sandbox, dashboard, and entity-discovery work as follow-up steps unless the pack uses one of the richer named profiles below or the spec defines a `configured_outcome`.
+- `configured_outcome` can preview/apply/validate post-install configuration that has a safe declarative shape. Supported outcome blocks are `native`, `macros` / `macro_updates`, and `saved_searches` / `entity_discovery_searches`. Use this for service imports already represented as native objects, entity-discovery saved-search enablement, pack macro tuning, and other deterministic handoff tasks. Unsupported post-install task blocks such as `lookup_updates`, `data_model_accelerations`, `kpi_backfills`, `service_imports`, `service_discovery`, `alert_integrations`, `dashboards`, `navigation_updates`, or `sandbox_publish` are emitted as warning steps so operators can distinguish manual follow-up from automated outcome work.
+- Content Library discovery refresh status is captured in the JSON/report output. A discovery warning does not hide the catalog lookup result, but it tells the operator that a stale catalog or Content Library endpoint issue may be behind unresolved packs.
 
 ### `aws`
 
@@ -183,6 +220,34 @@ content_library:
 - If local Windows inputs are visible on the search head, checks for the required WinHostMon and perfmon stanza families
 - Guides the operator through entity discovery, service-template linkage, and wrapper-macro tuning for non-default ingestion modes
 
+## Catalog-Generic Profiles
+
+These documented Content Packs 2.5 catalog entries have named profile keys for
+convenience and can also be declared by exact `title` or `pack_id`:
+
+- `citrix`
+- `example_glass_tables`
+- `ite_work_alert_routing`
+- `itsi_monitoring_and_alerting`
+- `microsoft_365`
+- `microsoft_exchange`
+- `netapp_data_ontap_dashboards_reports`
+- `pivotal_cloud_foundry`
+- `servicenow`
+- `shared_it_infrastructure`
+- `soar_system_logs`
+- `splunk_as_a_service`
+- `splunk_synthetic_monitoring`
+- `third_party_apm`
+- `unix_dashboards_reports`
+- `vmware_dashboards_reports`
+- `windows_dashboards_reports`
+
+These profiles resolve and install the live catalog pack, validate installed
+version and pack app visibility, and report pack-specific module work as
+follow-up steps. Add richer app/input/macro checks to the profile metadata when
+the repository needs deeper validation for one of these domains.
+
 ## Report
 
 Every content-pack execution writes:
@@ -196,4 +261,6 @@ The report includes:
 - install payload or install result
 - unmet prerequisites
 - pack-specific validation findings
-- next manual steps
+- `automation_scope`
+- `follow_up_required`
+- `follow_up_steps`

@@ -92,6 +92,7 @@ class SplunkRestClientTests(unittest.TestCase):
         catalog = client.content_pack_catalog()
 
         self.assertEqual(catalog, [{"id": "DA-ITSI-CP-appdynamics", "title": "Splunk AppDynamics", "version": "1.0.1", "installed_versions": []}])
+        self.assertEqual(client.content_library_discovery_status()["status"], "ok")
         self.assertEqual(
             calls,
             [
@@ -99,6 +100,24 @@ class SplunkRestClientTests(unittest.TestCase):
                 ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack"),
                 ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack"),
             ],
+        )
+
+    def test_content_pack_catalog_records_discovery_warning(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+
+        def fake_request(method, path, params=None, payload=None):
+            if path == "/servicesNS/nobody/DA-ITSI-ContentLibrary/content_library/discovery":
+                raise ValidationError("discovery endpoint unavailable")
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack":
+                return {"items": {"success": [], "failure": []}}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        self.assertEqual(client.content_pack_catalog(), [])
+        self.assertEqual(
+            client.content_library_discovery_status(),
+            {"attempted": True, "status": "warn", "message": "discovery endpoint unavailable"},
         )
 
     def test_preview_content_pack_falls_back_to_legacy_route(self) -> None:
@@ -152,6 +171,34 @@ class SplunkRestClientTests(unittest.TestCase):
             ],
         )
 
+    def test_content_pack_lifecycle_helpers_use_content_pack_routes(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack/refresh":
+                return {"refreshed": True}
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack/status":
+                return {"items": {"success": [{"id": "DA-ITSI-CP-appdynamics"}], "failure": []}}
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack/DA-ITSI-CP-appdynamics/1.0.1":
+                return {"entry": [{"content": {"id": "DA-ITSI-CP-appdynamics", "version": "1.0.1"}}]}
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        self.assertEqual(client.refresh_content_pack_catalog(), {"refreshed": True})
+        self.assertEqual(client.content_pack_status()["items"]["success"][0]["id"], "DA-ITSI-CP-appdynamics")
+        self.assertEqual(client.content_pack_detail("DA-ITSI-CP-appdynamics", "1.0.1")["version"], "1.0.1")
+        self.assertEqual(
+            calls,
+            [
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack/refresh", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack/status", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/content_pack/DA-ITSI-CP-appdynamics/1.0.1", None),
+            ],
+        )
+
     def test_find_object_by_title_reports_missing_itsi_endpoint_cleanly(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
         client._request = lambda *args, **kwargs: (_ for _ in ()).throw(KeyError("/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service"))  # type: ignore[attr-defined]
@@ -198,26 +245,31 @@ class SplunkRestClientTests(unittest.TestCase):
             ],
         )
 
-    def test_find_object_by_field_uses_configured_identity_field(self) -> None:
+    def test_find_object_by_field_matches_event_management_objects_locally(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
         calls: list[tuple[str, str, object]] = []
 
         def fake_request(method, path, params=None, payload=None):
             calls.append((method, path, params))
-            return {"entry": [{"content": {"_key": "correlation:1", "name": "Edge Device Down"}}]}
+            return {
+                "entry": [
+                    {"content": {"_key": "correlation:1", "name": "Wrong Search"}},
+                    {"content": {"_key": "correlation:2", "name": "Edge Device Down"}},
+                ]
+            }
 
         client._request = fake_request  # type: ignore[attr-defined]
 
         found = client.find_object_by_field("correlation_search", "name", "Edge Device Down", interface="event_management")
 
-        self.assertEqual(found, {"_key": "correlation:1", "name": "Edge Device Down"})
+        self.assertEqual(found, {"_key": "correlation:2", "name": "Edge Device Down"})
         self.assertEqual(
             calls,
             [
                 (
                     "GET",
                     "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/correlation_search",
-                    {"filter_data": '{"name": "Edge Device Down"}'},
+                    None,
                 )
             ],
         )
@@ -264,6 +316,36 @@ class SplunkRestClientTests(unittest.TestCase):
             [("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service", {"count": 0})],
         )
 
+    def test_list_objects_supports_filter_projection_and_windowing(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params))
+            return {"entry": [{"content": {"_key": "service:1", "title": "API"}}]}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        listed = client.list_objects(
+            "service",
+            filter_data={"title": "API"},
+            fields=["_key", "title"],
+            limit=25,
+            offset=50,
+        )
+
+        self.assertEqual(listed, [{"_key": "service:1", "title": "API"}])
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "GET",
+                    "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service",
+                    {"count": 25, "filter": '{"title": "API"}', "fields": "_key,title", "offset": 50},
+                )
+            ],
+        )
+
     def test_list_event_management_objects_omits_unsupported_count_param(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
         calls: list[tuple[str, str, object]] = []
@@ -280,6 +362,35 @@ class SplunkRestClientTests(unittest.TestCase):
         self.assertEqual(
             calls,
             [("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/correlation_search", None)],
+        )
+
+    def test_list_event_management_objects_supports_notable_event_filters(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, params))
+            return [{"_key": "notable:1", "status": "5"}]
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        listed = client.list_event_management_objects(
+            "notable_event",
+            {"status": "5"},
+            limit=1,
+            fields="_key,status",
+        )
+
+        self.assertEqual(listed, [{"_key": "notable:1", "status": "5"}])
+        self.assertEqual(
+            calls,
+            [
+                (
+                    "GET",
+                    "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event",
+                    {"filter_data": '{"status": "5"}', "limit": 1, "fields": "_key,status"},
+                )
+            ],
         )
 
     def test_kpi_entity_threshold_uses_documented_put_endpoint(self) -> None:
@@ -621,6 +732,8 @@ class SplunkRestClientTests(unittest.TestCase):
             calls.append((method, path, payload))
             if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/entity/retire_retirable":
                 return ["entity:1"]
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/entity/count_retirable":
+                return [{"_key": "entity:1", "title": "API 1"}, {"_key": "entity:2", "title": "API 2"}]
             return {"status": "ok"}
 
         client._request = fake_request  # type: ignore[attr-defined]
@@ -629,11 +742,15 @@ class SplunkRestClientTests(unittest.TestCase):
         client.stop_custom_threshold_window("ctw:business-hours")
         client.retire_entities({"data": ["entity:1"]})
         client.restore_entities({"data": ["entity:1"]})
+        retirable_entities = client.retirable_entities()
+        retirable_count = client.count_retirable_entities()
         retired = client.retire_retirable_entities()
         client.apply_kpi_threshold_recommendation({"itsi_service_id": "service:1", "itsi_kpi_id": "kpi:1"})
         client.apply_kpi_entity_threshold_recommendation({"itsi_service_id": "service:1", "itsi_kpi_id": "kpi:1", "entity_key": "entity:1"})
         client.shift_time_offset({"offset": 3600, "service": {"_keys": ["service:1"]}})
 
+        self.assertEqual(retirable_entities[0]["title"], "API 1")
+        self.assertEqual(retirable_count, 2)
         self.assertEqual(retired, ["entity:1"])
         self.assertEqual(
             calls,
@@ -642,6 +759,8 @@ class SplunkRestClientTests(unittest.TestCase):
                 ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/custom_threshold_windows/ctw%3Abusiness-hours/stop", None),
                 ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/entity/retire", {"data": ["entity:1"]}),
                 ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/entity/restore", {"data": ["entity:1"]}),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/entity/count_retirable", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/entity/count_retirable", None),
                 ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/entity/retire_retirable", None),
                 ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/kpi_threshold_recommendations", {"itsi_service_id": "service:1", "itsi_kpi_id": "kpi:1"}),
                 ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/kpi_entity_threshold_recommendations", {"itsi_service_id": "service:1", "itsi_kpi_id": "kpi:1", "entity_key": "entity:1"}),
@@ -679,8 +798,12 @@ class SplunkRestClientTests(unittest.TestCase):
                 return ["service", "entity"]
             if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_alias_list":
                 return {"items": ["host"]}
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/entity_discovery_searches/entity%3A1":
+                return [{"name": "ITSI Import Objects - Perfmon"}]
             if path == "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions":
                 return {"entry": [{"name": "send_email", "content": {"name": "send_email"}}]}
+            if path == "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions/send_email":
+                return {"entry": [{"name": "send_email", "content": {"required_params": ["message"]}}]}
             raise AssertionError(path)
 
         client._request = fake_request  # type: ignore[attr-defined]
@@ -688,14 +811,18 @@ class SplunkRestClientTests(unittest.TestCase):
         self.assertEqual(client.itsi_supported_object_types("itoa")[0]["title"], "service")
         self.assertEqual(client.itsi_supported_object_types("itoa")[1]["name"], "entity")
         self.assertEqual(client.itsi_alias_list(), {"items": ["host"]})
+        self.assertEqual(client.entity_discovery_searches("entity:1")[0]["name"], "ITSI Import Objects - Perfmon")
         self.assertEqual(client.notable_event_actions()[0]["name"], "send_email")
+        self.assertEqual(client.get_notable_event_action("send_email")["name"], "send_email")
         self.assertEqual(
             calls,
             [
                 ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_supported_object_types"),
                 ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_supported_object_types"),
                 ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/get_alias_list"),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/entity_discovery_searches/entity%3A1"),
                 ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions"),
+                ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions/send_email"),
             ],
         )
 
@@ -711,26 +838,93 @@ class SplunkRestClientTests(unittest.TestCase):
 
         client.update_notable_event_group("episode:1", {"status": 5})
         client.execute_notable_event_action("send_email", {"ids": ["episode:1"], "params": {}})
+        client.create_notable_event_comment({"itsi_group_id": "episode:1", "comment": "Reviewed"})
         client.link_episode_ticket({"ticket_id": "NET-1"}, group_key="episode:1")
+        client.get_episode_tickets("episode:1")
         client.unlink_episode_ticket("episode:1", "jira", "NET-1")
         client.create_episode_export({"filter_data": {"status": 5}})
+        client.list_episode_exports({"status": "COMPLETED"})
+        client.get_episode_export("export:1")
+        client.download_episode_export_file("episodes.csv")
+        client.delete_episode_export("export:1")
+        client.delete_episode_exports({"status": "FAILED"})
+        client.delete_episode_export_file("episodes.csv")
         client.event_management_count("notable_event_group", {"status": 5})
         client.active_maintenance_window("service:1")
         client.maintenance_windows_for_object("service:1")
         client.maintenance_windows_count_for_object("service:1")
+        client.templatize_object("service", "service:1")
+        client.count_objects("service")
+        client.bulk_update_objects("entity", [{"_key": "entity:1", "title": "Entity"}])
 
         self.assertEqual(
             calls,
             [
                 ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_group/episode%3A1", {"status": 5}),
                 ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions/send_email", {"ids": ["episode:1"], "params": {}}),
+                ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_comment", {"data": {"itsi_group_id": "episode:1", "comment": "Reviewed"}}),
                 ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/ticketing/episode%3A1", {"ticket_id": "NET-1"}),
+                ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/ticketing/episode%3A1", None),
                 ("DELETE", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/ticketing/episode%3A1/jira/NET-1", None),
                 ("POST", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/episode_export", {"filter_data": {"status": 5}}),
+                ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/episode_export", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/episode_export/export%3A1", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/episode_export/file/episodes.csv", None),
+                ("DELETE", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/episode_export/export%3A1", None),
+                ("DELETE", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/episode_export", None),
+                ("DELETE", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/episode_export/file/episodes.csv", None),
                 ("GET", "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_group/count", None),
                 ("GET", "/servicesNS/nobody/SA-ITOA/maintenance_services_interface/vLatest/get_active_maintenance_window/service%3A1", None),
                 ("GET", "/servicesNS/nobody/SA-ITOA/maintenance_services_interface/vLatest/get_maintenance_windows/service%3A1", None),
                 ("GET", "/servicesNS/nobody/SA-ITOA/maintenance_services_interface/vLatest/get_maintenance_windows/count/service%3A1", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service/service%3A1/templatize", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/service/count", None),
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/vLatest/entity/bulk_update", [{"_key": "entity:1", "title": "Entity"}]),
+            ],
+        )
+
+    def test_event_action_and_ticket_link_preserve_list_responses(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+
+        def fake_request(method, path, params=None, payload=None):
+            if path == "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/notable_event_actions/script":
+                return [{"action_name": "script", "sid": "search:1"}]
+            if path == "/servicesNS/nobody/SA-ITOA/event_management_interface/vLatest/ticketing/episode%3A1":
+                return ["ticket-link:1"]
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        self.assertEqual(
+            client.execute_notable_event_action("script", {"ids": ["episode:1"], "params": {}}),
+            [{"action_name": "script", "sid": "search:1"}],
+        )
+        self.assertEqual(
+            client.link_episode_ticket({"ticket_id": "NET-1"}, group_key="episode:1"),
+            ["ticket-link:1"],
+        )
+
+    def test_custom_content_pack_authorship_helpers_use_documented_routes(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, object]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/cp%3Anetwork/submit":
+                return {"submitted": True}
+            if path == "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/files/cp%3Anetwork.tar.gz":
+                return b"archive"
+            raise AssertionError(path)
+
+        client._request = fake_request  # type: ignore[attr-defined]
+
+        self.assertEqual(client.submit_custom_content_pack("cp:network"), {"submitted": True})
+        self.assertEqual(client.download_custom_content_pack("cp:network"), b"archive")
+        self.assertEqual(
+            calls,
+            [
+                ("POST", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/content_pack/cp%3Anetwork/submit", None),
+                ("GET", "/servicesNS/nobody/SA-ITOA/itoa_interface/content_pack_authorship/vLatest/files/cp%3Anetwork.tar.gz", None),
             ],
         )
 

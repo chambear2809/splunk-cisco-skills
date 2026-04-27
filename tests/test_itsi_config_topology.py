@@ -1,18 +1,22 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "skills" / "splunk-itsi-config" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+import run_topology  # noqa: E402
 from lib.common import ValidationError  # noqa: E402
 from lib.content_packs import CONTENT_LIBRARY_APP, ITSI_APP, TopologyWorkflow  # noqa: E402
 from lib.topology import compile_topology  # noqa: E402
@@ -160,6 +164,9 @@ class FakeTopologyClient:
                 return copy.deepcopy(obj)
         return None
 
+    def list_objects(self, object_type: str, interface: str = "itoa") -> list[dict]:
+        return [copy.deepcopy(value) for value in self._object_store(object_type).values()]
+
     def create_object(self, object_type: str, payload: dict) -> dict:
         store = self._object_store(object_type)
         created = copy.deepcopy(payload)
@@ -180,6 +187,15 @@ class FakeTopologyClient:
         store[updated["title"]] = updated
         self.operations.append(("update", object_type, updated["title"]))
         return {"_key": key}
+
+    def delete_object(self, object_type: str, key: str, interface: str = "itoa") -> dict:
+        store = self._object_store(object_type)
+        for title, payload in list(store.items()):
+            if payload.get("_key") == key:
+                del store[title]
+                self.operations.append(("delete", object_type, title))
+                return {"_key": key}
+        raise AssertionError(f"Unknown {object_type} key {key}")
 
     def get_service_template_link(self, service_key: str) -> str | None:
         service = self.get_object("service", service_key)
@@ -212,6 +228,64 @@ def vmware_spec() -> dict:
 
 
 class TopologyWorkflowTests(unittest.TestCase):
+    def test_topology_prune_plan_protects_topology_only_services(self) -> None:
+        client = FakeTopologyClient(
+            apps=HEALTHY_ITSI_APPS,
+            objects={
+                "service": {
+                    "Business Platform": {"_key": "service:business", "title": "Business Platform"},
+                    "Retired API": {"_key": "service:retired", "title": "Retired API"},
+                }
+            },
+        )
+        spec = {
+            "topology": {
+                "roots": [
+                    {
+                        "id": "business",
+                        "service_ref": "Business Platform",
+                    }
+                ]
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = TopologyWorkflow(client, tempdir).run(spec, "prune-plan")
+
+        candidates = result["native"]["prune_plan"]["candidates"]
+        self.assertEqual([candidate["title"] for candidate in candidates], ["Retired API"])
+        self.assertEqual(result["topology"]["changes"], [])
+
+    def test_topology_cleanup_apply_deletes_reviewed_unmanaged_candidate(self) -> None:
+        client = FakeTopologyClient(
+            apps=HEALTHY_ITSI_APPS,
+            objects={
+                "service": {
+                    "Business Platform": {"_key": "service:business", "title": "Business Platform"},
+                    "Retired API": {"_key": "service:retired", "title": "Retired API"},
+                }
+            },
+        )
+        spec = {"topology": {"roots": [{"id": "business", "service_ref": "Business Platform"}]}}
+        with tempfile.TemporaryDirectory() as tempdir:
+            workflow = TopologyWorkflow(client, tempdir)
+            plan_result = workflow.run(spec, "prune-plan")
+            candidate = plan_result["native"]["prune_plan"]["candidates"][0]
+            cleanup_spec = copy.deepcopy(spec)
+            cleanup_spec["cleanup"] = {
+                "allow_destroy": True,
+                "confirm": "DELETE_UNMANAGED_ITSI_OBJECTS",
+                "plan_id": plan_result["native"]["prune_plan"]["plan_id"],
+                "max_deletes": 1,
+                "candidate_ids": [candidate["candidate_id"]],
+            }
+
+            cleanup_result = workflow.run(cleanup_spec, "cleanup-apply")
+
+        self.assertIn(("delete", "service", "Retired API"), client.operations)
+        self.assertIn("Business Platform", client.objects["service"])
+        self.assertEqual(cleanup_result["native"]["changes"][0]["action"], "delete")
+
     def test_preview_uses_content_pack_preview_for_pack_relative_refs(self) -> None:
         client = FakeTopologyClient(
             apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "Splunk_TA_vmware_inframon", "DA-ITSI-CP-vmware"},
@@ -789,6 +863,154 @@ class TopologyWorkflowTests(unittest.TestCase):
             glass_table = payload["glass_tables"][0]
             self.assertEqual(glass_table["title"], "Business Map")
             self.assertIn({"source": "api", "target": "db", "kpis": ["Availability"]}, glass_table["payload"]["edges"])
+
+
+class RunTopologyCliExitCodeTests(unittest.TestCase):
+    """End-to-end coverage for run_topology.py prune-plan and cleanup-apply modes."""
+
+    @staticmethod
+    def _write_spec(tempdir: str, payload: dict) -> str:
+        spec_path = Path(tempdir) / "spec.json"
+        spec_path.write_text(json.dumps(payload), encoding="utf-8")
+        return str(spec_path)
+
+    def _invoke(self, *, spec_payload: dict, fake_result: dict, mode: str, extra_args: list[str] | None = None) -> tuple[int, str]:
+        with tempfile.TemporaryDirectory() as tempdir:
+            spec_json_path = self._write_spec(tempdir, spec_payload)
+            backup_path = Path(tempdir) / "backup.yaml"
+            argv = [
+                "run_topology.py",
+                "--spec-json",
+                spec_json_path,
+                "--mode",
+                mode,
+                "--report-root",
+                str(Path(tempdir) / "reports"),
+            ]
+            if mode == "cleanup-apply":
+                argv.extend(["--backup-output", str(backup_path)])
+            if extra_args:
+                argv.extend(extra_args)
+
+            class FakeNativeWorkflowResult:
+                exports = {"native_spec": {"services": []}}
+
+            class FakeNativeWorkflow:
+                def __init__(self, _client):
+                    pass
+
+                def run(self, _spec, _mode):
+                    return FakeNativeWorkflowResult()
+
+            class FakeTopologyWorkflow:
+                def __init__(self, _client, _report_root):
+                    pass
+
+                def run(self, _spec, _mode):
+                    return fake_result
+
+            buffer = io.StringIO()
+            with patch.object(run_topology, "SplunkRestClient") as mock_client_cls, \
+                 patch.object(run_topology, "TopologyWorkflow", FakeTopologyWorkflow), \
+                 patch.object(run_topology, "NativeWorkflow", FakeNativeWorkflow), \
+                 patch.object(sys, "argv", argv), \
+                 redirect_stdout(buffer):
+                mock_client_cls.from_spec.return_value = object()
+                exit_code = run_topology.main()
+            return exit_code, buffer.getvalue()
+
+    def _success_payload(self, mode: str) -> dict:
+        return {
+            "mode": mode,
+            "itsi": {"checks": [{"status": "pass", "check": "itsi", "message": "ok"}]},
+            "content_library": {"checks": [{"status": "pass", "check": "content_library", "message": "ok"}]},
+            "report_path": "/tmp/report.md",
+            "runs": [],
+            "native": {"changes": [], "validations": [], "diagnostics": [], "prune_plan": {"candidates": []}},
+            "topology": {"changes": [], "validations": [], "resolved_nodes": {}},
+        }
+
+    def test_run_topology_prune_plan_exits_zero_on_clean_result(self) -> None:
+        spec = {"connection": {"base_url": "https://example:8089"}, "topology": {"roots": [{"id": "a", "service_ref": "A"}]}}
+        exit_code, output = self._invoke(spec_payload=spec, fake_result=self._success_payload("prune-plan"), mode="prune-plan")
+        self.assertEqual(exit_code, 0)
+        payload = json.loads(output.strip())
+        self.assertEqual(payload["mode"], "prune-plan")
+
+    def test_run_topology_prune_plan_exits_nonzero_when_native_change_errors(self) -> None:
+        result = self._success_payload("prune-plan")
+        result["native"]["changes"] = [{"object_type": "service", "title": "Retired", "action": "delete", "status": "error", "detail": "blocked"}]
+        spec = {"connection": {"base_url": "https://example:8089"}, "topology": {"roots": [{"id": "a", "service_ref": "A"}]}}
+        exit_code, _ = self._invoke(spec_payload=spec, fake_result=result, mode="prune-plan")
+        self.assertEqual(exit_code, 1)
+
+    def test_run_topology_cleanup_apply_writes_backup_and_exits_zero(self) -> None:
+        spec = {"connection": {"base_url": "https://example:8089"}, "topology": {"roots": [{"id": "a", "service_ref": "A"}]}}
+        success_payload = self._success_payload("cleanup-apply")
+        with tempfile.TemporaryDirectory() as tempdir:
+            spec_json_path = self._write_spec(tempdir, spec)
+            backup_path = Path(tempdir) / "backup.yaml"
+            argv = [
+                "run_topology.py",
+                "--spec-json",
+                spec_json_path,
+                "--mode",
+                "cleanup-apply",
+                "--backup-output",
+                str(backup_path),
+                "--report-root",
+                str(Path(tempdir) / "reports"),
+            ]
+            captured_native_modes: list[str] = []
+
+            class FakeNativeWorkflowResult:
+                exports = {"native_spec": {"services": [{"title": "Sample"}]}}
+
+            class FakeNativeWorkflow:
+                def __init__(self, _client):
+                    pass
+
+                def run(self, _spec, mode):
+                    captured_native_modes.append(mode)
+                    return FakeNativeWorkflowResult()
+
+            class FakeTopologyWorkflow:
+                def __init__(self, _client, _report_root):
+                    pass
+
+                def run(self, _spec, _mode):
+                    return success_payload
+
+            with patch.object(run_topology, "SplunkRestClient") as mock_client_cls, \
+                 patch.object(run_topology, "TopologyWorkflow", FakeTopologyWorkflow), \
+                 patch.object(run_topology, "NativeWorkflow", FakeNativeWorkflow), \
+                 patch.object(sys, "argv", argv), \
+                 redirect_stdout(io.StringIO()):
+                mock_client_cls.from_spec.return_value = object()
+                exit_code = run_topology.main()
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(backup_path.exists(), "cleanup-apply must write the backup before deletion")
+            self.assertIn("Sample", backup_path.read_text(encoding="utf-8"))
+            self.assertEqual(captured_native_modes[0], "export")
+
+    def test_run_topology_cleanup_apply_requires_backup_output(self) -> None:
+        spec = {"connection": {"base_url": "https://example:8089"}, "topology": {"roots": [{"id": "a", "service_ref": "A"}]}}
+        with tempfile.TemporaryDirectory() as tempdir:
+            spec_json_path = self._write_spec(tempdir, spec)
+            argv = [
+                "run_topology.py",
+                "--spec-json",
+                spec_json_path,
+                "--mode",
+                "cleanup-apply",
+            ]
+            with patch.object(run_topology, "SplunkRestClient") as mock_client_cls, \
+                 patch.object(sys, "argv", argv), \
+                 redirect_stdout(io.StringIO()):
+                mock_client_cls.from_spec.return_value = object()
+                exit_code = run_topology.main()
+            self.assertEqual(exit_code, 1)
 
 
 if __name__ == "__main__":

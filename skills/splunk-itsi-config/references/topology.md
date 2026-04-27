@@ -12,6 +12,8 @@ top-level service-tree DSL:
 - `bash scripts/setup.sh --workflow topology --spec <path>`
 - `bash scripts/setup.sh --workflow topology --spec <path> --apply`
 - `bash scripts/validate.sh --workflow topology --spec <path>`
+- `bash scripts/setup.sh --workflow topology --spec <path> --mode prune-plan --output topology-prune-plan.json`
+- `bash scripts/setup.sh --workflow topology --spec <path> --mode cleanup-apply --backup-output cleanup-backup.native.yaml`
 - `python3 scripts/topology_glass_table.py --spec-json <path> --output topology-glass.native.yaml --output-format yaml`
 
 Topology specs can include all native sections from `references/native_itsi.md`, including extended ITSI objects such as teams, entity types, KPI base searches, service templates, custom content packs, correlation searches, Event Analytics configuration, maintenance windows, backup jobs, glass tables/icons, deep dives, and home views.
@@ -107,4 +109,5 @@ topology:
 
 - Missing node ids, duplicate ids, missing `ref` targets, self-dependencies, and cycles fail immediately.
 - Explicit `kpis` on an edge must match live KPI titles on the child service for apply and validate.
-- The workflow only adds or updates managed services, template links, and dependencies. It does not delete or prune existing ITSI objects in v1.
+- Normal preview/apply/validate only adds or updates managed services, template links, and dependencies.
+- `prune-plan` and guarded `cleanup-apply` reuse the native cleanup model. The topology workflow expands `topology.roots` into desired service titles first, including pack-prefix candidates for `service_ref` nodes, so topology-only services are not reported as unmanaged just because they are absent from the top-level `services` section.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 import os
 import sys
 import subprocess
@@ -24,6 +25,7 @@ from lib.content_packs import (  # noqa: E402
     ShellContentLibraryInstaller,
     build_install_payload,
     resolve_catalog_entry,
+    resolve_pack_definition,
     validate_profile,
 )
 
@@ -39,25 +41,36 @@ class FakeContentPackClient:
         catalog: list[dict] | None = None,
         previews: dict[tuple[str, str], object] | None = None,
         macros: dict[tuple[str, str], dict] | None = None,
+        saved_searches: dict[tuple[str, str], dict] | None = None,
         macro_lists: dict[str, list[dict]] | None = None,
         inputs: dict[str, list[dict]] | None = None,
         confs: dict[tuple[str, str, str], dict] | None = None,
         endpoints: dict[tuple[str, str], list[dict]] | None = None,
+        content_pack_status_value: dict | None = None,
+        content_pack_details: dict[tuple[str, str], dict] | None = None,
         kvstore_status_value: str | None = "ready",
         kvstore_collections: dict[tuple[str, str], dict[str, str]] | None = None,
+        discovery_status: dict | None = None,
     ):
         self.apps = set(apps or set())
         self.app_versions = dict(app_versions or {})
         self.catalog = list(catalog or [])
         self.previews = dict(previews or {})
         self.macros = dict(macros or {})
+        self.saved_searches = dict(saved_searches or {})
         self.macro_lists = dict(macro_lists or {})
         self.inputs = dict(inputs or {})
         self.confs = dict(confs or {})
         self.endpoints = dict(endpoints or {})
+        self.content_pack_status_value = dict(content_pack_status_value or {"success": [], "failure": []})
+        self.content_pack_details = dict(content_pack_details or {})
         self.kvstore_status_value = kvstore_status_value
         self.kvstore_collections = dict(kvstore_collections or {})
+        self.discovery_status = dict(discovery_status or {"attempted": False, "status": "not_attempted"})
         self.install_requests: list[tuple[str, str, dict]] = []
+        self.refresh_calls = 0
+        self.macro_updates: list[tuple[str, str, dict]] = []
+        self.saved_search_updates: list[tuple[str, str, dict]] = []
 
     def get_app(self, app_name: str):
         if app_name not in self.apps:
@@ -82,6 +95,24 @@ class FakeContentPackClient:
     def content_pack_catalog(self) -> list[dict]:
         return list(self.catalog)
 
+    def content_library_discovery_status(self) -> dict:
+        return dict(self.discovery_status)
+
+    def refresh_content_pack_catalog(self) -> dict:
+        self.refresh_calls += 1
+        return {"refreshed": True}
+
+    def content_pack_status(self) -> dict:
+        return dict(self.content_pack_status_value)
+
+    def content_pack_detail(self, pack_id: str, version: str) -> dict:
+        return dict(
+            self.content_pack_details.get(
+                (pack_id, version),
+                {"id": pack_id, "title": pack_id, "version": version, "content": {"services": []}},
+            )
+        )
+
     def preview_content_pack(self, pack_id: str, version: str):
         return self.previews[(pack_id, version)]
 
@@ -91,6 +122,19 @@ class FakeContentPackClient:
 
     def get_macro(self, app_name: str, macro_name: str):
         return self.macros.get((app_name, macro_name))
+
+    def update_macro(self, app_name: str, macro_name: str, payload: dict):
+        self.macro_updates.append((app_name, macro_name, dict(payload)))
+        self.macros[(app_name, macro_name)] = dict(payload)
+        return dict(payload)
+
+    def get_saved_search(self, app_name: str, search_name: str):
+        return self.saved_searches.get((app_name, search_name))
+
+    def update_saved_search(self, app_name: str, search_name: str, payload: dict):
+        self.saved_search_updates.append((app_name, search_name, dict(payload)))
+        self.saved_searches[(app_name, search_name)] = dict(payload)
+        return dict(payload)
 
     def list_macros(self, app_name: str):
         return list(self.macro_lists.get(app_name, []))
@@ -207,7 +251,7 @@ class ContentPackTests(unittest.TestCase):
             self.assertEqual(result["source"], "local-extract")
             self.assertEqual(commands[0][0], "bash")
             self.assertEqual(commands[1][:2], ["bash", "-lc"])
-            self.assertIn("tar -xf", commands[1][2])
+            self.assertIn("Unsafe archive member", commands[1][2])
             self.assertIn("cp -R", commands[1][2])
             self.assertIn("printf '%s\\n%s\\n'", commands[1][2])
             self.assertIn('"$splunk_bin" restart', commands[1][2])
@@ -277,7 +321,7 @@ class ContentPackTests(unittest.TestCase):
             self.assertEqual(commands[2][3], "scp")
             self.assertEqual(commands[3][:2], ["sshpass", "-f"])
             self.assertEqual(commands[3][3], "ssh")
-            self.assertIn("tar -xf", commands[3][-1])
+            self.assertIn("Unsafe archive member", commands[3][-1])
             self.assertIn("cp -R", commands[3][-1])
             self.assertNotIn("install app", commands[3][-1])
             self.assertIn("nohup", commands[3][-1])
@@ -342,6 +386,36 @@ class ContentPackTests(unittest.TestCase):
             command_text = "\n".join(" ".join(str(part) for part in command) for command in commands)
             self.assertNotIn("changeme", command_text)
 
+    def test_shell_installer_rejects_unsafe_bundle_members_before_extracting(self) -> None:
+        escape_path = Path(f"/tmp/codex-unsafe-bundle-{os.getpid()}.txt")
+        escape_path.unlink(missing_ok=True)
+        try:
+            with tempfile.TemporaryDirectory() as tempdir:
+                bundle_path = Path(tempdir) / "splunk-app-for-content-packs_250.spl"
+                with tarfile.open(bundle_path, "w:gz") as archive:
+                    data = b"escape"
+                    info = tarfile.TarInfo(f"../{escape_path.name}")
+                    info.size = len(data)
+                    archive.addfile(info, io.BytesIO(data))
+
+                fake_splunk = Path(tempdir) / "splunk-home" / "bin" / "splunk"
+                fake_splunk.parent.mkdir(parents=True)
+                fake_splunk.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+                fake_splunk.chmod(0o755)
+                client = SimpleNamespace(config=SimpleNamespace(username="splunk", password="changeme"))
+                installer = ShellContentLibraryInstaller()
+                spec = {
+                    "connection": {"base_url": "https://127.0.0.1:8089", "verify_ssl": False},
+                    "content_library": {"remote_splunk_bin": str(fake_splunk)},
+                }
+
+                with self.assertRaisesRegex(ValidationError, "Unsafe archive member"):
+                    installer._cli_install_bundle(bundle_path, spec, client, installer._build_env(spec, client))
+
+            self.assertFalse(escape_path.exists())
+        finally:
+            escape_path.unlink(missing_ok=True)
+
     def test_shell_installer_build_env_maps_supported_auth_variables(self) -> None:
         client = SimpleNamespace(config=SimpleNamespace(username="admin", password="changeme", session_key="token-123"))
         installer = ShellContentLibraryInstaller()
@@ -393,6 +467,22 @@ class ContentPackTests(unittest.TestCase):
         self.assertEqual(entry["id"], "DA-ITSI-CP-aws-dashboards")
         self.assertEqual(entry["title"], "AWS Dashboards and Reports")
 
+    def test_resolve_catalog_entry_accepts_pack_id(self) -> None:
+        catalog = [
+            {"id": "DA-ITSI-CP-third-party-apm", "title": "Third-Party APM", "version": "1.4.0"},
+        ]
+
+        entry = resolve_catalog_entry(catalog, None, pack_id="DA-ITSI-CP-third-party-apm")
+
+        self.assertEqual(entry["title"], "Third-Party APM")
+
+    def test_resolve_pack_definition_allows_generic_catalog_title(self) -> None:
+        profile_key, profile_meta = resolve_pack_definition({"title": "Microsoft 365"}, 0)
+
+        self.assertEqual(profile_key, "catalog_pack_1")
+        self.assertEqual(profile_meta["title"], "Microsoft 365")
+        self.assertTrue(profile_meta["generic_catalog_profile"])
+
     def test_resolve_catalog_entry_reports_empty_live_catalog_cleanly(self) -> None:
         with self.assertRaises(ValidationError) as error:
             resolve_catalog_entry([], "Splunk AppDynamics")
@@ -419,6 +509,210 @@ class ContentPackTests(unittest.TestCase):
 
         self.assertEqual(result["runs"][0]["title"], "AWS Dashboards and Reports")
         self.assertEqual(result["runs"][0]["pack_id"], "DA-ITSI-CP-aws-dashboards")
+
+    def test_generic_catalog_pack_previews_by_title_and_reports_followup_scope(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP},
+            catalog=[{"id": "DA-ITSI-CP-microsoft-365", "title": "Microsoft 365", "version": "1.5.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-microsoft-365", "1.5.0"): {"service_template": [{"id": "template-1"}]}},
+        )
+        spec = {"connection": {"platform": "enterprise"}, "packs": [{"title": "Microsoft 365"}]}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "preview")
+            report_text = Path(result["report_path"]).read_text(encoding="utf-8")
+
+        run = result["runs"][0]
+        self.assertEqual(run["profile"], "catalog_pack_1")
+        self.assertEqual(run["pack_id"], "DA-ITSI-CP-microsoft-365")
+        self.assertEqual(run["preview_summary"]["object_counts"]["service_template"], 1)
+        self.assertTrue(run["follow_up_required"])
+        self.assertIn("catalog_install_validate", run["automation_scope"])
+        self.assertTrue(any(finding["check"] == "profile" and finding["status"] == "warn" for finding in run["findings"]))
+        self.assertIn("Automation scope", report_text)
+        self.assertIn("Follow-up steps", report_text)
+
+    def test_content_pack_workflow_surfaces_content_library_discovery_warning(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP},
+            catalog=[{"id": "DA-ITSI-CP-microsoft-365", "title": "Microsoft 365", "version": "1.5.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-microsoft-365", "1.5.0"): {}},
+            discovery_status={"attempted": True, "status": "warn", "message": "discovery endpoint unavailable"},
+        )
+        spec = {"connection": {"platform": "enterprise"}, "packs": [{"title": "Microsoft 365"}]}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "preview")
+            report_text = Path(result["report_path"]).read_text(encoding="utf-8")
+
+        self.assertEqual(result["content_library"]["content_library_discovery"]["status"], "warn")
+        self.assertTrue(
+            any(check["check"] == "content_library_discovery" and check["status"] == "warn" for check in result["content_library"]["checks"])
+        )
+        self.assertIn("Content Library discovery refresh was unavailable", report_text)
+
+    def test_content_pack_preview_records_lifecycle_metadata_and_configured_outcome(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP},
+            catalog=[{"id": "DA-ITSI-CP-third-party-apm", "title": "Third-Party APM", "version": "1.4.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-third-party-apm", "1.4.0"): {"service_template": [{"id": "template-1"}]}},
+            content_pack_status_value={"success": [{"id": "DA-ITSI-CP-third-party-apm"}], "failure": []},
+            content_pack_details={
+                ("DA-ITSI-CP-third-party-apm", "1.4.0"): {
+                    "id": "DA-ITSI-CP-third-party-apm",
+                    "title": "Third-Party APM",
+                    "version": "1.4.0",
+                    "content": {"service_template": []},
+                }
+            },
+            macros={("DA-ITSI-CP-third-party-apm", "itsi-cp-third-party-apm-indexes"): {"definition": 'index="apm"'}},
+            saved_searches={("DA-ITSI-CP-third-party-apm", "Third Party APM Entity Discovery"): {"disabled": "1"}},
+        )
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "title": "Third-Party APM",
+                    "configured_outcome": {
+                        "macros": [
+                            {
+                                "app": "DA-ITSI-CP-third-party-apm",
+                                "name": "itsi-cp-third-party-apm-indexes",
+                                "definition": 'index="apm"',
+                            }
+                        ],
+                        "saved_searches": [
+                            {
+                                "app": "DA-ITSI-CP-third-party-apm",
+                                "name": "Third Party APM Entity Discovery",
+                                "enabled": True,
+                            }
+                        ],
+                        "lookup_updates": [{"name": "itsi_kpi_attributes"}],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "preview")
+
+        run = result["runs"][0]
+        self.assertEqual(client.refresh_calls, 1)
+        self.assertEqual(run["pack_status"]["success"][0]["id"], "DA-ITSI-CP-third-party-apm")
+        self.assertEqual(run["pack_detail"]["content_keys"], ["service_template"])
+        outcome_steps = {(step["kind"], step["title"]): step["detail"] for step in run["configured_outcome"]["steps"]}
+        outcome_statuses = {(step["kind"], step["title"]): step["status"] for step in run["configured_outcome"]["steps"]}
+        self.assertIn(("macro", "itsi-cp-third-party-apm-indexes"), outcome_steps)
+        self.assertIn(("saved_search", "Third Party APM Entity Discovery"), outcome_steps)
+        self.assertEqual(outcome_statuses[("unsupported_outcome", "lookup_updates")], "warn")
+        self.assertTrue(any(finding["check"] == "configured_outcome" and finding["status"] == "warn" for finding in run["findings"]))
+        self.assertFalse(client.macro_updates)
+        self.assertFalse(client.saved_search_updates)
+
+    def test_configured_outcome_apply_records_error_when_macro_or_saved_search_missing(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[
+                {
+                    "id": "DA-ITSI-CP-example-glass-tables",
+                    "title": "Example Glass Tables",
+                    "version": "1.0.0",
+                    "installed_versions": [],
+                }
+            ],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {"glass_table": [{"id": "gt-1"}]}},
+            macros={},
+            saved_searches={},
+        )
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "macros": [{"name": "missing-macro", "definition": 'index="x"'}],
+                        "saved_searches": [{"name": "Missing Search", "enabled": True}],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        run = result["runs"][0]
+        outcome_steps = {(step["kind"], step["title"]): step for step in run["configured_outcome"]["steps"]}
+        macro_step = outcome_steps[("macro", "missing-macro")]
+        search_step = outcome_steps[("saved_search", "Missing Search")]
+        self.assertEqual(macro_step["status"], "error")
+        self.assertIn("was not found", macro_step["detail"])
+        self.assertEqual(search_step["status"], "error")
+        self.assertIn("was not found", search_step["detail"])
+        self.assertFalse(client.macro_updates)
+        self.assertFalse(client.saved_search_updates)
+        self.assertTrue(
+            any(
+                finding["check"] == "configured_outcome" and finding["status"] == "error"
+                for finding in run["findings"]
+            )
+        )
+
+    def test_content_pack_apply_runs_configured_outcome_updates_after_install(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[
+                {
+                    "id": "DA-ITSI-CP-example-glass-tables",
+                    "title": "Example Glass Tables",
+                    "version": "1.0.0",
+                    "installed_versions": [],
+                }
+            ],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {"glass_table": [{"id": "gt-1"}]}},
+            macros={("DA-ITSI-CP-example-glass-tables", "example-indexes"): {"definition": 'index="old"'}},
+            saved_searches={("DA-ITSI-CP-example-glass-tables", "Example Entity Discovery"): {"disabled": "1"}},
+        )
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "macro_updates": [{"name": "example-indexes", "definition": 'index="new"'}],
+                        "entity_discovery_searches": [{"name": "Example Entity Discovery", "enabled": True}],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        self.assertEqual(client.install_requests[0][0], "DA-ITSI-CP-example-glass-tables")
+        self.assertEqual(
+            client.macro_updates,
+            [("DA-ITSI-CP-example-glass-tables", "example-indexes", {"definition": 'index="new"'})],
+        )
+        self.assertEqual(
+            client.saved_search_updates,
+            [("DA-ITSI-CP-example-glass-tables", "Example Entity Discovery", {"disabled": "0"})],
+        )
+        self.assertTrue(any(finding["check"] == "configured_outcome" for finding in result["runs"][0]["findings"]))
+
+    def test_additional_documented_profile_resolves_without_unsupported_error(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP},
+            catalog=[{"id": "DA-ITSI-CP-microsoft-365", "title": "Microsoft 365", "version": "1.5.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-microsoft-365", "1.5.0"): {"service_template": [{"id": "template-1"}]}},
+        )
+        spec = {"connection": {"platform": "enterprise"}, "packs": [{"profile": "microsoft_365"}]}
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "preview")
+
+        self.assertEqual(result["runs"][0]["profile"], "microsoft_365")
+        self.assertEqual(result["runs"][0]["title"], "Microsoft 365")
 
     def test_install_payload_uses_safe_defaults_and_boolean_serialization(self) -> None:
         payload = build_install_payload(

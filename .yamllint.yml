@@ -1,5 +1,10 @@
 extends: default
 
+ignore: |
+  skills/splunk-connect-for-snmp-setup/templates/kubernetes/values.yaml
+  skills/splunk-connect-for-syslog-setup/templates/host/docker-compose.yml
+  skills/splunk-connect-for-syslog-setup/templates/kubernetes/values.yaml
+
 rules:
   line-length:
     max: 200

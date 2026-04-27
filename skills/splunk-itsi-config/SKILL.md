@@ -1,6 +1,6 @@
 ---
 name: splunk-itsi-config
-description: Skill for previewing, applying, and validating native ITSI objects, selected ITSI content packs, and hybrid ITSI service-tree specs from repo-local YAML files. Use when Codex needs to manage ITSI entities, services, KPIs, dependencies, custom NEAPs, service-template links, or service trees, or when it needs to preview, install, and validate the AWS, Cisco Data Center, Cisco Enterprise Networks, Cisco ThousandEyes, Linux, Splunk AppDynamics, Splunk Observability Cloud, VMware, or Windows ITSI content packs through the official ITSI content-pack REST endpoints.
+description: Skill for previewing, applying, and validating native ITSI objects, ITSI content packs, and hybrid ITSI service-tree specs from repo-local YAML files. Use when Codex needs to manage ITSI entities, services, KPIs, dependencies, custom NEAPs, service-template links, or service trees, or when it needs to preview, install, and validate Splunk App for Content Packs catalog entries through the official ITSI content-pack REST endpoints.
 ---
 
 # Splunk ITSI Config
@@ -8,8 +8,8 @@ description: Skill for previewing, applying, and validating native ITSI objects,
 This skill is rooted in `skills/splunk-itsi-config/` and supports these workflow paths:
 
 - Native ITSI automation for entities, services, KPIs, service dependencies, and custom NEAPs.
-- Extended native ITSI automation for teams, entity types, service templates, KPI base searches, KPI templates, KPI threshold templates, custom threshold windows and service/KPI links, custom content packs, correlation searches, Event Analytics configuration, maintenance windows, backup jobs, glass tables/icons, deep dives, and home views through typed REST passthrough sections.
-- Content-pack automation for preview, install, validate, and guided handoff for selected ITSI content packs.
+- Extended native ITSI automation for teams, entity types, entity filter rules, service templates, KPI base searches, KPI templates, KPI threshold templates, custom threshold windows and service/KPI links, custom content packs, correlation searches, Event Analytics configuration, maintenance windows, backup jobs, glass tables/icons, deep dives, and home views through typed REST passthrough sections.
+- Content-pack automation for preview, install, validate, and guided handoff for known ITSI content-pack profiles plus generic catalog-title or pack-ID entries.
 - Hybrid topology automation for native objects, content packs, template-backed services, and ITSI service-tree dependencies in one run.
 
 ## Beginner-First Operating Model
@@ -59,6 +59,8 @@ Useful quickstart files:
   - `bash scripts/validate.sh --workflow content-packs --spec <path>`
   - `bash scripts/setup.sh --workflow topology --spec <path>`
   - `bash scripts/setup.sh --workflow topology --spec <path> --apply`
+  - `bash scripts/setup.sh --workflow topology --spec <path> --mode prune-plan --output topology-prune-plan.json`
+  - `bash scripts/setup.sh --workflow topology --spec <path> --mode cleanup-apply --backup-output cleanup-backup.native.yaml`
   - `bash scripts/validate.sh --workflow topology --spec <path>`
   - `python3 scripts/topology_glass_table.py --spec-json <path> --output topology-glass.native.yaml --output-format yaml`
   - `python3 scripts/native_offline_smoke.py --spec-json <path>`
@@ -91,7 +93,7 @@ an ITSI YAML spec or in chat.
 
 - Preview is the default.
 - `--apply` is required for writes.
-- Native read-only modes are available through `setup.sh --workflow native --mode export|inventory|prune-plan`. `export` writes a brownfield native spec skeleton, `inventory` reports live ITSI object counts/app versions/KV Store status plus supported-object/alias/notable-action discovery, Event Management counts, and optional per-object maintenance-window status when the live endpoints expose them, and `prune-plan` reports unmanaged live objects without deleting anything.
+- Native read-only modes are available through `setup.sh --workflow native --mode export|inventory|prune-plan`. `export` writes a brownfield native spec skeleton, skips managed/default NEAPs unless the spec sets `export.include_managed_neaps: true`, `inventory` reports live ITSI object counts/app versions/KV Store status plus supported-object/alias/notable-action discovery, notable-action detail readback, entity-discovery-search readback for requested entities, retirable-entity counts, Event Management counts for episode groups and notable events, optional filtered notable-event readback, optional count-endpoint-only inventory for large estates, ticket readback, episode-export status/listing, service/KPI-base-search templatize output, and optional per-object maintenance-window status when the live endpoints expose them, and `prune-plan` reports unmanaged live objects without deleting anything.
 - Guarded cleanup is available through `setup.sh --workflow native --mode cleanup-apply --backup-output <path>`. It recomputes the current prune plan, requires `cleanup.allow_destroy: true`, `cleanup.confirm: DELETE_UNMANAGED_ITSI_OBJECTS`, a matching `cleanup.plan_id`, positive `cleanup.max_deletes`, and explicit `cleanup.candidate_ids`. The CLI writes a live export backup before deleting. High-risk deletes for `custom_content_packs`, `glass_table_icons`, and `kpi_entity_thresholds` also require a fresh prune plan with `cleanup.allow_high_risk_deletes: true`, `cleanup.confirm_high_risk: DELETE_HIGH_RISK_ITSI_OBJECTS`, and every selected ID repeated in `cleanup.high_risk_candidate_ids`.
 - `python3 scripts/native_offline_smoke.py --spec-json <path>` runs native preview/apply/validate/export/inventory/prune-plan against an in-memory ITSI-shaped client. Use it for regression checks without touching a live ITSI instance.
 - Upserts are additive and idempotent for the managed fields in the spec.
@@ -101,15 +103,16 @@ an ITSI YAML spec or in chat.
 - Core `entities`, `services`, and service `kpis` support typed convenience fields and also merge additional top-level ITSI schema fields plus `payload` into the REST body. Local DSL keys such as `depends_on`, `service_template`, and threshold helpers are not sent as raw schema fields.
 - Extended object sections set common ITSI fields (`title`, `description`, `sec_grp`, `object_type`) and merge additional top-level fields plus `payload` into the REST request body. They cover entity-management policies/rules, data-integration templates, KPI/search/template objects, Content Library authorship objects, Event Management views/searches/templates, maintenance, backup/restore, deep dives, glass tables/icons, home views, KPI entity thresholds, refresh queue jobs, sandboxes, upgrade-readiness prechecks, summarization objects, and user preferences. Use exported ITSI payload fields when managing version-specific object shapes.
 - Keyed updates on the generic ITSI, Event Management, maintenance, and backup/restore route families set `is_partial_data=1` so unmanaged fields are preserved. Full-payload special routes such as `kpi_entity_threshold`, icon collection, and content-pack authorship do not use that parameter.
-- Service template links are applied through the ITSI service template link endpoint after services exist and before dependencies are validated or merged.
+- For large native estates, `bulk_apply.enabled: true` can batch eligible existing keyed updates through `itoa_interface/<object_type>/bulk_update` while preserving normal preview/change accounting. Inventory and prune-plan use documented projection/window parameters where the route supports them. Set `bulk_apply.sections` to limit batching to sections such as `entities`, `services`, or `kpi_base_searches`; creates, special route families, dependency merges, and cleanup stay on their explicit paths.
+- Service template links are applied through the ITSI service template link endpoint after services exist and before dependencies are validated or merged. This REST path has append-only entity-rule semantics; use the ITSI UI when an operator needs replace or keep-existing choices.
 - `custom_threshold_window_links` are applied after services exist by resolving window/service/KPI titles or live IDs and calling the ITSI custom-threshold-window service/KPI association endpoint only for missing links.
 - `entity_type_titles` on entities resolve against live entity types or entity types declared earlier in the same spec.
 - Custom content packs use the ITSI content pack authorship API. Backup jobs, maintenance windows, Event Analytics, and glass-table icons use their documented ITSI route families rather than the default object route.
 - Event Management sections use the route family exposed by ITSI for each object. `event_management_states` use the core ITSI object route on tested ITSI 4.21.2 hosts; `correlation_searches`, `notable_event_email_templates`, and `neaps` use the ITSI `event_management_interface` and its `filter_data` lookup parameter. Event Management interface creates are wrapped in the documented `data` envelope; keyed updates send the object payload directly.
 - Deep dive updates preserve the existing owner fields in the payload because Splunk requires those fields on keyed deep-dive updates.
-- Operational Event Analytics records and append-only APIs, such as notable events, notable event groups, comments, and ticket/action execution, are intentionally excluded from the idempotent upsert model.
+- Operational Event Analytics records and append-only APIs, such as notable events, notable event groups, comments, and ticket/action execution, are intentionally excluded from the idempotent upsert model; notable events are available through guarded/read-only inventory filters when a live endpoint exposes them.
 - ITSI action/helper APIs such as entity retire/restore, threshold recommendations, custom threshold window stop/disconnect, and bulk time-offset shifts are intentionally excluded from the normal idempotent upsert model.
-- Guarded `operational_actions` can run selected non-idempotent helper APIs only when every action sets `allow_operational_action: true`. Use these for explicit operator-driven retire/restore, custom-threshold stop/disconnect, threshold recommendation-apply, time-offset-shift, notable-event-group update, notable-event action execution, ticket link/unlink, or episode-export work; they are not part of normal config drift validation. Custom-threshold disconnect also requires `disconnect_all: true`; `entity_retire_retirable` requires `retire_all_retirable: true`; notable-event action execution requires `allow_notable_event_action_execute: true`; ticket unlink requires `allow_ticket_unlink: true`; episode status/state/severity changes require `allow_episode_field_change: true`.
+- Guarded `operational_actions` can run selected non-idempotent helper APIs only when every action sets `allow_operational_action: true`. Use these for explicit operator-driven retire/restore, custom-threshold stop/disconnect, threshold recommendation-apply, time-offset-shift, notable-event-group update, notable-event comment append, notable-event action execution, ticket link/read/unlink, episode-export create/list/get/download/delete, service or KPI-base-search templatize, guarded bulk update, or custom content-pack submit/download work; they are not part of normal config drift validation. Custom-threshold disconnect also requires `disconnect_all: true`; `entity_retire_retirable` requires `retire_all_retirable: true` and previews the documented retirable-entity target list/count when available; notable-event action execution requires `allow_notable_event_action_execute: true` and reads action metadata before execution when available; ticket unlink requires `allow_ticket_unlink: true`; episode export deletes require `allow_episode_export_delete: true`, filter-based export deletes also require `allow_episode_export_bulk_delete: true`, bulk updates require `allow_bulk_update: true`, and episode status/state/severity changes require `allow_episode_field_change: true`. Apply mode preserves helper response payloads in informational diagnostics for audit.
 - Service dependencies are applied in a second pass after services exist.
 - Custom NEAPs use the ITSI event management interface. Managed, packaged, and default NEAPs are protected from overwrite in v1.
 
@@ -130,6 +133,7 @@ an ITSI YAML spec or in chat.
 - Pack resolution is by exact catalog title, not hardcoded package ID.
 - For validation, the workflow resolves the live bundled content-pack app from profile-specific app candidates instead of assuming the catalog ID matches the installed app name.
 - Profiles that ship known companion dashboard apps report those as additional bundle-aware checks.
+- Any live Content Library pack can be declared by exact `title` / `catalog_title` or `pack_id` even when there is not yet a profile-specific validator. Generic catalog entries automate preview/install/validate and emit `automation_scope`, `follow_up_required`, and `follow_up_steps` in JSON and reports.
 - The workflow always calls the official content-pack `preview` endpoint before install.
 - Install requests default to:
   - `resolution: skip`
@@ -138,7 +142,7 @@ an ITSI YAML spec or in chat.
   - `install_all: true`
   - `backfill: false`
   - `prefix: ""`
-- Post-install module flows remain guided in v1. The skill stops at install, validation, and a generated handoff report.
+- Post-install module flows are explicit workflow state. The skill automates install/validation and reports remaining module tasks as machine-readable `follow_up_steps`; pack-specific service imports, sandbox publish, entity discovery, saved-search enablement, macro tuning, and navigation adjustments can be automated through `configured_outcome`, native sections, or topology sections when a safe declarative payload is available. Unsupported `configured_outcome` task types, such as lookup updates, data model acceleration, KPI backfill, service discovery/import, alert integration, dashboard tuning, and navigation updates, are reported as warning steps instead of being silently ignored.
 
 ## Topology Workflow Rules
 
@@ -153,7 +157,7 @@ an ITSI YAML spec or in chat.
 - Preview can resolve pack-relative services and templates from the content-pack `preview` response even when they are not installed yet.
 - Apply and validate require live template and service resolution for anything that must exist in ITSI after install.
 - Self-dependencies, missing references, missing explicit KPI names, and cycles fail the run.
-- No delete or prune behavior is implemented in v1.
+- Topology prune-plan and cleanup-apply are available through the native guarded cleanup model. The workflow derives managed service titles from `services` and `topology.roots` so topology-only services are protected from prune candidates; cleanup still requires the same reviewed `cleanup` guards and a backup output.
 
 ## Supported Content-Pack Profiles
 
@@ -161,13 +165,30 @@ an ITSI YAML spec or in chat.
 - `cisco_data_center`
 - `cisco_enterprise_networks`
 - `cisco_thousandeyes`
+- `citrix`
+- `example_glass_tables`
+- `ite_work_alert_routing`
+- `itsi_monitoring_and_alerting`
 - `linux`
+- `microsoft_365`
+- `microsoft_exchange`
+- `netapp_data_ontap_dashboards_reports`
+- `pivotal_cloud_foundry`
+- `servicenow`
+- `shared_it_infrastructure`
+- `soar_system_logs`
 - `splunk_appdynamics`
 - `splunk_observability_cloud`
+- `splunk_as_a_service`
+- `splunk_synthetic_monitoring`
+- `third_party_apm`
+- `unix_dashboards_reports`
 - `vmware`
+- `vmware_dashboards_reports`
 - `windows`
+- `windows_dashboards_reports`
 
-Each profile has preset app checks, input-readiness checks, and guided next steps.
+The Cisco/AWS/Linux/AppDynamics/Observability/VMware/Windows profiles have richer app, input, and macro checks. The other documented Content Packs 2.5 profiles use catalog-generic install/visibility validation plus explicit follow-up steps. For a pack that is not listed, use `title`, `catalog_title`, or `pack_id` directly.
 
 ## Reports
 

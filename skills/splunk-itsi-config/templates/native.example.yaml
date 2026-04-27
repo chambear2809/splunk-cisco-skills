@@ -8,12 +8,45 @@ connection:
 defaults:
   sec_grp: default_itsi_security_group
 
+# Optional native apply acceleration for existing keyed objects.
+# This batches eligible update payloads through the documented
+# itoa_interface/<object_type>/bulk_update route. Creates, special routes,
+# and cleanup still use their normal guarded paths.
+# bulk_apply:
+#   enabled: true
+#   sections:
+#     - entities
+#     - services
+#     - kpi_base_searches
+
 # Optional read-only inventory enrichment.
 # inventory:
+#   use_count_endpoints: true
+#   count_only: false
 #   maintenance_object_keys:
 #     - replace-with-live-service-or-entity-key
+#   entity_discovery_entity_keys:
+#     - replace-with-live-entity-key
 #   notable_event_group_filter:
 #     status: 5
+#   notable_event_filter:
+#     status: 5
+#   notable_event_action_names:
+#     - send_email
+#   notable_event_limit: 25
+#   notable_event_fields:
+#     - _key
+#     - status
+#     - severity
+#   ticket_episode_keys:
+#     - replace-with-live-episode-key
+#   episode_export_keys:
+#     - replace-with-live-export-key
+#   episode_export_filter:
+#     status: COMPLETED
+#   templatize_objects:
+#     - object_type: service
+#       key: replace-with-live-service-key
 
 teams:
   - title: Network Operations
@@ -35,6 +68,12 @@ entity_types:
           field: sourcetype
           values:
             - cisco:*
+
+entity_filter_rules:
+  - title: Example Network Entity Filter
+    description: Replace payload fields with an exported entity filter rule.
+    payload:
+      filter: '{"title":{"$regex":"edge-.*"}}'
 
 entity_management_policies:
   - title: Example Entity Discovery Policy
@@ -81,7 +120,7 @@ custom_threshold_windows:
 
 service_templates:
   - title: Network Device Template
-    description: Template that can be linked to matching services
+    description: Template that can be linked to matching services; REST links append template entity rules.
     entity_rules:
       - field: host
         field_type: alias
@@ -333,6 +372,7 @@ user_preferences:
 #       - replace-with-live-entity-key
 #   - action: entity_retire_retirable
 #     allow_operational_action: true
+#     # Preview reads entity/count_retirable targets before this destructive transition.
 #     retire_all_retirable: true
 #   - action: notable_event_action_execute
 #     allow_operational_action: true
@@ -342,9 +382,46 @@ user_preferences:
 #       - replace-with-live-episode-key
 #     params:
 #       message: Review this episode.
+#   - action: notable_event_comment
+#     allow_operational_action: true
+#     group_key: replace-with-live-episode-key
+#     comment: Reviewed by the platform team.
 #   - action: ticket_link
 #     allow_operational_action: true
 #     group_key: replace-with-live-episode-key
 #     ticket_system: jira
 #     ticket_id: NET-123
 #     ticket_url: https://jira.example/browse/NET-123
+#   - action: ticket_read
+#     allow_operational_action: true
+#     group_key: replace-with-live-episode-key
+#   - action: episode_export_get
+#     allow_operational_action: true
+#     export_key: replace-with-live-export-key
+#   - action: episode_export_download
+#     allow_operational_action: true
+#     filename: replace-with-export.csv
+#     output_path: /tmp/itsi-episode-export.csv
+#   - action: episode_export_delete
+#     allow_operational_action: true
+#     allow_episode_export_delete: true
+#     export_key: replace-with-live-export-key
+#   - action: templatize_object
+#     allow_operational_action: true
+#     object_type: service
+#     key: replace-with-live-service-key
+#     output_path: /tmp/itsi-service-template.json
+#   - action: bulk_update
+#     allow_operational_action: true
+#     allow_bulk_update: true
+#     object_type: entity
+#     payloads:
+#       - _key: replace-with-live-entity-key
+#         title: Example Entity
+#   - action: custom_content_pack_submit
+#     allow_operational_action: true
+#     content_pack_key: replace-with-live-custom-content-pack-key
+#   - action: custom_content_pack_download
+#     allow_operational_action: true
+#     content_pack_key: replace-with-live-custom-content-pack-key
+#     output_path: /tmp/custom-content-pack.tar.gz

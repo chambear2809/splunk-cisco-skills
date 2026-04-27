@@ -5,12 +5,17 @@ import json
 import re
 from copy import deepcopy
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from .common import ValidationError, bool_from_any, canonicalize, compact, deep_merge, listify, subset_matches
 
 
 DEFAULT_TEAM = "default_itsi_security_group"
+SERVICE_TEMPLATE_APPEND_SEMANTICS = (
+    "REST service-template linking uses append semantics for template entity rules; "
+    "use the ITSI UI when an operator needs replace or keep-existing entity-rule choices."
+)
 
 
 @dataclass(frozen=True)
@@ -32,6 +37,7 @@ class ConfigObjectSection:
 PRE_SERVICE_CONFIG_SECTIONS = (
     ConfigObjectSection("teams", "team", default_sec_grp=False),
     ConfigObjectSection("entity_types", "entity_type"),
+    ConfigObjectSection("entity_filter_rules", "entity_filter_rule"),
     ConfigObjectSection("entity_management_policies", "entity_management_policies", label="entity_management_policy"),
     ConfigObjectSection("entity_management_rules", "entity_management_rules", label="entity_management_rule"),
     ConfigObjectSection("data_integration_templates", "data_integration_template"),
@@ -92,6 +98,34 @@ PROTECTED_CLEANUP_KEY_PREFIXES = (
     "sai-",
     "vmware_",
 )
+PROTECTED_CLEANUP_SOURCE_FIELDS = (
+    "source_itsi_da",
+    "source_app",
+    "source_app_name",
+    "source_content_pack",
+    "source_content_pack_id",
+    "content_pack",
+    "content_pack_id",
+    "content_pack_app",
+    "origin_app",
+    "origin_app_id",
+    "managed_by",
+    "eai:appName",
+)
+PROTECTED_CLEANUP_MANAGED_FIELDS = (
+    "is_default",
+    "is_packaged",
+    "is_system",
+    "managed",
+    "packaged",
+    "system",
+)
+PROTECTED_CLEANUP_SOURCE_PREFIXES = (
+    "da-itsi-",
+    "da-itsi-cp-",
+    "content pack for ",
+    "splunk app for content packs",
+)
 PROTECTED_CLEANUP_TITLES_BY_SECTION = {
     "backup_restore_jobs": {"Default Scheduled Backup"},
     "correlation_searches": {
@@ -115,10 +149,32 @@ PROTECTED_CLEANUP_TITLES_BY_SECTION = {
     "teams": {"Global"},
 }
 PROTECTED_CLEANUP_TITLE_PREFIXES = (
+    "Amazon Web Services ",
+    "AWS ",
+    "Cisco ",
     "DA-ITSI-",
+    "Citrix ",
+    "Content Pack for ",
+    "Exchange ",
+    "ITSI Monitoring and Alerting",
+    "Microsoft 365",
+    "Microsoft Exchange",
+    "Monitoring Citrix",
+    "Monitoring Microsoft Windows",
+    "Monitoring Splunk as a Service",
+    "Monitoring Unix and Linux",
+    "NetApp ",
     "SAI:",
+    "ServiceNow",
+    "Shared IT Infrastructure",
+    "SOAR ",
     "Splunk AppDynamics ",
+    "Splunk Observability Cloud",
+    "Splunk Synthetic Monitoring",
+    "Third-Party APM",
+    "Unix Dashboards",
     "VMware ",
+    "Windows Dashboards",
 )
 
 CONFIG_OBJECT_RESERVED_KEYS = {"payload", "title", "description", "sec_grp", "object_type", "allow_restore"}
@@ -619,6 +675,90 @@ def _inventory_titles(items: list[dict[str, Any]]) -> list[str]:
     return sorted(titles)
 
 
+def _cleanup_source_metadata(live: dict[str, Any]) -> dict[str, Any]:
+    metadata: dict[str, Any] = {}
+    for field_name in PROTECTED_CLEANUP_SOURCE_FIELDS + PROTECTED_CLEANUP_MANAGED_FIELDS:
+        if field_name in live:
+            metadata[field_name] = deepcopy(live[field_name])
+    acl = live.get("acl")
+    if isinstance(acl, dict):
+        app_name = acl.get("app") or acl.get("appName")
+        if app_name:
+            metadata["acl.app"] = app_name
+    return metadata
+
+
+def _cleanup_source_value_is_protected(value: Any) -> bool:
+    if isinstance(value, list):
+        return any(_cleanup_source_value_is_protected(item) for item in value)
+    if isinstance(value, dict):
+        return any(_cleanup_source_value_is_protected(item) for item in value.values())
+    normalized = str(value or "").strip().lower()
+    if not normalized or normalized == "manual":
+        return False
+    return any(normalized.startswith(prefix) for prefix in PROTECTED_CLEANUP_SOURCE_PREFIXES)
+
+
+def _bulk_apply_options(spec: dict[str, Any]) -> dict[str, Any]:
+    raw = spec.get("bulk_apply")
+    if not isinstance(raw, dict):
+        apply_options = spec.get("apply") if isinstance(spec.get("apply"), dict) else {}
+        raw = {
+            "enabled": apply_options.get("use_bulk_update") or apply_options.get("bulk_update"),
+            "sections": apply_options.get("bulk_update_sections"),
+            "partial": apply_options.get("bulk_update_partial"),
+        }
+    sections = {
+        str(item).strip()
+        for item in listify(raw.get("sections") or raw.get("bulk_update_sections"))
+        if str(item).strip()
+    }
+    return {
+        "enabled": bool_from_any(raw.get("enabled") or raw.get("use_bulk_update") or raw.get("bulk_update")),
+        "sections": sections,
+        "partial": bool_from_any(raw.get("partial"), default=True),
+    }
+
+
+def _bulk_apply_section_selected(options: dict[str, Any], section_name: str, object_type: str) -> bool:
+    if not bool_from_any(options.get("enabled")):
+        return False
+    sections = options.get("sections")
+    if isinstance(sections, set) and sections:
+        return section_name in sections or object_type in sections
+    return True
+
+
+def _bulk_apply_supported(section_name: str, object_type: str, interface: str = "itoa") -> bool:
+    return interface == "itoa" and object_type != "kpi_entity_threshold" and section_name != "kpi_entity_thresholds"
+
+
+def _projection_fields(*field_groups: Any) -> tuple[str, ...]:
+    fields: list[str] = []
+    for group in field_groups:
+        items = group if isinstance(group, (list, tuple, set)) else listify(group)
+        for field_name in items:
+            normalized = str(field_name).strip()
+            if normalized and normalized not in fields:
+                fields.append(normalized)
+    return tuple(fields)
+
+
+def _inventory_projection_fields(identity_field: str = "title") -> tuple[str, ...]:
+    return _projection_fields("_key", "title", "name", identity_field, "object_type")
+
+
+def _cleanup_projection_fields(identity_field: str = "title") -> tuple[str, ...]:
+    return _projection_fields(
+        _inventory_projection_fields(identity_field),
+        PROTECTED_CLEANUP_SOURCE_FIELDS,
+        PROTECTED_CLEANUP_MANAGED_FIELDS,
+        "acl",
+        "eai:acl",
+        "eai:acl.app",
+    )
+
+
 def _uses_preview_key(value: str) -> bool:
     return value.startswith("preview-") or (value.startswith("preview-service::") and "::kpi::" in value)
 
@@ -869,8 +1009,17 @@ def _build_dependency_entry(dependency_spec: Any, services_by_title: dict[str, d
     if not dependency_service or not dependency_service.get("_key"):
         raise ValidationError(f"Dependency service '{dependency_title}' was not found after the service upsert pass.")
     dependency_kpis = {kpi.get("title"): kpi.get("_key") for kpi in listify(dependency_service.get("kpis")) if kpi.get("title")}
+    dependency_kpi_ids = {str(kpi.get("_key")) for kpi in listify(dependency_service.get("kpis")) if kpi.get("_key")}
     selected_titles = dependency_spec.get("kpis")
-    if selected_titles:
+    selected_ids = dependency_spec.get("kpi_ids") or dependency_spec.get("kpi_keys")
+    if selected_ids:
+        selected_kpis = _unique_nonblank_strings(selected_ids, f"depends_on {dependency_title} kpi_ids")
+        missing_ids = [kpi_id for kpi_id in selected_kpis if kpi_id not in dependency_kpi_ids]
+        if missing_ids:
+            raise ValidationError(
+                f"Dependency service '{dependency_title}' is missing KPI id(s): {', '.join(sorted(missing_ids))}."
+            )
+    elif selected_titles:
         missing_titles = [title for title in selected_titles if title not in dependency_kpis]
         if missing_titles:
             raise ValidationError(
@@ -959,13 +1108,55 @@ class NativeWorkflow:
             return self._validate(spec)
         return self._upsert(spec, apply=(mode == "apply"), mode=mode)
 
-    def _list_objects(self, section: ConfigObjectSection) -> list[dict[str, Any]]:
+    def _list_object_type(
+        self,
+        object_type: str,
+        interface: str = "itoa",
+        *,
+        fields: tuple[str, ...] | list[str] | str | None = None,
+        filter_data: dict[str, Any] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[dict[str, Any]]:
         if hasattr(self.client, "list_objects"):
+            kwargs: dict[str, Any] = {"interface": interface}
+            if fields and interface != "icon_collection":
+                kwargs["fields"] = fields
+            if filter_data:
+                kwargs["filter_data"] = filter_data
+            if limit is not None:
+                kwargs["limit"] = limit
+            if offset is not None:
+                kwargs["offset"] = offset
             try:
-                return self.client.list_objects(section.object_type, interface=section.interface)
+                return self.client.list_objects(object_type, **kwargs)
             except TypeError:
-                return self.client.list_objects(section.object_type)
+                try:
+                    return self.client.list_objects(object_type, interface=interface)
+                except TypeError:
+                    return self.client.list_objects(object_type)
         return []
+
+    def _list_objects(
+        self,
+        section: ConfigObjectSection,
+        *,
+        fields: tuple[str, ...] | list[str] | str | None = None,
+        filter_data: dict[str, Any] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[dict[str, Any]]:
+        try:
+            return self._list_object_type(
+                section.object_type,
+                interface=section.interface,
+                fields=fields,
+                filter_data=filter_data,
+                limit=limit,
+                offset=offset,
+            )
+        except TypeError:
+            return self._list_object_type(section.object_type, interface=section.interface)
 
     @staticmethod
     def _unavailable_section_diagnostic(section: ConfigObjectSection, exc: Exception) -> dict[str, Any]:
@@ -988,9 +1179,20 @@ class NativeWorkflow:
         section: ConfigObjectSection,
         result: NativeResult | None = None,
         unavailable_sections: list[dict[str, Any]] | None = None,
+        *,
+        fields: tuple[str, ...] | list[str] | str | None = None,
+        filter_data: dict[str, Any] | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
     ) -> list[dict[str, Any]]:
         try:
-            return self._list_objects(section)
+            return self._list_objects(
+                section,
+                fields=fields,
+                filter_data=filter_data,
+                limit=limit,
+                offset=offset,
+            )
         except Exception as exc:
             if not self._is_optional_list_unavailable(exc):
                 raise
@@ -1055,7 +1257,11 @@ class NativeWorkflow:
                 exported_services.append(service_spec)
             exported["services"] = exported_services
         if not sections or "neaps" in sections or "notable_event_aggregation_policy" in sections:
-            neap_objects = self._list_objects(NEAP_SECTION)
+            include_managed_neaps = bool_from_any(export_options.get("include_managed_neaps"))
+            neap_objects = [
+                item for item in self._list_objects(NEAP_SECTION)
+                if include_managed_neaps or not _neap_is_managed(item)
+            ]
             neaps = [_export_object_spec(item) for item in neap_objects]
             if neaps or bool_from_any(export_options.get("include_empty")):
                 exported["neaps"] = [item for item in neaps if item.get("title")]
@@ -1074,6 +1280,8 @@ class NativeWorkflow:
     def _inventory(self, spec: dict[str, Any]) -> NativeResult:
         result = NativeResult(mode="inventory")
         inventory_options = spec.get("inventory", {}) if isinstance(spec.get("inventory"), dict) else {}
+        count_only = bool_from_any(inventory_options.get("count_only"))
+        include_count_endpoint = count_only or bool_from_any(inventory_options.get("use_count_endpoints"))
         inventory: dict[str, Any] = {"apps": {}, "objects": {}}
         for app in ("SA-ITOA", "itsi", "DA-ITSI-ContentLibrary"):
             if hasattr(self.client, "get_app_version"):
@@ -1085,22 +1293,60 @@ class NativeWorkflow:
                 inventory["kvstore_status"] = f"unavailable: {exc}"
         for section in ALL_CONFIG_SECTIONS:
             try:
-                objects = self._list_objects(section)
-                inventory["objects"][section.section] = {
+                count_endpoint = None
+                count_error = None
+                if include_count_endpoint and hasattr(self.client, "count_objects"):
+                    try:
+                        count_endpoint = self.client.count_objects(section.object_type, interface=section.interface)
+                    except Exception as exc:
+                        count_error = str(exc)
+                if count_only and count_endpoint is not None:
+                    inventory["objects"][section.section] = {
+                        "object_type": section.object_type,
+                        "count": count_endpoint,
+                        "count_source": "count_endpoint",
+                    }
+                    continue
+                objects = self._list_objects(section, fields=_inventory_projection_fields(section.identity_field))
+                object_summary = {
                     "object_type": section.object_type,
                     "count": len(objects),
                     "titles": sorted(str(item.get(section.identity_field) or item.get("title") or item.get("name")) for item in objects if item.get(section.identity_field) or item.get("title") or item.get("name")),
                 }
+                if count_endpoint is not None:
+                    object_summary["count_endpoint"] = count_endpoint
+                if count_error:
+                    object_summary["count_endpoint_status"] = f"unavailable: {count_error}"
+                inventory["objects"][section.section] = object_summary
             except Exception as exc:  # keep inventory best-effort
                 inventory["objects"][section.section] = {"object_type": section.object_type, "status": "unavailable", "message": str(exc)}
         for section_name, object_type in (("entities", "entity"), ("services", "service")):
             try:
-                objects = self.client.list_objects(object_type) if hasattr(self.client, "list_objects") else []
-                inventory["objects"][section_name] = {
+                count_endpoint = None
+                count_error = None
+                if include_count_endpoint and hasattr(self.client, "count_objects"):
+                    try:
+                        count_endpoint = self.client.count_objects(object_type)
+                    except Exception as exc:
+                        count_error = str(exc)
+                if count_only and count_endpoint is not None:
+                    inventory["objects"][section_name] = {
+                        "object_type": object_type,
+                        "count": count_endpoint,
+                        "count_source": "count_endpoint",
+                    }
+                    continue
+                objects = self._list_object_type(object_type, fields=_inventory_projection_fields("title"))
+                object_summary = {
                     "object_type": object_type,
                     "count": len(objects),
                     "titles": sorted(str(item.get("title")) for item in objects if item.get("title")),
                 }
+                if count_endpoint is not None:
+                    object_summary["count_endpoint"] = count_endpoint
+                if count_error:
+                    object_summary["count_endpoint_status"] = f"unavailable: {count_error}"
+                inventory["objects"][section_name] = object_summary
             except Exception as exc:
                 inventory["objects"][section_name] = {"object_type": object_type, "status": "unavailable", "message": str(exc)}
         if hasattr(self.client, "content_pack_catalog"):
@@ -1141,20 +1387,146 @@ class NativeWorkflow:
                 discovery["notable_event_actions"] = {"count": len(actions), "titles": _inventory_titles(actions)}
             except Exception as exc:
                 discovery["notable_event_actions"] = {"status": "unavailable", "message": str(exc)}
+        notable_action_names = _unique_nonblank_strings(
+            inventory_options.get("notable_event_action_names") or inventory_options.get("notable_event_actions"),
+            "inventory.notable_event_action_names",
+        )
+        if notable_action_names and hasattr(self.client, "get_notable_event_action"):
+            action_details: dict[str, Any] = {}
+            for action_name in notable_action_names:
+                try:
+                    action_details[action_name] = self.client.get_notable_event_action(action_name)
+                except Exception as exc:
+                    action_details[action_name] = {"status": "unavailable", "message": str(exc)}
+            discovery["notable_event_action_details"] = action_details
         if discovery:
             inventory["discovery"] = discovery
-        if hasattr(self.client, "event_management_count"):
+        if hasattr(self.client, "retirable_entities"):
             try:
-                inventory["event_management_counts"] = {
-                    "notable_event_group": self.client.event_management_count(
-                        "notable_event_group",
-                        inventory_options.get("notable_event_group_filter")
-                        if isinstance(inventory_options.get("notable_event_group_filter"), dict)
-                        else None,
-                    )
+                retirable_entities = self.client.retirable_entities()
+                inventory["retirable_entities"] = {
+                    "count": len(retirable_entities),
+                    "items": [
+                        compact(
+                            {
+                                "_key": item.get("_key"),
+                                "title": item.get("title") or item.get("name"),
+                            }
+                        )
+                        for item in retirable_entities
+                        if isinstance(item, dict)
+                    ],
                 }
             except Exception as exc:
-                inventory["event_management_counts"] = {"status": "unavailable", "message": str(exc)}
+                inventory["retirable_entities"] = {"status": "unavailable", "message": str(exc)}
+        elif hasattr(self.client, "count_retirable_entities"):
+            try:
+                inventory["retirable_entities"] = {"count": self.client.count_retirable_entities()}
+            except Exception as exc:
+                inventory["retirable_entities"] = {"status": "unavailable", "message": str(exc)}
+        entity_discovery_keys = _unique_nonblank_strings(
+            inventory_options.get("entity_discovery_entity_keys") or inventory_options.get("entity_discovery_keys"),
+            "inventory.entity_discovery_entity_keys",
+        )
+        if entity_discovery_keys and hasattr(self.client, "entity_discovery_searches"):
+            discovery_searches: dict[str, Any] = {}
+            for entity_key in entity_discovery_keys:
+                try:
+                    searches = self.client.entity_discovery_searches(entity_key)
+                    discovery_searches[entity_key] = {"count": len(searches), "items": searches}
+                except Exception as exc:
+                    discovery_searches[entity_key] = {"status": "unavailable", "message": str(exc)}
+            inventory["entity_discovery_searches"] = discovery_searches
+        if hasattr(self.client, "event_management_count"):
+            event_counts: dict[str, Any] = {}
+            for object_type, filter_key in (
+                ("notable_event_group", "notable_event_group_filter"),
+                ("notable_event", "notable_event_filter"),
+            ):
+                try:
+                    filter_value = inventory_options.get(filter_key)
+                    event_counts[object_type] = self.client.event_management_count(
+                        object_type,
+                        filter_value if isinstance(filter_value, dict) else None,
+                    )
+                except Exception as exc:
+                    event_counts[object_type] = {"status": "unavailable", "message": str(exc)}
+            inventory["event_management_counts"] = event_counts
+        notable_event_filter = inventory_options.get("notable_event_filter")
+        list_notable_events = bool_from_any(inventory_options.get("list_notable_events"))
+        if isinstance(notable_event_filter, dict) or list_notable_events:
+            notable_events: list[dict[str, Any]]
+            try:
+                raw_limit = inventory_options.get("notable_event_limit")
+                limit = int(raw_limit) if raw_limit is not None else None
+                raw_fields = inventory_options.get("notable_event_fields")
+                fields = ",".join(str(item) for item in listify(raw_fields)) if isinstance(raw_fields, list) else raw_fields
+                if hasattr(self.client, "list_event_management_objects"):
+                    notable_events = self.client.list_event_management_objects(
+                        "notable_event",
+                        notable_event_filter if isinstance(notable_event_filter, dict) else None,
+                        limit=limit,
+                        fields=str(fields) if fields else None,
+                    )
+                elif hasattr(self.client, "list_objects"):
+                    notable_events = self.client.list_objects("notable_event", interface="event_management")
+                    if limit is not None:
+                        notable_events = notable_events[:limit]
+                else:
+                    notable_events = []
+                inventory["notable_events"] = {"count": len(notable_events), "items": notable_events}
+            except Exception as exc:
+                inventory["notable_events"] = {"status": "unavailable", "message": str(exc)}
+        ticket_episode_keys = _unique_nonblank_strings(
+            inventory_options.get("ticket_episode_keys") or inventory_options.get("ticket_group_keys"),
+            "inventory.ticket_episode_keys",
+        )
+        if ticket_episode_keys and hasattr(self.client, "get_episode_tickets"):
+            episode_tickets: dict[str, Any] = {}
+            for group_key in ticket_episode_keys:
+                try:
+                    tickets = self.client.get_episode_tickets(group_key)
+                    episode_tickets[group_key] = {"count": len(tickets), "tickets": tickets}
+                except Exception as exc:
+                    episode_tickets[group_key] = {"status": "unavailable", "message": str(exc)}
+            inventory["episode_tickets"] = episode_tickets
+        if hasattr(self.client, "list_episode_exports"):
+            episode_export_filter = inventory_options.get("episode_export_filter")
+            list_exports = bool_from_any(inventory_options.get("list_episode_exports"))
+            if isinstance(episode_export_filter, dict) or list_exports:
+                try:
+                    filter_payload = episode_export_filter if isinstance(episode_export_filter, dict) else None
+                    exports = self.client.list_episode_exports(filter_payload)
+                    inventory["episode_exports"] = {"count": len(exports), "items": exports}
+                except Exception as exc:
+                    inventory["episode_exports"] = {"status": "unavailable", "message": str(exc)}
+        episode_export_keys = _unique_nonblank_strings(inventory_options.get("episode_export_keys"), "inventory.episode_export_keys")
+        if episode_export_keys and hasattr(self.client, "get_episode_export"):
+            export_status: dict[str, Any] = {}
+            for export_key in episode_export_keys:
+                try:
+                    export_status[export_key] = self.client.get_episode_export(export_key) or {"status": "missing"}
+                except Exception as exc:
+                    export_status[export_key] = {"status": "unavailable", "message": str(exc)}
+            inventory["episode_export_status"] = export_status
+        templatize_specs = listify(inventory_options.get("templatize_objects"))
+        if templatize_specs and hasattr(self.client, "templatize_object"):
+            templates: dict[str, Any] = {}
+            for index, template_spec in enumerate(templatize_specs):
+                if not isinstance(template_spec, dict):
+                    templates[f"templatize[{index}]"] = {"status": "error", "message": "templatize_objects entries must be mappings."}
+                    continue
+                object_type = str(template_spec.get("object_type") or "").strip()
+                key = str(template_spec.get("key") or template_spec.get("_key") or "").strip()
+                label = f"{object_type}:{key}" if object_type and key else f"templatize[{index}]"
+                if not object_type or not key:
+                    templates[label] = {"status": "error", "message": "templatize_objects entries must define object_type and key."}
+                    continue
+                try:
+                    templates[label] = self.client.templatize_object(object_type, key)
+                except Exception as exc:
+                    templates[label] = {"status": "unavailable", "message": str(exc)}
+            inventory["templatized_objects"] = templates
         maintenance_keys = _unique_nonblank_strings(inventory_options.get("maintenance_object_keys"), "inventory.maintenance_object_keys")
         if maintenance_keys:
             maintenance_status: dict[str, Any] = {}
@@ -1208,13 +1580,19 @@ class NativeWorkflow:
         key = str(candidate.get("key") or "").strip()
         title = str(candidate.get("title") or "").strip()
         key_lower = key.lower()
+        title_lower = title.lower()
+        source = candidate.get("source") if isinstance(candidate.get("source"), dict) else {}
+        if any(bool_from_any(source.get(field_name)) for field_name in PROTECTED_CLEANUP_MANAGED_FIELDS):
+            return "candidate is marked as managed/default/shipped content; set cleanup.allow_system_objects: true only after manual review."
+        if any(_cleanup_source_value_is_protected(value) for value in source.values()):
+            return "candidate source metadata points to shipped ITSI/content-pack content; set cleanup.allow_system_objects: true only after manual review."
         if key in PROTECTED_CLEANUP_KEYS or key_lower in {item.lower() for item in PROTECTED_CLEANUP_KEYS}:
             return "candidate looks like a default ITSI object; set cleanup.allow_system_objects: true only after manual review."
         if any(key_lower.startswith(prefix) for prefix in PROTECTED_CLEANUP_KEY_PREFIXES):
             return "candidate looks like shipped ITSI/content-pack content; set cleanup.allow_system_objects: true only after manual review."
         if title in PROTECTED_CLEANUP_TITLES_BY_SECTION.get(section_name, set()):
             return "candidate title matches known default ITSI content; set cleanup.allow_system_objects: true only after manual review."
-        if any(title.startswith(prefix) for prefix in PROTECTED_CLEANUP_TITLE_PREFIXES):
+        if any(title_lower.startswith(prefix.lower()) for prefix in PROTECTED_CLEANUP_TITLE_PREFIXES):
             return "candidate title looks like shipped ITSI/content-pack content; set cleanup.allow_system_objects: true only after manual review."
         return None
 
@@ -1262,7 +1640,12 @@ class NativeWorkflow:
                 for item in listify(spec.get(section.section))
                 if isinstance(item, dict)
             }
-            for live in self._list_objects_best_effort(section, result, plan["unavailable_sections"]):
+            for live in self._list_objects_best_effort(
+                section,
+                result,
+                plan["unavailable_sections"],
+                fields=_cleanup_projection_fields(section.identity_field),
+            ):
                 title = str(live.get(section.identity_field) or live.get("title") or live.get("name") or "").strip()
                 if title and title not in desired_by_section[section.section]:
                     candidate = {
@@ -1272,6 +1655,9 @@ class NativeWorkflow:
                         "title": title,
                         "key": live.get("_key"),
                     }
+                    source = _cleanup_source_metadata(live)
+                    if source:
+                        candidate["source"] = source
                     supported, reason = self._cleanup_support(section.section, candidate, allow_system_objects, allow_high_risk)
                     candidate["high_risk_delete"] = section.section in HIGH_RISK_CLEANUP_SECTIONS
                     candidate["delete_supported"] = supported
@@ -1281,7 +1667,7 @@ class NativeWorkflow:
                     plan["candidates"].append(candidate)
         for section_name, object_type in (("entities", "entity"), ("services", "service")):
             desired_titles = {str(item.get("title") or "").strip() for item in listify(spec.get(section_name)) if isinstance(item, dict)}
-            live_objects = self.client.list_objects(object_type) if hasattr(self.client, "list_objects") else []
+            live_objects = self._list_object_type(object_type, fields=_cleanup_projection_fields("title"))
             for live in live_objects:
                 title = str(live.get("title") or "").strip()
                 if title and title not in desired_titles:
@@ -1292,6 +1678,9 @@ class NativeWorkflow:
                         "title": title,
                         "key": live.get("_key"),
                     }
+                    source = _cleanup_source_metadata(live)
+                    if source:
+                        candidate["source"] = source
                     supported, reason = self._cleanup_support(section_name, candidate, allow_system_objects, allow_high_risk)
                     candidate["high_risk_delete"] = section_name in HIGH_RISK_CLEANUP_SECTIONS
                     candidate["delete_supported"] = supported
@@ -1444,10 +1833,19 @@ class NativeWorkflow:
         *,
         apply: bool,
         default_team: str,
+        bulk_apply_options: dict[str, Any],
     ) -> dict[str, dict[str, dict[str, Any]]]:
         snapshots: dict[str, dict[str, dict[str, Any]]] = {}
         for section in sections:
             seen_titles: set[str] = set()
+            bulk_selected = (
+                _bulk_apply_section_selected(bulk_apply_options, section.section, section.object_type)
+                and _bulk_apply_supported(section.section, section.object_type, section.interface)
+                and hasattr(self.client, "bulk_update_objects")
+            )
+            bulk_payloads: list[dict[str, Any]] = []
+            bulk_records: list[ChangeRecord] = []
+            bulk_snapshots: list[tuple[str, dict[str, Any]]] = []
             for object_spec in listify(spec.get(section.section)):
                 if not isinstance(object_spec, dict):
                     raise ValidationError(f"{section.section} entries must be mappings.")
@@ -1489,6 +1887,22 @@ class NativeWorkflow:
                     )
                     continue
                 if apply:
+                    if bulk_selected:
+                        desired["_key"] = existing["_key"]
+                        bulk_payloads.append(deepcopy(desired))
+                        snapshot = deepcopy(desired)
+                        bulk_snapshots.append((title, snapshot))
+                        bulk_records.append(
+                            ChangeRecord(
+                                section.display_label,
+                                title,
+                                "update",
+                                "ok",
+                                f"Bulk-updated {section.display_label}.",
+                                key=snapshot.get("_key"),
+                            )
+                        )
+                        continue
                     self._update_object(section, existing["_key"], desired)
                     desired["_key"] = existing["_key"]
                 snapshot = desired if apply else _apply_preview_config_key(desired)
@@ -1499,10 +1913,26 @@ class NativeWorkflow:
                         title,
                         "update",
                         "ok",
-                        f"Updated {section.display_label}." if apply else f"Would update {section.display_label}.",
+                        f"Updated {section.display_label}."
+                        if apply
+                        else (
+                            f"Would bulk-update {section.display_label}."
+                            if bulk_selected
+                            else f"Would update {section.display_label}."
+                        ),
                         key=snapshot.get("_key"),
                     )
                 )
+            if apply and bulk_payloads:
+                self.client.bulk_update_objects(
+                    section.object_type,
+                    bulk_payloads,
+                    interface=section.interface,
+                    partial=bool_from_any(bulk_apply_options.get("partial"), default=True),
+                )
+                for title, snapshot in bulk_snapshots:
+                    snapshots.setdefault(section.object_type, {})[title] = snapshot
+                result.changes.extend(bulk_records)
         return snapshots
 
     @staticmethod
@@ -1668,6 +2098,14 @@ class NativeWorkflow:
                 if not apply:
                     services_by_title[service_title] = _apply_service_template_snapshot(service, template)
                 continue
+            result.diagnostics.append(
+                {
+                    "status": "warn",
+                    "object_type": "service_template_link",
+                    "title": service_title,
+                    "message": SERVICE_TEMPLATE_APPEND_SEMANTICS,
+                }
+            )
             if apply:
                 self.client.link_service_to_template(service["_key"], template_key)
                 refreshed = self.client.get_object("service", service["_key"]) or service
@@ -1677,13 +2115,15 @@ class NativeWorkflow:
             result.changes.append(
                 ChangeRecord(
                     "service_template_link",
-                    service_title,
-                    "update",
-                    "ok",
-                    "Linked service to service template." if apply else "Would link service to service template.",
-                    key=service.get("_key"),
+                        service_title,
+                        "update",
+                        "ok",
+                        "Linked service to service template with REST append semantics."
+                        if apply
+                        else "Would link service to service template with REST append semantics.",
+                        key=service.get("_key"),
+                    )
                 )
-            )
 
     def _apply_custom_threshold_window_links(
         self,
@@ -1815,7 +2255,10 @@ class NativeWorkflow:
                                 "status": "error",
                                 "object_type": "service_template_link",
                                 "title": service_title,
-                                "message": "Service template link does not match the requested template.",
+                                "message": (
+                                    "Service template link does not match the requested template. "
+                                    f"{SERVICE_TEMPLATE_APPEND_SEMANTICS}"
+                                ),
                             }
                         )
                 except ValidationError as exc:
@@ -1902,10 +2345,40 @@ class NativeWorkflow:
             "notable_event_actions_execute": "notable_event_action_execute",
             "episode_ticket_link": "ticket_link",
             "link_episode_ticket": "ticket_link",
+            "episode_ticket_read": "ticket_read",
+            "get_episode_tickets": "ticket_read",
+            "read_episode_tickets": "ticket_read",
             "episode_ticket_unlink": "ticket_unlink",
             "unlink_episode_ticket": "ticket_unlink",
             "episode_export": "episode_export_create",
             "create_episode_export": "episode_export_create",
+            "episode_export_status": "episode_export_get",
+            "episode_export_get": "episode_export_get",
+            "get_episode_export": "episode_export_get",
+            "episode_export_list": "episode_export_list",
+            "list_episode_exports": "episode_export_list",
+            "episode_export_download": "episode_export_file_download",
+            "download_episode_export": "episode_export_file_download",
+            "episode_export_file_download": "episode_export_file_download",
+            "episode_export_delete": "episode_export_delete",
+            "delete_episode_export": "episode_export_delete",
+            "episode_export_file_delete": "episode_export_file_delete",
+            "delete_episode_export_file": "episode_export_file_delete",
+            "templatize": "templatize_object",
+            "templatize_object": "templatize_object",
+            "service_templatize": "templatize_object",
+            "kpi_base_search_templatize": "templatize_object",
+            "bulk_update": "bulk_update_objects",
+            "bulk_update_objects": "bulk_update_objects",
+            "episode_comment": "notable_event_comment_create",
+            "notable_event_comment": "notable_event_comment_create",
+            "create_notable_event_comment": "notable_event_comment_create",
+            "custom_content_pack_submit": "custom_content_pack_submit",
+            "submit_custom_content_pack": "custom_content_pack_submit",
+            "content_pack_submit": "custom_content_pack_submit",
+            "custom_content_pack_download": "custom_content_pack_download",
+            "download_custom_content_pack": "custom_content_pack_download",
+            "content_pack_download": "custom_content_pack_download",
         }
         return aliases.get(action, action)
 
@@ -1920,6 +2393,8 @@ class NativeWorkflow:
             or action_spec.get("ticket_id")
             or action_spec.get("group_key")
             or action_spec.get("episode_id")
+            or action_spec.get("content_pack_key")
+            or action_spec.get("pack_key")
             or action
         )
 
@@ -1987,6 +2462,71 @@ class NativeWorkflow:
         return action_name, payload
 
     @staticmethod
+    def _notable_event_comment_payload(action_spec: dict[str, Any]) -> dict[str, Any]:
+        payload = deepcopy(action_spec.get("payload")) if isinstance(action_spec.get("payload"), dict) else {}
+        for source, target in (
+            ("comment", "comment"),
+            ("message", "comment"),
+            ("group_key", "itsi_group_id"),
+            ("episode_key", "itsi_group_id"),
+            ("notable_event_group_key", "itsi_group_id"),
+            ("notable_event_group_id", "itsi_group_id"),
+            ("episode_id", "itsi_group_id"),
+            ("event_id", "event_id"),
+            ("author", "author"),
+        ):
+            if action_spec.get(source) is not None:
+                payload[target] = action_spec[source]
+        if not payload:
+            raise ValidationError("notable_event_comment_create must define a payload or comment fields.")
+        return payload
+
+    @staticmethod
+    def _custom_content_pack_key(action_spec: dict[str, Any], label: str) -> str:
+        return _first_nonblank_field(
+            action_spec,
+            ("content_pack_key", "pack_key", "_key", "key"),
+            label,
+        )
+
+    @staticmethod
+    def _write_download_payload(output_path: str, payload: Any) -> str:
+        path = Path(output_path).expanduser()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if isinstance(payload, bytes):
+            path.write_bytes(payload)
+        elif isinstance(payload, str):
+            path.write_text(payload, encoding="utf-8")
+        else:
+            path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        return str(path)
+
+    @staticmethod
+    def _operational_response_summary(response: Any) -> str:
+        if response is None:
+            return ""
+        if isinstance(response, list):
+            return f" Response items: {len(response)}."
+        if isinstance(response, dict):
+            keys = ", ".join(sorted(str(key) for key in response.keys())[:5])
+            return f" Response keys: {keys}." if keys else " Response captured."
+        return " Response captured."
+
+    @staticmethod
+    def _append_operational_response(result: NativeResult, title: str, action: str, response: Any) -> None:
+        if response is None:
+            return
+        result.diagnostics.append(
+            {
+                "status": "info",
+                "object_type": "operational_action_result",
+                "title": title,
+                "action": action,
+                "result": deepcopy(response),
+            }
+        )
+
+    @staticmethod
     def _ticket_link_payload(action_spec: dict[str, Any]) -> tuple[str | None, dict[str, Any]]:
         payload = deepcopy(action_spec.get("payload")) if isinstance(action_spec.get("payload"), dict) else {}
         group_key = str(action_spec.get("group_key") or action_spec.get("episode_key") or action_spec.get("notable_event_group_key") or "").strip() or None
@@ -2020,6 +2560,95 @@ class NativeWorkflow:
         ticketing_system = _first_nonblank_field(action_spec, ("ticketing_system", "ticket_system"), "ticket_unlink")
         ticket_id = _first_nonblank_field(action_spec, ("ticket_id",), "ticket_unlink")
         return group_key, ticketing_system, ticket_id
+
+    @staticmethod
+    def _ticket_read_group_key(action_spec: dict[str, Any]) -> str:
+        return _first_nonblank_field(
+            action_spec,
+            ("group_key", "episode_key", "notable_event_group_key", "episode_id"),
+            "ticket_read",
+        )
+
+    @staticmethod
+    def _episode_export_key(action_spec: dict[str, Any], label: str = "episode_export") -> str:
+        return _first_nonblank_field(action_spec, ("export_key", "episode_export_key", "_key", "key"), label)
+
+    @staticmethod
+    def _episode_export_filename(action_spec: dict[str, Any], label: str = "episode_export_file") -> str:
+        return _first_nonblank_field(action_spec, ("filename", "file_name", "export_filename"), label)
+
+    @staticmethod
+    def _episode_export_filter(action_spec: dict[str, Any], label: str) -> dict[str, Any] | None:
+        value = action_spec.get("filter_data") or action_spec.get("filter")
+        if value is None:
+            payload = action_spec.get("payload")
+            if isinstance(payload, dict):
+                value = payload.get("filter_data") or payload.get("filter")
+        if value is None:
+            return None
+        if not isinstance(value, dict) or not value:
+            raise ValidationError(f"{label} filter_data must be a non-empty mapping.")
+        return deepcopy(value)
+
+    @staticmethod
+    def _episode_export_delete_target(action_spec: dict[str, Any]) -> tuple[str, str | dict[str, Any]]:
+        if not bool_from_any(action_spec.get("allow_episode_export_delete")):
+            raise ValidationError(
+                "episode_export_delete removes generated export records or files. "
+                "Set allow_episode_export_delete: true after explicit operator review."
+            )
+        for key_name in ("export_key", "episode_export_key", "_key", "key"):
+            value = str(action_spec.get(key_name) or "").strip()
+            if value:
+                return "key", value
+        for key_name in ("filename", "file_name", "export_filename"):
+            value = str(action_spec.get(key_name) or "").strip()
+            if value:
+                return "filename", value
+        filter_data = NativeWorkflow._episode_export_filter(action_spec, "episode_export_delete")
+        if filter_data is not None:
+            if not bool_from_any(action_spec.get("allow_episode_export_bulk_delete")):
+                raise ValidationError(
+                    "episode_export_delete with filter_data can delete multiple exports. "
+                    "Set allow_episode_export_bulk_delete: true after explicit operator review."
+                )
+            return "filter_data", filter_data
+        raise ValidationError("episode_export_delete must define export_key, filename, or filter_data.")
+
+    @staticmethod
+    def _templatize_fields(action_spec: dict[str, Any]) -> tuple[str, str]:
+        object_type = str(action_spec.get("object_type") or "").strip()
+        if not object_type:
+            if action_spec.get("service_key"):
+                object_type = "service"
+            elif action_spec.get("kpi_base_search_key"):
+                object_type = "kpi_base_search"
+        key = str(
+            action_spec.get("key")
+            or action_spec.get("_key")
+            or action_spec.get("service_key")
+            or action_spec.get("kpi_base_search_key")
+            or ""
+        ).strip()
+        if object_type not in {"service", "kpi_base_search"}:
+            raise ValidationError("templatize_object must define object_type as service or kpi_base_search.")
+        if not key:
+            raise ValidationError("templatize_object must define key, _key, service_key, or kpi_base_search_key.")
+        return object_type, key
+
+    @staticmethod
+    def _bulk_update_fields(action_spec: dict[str, Any]) -> tuple[str, str, list[dict[str, Any]], bool]:
+        if not bool_from_any(action_spec.get("allow_bulk_update")):
+            raise ValidationError("bulk_update_objects requires allow_bulk_update: true after explicit operator review.")
+        object_type = _first_nonblank_field(action_spec, ("object_type",), "bulk_update_objects")
+        interface = str(action_spec.get("interface") or "itoa").strip() or "itoa"
+        payloads = action_spec.get("payloads") or action_spec.get("objects") or action_spec.get("payload")
+        if isinstance(payloads, dict):
+            payloads = [payloads]
+        if not isinstance(payloads, list) or not payloads or not all(isinstance(item, dict) for item in payloads):
+            raise ValidationError("bulk_update_objects must define payloads as a non-empty list of mappings.")
+        partial = bool_from_any(action_spec.get("partial"), default=True)
+        return object_type, interface, [deepcopy(item) for item in payloads], partial
 
     def _apply_operational_actions(
         self,
@@ -2088,15 +2717,65 @@ class NativeWorkflow:
                         "entity_retire_retirable retires every entity currently marked retirable. "
                         "Set retire_all_retirable: true after explicit operator review."
                     )
+                retirable_count = None
+                retirable_entities = None
+                if hasattr(self.client, "retirable_entities"):
+                    try:
+                        retirable_entities = self.client.retirable_entities()
+                        retirable_count = len(retirable_entities)
+                    except Exception as exc:
+                        result.diagnostics.append(
+                            {
+                                "status": "warn",
+                                "object_type": "operational_action",
+                                "title": title,
+                                "message": f"Could not read entity/count_retirable target list before retire_retirable: {exc}",
+                            }
+                        )
+                if retirable_count is None and hasattr(self.client, "count_retirable_entities"):
+                    try:
+                        retirable_count = self.client.count_retirable_entities()
+                    except Exception as exc:
+                        result.diagnostics.append(
+                            {
+                                "status": "warn",
+                                "object_type": "operational_action",
+                                "title": title,
+                                "message": f"Could not read entity/count_retirable before retire_retirable: {exc}",
+                            }
+                        )
+                if retirable_entities is not None:
+                    target_items = [
+                        compact({"_key": item.get("_key"), "title": item.get("title") or item.get("name")})
+                        for item in retirable_entities[:25]
+                        if isinstance(item, dict)
+                    ]
+                    self._append_operational_response(
+                        result,
+                        f"{title} targets",
+                        "entity_retire_retirable_targets",
+                        {
+                            "count": retirable_count,
+                            "items": target_items,
+                            "truncated": len(retirable_entities) > len(target_items),
+                        },
+                    )
                 if apply:
                     self.client.retire_retirable_entities()
+                detail = "Retired all retirable entities." if apply else "Would retire all retirable entities."
+                if retirable_count is not None:
+                    detail = (
+                        f"Retired {retirable_count} retirable entit{'y' if retirable_count == 1 else 'ies'}."
+                        if apply
+                        else f"Would retire {retirable_count} retirable entit{'y' if retirable_count == 1 else 'ies'}."
+                    )
                 result.changes.append(
                     ChangeRecord(
                         "operational_action",
                         title,
                         "apply" if apply else "preview",
                         "ok",
-                        "Retired all retirable entities." if apply else "Would retire all retirable entities.",
+                        detail,
                     )
                 )
                 continue
@@ -2117,29 +2796,81 @@ class NativeWorkflow:
                 continue
             if action == "notable_event_action_execute":
                 action_name, payload = self._notable_event_action(action_spec)
+                if hasattr(self.client, "get_notable_event_action"):
+                    try:
+                        action_detail = self.client.get_notable_event_action(action_name)
+                        self._append_operational_response(result, f"{title} action detail", "notable_event_action_detail", action_detail)
+                    except Exception as exc:
+                        result.diagnostics.append(
+                            {
+                                "status": "warn",
+                                "object_type": "operational_action",
+                                "title": title,
+                                "message": f"Could not read notable event action metadata for '{action_name}': {exc}",
+                            }
+                        )
+                response = None
                 if apply:
-                    self.client.execute_notable_event_action(action_name, payload)
+                    response = self.client.execute_notable_event_action(action_name, payload)
+                    self._append_operational_response(result, title, action, response)
                 result.changes.append(
                     ChangeRecord(
                         "operational_action",
                         title,
                         "apply" if apply else "preview",
                         "ok",
-                        f"Executed notable event action '{action_name}'." if apply else f"Would execute notable event action '{action_name}'.",
+                        f"Executed notable event action '{action_name}'." + self._operational_response_summary(response)
+                        if apply else f"Would execute notable event action '{action_name}'.",
+                    )
+                )
+                continue
+            if action == "notable_event_comment_create":
+                payload = self._notable_event_comment_payload(action_spec)
+                if apply:
+                    self.client.create_notable_event_comment(payload)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        "Created notable event comment." if apply else "Would create notable event comment.",
                     )
                 )
                 continue
             if action == "ticket_link":
                 group_key, payload = self._ticket_link_payload(action_spec)
+                response = None
                 if apply:
-                    self.client.link_episode_ticket(payload, group_key=group_key)
+                    response = self.client.link_episode_ticket(payload, group_key=group_key)
+                    self._append_operational_response(result, title, action, response)
                 result.changes.append(
                     ChangeRecord(
                         "operational_action",
                         title,
                         "apply" if apply else "preview",
                         "ok",
-                        "Linked ticket to ITSI episode." if apply else "Would link ticket to ITSI episode.",
+                        "Linked ticket to ITSI episode." + self._operational_response_summary(response)
+                        if apply else "Would link ticket to ITSI episode.",
+                        key=group_key,
+                    )
+                )
+                continue
+            if action == "ticket_read":
+                group_key = self._ticket_read_group_key(action_spec)
+                tickets = self.client.get_episode_tickets(group_key) if apply else []
+                detail = (
+                    f"Read {len(tickets)} ticket link(s) from ITSI episode."
+                    if apply
+                    else "Would read ticket links from ITSI episode."
+                )
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "read" if apply else "preview",
+                        "ok",
+                        detail,
                         key=group_key,
                     )
                 )
@@ -2173,6 +2904,161 @@ class NativeWorkflow:
                     )
                 )
                 continue
+            if action == "episode_export_list":
+                filter_data = self._episode_export_filter(action_spec, "episode_export_list")
+                exports = self.client.list_episode_exports(filter_data) if apply else []
+                detail = (
+                    f"Read {len(exports)} episode export record(s)."
+                    if apply
+                    else "Would read episode export records."
+                )
+                result.changes.append(
+                    ChangeRecord("operational_action", title, "read" if apply else "preview", "ok", detail)
+                )
+                continue
+            if action == "episode_export_get":
+                export_key = self._episode_export_key(action_spec, "episode_export_get")
+                export_status = self.client.get_episode_export(export_key) if apply else None
+                detail = (
+                    "Read episode export status." if apply and export_status else
+                    "Episode export was not found." if apply else
+                    "Would read episode export status."
+                )
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "read" if apply else "preview",
+                        "ok",
+                        detail,
+                        key=export_key,
+                    )
+                )
+                continue
+            if action == "episode_export_file_download":
+                filename = self._episode_export_filename(action_spec, "episode_export_file_download")
+                output_path = str(action_spec.get("output_path") or "").strip()
+                if not output_path:
+                    raise ValidationError("episode_export_file_download requires output_path.")
+                written_path = None
+                if apply:
+                    download_payload = self.client.download_episode_export_file(filename)
+                    written_path = self._write_download_payload(output_path, download_payload)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        f"Downloaded episode export file to {written_path}." if apply else "Would download episode export file.",
+                        key=filename,
+                    )
+                )
+                continue
+            if action in {"episode_export_delete", "episode_export_file_delete"}:
+                if action == "episode_export_file_delete":
+                    if not bool_from_any(action_spec.get("allow_episode_export_delete")):
+                        raise ValidationError(
+                            "episode_export_file_delete removes generated CSV files. "
+                            "Set allow_episode_export_delete: true after explicit operator review."
+                        )
+                    target_kind, target = "filename", self._episode_export_filename(action_spec, "episode_export_file_delete")
+                else:
+                    target_kind, target = self._episode_export_delete_target(action_spec)
+                if apply:
+                    if target_kind == "key":
+                        self.client.delete_episode_export(str(target))
+                    elif target_kind == "filename":
+                        self.client.delete_episode_export_file(str(target))
+                    else:
+                        self.client.delete_episode_exports(target)  # type: ignore[arg-type]
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        f"Deleted episode export by {target_kind}." if apply else f"Would delete episode export by {target_kind}.",
+                        key=str(target) if not isinstance(target, dict) else None,
+                    )
+                )
+                continue
+            if action == "templatize_object":
+                object_type, key = self._templatize_fields(action_spec)
+                output_path = str(action_spec.get("output_path") or "").strip()
+                written_path = None
+                if apply:
+                    template = self.client.templatize_object(object_type, key)
+                    if output_path:
+                        written_path = self._write_download_payload(output_path, template)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "read" if apply else "preview",
+                        "ok",
+                        f"Generated {object_type} template" + (f" at {written_path}." if written_path else ".")
+                        if apply
+                        else f"Would generate {object_type} template.",
+                        key=key,
+                    )
+                )
+                continue
+            if action == "bulk_update_objects":
+                object_type, interface, payloads, partial = self._bulk_update_fields(action_spec)
+                if apply:
+                    self.client.bulk_update_objects(object_type, payloads, interface=interface, partial=partial)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        f"Bulk-updated {len(payloads)} {object_type} object(s)."
+                        if apply
+                        else f"Would bulk-update {len(payloads)} {object_type} object(s).",
+                    )
+                )
+                continue
+            if action == "custom_content_pack_submit":
+                pack_key = self._custom_content_pack_key(action_spec, "custom_content_pack_submit")
+                if apply:
+                    self.client.submit_custom_content_pack(pack_key)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        f"Submitted custom content pack '{pack_key}'."
+                        if apply
+                        else f"Would submit custom content pack '{pack_key}'.",
+                        key=pack_key,
+                    )
+                )
+                continue
+            if action == "custom_content_pack_download":
+                pack_key = self._custom_content_pack_key(action_spec, "custom_content_pack_download")
+                output_path = str(action_spec.get("output_path") or "").strip()
+                written_path = None
+                if apply:
+                    download_payload = self.client.download_custom_content_pack(pack_key)
+                    if output_path:
+                        written_path = self._write_download_payload(output_path, download_payload)
+                result.changes.append(
+                    ChangeRecord(
+                        "operational_action",
+                        title,
+                        "apply" if apply else "preview",
+                        "ok",
+                        f"Downloaded custom content pack '{pack_key}'"
+                        + (f" to {written_path}." if written_path else ".")
+                        if apply
+                        else f"Would download custom content pack '{pack_key}'.",
+                        key=pack_key,
+                    )
+                )
+                continue
             dispatch = {
                 "entity_retire": self.client.retire_entities,
                 "entity_restore": self.client.restore_entities,
@@ -2184,15 +3070,19 @@ class NativeWorkflow:
             if not handler:
                 raise ValidationError(f"Unsupported operational action '{action}'.")
             payload = self._operational_payload(action_spec, action)
+            response = None
             if apply:
-                handler(payload)
+                response = handler(payload)
+                self._append_operational_response(result, title, action, response)
             result.changes.append(
                 ChangeRecord(
                     "operational_action",
                     title,
                     "apply" if apply else "preview",
                     "ok",
-                    f"Applied operational action '{action}'." if apply else f"Would apply operational action '{action}'.",
+                    f"Applied operational action '{action}'." + self._operational_response_summary(response)
+                    if apply
+                    else f"Would apply operational action '{action}'.",
                 )
             )
 
@@ -2239,12 +3129,41 @@ class NativeWorkflow:
                     self._notable_event_group_update(action_spec)
                 elif action == "notable_event_action_execute":
                     self._notable_event_action(action_spec)
+                elif action == "notable_event_comment_create":
+                    self._notable_event_comment_payload(action_spec)
                 elif action == "ticket_link":
                     self._ticket_link_payload(action_spec)
+                elif action == "ticket_read":
+                    self._ticket_read_group_key(action_spec)
                 elif action == "ticket_unlink":
                     self._ticket_unlink_fields(action_spec)
                 elif action == "episode_export_create":
                     _nonempty_mapping(action_spec.get("payload"), "episode_export_create payload")
+                elif action == "episode_export_list":
+                    self._episode_export_filter(action_spec, "episode_export_list")
+                elif action == "episode_export_get":
+                    self._episode_export_key(action_spec, "episode_export_get")
+                elif action == "episode_export_file_download":
+                    self._episode_export_filename(action_spec, "episode_export_file_download")
+                    if not str(action_spec.get("output_path") or "").strip():
+                        raise ValidationError("episode_export_file_download requires output_path.")
+                elif action == "episode_export_delete":
+                    self._episode_export_delete_target(action_spec)
+                elif action == "episode_export_file_delete":
+                    if not bool_from_any(action_spec.get("allow_episode_export_delete")):
+                        raise ValidationError(
+                            "episode_export_file_delete removes generated CSV files. "
+                            "Set allow_episode_export_delete: true after explicit operator review."
+                        )
+                    self._episode_export_filename(action_spec, "episode_export_file_delete")
+                elif action == "templatize_object":
+                    self._templatize_fields(action_spec)
+                elif action == "bulk_update_objects":
+                    self._bulk_update_fields(action_spec)
+                elif action == "custom_content_pack_submit":
+                    self._custom_content_pack_key(action_spec, "custom_content_pack_submit")
+                elif action == "custom_content_pack_download":
+                    self._custom_content_pack_key(action_spec, "custom_content_pack_download")
                 elif action in {
                     "entity_retire",
                     "entity_restore",
@@ -2268,14 +3187,23 @@ class NativeWorkflow:
         self._add_preflight_diagnostics(spec, result)
         defaults = spec.get("defaults", {})
         default_team = defaults.get("sec_grp", DEFAULT_TEAM)
+        bulk_apply_options = _bulk_apply_options(spec)
         pre_snapshots = self._upsert_config_sections(
             spec,
             result,
             PRE_SERVICE_CONFIG_SECTIONS,
             apply=apply,
             default_team=default_team,
+            bulk_apply_options=bulk_apply_options,
         )
         entity_types_by_title = self._resolve_entity_types_by_title(spec, pre_snapshots)
+        bulk_entities_selected = (
+            _bulk_apply_section_selected(bulk_apply_options, "entities", "entity")
+            and _bulk_apply_supported("entities", "entity")
+            and hasattr(self.client, "bulk_update_objects")
+        )
+        bulk_entity_payloads: list[dict[str, Any]] = []
+        bulk_entity_records: list[ChangeRecord] = []
         for entity_spec in listify(spec.get("entities")):
             existing = self.client.find_object_by_title("entity", entity_spec["title"])
             desired = _normalize_entity(entity_spec, default_team, existing, entity_types_by_title)
@@ -2292,10 +3220,33 @@ class NativeWorkflow:
                 result.changes.append(ChangeRecord("entity", entity_spec["title"], "noop", "ok", "Entity already matches.", key=existing.get("_key")))
                 continue
             if apply:
+                if bulk_entities_selected:
+                    desired["_key"] = existing["_key"]
+                    bulk_entity_payloads.append(deepcopy(desired))
+                    bulk_entity_records.append(
+                        ChangeRecord("entity", entity_spec["title"], "update", "ok", "Bulk-updated entity.", key=existing.get("_key"))
+                    )
+                    continue
                 self.client.update_object("entity", existing["_key"], desired)
             result.changes.append(
-                ChangeRecord("entity", entity_spec["title"], "update", "ok", "Updated entity." if apply else "Would update entity.", key=existing.get("_key"))
+                ChangeRecord(
+                    "entity",
+                    entity_spec["title"],
+                    "update",
+                    "ok",
+                    "Updated entity."
+                    if apply
+                    else ("Would bulk-update entity." if bulk_entities_selected else "Would update entity."),
+                    key=existing.get("_key"),
+                )
             )
+        if apply and bulk_entity_payloads:
+            self.client.bulk_update_objects(
+                "entity",
+                bulk_entity_payloads,
+                partial=bool_from_any(bulk_apply_options.get("partial"), default=True),
+            )
+            result.changes.extend(bulk_entity_records)
 
         service_titles = [service_spec["title"] for service_spec in listify(spec.get("services"))]
         dependency_titles = []
@@ -2303,6 +3254,13 @@ class NativeWorkflow:
             for dependency in listify(service_spec.get("depends_on")):
                 dependency_titles.append(dependency if isinstance(dependency, str) else dependency["service"])
         services_by_title: dict[str, dict[str, Any]] = {}
+        bulk_services_selected = (
+            _bulk_apply_section_selected(bulk_apply_options, "services", "service")
+            and _bulk_apply_supported("services", "service")
+            and hasattr(self.client, "bulk_update_objects")
+        )
+        bulk_service_payloads: list[dict[str, Any]] = []
+        bulk_service_records: list[ChangeRecord] = []
         for service_spec in listify(spec.get("services")):
             existing = self.client.find_object_by_title("service", service_spec["title"])
             desired = _normalize_service(service_spec, existing, default_team)
@@ -2324,6 +3282,14 @@ class NativeWorkflow:
                 )
                 continue
             if apply and not _compare_service(existing, desired, service_spec):
+                if bulk_services_selected:
+                    desired["_key"] = existing["_key"]
+                    bulk_service_payloads.append(deepcopy(desired))
+                    services_by_title[service_spec["title"]] = deepcopy(desired)
+                    bulk_service_records.append(
+                        ChangeRecord("service", service_spec["title"], "update", "ok", "Bulk-updated service.", key=existing.get("_key"))
+                    )
+                    continue
                 self.client.update_object("service", existing["_key"], desired)
                 existing = self.client.get_object("service", existing["_key"]) or desired
                 result.changes.append(
@@ -2331,13 +3297,27 @@ class NativeWorkflow:
                 )
             elif not apply and not _compare_service(existing, desired, service_spec):
                 result.changes.append(
-                    ChangeRecord("service", service_spec["title"], "update", "ok", "Would update service.", key=existing.get("_key"))
+                    ChangeRecord(
+                        "service",
+                        service_spec["title"],
+                        "update",
+                        "ok",
+                        "Would bulk-update service." if bulk_services_selected else "Would update service.",
+                        key=existing.get("_key"),
+                    )
                 )
             else:
                 result.changes.append(
                     ChangeRecord("service", service_spec["title"], "noop", "ok", "Service already matches.", key=existing.get("_key"))
                 )
             services_by_title[service_spec["title"]] = deepcopy(existing if apply else _apply_preview_keys(desired))
+        if apply and bulk_service_payloads:
+            self.client.bulk_update_objects(
+                "service",
+                bulk_service_payloads,
+                partial=bool_from_any(bulk_apply_options.get("partial"), default=True),
+            )
+            result.changes.extend(bulk_service_records)
 
         self._apply_service_template_links(
             listify(spec.get("services")),
@@ -2443,6 +3423,7 @@ class NativeWorkflow:
             POST_SERVICE_CONFIG_SECTIONS,
             apply=apply,
             default_team=default_team,
+            bulk_apply_options=bulk_apply_options,
         )
         self._apply_operational_actions(
             listify(spec.get("operational_actions")),

@@ -15,6 +15,7 @@ content_library:
   install_if_missing: true
   source: splunkbase
   app_id: "5391"
+  refresh_catalog: true
 
 packs:
   - profile: aws
@@ -104,3 +105,28 @@ packs:
       - perfmon
     metrics_indexes:
       - itsi_im_metrics
+
+  - profile: microsoft_365
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""
+    configured_outcome:
+      macros:
+        - app: DA-ITSI-CP-microsoft-365
+          name: itsi-cp-microsoft-365-indexes
+          definition: index="o365"
+      saved_searches:
+        - app: DA-ITSI-CP-microsoft-365
+          name: Microsoft 365 Entity Discovery
+          enabled: false
+
+  - title: Third-Party APM
+    resolution: skip
+    enabled: false
+    saved_search_action: disable
+    install_all: true
+    backfill: false
+    prefix: ""

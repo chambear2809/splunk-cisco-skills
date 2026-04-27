@@ -78,6 +78,41 @@ hbs_shell_join() {
     printf '%s' "${joined% }"
 }
 
+# Returns the unquoted body of the currently-registered trap for the given signal,
+# or empty if no trap is registered. Uses `eval` because `trap -p` returns the body
+# wrapped in shell-quoted single-quotes; the eval removes that quoting.
+#
+# SECURITY NOTE: This helper assumes every trap currently in scope was registered by
+# repo-controlled code with sanitized arguments. Callers must NOT register traps
+# whose body is constructed from untrusted input — the eval here would re-interpret
+# any shell metacharacters in such a body.
+hbs_trap_body() {
+    local signal="${1:-}"
+    local trap_output body
+    trap_output="$(trap -p "${signal}" || true)"
+    [[ -n "${trap_output}" ]] || return 0
+    body="${trap_output#trap -- }"
+    body="${body%" ${signal}"}"
+    eval "printf '%s' ${body}"
+}
+
+hbs_append_cleanup_trap() {
+    local cleanup_cmd="${1:-}"
+    shift || true
+    local signal existing
+    [[ -n "${cleanup_cmd}" ]] || return 0
+    for signal in "$@"; do
+        existing="$(hbs_trap_body "${signal}")"
+        if [[ -n "${existing}" ]]; then
+            # shellcheck disable=SC2064  # intentional: cleanup paths are captured at registration time.
+            trap "${existing}; ${cleanup_cmd}" "${signal}"
+        else
+            # shellcheck disable=SC2064  # intentional: cleanup paths are captured at registration time.
+            trap "${cleanup_cmd}" "${signal}"
+        fi
+    done
+}
+
 hbs_detect_package_type() {
     local source_path="${1:-}"
     local lower_name
@@ -767,9 +802,8 @@ hbs_make_sshpass_file() {
     pass_file="$(mktemp)"
     chmod 600 "${pass_file}"
     printf '%s' "${SPLUNK_SSH_PASS}" > "${pass_file}"
-    # Register cleanup so the password file is removed even if the script is interrupted.
-    # shellcheck disable=SC2064  # intentional: trap value captured at registration time.
-    trap "rm -f '${pass_file}'" EXIT INT TERM
+    # Register cleanup without replacing any caller cleanup that is already active.
+    hbs_append_cleanup_trap "rm -f $(printf '%q' "${pass_file}")" EXIT INT TERM
     printf '%s' "${pass_file}"
 }
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 from pathlib import Path
 import re
@@ -27,7 +27,14 @@ from .common import (
     write_text,
 )
 from .native import NativeResult, NativeWorkflow
-from .topology import ServiceTopologyWorkflow, TopologyResult, compile_topology, validate_topology_pack_references
+from .topology import (
+    ServiceTopologyWorkflow,
+    TopologyResult,
+    _pack_contexts_by_profile,
+    _title_candidates,
+    compile_topology,
+    validate_topology_pack_references,
+)
 
 ITSI_APP = "SA-ITOA"
 ITSI_APP_ID = "1841"
@@ -40,6 +47,28 @@ DEFAULT_APP_INSTALL_SCRIPT = (
     / "scripts"
     / "install_app.sh"
 )
+SUPPORTED_CONFIGURED_OUTCOME_KEYS = {
+    "native",
+    "macros",
+    "macro_updates",
+    "saved_searches",
+    "entity_discovery_searches",
+}
+DOCUMENTED_MANUAL_OUTCOME_HINTS = {
+    "lookup_updates": "lookup updates",
+    "lookups": "lookup updates",
+    "data_model_accelerations": "data model acceleration",
+    "data_models": "data model acceleration",
+    "kpi_backfills": "KPI backfill",
+    "backfills": "KPI backfill",
+    "correlation_searches": "correlation-search or alert enablement",
+    "alert_integrations": "alert integration",
+    "service_imports": "service import",
+    "service_discovery": "service discovery",
+    "sandbox_publish": "sandbox publish",
+    "navigation_updates": "navigation update",
+    "dashboards": "dashboard tuning",
+}
 
 ITSI_HEALTH_APPS: list[dict[str, str]] = [
     {
@@ -73,6 +102,44 @@ ITSI_KVSTORE_COLLECTIONS = [
     "itsi_kpi_template",
     "itsi_notable_event_group",
 ]
+
+
+GENERIC_PROFILE_KEYS = {"catalog", "generic", "custom"}
+
+
+GENERIC_CONTENT_PACK_STEPS = [
+    "Review the content-pack preview object list before enabling searches, services, or dashboards.",
+    "Complete any Data Integrations module steps exposed by the installed content pack.",
+    "Validate required add-ons, indexes, macros, entity discovery searches, and saved-search enablement for this pack.",
+    "Review service-template links, KPI thresholds, alerting behavior, and dashboard navigation before production use.",
+]
+
+
+def _catalog_profile(
+    title: str,
+    *,
+    catalog_titles: list[str] | None = None,
+    pack_app_candidates: list[str] | None = None,
+    required_apps: list[dict[str, Any]] | None = None,
+    alternative_app_groups: list[dict[str, Any]] | None = None,
+    companion_app_checks: list[dict[str, Any]] | None = None,
+    macro_checks: list[dict[str, Any]] | None = None,
+    required_inputs: list[dict[str, Any]] | None = None,
+    post_install_steps: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "title": title,
+        "catalog_titles": catalog_titles or [title],
+        "pack_app_candidates": pack_app_candidates or [],
+        "required_apps": required_apps or [],
+        "alternative_app_groups": alternative_app_groups or [],
+        "companion_app_checks": companion_app_checks or [],
+        "macro_checks": macro_checks or [],
+        "required_inputs": required_inputs or [],
+        "post_install_steps": post_install_steps or GENERIC_CONTENT_PACK_STEPS,
+        "automation_scope": "catalog_install_validate_with_guided_followup",
+        "generic_catalog_profile": True,
+    }
 
 
 PACK_PROFILES: dict[str, dict[str, Any]] = {
@@ -285,6 +352,245 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
             "Tune the KPI base searches and threshold levels for your environment.",
         ],
     },
+    "example_glass_tables": _catalog_profile(
+        "Example Glass Tables",
+        pack_app_candidates=["DA-ITSI-CP-example-glass-tables"],
+        post_install_steps=[
+            "Review the example glass tables and clone only the layouts that match your use case.",
+            "Replace static example data sources with production service, KPI, or search-backed tokens.",
+        ],
+    ),
+    "ite_work_alert_routing": _catalog_profile(
+        "ITE Work Alert Routing",
+        pack_app_candidates=["DA-ITSI-CP-ite-work-alert-routing"],
+        companion_app_checks=[
+            {"label": "Splunk On-Call", "candidates": ["splunk_app_on_call", "victorops_app_for_splunk"]},
+            {"label": "Splunk Add-on for ServiceNow", "candidates": ["Splunk_TA_snow", "Splunk_TA_servicenow"]},
+        ],
+        post_install_steps=[
+            "Confirm this ITE Work-focused pack is appropriate for the target environment before enabling alert actions.",
+            "Configure optional Splunk On-Call or ServiceNow routing integrations if those actions are required.",
+            "Review and enable only the saved searches and actions needed for alert routing.",
+        ],
+    ),
+    "itsi_monitoring_and_alerting": _catalog_profile(
+        "ITSI Monitoring and Alerting",
+        pack_app_candidates=["DA-ITSI-CP-itsi-monitoring-and-alerting"],
+        companion_app_checks=[
+            {"label": "Lookup File Editor", "candidates": ["lookup_editor", "splunk_app_lookup_editor"]},
+            {"label": "Punchcard Visualization", "candidates": ["punchcard_app", "punchcard_custom_viz"]},
+        ],
+        post_install_steps=[
+            "Review the included alerting lookup files and populate local ownership, routing, and enrichment values.",
+            "Install optional dashboard dependencies such as Lookup File Editor or Punchcard visualization when needed.",
+            "Enable and tune the monitoring saved searches for your ITSI service and episode volumes.",
+        ],
+    ),
+    "microsoft_365": _catalog_profile(
+        "Microsoft 365",
+        pack_app_candidates=["DA-ITSI-CP-microsoft-365", "DA-ITSI-CP-o365"],
+        required_apps=[
+            {
+                "label": "Splunk Add-on for Microsoft Office 365",
+                "candidates": ["splunk_ta_o365", "Splunk_TA_o365", "Splunk_TA_microsoft-cloudservices", "Splunk_TA_MS_O365"],
+            }
+        ],
+        macro_checks=[
+            {"macro": "itsi-cp-microsoft-365-indexes", "static_indexes_key": "event_indexes", "optional": True},
+            {"macro": "itsi-cp-o365-indexes", "static_indexes_key": "event_indexes", "optional": True},
+        ],
+        post_install_steps=[
+            "Confirm Microsoft 365 data is ingested by the Splunk Add-on for Microsoft Office 365.",
+            "Align the content-pack macros with your Microsoft 365 event indexes.",
+            "Enable entity discovery, service templates, and saved searches only after validating data freshness.",
+        ],
+    ),
+    "microsoft_exchange": _catalog_profile(
+        "Microsoft Exchange",
+        pack_app_candidates=["DA-ITSI-CP-microsoft-exchange"],
+        required_apps=[
+            {
+                "label": "Splunk Add-on for Microsoft Exchange",
+                "candidates": ["Splunk_TA_microsoft_exchange", "Splunk_TA_windows_exchange", "TA-Exchange-Mailbox"],
+            }
+        ],
+        macro_checks=[
+            {"macro": "itsi-cp-microsoft-exchange-indexes", "static_indexes_key": "event_indexes", "optional": True},
+            {"macro": "itsi-cp-exchange-indexes", "static_indexes_key": "event_indexes", "optional": True},
+        ],
+        post_install_steps=[
+            "Confirm Exchange data is ingested by the Splunk Add-on for Microsoft Exchange.",
+            "Align the Exchange macros with your mailbox, transport, and host indexes.",
+            "Review service templates, entity discovery, and thresholds before enabling alerting.",
+        ],
+    ),
+    "citrix": _catalog_profile(
+        "Monitoring Citrix",
+        pack_app_candidates=["DA-ITSI-CP-citrix"],
+        required_apps=[
+            {"label": "Add-on for the Content Pack for Monitoring Citrix", "candidates": ["Splunk_TA_citrix", "TA-citrix-cp", "DA-ITSI-TA-citrix"]},
+            {"label": "Splunk Add-on for Microsoft IIS", "candidates": ["Splunk_TA_microsoft-iis", "Splunk_TA_iis"]},
+            {"label": "Template for Citrix XenDesktop 7", "candidates": ["Splunk_TA_xendesktop7", "TA-XD7", "TA-Citrix-XenDesktop7"]},
+            {"label": "Splunk Add-on for Citrix NetScaler", "candidates": ["Splunk_TA_citrix_netscaler", "TA-NetScaler"]},
+        ],
+        post_install_steps=[
+            "Confirm Citrix, IIS, XenDesktop, and NetScaler prerequisite data sources are present where used.",
+            "Align macros and service templates with the Citrix components deployed in this environment.",
+            "Review KPI base searches and thresholds before enabling Citrix services.",
+        ],
+    ),
+    "pivotal_cloud_foundry": _catalog_profile(
+        "Monitoring Pivotal Cloud Foundry",
+        pack_app_candidates=["DA-ITSI-CP-pivotal-cloud-foundry", "DA-ITSI-CP-pcf"],
+        companion_app_checks=[
+            {"label": "Splunk Firehose Nozzle for PCF", "candidates": ["splunk-firehose-nozzle", "Splunk_TA_pcf", "TA-pivotal-cloud-foundry"]},
+        ],
+        post_install_steps=[
+            "Confirm Pivotal Cloud Foundry events and metrics are ingested from the firehose nozzle.",
+            "Align indexes and macros with your PCF foundation naming and ingestion mode.",
+            "Review entity discovery, service templates, and saved searches before enabling services.",
+        ],
+    ),
+    "splunk_as_a_service": _catalog_profile(
+        "Monitoring Splunk as a Service",
+        pack_app_candidates=["DA-ITSI-CP-splunk-as-a-service"],
+        macro_checks=[
+            {"macro": "itsi-cp-splunk-as-a-service-indexes", "static_indexes_key": "event_indexes", "default_indexes": ["_internal"], "optional": True},
+        ],
+        post_install_steps=[
+            "Review the Splunk service monitoring searches against your deployment topology and indexes.",
+            "Tune thresholds for search head, indexer, forwarder, and platform-health services.",
+            "Enable saved searches progressively and validate episode noise before production use.",
+        ],
+    ),
+    "netapp_data_ontap_dashboards_reports": _catalog_profile(
+        "NetApp Data ONTAP Dashboards and Reports",
+        pack_app_candidates=["DA-ITSI-CP-netapp-data-ontap-dashboards", "DA-ITSI-CP-netapp"],
+        required_apps=[
+            {"label": "Splunk Add-on for NetApp Data ONTAP", "candidates": ["Splunk_TA_ontap", "Splunk_TA_netapp"]},
+            {"label": "Splunk Add-on for NetApp Data ONTAP Indexes", "candidates": ["Splunk_TA_ontap_indexes", "SA-ontap-indexes"]},
+            {"label": "Splunk Add-on for NetApp Data ONTAP Extractions", "candidates": ["Splunk_TA_ontap_extractions", "TA-ontap-extractions"]},
+        ],
+        post_install_steps=[
+            "Confirm the NetApp Data ONTAP add-ons and index packages are installed where data is collected.",
+            "Review NetApp dashboard macros and saved searches after the automatically installed dashboard pack is visible.",
+            "Tune storage thresholds and dashboard navigation for the monitored arrays.",
+        ],
+    ),
+    "servicenow": _catalog_profile(
+        "ServiceNow",
+        pack_app_candidates=["DA-ITSI-CP-servicenow"],
+        required_apps=[
+            {"label": "Splunk Add-on for ServiceNow", "candidates": ["Splunk_TA_snow", "Splunk_TA_servicenow"]},
+        ],
+        companion_app_checks=[
+            {"label": "Dendrogram Viz", "candidates": ["dendrogram-viz", "dendrogram_app", "DA-ITSI-DendrogramViz"]},
+        ],
+        post_install_steps=[
+            "Confirm ServiceNow data is ingested by the Splunk Add-on for ServiceNow.",
+            "Install optional visualization dependencies, such as Dendrogram Viz, when dashboard panels require them.",
+            "Review ServiceNow service templates, ticketing links, and thresholds before enabling actions.",
+        ],
+    ),
+    "shared_it_infrastructure": _catalog_profile(
+        "Shared IT Infrastructure Components",
+        pack_app_candidates=["DA-ITSI-CP-shared-it-infrastructure-components", "DA-ITSI-CP-shared-it-infrastructure"],
+        post_install_steps=[
+            "Review the shared infrastructure dependency model and adapt it to local service ownership.",
+            "Map packaged infrastructure components to production services before enabling dependency edges.",
+            "Validate any _internal searches against retention and access requirements.",
+        ],
+    ),
+    "soar_system_logs": _catalog_profile(
+        "SOAR System Logs",
+        pack_app_candidates=["DA-ITSI-CP-soar-system-logs"],
+        required_apps=[
+            {"label": "Splunk Add-on for Unix and Linux", "candidates": ["Splunk_TA_nix"]},
+            {"label": "Splunk App for SOAR", "candidates": ["phantom", "Splunk_SA_Scientific_Python_linux_x86_64", "splunk_app_soar"]},
+        ],
+        post_install_steps=[
+            "Confirm SOAR and Unix/Linux log data is ingested into the expected indexes.",
+            "Align SOAR log macros, service templates, and entity discovery with the monitored SOAR deployment.",
+            "Review saved searches and KPI thresholds before enabling alerting.",
+        ],
+    ),
+    "splunk_synthetic_monitoring": _catalog_profile(
+        "Splunk Synthetic Monitoring",
+        pack_app_candidates=["DA-ITSI-CP-splunk-synthetic-monitoring", "DA-ITSI-CP-synthetic-monitoring"],
+        required_apps=[
+            {
+                "label": "Splunk Synthetic Monitoring Add-on",
+                "candidates": ["Splunk_TA_synthetic_monitoring", "splunk_ta_synthetic_monitoring", "Splunk_TA_synthetics"],
+            }
+        ],
+        macro_checks=[
+            {"macro": "itsi-cp-synthetic-monitoring-indexes", "static_indexes_key": "metrics_indexes", "optional": True},
+        ],
+        post_install_steps=[
+            "Confirm the Splunk Synthetic Monitoring Add-on is collecting synthetic checks.",
+            "Align metrics indexes and macros with the Synthetic Monitoring ingestion path.",
+            "Review service templates, entity links, and KPI thresholds before enabling services.",
+        ],
+    ),
+    "third_party_apm": _catalog_profile(
+        "Third-Party APM",
+        pack_app_candidates=["DA-ITSI-CP-third-party-apm"],
+        alternative_app_groups=[
+            {
+                "label": "Dynatrace or New Relic add-on",
+                "apps": [
+                    {"label": "Dynatrace Add-on for Splunk", "candidates": ["TA-Dynatrace", "Splunk_TA_dynatrace"]},
+                    {"label": "Splunk Add-on for New Relic", "candidates": ["Splunk_TA_new_relic", "TA-New-Relic"]},
+                ],
+            }
+        ],
+        macro_checks=[
+            {"macro": "itsi-cp-third-party-apm-indexes", "static_indexes_key": "event_indexes", "optional": True},
+        ],
+        post_install_steps=[
+            "Confirm Dynatrace or New Relic add-on data is present for the monitored applications.",
+            "Align third-party APM macros with the event indexes used by those add-ons.",
+            "Review service templates and KPI thresholds before enabling APM services.",
+        ],
+    ),
+    "unix_dashboards_reports": _catalog_profile(
+        "Unix Dashboards and Reports",
+        pack_app_candidates=["DA-ITSI-CP-unix-dashboards"],
+        required_apps=[{"label": "Splunk Add-on for Unix and Linux", "candidates": ["Splunk_TA_nix"]}],
+        post_install_steps=[
+            "Confirm the Unix and Linux dashboard companion pack is visible after content-library install.",
+            "Align dashboard and OS-module macros with your Unix and Linux indexes.",
+            "Review dashboard saved searches and panels before using them as operational views.",
+        ],
+    ),
+    "vmware_dashboards_reports": _catalog_profile(
+        "VMware Dashboards and Reports",
+        pack_app_candidates=["DA-ITSI-CP-vmware-dashboards"],
+        required_apps=[
+            {
+                "label": "Splunk Add-on for VMware Metrics",
+                "candidates": ["Splunk_TA_vmware_inframon", "Splunk_TA_VMware_inframon", "SA-Hydra-inframon", "SA-VMWIndex-inframon"],
+            }
+        ],
+        post_install_steps=[
+            "Confirm the VMware dashboard companion pack is visible after content-library install.",
+            "Align VMware dashboard macros with your VMware metrics and event indexes.",
+            "Review dashboard saved searches and panels before using them as operational views.",
+        ],
+    ),
+    "windows_dashboards_reports": _catalog_profile(
+        "Windows Dashboards and Reports",
+        pack_app_candidates=["DA-ITSI-CP-windows-dashboards"],
+        required_apps=[{"label": "Splunk Add-on for Windows", "candidates": ["Splunk_TA_windows"]}],
+        companion_app_checks=[
+            {"label": "Splunk Supporting Add-on for Active Directory", "candidates": ["SA-ldapsearch", "Splunk_SA_LDAPSearch", "TA-DomainController-2012R2"]},
+        ],
+        post_install_steps=[
+            "Confirm the Windows dashboard companion pack is visible after content-library install.",
+            "Align Windows and Active Directory dashboard macros with your event and metrics indexes.",
+            "Review dashboard saved searches and panels before using them as operational views.",
+        ],
+    ),
 }
 
 
@@ -299,6 +605,57 @@ class PackRun:
     install_payload: dict[str, Any] | None
     install_result: Any = None
     installed: bool = False
+    automation_scope: str = "profile_install_validate_with_guided_followup"
+    follow_up_required: bool = True
+    follow_up_steps: list[str] = field(default_factory=list)
+    pack_status: dict[str, Any] | None = None
+    pack_detail: dict[str, Any] | None = None
+    configured_outcome: dict[str, Any] | None = None
+
+
+def _safe_tar_extract_shell_command() -> str:
+    return r'''python3 - "$archive" "$workdir" <<'PY'
+import os
+from pathlib import PurePosixPath
+import sys
+import tarfile
+
+
+def fail(message):
+    print(f"ERROR: Unsafe archive member: {message}", file=sys.stderr)
+    sys.exit(1)
+
+
+def safe_relative_path(value):
+    normalized = str(value or "").replace("\\", "/").strip()
+    path = PurePosixPath(normalized)
+    return bool(normalized) and not path.is_absolute() and ".." not in path.parts
+
+
+archive_path, destination = sys.argv[1], sys.argv[2]
+destination = os.path.abspath(destination)
+with tarfile.open(archive_path, "r:*") as archive:
+    members = archive.getmembers()
+    for member in members:
+        if not safe_relative_path(member.name):
+            fail(member.name)
+        target = os.path.abspath(os.path.join(destination, member.name))
+        if os.path.commonpath([destination, target]) != destination:
+            fail(member.name)
+        if member.isdev() or member.isfifo():
+            fail(f"{member.name} uses a special file type")
+        if member.issym() or member.islnk():
+            if not safe_relative_path(member.linkname):
+                fail(f"{member.name} -> {member.linkname}")
+            link_target = os.path.abspath(os.path.join(os.path.dirname(target), member.linkname))
+            if os.path.commonpath([destination, link_target]) != destination:
+                fail(f"{member.name} -> {member.linkname}")
+    try:
+        archive.extractall(destination, members=members, filter="data")
+    except TypeError:
+        archive.extractall(destination, members=members)
+PY
+'''
 
 
 class ShellContentLibraryInstaller:
@@ -422,40 +779,41 @@ class ShellContentLibraryInstaller:
                 'sleep 2'
             )
         return (
-            "set -e; "
-            f"archive={shlex.quote(archive_path)}; "
-            f"apps_dir={shlex.quote(apps_dir)}; "
-            f"splunk_bin={shlex.quote(splunk_bin)}; "
-            f"auth_file={shlex.quote(auth_file)}; "
-            'chmod 600 "$auth_file" 2>/dev/null || true; '
-            "workdir=$(mktemp -d /tmp/codex-bundle.XXXXXX); "
-            f'cleanup() {{ {cleanup_body}; }}; '
-            "trap cleanup EXIT; "
-            'mkdir -p "$apps_dir"; '
-            'tar -xf "$archive" -C "$workdir"; '
-            'found=0; installed=0; '
-            'for app_dir in "$workdir"/*; do '
-            '[ -d "$app_dir" ] || continue; '
-            'found=1; '
-            'app_name=$(basename "$app_dir"); '
-            'dest="$apps_dir/$app_name"; '
-            'if [ -e "$dest" ]; then '
-            'echo "Skipping existing extracted app $app_name"; '
-            'continue; '
-            'fi; '
-            'cp -R "$app_dir" "$dest"; '
-            'echo "Installed extracted app $app_name"; '
-            'installed=$((installed+1)); '
-            "done; "
-            'if [ "$found" -ne 1 ]; then '
-            'echo "No app directories found in bundle archive." >&2; '
-            "exit 1; "
-            "fi; "
-            'if [ "$installed" -eq 0 ]; then '
-            'echo "No new apps were extracted from bundle archive." >&2; '
-            "exit 1; "
-            "fi; "
-            + restart_command
+            "set -e\n"
+            f"archive={shlex.quote(archive_path)}\n"
+            f"apps_dir={shlex.quote(apps_dir)}\n"
+            f"splunk_bin={shlex.quote(splunk_bin)}\n"
+            f"auth_file={shlex.quote(auth_file)}\n"
+            'chmod 600 "$auth_file" 2>/dev/null || true\n'
+            "workdir=$(mktemp -d /tmp/codex-bundle.XXXXXX)\n"
+            f"cleanup() {{ {cleanup_body}; }}\n"
+            "trap cleanup EXIT\n"
+            'mkdir -p "$apps_dir"\n'
+            f"{_safe_tar_extract_shell_command()}\n"
+            "found=0\n"
+            "installed=0\n"
+            'for app_dir in "$workdir"/*; do\n'
+            '  [ -d "$app_dir" ] || continue\n'
+            "  found=1\n"
+            '  app_name=$(basename "$app_dir")\n'
+            '  dest="$apps_dir/$app_name"\n'
+            '  if [ -e "$dest" ]; then\n'
+            '    echo "Skipping existing extracted app $app_name"\n'
+            "    continue\n"
+            "  fi\n"
+            '  cp -R "$app_dir" "$dest"\n'
+            '  echo "Installed extracted app $app_name"\n'
+            "  installed=$((installed+1))\n"
+            "done\n"
+            'if [ "$found" -ne 1 ]; then\n'
+            '  echo "No app directories found in bundle archive." >&2\n'
+            "  exit 1\n"
+            "fi\n"
+            'if [ "$installed" -eq 0 ]; then\n'
+            '  echo "No new apps were extracted from bundle archive." >&2\n'
+            "  exit 1\n"
+            "fi\n"
+            f"{restart_command}\n"
         )
 
     def _cli_install_bundle(self, local_file: Path, spec: dict[str, Any], client: Any, env: dict[str, str]) -> dict[str, Any]:
@@ -780,23 +1138,110 @@ def _wait_for_app_visibility(client: Any, app_name: str, *, timeout_seconds: int
     return False
 
 
-def resolve_catalog_entry(catalog: list[dict[str, Any]], title: str | list[str] | tuple[str, ...], version: str | None = None) -> dict[str, Any]:
+def resolve_catalog_entry(
+    catalog: list[dict[str, Any]],
+    title: str | list[str] | tuple[str, ...] | None,
+    version: str | None = None,
+    *,
+    pack_id: str | None = None,
+) -> dict[str, Any]:
     exact_titles = [str(item).strip() for item in listify(title) if str(item).strip()]
+    exact_ids = [str(item).strip() for item in listify(pack_id) if str(item).strip()]
     if not catalog:
         raise ValidationError(
             "The live ITSI content-pack catalog is empty. Confirm DA-ITSI-ContentLibrary discovery completed and the packaged content-pack apps are installed."
         )
-    exact_matches = [entry for entry in catalog if str(entry.get("title", "")).strip() in exact_titles]
+    exact_matches = [
+        entry
+        for entry in catalog
+        if str(entry.get("id", "")).strip() in exact_ids
+        or str(entry.get("title", "")).strip() in exact_titles
+    ]
     if not exact_matches:
-        requested_titles = ", ".join(exact_titles) or str(title)
-        raise ValidationError(f"Content pack '{requested_titles}' was not found in the live ITSI content library catalog.")
+        requested = ", ".join(exact_titles + exact_ids) or str(title or pack_id)
+        raise ValidationError(f"Content pack '{requested}' was not found in the live ITSI content library catalog.")
     if version:
         for entry in exact_matches:
             if str(entry.get("version")) == version:
                 return entry
-        requested_titles = ", ".join(exact_titles) or str(title)
-        raise ValidationError(f"Content pack '{requested_titles}' is available, but version '{version}' was not found.")
+        requested = ", ".join(exact_titles + exact_ids) or str(title or pack_id)
+        raise ValidationError(f"Content pack '{requested}' is available, but version '{version}' was not found.")
     return sorted(exact_matches, key=lambda item: semver_key(str(item.get("version", ""))), reverse=True)[0]
+
+
+def _normalize_required_apps(value: Any) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    for item in listify(value):
+        if isinstance(item, str):
+            app_name = item.strip()
+            if app_name:
+                normalized.append({"label": app_name, "candidates": [app_name]})
+            continue
+        if isinstance(item, dict):
+            label = str(item.get("label") or item.get("app") or item.get("name") or "").strip()
+            candidates = _candidate_list(item.get("candidates") or item.get("candidate") or item.get("app") or item.get("name"))
+            if label or candidates:
+                normalized.append({"label": label or candidates[0], "candidates": candidates or [label]})
+            continue
+        raise ValidationError("packs.required_apps entries must be strings or mappings.")
+    return normalized
+
+
+def _generic_pack_profile(pack_spec: dict[str, Any], profile_key: str) -> dict[str, Any]:
+    title = str(
+        pack_spec.get("catalog_title")
+        or pack_spec.get("title")
+        or pack_spec.get("pack_title")
+        or pack_spec.get("pack_id")
+        or pack_spec.get("id")
+        or profile_key
+    ).strip()
+    if not title:
+        raise ValidationError("Generic content-pack entries must define title, catalog_title, pack_id, or id.")
+    steps = _candidate_list(pack_spec.get("follow_up_steps") or pack_spec.get("post_install_steps"))
+    app_candidates = _candidate_list(
+        pack_spec.get("pack_app_candidates")
+        or pack_spec.get("app_candidates")
+        or pack_spec.get("pack_app")
+    )
+    return _catalog_profile(
+        title,
+        catalog_titles=_candidate_list(pack_spec.get("catalog_titles") or pack_spec.get("catalog_title") or pack_spec.get("title") or pack_spec.get("pack_title")),
+        pack_app_candidates=app_candidates,
+        required_apps=_normalize_required_apps(pack_spec.get("required_apps")),
+        companion_app_checks=listify(pack_spec.get("companion_app_checks")),
+        post_install_steps=steps or GENERIC_CONTENT_PACK_STEPS,
+    )
+
+
+def resolve_pack_definition(pack_spec: dict[str, Any], index: int = 0) -> tuple[str, dict[str, Any]]:
+    if not isinstance(pack_spec, dict):
+        raise ValidationError("Each packs entry must be a mapping.")
+    profile_key = str(pack_spec.get("profile") or "").strip()
+    if profile_key in PACK_PROFILES:
+        return profile_key, PACK_PROFILES[profile_key]
+    has_catalog_identity = any(
+        str(pack_spec.get(key) or "").strip()
+        for key in ("title", "catalog_title", "pack_title", "pack_id", "id")
+    )
+    if profile_key in GENERIC_PROFILE_KEYS or (not profile_key and has_catalog_identity) or (profile_key and has_catalog_identity):
+        resolved_profile = profile_key or f"catalog_pack_{index + 1}"
+        return resolved_profile, _generic_pack_profile(pack_spec, resolved_profile)
+    if not profile_key:
+        raise ValidationError("Each content-pack entry must define profile, title, catalog_title, pack_id, or id.")
+    raise ValidationError(f"Unsupported content-pack profile '{profile_key}'.")
+
+
+def resolve_pack_catalog_entry(catalog: list[dict[str, Any]], pack_spec: dict[str, Any], profile_meta: dict[str, Any]) -> dict[str, Any]:
+    catalog_titles = (
+        _candidate_list(pack_spec.get("catalog_titles"))
+        or _candidate_list(pack_spec.get("catalog_title"))
+        or _candidate_list(pack_spec.get("title") or pack_spec.get("pack_title"))
+        or _candidate_list(profile_meta.get("catalog_titles"))
+        or [str(profile_meta["title"])]
+    )
+    pack_id = str(pack_spec.get("pack_id") or pack_spec.get("id") or "").strip() or None
+    return resolve_catalog_entry(catalog, catalog_titles, pack_spec.get("version"), pack_id=pack_id)
 
 
 def build_install_payload(pack_spec: dict[str, Any]) -> dict[str, Any]:
@@ -1050,8 +1495,8 @@ def _enabled_input_entries(client: Any, app_name: str) -> list[dict[str, Any]]:
 
 
 def _input_label(entry: dict[str, Any]) -> str:
-    for field in ("title", "name", "eai:type", "eai:location", "id"):
-        value = str(entry.get(field) or "").strip()
+    for field_name in ("title", "name", "eai:type", "eai:location", "id"):
+        value = str(entry.get(field_name) or "").strip()
         if value:
             return value
     return "<unnamed input>"
@@ -1066,8 +1511,8 @@ def _input_indexes(client: Any, app_name: str, fields: list[str]) -> list[str]:
     for entry in client.list_inputs(app_name):
         if not _is_enabled_input(entry):
             continue
-        for field in fields:
-            value = entry.get(field)
+        for field_name in fields:
+            value = entry.get(field_name)
             if not value:
                 continue
             if isinstance(value, str):
@@ -1093,6 +1538,23 @@ def _check_required_apps(client: Any, findings: list[dict[str, str]], profile_me
             findings.append(_finding("pass", "app", f"{app_requirement['label']} is installed as {installed}."))
         else:
             findings.append(_finding("error", "app", f"{app_requirement['label']} is not installed."))
+    for app_group in profile_meta.get("alternative_app_groups", []):
+        installed_choice: tuple[str, str] | None = None
+        checked: list[str] = []
+        for app_requirement in listify(app_group.get("apps")):
+            candidates = _candidate_list(app_requirement.get("candidates"))
+            checked.extend(candidates)
+            installed = client.first_installed_app(candidates)
+            if installed:
+                installed_choice = (str(app_requirement.get("label") or app_group.get("label") or installed), installed)
+                break
+        group_label = str(app_group.get("label") or "One of the required add-ons")
+        if installed_choice:
+            installed_apps[group_label] = installed_choice[1]
+            findings.append(_finding("pass", "app", f"{group_label} is satisfied by {installed_choice[0]} installed as {installed_choice[1]}."))
+        else:
+            checked_text = ", ".join(checked) if checked else "no candidates declared"
+            findings.append(_finding("error", "app", f"{group_label} is not installed. Checked: {checked_text}."))
     return installed_apps
 
 
@@ -1215,6 +1677,8 @@ def _check_macro_alignment(
                         f"Macro '{macro_name}' cannot be validated until content-pack app {macro_app_name} is installed.",
                     )
                 )
+            elif bool_from_any(macro_check.get("optional")):
+                findings.append(_finding("warn", "macro", f"Optional macro '{macro_name}' was not found in app {macro_app_name}."))
             else:
                 findings.append(_finding("error", "macro", f"Macro '{macro_name}' was not found in app {macro_app_name}."))
             continue
@@ -1250,6 +1714,14 @@ def _check_macro_alignment(
             continue
         if macro_mentions_indexes(definition, expected_indexes):
             findings.append(_finding("pass", "macro", f"Macro '{macro_name}' aligns with indexes: {', '.join(expected_indexes)}."))
+        elif bool_from_any(macro_check.get("optional")):
+            findings.append(
+                _finding(
+                    "warn",
+                    "macro",
+                    f"Optional macro '{macro_name}' does not align with expected indexes {', '.join(expected_indexes)}. Current definition: {definition}",
+                )
+            )
         else:
             findings.append(
                 _finding(
@@ -1438,19 +1910,28 @@ def validate_profile(
     pack_app_name: str,
 ) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
+    profile_name = str(pack_spec.get("profile") or "").strip()
+    if profile_meta.get("generic_catalog_profile"):
+        findings.append(
+            _finding(
+                "warn",
+                "profile",
+                "Using catalog-generic content-pack validation. Install/visibility checks are automated; pack-specific data, macro, module, and dashboard checks are reported as follow-up steps.",
+            )
+        )
     installed_apps = _check_required_apps(client, findings, profile_meta)
     missing_requirements = _check_required_inputs(client, findings, profile_meta)
-    if pack_spec["profile"] == "cisco_data_center":
+    if profile_name == "cisco_data_center":
         _check_cisco_data_center(client, findings, missing_requirements)
-    if pack_spec["profile"] == "cisco_enterprise_networks":
+    if profile_name == "cisco_enterprise_networks":
         _check_cisco_enterprise_networks(client, findings, missing_requirements)
     _check_macro_alignment(client, findings, pack_spec, profile_meta, pack_app_name)
-    if pack_spec["profile"] == "aws":
+    if profile_name == "aws":
         aws_app = installed_apps.get("Splunk Add-on for AWS", "Splunk_TA_aws")
         _check_aws(client, findings, aws_app)
-    if pack_spec["profile"] == "cisco_thousandeyes":
+    if profile_name == "cisco_thousandeyes":
         _check_thousandeyes(client, findings, pack_spec, profile_meta, pack_app_name)
-    if pack_spec["profile"] == "linux":
+    if profile_name == "linux":
         nix_app = installed_apps.get("Splunk Add-on for Unix and Linux", "Splunk_TA_nix")
         _check_linux(client, findings, nix_app)
         _check_custom_index_overrides(
@@ -1461,12 +1942,12 @@ def validate_profile(
             override_keys=["event_indexes"],
             pack_spec=pack_spec,
         )
-    if pack_spec["profile"] == "splunk_observability_cloud":
+    if profile_name == "splunk_observability_cloud":
         sim_app = installed_apps.get("Splunk Infrastructure Monitoring Add-on", "splunk_ta_sim")
         _check_observability(client, findings, pack_spec, pack_app_name, sim_app)
-    if pack_spec["profile"] == "vmware":
+    if profile_name == "vmware":
         _check_vmware(findings, installed_apps.get("Splunk Add-on for VMware Metrics"))
-    if pack_spec["profile"] == "windows":
+    if profile_name == "windows":
         windows_app = installed_apps.get("Splunk Add-on for Windows", "Splunk_TA_windows")
         _check_windows(client, findings, windows_app)
         _check_custom_index_overrides(
@@ -1497,6 +1978,368 @@ def _install_failures(install_result: Any) -> list[str]:
         elif isinstance(saved_search_failures, dict) and any(saved_search_failures.values()):
             failures.append(f"Saved search updates reported failures: {saved_search_failures}")
     return failures
+
+
+def _maybe_refresh_content_pack_catalog(client: Any, content_library_state: dict[str, Any], spec: dict[str, Any]) -> None:
+    section = spec.get("content_library", {}) if isinstance(spec.get("content_library"), dict) else {}
+    if not bool_from_any(section.get("refresh_catalog"), default=True):
+        content_library_state["catalog_refresh"] = {"attempted": False, "status": "skipped"}
+        return
+    if not hasattr(client, "refresh_content_pack_catalog"):
+        content_library_state["catalog_refresh"] = {"attempted": False, "status": "unsupported"}
+        return
+    try:
+        response = client.refresh_content_pack_catalog()
+        content_library_state["catalog_refresh"] = {"attempted": True, "status": "ok", "response": response}
+        content_library_state.setdefault("checks", []).append(
+            _finding("pass", "content_pack_refresh", "ITSI content-pack catalog refresh completed.")
+        )
+    except (KeyError, ValidationError) as exc:
+        content_library_state["catalog_refresh"] = {"attempted": True, "status": "warn", "message": str(exc)}
+        content_library_state.setdefault("checks", []).append(
+            _finding("warn", "content_pack_refresh", f"ITSI content-pack catalog refresh was unavailable: {exc}")
+        )
+
+
+def _record_content_library_discovery_state(client: Any, content_library_state: dict[str, Any]) -> None:
+    if not hasattr(client, "content_library_discovery_status"):
+        return
+    status = client.content_library_discovery_status()
+    if not isinstance(status, dict) or not status.get("attempted"):
+        return
+    content_library_state["content_library_discovery"] = deepcopy(status)
+    if status.get("status") == "ok":
+        content_library_state.setdefault("checks", []).append(
+            _finding("pass", "content_library_discovery", "Content Library discovery refresh completed before catalog lookup.")
+        )
+    elif status.get("status") == "warn":
+        content_library_state.setdefault("checks", []).append(
+            _finding(
+                "warn",
+                "content_library_discovery",
+                f"Content Library discovery refresh was unavailable before catalog lookup: {status.get('message', 'unknown error')}",
+            )
+        )
+
+
+def _summarize_content_pack_detail(detail: Any) -> dict[str, Any] | None:
+    if not isinstance(detail, dict):
+        return None
+    summary: dict[str, Any] = {}
+    for key in ("id", "name", "title", "version", "status", "installed_versions"):
+        if key in detail:
+            summary[key] = deepcopy(detail[key])
+    for section_key in ("content", "itsi_objects", "splunk_objects", "user_selected_objects"):
+        value = detail.get(section_key)
+        if isinstance(value, dict):
+            summary[f"{section_key}_keys"] = sorted(str(item) for item in value.keys())
+    return summary or None
+
+
+def _content_pack_lifecycle_metadata(client: Any, findings: list[dict[str, str]], catalog_entry: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+    pack_status = None
+    pack_detail = None
+    if hasattr(client, "content_pack_status"):
+        try:
+            status = client.content_pack_status()
+            if isinstance(status, dict):
+                pack_status = deepcopy(status)
+                status_failures = status.get("failure")
+                if status_failures:
+                    findings.append(_finding("warn", "content_pack_status", f"Content-pack status reports failures: {status_failures}"))
+                else:
+                    findings.append(_finding("pass", "content_pack_status", "Content-pack status endpoint is reachable."))
+        except (KeyError, ValidationError) as exc:
+            findings.append(_finding("warn", "content_pack_status", f"Content-pack status endpoint is unavailable: {exc}"))
+    if hasattr(client, "content_pack_detail"):
+        try:
+            detail = client.content_pack_detail(str(catalog_entry["id"]), str(catalog_entry["version"]))
+            pack_detail = _summarize_content_pack_detail(detail)
+            findings.append(_finding("pass", "content_pack_detail", "Content-pack detail endpoint is reachable."))
+        except (KeyError, ValidationError) as exc:
+            findings.append(_finding("warn", "content_pack_detail", f"Content-pack detail endpoint is unavailable: {exc}"))
+    return pack_status, pack_detail
+
+
+def _record_outcome_step(result: dict[str, Any], status: str, kind: str, title: str, detail: str) -> None:
+    result.setdefault("steps", []).append({"status": status, "kind": kind, "title": title, "detail": detail})
+
+
+def _outcome_failed(result: dict[str, Any]) -> bool:
+    return any(step.get("status") == "error" for step in result.get("steps", []))
+
+
+def _outcome_warned(result: dict[str, Any]) -> bool:
+    return any(step.get("status") == "warn" for step in result.get("steps", []))
+
+
+def _configured_outcome_finding(result: dict[str, Any]) -> dict[str, str]:
+    if _outcome_failed(result):
+        return _finding("error", "configured_outcome", "Configured outcome automation reported errors.")
+    if _outcome_warned(result):
+        return _finding("warn", "configured_outcome", "Configured outcome automation reported unsupported or manual task types.")
+    return _finding("pass", "configured_outcome", "Configured outcome automation completed or previewed cleanly.")
+
+
+def _record_unsupported_outcome_steps(result: dict[str, Any], outcome_spec: dict[str, Any]) -> None:
+    for key in sorted(str(item) for item in outcome_spec if item not in SUPPORTED_CONFIGURED_OUTCOME_KEYS):
+        value = outcome_spec.get(key)
+        if value in (None, False, "", [], {}):
+            continue
+        task_label = DOCUMENTED_MANUAL_OUTCOME_HINTS.get(key, key.replace("_", " "))
+        _record_outcome_step(
+            result,
+            "warn",
+            "unsupported_outcome",
+            key,
+            f"{task_label} is not automated by configured_outcome; keep this as an explicit manual follow-up or model it with native/topology payloads.",
+        )
+
+
+def _native_result_payload(native_result: NativeResult) -> dict[str, Any]:
+    return {
+        "mode": native_result.mode,
+        "summary": native_result.summary(),
+        "failed": native_result.failed,
+        "changes": [change.__dict__ for change in native_result.changes],
+        "validations": deepcopy(native_result.validations),
+        "diagnostics": deepcopy(native_result.diagnostics),
+    }
+
+
+def _run_macro_outcomes(client: Any, result: dict[str, Any], macros: list[Any], mode: str, pack_app_name: str) -> None:
+    for index, macro_spec in enumerate(macros):
+        if not isinstance(macro_spec, dict):
+            _record_outcome_step(result, "error", "macro", f"macro[{index}]", "Macro outcome entries must be mappings.")
+            continue
+        app_name = str(macro_spec.get("app") or pack_app_name).strip()
+        macro_name = str(macro_spec.get("name") or macro_spec.get("macro") or "").strip()
+        definition = macro_spec.get("definition")
+        if not app_name or not macro_name or definition is None:
+            _record_outcome_step(result, "error", "macro", macro_name or f"macro[{index}]", "Macro outcomes require app/name/definition.")
+            continue
+        current = client.get_macro(app_name, macro_name) if hasattr(client, "get_macro") else None
+        current_definition = str((current or {}).get("definition") or "")
+        if mode == "validate":
+            if current and current_definition == str(definition):
+                _record_outcome_step(result, "pass", "macro", macro_name, "Macro definition matches.")
+            else:
+                _record_outcome_step(result, "error", "macro", macro_name, "Macro definition does not match or macro is missing.")
+            continue
+        if mode == "preview":
+            action = "noop" if current and current_definition == str(definition) else "update"
+            _record_outcome_step(result, "pass", "macro", macro_name, f"Would {action} macro in app {app_name}.")
+            continue
+        if not hasattr(client, "update_macro"):
+            _record_outcome_step(result, "error", "macro", macro_name, "Configured client cannot update macros.")
+            continue
+        if not current:
+            _record_outcome_step(
+                result,
+                "error",
+                "macro",
+                macro_name,
+                f"Macro '{macro_name}' was not found in app {app_name}; create the macro before running configured_outcome.macros.",
+            )
+            continue
+        payload = {key: value for key, value in macro_spec.items() if key not in {"app", "name", "macro"}}
+        payload["definition"] = str(definition)
+        try:
+            client.update_macro(app_name, macro_name, payload)
+        except KeyError:
+            _record_outcome_step(
+                result,
+                "error",
+                "macro",
+                macro_name,
+                f"Macro '{macro_name}' was not found in app {app_name} during update; the macro may have been removed concurrently.",
+            )
+            continue
+        except ValidationError as exc:
+            _record_outcome_step(result, "error", "macro", macro_name, f"Macro update failed: {exc}")
+            continue
+        _record_outcome_step(result, "pass", "macro", macro_name, f"Updated macro in app {app_name}.")
+
+
+def _run_saved_search_outcomes(client: Any, result: dict[str, Any], searches: list[Any], mode: str, pack_app_name: str) -> None:
+    for index, search_spec in enumerate(searches):
+        if not isinstance(search_spec, dict):
+            _record_outcome_step(result, "error", "saved_search", f"saved_search[{index}]", "Saved-search outcome entries must be mappings.")
+            continue
+        app_name = str(search_spec.get("app") or pack_app_name).strip()
+        search_name = str(search_spec.get("name") or search_spec.get("title") or "").strip()
+        if not app_name or not search_name:
+            _record_outcome_step(result, "error", "saved_search", search_name or f"saved_search[{index}]", "Saved-search outcomes require app/name.")
+            continue
+        current = client.get_saved_search(app_name, search_name) if hasattr(client, "get_saved_search") else None
+        payload = {key: value for key, value in search_spec.items() if key not in {"app", "name", "title"}}
+        if "enabled" in payload:
+            payload["disabled"] = "0" if bool_from_any(payload.pop("enabled")) else "1"
+        desired_subset = {key: str(value) for key, value in payload.items()}
+        current_subset = {key: str((current or {}).get(key)) for key in desired_subset}
+        matches = bool(current) and current_subset == desired_subset
+        if mode == "validate":
+            _record_outcome_step(
+                result,
+                "pass" if matches else "error",
+                "saved_search",
+                search_name,
+                "Saved search matches." if matches else "Saved search does not match or is missing.",
+            )
+            continue
+        if mode == "preview":
+            action = "noop" if matches else "update"
+            _record_outcome_step(result, "pass", "saved_search", search_name, f"Would {action} saved search in app {app_name}.")
+            continue
+        if not hasattr(client, "update_saved_search"):
+            _record_outcome_step(result, "error", "saved_search", search_name, "Configured client cannot update saved searches.")
+            continue
+        if not current:
+            _record_outcome_step(
+                result,
+                "error",
+                "saved_search",
+                search_name,
+                f"Saved search '{search_name}' was not found in app {app_name}; create or install the saved search before running configured_outcome.saved_searches.",
+            )
+            continue
+        try:
+            client.update_saved_search(app_name, search_name, payload)
+        except KeyError:
+            _record_outcome_step(
+                result,
+                "error",
+                "saved_search",
+                search_name,
+                f"Saved search '{search_name}' was not found in app {app_name} during update; the saved search may have been removed concurrently.",
+            )
+            continue
+        except ValidationError as exc:
+            _record_outcome_step(result, "error", "saved_search", search_name, f"Saved-search update failed: {exc}")
+            continue
+        _record_outcome_step(result, "pass", "saved_search", search_name, f"Updated saved search in app {app_name}.")
+
+
+def _run_configured_outcome(
+    client: Any,
+    pack_spec: dict[str, Any],
+    base_spec: dict[str, Any],
+    mode: str,
+    *,
+    pack_app_name: str,
+) -> dict[str, Any] | None:
+    outcome_spec = pack_spec.get("configured_outcome") or pack_spec.get("outcome")
+    if not outcome_spec:
+        return None
+    if not isinstance(outcome_spec, dict):
+        raise ValidationError("configured_outcome must be a mapping when provided.")
+    result: dict[str, Any] = {"mode": mode, "steps": []}
+    native_spec = outcome_spec.get("native")
+    if native_spec is not None:
+        if not isinstance(native_spec, dict):
+            raise ValidationError("configured_outcome.native must be a mapping.")
+        merged_native_spec = deepcopy(native_spec)
+        if isinstance(base_spec.get("defaults"), dict) and "defaults" not in merged_native_spec:
+            merged_native_spec["defaults"] = deepcopy(base_spec["defaults"])
+        native_result = NativeWorkflow(client).run(merged_native_spec, mode)
+        result["native"] = _native_result_payload(native_result)
+        _record_outcome_step(
+            result,
+            "error" if native_result.failed else "pass",
+            "native",
+            "configured_outcome.native",
+            "Native configured outcome failed." if native_result.failed else "Native configured outcome completed.",
+        )
+    _run_macro_outcomes(client, result, listify(outcome_spec.get("macros") or outcome_spec.get("macro_updates")), mode, pack_app_name)
+    _run_saved_search_outcomes(
+        client,
+        result,
+        listify(outcome_spec.get("saved_searches") or outcome_spec.get("entity_discovery_searches")),
+        mode,
+        pack_app_name,
+    )
+    _record_unsupported_outcome_steps(result, outcome_spec)
+    return result
+
+
+def _build_pack_contexts_for_cleanup(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    contexts: list[dict[str, Any]] = []
+    seen_profiles: set[str] = set()
+    for index, pack_spec in enumerate(listify(spec.get("packs"))):
+        if not isinstance(pack_spec, dict):
+            raise ValidationError("Each topology pack entry must be a mapping.")
+        profile_key, profile_meta = resolve_pack_definition(pack_spec, index)
+        if profile_key in seen_profiles:
+            raise ValidationError(f"Content-pack profile '{profile_key}' is declared more than once in this run.")
+        seen_profiles.add(profile_key)
+        contexts.append(
+            {
+                "profile": profile_key,
+                "pack_spec": deepcopy(pack_spec),
+                "profile_meta": deepcopy(profile_meta),
+                "title": str(profile_meta.get("title") or profile_key),
+                "catalog_entry": {},
+                "preview": {},
+            }
+        )
+    return contexts
+
+
+def _topology_desired_native_spec(spec: dict[str, Any], pack_contexts: list[dict[str, Any]]) -> dict[str, Any]:
+    derived = deepcopy(spec)
+    compiled = compile_topology(spec)
+    declared_services = [
+        deepcopy(service_spec)
+        for service_spec in listify(derived.get("services"))
+        if isinstance(service_spec, dict)
+    ]
+    service_titles = {
+        str(service_spec.get("title") or "").strip()
+        for service_spec in declared_services
+        if str(service_spec.get("title") or "").strip()
+    }
+    pack_context_map = _pack_contexts_by_profile(pack_contexts)
+    for node in compiled.get("nodes", {}).values():
+        service_spec = node.get("service")
+        if isinstance(service_spec, dict):
+            title = str(service_spec.get("title") or "").strip()
+            if title and title not in service_titles:
+                declared_services.append(deepcopy(service_spec))
+                service_titles.add(title)
+            continue
+        reference = node.get("service_ref")
+        if isinstance(reference, dict):
+            for title in _title_candidates(reference, pack_context_map):
+                if title and title not in service_titles:
+                    declared_services.append({"title": title})
+                    service_titles.add(title)
+    if declared_services:
+        derived["services"] = declared_services
+    return derived
+
+
+def _native_payload(native_result: NativeResult) -> dict[str, Any]:
+    payload = {
+        "summary": native_result.summary(),
+        "changes": [change.__dict__ for change in native_result.changes],
+        "validations": native_result.validations,
+        "diagnostics": native_result.diagnostics,
+    }
+    if native_result.exports:
+        payload["exports"] = native_result.exports
+    if native_result.inventory:
+        payload["inventory"] = native_result.inventory
+    if native_result.prune_plan:
+        payload["prune_plan"] = native_result.prune_plan
+    return payload
+
+
+def _profile_follow_up_steps(profile_meta: dict[str, Any]) -> list[str]:
+    return _candidate_list(profile_meta.get("post_install_steps")) or GENERIC_CONTENT_PACK_STEPS
+
+
+def _profile_automation_scope(profile_meta: dict[str, Any]) -> str:
+    return str(profile_meta.get("automation_scope") or "profile_install_validate_with_guided_followup")
 
 
 def _append_prerequisite_state(lines: list[str], label: str, state: dict[str, Any]) -> None:
@@ -1537,15 +2380,23 @@ def _render_report(
         lines.append(f"- Catalog app: `{run.pack_id or 'unresolved'}`")
         lines.append(f"- Version: `{run.version or 'unresolved'}`")
         lines.append(f"- Installed in this run: `{'yes' if run.installed else 'no'}`")
+        lines.append(f"- Automation scope: `{run.automation_scope}`")
+        lines.append(f"- Operator follow-up required: `{'yes' if run.follow_up_required else 'no'}`")
         if run.preview_summary:
             lines.append(f"- Preview summary: `{run.preview_summary}`")
         if run.install_payload:
             lines.append(f"- Install payload: `{run.install_payload}`")
+        if run.pack_status:
+            lines.append(f"- Pack status: `{run.pack_status}`")
+        if run.pack_detail:
+            lines.append(f"- Pack detail: `{run.pack_detail}`")
+        if run.configured_outcome:
+            lines.append(f"- Configured outcome: `{run.configured_outcome}`")
         lines.append("- Findings:")
         for finding in run.findings:
             lines.append(f"  - [{finding['status']}] {finding['check']}: {finding['message']}")
-        lines.append("- Next manual steps:")
-        for step in PACK_PROFILES[run.profile]["post_install_steps"]:
+        lines.append("- Follow-up steps:")
+        for step in run.follow_up_steps:
             lines.append(f"  - {step}")
         lines.append("")
     report_path = report_dir / "content-pack-summary.md"
@@ -1576,8 +2427,14 @@ def _render_topology_report(
         lines.append("- No content packs declared.")
     for run in runs:
         lines.append(f"- `{run.profile}` -> `{run.title}` ({run.version or 'unresolved'})")
+        lines.append(f"  - Automation scope: `{run.automation_scope}`")
+        lines.append(f"  - Operator follow-up required: `{'yes' if run.follow_up_required else 'no'}`")
+        if run.configured_outcome:
+            lines.append(f"  - Configured outcome: `{run.configured_outcome}`")
         for finding in run.findings:
             lines.append(f"  - [{finding['status']}] {finding['check']}: {finding['message']}")
+        for step in run.follow_up_steps:
+            lines.append(f"  - Follow-up: {step}")
     lines.append("")
     lines.append("## Native")
     lines.append("")
@@ -1645,23 +2502,23 @@ class ContentPackWorkflow:
             installer=self.content_library_installer,
         )
         report_dir = ensure_dir(self.report_root / timestamp_slug())
+        _maybe_refresh_content_pack_catalog(self.client, content_library_state, spec)
         catalog = self.client.content_pack_catalog()
+        _record_content_library_discovery_state(self.client, content_library_state)
         prerequisite_errors = _state_has_error(itsi_state) or _state_has_error(content_library_state)
         runs: list[PackRun] = []
-        for pack_spec in listify(spec.get("packs")):
-            profile_key = pack_spec["profile"]
-            profile_meta = PACK_PROFILES.get(profile_key)
-            if not profile_meta:
-                raise ValidationError(f"Unsupported content-pack profile '{profile_key}'.")
-            catalog_titles = profile_meta.get("catalog_titles") or [profile_meta["title"]]
-            catalog_entry = resolve_catalog_entry(catalog, catalog_titles, pack_spec.get("version"))
+        for index, pack_spec in enumerate(listify(spec.get("packs"))):
+            profile_key, profile_meta = resolve_pack_definition(pack_spec, index)
+            catalog_entry = resolve_pack_catalog_entry(catalog, pack_spec, profile_meta)
             pack_title = str(catalog_entry.get("title") or profile_meta["title"])
             pack_app_name = resolve_pack_app_name(self.client, profile_meta, str(catalog_entry.get("id") or ""))
             findings = validate_profile(self.client, pack_spec, profile_meta, pack_app_name)
+            pack_status, pack_detail = _content_pack_lifecycle_metadata(self.client, findings, catalog_entry)
             preview_summary = None
             install_payload = None
             install_result = None
             installed = False
+            configured_outcome = None
             if mode == "validate":
                 installed_versions = _installed_versions(catalog_entry)
                 if catalog_entry["version"] in installed_versions:
@@ -1691,6 +2548,10 @@ class ContentPackWorkflow:
                 _check_pack_bundle_visibility(self.client, findings, profile_meta, pack_app_name=pack_app_name)
             elif mode == "preview":
                 install_payload = build_install_payload(pack_spec)
+            if not prerequisite_errors and not _has_error(findings):
+                configured_outcome = _run_configured_outcome(self.client, pack_spec, spec, mode, pack_app_name=pack_app_name)
+                if configured_outcome:
+                    findings.append(_configured_outcome_finding(configured_outcome))
             runs.append(
                 PackRun(
                     profile=profile_key,
@@ -1702,6 +2563,12 @@ class ContentPackWorkflow:
                     install_payload=install_payload,
                     install_result=install_result,
                     installed=installed,
+                    automation_scope=_profile_automation_scope(profile_meta),
+                    follow_up_required=bool(_profile_follow_up_steps(profile_meta)),
+                    follow_up_steps=_profile_follow_up_steps(profile_meta),
+                    pack_status=pack_status,
+                    pack_detail=pack_detail,
+                    configured_outcome=configured_outcome,
                 )
             )
         report_path = _render_report(mode, runs, report_dir, itsi_state, content_library_state)
@@ -1728,27 +2595,27 @@ class TopologyWorkflow:
         self.itsi_installer = itsi_installer or ShellItsiInstaller()
 
     def run(self, spec: dict[str, Any], mode: str) -> dict[str, Any]:
-        if mode not in {"preview", "apply", "validate"}:
+        if mode not in {"preview", "apply", "validate", "prune-plan", "cleanup-apply"}:
             raise ValidationError(f"Unsupported topology mode '{mode}'.")
+        if mode in {"prune-plan", "cleanup-apply"}:
+            return self._run_cleanup_mode(spec, mode)
         platform = infer_platform(spec)
         pack_specs = listify(spec.get("packs"))
         if mode == "apply":
             seen_profiles: set[str] = set()
-            for pack_spec in pack_specs:
+            resolved_profiles: list[str] = []
+            for index, pack_spec in enumerate(pack_specs):
                 if not isinstance(pack_spec, dict):
                     raise ValidationError("Each topology pack entry must be a mapping.")
-                profile_key = str(pack_spec.get("profile") or "").strip()
-                if not profile_key:
-                    raise ValidationError("Each topology pack entry must define profile.")
-                if profile_key not in PACK_PROFILES:
-                    raise ValidationError(f"Unsupported content-pack profile '{profile_key}'.")
+                profile_key, _profile_meta = resolve_pack_definition(pack_spec, index)
                 if profile_key in seen_profiles:
                     raise ValidationError(f"Content-pack profile '{profile_key}' is declared more than once in this run.")
                 seen_profiles.add(profile_key)
+                resolved_profiles.append(profile_key)
             compiled_topology = compile_topology(spec)
             validate_topology_pack_references(
                 compiled_topology,
-                [str(pack_spec.get("profile") or "").strip() for pack_spec in pack_specs if isinstance(pack_spec, dict)],
+                resolved_profiles,
             )
         itsi_state = _ensure_itsi(
             self.client,
@@ -1764,7 +2631,9 @@ class TopologyWorkflow:
                 spec=spec,
                 installer=self.content_library_installer,
             )
+            _maybe_refresh_content_pack_catalog(self.client, content_library_state, spec)
             catalog = self.client.content_pack_catalog()
+            _record_content_library_discovery_state(self.client, content_library_state)
         else:
             content_library_state = {
                 "required": False,
@@ -1780,21 +2649,21 @@ class TopologyWorkflow:
         prerequisite_errors = _state_has_error(itsi_state) or _state_has_error(content_library_state)
         runs: list[PackRun] = []
         pack_contexts: list[dict[str, Any]] = []
-        for pack_spec in pack_specs:
-            profile_key = pack_spec["profile"]
-            profile_meta = PACK_PROFILES.get(profile_key)
-            if not profile_meta:
-                raise ValidationError(f"Unsupported content-pack profile '{profile_key}'.")
-            catalog_titles = profile_meta.get("catalog_titles") or [profile_meta["title"]]
-            catalog_entry = resolve_catalog_entry(catalog, catalog_titles, pack_spec.get("version"))
+        profile_meta_by_key: dict[str, dict[str, Any]] = {}
+        for index, pack_spec in enumerate(pack_specs):
+            profile_key, profile_meta = resolve_pack_definition(pack_spec, index)
+            profile_meta_by_key[profile_key] = profile_meta
+            catalog_entry = resolve_pack_catalog_entry(catalog, pack_spec, profile_meta)
             pack_title = str(catalog_entry.get("title") or profile_meta["title"])
             pack_app_name = resolve_pack_app_name(self.client, profile_meta, str(catalog_entry.get("id") or ""))
             findings = validate_profile(self.client, pack_spec, profile_meta, pack_app_name)
+            pack_status, pack_detail = _content_pack_lifecycle_metadata(self.client, findings, catalog_entry)
             preview_summary = None
             preview_payload = None
             install_payload = None
             install_result = None
             installed = False
+            configured_outcome = None
             if mode == "validate":
                 installed_versions = _installed_versions(catalog_entry)
                 if catalog_entry["version"] in installed_versions:
@@ -1814,6 +2683,10 @@ class TopologyWorkflow:
                 install_payload = build_install_payload(pack_spec)
             elif mode == "preview":
                 install_payload = build_install_payload(pack_spec)
+            if mode in {"preview", "validate"} and not prerequisite_errors and not _has_error(findings):
+                configured_outcome = _run_configured_outcome(self.client, pack_spec, spec, mode, pack_app_name=pack_app_name)
+                if configured_outcome:
+                    findings.append(_configured_outcome_finding(configured_outcome))
             runs.append(
                 PackRun(
                     profile=profile_key,
@@ -1825,6 +2698,12 @@ class TopologyWorkflow:
                     install_payload=install_payload,
                     install_result=install_result,
                     installed=installed,
+                    automation_scope=_profile_automation_scope(profile_meta),
+                    follow_up_required=bool(_profile_follow_up_steps(profile_meta)),
+                    follow_up_steps=_profile_follow_up_steps(profile_meta),
+                    pack_status=pack_status,
+                    pack_detail=pack_detail,
+                    configured_outcome=configured_outcome,
                 )
             )
             pack_contexts.append(
@@ -1834,6 +2713,7 @@ class TopologyWorkflow:
                     "catalog_entry": deepcopy(catalog_entry),
                     "title": pack_title,
                     "preview": deepcopy(preview_payload),
+                    "profile_meta": deepcopy(profile_meta),
                 }
             )
 
@@ -1858,9 +2738,13 @@ class TopologyWorkflow:
                 run.installed = True
                 for failure_message in _install_failures(run.install_result):
                     run.findings.append(_finding("error", "install", failure_message))
-                profile_meta = PACK_PROFILES[run.profile]
+                profile_meta = profile_meta_by_key[run.profile]
                 pack_app_name = resolve_pack_app_name(self.client, profile_meta, run.pack_id)
                 _check_pack_bundle_visibility(self.client, run.findings, profile_meta, pack_app_name=pack_app_name)
+                pack_spec = next(context["pack_spec"] for context in pack_contexts if context["profile"] == run.profile)
+                run.configured_outcome = _run_configured_outcome(self.client, pack_spec, spec, mode, pack_app_name=pack_app_name)
+                if run.configured_outcome:
+                    run.findings.append(_configured_outcome_finding(run.configured_outcome))
             if not any(_has_error(run.findings) for run in runs):
                 native_preview = NativeWorkflow(self.client).run(spec, "preview")
                 topology_workflow.preflight_apply(
@@ -1897,14 +2781,59 @@ class TopologyWorkflow:
             "report_path": str(report_path),
             "runs": [run.__dict__ for run in runs],
             "native": {
-                "summary": native_result.summary(),
-                "changes": [change.__dict__ for change in native_result.changes],
-                "validations": native_result.validations,
-                "diagnostics": native_result.diagnostics,
+                **_native_payload(native_result),
             },
             "topology": {
                 "changes": [change.__dict__ for change in topology_result.changes],
                 "validations": topology_result.validations,
                 "resolved_nodes": topology_result.resolved_nodes,
+            },
+        }
+
+    def _run_cleanup_mode(self, spec: dict[str, Any], mode: str) -> dict[str, Any]:
+        pack_contexts = _build_pack_contexts_for_cleanup(spec)
+        validate_topology_pack_references(
+            compile_topology(spec),
+            [str(context.get("profile") or "") for context in pack_contexts],
+        )
+        itsi_state = _ensure_itsi(
+            self.client,
+            mode="preview",
+            spec=spec,
+            installer=self.itsi_installer,
+        )
+        content_library_state = {
+            "required": False,
+            "present_before": False,
+            "installed_in_this_run": False,
+            "source": None,
+            "app_id": None,
+            "checks": [],
+            "message": "Content library is not required for topology prune-plan or cleanup-apply.",
+        }
+        native_spec = _topology_desired_native_spec(spec, pack_contexts)
+        native_result = NativeWorkflow(self.client).run(native_spec, mode)
+        topology_result = TopologyResult(mode=mode)
+        report_dir = ensure_dir(self.report_root / timestamp_slug())
+        report_path = _render_topology_report(
+            mode,
+            [],
+            report_dir,
+            itsi_state,
+            content_library_state,
+            native_result,
+            topology_result,
+        )
+        return {
+            "mode": mode,
+            "itsi": itsi_state,
+            "content_library": content_library_state,
+            "report_path": str(report_path),
+            "runs": [],
+            "native": _native_payload(native_result),
+            "topology": {
+                "changes": [],
+                "validations": [],
+                "resolved_nodes": {},
             },
         }

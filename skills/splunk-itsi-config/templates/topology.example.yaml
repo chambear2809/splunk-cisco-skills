@@ -78,3 +78,15 @@ topology:
             - ref: shared_db
               kpis:
                 - Availability
+
+# Optional destructive cleanup for topology-managed environments.
+# Generate and review first:
+#   bash scripts/setup.sh --workflow topology --spec templates/topology.example.yaml --mode prune-plan --output topology-prune-plan.json
+# Then copy the reviewed plan_id/candidate_ids into cleanup before running cleanup-apply.
+# cleanup:
+#   allow_destroy: true
+#   confirm: DELETE_UNMANAGED_ITSI_OBJECTS
+#   plan_id: replace-with-current-prune-plan-id
+#   max_deletes: 1
+#   candidate_ids:
+#     - replace-with-reviewed-candidate-id

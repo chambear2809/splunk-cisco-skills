@@ -166,6 +166,25 @@ EOF
     [ "$config_text" = 'user = "admin\"user:pa\"ss\\word"' ]
 }
 
+@test "hbs_make_sshpass_file preserves existing cleanup trap" {
+    source "${LIB_DIR}/host_bootstrap_helpers.sh"
+    export SPLUNK_SSH_PASS="ssh-secret"
+    marker_file=$(mktemp)
+    rm -f "${marker_file}"
+
+    trap "printf old > $(printf '%q' "${marker_file}")" EXIT
+    pass_file="$(hbs_make_sshpass_file)"
+    TEST_TEMP_FILES+=("${pass_file}" "${marker_file}")
+
+    trap_output="$(trap -p EXIT)"
+    [[ "${trap_output}" == *"printf old"* ]]
+    [[ "${trap_output}" == *"rm -f"* ]]
+    [[ "${trap_output}" == *"${pass_file}"* ]]
+
+    rm -f "${pass_file}"
+    trap - EXIT
+}
+
 # --- log ---
 
 @test "log outputs timestamped message" {

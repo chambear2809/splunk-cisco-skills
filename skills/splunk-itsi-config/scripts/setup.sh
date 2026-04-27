@@ -18,6 +18,8 @@ usage() {
 Usage: setup.sh --workflow native|content-packs|topology --spec PATH [--apply]
        setup.sh --workflow native --spec PATH --mode export|inventory|prune-plan [--output PATH] [--output-format json|yaml]
        setup.sh --workflow native --spec PATH --mode cleanup-apply --backup-output PATH
+       setup.sh --workflow topology --spec PATH --mode prune-plan [--output PATH] [--output-format json|yaml]
+       setup.sh --workflow topology --spec PATH --mode cleanup-apply --backup-output PATH
 
 Examples:
   bash scripts/setup.sh --workflow content-packs --spec templates/beginner.content-pack.yaml
@@ -32,6 +34,8 @@ Examples:
   bash scripts/setup.sh --workflow content-packs --spec my-packs.yaml --apply
   bash scripts/setup.sh --workflow topology --spec templates/topology.example.yaml
   bash scripts/setup.sh --workflow topology --spec my-topology.yaml --apply
+  bash scripts/setup.sh --workflow topology --spec my-topology.yaml --mode prune-plan --output topology-prune-plan.json
+  bash scripts/setup.sh --workflow topology --spec my-topology.yaml --mode cleanup-apply --backup-output cleanup-backup.native.yaml
 EOF
 }
 
@@ -135,7 +139,7 @@ case "${WORKFLOW}" in
     ;;
   content-packs)
     if [[ -n "${MODE_OVERRIDE}" ]]; then
-      echo "--mode is only supported for the native workflow" >&2
+      echo "--mode is only supported for the native and topology workflows" >&2
       exit 1
     fi
     MODE="preview"
@@ -145,15 +149,22 @@ case "${WORKFLOW}" in
     python3 "${SCRIPT_DIR}/run_content_packs.py" --spec-json "${SPEC_JSON}" --mode "${MODE}"
     ;;
   topology)
-    if [[ -n "${MODE_OVERRIDE}" ]]; then
-      echo "--mode is only supported for the native workflow" >&2
-      exit 1
-    fi
-    MODE="preview"
+    MODE="${MODE_OVERRIDE:-preview}"
     if [[ "${APPLY}" == true ]]; then
       MODE="apply"
     fi
-    python3 "${SCRIPT_DIR}/run_topology.py" --spec-json "${SPEC_JSON}" --mode "${MODE}"
+    EXTRA_ARGS=()
+    if [[ -n "${OUTPUT_PATH}" ]]; then
+      EXTRA_ARGS+=(--output "${OUTPUT_PATH}" --output-format "${OUTPUT_FORMAT}")
+    fi
+    if [[ -n "${BACKUP_OUTPUT}" ]]; then
+      EXTRA_ARGS+=(--backup-output "${BACKUP_OUTPUT}" --backup-format "${BACKUP_FORMAT}")
+    fi
+    if [[ "${#EXTRA_ARGS[@]}" -gt 0 ]]; then
+      python3 "${SCRIPT_DIR}/run_topology.py" --spec-json "${SPEC_JSON}" --mode "${MODE}" "${EXTRA_ARGS[@]}"
+    else
+      python3 "${SCRIPT_DIR}/run_topology.py" --spec-json "${SPEC_JSON}" --mode "${MODE}"
+    fi
     ;;
   *)
     echo "Unsupported workflow: ${WORKFLOW}" >&2

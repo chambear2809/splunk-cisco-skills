@@ -20,10 +20,15 @@ content_library:
   install_if_missing: true
   source: splunkbase
   app_id: "5391"
+  refresh_catalog: true
 
-# Supported profiles:
+# Rich profiles include app/input/macro checks:
 # aws, cisco_data_center, cisco_enterprise_networks, cisco_thousandeyes,
 # linux, splunk_appdynamics, splunk_observability_cloud, vmware, windows.
+#
+# Other Content Library packs can use a documented profile key, exact title,
+# catalog_title, or pack_id. Generic catalog entries still preview/install/validate
+# and report follow-up steps.
 #
 # Keep one pack in the first pass. Add more after preview and validation are clean.
 packs:
@@ -35,3 +40,17 @@ packs:
     backfill: false
     prefix: "Starter - "
     index_macro_value: index="thousandeyes"
+
+    # Example generic catalog entry. Keep commented until needed.
+    # - title: Microsoft 365
+    #   resolution: skip
+    #   enabled: false
+    #   saved_search_action: disable
+    #   install_all: true
+    #   backfill: false
+    #   prefix: ""
+    #   configured_outcome:
+    #     saved_searches:
+    #       - app: DA-ITSI-CP-microsoft-365
+    #         name: Microsoft 365 Entity Discovery
+    #         enabled: false
