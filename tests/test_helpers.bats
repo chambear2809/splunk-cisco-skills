@@ -131,6 +131,28 @@ EOF
     unset SPLUNK_CA_CERT
 }
 
+@test "_set_splunk_curl_tls_args verifies by default when SPLUNK_VERIFY_SSL is unset" {
+    # Locks in the secure-by-default TLS posture for Splunk REST connections
+    # (no -k flag emitted) so a future change cannot silently regress it.
+    source "${LIB_DIR}/rest_helpers.sh"
+    unset SPLUNK_VERIFY_SSL
+    unset SPLUNK_CA_CERT
+    _set_splunk_curl_tls_args
+    [ "${#_tls_verify_args[@]}" -eq 0 ]
+}
+
+@test "_set_splunk_curl_tls_args supports SPLUNK_VERIFY_SSL=false opt-out for self-signed Splunk" {
+    # Self-signed on-prem deployments are common; the explicit opt-out must
+    # produce -k and warn-once without requiring any code change.
+    source "${LIB_DIR}/rest_helpers.sh"
+    export SPLUNK_VERIFY_SSL="false"
+    unset SPLUNK_CA_CERT
+    unset _WARNED_SPLUNK_INSECURE_TLS
+    _set_splunk_curl_tls_args 2>/dev/null
+    [ "${_tls_verify_args[0]}" = "-k" ]
+    unset SPLUNK_VERIFY_SSL
+}
+
 @test "_set_splunkbase_curl_tls_args verifies by default" {
     source "${LIB_DIR}/rest_helpers.sh"
     unset SPLUNKBASE_VERIFY_SSL
@@ -139,13 +161,24 @@ EOF
     [ "${#_tls_verify_args[@]}" -eq 0 ]
 }
 
-@test "_set_app_download_curl_tls_args inherits insecure Splunk mode by default" {
+@test "_set_app_download_curl_tls_args opts out when SPLUNK_VERIFY_SSL=false is set" {
     source "${LIB_DIR}/rest_helpers.sh"
     export SPLUNK_VERIFY_SSL="false"
     unset APP_DOWNLOAD_VERIFY_SSL
     unset APP_DOWNLOAD_CA_CERT
-    _set_app_download_curl_tls_args
+    unset _WARNED_APP_DOWNLOAD_INSECURE_TLS
+    _set_app_download_curl_tls_args 2>/dev/null
     [ "${_tls_verify_args[0]}" = "-k" ]
+}
+
+@test "_set_app_download_curl_tls_args verifies by default when nothing is overridden" {
+    source "${LIB_DIR}/rest_helpers.sh"
+    unset SPLUNK_VERIFY_SSL
+    unset APP_DOWNLOAD_VERIFY_SSL
+    unset SPLUNK_CA_CERT
+    unset APP_DOWNLOAD_CA_CERT
+    _set_app_download_curl_tls_args
+    [ "${#_tls_verify_args[@]}" -eq 0 ]
 }
 
 @test "hbs_make_curl_auth_config writes 0600 curl config without argv secrets" {

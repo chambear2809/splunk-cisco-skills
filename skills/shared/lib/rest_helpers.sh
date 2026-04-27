@@ -187,14 +187,28 @@ verify_search_api_connectivity() {
     fi
 
     _set_splunk_curl_tls_args || return 1
+    local curl_stderr curl_rc
+    curl_stderr=$(mktemp)
     http_code=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} --connect-timeout 8 --max-time 15 \
-        -o /dev/null -w '%{http_code}' "${uri}/services/auth/login" 2>/dev/null || echo "000")
+        -o /dev/null -w '%{http_code}' "${uri}/services/auth/login" 2>"${curl_stderr}" || echo "000")
+    curl_rc=$?
     case "${http_code}" in
         000)
             echo "ERROR: No HTTP response from ${uri} (TLS handshake or network failure)." >&2
+            # If curl reported a TLS verification error, surface the explicit
+            # opt-out so operators on self-signed Splunk hosts know how to
+            # proceed without having to read the rest_helpers source.
+            if [[ -s "${curl_stderr}" ]] && grep -q -i 'certificate\|ssl\|tls\|self.signed\|verify' "${curl_stderr}" 2>/dev/null; then
+                echo "  HINT: TLS verification failed against ${uri}. For self-signed Splunk hosts," >&2
+                echo "        either set SPLUNK_CA_CERT=/path/to/ca.pem (preferred) in the credentials" >&2
+                echo "        file or set SPLUNK_VERIFY_SSL=false to skip verification (curl -k)." >&2
+                grep -E '^(curl:|.*(SSL|TLS|certificate))' "${curl_stderr}" 2>/dev/null | head -2 >&2 || true
+            fi
+            rm -f "${curl_stderr}"
             return 1
             ;;
         401|400|200|303)
+            rm -f "${curl_stderr:-}"
             return 0
             ;;
         403)
@@ -202,10 +216,12 @@ verify_search_api_connectivity() {
             if type is_splunk_cloud &>/dev/null && is_splunk_cloud 2>/dev/null; then
                 echo "  HINT: Your IP may not be on the search-api allowlist." >&2
             fi
+            rm -f "${curl_stderr:-}"
             return 1
             ;;
         *)
-            echo "ERROR: Unexpected HTTP ${http_code} from ${uri}/services/auth/login." >&2
+            echo "ERROR: Unexpected HTTP ${http_code} from ${uri}/services/auth/login (curl exit ${curl_rc:-?})." >&2
+            rm -f "${curl_stderr:-}"
             return 1
             ;;
     esac

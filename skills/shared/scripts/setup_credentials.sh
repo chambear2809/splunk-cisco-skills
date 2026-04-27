@@ -90,6 +90,35 @@ if [[ -n "${sp_user}" ]]; then
     echo ""
 fi
 
+# Many on-prem Splunk deployments use self-signed certificates. Ask up front so
+# the operator does not hit a TLS-verification failure on the first script run.
+splunk_verify_ssl=""
+splunk_ca_cert=""
+if [[ -n "${splunk_uri}" ]]; then
+    echo ""
+    echo "TLS verification for Splunk management calls (default: verify):"
+    echo "  1) Verify with system root CAs (recommended; works for Splunk Cloud and any host with a trusted certificate)"
+    echo "  2) Verify with a private CA bundle (recommended for self-signed Splunk hosts)"
+    echo "  3) Skip TLS verification (curl -k; only for lab/self-signed targets)"
+    read -rp "Choose [1/2/3, default 1]: " tls_choice
+    case "${tls_choice}" in
+        ""|1)
+            ;;
+        2)
+            read -rp "Path to private CA bundle (PEM): " splunk_ca_cert
+            if [[ -z "${splunk_ca_cert}" || ! -f "${splunk_ca_cert}" ]]; then
+                echo "WARN: CA bundle path '${splunk_ca_cert}' is not a readable file; you can edit ${CRED_FILE} later."
+            fi
+            ;;
+        3)
+            splunk_verify_ssl="false"
+            ;;
+        *)
+            echo "Unknown TLS choice '${tls_choice}'; defaulting to verify."
+            ;;
+    esac
+fi
+
 splunk_ssh_host=""
 splunk_ssh_port="22"
 splunk_ssh_user="splunk"
@@ -175,6 +204,8 @@ splunk_mgmt_port_q=$(quote_credential_value "${splunk_mgmt_port}")
 splunk_search_api_uri_q=$(quote_credential_value "${splunk_uri}")
 sp_user_q=$(quote_credential_value "${sp_user}")
 sp_pass_q=$(quote_credential_value "${sp_pass}")
+splunk_verify_ssl_q=$(quote_credential_value "${splunk_verify_ssl}")
+splunk_ca_cert_q=$(quote_credential_value "${splunk_ca_cert}")
 splunk_ssh_host_q=$(quote_credential_value "${splunk_ssh_host}")
 splunk_ssh_port_q=$(quote_credential_value "${splunk_ssh_port}")
 splunk_ssh_user_q=$(quote_credential_value "${splunk_ssh_user}")
@@ -218,6 +249,12 @@ SPLUNK_URI=\${SPLUNK_SEARCH_API_URI}
 # SPLUNK_SEARCH_TARGET_ROLE="heavy-forwarder"
 SPLUNK_USER=${sp_user_q}
 SPLUNK_PASS=${sp_pass_q}
+# TLS verification for Splunk management calls. Leave empty (or set to "true")
+# for verified TLS. For self-signed Splunk deployments, either set
+# SPLUNK_CA_CERT to a trusted CA bundle (preferred) or set SPLUNK_VERIFY_SSL
+# to "false" to disable verification entirely (curl -k).
+SPLUNK_VERIFY_SSL=${splunk_verify_ssl_q}
+SPLUNK_CA_CERT=${splunk_ca_cert_q}
 SPLUNK_SSH_HOST=${splunk_ssh_host_q}
 SPLUNK_SSH_PORT=${splunk_ssh_port_q}
 SPLUNK_SSH_USER=${splunk_ssh_user_q}
