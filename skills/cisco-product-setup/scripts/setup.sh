@@ -1281,6 +1281,13 @@ run_intersight_configure() {
     if effective_create_defaults; then
         cmd+=(--create-defaults)
     fi
+    if has_user_value "verify_ssl"; then
+        if is_truthy "$(lookup_user_value "verify_ssl")"; then
+            cmd+=(--verify-ssl)
+        else
+            cmd+=(--no-verify-ssl)
+        fi
+    fi
     "${cmd[@]}"
 }
 
@@ -1347,6 +1354,13 @@ run_appdynamics_configure() {
         --client-secret-file "$(lookup_secret_file "client_secret")"
         --index "${index}")
     [[ -n "${create_inputs}" ]] && cmd+=(--create-inputs "${create_inputs}")
+    if has_user_value "verify_ssl"; then
+        if is_truthy "$(lookup_user_value "verify_ssl")"; then
+            cmd+=(--verify-ssl)
+        else
+            cmd+=(--no-verify-ssl)
+        fi
+    fi
     "${cmd[@]}"
 }
 

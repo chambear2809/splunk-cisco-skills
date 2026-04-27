@@ -13,6 +13,7 @@ CLIENT_NAME=""
 CLIENT_SECRET=""
 CREATE_INPUTS=""
 INDEX="appdynamics"
+SET_VERIFY_SSL=""
 
 usage() {
     cat <<EOF
@@ -31,6 +32,13 @@ Optional:
                              status, database, hardware, snapshots, security,
                              events, audit, licenses, custom
   --index INDEX              Target index for created inputs (default: appdynamics)
+  --no-verify-ssl            Disable TLS verification on the AppDynamics
+                             controller connection (sets verify_ssl=False in
+                             splunk_ta_appdynamics_settings.conf [additional_parameters]).
+                             Use this for self-hosted controllers with
+                             self-signed certificates.
+  --verify-ssl               Re-enable TLS verification on the controller
+                             connection.
 
 Splunk credentials are read from the project-root credentials file
 (falls back to ~/.splunk/credentials) automatically.
@@ -48,6 +56,8 @@ while [[ $# -gt 0 ]]; do
         --client-secret-file) require_arg "$1" $# || exit 1; CLIENT_SECRET=$(read_secret_file "$2"); shift 2 ;;
         --create-inputs) require_arg "$1" $# || exit 1; CREATE_INPUTS="$2"; shift 2 ;;
         --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
+        --no-verify-ssl) SET_VERIFY_SSL="False"; shift ;;
+        --verify-ssl) SET_VERIFY_SSL="True"; shift ;;
         --help) usage ;;
         *) echo "ERROR: Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -63,6 +73,16 @@ load_splunk_credentials
 SK=$(get_session_key "${SPLUNK_URI}")
 
 log "Authenticated to Splunk REST API."
+
+if [[ -n "${SET_VERIFY_SSL}" ]]; then
+    if rest_set_verify_ssl "${SK}" "${SPLUNK_URI}" "${APP_NAME}" \
+        "splunk_ta_appdynamics_settings" "additional_parameters" "${SET_VERIFY_SSL}" "verify_ssl"; then
+        log "Set verify_ssl=${SET_VERIFY_SSL} in splunk_ta_appdynamics_settings.conf."
+    else
+        log "ERROR: Failed to set verify_ssl in splunk_ta_appdynamics_settings.conf."
+        exit 1
+    fi
+fi
 
 local_endpoint="${SPLUNK_URI}/servicesNS/nobody/${APP_NAME}/Splunk_TA_AppDynamics_account"
 log "Creating AppDynamics controller connection '${ACCT_NAME}'..."

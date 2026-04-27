@@ -513,8 +513,11 @@ def build_intersight_route(override: dict) -> dict:
             override.get("template_checks"),
         ),
         "required_non_secret_keys": ["name", "client_id"],
-        "optional_non_secret_keys": ["hostname", "create_defaults"],
-        "accepted_non_secret_keys": ["client_id", "create_defaults", "hostname", "name"],
+        # `verify_ssl` is exposed for self-hosted Intersight Virtual
+        # Appliance deployments that use a private CA / self-signed cert.
+        # Public intersight.com SaaS users do not need to set it.
+        "optional_non_secret_keys": ["hostname", "create_defaults", "verify_ssl"],
+        "accepted_non_secret_keys": ["client_id", "create_defaults", "hostname", "name", "verify_ssl"],
         "secret_keys": ["client_secret"],
         "route": {
             "default_name": "INTERSIGHT_PROD",
@@ -579,8 +582,11 @@ def build_appdynamics_route(override: dict) -> dict:
             override.get("template_checks"),
         ),
         "required_non_secret_keys": ["name", "controller_url", "client_name"],
-        "optional_non_secret_keys": ["create_inputs", "index"],
-        "accepted_non_secret_keys": ["client_name", "controller_url", "create_inputs", "index", "name"],
+        # `verify_ssl` is exposed because AppDynamics controllers can be
+        # self-hosted with self-signed TLS certs; SaaS controllers do not
+        # need to set it.
+        "optional_non_secret_keys": ["create_inputs", "index", "verify_ssl"],
+        "accepted_non_secret_keys": ["client_name", "controller_url", "create_inputs", "index", "name", "verify_ssl"],
         "secret_keys": ["client_secret"],
         "route": {
             "default_name": "PROD",

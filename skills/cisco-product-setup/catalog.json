@@ -321,7 +321,8 @@
         "controller_url",
         "create_inputs",
         "index",
-        "name"
+        "name",
+        "verify_ssl"
       ],
       "addon": "Splunk_TA_AppDynamics",
       "addon_label": "Cisco Splunk Add-on for AppDynamics",
@@ -369,7 +370,8 @@
       "notes": "",
       "optional_non_secret_keys": [
         "create_inputs",
-        "index"
+        "index",
+        "verify_ssl"
       ],
       "prereq_apps": [],
       "prereq_labels": [],
@@ -2991,7 +2993,8 @@
         "client_id",
         "create_defaults",
         "hostname",
-        "name"
+        "name",
+        "verify_ssl"
       ],
       "addon": "Splunk_TA_Cisco_Intersight",
       "addon_label": "Cisco Intersight Add-on for Splunk",
@@ -3035,7 +3038,8 @@
       "notes": "",
       "optional_non_secret_keys": [
         "hostname",
-        "create_defaults"
+        "create_defaults",
+        "verify_ssl"
       ],
       "prereq_apps": [],
       "prereq_labels": [],
