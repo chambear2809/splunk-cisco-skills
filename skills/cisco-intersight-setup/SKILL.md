@@ -40,7 +40,7 @@ secret to a temporary file:
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-printf '%s\n' '<intersight_client_secret>' > /tmp/intersight_client_secret && chmod 600 /tmp/intersight_client_secret
+bash skills/shared/scripts/write_secret_file.sh /tmp/intersight_client_secret
 ```
 
 Then the agent passes `--client-secret-file /tmp/intersight_client_secret` to the configure
@@ -136,7 +136,7 @@ bash skills/cisco-intersight-setup/scripts/configure_account.sh \
 Copy/paste secret-file prep command:
 
 ```bash
-printf '%s\n' '<intersight_client_secret>' > /tmp/intersight_client_secret && chmod 600 /tmp/intersight_client_secret
+bash skills/shared/scripts/write_secret_file.sh /tmp/intersight_client_secret
 ```
 
 REST endpoint: `/servicesNS/nobody/Splunk_TA_Cisco_Intersight/Splunk_TA_Cisco_Intersight_account`

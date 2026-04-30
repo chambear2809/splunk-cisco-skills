@@ -39,7 +39,7 @@ For the Cisco Spaces activation token, instruct the user to write it to a tempor
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-printf '%s\n' '<activation_token>' > /tmp/spaces_token && chmod 600 /tmp/spaces_token
+bash skills/shared/scripts/write_secret_file.sh /tmp/spaces_token
 ```
 
 Then the agent passes `--token-file /tmp/spaces_token` to the configure script.
@@ -133,7 +133,7 @@ bash skills/cisco-spaces-setup/scripts/configure_stream.sh \
 Copy/paste secret-file prep command:
 
 ```bash
-printf '%s\n' '<activation_token>' > /tmp/spaces_token && chmod 600 /tmp/spaces_token
+bash skills/shared/scripts/write_secret_file.sh /tmp/spaces_token
 ```
 
 REST endpoint used (activation token encryption handled automatically):

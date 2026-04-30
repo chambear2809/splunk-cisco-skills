@@ -39,9 +39,9 @@ instruct the user to write the secret to a temporary file:
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-printf '%s\n' '<aci_or_apic_password>' > /tmp/dc_aci_password && chmod 600 /tmp/dc_aci_password
-printf '%s\n' '<nexus_dashboard_password>' > /tmp/dc_nd_password && chmod 600 /tmp/dc_nd_password
-printf '%s\n' '<nexus9k_password>' > /tmp/dc_nexus9k_password && chmod 600 /tmp/dc_nexus9k_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/dc_aci_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/dc_nd_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/dc_nexus9k_password
 ```
 
 Then the agent passes the matching `--password-file` path to the configure script.
@@ -135,9 +135,9 @@ bash skills/cisco-dc-networking-setup/scripts/configure_account.sh \
 Copy/paste secret-file prep commands:
 
 ```bash
-printf '%s\n' '<aci_or_apic_password>' > /tmp/dc_aci_password && chmod 600 /tmp/dc_aci_password
-printf '%s\n' '<nexus_dashboard_password>' > /tmp/dc_nd_password && chmod 600 /tmp/dc_nd_password
-printf '%s\n' '<nexus9k_password>' > /tmp/dc_nexus9k_password && chmod 600 /tmp/dc_nexus9k_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/dc_aci_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/dc_nd_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/dc_nexus9k_password
 ```
 
 Account types: `aci` (uses `--hostname`), `nd` (uses `--hostname`), `nexus9k` (uses `--device-ip`).

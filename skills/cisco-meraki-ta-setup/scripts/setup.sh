@@ -372,7 +372,7 @@ main() {
 
     log ""
     log "Write your Meraki Dashboard API key to a temp file:"
-    log "  printf '%s\\n' 'YOUR_API_KEY' > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key"
+    log "  bash skills/shared/scripts/write_secret_file.sh /tmp/meraki_api_key"
     log ""
     read -rp "Path to API key file (default: /tmp/meraki_api_key): " api_key_file
     api_key_file="${api_key_file:-/tmp/meraki_api_key}"

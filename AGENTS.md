@@ -87,9 +87,10 @@ interactively, or copy and edit `credentials.example`.
    ```
 
 6. **Device credentials** (device passwords, API keys, client secrets) should be
-   handled by instructing the user to create a temporary file:
+   handled by instructing the user to create a temporary file without putting
+   the secret in shell history:
    ```bash
-   echo "the_secret" > /tmp/secret_file && chmod 600 /tmp/secret_file
+   bash skills/shared/scripts/write_secret_file.sh /tmp/secret_file
    ```
    Then pass the file path to the script (e.g., `--password-file /tmp/secret_file`).
    Instruct the user to delete the file after use.

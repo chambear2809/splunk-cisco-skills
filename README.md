@@ -513,12 +513,13 @@ Safe patterns used in this repo:
 - Splunk auth is sent to the REST API through stdin or helper wrappers rather
   than exposed in process listings.
 - Device or vendor secrets should be provided through temporary files.
+- Use `skills/shared/scripts/write_secret_file.sh` to create those files without
+  putting secret values in shell history.
 
 Example:
 
 ```bash
-echo "device_secret_here" > /tmp/device_secret
-chmod 600 /tmp/device_secret
+bash skills/shared/scripts/write_secret_file.sh /tmp/device_secret
 
 bash skills/cisco-catalyst-ta-setup/scripts/configure_account.sh \
   --type catalyst_center \
@@ -536,6 +537,15 @@ The repository rule file that defines this behavior is:
 rules/credential-handling.mdc
 ```
 
+## Contributing
+
+Before opening a pull request, read `CONTRIBUTING.md` and run the checks listed
+there. At minimum, changes should pass the Python tests, Bats tests, ShellCheck,
+Ruff, YAML linting, generated-doc freshness checks, and repo-readiness checks.
+
+Security issues and leaked secrets should not be reported through public issues.
+Use the process in `SECURITY.md`.
+
 ## Repository Layout
 
 ```text
@@ -544,6 +554,10 @@ splunk-cloud-skills/
 │   └── workflows/
 │       └── ci.yml              # shell/unit test checks for first-party scripts
 ├── README.md
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CHANGELOG.md
+├── LICENSE
 ├── CLAUDE.md                    # Claude Code project context (auto-loaded)
 ├── ARCHITECTURE.md
 ├── CLOUD_DEPLOYMENT_MATRIX.md
@@ -551,6 +565,7 @@ splunk-cloud-skills/
 ├── credentials.example
 ├── credentials                  # local only, gitignored
 ├── .shellcheckrc
+├── .gitattributes
 ├── .mcp.json                    # Claude Code MCP server config
 ├── .cursor/
 │   ├── mcp.json                # Cursor MCP server config
@@ -574,6 +589,7 @@ splunk-cloud-skills/
 │   │   │   └── configure_account_helpers.sh  # create-or-update pattern
 │   │   └── scripts/
 │   │       ├── setup_credentials.sh
+│   │       ├── write_secret_file.sh
 │   │       ├── cloud_batch_install.sh
 │   │       └── cloud_batch_uninstall.sh
 │   ├── splunk-app-install/

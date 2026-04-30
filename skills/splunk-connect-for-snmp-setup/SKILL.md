@@ -37,7 +37,7 @@ secrets in chat.**
 - Keep HEC tokens and SNMPv3 secrets in local-only files. For example:
 
 ```bash
-printf '%s\n' '<hec_token>' > /tmp/sc4snmp_hec_token && chmod 600 /tmp/sc4snmp_hec_token
+bash skills/shared/scripts/write_secret_file.sh /tmp/sc4snmp_hec_token
 ```
 
 - For Docker Compose, keep SNMPv3 secrets in a local-only `secrets.json` file.

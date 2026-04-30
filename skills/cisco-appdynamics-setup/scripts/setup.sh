@@ -521,7 +521,7 @@ main() {
 
     log ""
     log "Write your AppDynamics client secret to a temp file:"
-    log "  echo \"YOUR_SECRET\" > /tmp/appd_client_secret && chmod 600 /tmp/appd_client_secret"
+    log "  bash skills/shared/scripts/write_secret_file.sh /tmp/appd_client_secret"
     log ""
     read -rp "Path to client secret file (default: /tmp/appd_client_secret): " secret_file
     secret_file="${secret_file:-/tmp/appd_client_secret}"
@@ -574,7 +574,7 @@ main() {
 
     log ""
     log "Write your AppDynamics analytics secret to a temp file:"
-    log "  echo \"YOUR_SECRET\" > /tmp/appd_analytics_secret && chmod 600 /tmp/appd_analytics_secret"
+    log "  bash skills/shared/scripts/write_secret_file.sh /tmp/appd_analytics_secret"
     log ""
     read -rp "Path to analytics secret file (default: /tmp/appd_analytics_secret): " analytics_secret_file
     analytics_secret_file="${analytics_secret_file:-/tmp/appd_analytics_secret}"

@@ -37,8 +37,8 @@ bash skills/shared/scripts/setup_credentials.sh
 For Secure Access API secrets, instruct the user to write them to temp files:
 
 ```bash
-printf '%s' "the_api_key" > /tmp/secure_access_api_key && chmod 600 /tmp/secure_access_api_key
-printf '%s' "the_api_secret" > /tmp/secure_access_api_secret && chmod 600 /tmp/secure_access_api_secret
+bash skills/shared/scripts/write_secret_file.sh /tmp/secure_access_api_key
+bash skills/shared/scripts/write_secret_file.sh /tmp/secure_access_api_secret
 ```
 
 ## Environment

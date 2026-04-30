@@ -5,7 +5,7 @@
 # restrictive permissions instead of storing them in git or pasting them in chat.
 #
 # Example secret file pattern:
-#   printf '%s\n' '<hec_token>' > /tmp/sc4s_hec_token && chmod 600 /tmp/sc4s_hec_token
+#   bash skills/shared/scripts/write_secret_file.sh /tmp/sc4s_hec_token
 #
 # This worksheet is for planning and render inputs. The setup script does not
 # source this file directly.

@@ -38,8 +38,9 @@ Options:
 Behavior:
   Validates Splunk-side prerequisites, checks the live collector runtime over SSH,
   sends one marked test event per target, and verifies collector-side handling.
-  Search verification is optional because some hosts accept HEC writes but do not
-  surface those events to local search reliably.
+  Remote runtime checks require the SSH user to be root or to have passwordless
+  sudo. Search verification is optional because some hosts accept HEC writes but
+  do not surface those events to local search reliably.
 EOF
     exit "${exit_code}"
 }
@@ -106,9 +107,20 @@ REMOTE_USER="${SPLUNK_SSH_USER}"
 
 run_remote_root() {
     local remote_cmd="$1"
-    local escaped_pass remote_payload pass_file rc
-    escaped_pass="${SPLUNK_SSH_PASS//\'/\'\\\'\'}"
+    local remote_payload remote_shell pass_file rc
     remote_payload="$(printf '%q' "${remote_cmd}")"
+
+    if [[ "${REMOTE_USER}" == "root" ]]; then
+        remote_shell="sh -lc ${remote_payload}"
+    else
+        remote_shell="sudo -n sh -lc ${remote_payload}"
+    fi
+
+    if ! command_exists sshpass; then
+        log "ERROR: sshpass is required for SSH-based live smoke checks."
+        return 1
+    fi
+
     pass_file="$(hbs_make_sshpass_file)"
     # Use accept-new + a per-smoke-run known_hosts file so the host key is
     # pinned for the duration of the run. SMOKE_KNOWN_HOSTS_FILE may be
@@ -120,7 +132,7 @@ run_remote_root() {
         -o StrictHostKeyChecking=accept-new \
         -o UserKnownHostsFile="${known_hosts_file}" \
         "${REMOTE_USER}@${REMOTE_HOST}" \
-        "printf '%s\n' '${escaped_pass}' | sudo -S -p '' sh -lc ${remote_payload}"
+        "${remote_shell}"
     rc=$?
     rm -f "${pass_file}"
     return "${rc}"

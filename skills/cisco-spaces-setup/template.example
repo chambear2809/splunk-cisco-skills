@@ -8,7 +8,7 @@
 #
 # Create the activation token temp file only when you are ready to run the
 # configure script:
-# printf '%s\n' '<activation_token>' > /tmp/spaces_token && chmod 600 /tmp/spaces_token
+# bash skills/shared/scripts/write_secret_file.sh /tmp/spaces_token
 #
 # Then pass:
 #   --token-file /tmp/spaces_token

@@ -38,9 +38,9 @@ Bootstraps Linux hosts that should run **full Splunk Enterprise**.
 - Keep secrets in temporary files only, for example:
 
 ```bash
-printf '%s\n' '<admin_password>' > /tmp/splunk_admin_password && chmod 600 /tmp/splunk_admin_password
-printf '%s\n' '<idxc_secret>' > /tmp/splunk_idxc_secret && chmod 600 /tmp/splunk_idxc_secret
-printf '%s\n' '<shc_secret>' > /tmp/splunk_shc_secret && chmod 600 /tmp/splunk_shc_secret
+bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_admin_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_idxc_secret
+bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_shc_secret
 ```
 
 - Reuse the project `credentials` file or `~/.splunk/credentials` for SSH and

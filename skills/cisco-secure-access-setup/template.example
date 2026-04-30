@@ -4,9 +4,9 @@
 # Keep the completed file local.
 #
 # Create temp secret files only when you are ready to run the scripts:
-# printf '%s\n' '<api_key>' > /tmp/secure_access_api_key && chmod 600 /tmp/secure_access_api_key
-# printf '%s\n' '<api_secret>' > /tmp/secure_access_api_secret && chmod 600 /tmp/secure_access_api_secret
-# printf '%s\n' '<cloudlock_token>' > /tmp/secure_access_cloudlock_token && chmod 600 /tmp/secure_access_cloudlock_token
+# bash skills/shared/scripts/write_secret_file.sh /tmp/secure_access_api_key
+# bash skills/shared/scripts/write_secret_file.sh /tmp/secure_access_api_secret
+# bash skills/shared/scripts/write_secret_file.sh /tmp/secure_access_cloudlock_token
 #
 # Then pass:
 #   --api-key-file /tmp/secure_access_api_key

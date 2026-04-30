@@ -12,7 +12,7 @@
 # intentionally omitted from this worksheet.
 #
 # Create the API key temp file only when you are ready to run the configure script:
-# printf '%s\n' '<meraki_dashboard_api_key>' > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key
+# bash skills/shared/scripts/write_secret_file.sh /tmp/meraki_api_key
 #
 # Then pass:
 #   --api-key-file /tmp/meraki_api_key

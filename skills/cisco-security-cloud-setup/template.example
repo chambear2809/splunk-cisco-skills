@@ -8,11 +8,10 @@
 # Uncomment or copy the product block you need below. Keys mirror the
 # configure_product.sh --set names, uppercased for readability. Values in
 # <angle brackets> are placeholders to replace locally.
-# Write any needed secret file with one of these patterns:
-# printf '%s\n' '<single_line_secret>' > /tmp/secret_name && chmod 600 /tmp/secret_name
-# umask 077 && cat > /tmp/secret_name <<'EOF'
-# <multi_line_secret_or_json>
-# EOF
+# Write any needed single-line secret file with:
+# bash skills/shared/scripts/write_secret_file.sh /tmp/secret_name
+# Write multi-line secret material or JSON with:
+# bash skills/shared/scripts/write_secret_file.sh --editor /tmp/secret_name
 #
 # Then pass the file with:
 #   --secret-file FIELD /tmp/secret_name
@@ -21,7 +20,7 @@ APP_NAME=CiscoSecurityCloud
 APP_ID=7404
 
 # Example:
-# printf '%s\n' '<refresh_token>' > /tmp/cisco_security_cloud_xdr_refresh_token && chmod 600 /tmp/cisco_security_cloud_xdr_refresh_token
+# bash skills/shared/scripts/write_secret_file.sh /tmp/cisco_security_cloud_xdr_refresh_token
 
 # -----------------------------------------------------------------------------
 # Cisco Duo

@@ -7,8 +7,8 @@
 # `template.local`.
 #
 # Create secret temp files only when you are ready to run the configure scripts:
-# printf '%s\n' '<controller_client_secret>' > /tmp/appd_client_secret && chmod 600 /tmp/appd_client_secret
-# printf '%s\n' '<analytics_secret>' > /tmp/appd_analytics_secret && chmod 600 /tmp/appd_analytics_secret
+# bash skills/shared/scripts/write_secret_file.sh /tmp/appd_client_secret
+# bash skills/shared/scripts/write_secret_file.sh /tmp/appd_analytics_secret
 #
 # Then pass:
 #   --client-secret-file /tmp/appd_client_secret

@@ -7,7 +7,7 @@
 # `template.local`.
 #
 # Create the secret temp file only when you are ready to run the configure script:
-# printf '%s\n' '<intersight_client_secret>' > /tmp/intersight_client_secret && chmod 600 /tmp/intersight_client_secret
+# bash skills/shared/scripts/write_secret_file.sh /tmp/intersight_client_secret
 #
 # Then pass:
 #   --client-secret-file /tmp/intersight_client_secret

@@ -6,9 +6,9 @@
 # them in chat.
 #
 # Example secret-file pattern:
-#   printf '%s\n' '<admin_password>' > /tmp/splunk_admin_password && chmod 600 /tmp/splunk_admin_password
-#   printf '%s\n' '<idxc_secret>' > /tmp/splunk_idxc_secret && chmod 600 /tmp/splunk_idxc_secret
-#   printf '%s\n' '<shc_secret>' > /tmp/splunk_shc_secret && chmod 600 /tmp/splunk_shc_secret
+#   bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_admin_password
+#   bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_idxc_secret
+#   bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_shc_secret
 
 # -----------------------------------------------------------------------------
 # Host and execution model

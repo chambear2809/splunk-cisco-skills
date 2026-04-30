@@ -48,14 +48,14 @@ temporary file:
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-printf '%s' "the_appd_client_secret" > /tmp/appd_client_secret && chmod 600 /tmp/appd_client_secret
+bash skills/shared/scripts/write_secret_file.sh /tmp/appd_client_secret
 ```
 
 For the optional AppDynamics analytics secret:
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-printf '%s' "the_appd_analytics_secret" > /tmp/appd_analytics_secret && chmod 600 /tmp/appd_analytics_secret
+bash skills/shared/scripts/write_secret_file.sh /tmp/appd_analytics_secret
 ```
 
 Then the agent passes `--client-secret-file` or `--analytics-secret-file` to

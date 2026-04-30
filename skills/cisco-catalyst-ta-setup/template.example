@@ -11,8 +11,8 @@
 # the `configure_account.sh` workflow yet, so they are intentionally omitted here.
 #
 # Create secret temp files only when you are ready to run the configure script:
-# printf '%s\n' '<device_password>' > /tmp/catalyst_device_password && chmod 600 /tmp/catalyst_device_password
-# printf '%s\n' '<cybervision_api_token>' > /tmp/catalyst_cybervision_api_token && chmod 600 /tmp/catalyst_cybervision_api_token
+# bash skills/shared/scripts/write_secret_file.sh /tmp/catalyst_device_password
+# bash skills/shared/scripts/write_secret_file.sh /tmp/catalyst_cybervision_api_token
 #
 # Then pass:
 #   --password-file /tmp/catalyst_device_password

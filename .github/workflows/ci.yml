@@ -101,7 +101,7 @@ jobs:
           cache-dependency-path: requirements-dev.txt
 
       - name: Install validation tools
-        run: pip install "ruff>=0.11,<1" "yamllint>=1.35,<2"
+        run: pip install -r requirements-dev.txt
 
       - name: Validate JSON files
         run: |
@@ -130,8 +130,8 @@ jobs:
           print(f"All {len(json_files)} JSON files are valid.")
           PY
 
-      - name: Lint YAML (workflow files)
-        run: yamllint -c .yamllint.yml .github/workflows/
+      - name: Lint YAML (GitHub and workflow files)
+        run: yamllint -c .yamllint.yml .github/
 
       - name: Lint Python with ruff
         run: ruff check skills/ tests/
@@ -149,3 +149,6 @@ jobs:
 
       - name: Check SKILL.md frontmatter
         run: python3 tests/check_skill_frontmatter.py
+
+      - name: Check repository readiness
+        run: python3 tests/check_repo_readiness.py

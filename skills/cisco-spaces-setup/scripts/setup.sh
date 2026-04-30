@@ -142,7 +142,7 @@ main() {
 
     log ""
     log "Write your Cisco Spaces activation token to a temp file:"
-    log "  printf '%s\\n' 'YOUR_TOKEN' > /tmp/spaces_token && chmod 600 /tmp/spaces_token"
+    log "  bash skills/shared/scripts/write_secret_file.sh /tmp/spaces_token"
     log ""
     read -rp "Path to activation token file (default: /tmp/spaces_token): " token_file
     token_file="${token_file:-/tmp/spaces_token}"

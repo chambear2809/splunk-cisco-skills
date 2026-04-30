@@ -319,7 +319,7 @@ main() {
 
     log ""
     log "Write your OAuth2 Client Secret to a temp file:"
-    log "  echo \"YOUR_SECRET\" > /tmp/client_secret && chmod 600 /tmp/client_secret"
+    log "  bash skills/shared/scripts/write_secret_file.sh /tmp/client_secret"
     log ""
     read -rp "Path to client secret file (default: /tmp/client_secret): " secret_file
     secret_file="${secret_file:-/tmp/client_secret}"

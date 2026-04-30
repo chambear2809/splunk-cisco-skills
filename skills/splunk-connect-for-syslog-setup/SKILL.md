@@ -36,7 +36,7 @@ areas:
 - Keep HEC tokens in temporary or local-only files, for example:
 
 ```bash
-printf '%s\n' '<hec_token>' > /tmp/sc4s_hec_token && chmod 600 /tmp/sc4s_hec_token
+bash skills/shared/scripts/write_secret_file.sh /tmp/sc4s_hec_token
 ```
 
 - For Kubernetes, prefer a token-free `values.yaml` plus a local-only

@@ -43,7 +43,8 @@ The user can also invoke skills directly as slash commands (e.g. `/cisco-catalys
 ## Splunk MCP Server
 
 If `.mcp.json` exists at the project root, the Splunk MCP server is available as the
-`splunk-mcp` tool. This path (`splunk-mcp-rendered/run-splunk-mcp.sh`) only exists
+`splunk-mcp` tool through the tracked `splunk-mcp-rendered/run-splunk-mcp.js`
+bridge. The local token file (`splunk-mcp-rendered/.env.splunk-mcp`) only exists
 after running the `splunk-mcp-server-setup` skill. Use MCP search tools for live
 Splunk queries when available.
 
@@ -86,9 +87,10 @@ interactively, or copy and edit `credentials.example`.
    ```
 
 6. **Device credentials** (device passwords, API keys, client secrets) should be
-   handled by instructing the user to create a temporary file:
+   handled by instructing the user to create a temporary file without putting
+   the secret in shell history:
    ```bash
-   echo "the_secret" > /tmp/secret_file && chmod 600 /tmp/secret_file
+   bash skills/shared/scripts/write_secret_file.sh /tmp/secret_file
    ```
    Then pass the file path to the script (e.g., `--password-file /tmp/secret_file`).
    Instruct the user to delete the file after use.

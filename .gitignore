@@ -30,9 +30,10 @@ splunk-ta/_unpacked/
 # --- IDE / agent scaffolding (not project content) ---
 skills-cursor/
 plugins/
-commands/
+/commands/
 subagents/
 projects/tmp-*
+.claude/settings.local.json
 
 # --- Local TA intake templates ---
 **/template.local

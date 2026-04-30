@@ -40,10 +40,10 @@ Cyber Vision API token), instruct the user to write the secret to a temporary fi
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-printf '%s\n' '<catalyst_center_password>' > /tmp/catalyst_center_password && chmod 600 /tmp/catalyst_center_password
-printf '%s\n' '<ise_password>' > /tmp/ise_password && chmod 600 /tmp/ise_password
-printf '%s\n' '<sdwan_password>' > /tmp/sdwan_password && chmod 600 /tmp/sdwan_password
-printf '%s\n' '<cybervision_api_token>' > /tmp/cybervision_api_token && chmod 600 /tmp/cybervision_api_token
+bash skills/shared/scripts/write_secret_file.sh /tmp/catalyst_center_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/ise_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/sdwan_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/cybervision_api_token
 ```
 
 Then the agent passes the matching `--password-file` or `--api-token-file`
@@ -136,10 +136,10 @@ bash skills/cisco-catalyst-ta-setup/scripts/configure_account.sh \
 Copy/paste secret-file prep commands:
 
 ```bash
-printf '%s\n' '<catalyst_center_password>' > /tmp/catalyst_center_password && chmod 600 /tmp/catalyst_center_password
-printf '%s\n' '<ise_password>' > /tmp/ise_password && chmod 600 /tmp/ise_password
-printf '%s\n' '<sdwan_password>' > /tmp/sdwan_password && chmod 600 /tmp/sdwan_password
-printf '%s\n' '<cybervision_api_token>' > /tmp/cybervision_api_token && chmod 600 /tmp/cybervision_api_token
+bash skills/shared/scripts/write_secret_file.sh /tmp/catalyst_center_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/ise_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/sdwan_password
+bash skills/shared/scripts/write_secret_file.sh /tmp/cybervision_api_token
 ```
 
 Account types and their required fields:

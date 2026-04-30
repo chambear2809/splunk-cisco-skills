@@ -11,9 +11,9 @@
 # because `configure_account.sh` does not prompt for them today.
 #
 # Create secret temp files only when you are ready to run the configure script:
-# printf '%s\n' '<aci_or_apic_password>' > /tmp/dc_aci_password && chmod 600 /tmp/dc_aci_password
-# printf '%s\n' '<nexus_dashboard_password>' > /tmp/dc_nd_password && chmod 600 /tmp/dc_nd_password
-# printf '%s\n' '<nexus9k_password>' > /tmp/dc_nexus9k_password && chmod 600 /tmp/dc_nexus9k_password
+# bash skills/shared/scripts/write_secret_file.sh /tmp/dc_aci_password
+# bash skills/shared/scripts/write_secret_file.sh /tmp/dc_nd_password
+# bash skills/shared/scripts/write_secret_file.sh /tmp/dc_nexus9k_password
 #
 # Then pass the matching file with `--password-file`.
 #

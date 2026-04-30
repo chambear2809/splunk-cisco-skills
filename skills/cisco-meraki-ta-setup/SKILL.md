@@ -38,7 +38,7 @@ For the Meraki Dashboard API key, instruct the user to write it to a temporary f
 
 ```bash
 # User creates the file themselves (agent never sees the secret)
-printf '%s\n' '<meraki_dashboard_api_key>' > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key
+bash skills/shared/scripts/write_secret_file.sh /tmp/meraki_api_key
 ```
 
 Then the agent passes `--api-key-file /tmp/meraki_api_key` to the configure script.
@@ -138,7 +138,7 @@ bash skills/cisco-meraki-ta-setup/scripts/configure_account.sh \
 Copy/paste secret-file prep command:
 
 ```bash
-printf '%s\n' '<meraki_dashboard_api_key>' > /tmp/meraki_api_key && chmod 600 /tmp/meraki_api_key
+bash skills/shared/scripts/write_secret_file.sh /tmp/meraki_api_key
 ```
 
 REST endpoint used (API key encryption handled automatically):
