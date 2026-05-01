@@ -4,8 +4,9 @@ This repository is a working library of Cursor, Codex, and Claude Code agent ski
 shell scripts for installing, configuring, and validating Splunk apps and
 Technology Add-ons on Splunk Cloud and self-managed Splunk Enterprise
 deployments, and for
-bootstrapping Linux Splunk Enterprise hosts themselves, including search-tier,
-indexer, forwarder, and external-collector topologies.
+bootstrapping Linux Splunk Enterprise hosts and self-managed Kubernetes
+runtimes, including search-tier, indexer, forwarder, and external-collector
+topologies.
 
 ## Start With The Intake Templates
 
@@ -24,6 +25,22 @@ The repo is designed for two use cases:
   in `skills/*/SKILL.md` and runs the matching scripts for you.
 - **Direct shell use**: you can run the scripts under each skill manually if you
   prefer to operate outside the agent.
+
+Common starting points:
+
+- If you know the Cisco product but not the Splunk app, run
+  `skills/cisco-product-setup/scripts/setup.sh --dry-run`.
+- If you already know the Splunkbase app or TA, use
+  `skills/splunk-app-install/scripts/install_app.sh`, then run the matching
+  setup skill.
+- If you need Linux host bootstrap, start with
+  `skills/splunk-enterprise-host-setup/`.
+- If you need Splunk Enterprise on Kubernetes, start with
+  `skills/splunk-enterprise-kubernetes-setup/`. The workflow renders assets by
+  default and only applies them when you request an apply phase.
+- If you need external syslog or SNMP collection, start with
+  `skills/splunk-connect-for-syslog-setup/` or
+  `skills/splunk-connect-for-snmp-setup/`.
 
 If you know the Cisco product name but not which TA or app it needs, start with
 `cisco-product-setup`. It resolves the product against the packaged SCAN
@@ -46,18 +63,21 @@ operations do **not** use the search-tier REST API in cloud mode.
 
 ## What This Repository Covers
 
-At a high level, the repo gives you four layers of automation:
+At a high level, the repo gives you five layers of automation:
 
 1. **Host bootstrap**: download Splunk Enterprise packages, install them on
    Linux hosts, and configure standalone or single-site clustered search-tier,
    indexer, and heavy-forwarder roles.
-2. **Package delivery**: download apps from Splunkbase, fetch them from a URL,
+2. **Kubernetes runtime bootstrap**: render and optionally apply Splunk
+   Operator for Kubernetes or Splunk POD deployment assets for full Splunk
+   Enterprise.
+3. **Package delivery**: download apps from Splunkbase, fetch them from a URL,
    or install them from local `.tgz` or `.spl` files. In Splunk Cloud, installs
    are executed through ACS instead of direct `/services/apps/local` calls.
-3. **App-specific setup**: create indexes, configure accounts, enable inputs,
+4. **App-specific setup**: create indexes, configure accounts, enable inputs,
    update macros, and apply dashboard settings. In Splunk Cloud, index creation
    uses ACS and the app-specific REST configuration uses the search tier.
-4. **Validation**: confirm the app is installed, the expected objects exist, and
+5. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
 Most of the repo follows the same pattern:
@@ -72,8 +92,8 @@ Most of the repo follows the same pattern:
 - `scripts/` contains the actual shell automation.
 - `mcp_tools.json` is present for skills that expose search tooling through MCP.
 
-This `README.md` is now the main overview document, while each `SKILL.md` and `reference.md` carries the
-skill-specific details.
+This `README.md` is now the main overview document, while each `SKILL.md` and
+`reference.md` carries the skill-specific details.
 
 ## Supported Skills
 
@@ -98,6 +118,7 @@ skill-specific details.
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
+| `splunk-enterprise-kubernetes-setup` | Splunk Enterprise on Kubernetes | Render, preflight, apply, and validate SOK S1/C3/M4 or Splunk POD on Cisco UCS |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
 | `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render or apply Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
 | `splunk-connect-for-snmp-setup` | SC4SNMP external collector | Prepare Splunk HEC/indexes and render or apply Docker Compose or Helm assets for Splunk Connect for SNMP |
@@ -170,7 +191,7 @@ delivers it comes through ACS, a deployer, or another control-plane path.
 
 ## How To Use This Repo
 
-The normal workflow is:
+The normal app and TA workflow is:
 
 1. Configure credentials once.
 2. Install the app or TA from Splunkbase (latest version). If Splunkbase is
@@ -179,6 +200,10 @@ The normal workflow is:
 4. Validate the deployment.
 5. Restart Splunk if the setup script tells you to. The generic install/uninstall
    scripts already restart Splunk automatically unless you explicitly skip it.
+
+Kubernetes and external-collector workflows are different: they usually render
+reviewable runtime assets first, then optionally run a preflight, apply, or live
+status phase after an operator reviews the generated files.
 
 ### 1. Configure Credentials
 
@@ -387,6 +412,14 @@ Prepare Splunk Connect for Syslog and render a Docker deployment
 Bootstrap a Splunk heavy forwarder on my Linux host and point it at my indexer cluster
 ```
 
+```text
+Render a Splunk Operator for Kubernetes C3 deployment and run preflight
+```
+
+```text
+Render a Splunk POD medium profile for my Cisco UCS controller and worker nodes
+```
+
 The agent is expected to ask only for **non-secret** values in conversation,
 such as:
 
@@ -429,12 +462,20 @@ bash skills/cisco-meraki-ta-setup/scripts/validate.sh
 bash skills/splunk-stream-setup/scripts/validate.sh
 ```
 
+```bash
+bash skills/splunk-enterprise-kubernetes-setup/scripts/validate.sh --target sok
+```
+
 The validation scripts generally check:
 
 - app installation state
 - indexes and macros
 - account or input configuration
 - data presence in the expected indexes
+
+For rendered Kubernetes or external-collector workflows, validation also checks
+that the expected generated files are present and can optionally run live status
+commands when the target environment is reachable.
 
 ## Splunk Cloud Notes
 
@@ -551,20 +592,29 @@ Use the process in `SECURITY.md`.
 ```text
 splunk-cisco-skills/
 ├── .github/
-│   └── workflows/
-│       └── ci.yml              # shell/unit test checks for first-party scripts
+│   ├── workflows/
+│   │   └── ci.yml              # shell, Python, lint, and generated-doc checks
+│   ├── ISSUE_TEMPLATE/         # bug and skill request templates
+│   ├── CODEOWNERS
+│   └── pull_request_template.md
 ├── README.md
+├── AGENTS.md                    # Codex project context
+├── CLAUDE.md                    # Claude Code project context
 ├── CONTRIBUTING.md
 ├── SECURITY.md
 ├── CHANGELOG.md
 ├── LICENSE
-├── CLAUDE.md                    # Claude Code project context (auto-loaded)
 ├── ARCHITECTURE.md
 ├── CLOUD_DEPLOYMENT_MATRIX.md
+├── DEPLOYMENT_ROLE_MATRIX.md
 ├── DEMO_SCRIPTS.md
 ├── credentials.example
 ├── credentials                  # local only, gitignored
+├── requirements-agent.txt       # local MCP agent server dependencies
+├── requirements-dev.txt         # test and lint dependencies
+├── pytest.ini
 ├── .shellcheckrc
+├── .yamllint.yml
 ├── .gitattributes
 ├── .mcp.json                    # Claude Code MCP server config
 ├── .cursor/
@@ -574,8 +624,18 @@ splunk-cisco-skills/
 │   ├── commands/               # Claude Code slash commands (one per skill)
 │   └── rules/
 │       └── credential-handling.md
+├── agent/
+│   ├── register-codex-splunk-cisco-skills-mcp.sh
+│   ├── run-splunk-cisco-skills-mcp.py
+│   └── splunk_cisco_skills_mcp/
+│       ├── core.py
+│       └── server.py
 ├── splunk-ta/                   # local package cache; binaries ignored by git
 │   └── _unpacked/              # review-only extracted copies
+├── splunk-mcp-rendered/
+│   └── run-splunk-mcp.js        # tracked bridge for Splunk MCP Server
+├── sc4s-rendered/               # local generated SC4S output, gitignored
+├── sc4snmp-rendered/            # local generated SC4SNMP output, gitignored
 ├── skills/
 │   ├── shared/
 │   │   ├── app_registry.json   # single source of truth for Splunkbase IDs
@@ -595,8 +655,10 @@ splunk-cisco-skills/
 │   ├── splunk-app-install/
 │   ├── splunk-ai-assistant-setup/
 │   ├── splunk-enterprise-host-setup/
+│   ├── splunk-enterprise-kubernetes-setup/
 │   ├── splunk-connect-for-syslog-setup/
 │   ├── splunk-connect-for-snmp-setup/
+│   ├── splunk-itsi-config/
 │   ├── splunk-itsi-setup/
 │   ├── splunk-mcp-server-setup/
 │   ├── splunk-stream-setup/
@@ -686,14 +748,15 @@ sends SIGTERM, then SIGKILL after a short grace, and the response includes
 
 Minimum expected environment:
 
-- Splunk Enterprise with REST API access on `8089`, or Splunk Cloud with ACS
-  access and optional search-tier REST API access on `8089`
 - `bash`
 - `curl`
 - `python3`
 - `pip install -r requirements-agent.txt` for the local MCP agent server
 - Cursor, Codex, or Claude Code if you want the agent-driven workflow
-- a `splunk.com` account for Splunkbase downloads
+- Splunk Enterprise with REST API access on `8089`, or Splunk Cloud with ACS
+  access and optional search-tier REST API access on `8089`, for app and TA
+  workflows
+- a `splunk.com` account for Splunkbase downloads when installing public apps
 
 For Splunk Cloud workflows, you should also install the ACS CLI:
 
@@ -707,6 +770,13 @@ Depending on the workflow, you may also need:
 - `sshpass` for password-based remote host bootstrap and package staging
 - vendor credentials or tokens supplied through files for account setup scripts
 - `search-api` allow-list access for Cloud search-tier REST operations
+- `kubectl` and `helm` for Splunk Operator for Kubernetes workflows
+- `aws` CLI access when rendering the optional EKS kubeconfig helper
+- the Splunk Kubernetes Installer on the bastion host for Splunk POD workflows
+
+Render-only Kubernetes runs need only local shell and Python. Preflight, apply,
+and live validation phases need access to the Kubernetes cluster or POD bastion
+that will run the generated assets.
 
 ## Current Scope
 
@@ -724,3 +794,6 @@ customer-managed infrastructure rather than on the Cloud search tier.
 `splunk-connect-for-snmp-setup` follows the same external-collector model for
 SC4SNMP polling and traps. In both workflows, the rendered apply paths are
 rerunnable install-or-upgrade entrypoints for customer-managed runtimes.
+`splunk-enterprise-kubernetes-setup` is for self-managed Splunk Enterprise on
+Kubernetes: either Splunk Operator for Kubernetes on an existing cluster, or
+Splunk POD on Cisco UCS with the Splunk Kubernetes Installer.

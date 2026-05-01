@@ -54,6 +54,7 @@ TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"(^|/)template\.local$"),
     re.compile(r"^sc4s-rendered/"),
     re.compile(r"^sc4snmp-rendered/"),
+    re.compile(r"^splunk-enterprise-k8s-rendered/"),
     re.compile(r"^splunk-mcp-rendered/(?!run-splunk-mcp\.js$)"),
     re.compile(r"^splunk-ta/_unpacked/"),
     re.compile(r"^splunk-ta/.*\.(?:tgz|tar\.gz|spl|rpm|deb)$"),

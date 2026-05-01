@@ -1,0 +1,97 @@
+# Splunk Enterprise Kubernetes setup intake template
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Keep passwords, object-store keys, SSH private keys, HEC tokens, and license
+# contents out of this file. Use local-only files or existing Kubernetes
+# secrets and pass only paths or secret names to setup.sh.
+
+# -----------------------------------------------------------------------------
+# Shared workflow controls
+# -----------------------------------------------------------------------------
+# TARGET=sok
+# TARGET=pod
+# PHASE=render
+# OUTPUT_DIR=./splunk-enterprise-k8s-rendered
+
+# -----------------------------------------------------------------------------
+# Splunk Operator for Kubernetes
+# -----------------------------------------------------------------------------
+# ARCHITECTURE=s1
+# ARCHITECTURE=c3
+# ARCHITECTURE=m4
+# NAMESPACE=splunk
+# OPERATOR_NAMESPACE=splunk-operator
+# RELEASE_NAME=splunk-enterprise
+# OPERATOR_RELEASE_NAME=splunk-operator
+# OPERATOR_VERSION=3.1.0
+# CHART_VERSION=3.1.0
+# SPLUNK_VERSION=10.2.0
+# SPLUNK_IMAGE=splunk/splunk:10.2.0
+# STORAGE_CLASS=gp3
+# ETC_STORAGE=10Gi
+# VAR_STORAGE=100Gi
+# STANDALONE_REPLICAS=1
+# INDEXER_REPLICAS means total indexers for C3 and indexers per site for M4.
+# INDEXER_REPLICAS=3
+# SEARCH_HEAD_REPLICAS=3
+# SITE_COUNT=3
+# Optional: omit to avoid rendering zone node affinity for M4 indexers.
+# SITE_ZONES=us-west-2a,us-west-2b,us-west-2c
+
+# Required for SOK with Splunk Enterprise 10.x images:
+# ACCEPT_SPLUNK_GENERAL_TERMS=true
+
+# Optional EKS helper:
+# EKS_CLUSTER_NAME=splunk-prod
+# AWS_REGION=us-west-2
+
+# Optional license handling:
+# LICENSE_FILE=/absolute/path/to/splunk.lic
+
+# Optional SmartStore references. Do not put access keys here.
+# SMARTSTORE_BUCKET=splunk-smartstore-prod
+# SMARTSTORE_PREFIX=indexes
+# SMARTSTORE_REGION=us-west-2
+# SMARTSTORE_ENDPOINT=https://s3.us-west-2.amazonaws.com
+# SMARTSTORE_SECRET_REF=splunk-smartstore-s3
+
+# -----------------------------------------------------------------------------
+# Splunk POD on Cisco UCS
+# -----------------------------------------------------------------------------
+# POD_PROFILE=pod-small
+# POD_PROFILE=pod-medium
+# POD_PROFILE=pod-large
+# ES aliases render the same official profile plus premium app stanzas.
+# POD_PROFILE=pod-small-es
+# POD_PROFILE=pod-medium-es
+# POD_PROFILE=pod-large-es
+# Default worker counts are 8/11/15 without ES and 9/14/18 with ES.
+# POD preflight/apply/all runs require concrete controller IPs, worker IPs,
+# LICENSE_FILE, and SSH_PRIVATE_KEY_FILE; render-only can leave placeholders.
+# CONTROLLER_IPS=10.10.10.1,10.10.10.2,10.10.10.3
+# WORKER_IPS=10.10.10.4,10.10.10.5,10.10.10.6,10.10.10.7,10.10.10.8,10.10.10.9,10.10.10.10,10.10.10.11
+# SSH_USER=splunkadmin
+# SSH_PRIVATE_KEY_FILE=/absolute/path/to/ssh-private-key
+# LICENSE_FILE=/absolute/path/to/splunk.lic
+# INDEXER_APPS=/path/to/indexer-app.tgz
+# SEARCH_APPS=/path/to/sh-app.tar.gz
+# STANDALONE_APPS=./path/to/myapp.tgz
+# PREMIUM_APPS=./apps/splunk_app_es.tgz
+
+# -----------------------------------------------------------------------------
+# Example commands
+# -----------------------------------------------------------------------------
+# bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
+#   --target sok \
+#   --architecture c3 \
+#   --namespace splunk \
+#   --storage-class gp3 \
+#   --accept-splunk-general-terms
+#
+# bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
+#   --target pod \
+#   --pod-profile pod-medium \
+#   --controller-ips "${CONTROLLER_IPS}" \
+#   --worker-ips "${WORKER_IPS}" \
+#   --license-file "${LICENSE_FILE}" \
+#   --ssh-private-key-file "${SSH_PRIVATE_KEY_FILE}"

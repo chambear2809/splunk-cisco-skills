@@ -182,6 +182,15 @@
         "notes": "Enterprise runtime bootstrap workflow for standalone or single-site clustered hosts."
       },
       {
+        "kind": "workflow",
+        "skill": "splunk-enterprise-kubernetes-setup",
+        "label": "`splunk-enterprise-kubernetes-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Not a Splunk Cloud install path; renders customer-managed Splunk Enterprise Kubernetes deployments",
+        "cloud_config_path": "Rendered SOK Helm assets or Splunk POD cluster-config.yaml and installer helpers",
+        "notes": "Self-managed Kubernetes runtime workflow for SOK S1/C3/M4 or Splunk POD on Cisco UCS."
+      },
+      {
         "kind": "app",
         "app_name": "ta_cisco_spaces",
         "label": "`cisco-spaces-setup`",
@@ -378,6 +387,18 @@
       },
       "cloud_pairing": [],
       "notes": "Linux host bootstrap workflow for self-managed Splunk Enterprise search tiers, indexers, cluster managers, SHC members, and heavy forwarders."
+    },
+    {
+      "skill": "splunk-enterprise-kubernetes-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Self-managed Splunk Enterprise Kubernetes runtime workflow using SOK Helm assets or Splunk POD installer assets."
     },
     {
       "skill": "splunk-itsi-setup",

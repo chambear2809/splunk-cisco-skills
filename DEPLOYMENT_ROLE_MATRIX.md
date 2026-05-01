@@ -48,6 +48,7 @@ For Cloud-specific install and API behavior, see
 | `splunk-connect-for-syslog-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4S runtime assets. |
 | `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets. |
 | `splunk-enterprise-host-setup` | Supported | Supported | Supported | None | None | None | Linux host bootstrap workflow for self-managed Splunk Enterprise search tiers, indexers, cluster managers, SHC members, and heavy forwarders. |
+| `splunk-enterprise-kubernetes-setup` | Supported | Supported | None | None | None | None | Self-managed Splunk Enterprise Kubernetes runtime workflow using SOK Helm assets or Splunk POD installer assets. |
 | `splunk-itsi-setup` | Required | None | None | None | None | None | Premium search-tier app for ITSI dashboards and service analytics. |
 | `splunk-itsi-config` | Required | None | None | None | None | None | Search-tier workflow for ITSI content-pack bootstrap, validation, and service-topology automation. |
 | `splunk-ai-assistant-setup` | Required | None | None | None | None | None | Search-tier AI assistant app with cloud-backed inference, app UI settings, and KV Store-backed local chat state. |

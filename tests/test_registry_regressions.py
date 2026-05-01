@@ -132,6 +132,7 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("cisco-product-setup", skill_topologies)
         self.assertIn("splunk-connect-for-syslog-setup", skill_topologies)
         self.assertIn("splunk-connect-for-snmp-setup", skill_topologies)
+        self.assertIn("splunk-enterprise-kubernetes-setup", skill_topologies)
         self.assertIn("splunk-app-install", skill_topologies)
 
         for skill, topology in skill_topologies.items():
@@ -146,6 +147,9 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(sc4s["role_support"]["external-collector"], "required")
         sc4snmp = skill_topologies["splunk-connect-for-snmp-setup"]
         self.assertEqual(sc4snmp["role_support"]["external-collector"], "required")
+        enterprise_k8s = skill_topologies["splunk-enterprise-kubernetes-setup"]
+        self.assertEqual(enterprise_k8s["role_support"]["external-collector"], "none")
+        self.assertEqual(enterprise_k8s["cloud_pairing"], [])
 
 
     def test_role_matrix_keeps_search_tier_only_and_collector_defaults_explicit(self):

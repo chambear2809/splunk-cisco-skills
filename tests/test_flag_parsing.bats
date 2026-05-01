@@ -199,6 +199,18 @@ teardown() {
     [[ "$output" =~ "Splunk Enterprise Host Validation" ]]
 }
 
+@test "enterprise kubernetes setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Enterprise Kubernetes Setup" ]]
+}
+
+@test "enterprise kubernetes validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-kubernetes-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Enterprise Kubernetes Validation" ]]
+}
+
 @test "enterprise host smoke latest resolution --help exits 0" {
     run bash "${PROJECT_ROOT}/skills/splunk-enterprise-host-setup/scripts/smoke_latest_resolution.sh" --help
     [ "$status" -eq 0 ]
@@ -336,6 +348,27 @@ teardown() {
     run bash "${PROJECT_ROOT}/skills/cisco-product-setup/scripts/setup.sh" --bogus
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "enterprise kubernetes setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise kubernetes setup rejects missing values" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh" --target
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise kubernetes validate rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-kubernetes-setup/scripts/validate.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
 }
 
 @test "secure-access validate rejects unknown flag" {
