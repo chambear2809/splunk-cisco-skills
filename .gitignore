@@ -19,6 +19,11 @@ splunk-ta/_unpacked/
 **/__pycache__/
 **/*.pyc
 .pytest_cache/
+.ruff_cache/
+
+# --- Local virtualenvs ---
+.venv/
+venv/
 
 # --- macOS ---
 .DS_Store

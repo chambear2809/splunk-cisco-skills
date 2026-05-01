@@ -927,11 +927,11 @@ download_from_url() {
         exit 1
     fi
 
-    local actual_sha
+    local actual_sha actual_lower expected_lower
     actual_sha="$(hbs_sha256_file "${output_path}")"
-    local expected_lower
+    actual_lower="$(printf '%s' "${actual_sha}" | tr '[:upper:]' '[:lower:]')"
     expected_lower="$(printf '%s' "${EXPECTED_SHA256}" | tr '[:upper:]' '[:lower:]')"
-    if [[ -z "${actual_sha}" || "${actual_sha,,}" != "${expected_lower}" ]]; then
+    if [[ -z "${actual_sha}" || "${actual_lower}" != "${expected_lower}" ]]; then
         rm -f "${output_path}"
         log "ERROR: SHA-256 mismatch for downloaded package."
         log "       expected: ${expected_lower}"

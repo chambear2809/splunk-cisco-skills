@@ -70,6 +70,7 @@ get_external_json() {
 
     auth_config="$(mktemp)"
     chmod 600 "${auth_config}"
+    hbs_append_cleanup_trap "rm -f $(printf '%q' "${auth_config}") 2>/dev/null || true" EXIT INT TERM
     printf 'header = "Authorization: Bearer %s"\n' "$(_curl_config_escape "${bearer_token}")" > "${auth_config}"
 
     case $- in

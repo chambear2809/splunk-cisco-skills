@@ -8,7 +8,7 @@
 - [ ] `bats tests/*.bats`
 - [ ] `bash -n` for changed shell scripts, or all scripts
 - [ ] `shellcheck --severity=warning $(find skills -name '*.sh' -print)`
-- [ ] `ruff check skills/ tests/`
+- [ ] `ruff check skills/ tests/ agent/`
 - [ ] `yamllint -c .yamllint.yml .github/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents`
 - [ ] `python3 skills/shared/scripts/generate_deployment_docs.py --check`
 - [ ] SCAN catalog check run or intentionally skipped because the local SCAN package is unavailable

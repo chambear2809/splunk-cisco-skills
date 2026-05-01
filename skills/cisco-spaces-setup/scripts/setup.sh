@@ -55,14 +55,15 @@ check_prereqs() {
 }
 
 create_indexes() {
+    local index="${INDEX:-${DEFAULT_INDEX}}"
     log "Creating indexes..."
     if ! is_splunk_cloud; then
         ensure_search_api_session
     fi
-    if platform_create_index "${SK-}" "${SPLUNK_URI}" "${DEFAULT_INDEX}" "512000"; then
-        log "  Index '${DEFAULT_INDEX}' created or already exists."
+    if platform_create_index "${SK:-}" "${SPLUNK_URI}" "${index}" "512000"; then
+        log "  Index '${index}' created or already exists."
     else
-        log "ERROR: Failed to create index '${DEFAULT_INDEX}'"
+        log "ERROR: Failed to create index '${index}'"
         return 1
     fi
     log "Index creation complete."
@@ -126,7 +127,11 @@ main() {
     ensure_app_visible
     log "$(log_platform_restart_guidance "index changes")"
 
-    [[ -t 0 ]] || return 0
+    if [[ ! -t 0 ]]; then
+        log "Non-interactive mode: skipping meta stream configuration prompt."
+        log "To configure a stream, re-run with: --enable-inputs --stream NAME"
+        return 0
+    fi
     log ""
     read -rp "Would you like to configure a Cisco Spaces meta stream now? [y/N]: " yn
     case "${yn}" in
@@ -164,6 +169,7 @@ main() {
     auto_idx="${auto_idx:-${DEFAULT_INDEX}}"
 
     log ""
+    hbs_append_cleanup_trap "rm -f $(printf '%q' "${token_file}") 2>/dev/null || true" EXIT INT TERM
     bash "${SCRIPT_DIR}/configure_stream.sh" \
         --name "${stream_name}" \
         --token-file "${token_file}" \
@@ -171,8 +177,6 @@ main() {
         ${location_updates:+"${location_updates}"} \
         ${auto_flag:+"${auto_flag}"} \
         --index "${auto_idx}"
-
-    rm -f "${token_file}" 2>/dev/null || true
     log ""
     log "Run 'bash ${SCRIPT_DIR}/validate.sh' to verify the deployment."
 }

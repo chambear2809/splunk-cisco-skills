@@ -68,7 +68,7 @@ create_indexes() {
     if ! is_splunk_cloud; then
         ensure_search_api_session
     fi
-    if platform_create_index "${SK-}" "${SPLUNK_URI}" "meraki" "512000"; then
+    if platform_create_index "${SK:-}" "${SPLUNK_URI}" "meraki" "512000"; then
         log "  Index 'meraki' created or already exists."
     else
         log "ERROR: Failed to create index 'meraki'"

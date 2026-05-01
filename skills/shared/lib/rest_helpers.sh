@@ -435,7 +435,7 @@ rest_check_app() {
     local http_code
     http_code=$(splunk_curl "${sk}" --connect-timeout 5 --max-time 15 \
         "${uri}/services/apps/local/${app}?output_mode=json" \
-        -o /dev/null -w '%{http_code}' 2>/dev/null)
+        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
     [[ "${http_code}" == "200" ]]
 }
 
@@ -467,7 +467,7 @@ rest_check_saved_search() {
     encoded_name=$(_urlencode "${search_name}")
     http_code=$(splunk_curl "${sk}" \
         "${uri}/servicesNS/nobody/${app}/saved/searches/${encoded_name}?output_mode=json" \
-        -o /dev/null -w '%{http_code}' 2>/dev/null)
+        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
     [[ "${http_code}" == "200" ]]
 }
 
@@ -500,7 +500,7 @@ rest_check_index() {
     local http_code
     http_code=$(splunk_curl "${sk}" \
         "${uri}/services/data/indexes/${idx}?output_mode=json" \
-        -o /dev/null -w '%{http_code}' 2>/dev/null)
+        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
     [[ "${http_code}" == "200" ]]
 }
 
@@ -594,7 +594,7 @@ rest_check_conf() {
     encoded_stanza=$(_urlencode "${stanza}")
     http_code=$(splunk_curl "${sk}" \
         "${uri}/servicesNS/nobody/${app}/configs/conf-${conf}/${encoded_stanza}?output_mode=json" \
-        -o /dev/null -w '%{http_code}' 2>/dev/null)
+        -o /dev/null -w '%{http_code}' 2>/dev/null || echo "000")
     [[ "${http_code}" == "200" ]]
 }
 

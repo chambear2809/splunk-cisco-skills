@@ -109,10 +109,30 @@ check_prereqs() {
     fi
 }
 
+ensure_app_visible() {
+    ensure_search_api_session
+    local visible
+    visible=$(splunk_curl "${SK}" \
+        "${SPLUNK_URI}/services/apps/local/${APP_NAME}?output_mode=json" 2>/dev/null \
+        | python3 -c "
+import json, sys
+try: print(json.load(sys.stdin)['entry'][0]['content'].get('visible', True))
+except: print('True')
+" 2>/dev/null || echo "True")
+    if [[ "${visible}" == "False" ]]; then
+        log "Setting ${APP_NAME} visible=true..."
+        deployment_set_app_visible "${SK}" "${SPLUNK_URI}" "${APP_NAME}" "true" >/dev/null 2>&1 || true
+    fi
+}
+
 normalize_hec_base_url() {
     local url="${1%/}"
     url="${url%/services/collector/event}"
     url="${url%/services/collector/raw}"
+    if [[ "${url}" != https://* && "${url}" != http://* ]]; then
+        log "ERROR: HEC URL must start with http:// or https://: ${url}" >&2
+        return 1
+    fi
     printf '%s' "${url}"
 }
 
@@ -364,7 +384,7 @@ create_indexes() {
         ensure_search_api_session
     fi
     for idx in "${DEFAULT_INDEXES[@]}"; do
-        if platform_create_index "${SK-}" "${SPLUNK_URI}" "${idx}" "512000"; then
+        if platform_create_index "${SK:-}" "${SPLUNK_URI}" "${idx}" "512000"; then
             log "  Index '${idx}' created or already exists."
         else
             log "ERROR: Failed to create index '${idx}'"
@@ -535,6 +555,7 @@ main() {
         ensure_hec_token "${HEC_TOKEN}"
     fi
     create_indexes
+    ensure_app_visible
     log "$(log_platform_restart_guidance "setup changes")"
 
     [[ -t 0 ]] || return 0

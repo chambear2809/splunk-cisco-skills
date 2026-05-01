@@ -1,4 +1,4 @@
-# ShellCheck configuration for splunk-cloud-skills
+# ShellCheck configuration for splunk-cisco-skills
 # https://github.com/koalaman/shellcheck/wiki/Directive
 
 # Allow sourcing files relative to the script location

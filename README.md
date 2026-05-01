@@ -549,7 +549,7 @@ Use the process in `SECURITY.md`.
 ## Repository Layout
 
 ```text
-splunk-cloud-skills/
+splunk-cisco-skills/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml              # shell/unit test checks for first-party scripts
@@ -628,6 +628,60 @@ If you want to understand a specific skill, read these files in order:
 
 That is where the real behavior lives.
 
+## Local MCP Agent Server
+
+The repo includes a local MCP server, `splunk-cisco-skills`, for agent clients
+that can use MCP tools. It exposes the skill catalog, skill instructions,
+templates, Cisco product resolution, dry-run planning, and gated script
+execution.
+
+The launcher invoked by Claude Code, Cursor, and Codex prefers the repo-local
+`.venv` when it exists, so GUI clients do not need to inherit an activated
+shell. The simplest setup is:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-agent.txt
+```
+
+If you prefer a system-wide install:
+
+```bash
+pip3 install -r requirements-agent.txt
+```
+
+If your global pip configuration points at an internal package index that does
+not mirror the MCP SDK, install from public PyPI explicitly:
+
+```bash
+pip install --index-url https://pypi.org/simple -r requirements-agent.txt
+```
+
+The server is registered in `.mcp.json` for Claude Code and `.cursor/mcp.json`
+for Cursor alongside the existing `splunk-mcp` bridge. Codex stores MCP servers
+in the user config, so register the repo-local server once with:
+
+```bash
+bash agent/register-codex-splunk-cisco-skills-mcp.sh
+```
+
+Read-only plans (validate scripts, `--help`, and `cisco-product-setup` with
+`--dry-run` or `--list-products`) can run with an explicit client confirmation.
+Plans are single-use: each plan hash is consumed when it executes. To allow
+mutating setup, install, or configure scripts, start the MCP server process with:
+
+```bash
+SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1
+```
+
+Execution always requires a previously generated plan hash and explicit
+confirmation from the client. Each `plan_*` and `execute_*` call accepts a
+`timeout_seconds` argument (default 30 minutes, capped at 2 hours by default
+or by `MCP_MAX_TIMEOUT_SECONDS`); if a child process exceeds it, the server
+sends SIGTERM, then SIGKILL after a short grace, and the response includes
+`timed_out: true`. Subprocess stdout and stderr are bounded per stream
+(256 KiB each) to keep the server stable when scripts are noisy.
+
 ## Requirements
 
 Minimum expected environment:
@@ -637,6 +691,7 @@ Minimum expected environment:
 - `bash`
 - `curl`
 - `python3`
+- `pip install -r requirements-agent.txt` for the local MCP agent server
 - Cursor, Codex, or Claude Code if you want the agent-driven workflow
 - a `splunk.com` account for Splunkbase downloads
 

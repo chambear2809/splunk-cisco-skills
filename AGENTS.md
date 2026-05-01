@@ -1,6 +1,6 @@
 # Splunk TA Skills — Codex Context
 
-This repository is a working library of Cursor, Codex, and Codex agent skills plus
+This repository is a working library of Cursor, Codex, and Claude Code agent skills plus
 shell scripts for installing, configuring, and validating Splunk apps and Technology
 Add-ons on Splunk Cloud and self-managed Splunk Enterprise deployments, and for
 bootstrapping Linux Splunk Enterprise hosts.
@@ -33,7 +33,7 @@ The user can also invoke skills directly as slash commands (e.g. `/cisco-catalys
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
 | `splunk-itsi-config` | Native ITSI objects, service trees, and supported ITSI content packs | Preview, apply, and validate ITSI entities, services, KPIs, dependencies, template links, service trees, NEAPs, and selected content packs from YAML specs |
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant for SPL; drive Enterprise cloud-connected onboarding |
-| `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Codex bridge bundles |
+| `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
@@ -47,6 +47,40 @@ If `.mcp.json` exists at the project root, the Splunk MCP server is available as
 bridge. The local token file (`splunk-mcp-rendered/.env.splunk-mcp`) only exists
 after running the `splunk-mcp-server-setup` skill. Use MCP search tools for live
 Splunk queries when available.
+
+## Local Skill MCP Server
+
+The project also exposes a local `splunk-cisco-skills` MCP server through
+`agent/run-splunk-cisco-skills-mcp.py`. Install its Python dependencies with:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-agent.txt
+```
+
+If an internal pip index does not mirror the MCP SDK, install from public PyPI
+explicitly:
+
+```bash
+pip install --index-url https://pypi.org/simple -r requirements-agent.txt
+```
+
+The launcher automatically prefers `.venv/bin/python` when the repo-local venv
+exists, so Claude Code and Cursor do not need to inherit an activated shell.
+Claude Code reads `.mcp.json`; Cursor reads `.cursor/mcp.json`; Codex needs a
+one-time registration with `bash agent/register-codex-splunk-cisco-skills-mcp.sh`.
+
+This server provides read-only skill catalog, template, product-resolution, and
+planning tools by default. Read-only plans can run with explicit confirmation.
+Mutating setup, install, or configure scripts are disabled unless the MCP server
+process is started with `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`; all execution tools
+require a matching plan hash and explicit confirmation.
+
+Plans are single-use and stored in memory for the MCP server session: a plan
+is consumed when it executes, and the entire plan store is lost if the server
+restarts. If a plan hash is rejected as unknown, re-run the plan step to get a
+fresh hash. `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1` is a server-wide toggle — it
+enables mutating execution for all clients connected to that server process.
 
 ## Credentials
 

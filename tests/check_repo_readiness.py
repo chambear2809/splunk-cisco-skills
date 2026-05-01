@@ -22,6 +22,12 @@ REQUIRED_TOP_LEVEL = [
     ".github/pull_request_template.md",
     ".github/ISSUE_TEMPLATE/bug_report.md",
     ".github/ISSUE_TEMPLATE/skill_request.md",
+    "agent/run-splunk-cisco-skills-mcp.py",
+    "agent/register-codex-splunk-cisco-skills-mcp.sh",
+    "agent/splunk_cisco_skills_mcp/__init__.py",
+    "agent/splunk_cisco_skills_mcp/core.py",
+    "agent/splunk_cisco_skills_mcp/server.py",
+    "requirements-agent.txt",
 ]
 
 UNSAFE_SECRET_EXAMPLE_RE = re.compile(
@@ -220,6 +226,39 @@ def check_registry_skill_refs(errors: list[str]) -> None:
                 )
 
 
+def check_local_mcp_server_config(errors: list[str]) -> None:
+    """Both MCP configs must register the local skill server through python3.
+
+    The server depends on `mcp[cli]` and `PyYAML`; whichever interpreter is
+    invoked must have those installed (see README "Local MCP Agent Server").
+    """
+    for rel in (".mcp.json", ".cursor/mcp.json"):
+        path = REPO_ROOT / rel
+        if not path.is_file():
+            errors.append(f"{rel}: missing MCP configuration file")
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            errors.append(f"{rel}: invalid JSON: {exc}")
+            continue
+        servers = payload.get("mcpServers", {})
+        local = servers.get("splunk-cisco-skills")
+        if not isinstance(local, dict):
+            errors.append(f"{rel}: missing splunk-cisco-skills server entry")
+            continue
+        command = str(local.get("command", ""))
+        if not re.search(r"python3?(\b|$)", command):
+            errors.append(
+                f"{rel}: splunk-cisco-skills server must use a python3 command, got {command!r}"
+            )
+        args = local.get("args") or []
+        if not args or "run-splunk-cisco-skills-mcp.py" not in str(args[0]):
+            errors.append(
+                f"{rel}: splunk-cisco-skills server must reference run-splunk-cisco-skills-mcp.py"
+            )
+
+
 def main() -> int:
     errors: list[str] = []
     check_required_files(errors)
@@ -230,6 +269,7 @@ def main() -> int:
     check_smoke_script_no_sudo_password(errors)
     check_mcp_tool_schema(errors)
     check_registry_skill_refs(errors)
+    check_local_mcp_server_config(errors)
 
     if errors:
         print("Repository readiness errors:", file=sys.stderr)

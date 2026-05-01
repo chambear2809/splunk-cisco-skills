@@ -28,7 +28,9 @@ Usage: $(basename "$0") [OPTIONS]
 Options:
   --macros-only              Update macros only
   --accelerate               Enable data model acceleration
-  --custom-indexes "a,b,c"   Use custom index list (comma-separated)
+  --custom-indexes "a,b,c"   Use custom index list (comma-separated). Each index
+                             must match Splunk's index name rules: only ASCII
+                             letters, digits, underscore, and hyphen, 1-80 chars.
   --help                     Show this help
 
 With no flags, runs full setup (macros + saved search enablement).
@@ -65,9 +67,19 @@ check_prereqs() {
 update_macros() {
     log "Updating index macro..."
 
-    local body index_list
+    local body index_list idx
     if [[ -n "${CUSTOM_INDEXES}" ]]; then
-        index_list=$(echo "${CUSTOM_INDEXES}" | tr ',' '\n' | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//')
+        # Strict allowlist: Splunk index names are ASCII letters/digits/_/- (length 1..80).
+        # Reject anything else to prevent SPL injection through the macro definition.
+        IFS=',' read -ra _custom_idx_parts <<<"${CUSTOM_INDEXES}"
+        for idx in "${_custom_idx_parts[@]}"; do
+            if [[ ! "${idx}" =~ ^[A-Za-z0-9_-]{1,80}$ ]]; then
+                log "ERROR: --custom-indexes value '${idx}' is not a valid Splunk index name."
+                log "  Allowed characters: A-Z a-z 0-9 _ - ; length 1-80; comma-separated."
+                return 1
+            fi
+        done
+        index_list=$(printf '%s\n' "${_custom_idx_parts[@]}" | sed 's/^/"/;s/$/"/' | tr '\n' ',' | sed 's/,$//')
         index_list="index IN (${index_list})"
     else
         index_list='index IN ("catalyst", "ise", "sdwan", "cybervision")'

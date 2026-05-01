@@ -608,12 +608,14 @@ def build_spaces_route(override: dict) -> dict:
             override.get("template_checks"),
         ),
         "required_non_secret_keys": ["name", "region"],
-        "optional_non_secret_keys": ["location_updates_status", "index"],
-        "accepted_non_secret_keys": ["index", "location_updates_status", "name", "region"],
+        "optional_non_secret_keys": ["auto_inputs", "location_updates_status", "index"],
+        "accepted_non_secret_keys": ["auto_inputs", "index", "location_updates_status", "name", "region"],
         "secret_keys": ["activation_token"],
+        "required_secret_keys": ["activation_token"],
         "route": {
             "default_name": "production",
             "default_index": "cisco_spaces",
+            "default_auto_inputs": "true",
         },
     }
 

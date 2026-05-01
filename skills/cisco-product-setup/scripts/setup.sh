@@ -11,6 +11,7 @@ INSTALL_APP_SCRIPT="${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.s
 
 PRODUCT_QUERY=""
 DRY_RUN=false
+JSON_OUTPUT=false
 INSTALL_ONLY=false
 CONFIGURE_ONLY=false
 VALIDATE_ONLY=false
@@ -59,6 +60,7 @@ Options:
   --set KEY VALUE           Set a non-secret product field (repeatable)
   --secret-file KEY PATH    Read a secret from PATH (repeatable)
   --dry-run                 Show the resolved workflow without changing Splunk
+  --json                    Emit machine-readable JSON with --dry-run or --list-products
   --install-only            Install the required Splunk apps only
   --configure-only          Configure the resolved product only
   --validate-only           Run validation only
@@ -160,6 +162,23 @@ lookup_secret_file() {
 
 has_secret_file() {
     lookup_secret_file "${1:-}" >/dev/null 2>&1
+}
+
+secret_file_status() {
+    local key="$1" path
+    if ! path="$(lookup_secret_file "${key}" 2>/dev/null)"; then
+        printf '%s' "missing"
+        return 0
+    fi
+    if [[ ! -f "${path}" ]]; then
+        printf 'missing: %s' "${path}"
+        return 0
+    fi
+    if [[ ! -r "${path}" ]]; then
+        printf 'unreadable: %s' "${path}"
+        return 0
+    fi
+    printf '%s' "ready"
 }
 
 append_secret_file() {
@@ -468,6 +487,7 @@ parse_args() {
                 shift 3
                 ;;
             --dry-run) DRY_RUN=true; shift ;;
+            --json) JSON_OUTPUT=true; shift ;;
             --install-only) INSTALL_ONLY=true; MODE_FLAGS=$((MODE_FLAGS + 1)); shift ;;
             --configure-only) CONFIGURE_ONLY=true; MODE_FLAGS=$((MODE_FLAGS + 1)); shift ;;
             --validate-only) VALIDATE_ONLY=true; MODE_FLAGS=$((MODE_FLAGS + 1)); shift ;;
@@ -721,6 +741,11 @@ prepare_effective_route() {
             EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
             EFFECTIVE_INPUT_TYPE="$(product_field route.default_input_type)"
             ;;
+        spaces)
+            EFFECTIVE_DEFAULT_NAME="$(product_field route.default_name)"
+            EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
+            append_unique_required_secret "activation_token"
+            ;;
         appdynamics)
             EFFECTIVE_DEFAULT_NAME="$(product_field route.default_name)"
             EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
@@ -776,6 +801,25 @@ effective_appdynamics_index() {
     fi
 }
 
+effective_spaces_index() {
+    local value
+    value="$(lookup_user_value "index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "${EFFECTIVE_DEFAULT_INDEX:-cisco_spaces}"
+    fi
+}
+
+effective_spaces_auto_inputs() {
+    local value
+    value="$(lookup_user_value "auto_inputs" || true)"
+    if [[ -z "${value}" ]]; then
+        value="$(product_field route.default_auto_inputs)"
+    fi
+    is_truthy "${value}"
+}
+
 effective_create_inputs() {
     local value
     value="$(lookup_user_value "create_inputs" || true)"
@@ -805,7 +849,7 @@ effective_auto_inputs() {
 }
 
 check_missing_configuration_inputs() {
-    local key secret_key missing=()
+    local key secret_key secret_status missing=()
 
     prepare_effective_route
 
@@ -829,7 +873,12 @@ check_missing_configuration_inputs() {
 
     if [[ -n "${EFFECTIVE_REQUIRED_SECRET_KEYS[0]+set}" ]]; then
         for secret_key in "${EFFECTIVE_REQUIRED_SECRET_KEYS[@]}"; do
-            has_secret_file "${secret_key}" || missing+=("${secret_key} (secret-file)")
+            secret_status="$(secret_file_status "${secret_key}")"
+            case "${secret_status}" in
+                ready) ;;
+                missing) missing+=("${secret_key} (secret-file)") ;;
+                *) missing+=("${secret_key} (secret-file ${secret_status})") ;;
+            esac
         done
     fi
 
@@ -958,6 +1007,12 @@ print_command_plan() {
             echo "  - skills/cisco-appdynamics-setup/scripts/configure_account.sh"
             echo "  - skills/cisco-appdynamics-setup/scripts/validate.sh"
             ;;
+        spaces)
+            echo "Workflow scripts:"
+            echo "  - skills/cisco-spaces-setup/scripts/setup.sh"
+            echo "  - skills/cisco-spaces-setup/scripts/configure_stream.sh"
+            echo "  - skills/cisco-spaces-setup/scripts/validate.sh"
+            ;;
     esac
 }
 
@@ -1019,13 +1074,206 @@ emit_summary() {
     print_command_plan
 
     echo "Missing values for configure:"
-    while IFS= read -r missing || [[ -n "${missing}" ]]; do
-        [[ -n "${missing}" ]] || continue
-        found_missing=true
-        echo "  - ${missing}"
-    done < <(check_missing_configuration_inputs)
-    ${found_missing} || echo "  - none"
+    if ${INSTALL_ONLY} || ${VALIDATE_ONLY}; then
+        echo "  - not checked for this phase"
+    else
+        while IFS= read -r missing || [[ -n "${missing}" ]]; do
+            [[ -n "${missing}" ]] || continue
+            found_missing=true
+            echo "  - ${missing}"
+        done < <(check_missing_configuration_inputs)
+        ${found_missing} || echo "  - none"
+    fi
     return 0
+}
+
+join_json_items() {
+    local IFS=$'\037'
+    printf '%s' "$*"
+}
+
+emit_summary_json() {
+    local missing_values=() missing
+
+    prepare_effective_route
+
+    if ! ${INSTALL_ONLY} && ! ${VALIDATE_ONLY}; then
+        while IFS= read -r missing || [[ -n "${missing}" ]]; do
+            [[ -n "${missing}" ]] || continue
+            missing_values+=("${missing}")
+        done < <(check_missing_configuration_inputs)
+    fi
+
+    JSON_REQUIRED_NON_SECRET="$(join_json_items "${EFFECTIVE_REQUIRED_NON_SECRET_KEYS[@]}")" \
+    JSON_OPTIONAL_NON_SECRET="$(join_json_items "${EFFECTIVE_OPTIONAL_NON_SECRET_KEYS[@]}")" \
+    JSON_ACCEPTED_SECRET="$(join_json_items "${EFFECTIVE_ACCEPTED_SECRET_KEYS[@]}")" \
+    JSON_REQUIRED_SECRET="$(join_json_items "${EFFECTIVE_REQUIRED_SECRET_KEYS[@]}")" \
+    JSON_DEFAULT_KEYS="$(join_json_items "${EFFECTIVE_DEFAULT_KEYS[@]}")" \
+    JSON_DEFAULT_VALUES="$(join_json_items "${EFFECTIVE_DEFAULT_VALUES[@]}")" \
+    JSON_MISSING_VALUES="$(join_json_items "${missing_values[@]}")" \
+    JSON_ROUTE_TYPE="${ROUTE_TYPE}" \
+    JSON_PRIMARY_SKILL="${PRIMARY_SKILL}" \
+    JSON_EFFECTIVE_PRODUCT_KEY="${EFFECTIVE_PRODUCT_KEY}" \
+    JSON_EFFECTIVE_ACCOUNT_TYPE="${EFFECTIVE_ACCOUNT_TYPE}" \
+    JSON_EFFECTIVE_DEFAULT_NAME="${EFFECTIVE_DEFAULT_NAME}" \
+    JSON_EFFECTIVE_DEFAULT_INDEX="${EFFECTIVE_DEFAULT_INDEX}" \
+    JSON_EFFECTIVE_INPUT_TYPE="${EFFECTIVE_INPUT_TYPE}" \
+    JSON_EFFECTIVE_VARIANT_KEY="${EFFECTIVE_VARIANT_KEY}" \
+    JSON_EFFECTIVE_VARIANT_VALUE="${EFFECTIVE_VARIANT_VALUE}" \
+    JSON_INSTALL_ONLY="${INSTALL_ONLY}" \
+    JSON_CONFIGURE_ONLY="${CONFIGURE_ONLY}" \
+    JSON_VALIDATE_ONLY="${VALIDATE_ONLY}" \
+    python3 - "${PRODUCT_FILE}" "${REGISTRY_PATH}" <<'PY'
+import json
+import os
+import sys
+from pathlib import Path
+
+SEP = "\x1f"
+
+
+def split_env(name):
+    value = os.environ.get(name, "")
+    return [] if value == "" else value.split(SEP)
+
+
+def env_bool(name):
+    return os.environ.get(name, "false").lower() == "true"
+
+
+product = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+registry = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+registry_by_name = {
+    str(app.get("app_name", "")): app
+    for app in registry.get("apps", [])
+    if app.get("app_name")
+}
+
+route_type = os.environ.get("JSON_ROUTE_TYPE", "")
+default_keys = split_env("JSON_DEFAULT_KEYS")
+default_values = split_env("JSON_DEFAULT_VALUES")
+defaults = dict(zip(default_keys, default_values))
+
+if env_bool("JSON_INSTALL_ONLY"):
+    phases = ["install"]
+elif env_bool("JSON_CONFIGURE_ONLY"):
+    phases = ["configure"]
+elif env_bool("JSON_VALIDATE_ONLY"):
+    phases = ["validate"]
+else:
+    phases = ["install", "configure", "validate"]
+
+workflow_scripts_by_route = {
+    "security_cloud_product": [
+        "skills/cisco-security-cloud-setup/scripts/configure_product.sh",
+        "skills/cisco-security-cloud-setup/scripts/validate.sh",
+    ],
+    "security_cloud_variant": [
+        "skills/cisco-security-cloud-setup/scripts/configure_product.sh",
+        "skills/cisco-security-cloud-setup/scripts/validate.sh",
+    ],
+    "secure_access": [
+        "skills/cisco-secure-access-setup/scripts/configure_account.sh",
+        "skills/cisco-secure-access-setup/scripts/configure_settings.sh",
+        "skills/cisco-secure-access-setup/scripts/validate.sh",
+    ],
+    "dc_networking": [
+        "skills/cisco-dc-networking-setup/scripts/setup.sh",
+        "skills/cisco-dc-networking-setup/scripts/configure_account.sh",
+        "skills/cisco-dc-networking-setup/scripts/validate.sh",
+    ],
+    "catalyst_stack": [
+        "skills/cisco-catalyst-ta-setup/scripts/setup.sh",
+        "skills/cisco-catalyst-ta-setup/scripts/configure_account.sh",
+        "skills/cisco-enterprise-networking-setup/scripts/setup.sh",
+        "skills/cisco-catalyst-ta-setup/scripts/validate.sh",
+        "skills/cisco-enterprise-networking-setup/scripts/validate.sh",
+    ],
+    "meraki": [
+        "skills/cisco-meraki-ta-setup/scripts/setup.sh",
+        "skills/cisco-meraki-ta-setup/scripts/configure_account.sh",
+        "skills/cisco-meraki-ta-setup/scripts/validate.sh",
+        "skills/cisco-enterprise-networking-setup/scripts/setup.sh",
+        "skills/cisco-enterprise-networking-setup/scripts/validate.sh",
+    ],
+    "intersight": [
+        "skills/cisco-intersight-setup/scripts/setup.sh",
+        "skills/cisco-intersight-setup/scripts/configure_account.sh",
+        "skills/cisco-intersight-setup/scripts/validate.sh",
+    ],
+    "thousandeyes": [
+        "skills/cisco-thousandeyes-setup/scripts/setup.sh",
+        "skills/cisco-thousandeyes-setup/scripts/configure_account.sh",
+        "skills/cisco-thousandeyes-setup/scripts/validate.sh",
+    ],
+    "appdynamics": [
+        "skills/cisco-appdynamics-setup/scripts/setup.sh",
+        "skills/cisco-appdynamics-setup/scripts/configure_account.sh",
+        "skills/cisco-appdynamics-setup/scripts/validate.sh",
+    ],
+    "spaces": [
+        "skills/cisco-spaces-setup/scripts/setup.sh",
+        "skills/cisco-spaces-setup/scripts/configure_stream.sh",
+        "skills/cisco-spaces-setup/scripts/validate.sh",
+    ],
+}
+
+install_apps = []
+for app_name in product.get("install_apps", []) or []:
+    metadata = registry_by_name.get(str(app_name), {})
+    install_apps.append(
+        {
+            "app_name": app_name,
+            "splunkbase_id": metadata.get("splunkbase_id", ""),
+            "label": metadata.get("label", ""),
+            "skill": metadata.get("skill", ""),
+        }
+    )
+
+variant_key = os.environ.get("JSON_EFFECTIVE_VARIANT_KEY", "")
+variant_value = os.environ.get("JSON_EFFECTIVE_VARIANT_VALUE", "")
+variants = {}
+if variant_key:
+    for key, value in (product.get("route", {}).get("variants", {}) or {}).items():
+        variants[key] = value.get("product_key", "") if isinstance(value, dict) else ""
+
+payload = {
+    "resolved_product": {
+        "id": product.get("id", ""),
+        "display_name": product.get("display_name", ""),
+        "automation_state": product.get("automation_state", ""),
+        "route_type": route_type,
+        "primary_skill": os.environ.get("JSON_PRIMARY_SKILL", ""),
+        "notes": product.get("notes", ""),
+        "manual_gap_reason": product.get("manual_gap_reason", ""),
+    },
+    "route": {
+        "type": route_type,
+        "product_key": os.environ.get("JSON_EFFECTIVE_PRODUCT_KEY", ""),
+        "account_type": os.environ.get("JSON_EFFECTIVE_ACCOUNT_TYPE", ""),
+        "default_name": os.environ.get("JSON_EFFECTIVE_DEFAULT_NAME", ""),
+        "default_index": os.environ.get("JSON_EFFECTIVE_DEFAULT_INDEX", ""),
+        "input_type": os.environ.get("JSON_EFFECTIVE_INPUT_TYPE", ""),
+        "variant_key": variant_key,
+        "variant_value": variant_value,
+        "variants": variants,
+        "defaults": defaults,
+    },
+    "dashboards": product.get("dashboards", []) or [],
+    "template_paths": product.get("template_paths", []) or [],
+    "install_apps": install_apps,
+    "required_non_secret_keys": split_env("JSON_REQUIRED_NON_SECRET"),
+    "optional_non_secret_keys": split_env("JSON_OPTIONAL_NON_SECRET"),
+    "secret_file_keys": split_env("JSON_ACCEPTED_SECRET"),
+    "required_secret_file_keys": split_env("JSON_REQUIRED_SECRET"),
+    "missing_values_for_configure": split_env("JSON_MISSING_VALUES"),
+    "planned_phases": phases,
+    "workflow_scripts": workflow_scripts_by_route.get(route_type, []),
+}
+
+json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+sys.stdout.write("\n")
+PY
 }
 
 require_configuration_ready() {
@@ -1364,6 +1612,29 @@ run_appdynamics_configure() {
     "${cmd[@]}"
 }
 
+run_spaces_configure() {
+    local name index cmd
+    name="$(effective_name)"
+    index="$(effective_spaces_index)"
+
+    bash "${SCRIPT_DIR}/../../cisco-spaces-setup/scripts/setup.sh" --index "${index}"
+
+    cmd=(bash "${SCRIPT_DIR}/../../cisco-spaces-setup/scripts/configure_stream.sh"
+        --name "${name}"
+        --token-file "$(lookup_secret_file "activation_token")"
+        --region "$(lookup_user_value "region")"
+        --index "${index}")
+
+    if has_user_value "location_updates_status" && is_truthy "$(lookup_user_value "location_updates_status")"; then
+        cmd+=(--location-updates)
+    fi
+    if effective_spaces_auto_inputs; then
+        cmd+=(--auto-inputs)
+    fi
+
+    "${cmd[@]}"
+}
+
 run_configure_phase() {
     case "${ROUTE_TYPE}" in
         security_cloud_product|security_cloud_variant) run_security_cloud_configure ;;
@@ -1374,6 +1645,7 @@ run_configure_phase() {
         intersight) run_intersight_configure ;;
         thousandeyes) run_thousandeyes_configure ;;
         appdynamics) run_appdynamics_configure ;;
+        spaces) run_spaces_configure ;;
         *)
             log "ERROR: Unsupported route type '${ROUTE_TYPE}'."
             exit 1
@@ -1422,6 +1694,13 @@ run_validation_phase() {
         appdynamics)
             bash "${SCRIPT_DIR}/../../cisco-appdynamics-setup/scripts/validate.sh"
             ;;
+        spaces)
+            bash "${SCRIPT_DIR}/../../cisco-spaces-setup/scripts/validate.sh"
+            ;;
+        *)
+            log "ERROR: Unsupported route type '${ROUTE_TYPE}' for validation." >&2
+            exit 1
+            ;;
     esac
 }
 
@@ -1429,21 +1708,36 @@ main() {
     parse_args "$@"
 
     if ${LIST_PRODUCTS}; then
+        if ${JSON_OUTPUT}; then
+            exec bash "${RESOLVE_SCRIPT}" --catalog "${CATALOG_PATH}" --list-products --json
+        fi
         exec bash "${RESOLVE_SCRIPT}" --catalog "${CATALOG_PATH}" --list-products
     fi
 
     [[ -n "${PRODUCT_QUERY}" ]] || usage
     (( MODE_FLAGS <= 1 )) || { echo "ERROR: Choose only one of --install-only, --configure-only, or --validate-only." >&2; exit 1; }
+    if ${JSON_OUTPUT} && ! ${DRY_RUN}; then
+        echo "ERROR: --json is only supported with --dry-run or --list-products." >&2
+        exit 1
+    fi
 
     resolve_product
     validate_known_keys
     prepare_effective_route
     emit_role_warnings
     if [[ "${AUTOMATION_STATE}" != "automated" ]]; then
-        emit_summary
+        if ${JSON_OUTPUT}; then
+            emit_summary_json
+        else
+            emit_summary
+        fi
         exit 1
     fi
-    emit_summary
+    if ${JSON_OUTPUT}; then
+        emit_summary_json
+    else
+        emit_summary
+    fi
 
     if ${DRY_RUN}; then
         exit 0

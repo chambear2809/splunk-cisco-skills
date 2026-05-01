@@ -581,6 +581,11 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                         "type": "stdio",
                         "command": "node",
                         "args": ["${workspaceFolder}/splunk-mcp-rendered/run-splunk-mcp.js"],
+                    },
+                    "splunk-cisco-skills": {
+                        "type": "stdio",
+                        "command": "python3",
+                        "args": ["${workspaceFolder}/agent/run-splunk-cisco-skills-mcp.py"],
                     }
                 }
             },
@@ -686,6 +691,11 @@ class MCPRegressionTests(ShellScriptRegressionBase):
                         "type": "stdio",
                         "command": "node",
                         "args": ["./splunk-mcp-rendered/run-splunk-mcp.js"],
+                    },
+                    "splunk-cisco-skills": {
+                        "type": "stdio",
+                        "command": "python3",
+                        "args": ["./agent/run-splunk-cisco-skills-mcp.py"],
                     }
                 }
             },

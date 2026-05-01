@@ -27,8 +27,13 @@ bash skills/shared/scripts/write_secret_file.sh --editor /tmp/example_secret
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements-dev.txt
+pip install -r requirements-dev.txt -r requirements-agent.txt
 ```
+
+`requirements-agent.txt` provides `mcp[cli]` and `PyYAML`, which are required
+to run `tests/test_agent_mcp_core.py` and to launch the local MCP agent server
+described in the README. Skipping it leaves the dev venv unable to import
+`agent.splunk_cisco_skills_mcp`.
 
 Install shell tooling used by CI:
 
@@ -54,8 +59,8 @@ for path in sorted(Path("skills").rglob("*.sh")):
     subprocess.run(["bash", "-n", str(path)], check=True)
 PY
 shellcheck --severity=warning $(find skills -name '*.sh' -print)
-ruff check skills/ tests/
-yamllint -c .yamllint.yml .github/workflows/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents
+ruff check skills/ tests/ agent/
+yamllint -c .yamllint.yml .github/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents
 python3 skills/shared/scripts/generate_deployment_docs.py --check
 if ls splunk-ta/splunk-cisco-app-navigator-*.tar.gz 1>/dev/null 2>&1; then
   python3 skills/cisco-product-setup/scripts/build_catalog.py --check

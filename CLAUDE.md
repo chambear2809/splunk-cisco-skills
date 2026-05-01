@@ -48,6 +48,40 @@ bridge. The local token file (`splunk-mcp-rendered/.env.splunk-mcp`) only exists
 after running the `splunk-mcp-server-setup` skill. Use MCP search tools for live
 Splunk queries when available.
 
+## Local Skill MCP Server
+
+The project also exposes a local `splunk-cisco-skills` MCP server through
+`agent/run-splunk-cisco-skills-mcp.py`. Install its Python dependencies with:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-agent.txt
+```
+
+If an internal pip index does not mirror the MCP SDK, install from public PyPI
+explicitly:
+
+```bash
+pip install --index-url https://pypi.org/simple -r requirements-agent.txt
+```
+
+The launcher automatically prefers `.venv/bin/python` when the repo-local venv
+exists, so Claude Code and Cursor do not need to inherit an activated shell.
+Claude Code reads `.mcp.json`; Cursor reads `.cursor/mcp.json`; Codex needs a
+one-time registration with `bash agent/register-codex-splunk-cisco-skills-mcp.sh`.
+
+This server provides read-only skill catalog, template, product-resolution, and
+planning tools by default. Read-only plans can run with explicit confirmation.
+Mutating setup, install, or configure scripts are disabled unless the MCP server
+process is started with `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`; all execution tools
+require a matching plan hash and explicit confirmation.
+
+Plans are single-use and stored in memory for the MCP server session: a plan
+is consumed when it executes, and the entire plan store is lost if the server
+restarts. If a plan hash is rejected as unknown, re-run the plan step to get a
+fresh hash. `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1` is a server-wide toggle — it
+enables mutating execution for all clients connected to that server process.
+
 ## Credentials
 
 All scripts load deployment settings from a project-root `credentials` file first,

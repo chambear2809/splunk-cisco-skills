@@ -10,7 +10,10 @@ SHOW_PRODUCT=false
 QUERY=""
 
 usage() {
-    cat <<EOF
+    local exit_code="${1:-0}"
+    local target=1
+    [[ "${exit_code}" -ne 0 ]] && target=2
+    cat >&"${target}" <<EOF
 Cisco Product Resolver
 
 Usage: $(basename "$0") [OPTIONS] [QUERY]
@@ -22,7 +25,7 @@ Options:
   --catalog PATH           Override catalog.json path
   --help                   Show this help
 EOF
-    exit 0
+    exit "${exit_code}"
 }
 
 # shellcheck disable=SC2034
@@ -31,11 +34,16 @@ while [[ $# -gt 0 ]]; do
         --list-products) LIST_PRODUCTS=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --show-product) SHOW_PRODUCT=true; shift ;;
-        --catalog) [[ $# -ge 2 ]] || usage; CATALOG_PATH="$2"; shift 2 ;;
-        --help) usage ;;
+        --catalog)
+            if [[ $# -lt 2 ]]; then
+                echo "ERROR: --catalog requires a path argument" >&2
+                usage 1
+            fi
+            CATALOG_PATH="$2"; shift 2 ;;
+        --help) usage 0 ;;
         --*)
             echo "Unknown option: $1" >&2
-            usage
+            usage 1
             ;;
         *)
             if [[ -n "${QUERY}" ]]; then

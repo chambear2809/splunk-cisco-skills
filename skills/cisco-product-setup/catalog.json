@@ -6145,6 +6145,7 @@
     },
     {
       "accepted_non_secret_keys": [
+        "auto_inputs",
         "index",
         "location_updates_status",
         "name",
@@ -6191,6 +6192,7 @@
       ],
       "notes": "",
       "optional_non_secret_keys": [
+        "auto_inputs",
         "location_updates_status",
         "index"
       ],
@@ -6201,8 +6203,11 @@
         "name",
         "region"
       ],
-      "required_secret_keys": [],
+      "required_secret_keys": [
+        "activation_token"
+      ],
       "route": {
+        "default_auto_inputs": "true",
         "default_index": "cisco_spaces",
         "default_name": "production"
       },

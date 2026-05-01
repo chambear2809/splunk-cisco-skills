@@ -90,6 +90,11 @@ if [[ -z "${WORKFLOW}" || -z "${SPEC_PATH}" ]]; then
   exit 1
 fi
 
+if [[ ! -f "${SPEC_PATH}" ]]; then
+  echo "ERROR: Spec file not found: ${SPEC_PATH}" >&2
+  exit 1
+fi
+
 if [[ -n "${MODE_OVERRIDE}" && "${APPLY}" == true ]]; then
   echo "--mode and --apply are mutually exclusive" >&2
   exit 1

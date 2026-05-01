@@ -72,7 +72,7 @@ create_indexes() {
     if ! is_splunk_cloud; then
         ensure_search_api_session
     fi
-    if platform_create_index "${SK-}" "$SPLUNK_URI" "intersight" "512000"; then
+    if platform_create_index "${SK:-}" "$SPLUNK_URI" "intersight" "512000"; then
         log "  Index 'intersight' created or already exists"
     else
         log "  ERROR: Failed to create index 'intersight'"

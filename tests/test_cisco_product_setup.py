@@ -231,6 +231,106 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertIn("cisco-spaces-setup", result.stdout)
         self.assertIn("ta_cisco_spaces", result.stdout)
         self.assertIn("activation_token", result.stdout)
+        self.assertIn("activation_token (secret-file)", result.stdout)
+        self.assertIn("skills/cisco-spaces-setup/scripts/configure_stream.sh", result.stdout)
+
+    def test_cisco_spaces_json_requires_activation_token_file(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "Cisco Spaces",
+            "--set",
+            "name",
+            "production",
+            "--set",
+            "region",
+            "io",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["route"]["type"], "spaces")
+        self.assertIn("activation_token", payload["required_secret_file_keys"])
+        self.assertIn("activation_token (secret-file)", payload["missing_values_for_configure"])
+        self.assertIn(
+            "skills/cisco-spaces-setup/scripts/configure_stream.sh",
+            payload["workflow_scripts"],
+        )
+
+    def test_cisco_spaces_json_surfaces_missing_secret_file_path(self) -> None:
+        missing_path = str(Path(self._tmpdir.name) / "missing_spaces_token")
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "Cisco Spaces",
+            "--set",
+            "name",
+            "production",
+            "--set",
+            "region",
+            "io",
+            "--secret-file",
+            "activation_token",
+            missing_path,
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn(
+            f"activation_token (secret-file missing: {missing_path})",
+            payload["missing_values_for_configure"],
+        )
+
+    def test_install_only_json_does_not_report_configure_missing_values(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "Cisco Spaces",
+            "--install-only",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["planned_phases"], ["install"])
+        self.assertEqual(payload["missing_values_for_configure"], [])
+
+    def test_spaces_route_passes_custom_index_to_spaces_setup(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            token_path = Path(tmpdir) / "spaces_token"
+            log_path = Path(tmpdir) / "calls.log"
+            token_path.write_text("token", encoding="utf-8")
+            shell_body = f"""
+                source {shlex.quote(str(SETUP_SCRIPT))}
+                USER_KEYS=(name region index auto_inputs)
+                USER_VALUES=(production io custom_spaces false)
+                SECRET_KEYS=(activation_token)
+                SECRET_PATHS=({shlex.quote(str(token_path))})
+                EFFECTIVE_DEFAULT_NAME=production
+                EFFECTIVE_DEFAULT_INDEX=cisco_spaces
+                bash() {{
+                    printf '%s\\n' "$*" >> {shlex.quote(str(log_path))}
+                }}
+                run_spaces_configure
+                cat {shlex.quote(str(log_path))}
+            """
+            result = self.run_command("bash", "-lc", shell_body)
+
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertIn("cisco-spaces-setup/scripts/setup.sh --index custom_spaces", result.stdout)
+        self.assertIn("configure_stream.sh --name production", result.stdout)
+        self.assertIn("--index custom_spaces", result.stdout)
 
     def test_cisco_hypershield_is_roadmap(self) -> None:
         result = self.run_command(

@@ -21,13 +21,18 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
-          cache-dependency-path: requirements-dev.txt
+          cache-dependency-path: |
+            requirements-dev.txt
+            requirements-agent.txt
 
       - name: Install Python test dependencies
-        run: pip install -r requirements-dev.txt
+        run: pip install -r requirements-dev.txt -r requirements-agent.txt
 
       - name: Run Python tests
         run: pytest tests/ -v
+
+      - name: Import local MCP agent server
+        run: python3 -c "import agent.splunk_cisco_skills_mcp.server; print('local MCP agent import ok')"
 
   # ── Bats tests ────────────────────────────────────────────────────────
   bats-tests:
@@ -49,14 +54,24 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       SHELLCHECK_VERSION: "0.10.0"
+      # SHA256 of shellcheck-v0.10.0.linux.x86_64.tar.xz from
+      # https://github.com/koalaman/shellcheck/releases/tag/v0.10.0
+      # Update this hash whenever SHELLCHECK_VERSION changes.
+      SHELLCHECK_SHA256: "6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87"
     steps:
       - name: Check out repository
         uses: actions/checkout@v6.0.2
 
       - name: Install ShellCheck
         run: |
-          curl -sSL "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
-            | tar -xJf - --strip-components=1 -C /usr/local/bin "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
+          set -euo pipefail
+          archive="shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
+          curl -sSL --fail \
+            "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/${archive}" \
+            -o "${archive}"
+          echo "${SHELLCHECK_SHA256}  ${archive}" | sha256sum -c -
+          tar -xJf "${archive}" --strip-components=1 -C /usr/local/bin "shellcheck-v${SHELLCHECK_VERSION}/shellcheck"
+          rm -f "${archive}"
           shellcheck --version
 
       - name: Syntax-check shell scripts
@@ -130,18 +145,24 @@ jobs:
           print(f"All {len(json_files)} JSON files are valid.")
           PY
 
-      - name: Lint YAML (GitHub and workflow files)
-        run: yamllint -c .yamllint.yml .github/
+      - name: Lint YAML (GitHub, workflow files, and ITSI templates/agents)
+        run: |
+          yamllint -c .yamllint.yml \
+            .github/ \
+            skills/splunk-itsi-config/templates \
+            skills/splunk-itsi-config/agents
 
       - name: Lint Python with ruff
-        run: ruff check skills/ tests/
+        run: ruff check skills/ tests/ agent/
 
       - name: Check catalog freshness
         run: |
           if ls splunk-ta/splunk-cisco-app-navigator-*.tar.gz 1>/dev/null 2>&1; then
             python3 skills/cisco-product-setup/scripts/build_catalog.py --check
           else
-            echo "SCAN package not in tree (gitignored binary); skipping catalog freshness check."
+            echo "WARNING: SCAN package not in tree (gitignored binary); catalog freshness check skipped."
+            echo "  If you modified catalog_overrides.json, rebuild catalog.json locally with:"
+            echo "  python3 skills/cisco-product-setup/scripts/build_catalog.py --write"
           fi
 
       - name: Check deployment docs freshness
