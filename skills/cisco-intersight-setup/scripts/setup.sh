@@ -100,7 +100,7 @@ except: print('True')
 create_macros() {
     log "Configuring macros..."
     local def_encoded
-    def_encoded=$(_urlencode 'index IN (intersight)')
+    def_encoded=$(python3 -c "import urllib.parse; print(urllib.parse.quote('index IN (intersight)', safe=''))")
     if rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_intersight_index" "definition=${def_encoded}"; then
         log "  Macro 'cisco_intersight_index' configured"
     else

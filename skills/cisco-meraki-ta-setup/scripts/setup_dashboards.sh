@@ -18,7 +18,7 @@ fi
 
 log "Configuring meraki_index macro to use index '${INDEX_NAME}'..."
 
-NEW_DEF="index IN (${INDEX_NAME})"
+NEW_DEF="index IN(${INDEX_NAME})"
 def_encoded=$(_urlencode "${NEW_DEF}")
 body="definition=${def_encoded}&iseval=0"
 

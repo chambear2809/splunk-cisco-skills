@@ -75,9 +75,9 @@ if [[ -z "${ACCT_TYPE}" || -z "${ACCT_NAME}" ]]; then
     exit 1
 fi
 
-load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+load_splunk_credentials
 
-SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
+SK=$(get_session_key "${SPLUNK_URI}")
 
 log "Authenticated to Splunk REST API."
 

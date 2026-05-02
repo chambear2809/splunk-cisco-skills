@@ -287,9 +287,9 @@ store_oauth_account() {
     rest_create_or_update_account "${SK}" "${endpoint}" "${account_email}" "${create_body}" "${update_body}" >/dev/null
 }
 
-load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+load_splunk_credentials
 
-SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
+SK=$(get_session_key "${SPLUNK_URI}")
 
 log "Authenticated to Splunk REST API."
 

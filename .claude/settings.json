@@ -5,10 +5,7 @@
       "Bash(kubectl describe *)",
       "Bash(kubectl logs *)",
       "Bash(kubectl config current-context)",
-      "Bash(kubectl config get-contexts *)",
-      "Bash(bats tests/*.bats *)",
-      "Bash(shellcheck *)",
-      "Bash(ruff check *)"
+      "Bash(kubectl config get-contexts *)"
     ]
   }
 }

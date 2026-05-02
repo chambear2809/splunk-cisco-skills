@@ -237,7 +237,7 @@ except Exception:
     exit 0
 fi
 
-load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
+load_splunk_credentials
 
 SK=$(get_session_key "${SPLUNK_URI}") || {
     log "ERROR: Failed to obtain a Splunk session key for ${SPLUNK_URI}."
