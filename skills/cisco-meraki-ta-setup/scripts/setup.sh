@@ -96,8 +96,8 @@ except: print('True')
 configure_dashboards() {
     local index_name="${1:-meraki}"
     ensure_search_api_session
-    log "Configuring dashboard macro 'meraki_index' -> index IN(${index_name})..."
-    local new_def="index IN(${index_name})"
+    log "Configuring dashboard macro 'meraki_index' -> index IN (${index_name})..."
+    local new_def="index IN (${index_name})"
     local def_encoded body current_def
     def_encoded=$(_urlencode "${new_def}")
     body="definition=${def_encoded}&iseval=0"

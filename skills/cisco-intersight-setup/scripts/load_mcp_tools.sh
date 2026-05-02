@@ -14,9 +14,9 @@ if [[ ! -f "${MCP_TOOLS_JSON}" ]]; then
     exit 1
 fi
 
-load_splunk_credentials
+load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
 
-SESSION_KEY=$(get_session_key "${SPLUNK_URI}")
+SESSION_KEY=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 
 if ! rest_check_app "${SESSION_KEY}" "${SPLUNK_URI}" "Splunk_MCP_Server"; then
     log "ERROR: Splunk MCP Server app not installed"

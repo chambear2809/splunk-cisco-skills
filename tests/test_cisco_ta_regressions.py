@@ -737,6 +737,28 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
                 msg="Should not POST to settings conf when --no-verify-ssl is not passed",
             )
 
+    def test_intersight_validate_reads_vendor_settings_conf_for_ssl_validation(self):
+        script_text = (
+            REPO_ROOT / "skills/cisco-intersight-setup/scripts/validate.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn(
+            '"Splunk_TA_Cisco_Intersight_settings" "verify_ssl" "ssl_validation"',
+            script_text,
+        )
+        self.assertNotIn(
+            '"splunk_ta_cisco_intersight_settings" "verify_ssl" "ssl_validation"',
+            script_text,
+        )
+
+    def test_product_setup_meraki_macro_uses_valid_in_syntax(self):
+        script_text = (
+            REPO_ROOT / "skills/cisco-product-setup/scripts/setup.sh"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('definition="index IN (${index_name})"', script_text)
+        self.assertNotIn('definition="index IN(${index_name})"', script_text)
+
 
     def test_meraki_setup_devices_group_includes_all_supported_device_inputs(self):
         with tempfile.TemporaryDirectory() as tmpdir:

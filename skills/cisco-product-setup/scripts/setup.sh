@@ -455,14 +455,8 @@ update_meraki_macro() {
     local index_name="$1" definition encoded body
     [[ -n "${index_name}" ]] || return 0
     ensure_wrapper_session
-    definition="index IN(${index_name})"
-    encoded=$(python3 - "${definition}" <<'PY'
-import sys
-import urllib.parse
-
-print(urllib.parse.quote(sys.argv[1], safe=""), end="")
-PY
-)
+    definition="index IN (${index_name})"
+    encoded=$(_urlencode "${definition}")
     body="definition=${encoded}&iseval=0"
     if rest_set_conf "${SK}" "${SPLUNK_URI}" "Splunk_TA_cisco_meraki" "macros" "meraki_index" "${body}"; then
         log "Updated meraki_index macro to '${definition}'."
