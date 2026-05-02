@@ -131,6 +131,60 @@
         "notes": "Search-tier MCP endpoint for Splunk with encrypted token issuance and shared Cursor/Codex/Claude Code bridge rendering."
       },
       {
+        "kind": "workflow",
+        "skill": "splunk-agent-management-setup",
+        "label": "`splunk-agent-management-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Not a Splunk Cloud install path; renders customer-managed Agent Management assets",
+        "cloud_config_path": "Rendered serverclass.conf, deployment apps, and deploymentclient.conf for Enterprise deployment-server style workflows",
+        "notes": "Splunk Enterprise 10.x Agent Management workflow for full Enterprise instances, forwarders, and OTel fleet overview."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-workload-management-setup",
+        "label": "`splunk-workload-management-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Not a Splunk Cloud install path; configures self-managed Enterprise Workload Management",
+        "cloud_config_path": "Rendered workload_pools.conf, workload_rules.conf, workload_policy.conf, and local reload helpers",
+        "notes": "Linux-only Enterprise workflow for cgroups-backed workload pools, workload rules, and admission-rule guardrails."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-hec-service-setup",
+        "label": "`splunk-hec-service-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; Splunk Cloud HEC tokens are managed through ACS",
+        "cloud_config_path": "Enterprise inputs.conf rendering or Splunk Cloud ACS HEC token payloads and helper commands",
+        "notes": "Reusable HEC platform service workflow for allowed indexes, default source/sourcetype, TLS, and ACK-aware token handling."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-federated-search-setup",
+        "label": "`splunk-federated-search-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; Federated Search is native platform configuration",
+        "cloud_config_path": "Rendered self-managed Enterprise federated.conf/indexes.conf assets; Splunk Cloud deployments should use supported Federated Search UI or API workflows",
+        "notes": "Splunk-to-Splunk standard or transparent federated provider workflow with standard-mode federated index and SHC replication guardrails."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-index-lifecycle-smartstore-setup",
+        "label": "`splunk-index-lifecycle-smartstore-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Not a Splunk Cloud install path; SmartStore is managed by Splunk Cloud",
+        "cloud_config_path": "Rendered self-managed Enterprise SmartStore indexes.conf, server.conf, and limits.conf assets for indexers or cluster managers",
+        "notes": "Self-managed index lifecycle workflow for remote volumes, retention limits, cache manager settings, remote-storage localization limits, and cluster bundle apply."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-monitoring-console-setup",
+        "label": "`splunk-monitoring-console-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Not a Splunk Cloud app install; Cloud Monitoring Console is Splunk-managed",
+        "cloud_config_path": "Rendered self-managed Enterprise Monitoring Console local configuration plus review-only distsearch.conf peer and group helpers",
+        "notes": "Distributed or standalone Monitoring Console workflow for auto-config, distributed search groups, forwarder monitoring, and platform alert enablement."
+      },
+      {
         "kind": "app",
         "app_name": "splunk_app_stream",
         "label": "`splunk-stream-setup` search-tier app",
@@ -375,6 +429,83 @@
         "external-collector"
       ],
       "notes": "External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets."
+    },
+    {
+      "skill": "splunk-agent-management-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "heavy-forwarder",
+        "universal-forwarder"
+      ],
+      "notes": "Agent Management control-plane workflow for server classes, deployment apps, and deployment clients; do not target indexer cluster peers or SHC members directly."
+    },
+    {
+      "skill": "splunk-workload-management-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Self-managed Enterprise Workload Management workflow for Linux search heads and indexers."
+    },
+    {
+      "skill": "splunk-hec-service-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "heavy-forwarder"
+      ],
+      "notes": "Reusable HEC token and service configuration workflow for Enterprise HEC tiers or Splunk Cloud ACS-managed HEC."
+    },
+    {
+      "skill": "splunk-federated-search-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier workflow for Splunk-to-Splunk federated providers, standard-mode federated indexes, and SHC federated index replication settings."
+    },
+    {
+      "skill": "splunk-index-lifecycle-smartstore-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "required",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Self-managed indexer workflow for SmartStore remote volumes, retention policy, cache manager settings, and low-level remote-storage localization limits."
+    },
+    {
+      "skill": "splunk-monitoring-console-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier Monitoring Console workflow for distributed or standalone mode, distributed search groups, forwarder monitoring, platform alerts, and peer status review."
     },
     {
       "skill": "splunk-enterprise-host-setup",

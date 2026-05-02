@@ -1,0 +1,57 @@
+# Splunk Index Lifecycle / SmartStore Setup Worksheet
+#
+# Non-secret values only. Do not store object-store keys here.
+
+deployment: cluster
+scope: per-index
+phase: render
+
+splunk_home: /opt/splunk
+app_name: ZZZ_cisco_skills_smartstore
+
+remote_provider: s3
+volume_name: remote_store
+remote_path: s3://splunk-prod-smartstore/cluster-a
+indexes: main,summary
+
+max_global_data_size_mb:
+max_global_raw_data_size_mb:
+frozen_time_period_in_secs:
+
+cache_size_mb:
+eviction_policy:
+eviction_padding_mb:
+hotlist_recency_secs:
+hotlist_bloom_filter_recency_hours:
+index_hotlist_recency_secs:
+index_hotlist_bloom_filter_recency_hours:
+
+s3_endpoint:
+s3_auth_region:
+s3_signature_version:
+s3_supports_versioning: unset
+s3_tsidx_compression: unset
+s3_encryption: unset
+s3_kms_key_id:
+s3_kms_auth_region:
+s3_ssl_verify_server_cert: unset
+s3_ssl_versions:
+s3_access_key_file:
+s3_secret_key_file:
+
+gcs_credential_file:
+
+azure_endpoint:
+azure_container_name:
+
+bucket_localize_acquire_lock_timeout_sec:
+bucket_localize_connect_timeout_max_retries:
+bucket_localize_max_timeout_sec:
+
+clean_remote_storage_by_default: false
+apply_cluster_bundle: false
+restart_splunk: true
+
+# If static S3 keys are unavoidable:
+# bash skills/shared/scripts/write_secret_file.sh /tmp/smartstore_s3_access_key
+# bash skills/shared/scripts/write_secret_file.sh /tmp/smartstore_s3_secret_key

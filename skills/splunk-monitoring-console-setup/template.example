@@ -1,0 +1,24 @@
+# Copy to template.local for environment-specific non-secret values.
+# Do not store Splunk passwords or search-peer passwords here.
+
+MODE=distributed
+PHASE=render
+OUTPUT_DIR=./splunk-monitoring-console-rendered
+SPLUNK_HOME=/opt/splunk
+
+# Distributed mode inputs. Add peers through Splunk Web or a secure operator
+# workflow before relying on mc_auto_config.
+SEARCH_PEERS=cm01.example.com:8089,sh01.example.com:8089,idx01.example.com:8089
+SEARCH_PEER_SCHEME=https
+SEARCH_GROUPS="managers=cm01.example.com:8089;indexers=idx01.example.com:8089"
+DEFAULT_SEARCH_GROUP=
+PEER_USERNAME=admin
+ENABLE_AUTO_CONFIG=true
+
+# Optional forwarder monitoring and platform alerts.
+ENABLE_FORWARDER_MONITORING=false
+FORWARDER_CRON="*/15 * * * *"
+ENABLE_PLATFORM_ALERTS=false
+PLATFORM_ALERTS=Near Critical Disk Usage,Search Peer Not Responding
+
+RESTART_SPLUNK=true

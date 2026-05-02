@@ -49,6 +49,12 @@ projects/tmp-*
 # --- Local rendered deployment assets ---
 /sc4s-rendered/
 /sc4snmp-rendered/
+/splunk-agent-management-rendered/
+/splunk-workload-management-rendered/
+/splunk-hec-service-rendered/
+/splunk-federated-search-rendered/
+/splunk-smartstore-rendered/
+/splunk-monitoring-console-rendered/
 /splunk-enterprise-k8s-rendered/
 /splunk-mcp-rendered/*
 !/splunk-mcp-rendered/run-splunk-mcp.js

@@ -1,0 +1,30 @@
+# Splunk Federated Search Setup Worksheet
+#
+# Non-secret values only. Do not store the service-account password here.
+
+mode: standard
+phase: render
+apply_target: search-head
+
+splunk_home: /opt/splunk
+app_name: ZZZ_cisco_skills_federated_search
+
+provider_name: remote_prod
+remote_host_port: remote-sh.example.com:8089
+service_account: federated_svc
+password_file: /tmp/federated_provider_password
+
+app_context: search
+use_fsh_knowledge_objects: false
+
+federated_index_name: remote_main
+dataset_type: index
+dataset_name: main
+
+shc_replication: true
+max_preview_generation_duration: 0
+max_preview_generation_inputcount: 0
+restart_splunk: true
+
+# Create the password file without putting the secret in shell history:
+# bash skills/shared/scripts/write_secret_file.sh /tmp/federated_provider_password

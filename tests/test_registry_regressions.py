@@ -132,6 +132,12 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("cisco-product-setup", skill_topologies)
         self.assertIn("splunk-connect-for-syslog-setup", skill_topologies)
         self.assertIn("splunk-connect-for-snmp-setup", skill_topologies)
+        self.assertIn("splunk-agent-management-setup", skill_topologies)
+        self.assertIn("splunk-workload-management-setup", skill_topologies)
+        self.assertIn("splunk-hec-service-setup", skill_topologies)
+        self.assertIn("splunk-federated-search-setup", skill_topologies)
+        self.assertIn("splunk-index-lifecycle-smartstore-setup", skill_topologies)
+        self.assertIn("splunk-monitoring-console-setup", skill_topologies)
         self.assertIn("splunk-enterprise-kubernetes-setup", skill_topologies)
         self.assertIn("splunk-app-install", skill_topologies)
 
@@ -150,6 +156,19 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         enterprise_k8s = skill_topologies["splunk-enterprise-kubernetes-setup"]
         self.assertEqual(enterprise_k8s["role_support"]["external-collector"], "none")
         self.assertEqual(enterprise_k8s["cloud_pairing"], [])
+        agent_management = skill_topologies["splunk-agent-management-setup"]
+        self.assertEqual(agent_management["role_support"]["universal-forwarder"], "supported")
+        workload_management = skill_topologies["splunk-workload-management-setup"]
+        self.assertEqual(workload_management["role_support"]["indexer"], "supported")
+        self.assertEqual(workload_management["role_support"]["heavy-forwarder"], "none")
+        hec_service = skill_topologies["splunk-hec-service-setup"]
+        self.assertEqual(hec_service["role_support"]["heavy-forwarder"], "supported")
+        federated_search = skill_topologies["splunk-federated-search-setup"]
+        self.assertEqual(federated_search["role_support"]["search-tier"], "required")
+        smartstore = skill_topologies["splunk-index-lifecycle-smartstore-setup"]
+        self.assertEqual(smartstore["role_support"]["indexer"], "required")
+        monitoring_console = skill_topologies["splunk-monitoring-console-setup"]
+        self.assertEqual(monitoring_console["role_support"]["search-tier"], "required")
 
 
     def test_role_matrix_keeps_search_tier_only_and_collector_defaults_explicit(self):

@@ -211,6 +211,78 @@ teardown() {
     [[ "$output" =~ "Splunk Enterprise Kubernetes Validation" ]]
 }
 
+@test "agent management setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-agent-management-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Agent Management Setup" ]]
+}
+
+@test "agent management validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-agent-management-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Agent Management Validation" ]]
+}
+
+@test "workload management setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-workload-management-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Workload Management Setup" ]]
+}
+
+@test "workload management validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-workload-management-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Workload Management Validation" ]]
+}
+
+@test "hec service setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-hec-service-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk HEC Service Setup" ]]
+}
+
+@test "hec service validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-hec-service-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk HEC Service Validation" ]]
+}
+
+@test "federated search setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-federated-search-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Federated Search Setup" ]]
+}
+
+@test "federated search validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-federated-search-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Federated Search Validation" ]]
+}
+
+@test "smartstore setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-index-lifecycle-smartstore-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Index Lifecycle / SmartStore Setup" ]]
+}
+
+@test "smartstore validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-index-lifecycle-smartstore-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Index Lifecycle / SmartStore Validation" ]]
+}
+
+@test "monitoring console setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-monitoring-console-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Monitoring Console Setup" ]]
+}
+
+@test "monitoring console validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-monitoring-console-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Monitoring Console Validation" ]]
+}
+
 @test "enterprise host smoke latest resolution --help exits 0" {
     run bash "${PROJECT_ROOT}/skills/splunk-enterprise-host-setup/scripts/smoke_latest_resolution.sh" --help
     [ "$status" -eq 0 ]
@@ -243,6 +315,69 @@ teardown() {
 
 @test "sc4snmp validate rejects unknown flag" {
     run bash "${PROJECT_ROOT}/skills/splunk-connect-for-snmp-setup/scripts/validate.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "agent management setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-agent-management-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "workload management setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-workload-management-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "hec service setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-hec-service-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "federated search setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-federated-search-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "smartstore setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-index-lifecycle-smartstore-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "monitoring console setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-monitoring-console-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "federated search validate rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-federated-search-setup/scripts/validate.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "smartstore validate rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-index-lifecycle-smartstore-setup/scripts/validate.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "monitoring console validate rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-monitoring-console-setup/scripts/validate.sh" --bogus
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Unknown option" ]]
     [[ ! "$output" =~ "unbound variable" ]]

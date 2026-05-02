@@ -3,10 +3,9 @@
 This repository is a working library of Cursor, Codex, and Claude Code agent skills plus
 shell scripts for installing, configuring, and validating Splunk apps and
 Technology Add-ons on Splunk Cloud and self-managed Splunk Enterprise
-deployments, and for
-bootstrapping Linux Splunk Enterprise hosts and self-managed Kubernetes
-runtimes, including search-tier, indexer, forwarder, and external-collector
-topologies.
+deployments. It also bootstraps Linux Splunk Enterprise hosts and self-managed
+Kubernetes runtimes, including search-tier, indexer, forwarder, and
+external-collector topologies.
 
 ## Start With The Intake Templates
 
@@ -38,6 +37,13 @@ Common starting points:
 - If you need Splunk Enterprise on Kubernetes, start with
   `skills/splunk-enterprise-kubernetes-setup/`. The workflow renders assets by
   default and only applies them when you request an apply phase.
+- If you need Splunk platform administration services, start with
+  `skills/splunk-agent-management-setup/`,
+  `skills/splunk-workload-management-setup/`,
+  `skills/splunk-hec-service-setup/`,
+  `skills/splunk-federated-search-setup/`,
+  `skills/splunk-index-lifecycle-smartstore-setup/`, or
+  `skills/splunk-monitoring-console-setup/`.
 - If you need external syslog or SNMP collection, start with
   `skills/splunk-connect-for-syslog-setup/` or
   `skills/splunk-connect-for-snmp-setup/`.
@@ -63,7 +69,7 @@ operations do **not** use the search-tier REST API in cloud mode.
 
 ## What This Repository Covers
 
-At a high level, the repo gives you five layers of automation:
+At a high level, the repo gives you six layers of automation:
 
 1. **Host bootstrap**: download Splunk Enterprise packages, install them on
    Linux hosts, and configure standalone or single-site clustered search-tier,
@@ -77,7 +83,12 @@ At a high level, the repo gives you five layers of automation:
 4. **App-specific setup**: create indexes, configure accounts, enable inputs,
    update macros, and apply dashboard settings. In Splunk Cloud, index creation
    uses ACS and the app-specific REST configuration uses the search tier.
-5. **Validation**: confirm the app is installed, the expected objects exist, and
+5. **Platform administration workflows**: render and optionally apply
+   self-managed Splunk Enterprise service configuration for Agent Management,
+   Workload Management, Federated Search, SmartStore/index lifecycle, Monitoring
+   Console, and HEC service patterns. The HEC service workflow can also render
+   ACS-backed Splunk Cloud token payloads.
+6. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
 Most of the repo follows the same pattern:
@@ -117,6 +128,12 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant for SPL; drive Enterprise cloud-connected onboarding |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
+| `splunk-agent-management-setup` | Splunk Agent Management | Render, apply, and validate server classes, deployment apps, and deployment client assets |
+| `splunk-workload-management-setup` | Splunk Workload Management | Render and validate workload pools, workload rules, admission-rule guardrails, and Linux workload prerequisites |
+| `splunk-hec-service-setup` | Splunk HTTP Event Collector | Prepare reusable HEC token configuration, allowed indexes, Enterprise inputs.conf assets, and Splunk Cloud ACS payloads |
+| `splunk-federated-search-setup` | Splunk Federated Search | Render and validate self-managed Splunk-to-Splunk standard or transparent providers, standard-mode federated indexes, and SHC replication assets |
+| `splunk-index-lifecycle-smartstore-setup` | Splunk Index Lifecycle / SmartStore | Render and validate SmartStore `indexes.conf`, `server.conf`, and `limits.conf` assets for indexers or cluster managers |
+| `splunk-monitoring-console-setup` | Splunk Monitoring Console | Render and validate self-managed distributed or standalone Monitoring Console assets, including auto-config, peer/group review, forwarder monitoring, and platform alerts |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-enterprise-kubernetes-setup` | Splunk Enterprise on Kubernetes | Render, preflight, apply, and validate SOK S1/C3/M4 or Splunk POD on Cisco UCS |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
@@ -654,6 +671,12 @@ splunk-cisco-skills/
 │   │       └── cloud_batch_uninstall.sh
 │   ├── splunk-app-install/
 │   ├── splunk-ai-assistant-setup/
+│   ├── splunk-agent-management-setup/
+│   ├── splunk-workload-management-setup/
+│   ├── splunk-hec-service-setup/
+│   ├── splunk-federated-search-setup/
+│   ├── splunk-index-lifecycle-smartstore-setup/
+│   ├── splunk-monitoring-console-setup/
 │   ├── splunk-enterprise-host-setup/
 │   ├── splunk-enterprise-kubernetes-setup/
 │   ├── splunk-connect-for-syslog-setup/
@@ -783,6 +806,19 @@ that will run the generated assets.
 This repo focuses on vendor TAs/apps that can be configured through REST and
 shell automation on **self-managed Splunk Enterprise** and on **Splunk Cloud
 search tiers with ACS plus allowlisted REST API access**.
+
+The platform administration skills deliberately separate self-managed
+Enterprise file-render workflows from Splunk Cloud managed features:
+`splunk-federated-search-setup` renders Splunk-to-Splunk `federated.conf` and
+standard-mode `indexes.conf` assets, while Splunk Cloud-only Federated Search
+for Amazon S3 remains a supported Cloud UI/API workflow outside this renderer.
+`splunk-index-lifecycle-smartstore-setup` targets self-managed indexers and
+cluster managers with `indexes.conf`, `server.conf`, and `limits.conf`; Splunk
+Cloud SmartStore/storage lifecycle is managed by Splunk.
+`splunk-monitoring-console-setup` targets self-managed Enterprise Monitoring
+Console configuration and renders `distsearch.conf` only for peer and
+search-group review because search peer trust and passwords must be handled
+through Splunk Web or an operator-controlled secure workflow.
 
 The biggest Cloud-specific limitation is hybrid collection architectures. For
 example, Splunk Stream on Splunk Cloud uses a cloud-hosted `splunk_app_stream`

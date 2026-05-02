@@ -1,0 +1,37 @@
+# Splunk Agent Management setup intake template
+#
+# Non-secret values only.
+
+# MODE=both
+# MODE=agent-manager
+# MODE=deployment-client
+# PHASE=render
+# OUTPUT_DIR=./splunk-agent-management-rendered
+# SPLUNK_HOME=/opt/splunk
+
+# Agent manager / server class
+# SERVERCLASS_NAME=all_linux_forwarders
+# DEPLOYMENT_APP_NAME=ZZZ_cisco_skills_forwarder_base
+# APP_SOURCE_DIR=/path/to/existing/deployment/app
+# WHITELIST=*.example.com
+# BLACKLIST=dev-*.example.com
+# FILTER_TYPE=whitelist
+# MACHINE_TYPES_FILTER=linux-x86_64
+# RESTART_SPLUNKD=false
+# STATE_ON_CLIENT=enabled
+
+# Deployment client
+# AGENT_MANAGER_URI=https://am01.example.com:8089
+# CLIENT_NAME=web01.example.com
+# PHONE_HOME_INTERVAL=60
+# REPOSITORY_LOCATION=$SPLUNK_HOME/etc/apps
+# REPOSITORY_LOCATION_POLICY=rejectAlways
+
+# Example:
+# bash skills/splunk-agent-management-setup/scripts/setup.sh \
+#   --mode both \
+#   --agent-manager-uri "${AGENT_MANAGER_URI}" \
+#   --serverclass-name "${SERVERCLASS_NAME}" \
+#   --deployment-app-name "${DEPLOYMENT_APP_NAME}" \
+#   --whitelist "${WHITELIST}" \
+#   --machine-types-filter "${MACHINE_TYPES_FILTER}"

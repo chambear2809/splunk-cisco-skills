@@ -1,0 +1,33 @@
+# Splunk HEC Service Setup Worksheet
+#
+# Copy this file locally and fill in non-secret values. Do not store HEC token
+# values here.
+
+platform: enterprise
+phase: render
+
+splunk_home: /opt/splunk
+app_name: splunk_httpinput
+token_name: cisco_skills_hec
+description: Managed by splunk-hec-service-setup
+
+default_index: main
+allowed_indexes: main
+
+source:
+sourcetype:
+
+port: 8088
+enable_ssl: true
+global_disabled: false
+token_disabled: false
+use_ack: false
+s2s_indexes_validation: disabled_for_internal
+restart_splunk: true
+
+# Local-only token file paths. Keep these gitignored or outside the repo.
+token_file: /tmp/cisco_skills_hec_token
+write_token_file: /tmp/cisco_skills_hec_token
+
+# Splunk Cloud uses the repo credentials file for ACS context:
+# SPLUNK_CLOUD_STACK, ACS_SERVER, STACK_TOKEN or STACK_USERNAME/STACK_PASSWORD.

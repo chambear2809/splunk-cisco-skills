@@ -1,0 +1,41 @@
+# Splunk Workload Management setup intake template
+#
+# Non-secret values only.
+
+# PHASE=render
+# OUTPUT_DIR=./splunk-workload-management-rendered
+# PROFILE=balanced
+# PROFILE=search-priority
+# PROFILE=ingest-protect
+# SPLUNK_HOME=/opt/splunk
+# APP_NAME=ZZZ_cisco_skills_workload_management
+
+# Enable switches are intentionally explicit.
+# ENABLE_WORKLOAD_MANAGEMENT=false
+# ENABLE_ADMISSION_RULES=false
+
+# Custom category weights must add up to 100.
+# SEARCH_CPU=70
+# INGEST_CPU=20
+# MISC_CPU=10
+
+# Pools
+# DEFAULT_SEARCH_POOL=search_standard
+# CRITICAL_SEARCH_POOL=search_critical
+# INGEST_POOL=ingest_default
+# MISC_POOL=misc_default
+
+# Rules
+# CRITICAL_ROLE=admin
+# LONG_RUNNING_RUNTIME=10m
+# LONG_RUNNING_ACTION=abort
+# LONG_RUNNING_ACTION=alert
+# LONG_RUNNING_ACTION=move
+# ADMISSION_ALLTIME_ACTION=filter
+# ADMISSION_EXEMPT_ROLE=admin
+
+# Example:
+# bash skills/splunk-workload-management-setup/scripts/setup.sh \
+#   --profile ingest-protect \
+#   --critical-role security_admin \
+#   --enable-workload-management
