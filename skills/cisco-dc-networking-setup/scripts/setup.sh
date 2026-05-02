@@ -98,9 +98,9 @@ update_macros() {
     log "Updating search macros..."
 
     local def_aci def_nd def_n9k
-    def_aci=$(python3 -c "import urllib.parse; print(urllib.parse.quote('index IN (\"cisco_aci\")', safe=''))")
-    def_nd=$(python3 -c "import urllib.parse; print(urllib.parse.quote('index IN (\"cisco_nd\")', safe=''))")
-    def_n9k=$(python3 -c "import urllib.parse; print(urllib.parse.quote('index IN (\"cisco_nexus_9k\")', safe=''))")
+    def_aci=$(_urlencode 'index IN ("cisco_aci")')
+    def_nd=$(_urlencode 'index IN ("cisco_nd")')
+    def_n9k=$(_urlencode 'index IN ("cisco_nexus_9k")')
 
     if ! rest_set_conf "$SK" "$SPLUNK_URI" "$APP_NAME" "macros" "cisco_dc_aci_index" "definition=${def_aci}"; then
         log "ERROR: Failed to update macro 'cisco_dc_aci_index'."

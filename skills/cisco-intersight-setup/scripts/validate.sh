@@ -170,7 +170,7 @@ fi
 
 log ""
 log "--- Settings ---"
-ssl_val=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "splunk_ta_cisco_intersight_settings" "additional_parameters" "ssl_validation")
+ssl_val=$(rest_get_conf_value "$SK" "$SPLUNK_URI" "$APP_NAME" "splunk_ta_cisco_intersight_settings" "verify_ssl" "ssl_validation")
 if [[ -n "${ssl_val}" ]]; then
     if [[ "${ssl_val}" == "true" || "${ssl_val}" == "True" ]]; then
         pass "SSL validation is enabled"

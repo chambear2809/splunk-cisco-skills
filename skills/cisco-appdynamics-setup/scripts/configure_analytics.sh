@@ -73,9 +73,9 @@ if [[ "$(printf '%s' "${ANALYTICS_ENDPOINT}" | tr '[:upper:]' '[:lower:]')" == "
     fi
 fi
 
-load_splunk_credentials
+load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
 
-SK=$(get_session_key "${SPLUNK_URI}")
+SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 
 log "Authenticated to Splunk REST API."
 

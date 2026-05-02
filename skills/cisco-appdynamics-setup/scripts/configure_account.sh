@@ -68,9 +68,9 @@ if [[ -z "${ACCT_NAME}" || -z "${CONTROLLER_URL}" || -z "${CLIENT_NAME}" || -z "
     exit 1
 fi
 
-load_splunk_credentials
+load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
 
-SK=$(get_session_key "${SPLUNK_URI}")
+SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 
 log "Authenticated to Splunk REST API."
 
