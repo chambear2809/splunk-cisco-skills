@@ -1237,6 +1237,21 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def spec_from_cli(args: argparse.Namespace) -> Spec:
     """Build a spec dict from back-compat single-provider + repeated flags."""
+    # Back-compat guard: the old single-flag CLI rejected
+    # --use-fsh-knowledge-objects true for standard mode because Splunk forces
+    # the field to 0 in standard mode regardless of operator input. Surface
+    # the same error so existing scripts that relied on the rejection do not
+    # silently start ignoring the flag.
+    if (
+        args.mode == "standard"
+        and args.use_fsh_knowledge_objects == "true"
+        and not args.spec
+        and not args.provider
+    ):
+        raise SpecError(
+            "--use-fsh-knowledge-objects true is valid only for transparent mode providers; "
+            "Splunk forces useFSHKnowledgeObjects = 0 in standard mode."
+        )
     raw: dict[str, Any] = {
         "splunk_home": args.splunk_home,
         "app_name": args.app_name,

@@ -104,7 +104,11 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             self.assertIn("mode = standard", federated_conf)
             self.assertIn("max_preview_generation_duration = 55", federated_conf)
             self.assertIn("max_preview_generation_inputcount = 500000", federated_conf)
-            self.assertIn("password = __FEDERATED_SERVICE_ACCOUNT_PASSWORD_FROM_FILE__", federated_conf)
+            # Renderer was rewritten to emit per-provider password placeholders so
+            # multiple providers can each substitute independently from their own
+            # password_file. The single-provider back-compat CLI flow uses the
+            # provided --provider-name (here `remote_prod`) to derive the token.
+            self.assertIn("password = __FEDERATED_PASSWORD_FILE_BASE64__REMOTE_PROD__", federated_conf)
             self.assertIn("[federated:remote_metrics]", indexes_conf)
             self.assertIn("federated.dataset = metricindex:metrics", indexes_conf)
             self.assertIn("conf_replication_include.indexes = true", server_conf)
@@ -145,7 +149,11 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             indexes_conf = (Path(tmpdir) / "federated-search" / "indexes.conf").read_text(encoding="utf-8")
             federated_conf = (Path(tmpdir) / "federated-search" / "federated.conf.template").read_text(encoding="utf-8")
 
-            self.assertIn("Transparent mode federated providers do not use federated indexes.", indexes_conf)
+            # Renderer's wording was tightened in the multi-provider rewrite:
+            # transparent providers explicitly do not use federated indexes, and
+            # FSS3 federated indexes are created via REST. Both notes appear in
+            # the rendered indexes.conf placeholder file.
+            self.assertIn("Transparent-mode providers do not use federated indexes.", indexes_conf)
             self.assertNotIn("[federated:", indexes_conf)
             self.assertIn("useFSHKnowledgeObjects = 1", federated_conf)
 
