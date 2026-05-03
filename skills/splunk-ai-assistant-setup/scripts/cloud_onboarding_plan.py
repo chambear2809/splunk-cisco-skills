@@ -11,6 +11,9 @@ from typing import Any
 
 SETUP_SCRIPT = "skills/splunk-ai-assistant-setup/scripts/setup.sh"
 VALIDATE_SCRIPT = "skills/splunk-ai-assistant-setup/scripts/validate.sh"
+APP_NAME = "Splunk_AI_Assistant_Cloud"
+SPLUNKBASE_ID = "7245"
+LATEST_VERIFIED_APP_VERSION = "2.0.0"
 
 
 def shell_join(parts: list[str]) -> str:
@@ -41,7 +44,9 @@ def cloud_plan(args: argparse.Namespace) -> dict[str, Any]:
             "automation": "manual-gate",
             "details": [
                 "Use the public Splunkbase install path; do not private-upload the app archive.",
-                "Confirm the stack is in a supported commercial region and the app is available to the tenant.",
+                "Confirm the stack is in a supported AWS or Azure commercial region, or an eligible IL2 FedRAMP deployment.",
+                "Agent Mode in 2.0.0 is limited to supported AWS commercial regions and requires Splunk platform 10.1+.",
+                "In IL2 FedRAMP, Agent Mode is unavailable, data for training/fine-tuning defaults off, and Model Runtime uses Splunk-hosted models only.",
                 "If the UI blocks onboarding, open a Splunk Support or Cloud App Request and include app ID 7245.",
             ],
         },
@@ -66,12 +71,15 @@ def cloud_plan(args: argparse.Namespace) -> dict[str, Any]:
         "workflow": "splunk-ai-assistant-cloud-onboarding",
         "mode": "plan-only",
         "platform": "cloud",
-        "app": "Splunk_AI_Assistant_Cloud",
-        "splunkbase_id": "7245",
+        "app": APP_NAME,
+        "splunkbase_id": SPLUNKBASE_ID,
+        "latest_verified_version": LATEST_VERIFIED_APP_VERSION,
         "steps": steps,
         "notes": [
+            "Splunk AI Assistant for SPL was renamed to Splunk AI Assistant in the 2.0.0 documentation.",
             "This plan does not collect secrets and does not drive browser-only Cloud onboarding screens.",
             "Cloud installs remain ACS/public Splunkbase only; Enterprise cloud-connected activation uses setup.sh handlers instead.",
+            "After install, use the app UI to review Context settings and Model Runtime.",
         ],
     }
 
@@ -127,12 +135,16 @@ def enterprise_plan(args: argparse.Namespace) -> dict[str, Any]:
         "workflow": "splunk-ai-assistant-enterprise-onboarding",
         "mode": "plan-only",
         "platform": "enterprise",
-        "app": "Splunk_AI_Assistant_Cloud",
-        "splunkbase_id": "7245",
+        "app": APP_NAME,
+        "splunkbase_id": SPLUNKBASE_ID,
+        "latest_verified_version": LATEST_VERIFIED_APP_VERSION,
         "steps": steps,
         "notes": [
+            "Splunk AI Assistant for SPL was renamed to Splunk AI Assistant in the 2.0.0 documentation.",
+            "For unpinned latest installs, prefer Splunk Enterprise 9.3+ based on the current Splunkbase compatibility listing.",
             "Activation codes and proxy passwords must be stored in local files, never chat or command-line arguments.",
             "The search head must be able to reach Splunk-managed cloud services on HTTPS.",
+            "Agent Mode is not enabled by this Cloud Connected workflow; it is Cloud-region gated.",
         ],
     }
 
@@ -142,6 +154,7 @@ def render_text(plan: dict[str, Any]) -> str:
         f"Workflow: {plan['workflow']}",
         f"Platform: {plan['platform']}",
         f"App: {plan['app']} ({plan['splunkbase_id']})",
+        f"Latest verified version: {plan['latest_verified_version']}",
         "",
         "Steps:",
     ]

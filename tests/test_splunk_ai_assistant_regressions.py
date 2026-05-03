@@ -13,6 +13,25 @@ from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write
 
 
 class SplunkAIAssistantRegressionTests(ShellScriptRegressionBase):
+    def test_skill_metadata_tracks_current_ai_assistant_release(self) -> None:
+        registry = json.loads((REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8"))
+        entries = {
+            item["skill"]: item
+            for item in registry["apps"]
+            if item.get("skill") == "splunk-ai-assistant-setup"
+        }
+        app = entries["splunk-ai-assistant-setup"]
+        skill_text = (REPO_ROOT / "skills/splunk-ai-assistant-setup/SKILL.md").read_text(encoding="utf-8")
+        reference_text = (REPO_ROOT / "skills/splunk-ai-assistant-setup/reference.md").read_text(encoding="utf-8")
+
+        self.assertEqual(app["label"], "Splunk AI Assistant")
+        self.assertEqual(app["latest_verified_version"], "2.0.0")
+        self.assertEqual(app["min_splunk_version"], "9.3")
+        self.assertIn("formerly", skill_text)
+        self.assertIn("Splunk AI Assistant for SPL", skill_text)
+        self.assertIn("Agent Mode", reference_text)
+        self.assertIn("FedRAMP IL2", reference_text)
+
     def test_activation_code_is_not_passed_to_python_argv(self) -> None:
         script_text = (REPO_ROOT / "skills/splunk-ai-assistant-setup/scripts/setup.sh").read_text(encoding="utf-8")
 

@@ -272,8 +272,8 @@
         "app_name": "Splunk_AI_Assistant_Cloud",
         "label": "`splunk-ai-assistant-setup`",
         "cloud_install_path": "ACS Splunkbase",
-        "cloud_config_path": "App-local settings and activation happen in the app UI",
-        "notes": "Search-tier app only. Splunk Cloud installs stay on the public Splunkbase path; Enterprise uses cloud-connected activation after install."
+        "cloud_config_path": "App-local Context, Model Runtime, and feature settings happen in the app UI",
+        "notes": "Search-tier app only. Splunk Cloud installs stay on the public Splunkbase path; Enterprise uses cloud-connected activation after install. Latest verified Splunkbase release is 2.0.0; Agent Mode is Cloud-region gated and FedRAMP IL2 support is limited."
       },
       {
         "kind": "workflow",
@@ -1003,7 +1003,7 @@
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Search-tier AI assistant app with cloud-backed inference, app UI settings, and KV Store-backed local chat state."
+      "notes": "Search-tier Splunk AI Assistant app with cloud-backed inference, Context and Model Runtime app UI settings, Agent Mode Cloud-region gating, and KV Store-backed local chat state."
     },
     {
       "skill": "splunk-mcp-server-setup",
@@ -1054,7 +1054,7 @@
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Search-head-only catalog and management app. No data ingestion — provides product catalog UI, ecosystem intelligence, and Splunkbase analytics."
+      "notes": "Search-head-only catalog and management app. No data ingestion \u2014 provides product catalog UI, ecosystem intelligence, and Splunkbase analytics."
     }
   ],
   "apps": [
@@ -1081,7 +1081,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.0.25",
+      "latest_verified_date": "April 14, 2026"
     },
     {
       "skill": "cisco-catalyst-ta-setup",
@@ -1106,7 +1108,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "3.1.0",
+      "latest_verified_date": "March 3, 2026"
     },
     {
       "skill": "cisco-dc-networking-setup",
@@ -1131,7 +1135,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.2.0",
+      "latest_verified_date": "February 5, 2026"
     },
     {
       "skill": "cisco-enterprise-networking-setup",
@@ -1159,7 +1165,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "3.1.0",
+      "latest_verified_date": "March 3, 2026"
     },
     {
       "skill": "cisco-catalyst-enhanced-netflow-setup",
@@ -1184,7 +1192,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": true
-      }
+      },
+      "latest_verified_version": "2.1.0",
+      "latest_verified_date": "September 10, 2024"
     },
     {
       "skill": "cisco-security-cloud-setup",
@@ -1209,7 +1219,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "3.6.4",
+      "latest_verified_date": "March 30, 2026"
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -1234,7 +1246,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.0.55",
+      "latest_verified_date": "April 6, 2026"
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -1259,7 +1273,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.0.50",
+      "latest_verified_date": "April 6, 2026"
     },
     {
       "skill": "cisco-intersight-setup",
@@ -1284,7 +1300,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "3.1.1",
+      "latest_verified_date": "March 27, 2026"
     },
     {
       "skill": "cisco-appdynamics-setup",
@@ -1309,7 +1327,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "3.2.1",
+      "latest_verified_date": "May 1, 2026"
     },
     {
       "skill": "cisco-meraki-ta-setup",
@@ -1334,7 +1354,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "3.3.0",
+      "latest_verified_date": "March 18, 2026"
     },
     {
       "skill": "splunk-app-install",
@@ -1359,7 +1381,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.4.0",
+      "latest_verified_date": "April 8, 2026"
     },
     {
       "skill": "splunk-app-install",
@@ -1384,7 +1408,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "4.3.1",
+      "latest_verified_date": "April 25, 2025"
     },
     {
       "skill": "splunk-app-install",
@@ -1409,7 +1435,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.7.0",
+      "latest_verified_date": "July 30, 2024"
     },
     {
       "skill": "splunk-app-install",
@@ -1434,7 +1462,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "5.0.0",
+      "latest_verified_date": "December 13, 2024"
     },
     {
       "skill": "splunk-app-install",
@@ -1459,7 +1489,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.0.1",
+      "latest_verified_date": "September 16, 2025"
     },
     {
       "skill": "splunk-stream-setup",
@@ -1484,7 +1516,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "8.1.6",
+      "latest_verified_date": "March 3, 2026"
     },
     {
       "skill": "splunk-stream-setup",
@@ -1509,7 +1543,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": true,
         "uf_safe": true
-      }
+      },
+      "latest_verified_version": "8.1.6",
+      "latest_verified_date": "March 3, 2026"
     },
     {
       "skill": "splunk-stream-setup",
@@ -1534,7 +1570,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "8.1.6",
+      "latest_verified_date": "March 3, 2026"
     },
     {
       "skill": "cisco-thousandeyes-setup",
@@ -1559,7 +1597,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "0.6.0",
+      "latest_verified_date": "March 10, 2026"
     },
     {
       "skill": "splunk-itsi-setup",
@@ -1586,7 +1626,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "4.21.2",
+      "latest_verified_date": "March 18, 2026"
     },
     {
       "skill": "splunk-itsi-config",
@@ -1614,7 +1656,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "2.5.0",
+      "latest_verified_date": "February 10, 2026"
     },
     {
       "skill": "splunk-enterprise-security-install",
@@ -1640,7 +1684,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "8.5.1",
+      "latest_verified_date": "April 16, 2026"
     },
     {
       "skill": "splunk-security-essentials-setup",
@@ -1666,7 +1712,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "3.8.3",
+      "latest_verified_date": "January 21, 2026"
     },
     {
       "skill": "splunk-asset-risk-intelligence-setup",
@@ -1692,7 +1740,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.2.1",
+      "latest_verified_date": "October 9, 2025"
     },
     {
       "skill": "splunk-attack-analyzer-setup",
@@ -1718,7 +1768,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.2.1",
+      "latest_verified_date": "May 26, 2025"
     },
     {
       "skill": "splunk-attack-analyzer-setup",
@@ -1747,7 +1799,9 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.2.1",
+      "latest_verified_date": "June 3, 2025"
     },
     {
       "skill": "splunk-soar-setup",
@@ -1773,7 +1827,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.0.77",
+      "latest_verified_date": "March 18, 2026"
     },
     {
       "skill": "splunk-soar-setup",
@@ -1802,7 +1858,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "4.5.1",
+      "latest_verified_date": "April 6, 2026"
     },
     {
       "skill": "splunk-uba-setup",
@@ -1829,7 +1887,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.4.6",
+      "latest_verified_date": "March 18, 2025"
     },
     {
       "skill": "splunk-enterprise-security-config",
@@ -1858,18 +1918,21 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "5.26.0",
+      "latest_verified_date": "April 22, 2026"
     },
     {
       "skill": "splunk-ai-assistant-setup",
       "app_name": "Splunk_AI_Assistant_Cloud",
       "splunkbase_id": "7245",
-      "label": "Splunk AI Assistant for SPL",
+      "label": "Splunk AI Assistant",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
       "package_patterns": [
         "splunk-ai-assistant-for-spl_*"
       ],
-      "min_splunk_version": "9.2",
+      "min_splunk_version": "9.3",
+      "latest_verified_version": "2.0.0",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -1884,7 +1947,8 @@
         "needs_python_runtime": false,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_date": "April 9, 2026"
     },
     {
       "skill": "splunk-mcp-server-setup",
@@ -1934,7 +1998,9 @@
         "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
-      }
+      },
+      "latest_verified_version": "1.0.7",
+      "latest_verified_date": "February 18, 2026"
     }
   ]
 }

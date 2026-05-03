@@ -1,19 +1,21 @@
 ---
 name: splunk-ai-assistant-setup
 description: >-
-  Install, validate, and help complete Splunk AI Assistant for SPL
+  Install, validate, and help complete Splunk AI Assistant
   (`Splunk_AI_Assistant_Cloud`) setup on Splunk Cloud or Splunk Enterprise.
   Handles Splunkbase installation with the shared app installer, checks
   post-install health, and supports Enterprise cloud-connected onboarding,
   activation, and proxy configuration. Use when the user asks about
-  splunk-ai-assistant, Splunk AI Assistant for SPL, AI Assistant for SPL, or
-  the `Splunk_AI_Assistant_Cloud` app.
+  splunk-ai-assistant, Splunk AI Assistant, Splunk AI Assistant for SPL,
+  AI Assistant for SPL, or the `Splunk_AI_Assistant_Cloud` app.
 ---
 
-# Splunk AI Assistant for SPL Setup
+# Splunk AI Assistant Setup
 
 Automates installation, validation, and Enterprise setup assistance for
-**Splunk AI Assistant for SPL** (`Splunk_AI_Assistant_Cloud`).
+**Splunk AI Assistant** (`Splunk_AI_Assistant_Cloud`). The product was formerly
+branded **Splunk AI Assistant for SPL**; keep accepting that name in user
+requests and docs lookups while Splunk finishes the rename.
 
 ## What This Skill Covers
 
@@ -31,9 +33,13 @@ this app.
 
 - Primary path: Splunkbase app ID `7245`
 - Internal app name: `Splunk_AI_Assistant_Cloud`
+- Latest verified Splunkbase release: `2.0.0` (April 9, 2026)
 - Install on search heads only
 - Prefer the latest compatible release by omitting `--app-version`
 - Do not model this as a private-app upload on Splunk Cloud
+- For latest `2.0.0`, Splunkbase lists platform compatibility with Splunk
+  Enterprise `9.3+` and Splunk Cloud. Agent Mode requires Splunk platform
+  `10.1+`.
 
 For Splunk Cloud, the shared installer uses ACS Splunkbase install behavior.
 For Splunk Enterprise, the shared installer downloads from Splunkbase and
@@ -100,7 +106,13 @@ When no flags are passed, the setup script performs install plus validation.
 - The app must be installed from the public Splunkbase listing, not as a
   private upload of a downloaded archive.
 - Splunk Cloud self-service installs are supported only on eligible commercial
-  stacks and supported regions.
+  AWS/Azure stacks and supported regions.
+- Version `2.0.0` adds limited FedRAMP IL2 support. Agent Mode is not included
+  in the FedRAMP edition, data for training/fine-tuning defaults off, and Model
+  Runtime is fixed to Splunk-hosted models.
+- Version `2.0.0` also introduces Agent Mode for supported AWS commercial Cloud
+  regions, renames Personalization to Context, and turns Model Runtime on by
+  default for new installs and upgrades.
 - Cloud-side onboarding can require Splunk Web and/or Splunk Support actions,
   so the skill treats it as a first-class handoff instead of a hidden setup
   step. Render the handoff plan with:
@@ -118,6 +130,9 @@ python3 skills/splunk-ai-assistant-setup/scripts/cloud_onboarding_plan.py \
 **Splunk Enterprise (cloud connected)**
 
 - The search head must be able to reach `*.scs.splunk.com` on `443`
+- Use the current public Splunkbase app unless the target is pinned for a
+  documented compatibility reason. For latest `2.0.0`, prefer Enterprise
+  `9.3+`; older app pins can still be relevant for older Enterprise estates.
 - Optional: configure the outbound proxy first if the search head needs one:
 
 ```bash
@@ -188,6 +203,11 @@ bash skills/splunk-ai-assistant-setup/scripts/validate.sh \
 
 ## Notes
 
+- Splunk renamed the app from "Splunk AI Assistant for SPL" to "Splunk AI
+  Assistant" in the `2.0.0` documentation, but the Splunkbase ID and internal
+  app name remain stable.
+- Agent Mode is Cloud-limited in `2.0.0`; Enterprise validation can confirm
+  app install and Cloud Connected state, but it cannot turn on Agent Mode.
 - Chat data for the assistant is stored in the local KV Store on the customer
   stack, so KV Store readiness matters for validation.
 - The validator intentionally avoids the app's `/config` and

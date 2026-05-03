@@ -5,7 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="Splunk_AI_Assistant_Cloud"
-MIN_ENTERPRISE_VERSION="9.2.0"
+MIN_ENTERPRISE_VERSION_PRE_2="9.2.0"
+MIN_ENTERPRISE_VERSION_LATEST="9.3.0"
+MIN_AGENT_MODE_PLATFORM_VERSION="10.1.0"
 
 PASS=0
 WARN=0
@@ -24,7 +26,7 @@ info() { log "  INFO: $*"; }
 usage() {
     local exit_code="${1:-0}"
     cat <<EOF
-Splunk AI Assistant for SPL Validation
+Splunk AI Assistant Validation
 
 Usage: $(basename "$0") [OPTIONS]
 
@@ -267,6 +269,17 @@ assert_expected_state() {
     fi
 }
 
+installed_app_major() {
+    local value="$1"
+    python3 - "${value}" <<'PY'
+import re
+import sys
+
+match = re.search(r"\d+", sys.argv[1] or "")
+print(match.group(0) if match else "0", end="")
+PY
+}
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --expect-configured) require_arg "$1" $# || exit 1; EXPECT_CONFIGURED="$(normalize_boolean "$2")"; shift 2 ;;
@@ -277,7 +290,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log "=== Splunk AI Assistant for SPL Validation ==="
+log "=== Splunk AI Assistant Validation ==="
 log ""
 
 warn_if_current_skill_role_unsupported
@@ -373,6 +386,8 @@ log "--- Platform-Specific Checks ---"
 if is_splunk_cloud; then
     pass "Target is Splunk Cloud"
     info "This app must stay on the public Splunkbase install path for Cloud."
+    info "Version 2.0.0 introduces Agent Mode for supported AWS commercial regions, Context settings, and Model Runtime on by default."
+    info "FedRAMP IL2 support is limited: no Agent Mode, training/fine-tuning data off by default, Splunk-hosted models only."
     info "Enterprise cloud-connected onboarding and proxy settings do not apply on Splunk Cloud."
 else
     cc_config_json="$(collection_doc_json "cloud_connected_configurations")"
@@ -409,10 +424,25 @@ else
     fi
 
     pass "Target is Splunk Enterprise"
-    if [[ "${platform_version}" != "unknown" ]] && version_at_least "${platform_version}" "${MIN_ENTERPRISE_VERSION}"; then
-        pass "Enterprise version ${platform_version} meets the documented 9.2+ baseline"
+    installed_major="$(installed_app_major "${app_version}")"
+    if [[ "${installed_major}" -ge 2 ]]; then
+        min_enterprise_version="${MIN_ENTERPRISE_VERSION_LATEST}"
+        min_enterprise_label="9.3+ latest-app"
+    else
+        min_enterprise_version="${MIN_ENTERPRISE_VERSION_PRE_2}"
+        min_enterprise_label="9.2+ pre-2.0"
+    fi
+    if [[ "${platform_version}" != "unknown" ]] && version_at_least "${platform_version}" "${min_enterprise_version}"; then
+        pass "Enterprise version ${platform_version} meets the ${min_enterprise_label} baseline"
     elif [[ "${platform_version}" != "unknown" ]]; then
-        warn "Enterprise version ${platform_version} is older than the documented 9.2+ baseline"
+        warn "Enterprise version ${platform_version} is older than the ${min_enterprise_label} baseline for installed app version ${app_version}"
+    fi
+    if [[ "${installed_major}" -ge 2 && "${platform_version}" != "unknown" ]]; then
+        if version_at_least "${platform_version}" "${MIN_AGENT_MODE_PLATFORM_VERSION}"; then
+            info "Splunk platform ${platform_version} meets the 10.1+ Agent Mode platform baseline, but Agent Mode is still Cloud-region gated."
+        else
+            info "Agent Mode requires Splunk platform 10.1+ and supported Splunk Cloud AWS regions; this target is validation/onboarding only."
+        fi
     fi
 
     if [[ "${onboarded_state}" == "true" ]]; then

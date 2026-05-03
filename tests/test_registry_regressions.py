@@ -11,6 +11,42 @@ from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase
 # skill_topologies. Currently empty: every on-disk skill should appear.
 SKILL_TOPOLOGY_EXEMPTIONS: set[str] = set()
 
+SPLUNKBASE_APP_COVERAGE_IDS = {
+    "263",
+    "1747",
+    "1761",
+    "1809",
+    "1841",
+    "2731",
+    "3411",
+    "3435",
+    "3449",
+    "3471",
+    "4147",
+    "5234",
+    "5238",
+    "5391",
+    "5558",
+    "5580",
+    "6361",
+    "6872",
+    "6999",
+    "7000",
+    "7180",
+    "7245",
+    "7404",
+    "7538",
+    "7539",
+    "7557",
+    "7569",
+    "7719",
+    "7777",
+    "7828",
+    "8365",
+    "8485",
+    "8566",
+}
+
 
 def _on_disk_skill_dirs() -> set[str]:
     skills_root = REPO_ROOT / "skills"
@@ -463,6 +499,159 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("SA-ITOA", seeded)
         self.assertIn("SplunkEnterpriseSecuritySuite", seeded)
         self.assertIn("Splunk_AI_Assistant_Cloud", seeded)
+
+    def test_splunkbase_apps_track_latest_verified_release_metadata(self):
+        """Every Splunkbase-backed registry app records the latest version we audited."""
+        import re
+
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        version_re = re.compile(r"^\d+(\.\d+)*([.-][A-Za-z0-9]+)?$")
+        date_re = re.compile(r"^[A-Z][a-z]+ \d{1,2}, 20\d{2}$")
+
+        offenders = []
+        for app in registry.get("apps", []):
+            app_id = str(app.get("splunkbase_id", "")).strip()
+            if not app_id.isdigit():
+                continue
+            version = app.get("latest_verified_version")
+            date = app.get("latest_verified_date")
+            if not isinstance(version, str) or not version_re.fullmatch(version):
+                offenders.append(f"{app_id}/{app.get('app_name')}: bad latest_verified_version {version!r}")
+            if not isinstance(date, str) or not date_re.fullmatch(date):
+                offenders.append(f"{app_id}/{app.get('app_name')}: bad latest_verified_date {date!r}")
+
+        self.assertEqual(offenders, [], msg="Invalid Splunkbase latest metadata: " + ", ".join(offenders))
+
+    def test_splunkbase_app_coverage_ids_match_latest_audit_set(self):
+        """The audited public Splunkbase app set should not shrink or grow silently."""
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+
+        actual_ids = {
+            str(app.get("splunkbase_id", "")).strip()
+            for app in registry.get("apps", [])
+            if str(app.get("splunkbase_id", "")).strip().isdigit()
+        }
+
+        self.assertEqual(
+            actual_ids,
+            SPLUNKBASE_APP_COVERAGE_IDS,
+            msg=(
+                "Public Splunkbase-backed app coverage changed. Re-audit Splunkbase latest "
+                "versions, update registry metadata, then update SPLUNKBASE_APP_COVERAGE_IDS."
+            ),
+        )
+
+    def test_splunkbase_apps_have_install_metadata_for_generic_and_skill_installers(self):
+        """Every public Splunkbase app has enough registry metadata to install it."""
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+
+        offenders = []
+        for app in registry.get("apps", []):
+            app_id = str(app.get("splunkbase_id", "")).strip()
+            if not app_id.isdigit():
+                continue
+            if not app.get("app_name"):
+                offenders.append(f"{app_id}: missing app_name")
+            if not app.get("label"):
+                offenders.append(f"{app_id}: missing label")
+            if not app.get("skill"):
+                offenders.append(f"{app_id}: missing skill")
+            package_patterns = app.get("package_patterns")
+            if not isinstance(package_patterns, list) or not all(
+                isinstance(pattern, str) and pattern.strip()
+                for pattern in package_patterns
+            ):
+                offenders.append(f"{app_id}/{app.get('app_name')}: missing package_patterns")
+
+        self.assertEqual(
+            offenders,
+            [],
+            msg="Public Splunkbase apps missing install metadata: " + ", ".join(offenders),
+        )
+
+    def test_splunkbase_apps_have_skill_entrypoint_coverage(self):
+        """Every public Splunkbase app routes to an install/setup and validation path."""
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+
+        offenders = []
+        for app in registry.get("apps", []):
+            app_id = str(app.get("splunkbase_id", "")).strip()
+            if not app_id.isdigit():
+                continue
+
+            app_name = app.get("app_name")
+            skill = app.get("skill", "")
+            skill_dir = REPO_ROOT / "skills" / skill
+            if not (skill_dir / "SKILL.md").is_file():
+                offenders.append(f"{app_id}/{app_name}: missing skills/{skill}/SKILL.md")
+                continue
+
+            if skill == "splunk-app-install":
+                install_entrypoint = skill_dir / "scripts/install_app.sh"
+                if not install_entrypoint.is_file():
+                    offenders.append(f"{app_id}/{app_name}: missing generic install_app.sh")
+                # The generic installer validates by listing installed apps after install.
+                list_entrypoint = skill_dir / "scripts/list_apps.sh"
+                if not list_entrypoint.is_file():
+                    offenders.append(f"{app_id}/{app_name}: missing generic list_apps.sh")
+                continue
+
+            setup_entrypoint = skill_dir / "scripts/setup.sh"
+            validate_entrypoint = skill_dir / "scripts/validate.sh"
+            if not setup_entrypoint.is_file():
+                offenders.append(f"{app_id}/{app_name}: missing skills/{skill}/scripts/setup.sh")
+            if not validate_entrypoint.is_file():
+                offenders.append(f"{app_id}/{app_name}: missing skills/{skill}/scripts/validate.sh")
+
+        self.assertEqual(
+            offenders,
+            [],
+            msg="Public Splunkbase apps missing skill entrypoint coverage: " + ", ".join(offenders),
+        )
+
+    def test_splunkbase_install_dependencies_resolve_to_covered_apps(self):
+        """Companion app dependencies must resolve to another covered Splunkbase entry."""
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        apps_by_id = {
+            str(app.get("splunkbase_id", "")).strip(): app
+            for app in registry.get("apps", [])
+            if str(app.get("splunkbase_id", "")).strip().isdigit()
+        }
+
+        offenders = []
+        for app_id, app in apps_by_id.items():
+            for dependency_id in app.get("install_requires", []):
+                dependency_id = str(dependency_id).strip()
+                dependency = apps_by_id.get(dependency_id)
+                if dependency is None:
+                    offenders.append(
+                        f"{app_id}/{app.get('app_name')}: dependency {dependency_id} is not in registry"
+                    )
+                    continue
+                if dependency_id not in SPLUNKBASE_APP_COVERAGE_IDS:
+                    offenders.append(
+                        f"{app_id}/{app.get('app_name')}: dependency {dependency_id} is not in coverage set"
+                    )
+                if not dependency.get("skill"):
+                    offenders.append(
+                        f"{app_id}/{app.get('app_name')}: dependency {dependency_id} has no skill"
+                    )
+
+        self.assertEqual(
+            offenders,
+            [],
+            msg="Public Splunkbase app dependencies are not fully covered: " + ", ".join(offenders),
+        )
 
     def test_cisco_scan_setup_scripts_have_expected_invariants(self):
         """Structural invariants of the cisco-scan-setup scripts.

@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/../../shared/lib/host_bootstrap_helpers.sh"
 
 APP_NAME="Splunk_AI_Assistant_Cloud"
 APP_ID="7245"
+LATEST_VERIFIED_APP_VERSION="2.0.0"
 APP_INSTALL_SCRIPT="${APP_INSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh}"
 VALIDATE_SCRIPT="${VALIDATE_SCRIPT:-${SCRIPT_DIR}/validate.sh}"
 
@@ -34,7 +35,7 @@ AUTO_VALIDATE_EXPECTS_ONBOARDED=false
 usage() {
     local exit_code="${1:-0}"
     cat <<EOF
-Splunk AI Assistant for SPL Setup
+Splunk AI Assistant Setup
 
 Usage: $(basename "$0") [OPTIONS]
 
@@ -48,7 +49,7 @@ Operations:
   (no flags)                         Install/update and then validate
 
 Options:
-  --app-version VER                  Pin a specific Splunkbase version instead of latest
+  --app-version VER                  Pin a specific Splunkbase version instead of latest (${LATEST_VERIFIED_APP_VERSION})
   --email EMAIL                      Onboarding contact email
   --region REGION                    Onboarding region token such as usa
   --company-name NAME                Customer company name for onboarding submission
@@ -386,9 +387,12 @@ print_platform_notes() {
     log ""
     if is_splunk_cloud; then
         log "Splunk Cloud note: keep this app on the public Splunkbase install path."
-        log "Open the app in Splunk Web after install to confirm the feature is available on the target stack."
+        log "Latest verified release is ${LATEST_VERIFIED_APP_VERSION}; Agent Mode is limited to supported AWS commercial regions."
+        log "FedRAMP IL2 support is limited in ${LATEST_VERIFIED_APP_VERSION}: no Agent Mode, training/fine-tuning data off by default, and Splunk-hosted models only."
+        log "Open the app in Splunk Web after install to confirm Context, Model Runtime, and feature availability on the target stack."
     else
         log "Splunk Enterprise note: this app still uses Splunk-managed cloud services."
+        log "Latest verified release is ${LATEST_VERIFIED_APP_VERSION}; prefer Splunk Enterprise 9.3+ for unpinned latest installs."
         log "Allow outbound HTTPS to *.scs.splunk.com:443 from the search head."
         log "Use --submit-onboarding-form, --complete-onboarding, and optional proxy settings to drive the cloud-connected setup flow."
         log "If the target is an SHC and deployer-target credentials are configured, the shared installer can use deployer bundle delivery."
