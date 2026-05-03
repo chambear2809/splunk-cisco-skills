@@ -1,0 +1,102 @@
+{
+  "_comment": "Machine-readable premium-apps capability overlay consumed by scripts/render_assets.py preflight step 23. Tier-A entries embed the capability list with a pinned 'verified_version'; Tier-B entries are detected at runtime via the installed app's default/authorize.conf because Splunk does not publish their capability reference.",
+  "_schema_version": "1.0",
+  "_dedup_note": "Splunk's own ES 8.4 capability page lists edit_notable_events, schedule_search, edit_managed_configurations, edit_lookups twice (once per feature); the entries below are de-duplicated.",
+  "tier_a": {
+    "SplunkEnterpriseSecuritySuite": {
+      "verified_version": "8.4",
+      "source_url": "https://help.splunk.com/en/splunk-enterprise-security-8/install/8.4/installation/capability-reference-for-splunk-enterprise-security",
+      "must_not_remove": ["list_inputs"],
+      "capabilities_to_disable_on_public_reader": [
+        {"name": "edit_correlationsearches", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_notable_events", "default_role": "ess_analyst", "risk": "ops-only", "removal_breaks": false},
+        {"name": "edit_threat_intel", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_log_review", "default_role": "ess_analyst", "risk": "ops-only", "removal_breaks": false},
+        {"name": "edit_glasstable_*", "default_role": "ess_analyst", "risk": "ops-only", "removal_breaks": false},
+        {"name": "edit_managed_object", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_managed_configurations", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_lookups", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_global_setting_macros", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "schedule_search", "default_role": "power", "risk": "ops-only", "removal_breaks": false},
+        {"name": "edit_sequence_templates", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "mc_*", "default_role": "ess_user", "risk": "ops-only", "removal_breaks": false}
+      ]
+    },
+    "SplunkEnterpriseSecuritySuite_v7": {
+      "verified_version": "7.3",
+      "source_url": "https://help.splunk.com/splunk-enterprise-security-7/install/7.3/installation/capability-reference-for-splunk-enterprise-security",
+      "must_not_remove": [],
+      "capabilities_to_disable_on_public_reader": [
+        {"name": "edit_correlationsearches", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_notable_event", "default_role": "ess_analyst", "risk": "ops-only", "removal_breaks": false},
+        {"name": "edit_threat_intel", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_log_review", "default_role": "ess_analyst", "risk": "ops-only", "removal_breaks": false},
+        {"name": "edit_glasstable_*", "default_role": "ess_analyst", "risk": "ops-only", "removal_breaks": false},
+        {"name": "edit_sequence_templates", "default_role": "ess_admin", "risk": "admin-only", "removal_breaks": false}
+      ]
+    },
+    "splunk_app_soar": {
+      "verified_version": "1.0.74",
+      "source_url": "https://splunkbase.splunk.com/app/6361",
+      "must_not_remove": [],
+      "deprecated_role_to_flag": "splunk_app_soar",
+      "deprecated_role_first_version": "1.0.71",
+      "capabilities_to_disable_on_public_reader": [
+        {"name": "edit_phantom_*", "default_role": "splunk_app_soar_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_soar_export", "default_role": "splunk_app_soar_admin", "risk": "admin-only", "removal_breaks": false}
+      ]
+    },
+    "SA-ITOA": {
+      "verified_version": "4.21",
+      "source_url": "https://docs.splunk.com/Documentation/ITSI/4.21.0/Configure/itsi-roles",
+      "must_not_remove": [],
+      "capabilities_to_disable_on_public_reader": [
+        {"name": "itoa_admin", "default_role": "itoa_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_itsi_*", "default_role": "itoa_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "configure_itsi_*", "default_role": "itoa_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "delete_itsi_*", "default_role": "itoa_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "neap_admin", "default_role": "itoa_admin", "risk": "admin-only", "removal_breaks": false}
+      ]
+    },
+    "Splunk_TA_ueba": {
+      "verified_version": "latest",
+      "source_url": "https://splunkbase.splunk.com/app/4923",
+      "must_not_remove": [],
+      "capabilities_to_disable_on_public_reader": [
+        {"name": "edit_uba_settings", "default_role": "admin", "risk": "admin-only", "removal_breaks": false}
+      ]
+    },
+    "SplunkAssetRiskIntelligence": {
+      "verified_version": "1.2",
+      "source_url": "https://help.splunk.com/en/splunk-asset-and-risk-intelligence",
+      "must_not_remove": [],
+      "capabilities_to_disable_on_public_reader": [
+        {"name": "edit_assets", "default_role": "ari_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_risk_*", "default_role": "ari_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_classifications", "default_role": "ari_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "edit_exposure_analytics", "default_role": "ari_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "manage_collections", "default_role": "ari_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "configure_ari", "default_role": "ari_admin", "risk": "admin-only", "removal_breaks": false},
+        {"name": "view_ari_dashboards", "default_role": "ari_user", "risk": "read-only-safe", "removal_breaks": false},
+        {"name": "edit_ari_alerts", "default_role": "ari_admin", "risk": "admin-only", "removal_breaks": false}
+      ]
+    }
+  },
+  "tier_b": {
+    "Splunk_TA_SAA": {
+      "reason": "Attack Analyzer add-on; no public capability list. Run runtime authorize.conf scan."
+    },
+    "Splunk_App_SAA": {
+      "reason": "Attack Analyzer app; no public capability list. Run runtime authorize.conf scan."
+    },
+    "splunk_app_for_content_packs": {
+      "reason": "Splunk App for Content Packs; no public capability list."
+    },
+    "Splunk_Security_Essentials": {
+      "reason": "Splunk Security Essentials; no public capability list."
+    },
+    "splunk_app_soar_export": {
+      "reason": "Splunk App for SOAR Export (Splunkbase 3411); no public capability list."
+    }
+  }
+}

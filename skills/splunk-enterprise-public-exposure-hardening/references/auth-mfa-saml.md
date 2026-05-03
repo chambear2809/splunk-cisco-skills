@@ -1,9 +1,27 @@
 # Authentication / MFA / SAML Reference
 
+Splunk Enterprise supports five `authType` values: `Splunk`, `LDAP`,
+`Scripted`, `SAML`, `ProxySSO`. This skill makes opinionated
+recommendations:
+
+- **SAML** — recommended for federated user populations. See "SAML
+  SSO" below.
+- **LDAP** — supported with a hardened renderer. See
+  [auth-ldap-hardening.md](auth-ldap-hardening.md).
+- **ProxySSO** — supported via `--auth-mode reverse-proxy-sso`; the
+  proxy authenticates and Splunk trusts the upstream IP.
+- **Scripted** — REFUSED at preflight unless the operator passes
+  `--allow-scripted-auth`. Scripted auth invokes an external
+  Python/shell script for every login (RCE class on a
+  public-facing search head); the script must be audited
+  separately by the operator.
+- **Splunk (native)** — acceptable only for two break-glass admins.
+  Everyone else federates.
+
 ## Native local auth
 
 Acceptable only for two break-glass admins. Everyone else must
-authenticate through SAML SSO.
+authenticate through SAML SSO or LDAP.
 
 Local password policy applied by the renderer (`authentication.conf
 [splunk_auth]`):

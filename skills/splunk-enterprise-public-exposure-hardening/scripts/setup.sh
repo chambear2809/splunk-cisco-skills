@@ -64,6 +64,37 @@ ENABLE_FIPS="false"
 FIPS_VERSION="140-3"
 ALLOWED_UNARCHIVE_COMMANDS=""
 
+# LDAP defaults (only used when --auth-mode=ldap).
+LDAP_STRATEGY_NAME="ldaphost"
+LDAP_HOST=""
+LDAP_PORT="0"
+LDAP_SSL_ENABLED="true"
+LDAP_BIND_DN=""
+LDAP_BIND_PASSWORD_FILE=""
+LDAP_USER_BASE_DN=""
+LDAP_USER_BASE_FILTER=""
+LDAP_USER_NAME_ATTRIBUTE="sAMAccountName"
+LDAP_REAL_NAME_ATTRIBUTE="cn"
+LDAP_EMAIL_ATTRIBUTE="mail"
+LDAP_GROUP_BASE_DN=""
+LDAP_GROUP_BASE_FILTER=""
+LDAP_GROUP_NAME_ATTRIBUTE="cn"
+LDAP_GROUP_MEMBER_ATTRIBUTE="member"
+LDAP_GROUP_MAPPING_ATTRIBUTE="dn"
+LDAP_NESTED_GROUPS="true"
+LDAP_ANONYMOUS_REFERRALS="0"
+LDAP_ENABLE_RANGE_RETRIEVAL="false"
+LDAP_SIZELIMIT="1000"
+LDAP_PAGELIMIT="-1"
+LDAP_TIME_LIMIT="15"
+LDAP_NETWORK_TIMEOUT="20"
+LDAP_CHARSET=""
+LDAP_PUBLIC_READER_GROUP=""
+ALLOW_CLEARTEXT_LDAP="false"
+ALLOW_ANONYMOUS_LDAP_BIND="false"
+ALLOW_SCRIPTED_AUTH="false"
+FEDERATION_SERVICE_ACCOUNT_PASSWORD_FILE=""
+
 usage() {
     local exit_code="${1:-0}"
     cat <<EOF
@@ -105,7 +136,7 @@ Crypto:
   --required-sans CSV
 
 Auth:
-  --auth-mode native|saml|reverse-proxy-sso       (default: native)
+  --auth-mode native|saml|reverse-proxy-sso|ldap  (default: native)
   --saml-idp-metadata-path PATH
   --saml-entity-id URL
   --saml-signature-algorithm ALG                  (default: RSA-SHA256)
@@ -143,6 +174,41 @@ FIPS / unarchive (defense in depth):
   --enable-fips true|false                        (default: false)
   --fips-version 140-2|140-3                      (default: 140-3)
   --allowed-unarchive-commands CSV                (SVD-2026-0302 allowlist)
+
+LDAP (only used when --auth-mode=ldap):
+  --ldap-strategy-name NAME                       (default: ldaphost)
+  --ldap-host HOSTNAME                            (required for ldap mode)
+  --ldap-port PORT                                (0=auto: 636 SSL on, 389 off)
+  --ldap-ssl-enabled true|false                   (default: true)
+  --ldap-bind-dn DN                               (empty=anon bind, requires ack)
+  --ldap-bind-password-file PATH                  (file path, never argv)
+  --ldap-user-base-dn DN[;DN...]                  (semicolon for multi-tree)
+  --ldap-user-base-filter LDAP_FILTER
+  --ldap-user-name-attribute NAME                 (default: sAMAccountName)
+  --ldap-real-name-attribute NAME                 (default: cn)
+  --ldap-email-attribute NAME                     (default: mail)
+  --ldap-group-base-dn DN[;DN...]                 (semicolon for multi-tree)
+  --ldap-group-base-filter LDAP_FILTER
+  --ldap-group-name-attribute NAME                (default: cn)
+  --ldap-group-member-attribute NAME              (default: member)
+  --ldap-group-mapping-attribute NAME             (default: dn)
+  --ldap-nested-groups true|false                 (default: true)
+  --ldap-anonymous-referrals 0|1                  (default: 0; spec default 1)
+  --ldap-enable-range-retrieval true|false        (default: false)
+  --ldap-sizelimit N                              (default: 1000; lowercase!)
+  --ldap-pagelimit N                              (default: -1)
+  --ldap-time-limit SECONDS                       (default: 15; spec hard cap 30)
+  --ldap-network-timeout SECONDS                  (default: 20; must > time-limit)
+  --ldap-charset CHARSET                          (default: empty / UTF-8)
+  --ldap-public-reader-group GROUP_NAME           (LDAP group -> role_public_reader)
+  --allow-cleartext-ldap                          (ack; required for SSL=false)
+  --allow-anonymous-ldap-bind                     (ack; required for empty bind-dn)
+
+Auth refusal:
+  --allow-scripted-auth                           (ack required if authType=Scripted)
+
+Federation:
+  --federation-service-account-password-file PATH (file path; rotate helper)
 
 Render output:
   --output-dir PATH                               (default: <project>/${DEFAULT_RENDER_DIR_NAME})
@@ -219,6 +285,35 @@ while [[ $# -gt 0 ]]; do
         --enable-fips) require_arg "$1" $# || exit 1; ENABLE_FIPS="$2"; shift 2 ;;
         --fips-version) require_arg "$1" $# || exit 1; FIPS_VERSION="$2"; shift 2 ;;
         --allowed-unarchive-commands) require_arg "$1" $# || exit 1; ALLOWED_UNARCHIVE_COMMANDS="$2"; shift 2 ;;
+        --ldap-strategy-name) require_arg "$1" $# || exit 1; LDAP_STRATEGY_NAME="$2"; shift 2 ;;
+        --ldap-host) require_arg "$1" $# || exit 1; LDAP_HOST="$2"; shift 2 ;;
+        --ldap-port) require_arg "$1" $# || exit 1; LDAP_PORT="$2"; shift 2 ;;
+        --ldap-ssl-enabled) require_arg "$1" $# || exit 1; LDAP_SSL_ENABLED="$2"; shift 2 ;;
+        --ldap-bind-dn) require_arg "$1" $# || exit 1; LDAP_BIND_DN="$2"; shift 2 ;;
+        --ldap-bind-password-file) require_arg "$1" $# || exit 1; LDAP_BIND_PASSWORD_FILE="$2"; shift 2 ;;
+        --ldap-user-base-dn) require_arg "$1" $# || exit 1; LDAP_USER_BASE_DN="$2"; shift 2 ;;
+        --ldap-user-base-filter) require_arg "$1" $# || exit 1; LDAP_USER_BASE_FILTER="$2"; shift 2 ;;
+        --ldap-user-name-attribute) require_arg "$1" $# || exit 1; LDAP_USER_NAME_ATTRIBUTE="$2"; shift 2 ;;
+        --ldap-real-name-attribute) require_arg "$1" $# || exit 1; LDAP_REAL_NAME_ATTRIBUTE="$2"; shift 2 ;;
+        --ldap-email-attribute) require_arg "$1" $# || exit 1; LDAP_EMAIL_ATTRIBUTE="$2"; shift 2 ;;
+        --ldap-group-base-dn) require_arg "$1" $# || exit 1; LDAP_GROUP_BASE_DN="$2"; shift 2 ;;
+        --ldap-group-base-filter) require_arg "$1" $# || exit 1; LDAP_GROUP_BASE_FILTER="$2"; shift 2 ;;
+        --ldap-group-name-attribute) require_arg "$1" $# || exit 1; LDAP_GROUP_NAME_ATTRIBUTE="$2"; shift 2 ;;
+        --ldap-group-member-attribute) require_arg "$1" $# || exit 1; LDAP_GROUP_MEMBER_ATTRIBUTE="$2"; shift 2 ;;
+        --ldap-group-mapping-attribute) require_arg "$1" $# || exit 1; LDAP_GROUP_MAPPING_ATTRIBUTE="$2"; shift 2 ;;
+        --ldap-nested-groups) require_arg "$1" $# || exit 1; LDAP_NESTED_GROUPS="$2"; shift 2 ;;
+        --ldap-anonymous-referrals) require_arg "$1" $# || exit 1; LDAP_ANONYMOUS_REFERRALS="$2"; shift 2 ;;
+        --ldap-enable-range-retrieval) require_arg "$1" $# || exit 1; LDAP_ENABLE_RANGE_RETRIEVAL="$2"; shift 2 ;;
+        --ldap-sizelimit) require_arg "$1" $# || exit 1; LDAP_SIZELIMIT="$2"; shift 2 ;;
+        --ldap-pagelimit) require_arg "$1" $# || exit 1; LDAP_PAGELIMIT="$2"; shift 2 ;;
+        --ldap-time-limit) require_arg "$1" $# || exit 1; LDAP_TIME_LIMIT="$2"; shift 2 ;;
+        --ldap-network-timeout) require_arg "$1" $# || exit 1; LDAP_NETWORK_TIMEOUT="$2"; shift 2 ;;
+        --ldap-charset) require_arg "$1" $# || exit 1; LDAP_CHARSET="$2"; shift 2 ;;
+        --ldap-public-reader-group) require_arg "$1" $# || exit 1; LDAP_PUBLIC_READER_GROUP="$2"; shift 2 ;;
+        --allow-cleartext-ldap) ALLOW_CLEARTEXT_LDAP="true"; shift ;;
+        --allow-anonymous-ldap-bind) ALLOW_ANONYMOUS_LDAP_BIND="true"; shift ;;
+        --allow-scripted-auth) ALLOW_SCRIPTED_AUTH="true"; shift ;;
+        --federation-service-account-password-file) require_arg "$1" $# || exit 1; FEDERATION_SERVICE_ACCOUNT_PASSWORD_FILE="$2"; shift 2 ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --help) usage 0 ;;
@@ -255,9 +350,13 @@ validate_args() {
     validate_choice "${FORWARDER_MTLS}" true false
     validate_choice "${TLS_POLICY}" tls12 tls12_13
     validate_choice "${ENABLE_TLS13}" true false
-    validate_choice "${AUTH_MODE}" native saml reverse-proxy-sso
+    validate_choice "${AUTH_MODE}" native saml reverse-proxy-sso ldap
     validate_choice "${ENABLE_FIPS}" true false
     validate_choice "${FIPS_VERSION}" 140-2 140-3
+    validate_choice "${LDAP_SSL_ENABLED}" true false
+    validate_choice "${LDAP_NESTED_GROUPS}" true false
+    validate_choice "${LDAP_ANONYMOUS_REFERRALS}" 0 1
+    validate_choice "${LDAP_ENABLE_RANGE_RETRIEVAL}" true false
 
     if [[ -z "${PUBLIC_FQDN}" ]]; then
         log "ERROR: --public-fqdn is required"
@@ -333,9 +432,44 @@ build_renderer_args() {
         --enable-fips "${ENABLE_FIPS}"
         --fips-version "${FIPS_VERSION}"
         --allowed-unarchive-commands "${ALLOWED_UNARCHIVE_COMMANDS}"
+        --ldap-strategy-name "${LDAP_STRATEGY_NAME}"
+        --ldap-host "${LDAP_HOST}"
+        --ldap-port "${LDAP_PORT}"
+        --ldap-ssl-enabled "${LDAP_SSL_ENABLED}"
+        --ldap-bind-dn "${LDAP_BIND_DN}"
+        --ldap-bind-password-file "${LDAP_BIND_PASSWORD_FILE}"
+        --ldap-user-base-dn "${LDAP_USER_BASE_DN}"
+        --ldap-user-base-filter "${LDAP_USER_BASE_FILTER}"
+        --ldap-user-name-attribute "${LDAP_USER_NAME_ATTRIBUTE}"
+        --ldap-real-name-attribute "${LDAP_REAL_NAME_ATTRIBUTE}"
+        --ldap-email-attribute "${LDAP_EMAIL_ATTRIBUTE}"
+        --ldap-group-base-dn "${LDAP_GROUP_BASE_DN}"
+        --ldap-group-base-filter "${LDAP_GROUP_BASE_FILTER}"
+        --ldap-group-name-attribute "${LDAP_GROUP_NAME_ATTRIBUTE}"
+        --ldap-group-member-attribute "${LDAP_GROUP_MEMBER_ATTRIBUTE}"
+        --ldap-group-mapping-attribute "${LDAP_GROUP_MAPPING_ATTRIBUTE}"
+        --ldap-nested-groups "${LDAP_NESTED_GROUPS}"
+        --ldap-anonymous-referrals "${LDAP_ANONYMOUS_REFERRALS}"
+        --ldap-enable-range-retrieval "${LDAP_ENABLE_RANGE_RETRIEVAL}"
+        --ldap-sizelimit "${LDAP_SIZELIMIT}"
+        --ldap-pagelimit "${LDAP_PAGELIMIT}"
+        --ldap-time-limit "${LDAP_TIME_LIMIT}"
+        --ldap-network-timeout "${LDAP_NETWORK_TIMEOUT}"
+        --ldap-charset "${LDAP_CHARSET}"
+        --ldap-public-reader-group "${LDAP_PUBLIC_READER_GROUP}"
+        --federation-service-account-password-file "${FEDERATION_SERVICE_ACCOUNT_PASSWORD_FILE}"
     )
     if [[ "${ACCEPT_PUBLIC_EXPOSURE}" == "true" ]]; then
         RENDER_ARGS+=(--accept-public-exposure)
+    fi
+    if [[ "${ALLOW_CLEARTEXT_LDAP}" == "true" ]]; then
+        RENDER_ARGS+=(--allow-cleartext-ldap)
+    fi
+    if [[ "${ALLOW_ANONYMOUS_LDAP_BIND}" == "true" ]]; then
+        RENDER_ARGS+=(--allow-anonymous-ldap-bind)
+    fi
+    if [[ "${ALLOW_SCRIPTED_AUTH}" == "true" ]]; then
+        RENDER_ARGS+=(--allow-scripted-auth)
     fi
     if [[ -n "${SVD_FLOOR_FILE}" ]]; then
         RENDER_ARGS+=(--svd-floor-file "${SVD_FLOOR_FILE}")

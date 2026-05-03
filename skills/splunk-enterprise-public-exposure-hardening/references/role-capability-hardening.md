@@ -84,6 +84,22 @@ never_lockout = disabled
 After applying, validate via `preflight.sh` (which fails closed if it
 sees `never_lockout = enabled`).
 
+## Premium apps capability overlay
+
+When ES, SOAR, ITSI, UBA, ARI, AA, Mission Control, Content Packs,
+or SSE are installed alongside this skill's hardening app, those
+apps add capabilities that the base `role_public_reader` does not
+know about. See
+[premium-apps-capability-overlay.md](premium-apps-capability-overlay.md)
+for the two-tier audit (embedded list + runtime scan) and the JSON
+form at
+[premium-apps-capability-overlay.json](premium-apps-capability-overlay.json).
+
+The rendered preflight (step 23) automatically detects installed
+premium apps and emits WARN-level guidance. The ES-8.4-specific
+`list_inputs` capability is treated as ERROR-not-WARN if removed
+from any role per Splunk's own warning.
+
 ## SPL package upload surface
 
 There is no `enable_install_apps` toggle in any released Splunk

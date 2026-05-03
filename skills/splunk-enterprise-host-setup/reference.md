@@ -52,7 +52,7 @@ Out of scope in v1:
 - deployment server / serverclass
 - license manager bootstrap
 - Universal Forwarder bootstrap
-- TLS certificate generation
+- TLS certificate generation — owned by [`splunk-platform-pki-setup`](../splunk-platform-pki-setup/SKILL.md), which mints Private PKI or Public PKI CSR + handoff for every Splunk surface (Splunk Web, splunkd, S2S, HEC, KV Store, indexer cluster, SHC, LM, DS, MC, SAML SP, LDAPS, Edge Processor, UF fleet)
 
 Existing target-side config files that this skill rewrites are backed up as
 `*.bak.<timestamp>` before replacement.

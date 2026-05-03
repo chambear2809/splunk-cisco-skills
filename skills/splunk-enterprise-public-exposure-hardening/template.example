@@ -80,7 +80,7 @@ required_sans:
 # Authentication
 # ---------------------------------------------------------------------------
 
-# native | saml | reverse-proxy-sso
+# native | saml | reverse-proxy-sso | ldap
 auth_mode: saml
 
 # When auth_mode = saml: SAML IdP metadata file path on the local renderer
@@ -91,6 +91,43 @@ saml_signature_algorithm: RSA-SHA256
 
 # When auth_mode = reverse-proxy-sso: trustedIP for the proxy.
 proxy_sso_trusted_ip: 10.0.10.5
+
+# When auth_mode = ldap (see references/auth-ldap-hardening.md for details).
+ldap_strategy_name: ldaphost
+ldap_host: ad.example.com
+ldap_port: 0                     # 0 = auto: 636 if SSL, else 389
+ldap_ssl_enabled: true
+ldap_bind_dn: "cn=svc_splunk,ou=Service,dc=example,dc=com"
+# bind password lives in a local file; never put the value here.
+ldap_bind_password_file: /tmp/splunk_ldap_bind_password
+# Multi-tree DNs use ';' (semicolon) per Splunk authentication.conf spec.
+ldap_user_base_dn: "ou=Users,dc=example,dc=com"
+ldap_user_base_filter: ""
+ldap_user_name_attribute: sAMAccountName    # AD; use 'uid' for OpenLDAP
+ldap_real_name_attribute: cn
+ldap_email_attribute: mail
+ldap_group_base_dn: "ou=Groups,dc=example,dc=com"
+ldap_group_base_filter: ""
+ldap_group_name_attribute: cn
+ldap_group_member_attribute: member
+ldap_group_mapping_attribute: dn
+ldap_nested_groups: true
+ldap_anonymous_referrals: 0       # spec default 1 (insecure); harden to 0
+ldap_enable_range_retrieval: false
+ldap_sizelimit: 1000              # NOTE: spec spelling is lowercase
+ldap_pagelimit: -1
+ldap_time_limit: 15               # spec hard cap is 30
+ldap_network_timeout: 20          # must > ldap_time_limit
+ldap_charset: ""
+ldap_public_reader_group: SplunkPublicReaders   # LDAP group -> role_public_reader
+
+# LDAP refusals (set true ONLY if you understand the risk)
+allow_cleartext_ldap: false       # required to set ldap_ssl_enabled false
+allow_anonymous_ldap_bind: false  # required to leave ldap_bind_dn empty
+
+# Scripted-auth refusal — Splunk authType=Scripted invokes an external
+# script for every login. Refused at preflight unless explicitly acked.
+allow_scripted_auth: false
 
 # Local password policy for the break-glass admin (still required).
 min_password_length: 14
@@ -127,6 +164,20 @@ login_rate_per_minute: 5
 streaming_search_timeout: 600
 
 # ---------------------------------------------------------------------------
+# FIPS / unarchive (defense in depth)
+# ---------------------------------------------------------------------------
+
+# When true, the renderer emits a splunk-launch.conf overlay with
+# SPLUNK_FIPS=1 and the chosen FIPS_VERSION. The host kernel must
+# also be in FIPS mode and Splunk must be cold-started after applying.
+enable_fips: false
+fips_version: "140-3"            # 140-2 | 140-3
+
+# SVD-2026-0302 (RCE) defense-in-depth allowlist for the unarchive
+# command path on the search head. Empty = no unarchive permitted.
+allowed_unarchive_commands: ""
+
+# ---------------------------------------------------------------------------
 # Local-only secret file paths (NOT committed to git; chmod 600).
 # Use `bash skills/shared/scripts/write_secret_file.sh /tmp/<name>` to
 # create each one without the secret hitting shell history.
@@ -140,6 +191,10 @@ ssl_key_password_file: /tmp/splunk_ssl_key_password
 saml_signing_cert_file: /tmp/splunk_saml_signing_cert
 saml_signing_key_file: /tmp/splunk_saml_signing_key
 hec_mtls_ca_bundle_file: /opt/splunk/etc/auth/hec_client_ca.pem
+
+# When rotating a federated-search provider's service-account password
+# (see references/federated-search-provider-hardening.md).
+federation_service_account_password_file: /tmp/splunk_federation_service_account_password
 
 # ---------------------------------------------------------------------------
 # External probe (used by preflight + validate to confirm 8089/8191/8065/9887

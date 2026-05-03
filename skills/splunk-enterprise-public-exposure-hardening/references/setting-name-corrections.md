@@ -20,6 +20,15 @@ rendered `web.conf` does not contain any of these misnames.
 | `serverRoot` | Does not exist. The setting that mounts Splunk under a sub-path is `root_endpoint` (e.g. `root_endpoint = /splunk`). |
 | `splunkdConnectionHost` | Does not exist. The setting that controls Splunk Web → splunkd connection target is `mgmtHostPort`. |
 | `trustedProxiesList` | Does not exist. There is NO XFF allowlist in Splunk. Use `acceptFrom` on `web.conf [settings]` AND `server.conf [httpServer]` to lock down the immediate-client IP. |
+| `sizeLimit` (camelCase, in LDAP stanza) | Does not exist. The spec spelling is **lowercase `sizelimit`**. Splunk silently ignores camelCase. |
+| `bindPassword` (in LDAP stanza) | Does not exist. The spec key is `bindDNpassword` (one word, capital D). |
+| `enableTLSLDAP` | Does not exist. LDAP TLS is enabled via `SSLEnabled = 1` in the LDAP strategy stanza, plus `$SPLUNK_HOME/etc/openldap/ldap.conf` for cipher / protocol configuration. |
+| `sslVersions` (inside the `[<authSettings-key>]` LDAP stanza) | Does not exist for LDAP. The spec routes LDAP-channel TLS to `$SPLUNK_HOME/etc/openldap/ldap.conf` only. Splunk silently ignores `sslVersions` / `cipherSuite` / `ecdhCurves` inside the LDAP strategy stanza. |
+| `cipherSuite` (inside the LDAP stanza) | Same as above — does not apply to LDAP. |
+| `ecdhCurves` (inside the LDAP stanza) | Same as above — does not apply to LDAP. |
+| `roleMap_LDAP` (without strategy suffix) | Does not exist. The stanza name is `[roleMap_<authSettings-key>]` where `<authSettings-key>` matches the LDAP strategy stanza name (e.g., `[roleMap_ldaphost]` for `[ldaphost]`). |
+| `userToRoleMap_<ldap-strategy>` | Does not exist for LDAP. The `[userToRoleMap_*]` stanza is SAML-only. |
+| `pass4SymmKey` for federated search | Does NOT cover federation. Federation uses a per-provider native Splunk service-account user+password in `federated.conf [provider://<name>]` on the CONSUMER. The skill's `rotate-pass4symmkey.sh` does not touch federation creds; use `rotate-federation-service-account.sh`. |
 
 ## Real settings often confused with each other
 

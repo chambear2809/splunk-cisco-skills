@@ -38,6 +38,7 @@ GENERATED_FILES: set[str] = {
     "splunk/apps/000_public_exposure_hardening/default/commands.conf",
     "splunk/apps/000_public_exposure_hardening/default/props.conf",
     "splunk/apps/000_public_exposure_hardening/default/splunk-launch.conf",
+    "splunk/apps/000_public_exposure_hardening/default/openldap-ldap.conf.example",
     "splunk/apps/000_public_exposure_hardening/metadata/default.meta",
     "splunk/apps/000_public_exposure_hardening/metadata/local.meta",
     # Apply / rotate helpers
@@ -50,6 +51,7 @@ GENERATED_FILES: set[str] = {
     "splunk/apply-license-manager.sh",
     "splunk/rotate-pass4symmkey.sh",
     "splunk/rotate-splunk-secret.sh",
+    "splunk/rotate-federation-service-account.sh",
     "splunk/certificates/verify-certs.sh",
     "splunk/certificates/generate-csr-template.sh",
     "splunk/certificates/README.md",
@@ -90,6 +92,16 @@ EMBEDDED_SVD_FLOOR: dict[str, str] = {
     "10.0": "10.0.5",
     "9.4": "9.4.10",
     "9.3": "9.3.11",
+}
+
+# Splunk Secure Gateway app SVD floor (per-branch). Source:
+# advisory.splunk.com — SVD-2025-0302, SVD-2025-1208, SVD-2025-1202,
+# SVD-2025-0307, SVD-2024-1005, SVD-2023-0212. The renderer's preflight
+# uses these to refuse outdated splunk_secure_gateway installs.
+EMBEDDED_SG_FLOOR: dict[str, str] = {
+    "3.9": "3.9.10",
+    "3.8": "3.8.58",
+    "3.7": "3.7.28",
 }
 
 
@@ -222,13 +234,56 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--required-sans", default="")
     parser.add_argument(
         "--auth-mode",
-        choices=("native", "saml", "reverse-proxy-sso"),
+        choices=("native", "saml", "reverse-proxy-sso", "ldap"),
         default="native",
     )
     parser.add_argument("--saml-idp-metadata-path", default="")
     parser.add_argument("--saml-entity-id", default="")
     parser.add_argument("--saml-signature-algorithm", default="RSA-SHA256")
     parser.add_argument("--proxy-sso-trusted-ip", default="")
+    # LDAP CLI flags. Spec spelling preserved (lowercase sizelimit, etc).
+    # Multi-tree DN lists use ';' (semicolon) per spec.
+    parser.add_argument("--ldap-strategy-name", default="ldaphost")
+    parser.add_argument("--ldap-host", default="")
+    parser.add_argument("--ldap-port", type=int, default=0,
+                        help="0 = auto: 636 when SSLEnabled, else 389")
+    parser.add_argument("--ldap-ssl-enabled", choices=("true", "false"), default="true")
+    parser.add_argument("--ldap-bind-dn", default="")
+    parser.add_argument("--ldap-bind-password-file", default="")
+    parser.add_argument("--ldap-user-base-dn", default="",
+                        help="';'-separated multi-tree per Splunk authentication.conf spec")
+    parser.add_argument("--ldap-user-base-filter", default="")
+    parser.add_argument("--ldap-user-name-attribute", default="sAMAccountName")
+    parser.add_argument("--ldap-real-name-attribute", default="cn")
+    parser.add_argument("--ldap-email-attribute", default="mail")
+    parser.add_argument("--ldap-group-base-dn", default="")
+    parser.add_argument("--ldap-group-base-filter", default="")
+    parser.add_argument("--ldap-group-name-attribute", default="cn")
+    parser.add_argument("--ldap-group-member-attribute", default="member")
+    parser.add_argument("--ldap-group-mapping-attribute", default="dn")
+    parser.add_argument("--ldap-nested-groups", choices=("true", "false"), default="true")
+    parser.add_argument("--ldap-anonymous-referrals", choices=("0", "1"), default="0",
+                        help="Spec default is 1 (insecure); the renderer hardens to 0.")
+    parser.add_argument("--ldap-enable-range-retrieval", choices=("true", "false"),
+                        default="false")
+    parser.add_argument("--ldap-sizelimit", type=int, default=1000,
+                        help="Spec spelling is lowercase 'sizelimit'.")
+    parser.add_argument("--ldap-pagelimit", type=int, default=-1)
+    parser.add_argument("--ldap-time-limit", type=int, default=15,
+                        help="Spec hard cap is 30 seconds.")
+    parser.add_argument("--ldap-network-timeout", type=int, default=20,
+                        help="Spec requires this to be > --ldap-time-limit.")
+    parser.add_argument("--ldap-charset", default="")
+    parser.add_argument("--ldap-public-reader-group", default="",
+                        help="LDAP group name whose members map to role_public_reader.")
+    parser.add_argument("--allow-cleartext-ldap", action="store_true",
+                        help="Required ack to set --ldap-ssl-enabled false.")
+    parser.add_argument("--allow-anonymous-ldap-bind", action="store_true",
+                        help="Required ack to leave --ldap-bind-dn empty.")
+    parser.add_argument("--allow-scripted-auth", action="store_true",
+                        help="Required ack when authType=Scripted is detected at preflight.")
+    parser.add_argument("--federation-service-account-password-file", default="",
+                        help="Used by rotate-federation-service-account.sh.")
     parser.add_argument("--min-password-length", type=int, default=14)
     parser.add_argument("--expire-password-days", type=int, default=90)
     parser.add_argument("--lockout-attempts", type=int, default=5)
@@ -337,6 +392,52 @@ def validate(args: argparse.Namespace) -> None:
         die("--proxy-sso-trusted-ip is required when --auth-mode=reverse-proxy-sso.")
     if args.tls_policy == "tls12_13" and args.enable_tls13 != "true":
         die("--tls-policy=tls12_13 requires --enable-tls13=true.")
+    if args.auth_mode == "ldap":
+        validate_ldap_args(args)
+
+
+def _validate_dn(value: str, option: str) -> None:
+    if not value:
+        return
+    for entry in [s.strip() for s in value.split(";") if s.strip()]:
+        if "=" not in entry:
+            die(f"{option} entry {entry!r} does not look like an LDAP DN.")
+        if "\n" in entry or "\r" in entry:
+            die(f"{option} entries must not contain newlines.")
+
+
+def validate_ldap_args(args: argparse.Namespace) -> None:
+    if not args.ldap_host:
+        die("--ldap-host is required when --auth-mode=ldap.")
+    if not re.fullmatch(r"[A-Za-z0-9_]+", args.ldap_strategy_name or ""):
+        die("--ldap-strategy-name must be alphanumeric / underscore.")
+    if not args.ldap_user_base_dn:
+        die("--ldap-user-base-dn is required when --auth-mode=ldap.")
+    if not args.ldap_group_base_dn:
+        die("--ldap-group-base-dn is required when --auth-mode=ldap.")
+    _validate_dn(args.ldap_user_base_dn, "--ldap-user-base-dn")
+    _validate_dn(args.ldap_group_base_dn, "--ldap-group-base-dn")
+    if args.ldap_bind_dn:
+        _validate_dn(args.ldap_bind_dn, "--ldap-bind-dn")
+    if args.ldap_ssl_enabled == "false" and not args.allow_cleartext_ldap:
+        die("--ldap-ssl-enabled=false requires --allow-cleartext-ldap "
+            "(cleartext bind on a public-facing search head leaks credentials on the wire).")
+    if not args.ldap_bind_dn and not args.allow_anonymous_ldap_bind:
+        die("Empty --ldap-bind-dn (anonymous bind) requires --allow-anonymous-ldap-bind.")
+    if args.ldap_time_limit < 1 or args.ldap_time_limit > 30:
+        die("--ldap-time-limit must be 1..30 (Splunk's spec hard cap).")
+    # Splunk allows -1 (unlimited) for network_timeout, but unlimited
+    # blocking on a public-internet-facing search head is unacceptable —
+    # refuse outright. The operator can edit the rendered authentication.conf
+    # if they truly need it.
+    if args.ldap_network_timeout == -1:
+        die("--ldap-network-timeout=-1 (unlimited) is unsafe for public exposure; "
+            "set a finite value greater than --ldap-time-limit.")
+    if args.ldap_network_timeout <= args.ldap_time_limit:
+        die("--ldap-network-timeout must be greater than --ldap-time-limit "
+            "(spec L621-622).")
+    if args.ldap_sizelimit < 1:
+        die("--ldap-sizelimit must be >= 1.")
 
 
 def parse_version(value: str) -> tuple[int, int, int]:
@@ -353,6 +454,22 @@ def parse_version(value: str) -> tuple[int, int, int]:
     return (nums[0], nums[1], nums[2])
 
 
+def _floor_from_json_payload(data: dict) -> dict[str, str]:
+    """Accept either the flat mapping (legacy) or the structured payload
+    with a top-level `splunk_enterprise` key (current). The structured
+    payload may include a parallel `splunk_secure_gateway` block plus a
+    `_comment` key — both are tolerated.
+    """
+    # Legacy flat shape: {"10.2": "10.2.2", ...}
+    if all(re.match(r"^\d+\.\d+$", str(k)) for k in data.keys() if not str(k).startswith("_")):
+        return {str(k): str(v) for k, v in data.items() if not str(k).startswith("_")}
+    # Structured shape: pull out splunk_enterprise.
+    splunk = data.get("splunk_enterprise")
+    if not isinstance(splunk, dict):
+        die("svd-floor JSON must contain 'splunk_enterprise' or be a flat series->version map.")
+    return {str(k): str(v) for k, v in splunk.items() if not str(k).startswith("_")}
+
+
 def load_svd_floor(args: argparse.Namespace) -> dict[str, str]:
     if args.svd_floor_file:
         try:
@@ -361,7 +478,7 @@ def load_svd_floor(args: argparse.Namespace) -> dict[str, str]:
             die(f"could not read --svd-floor-file: {exc}")
         if not isinstance(data, dict):
             die("svd-floor JSON must be an object mapping series to fixed version.")
-        return {str(k): str(v) for k, v in data.items()}
+        return _floor_from_json_payload(data)
     return dict(EMBEDDED_SVD_FLOOR)
 
 
@@ -684,6 +801,15 @@ def render_outputs_conf(args: argparse.Namespace) -> str:
     )
 
 
+def _auth_type_for(args: argparse.Namespace) -> str:
+    return {
+        "saml": "SAML",
+        "ldap": "LDAP",
+        "reverse-proxy-sso": "Splunk",  # ProxySSO uses Splunk authType under the hood
+        "native": "Splunk",
+    }.get(args.auth_mode, "Splunk")
+
+
 def render_authentication_conf(args: argparse.Namespace) -> str:
     lines = [
         header(),
@@ -705,7 +831,7 @@ def render_authentication_conf(args: argparse.Namespace) -> str:
         f"passwordHistoryCount = {args.password_history_count}",
         "",
         "[authentication]",
-        f"authType = {'SAML' if args.auth_mode == 'saml' else 'Splunk'}",
+        f"authType = {_auth_type_for(args)}",
     ]
     if args.auth_mode == "saml":
         lines.append("authSettings = saml")
@@ -730,7 +856,92 @@ def render_authentication_conf(args: argparse.Namespace) -> str:
         ])
         if args.saml_signing_cert_file:
             lines.append("# attributeQuerySigningCertPath = /opt/splunk/etc/auth/idp_signing.pem")
+    elif args.auth_mode == "ldap":
+        strategy = args.ldap_strategy_name
+        port = args.ldap_port or (636 if args.ldap_ssl_enabled == "true" else 389)
+        ssl_enabled = "1" if args.ldap_ssl_enabled == "true" else "0"
+        nested = "1" if args.ldap_nested_groups == "true" else "0"
+        range_retrieval = "true" if args.ldap_enable_range_retrieval == "true" else "false"
+        lines.append(f"authSettings = {strategy}")
+        lines.extend([
+            "",
+            f"[{strategy}]",
+            "# LDAP TLS is configured in $SPLUNK_HOME/etc/openldap/ldap.conf. The",
+            "# strategy stanza does NOT take sslVersions / cipherSuite / ecdhCurves",
+            "# (those keys are not documented in authentication.conf for LDAP).",
+            "# See default/openldap-ldap.conf.example for the operator-side stub.",
+            f"host = {args.ldap_host}",
+            f"port = {port}",
+            f"SSLEnabled = {ssl_enabled}",
+        ])
+        if args.ldap_bind_dn:
+            lines.append(f"bindDN = {args.ldap_bind_dn}")
+        else:
+            lines.append("# bindDN is INTENTIONALLY blank: --allow-anonymous-ldap-bind acked.")
+        lines.extend([
+            "# bindDNpassword injected at apply time from --ldap-bind-password-file",
+            "# (Splunk does not auto-encrypt bindDNpassword on first read per spec).",
+            f"userBaseDN = {args.ldap_user_base_dn}",
+            f"userBaseFilter = {args.ldap_user_base_filter}",
+            f"userNameAttribute = {args.ldap_user_name_attribute}",
+            f"realNameAttribute = {args.ldap_real_name_attribute}",
+            f"emailAttribute = {args.ldap_email_attribute}",
+            f"groupBaseDN = {args.ldap_group_base_dn}",
+            f"groupBaseFilter = {args.ldap_group_base_filter}",
+            f"groupNameAttribute = {args.ldap_group_name_attribute}",
+            f"groupMemberAttribute = {args.ldap_group_member_attribute}",
+            f"groupMappingAttribute = {args.ldap_group_mapping_attribute}",
+            f"nestedGroups = {nested}",
+            "# anonymous_referrals defaults to 1 in spec; hardened to 0 here.",
+            f"anonymous_referrals = {args.ldap_anonymous_referrals}",
+            f"enableRangeRetrieval = {range_retrieval}",
+            "# Spec spelling is lowercase 'sizelimit'.",
+            f"sizelimit = {args.ldap_sizelimit}",
+            f"pagelimit = {args.ldap_pagelimit}",
+            "# timelimit is hard-capped at 30 per spec; network_timeout > timelimit.",
+            f"timelimit = {args.ldap_time_limit}",
+            f"network_timeout = {args.ldap_network_timeout}",
+        ])
+        if args.ldap_charset:
+            lines.append(f"charset = {args.ldap_charset}")
+        # roleMap stanza: Splunk role on the LEFT, semicolon-separated LDAP groups
+        # on the right (do NOT use comma; spec L654).
+        lines.extend([
+            "",
+            f"# Splunk role on the LEFT, ';'-separated LDAP groups on the RIGHT.",
+            f"# Group names are case-sensitive (spec L657).",
+            f"[roleMap_{strategy}]",
+        ])
+        if args.ldap_public_reader_group:
+            lines.append(f"role_public_reader = {args.ldap_public_reader_group}")
+        else:
+            lines.append("# role_public_reader = <ldap-group-name>")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def render_openldap_ldap_conf_example(args: argparse.Namespace) -> str:
+    """Operator-side TLS stub for $SPLUNK_HOME/etc/openldap/ldap.conf.
+
+    Splunk's authentication.conf spec defers LDAP TLS to this file; emitting
+    sslVersions / cipherSuite inside the [<authSettings-key>] strategy stanza
+    is silently ignored.
+    """
+    return (
+        header()
+        + "# This is an example TLS config for LDAP that the OPERATOR places at:\n"
+        f"#   {args.splunk_home}/etc/openldap/ldap.conf\n"
+        "# (NOT inside the rendered hardening app's local/.) Splunk's\n"
+        "# authentication.conf spec routes LDAP-channel TLS to this file —\n"
+        "# `sslVersions`/`cipherSuite` keys inside the [<strategy>] stanza\n"
+        "# of authentication.conf are not honored for LDAP.\n"
+        "TLS_REQCERT       demand\n"
+        f"TLS_CACERT        {args.ca_bundle_path}\n"
+        "# 3.1=TLS1.0  3.2=TLS1.1  3.3=TLS1.2\n"
+        "TLS_PROTOCOL_MIN  3.3\n"
+        "TLS_CIPHER_SUITE  "
+        "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:"
+        "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256\n"
+    )
 
 
 def render_authorize_conf(args: argparse.Namespace) -> str:
@@ -862,11 +1073,17 @@ def render_apply_search_head(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
     pass4_path = shell_quote(args.pass4symmkey_file or "")
     ssl_pass_path = shell_quote(args.ssl_key_password_file or "")
+    ldap_bind_pwd_path = shell_quote(args.ldap_bind_password_file or "")
+    ldap_strategy = shell_quote(args.ldap_strategy_name or "")
+    auth_mode = shell_quote(args.auth_mode)
     enable_fips = "true" if args.enable_fips == "true" else "false"
     return make_script(
         f"""splunk_home={splunk_home}
 pass4_file={pass4_path}
 ssl_pass_file={ssl_pass_path}
+ldap_bind_pwd_file={ldap_bind_pwd_path}
+ldap_strategy={ldap_strategy}
+auth_mode={auth_mode}
 enable_fips={enable_fips}
 
 if [[ ! -x "${{splunk_home}}/bin/splunk" ]]; then
@@ -934,6 +1151,19 @@ for frag in "$dst_app/local/server.conf.pass4symmkey.fragment" \\
   cat "$frag" >> "$dst_app/local/server.conf"
   rm -f "$frag"
 done
+
+# Inject LDAP bindDNpassword from local file (never argv) when --auth-mode=ldap.
+# Splunk does NOT auto-encrypt bindDNpassword on first read per spec, so this
+# file goes through the standard splunk.secret credential pipeline by being
+# placed in local/authentication.conf and rewritten by splunkd at first read.
+if [[ "$auth_mode" == "ldap" && -n "$ldap_bind_pwd_file" && -s "$ldap_bind_pwd_file" ]]; then
+  ldap_pw="$(cat "$ldap_bind_pwd_file")"
+  : > "$dst_app/local/authentication.conf"
+  printf '[%s]\\nbindDNpassword = %s\\n' "$ldap_strategy" "$ldap_pw" \\
+    >> "$dst_app/local/authentication.conf"
+  chmod 0400 "$dst_app/local/authentication.conf"
+  unset ldap_pw
+fi
 
 "${{splunk_home}}/bin/splunk" restart
 """
@@ -1020,12 +1250,14 @@ if [[ -z "$pass4_file" || ! -s "$pass4_file" ]]; then
   exit 1
 fi
 
-# Rotate the cluster manager pass4SymmKey via splunk btool / edit.
-# Reading from file keeps the secret off argv.
-pass4="$(cat "$pass4_file")"
+# Rotate the cluster manager pass4SymmKey. The CLI reads the secret from
+# the file directly via -auth-passphrase-file; the value never appears on
+# argv. Splunk session auth must be established beforehand by either:
+#   - Running as the 'splunk' service user with an active session, or
+#   - Running 'splunk login' as an admin first.
 "${{splunk_home}}/bin/splunk" edit cluster-config -mode manager \\
   -auth-passphrase-file "$pass4_file" || true
-unset pass4
+
 "${{splunk_home}}/bin/splunk" restart
 """
     )
@@ -1081,6 +1313,61 @@ new_key="$(cat "$secret_file")"
 unset new_key
 echo "Wrote rotation fragment to $local_dir/server.conf.pass4symmkey.fragment"
 echo "Merge into etc/system/local/server.conf, then 'splunk restart'."
+"""
+    )
+
+
+def render_rotate_federation_service_account(args: argparse.Namespace) -> str:
+    """Federated-search rotation. Federation auth is a NATIVE Splunk service
+    account user+password stored in `federated.conf [provider://...]` on the
+    CONSUMER SH (NOT pass4SymmKey). The existing rotate-pass4symmkey.sh does
+    not touch federation creds.
+    """
+    return make_script(
+        """splunk_home="${SPLUNK_HOME:-/opt/splunk}"
+service_account="${1:-}"
+new_password_file="${2:-}"
+
+if [[ -z "$service_account" || -z "$new_password_file" || ! -s "$new_password_file" ]]; then
+  cat <<USAGE >&2
+Usage: $0 <federation_service_account_username> /path/to/new_password_file
+
+Federated search authenticates with a native Splunk service-account
+user+password stored in federated.conf [provider://<name>] on the CONSUMER SH.
+This rotation:
+
+  1) Updates the service account on this PROVIDER SH via splunk edit user.
+  2) Reminds you to update each CONSUMER SH's federated.conf [provider://]
+     stanza with the new password (re-encrypted by the consumer's
+     splunk.secret).
+  3) Recommends a "Test connection" REST call before saving on each
+     consumer to avoid the documented 30-min auto-lockout when a
+     transparent-mode definition is saved with bad creds.
+
+The existing rotate-pass4symmkey.sh does NOT cover federation auth.
+USAGE
+  exit 2
+fi
+
+# Update the service account password on the provider SH. The CLI reads
+# the new password from the file via -password-file so the value never
+# appears on argv. Splunk session auth must be established beforehand by
+# either:
+#   - Running as the 'splunk' service user with an active session, or
+#   - Running 'splunk login' as an admin first.
+"${splunk_home}/bin/splunk" edit user "$service_account" \\
+    -password-file "$new_password_file"
+
+cat <<NEXT
+Provider-side rotation complete for user '$service_account'.
+Now update each CONSUMER SH:
+  1) splunk edit federated-provider <name> --service-account-password-file /path/to/new_password_file
+     (or edit etc/system/local/federated.conf [provider://<name>] manually).
+  2) On consumers running transparent mode, pre-validate via the
+     'Test connection' REST call before saving to avoid the 30-min lockout.
+  3) Splunk Enterprise 10.0+ supports mTLS for federation; consider
+     enabling it for public-exposure provider deployments.
+NEXT
 """
     )
 
@@ -2247,6 +2534,7 @@ def render_preflight(args: argparse.Namespace) -> str:
     probe = shell_quote(args.external_probe_cmd or "")
     helper = shell_quote(helper_path())
     cert_path = shell_quote(args.server_cert_path)
+    allow_scripted = "true" if args.allow_scripted_auth else "false"
     return make_script(
         f"""splunk_home={splunk_home}
 fqdn={fqdn}
@@ -2254,6 +2542,7 @@ proxy_cidr={proxy_cidr}
 external_probe={probe}
 cert_path={cert_path}
 helper={helper}
+allow_scripted_auth={allow_scripted}
 
 failures=0
 
@@ -2495,6 +2784,81 @@ for path in /services/apps/local /services/apps/appinstall \\
       ;;
   esac
 done
+
+# 22. Scripted-auth refusal. authType=Scripted invokes an external Python /
+# shell script for every login — RCE class on a public-facing search head.
+auth_type="$("${{splunk_home}}/bin/splunk" btool authentication list authentication 2>/dev/null \\
+  | awk -F'= *' '/^authType *=/ {{print $2; exit}}' || true)"
+if [[ "$auth_type" == "Scripted" ]]; then
+  if [[ "$allow_scripted_auth" == "true" ]]; then
+    echo "WARN: authType = Scripted is in use AND --allow-scripted-auth was acked."
+    echo "      Audit $splunk_home/etc/auth/scripts/ before exposing publicly."
+  else
+    fail "authType = Scripted requires --allow-scripted-auth ack (RCE class on public surface)"
+  fi
+else
+  ok "authType is not Scripted (current: ${{auth_type:-unknown}})"
+fi
+
+# 23. Premium-apps capability scan. Documented apps get embedded-list audit;
+# undocumented apps get a runtime authorize.conf scan with WARN-only output.
+declare -A tier_a=(
+  [SplunkEnterpriseSecuritySuite]="ES 8.4 — see references/premium-apps-capability-overlay.md"
+  [splunk_app_soar]="splunk_app_soar 1.0.74 — see references/premium-apps-capability-overlay.md"
+  [SA-ITOA]="ITSI 4.21 — see references/premium-apps-capability-overlay.md"
+  [Splunk_TA_ueba]="UEBA TA — see references/premium-apps-capability-overlay.md"
+  [SplunkAssetRiskIntelligence]="ARI 1.2 — see references/premium-apps-capability-overlay.md"
+)
+declare -A tier_b=(
+  [Splunk_TA_SAA]="Attack Analyzer — no public capability list; runtime scan recommended"
+  [Splunk_App_SAA]="Attack Analyzer — no public capability list; runtime scan recommended"
+  [splunk_app_for_content_packs]="Content Packs — no public capability list"
+  [Splunk_Security_Essentials]="SSE — no public capability list"
+  [splunk_app_soar_export]="SOAR Export 3411 — no public capability list"
+)
+detected_premium=0
+for app_dir in "${{splunk_home}}/etc/apps"/*; do
+  [[ -d "$app_dir" ]] || continue
+  name="$(basename "$app_dir")"
+  if [[ -n "${{tier_a[$name]:-}}" ]]; then
+    echo "WARN: Tier-A premium app detected: $name (${{tier_a[$name]}})."
+    echo "      Audit role_public_reader against the embedded capability list."
+    detected_premium=1
+  elif [[ -n "${{tier_b[$name]:-}}" ]]; then
+    echo "WARN: Tier-B premium app detected: $name (${{tier_b[$name]}})."
+    echo "      Run: cat $app_dir/default/authorize.conf 2>/dev/null | grep -E '^\\[role_|^\\[capability::|^.*= enabled' to enumerate."
+    detected_premium=1
+  fi
+done
+if [[ "$detected_premium" == "0" ]]; then
+  ok "no premium apps detected (or none on the known list)"
+fi
+
+# 24. SG-app version floor. The Splunk Secure Gateway app has its own SVD
+# class (SVD-2025-0302 HIGH 7.1, SVD-2025-1208, SVD-2025-1202, SVD-2025-0307,
+# SVD-2024-1005). Refuse on outdated versions.
+sg_app_dir="${{splunk_home}}/etc/apps/splunk_secure_gateway"
+if [[ -d "$sg_app_dir" ]]; then
+  sg_ver="$(awk -F'= *' '/^version *=/ {{print $2; exit}}' \\
+    "$sg_app_dir/default/app.conf" 2>/dev/null \\
+    | tr -d '[:space:]' || true)"
+  if [[ -z "$sg_ver" ]]; then
+    fail "Splunk Secure Gateway installed but version cannot be parsed"
+  else
+    # Floors from references/cve-svd-floor.json: 3.9.10 (latest), 3.8.58, 3.7.28
+    case "$sg_ver" in
+      3.9.10|3.9.1[0-9]*|3.9.[2-9][0-9]*) ok "splunk_secure_gateway $sg_ver >= 3.9.10 floor" ;;
+      3.8.58|3.8.[6-9][0-9]*|3.8.[1-9][0-9][0-9]*) ok "splunk_secure_gateway $sg_ver >= 3.8.58 floor" ;;
+      3.7.28|3.7.[3-9][0-9]*|3.7.[1-9][0-9][0-9]*) ok "splunk_secure_gateway $sg_ver >= 3.7.28 floor" ;;
+      4.*) ok "splunk_secure_gateway $sg_ver (>=4.x assumed past floor)" ;;
+      *)
+        fail "splunk_secure_gateway $sg_ver below SVD floor (3.9.10 / 3.8.58 / 3.7.28)"
+        ;;
+    esac
+  fi
+else
+  ok "splunk_secure_gateway not installed"
+fi
 
 if [[ "$failures" -gt 0 ]]; then
   echo "PREFLIGHT FAILED: $failures check(s) failed." >&2
@@ -2751,6 +3115,7 @@ def emit_all(args: argparse.Namespace, render_dir: Path, floor: dict[str, str]) 
         "splunk/apps/000_public_exposure_hardening/default/commands.conf": render_commands_conf(args),
         "splunk/apps/000_public_exposure_hardening/default/props.conf": render_props_conf(args),
         "splunk/apps/000_public_exposure_hardening/default/splunk-launch.conf": render_splunk_launch_conf(args),
+        "splunk/apps/000_public_exposure_hardening/default/openldap-ldap.conf.example": render_openldap_ldap_conf_example(args),
         "splunk/apps/000_public_exposure_hardening/metadata/default.meta": render_default_meta(args),
         "splunk/apps/000_public_exposure_hardening/metadata/local.meta": render_local_meta(args),
         # Reverse-proxy templates
@@ -2791,6 +3156,7 @@ def emit_all(args: argparse.Namespace, render_dir: Path, floor: dict[str, str]) 
         "splunk/apply-license-manager.sh": render_apply_license_manager(args),
         "splunk/rotate-pass4symmkey.sh": render_rotate_pass4symmkey(args),
         "splunk/rotate-splunk-secret.sh": render_rotate_splunk_secret(args),
+        "splunk/rotate-federation-service-account.sh": render_rotate_federation_service_account(args),
         "splunk/certificates/verify-certs.sh": render_verify_certs(args),
         "splunk/certificates/generate-csr-template.sh": render_generate_csr_template(args),
         "splunk/certificates/README.md": render_certificates_readme(args),

@@ -43,10 +43,10 @@ fi
 
 # --- 3. file count and structure
 count="$(find "$tmp/single/public-exposure" -type f 2>/dev/null | wc -l | tr -d ' ')"
-if [[ "$count" == "51" ]]; then
-    ok "default render produced 51 files"
+if [[ "$count" == "53" ]]; then
+    ok "default render produced 53 files"
 else
-    fail "default render produced $count files (expected 51)"
+    fail "default render produced $count files (expected 53)"
 fi
 
 # --- 4. shc-with-hec-and-hf
@@ -274,6 +274,193 @@ for stanza in '\[general\]' '\[clustering\]' '\[shclustering\]' '\[indexer_disco
 done
 if [[ "$rotate_failed" == "0" ]]; then
     ok "rotate-pass4symmkey.sh covers all six pass4SymmKey stanzas"
+fi
+
+# --- 19. LDAP rendering — correct spec syntax
+ldap_dir="$tmp/ldap"
+python3 "$RENDERER" \
+    --output-dir "$ldap_dir" \
+    --public-fqdn splunk.example.com \
+    --proxy-cidr 10.0.10.0/24 \
+    --auth-mode ldap \
+    --ldap-host ad.example.com \
+    --ldap-bind-dn "cn=svc_splunk,ou=Service,dc=example,dc=com" \
+    --ldap-bind-password-file /tmp/ldap.pwd \
+    --ldap-user-base-dn "ou=Users,dc=example,dc=com" \
+    --ldap-group-base-dn "ou=Groups,dc=example,dc=com" \
+    --ldap-public-reader-group "SplunkPublicReaders" \
+    >/dev/null 2>&1
+ldap_auth="$ldap_dir/public-exposure/splunk/apps/000_public_exposure_hardening/default/authentication.conf"
+if grep -q '^authType = LDAP' "$ldap_auth" \
+   && grep -q '^\[ldaphost\]$' "$ldap_auth" \
+   && grep -q '^\[roleMap_ldaphost\]$' "$ldap_auth" \
+   && grep -q '^role_public_reader = SplunkPublicReaders$' "$ldap_auth" \
+   && grep -q '^anonymous_referrals = 0' "$ldap_auth" \
+   && grep -q '^sizelimit = 1000' "$ldap_auth"; then
+    ok "LDAP rendering: authType + strategy + roleMap (Splunk-role-on-LEFT) + anon-referrals=0 + lowercase sizelimit"
+else
+    fail "LDAP rendering missing one of: authType=LDAP, [ldaphost], [roleMap_ldaphost], role_public_reader=, anonymous_referrals=0, sizelimit"
+fi
+
+# --- 20. LDAP stanza must NOT contain sslVersions / cipherSuite / ecdhCurves
+# (those keys do not apply to LDAP per spec; LDAP TLS lives in ldap.conf).
+strategy_block="$(awk '/^\[ldaphost\]$/,/^\[roleMap_/' "$ldap_auth")"
+if grep -q '^sslVersions' <<<"$strategy_block" \
+   || grep -q '^cipherSuite' <<<"$strategy_block" \
+   || grep -q '^ecdhCurves' <<<"$strategy_block"; then
+    fail "LDAP strategy stanza must NOT contain sslVersions/cipherSuite/ecdhCurves"
+else
+    ok "LDAP strategy stanza correctly omits sslVersions / cipherSuite / ecdhCurves"
+fi
+
+# --- 21. openldap-ldap.conf.example exists and pins TLS_PROTOCOL_MIN 3.3
+openldap_stub="$ldap_dir/public-exposure/splunk/apps/000_public_exposure_hardening/default/openldap-ldap.conf.example"
+if grep -q '^TLS_REQCERT       demand' "$openldap_stub" \
+   && grep -q '^TLS_PROTOCOL_MIN  3.3' "$openldap_stub"; then
+    ok "openldap-ldap.conf.example pins TLS_REQCERT demand + TLS_PROTOCOL_MIN 3.3"
+else
+    fail "openldap-ldap.conf.example missing TLS hardening lines"
+fi
+
+# --- 22. LDAP cleartext refusal
+if python3 "$RENDERER" \
+    --output-dir "$tmp/ldap-cleartext" \
+    --public-fqdn splunk.example.com \
+    --proxy-cidr 10.0.10.0/24 \
+    --auth-mode ldap \
+    --ldap-host ad.example.com \
+    --ldap-ssl-enabled false \
+    --ldap-bind-dn "cn=svc,dc=example,dc=com" \
+    --ldap-bind-password-file /tmp/ldap.pwd \
+    --ldap-user-base-dn "ou=Users,dc=example,dc=com" \
+    --ldap-group-base-dn "ou=Groups,dc=example,dc=com" \
+    >/dev/null 2>"$tmp/ldap-cleartext-err"; then
+    fail "LDAP cleartext rendering succeeded without --allow-cleartext-ldap"
+else
+    if grep -q "allow-cleartext-ldap" "$tmp/ldap-cleartext-err"; then
+        ok "LDAP cleartext refused without --allow-cleartext-ldap ack"
+    else
+        fail "LDAP cleartext refusal message did not mention the ack flag"
+    fi
+fi
+
+# --- 23. LDAP timelimit > 30 refused
+if python3 "$RENDERER" \
+    --output-dir "$tmp/ldap-tl" \
+    --public-fqdn splunk.example.com \
+    --proxy-cidr 10.0.10.0/24 \
+    --auth-mode ldap \
+    --ldap-host ad.example.com \
+    --ldap-bind-dn "cn=svc,dc=example,dc=com" \
+    --ldap-bind-password-file /tmp/ldap.pwd \
+    --ldap-user-base-dn "ou=Users,dc=example,dc=com" \
+    --ldap-group-base-dn "ou=Groups,dc=example,dc=com" \
+    --ldap-time-limit 60 \
+    >/dev/null 2>"$tmp/ldap-tl-err"; then
+    fail "LDAP --ldap-time-limit > 30 was accepted"
+else
+    if grep -q "time-limit" "$tmp/ldap-tl-err"; then
+        ok "LDAP --ldap-time-limit > 30 refused per spec hard cap"
+    else
+        fail "LDAP timelimit refusal message did not mention --ldap-time-limit"
+    fi
+fi
+
+# --- 24. Federation rotate helper present and reads from a file
+fed_rotate="$tmp/full/public-exposure/splunk/rotate-federation-service-account.sh"
+if [[ -x "$fed_rotate" ]] \
+   && grep -q 'federated' "$fed_rotate" \
+   && grep -q 'service_account' "$fed_rotate" \
+   && grep -q 'new_password_file' "$fed_rotate" \
+   && grep -q 'password-file' "$fed_rotate"; then
+    ok "rotate-federation-service-account.sh present and uses --password-file"
+else
+    fail "rotate-federation-service-account.sh missing or doesn't use file-based password"
+fi
+
+# --- 25. Federation helper does NOT actively use pass4SymmKey for federation.
+# The script's usage block may reference 'rotate-pass4symmkey.sh' (the OTHER
+# helper) by filename; that's fine. What we forbid is the script actually
+# calling splunk edit cluster-config / shcluster-config or writing
+# pass4SymmKey itself.
+if grep -E '(splunk\s+edit\s+(cluster|shcluster)-config|pass4SymmKey\s*=)' "$fed_rotate" >/dev/null 2>&1; then
+    fail "rotate-federation-service-account.sh appears to invoke pass4SymmKey rotation"
+else
+    ok "rotate-federation-service-account.sh does not invoke pass4SymmKey rotation"
+fi
+
+# --- 26. SG handoff doc exists and references prod.spacebridge.spl.mobi
+REPO_ROOT_REFS="$(dirname "$SCRIPT_DIR")/references"
+sg_doc="$REPO_ROOT_REFS/secure-gateway-handoff.md"
+if grep -q 'prod.spacebridge.spl.mobi' "$sg_doc"; then
+    ok "secure-gateway-handoff.md references prod.spacebridge.spl.mobi"
+else
+    fail "secure-gateway-handoff.md missing prod.spacebridge.spl.mobi"
+fi
+if grep -qi 'spacebridge\.splunk\.com' "$sg_doc"; then
+    fail "secure-gateway-handoff.md references the WRONG spacebridge URL (spacebridge.splunk.com)"
+else
+    ok "secure-gateway-handoff.md does not reference the wrong spacebridge URL"
+fi
+if grep -q 'ECC' "$sg_doc" && grep -qi 'libsodium\|ecies' "$sg_doc"; then
+    ok "secure-gateway-handoff.md describes ECC + Libsodium ECIES E2E auth"
+else
+    fail "secure-gateway-handoff.md missing E2E auth description"
+fi
+
+# --- 27. Federation provider hardening doc exists and documents the
+#        service-account auth (NOT pass4SymmKey)
+fed_doc="$REPO_ROOT_REFS/federated-search-provider-hardening.md"
+if grep -qi 'service.account' "$fed_doc" \
+   && grep -qi 'NOT.*pass4SymmKey\|not.*pass4SymmKey\|does NOT' "$fed_doc"; then
+    ok "federated-search-provider-hardening.md correctly says federation is NOT pass4SymmKey"
+else
+    fail "federated-search-provider-hardening.md missing the 'NOT pass4SymmKey' correction"
+fi
+
+# --- 28. SVD-floor JSON includes the SG floor
+floor_json="$REPO_ROOT_REFS/cve-svd-floor.json"
+if python3 -c "
+import json, sys
+d = json.load(open('$floor_json'))
+assert 'splunk_secure_gateway' in d, 'missing splunk_secure_gateway top-level key'
+sg = d['splunk_secure_gateway']
+for branch in ('3.9', '3.8', '3.7'):
+    assert branch in sg, f'missing {branch} branch'
+print('OK')
+" 2>/dev/null; then
+    ok "cve-svd-floor.json includes splunk_secure_gateway floor with 3.9/3.8/3.7 branches"
+else
+    fail "cve-svd-floor.json missing splunk_secure_gateway floor"
+fi
+
+# --- 29. premium-apps overlay JSON validates and pins versions
+overlay_json="$REPO_ROOT_REFS/premium-apps-capability-overlay.json"
+if python3 -c "
+import json, sys
+d = json.load(open('$overlay_json'))
+assert 'tier_a' in d and 'tier_b' in d
+for app, body in d['tier_a'].items():
+    assert 'verified_version' in body, f'{app} missing verified_version'
+    assert 'source_url' in body, f'{app} missing source_url'
+print('OK')
+" 2>/dev/null; then
+    ok "premium-apps-capability-overlay.json validates with pinned versions for all Tier-A apps"
+else
+    fail "premium-apps-capability-overlay.json invalid or missing pinned versions"
+fi
+
+# --- 30. list_inputs is in ES 8.4 must_not_remove
+if python3 -c "
+import json, sys
+d = json.load(open('$overlay_json'))
+es = d['tier_a'].get('SplunkEnterpriseSecuritySuite', {})
+assert 'list_inputs' in es.get('must_not_remove', []), 'list_inputs not flagged'
+print('OK')
+" 2>/dev/null; then
+    ok "premium-apps overlay flags list_inputs as must_not_remove for ES 8.4"
+else
+    fail "premium-apps overlay missing list_inputs in ES 8.4 must_not_remove"
 fi
 
 if [[ "$failed" -gt 0 ]]; then

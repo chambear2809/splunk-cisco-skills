@@ -1,0 +1,190 @@
+# Splunk Platform PKI Setup Worksheet
+#
+# Copy this file locally (e.g. cp template.example my-pki.yaml) and fill in
+# the non-secret values. Do NOT store passwords, CA private keys, or leaf
+# private keys here. The renderer reads secrets only from local files via
+# *-file CLI flags.
+
+# ---------------------------------------------------------------------------
+# Mode and target
+# ---------------------------------------------------------------------------
+
+# private | public
+# - private: operator builds an internal Root + Intermediate CA, signs leaves
+# - public:  operator submits CSRs to a third-party CA (Vault PKI / ACME /
+#            Microsoft AD CS / EJBCA / commercial CA)
+mode: private
+
+# CSV of surfaces this run targets. "all" expands to every surface this skill
+# supports. Common subsets:
+#   core5                 -> Splunk Web + splunkd + S2S + HEC + KV Store on
+#                            one host (good for a single SH)
+#   indexer-cluster       -> CM + peer cluster bundle drop-in
+#   shc                   -> SHC deployer drop-in for member rotation
+#   indexer-cluster,shc   -> full-cluster rollout
+#   all                   -> every surface, every host
+target: indexer-cluster,shc,license-manager,deployment-server,monitoring-console
+
+# Optional: prefer a specific public-CA handoff doc first in the operator
+# checklist. All four CA handoffs are always rendered regardless.
+# vault | acme | adcs | ejbca | other
+public_ca_name: vault
+
+# ---------------------------------------------------------------------------
+# Per-role FQDNs and hosts
+# ---------------------------------------------------------------------------
+
+# Cluster manager FQDN. Used as the SAN on the CM cert and for cluster bundle
+# REST callbacks.
+cm_fqdn: cm01.example.com
+
+# Indexer peers. CSV of FQDNs. Each peer gets its own leaf cert with its own
+# SAN. Forwarder outputs.conf overlay generates per-indexer
+# [tcpout-server://host:port] stanzas with sslCommonNameToCheck per host.
+peer_hosts: idx01.example.com,idx02.example.com,idx03.example.com
+
+# Search-head cluster deployer FQDN.
+shc_deployer_fqdn: deployer01.example.com
+
+# Search-head cluster members. CSV of FQDNs. Each member gets its own leaf
+# cert. The deployer's bundle distributes the trust anchor; per-member
+# leaves are staged out-of-band on each member host.
+shc_members: sh01.example.com,sh02.example.com,sh03.example.com
+
+# Optional supporting roles (omit / leave empty if --target doesn't include).
+lm_fqdn: lm01.example.com
+ds_fqdn: ds01.example.com
+mc_fqdn: mc01.example.com
+
+# Universal forwarder fleet groups. The renderer emits a per-group outputs
+# overlay. Leave empty if you don't want a UF overlay this run.
+uf_fleet_groups: prod-windows,prod-linux
+
+# DMZ heavy forwarder FQDNs (when --target includes dmz-hf).
+dmz_hf_hosts: hf01.example.com,hf02.example.com
+
+# Edge Processor FQDNs (when --target includes edge-processor).
+ep_fqdn: ep01.example.com
+ep_data_source_fqdn: datasource01.example.com
+
+# Federated Search provider FQDNs (when --target includes federated-search).
+federation_provider_hosts: fsp01.example.com,fsp02.example.com
+
+# ---------------------------------------------------------------------------
+# CA configuration (Private mode only)
+# ---------------------------------------------------------------------------
+
+# Root CA distinguished name. Operator becomes the CA in private mode.
+ca_country: US
+ca_state: California
+ca_locality: San Francisco
+ca_organization: Example Corp
+ca_organizational_unit: Splunk Platform Engineering
+ca_common_name: Example Corp Splunk Root CA
+ca_email: pki-admin@example.com
+
+# Strongly recommended for production. The Intermediate signs day-to-day
+# leaves and can be re-issued without disrupting the offline Root.
+include_intermediate_ca: true
+
+# Validity windows, in days.
+root_ca_days: 3650          # 10 years (Root)
+intermediate_ca_days: 1825  # 5 years (Intermediate)
+leaf_days: 825              # ~27 months (Splunk EP doc precedent + CA/B baseline)
+
+# ---------------------------------------------------------------------------
+# Algorithm policy
+# ---------------------------------------------------------------------------
+
+# splunk-modern (default) | fips-140-3 | stig
+# See references/algorithm-presets.md for cipher / curve / sig-algo / TLS
+# version detail.
+tls_policy: splunk-modern
+
+# tls1.2 is the only currently-supported value. Splunk's docs do not yet
+# list tls1.3 as a supported sslVersions value.
+tls_version_floor: tls1.2
+
+# Set to relax the lower bound (allow ssl3 / tls1.0 / tls1.1). Not
+# recommended; the upper bound stays at tls1.2.
+allow_deprecated_tls: false
+
+# rsa-2048 (default; KV-Store-friendly) | rsa-3072 | rsa-4096 |
+# ecdsa-p256 | ecdsa-p384 | ecdsa-p521
+key_algorithm: rsa-2048
+
+# pkcs1 (default, encrypted PKCS#1 PEM matching Splunk's docs) |
+# pkcs8 (required for Edge Processor and Splunk DB Connect)
+key_format: pkcs1
+
+# ---------------------------------------------------------------------------
+# mTLS surfaces
+# ---------------------------------------------------------------------------
+
+# none | s2s | hec | splunkd | s2s,hec (default) | all
+# splunkd mTLS is opt-in because it breaks operator tooling that doesn't
+# present a client cert.
+enable_mtls: s2s,hec
+
+# ---------------------------------------------------------------------------
+# Optional surfaces
+# ---------------------------------------------------------------------------
+
+# Encrypt the indexer-cluster replication port (9887). Atomic migration of
+# [replication_port://9887] -> [replication_port-ssl://9887] requires a
+# full cluster rolling restart. Opt-in because the migration is invasive.
+encrypt_replication_port: false
+
+# Render a SAML SP signing cert (separate trust domain from TLS). The IdP
+# cert (idpCertPath) is operator-supplied.
+saml_sp: false
+
+# Render an LDAP TLS trust bundle + ldap.conf overlay. Coexists with the
+# public-exposure-hardening skill's --ldap-ssl-enabled.
+ldaps: false
+
+# Render the Edge Processor cert pair (RSA + ECDSA paths supported via
+# --key-algorithm). Distribution is via EP UI / REST upload.
+include_edge_processor: false
+
+# ---------------------------------------------------------------------------
+# FIPS mode
+# ---------------------------------------------------------------------------
+
+# none (default) | 140-2 | 140-3
+# When non-none, the renderer emits a splunk-launch.conf overlay with
+# SPLUNK_FIPS_VERSION = <value>. NIST deprecates FIPS 140-2 on 2026-09-21,
+# so default for new deployments is 140-3.
+# Refuses to apply mid-migration (some peers on 140-2, others on 140-3).
+fips_mode: none
+
+# ---------------------------------------------------------------------------
+# Splunk runtime
+# ---------------------------------------------------------------------------
+
+splunk_home: /opt/splunk
+splunk_version: 10.2.2
+
+# Cert install directory under $SPLUNK_HOME/etc/auth/.
+cert_install_subdir: myssl
+
+# ---------------------------------------------------------------------------
+# Local-only secret file paths (NOT committed to git; chmod 600).
+# Use `bash skills/shared/scripts/write_secret_file.sh /tmp/<name>` to
+# create each one without the secret hitting shell history.
+# ---------------------------------------------------------------------------
+
+admin_password_file: /tmp/splunk_admin_password
+idxc_secret_file: /tmp/splunk_idxc_secret
+ca_key_password_file: /tmp/pki_root_ca_key_password
+intermediate_ca_key_password_file: /tmp/pki_intermediate_ca_key_password
+leaf_key_password_file: /tmp/pki_leaf_key_password
+saml_sp_key_password_file: /tmp/pki_saml_sp_key_password
+
+# ---------------------------------------------------------------------------
+# Operator acknowledgement
+# ---------------------------------------------------------------------------
+
+# Setting this to true is what the --accept-pki-rotation flag captures.
+# Renderer will refuse to apply unless the flag is present at apply time.
+operator_acknowledges_pki_rotation: false

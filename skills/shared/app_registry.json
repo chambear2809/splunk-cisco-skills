@@ -907,6 +907,18 @@
       "notes": "On-prem Splunk Enterprise public-internet exposure hardening workflow for Splunk Web, HEC, S2S, and splunkd REST edge surfaces. Renders Splunk-side overlays plus reverse-proxy, WAF, firewall, and operator handoff assets; Cloud is not a target."
     },
     {
+      "skill": "splunk-platform-pki-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "required",
+        "heavy-forwarder": "required",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [],
+      "notes": "On-prem Splunk Enterprise PKI lifecycle for every TLS surface (Splunk Web 8000, splunkd REST 8089, S2S 9997, HEC 8088, KV Store, indexer cluster including replication_port-ssl 9887, SHC, License Manager, Deployment Server, Monitoring Console, Federated Search, DMZ heavy forwarder, UF fleet, Edge Processor RSA + ECDSA, SAML SP signing, LDAPS trust, splunk CLI cacert.pem). Three TLS algorithm presets (splunk-modern, fips-140-3, stig); FIPS 140-2 / 140-3 wiring via splunk-launch.conf. Cloud is not a target (Splunk Cloud manages its own TLS)."
+    },
+    {
       "skill": "splunk-itsi-setup",
       "role_support": {
         "search-tier": "required",

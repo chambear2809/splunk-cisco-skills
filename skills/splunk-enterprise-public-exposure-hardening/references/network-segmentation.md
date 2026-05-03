@@ -115,10 +115,56 @@ exposure threat model. This skill is out of scope for them. See:
 
 ## Splunk Secure Gateway / Splunk Mobile
 
-Operate over outbound-only connections from the search head; do not
-require inbound public exposure. If you do choose to expose them
-publicly (for, e.g., on-call mobile push), they need their own
-threat model.
+Splunk Secure Gateway (SG) and Splunk Mobile are **outbound-only**
+from the search head:
+
+- SG connects outbound to `prod.spacebridge.spl.mobi:443` (default)
+  or `http.<region>.spacebridge.splunkcx.com:443` (regional). Add
+  these to the egress firewall allowlist.
+- Mobile clients authenticate **end-to-end to the SG app** via ECC
+  keypairs (Libsodium ECIES inside TLS 1.2). Spacebridge is an
+  encrypted relay that **cannot decrypt** the channel; it is NOT an
+  authentication endpoint.
+- SG opens NO new inbound ports. The SH-side surfaces (Splunk Web
+  `/en-US/app/splunk_secure_gateway/` and splunkd `/services/ssg/`)
+  are already covered by this skill's `web.conf` admin-path
+  lockdown and `[httpServer] acceptFrom`.
+- SG has its own SVD floor (`3.9.10` / `3.8.58` / `3.7.28` —
+  preflight step 24 enforces).
+- Disabling SG also disables Splunk Mobile, Edge Hub, and Mission
+  Control. Spacebridge is NOT FIPS 140-2 / GovCloud / FedRAMP-bound;
+  Private Spacebridge (Helm-deployed on-prem relay) is the air-gap
+  alternative.
+
+See [secure-gateway-handoff.md](secure-gateway-handoff.md) for the
+full handoff.
+
+## Federated search inbound (when this SH is a provider)
+
+If consumer SHs run federated searches against this SH:
+
+- Consumers reach **inbound on `mgmtHostPort` (default 8089)**.
+  There is NO separate federation port.
+- The existing `[httpServer] acceptFrom` allowlist must include
+  consumer SH IPs/CIDR.
+- Federation auth is a **native Splunk service-account
+  username+password** stored on the **consumer** in
+  `federated.conf [provider://<name>]` — NOT `pass4SymmKey`. The
+  existing `rotate-pass4symmkey.sh` does NOT cover federation. Use
+  the new `rotate-federation-service-account.sh` helper instead.
+- mTLS for federation is supported in Splunk Enterprise 10.0+ via
+  `[sslConfig] requireClientCert = true` on the provider —
+  recommended for public-exposure federation.
+- Splunk auto-locks the federation service account after bad
+  transparent-mode saves (default 30-minute timeout); pre-validate
+  every consumer-side update with a "Test connection" REST call.
+
+See [federated-search-provider-hardening.md](federated-search-provider-hardening.md)
+for the full hardening posture and rotation procedure.
+
+Cross-link: [splunk-federated-search-setup](../../splunk-federated-search-setup/SKILL.md)
+owns the provider/consumer wiring for the underlying federation
+infrastructure.
 
 ## Validation
 

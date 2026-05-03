@@ -212,18 +212,30 @@ Floor lives in
 [references/cve-svd-floor.json](references/cve-svd-floor.json) and
 ships embedded in the renderer; `--svd-floor-file` can override.
 
-## Cross-skill calls
+## Cross-skill handoff matrix
 
-The skill consumes — does not duplicate — these:
+The skill consumes — does not duplicate — these. When you also use
+one of the adjacent skills below, run THIS skill's preflight +
+validate against the fronting search head, then layer the adjacent
+skill's hardening on top.
 
-- HEC token lifecycle: [splunk-hec-service-setup](../splunk-hec-service-setup/SKILL.md)
-- Host bootstrap: [splunk-enterprise-host-setup](../splunk-enterprise-host-setup/SKILL.md)
-- Indexer cluster bundle: [splunk-indexer-cluster-setup](../splunk-indexer-cluster-setup/SKILL.md)
-- SHC deployer: [splunk-agent-management-setup](../splunk-agent-management-setup/SKILL.md)
-- License manager: [splunk-license-manager-setup](../splunk-license-manager-setup/SKILL.md)
-- Cloud allowlists (Cloud only — out of scope here): [splunk-cloud-acs-allowlist-setup](../splunk-cloud-acs-allowlist-setup/SKILL.md)
-- Federated search: [splunk-federated-search-setup](../splunk-federated-search-setup/SKILL.md)
-- Monitoring console: [splunk-monitoring-console-setup](../splunk-monitoring-console-setup/SKILL.md)
+| Adjacent skill | What it owns | What this skill provides |
+|---|---|---|
+| [splunk-platform-pki-setup](../splunk-platform-pki-setup/SKILL.md) | Full TLS / PKI lifecycle (Private CA or Public CSR + handoff to Vault PKI / ACME / AD CS / EJBCA), per-component cert distribution across every Splunk surface, FIPS 140-2/140-3 wiring, three TLS algorithm presets, KV-Store dual-EKU enforcement, replication-port TLS migration, SAML SP signing cert, LDAPS trust, `cacert.pem` alignment, delegated rotation runbook | Consumes the cert paths the PKI skill provisions; this skill's preflight refuses to declare a public-exposed SH ready until PKI verify-leaf has returned `OK`; the PKI skill consumes this skill's `--enable-fips` / `--fips-version` semantics rather than redefining |
+| [splunk-hec-service-setup](../splunk-hec-service-setup/SKILL.md) | HEC token lifecycle, allowed indexes, ACS HEC tokens | HEC TLS / mTLS rendering, body-size alignment, proxy vhost, sensitive-path denies |
+| [splunk-enterprise-host-setup](../splunk-enterprise-host-setup/SKILL.md) | Splunk host install / cluster bootstrap | Preflight refuses unbootstrapped hosts; SVD floor enforcement |
+| [splunk-indexer-cluster-setup](../splunk-indexer-cluster-setup/SKILL.md) | Indexer cluster bundle | `pass4SymmKey` rotation helper + acceptFrom enforcement for cluster CIDR |
+| [splunk-agent-management-setup](../splunk-agent-management-setup/SKILL.md) | SHC deployer, server classes | Hardening app drops into `shcluster/apps/`; SHC deployer pass4SymmKey rotation |
+| [splunk-license-manager-setup](../splunk-license-manager-setup/SKILL.md) | License manager / peer wiring | License master 8089 acceptFrom + pass4SymmKey rotation |
+| [splunk-cloud-acs-allowlist-setup](../splunk-cloud-acs-allowlist-setup/SKILL.md) | Splunk **Cloud** ACS allowlists | Out of scope — this skill is on-prem only |
+| [splunk-federated-search-setup](../splunk-federated-search-setup/SKILL.md) | Federation provider/consumer wiring | Provider-side acceptFrom + service-account rotation helper (federation auth is NOT pass4SymmKey) |
+| [splunk-monitoring-console-setup](../splunk-monitoring-console-setup/SKILL.md) | Monitoring Console distributed config | MC integration: forward `_audit` and platform alerts on hardening drift |
+| [splunk-connect-for-syslog-setup](../splunk-connect-for-syslog-setup/SKILL.md) | SC4S Docker/Helm runtime, syslog TLS listener | If SC4S delivers via HEC, run THIS skill against the HEC-receiving SH first |
+| [splunk-connect-for-snmp-setup](../splunk-connect-for-snmp-setup/SKILL.md) | SC4SNMP Docker/Helm runtime | Same as SC4S |
+| [splunk-mcp-server-setup](../splunk-mcp-server-setup/SKILL.md) | MCP server install + token issuance | If MCP is exposed publicly, run THIS skill against the SH fronting it; MCP token policy is owned by the MCP skill |
+| [splunk-stream-setup](../splunk-stream-setup/SKILL.md) | Wire data capture stack | Stream is internal-only; this skill does not apply |
+| [splunk-index-lifecycle-smartstore-setup](../splunk-index-lifecycle-smartstore-setup/SKILL.md) | SmartStore S3/GCS/Azure backend | Outbound-to-storage; this skill does not apply |
+| [splunk-enterprise-security-config](../splunk-enterprise-security-config/SKILL.md) (and ES/SOAR/ITSI/UBA/ARI/AA) | Premium apps + additional capabilities | Run THIS skill first; then re-audit `role_public_reader` against the [premium-apps-capability-overlay](references/premium-apps-capability-overlay.md) |
 
 ## References
 
@@ -245,6 +257,13 @@ Read [reference.md](reference.md) before any apply. Topical deep dives:
 - [references/operator-handoff-checklist.md](references/operator-handoff-checklist.md)
 - [references/setting-name-corrections.md](references/setting-name-corrections.md)
 - [references/fips-mode.md](references/fips-mode.md)
+- [references/auth-ldap-hardening.md](references/auth-ldap-hardening.md)
+- [references/premium-apps-capability-overlay.md](references/premium-apps-capability-overlay.md)
+  + [premium-apps-capability-overlay.json](references/premium-apps-capability-overlay.json) (machine-readable companion consumed by preflight)
+- [references/secure-gateway-handoff.md](references/secure-gateway-handoff.md)
+- [references/federated-search-provider-hardening.md](references/federated-search-provider-hardening.md)
+- [references/cve-svd-floor.json](references/cve-svd-floor.json) (Splunk core + SG-app per-branch floors)
+- [references/default-cert-fingerprints.json](references/default-cert-fingerprints.json) (machine-readable companion to default-cert-fingerprints / verify-certs.sh)
 
 ## What this skill does NOT do
 

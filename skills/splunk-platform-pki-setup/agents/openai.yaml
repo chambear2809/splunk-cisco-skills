@@ -1,0 +1,17 @@
+interface:
+  display_name: "Splunk Platform PKI Setup"
+  short_description: "Render Private or Public PKI across every Splunk Enterprise TLS surface"
+  default_prompt: >-
+    Use $splunk-platform-pki-setup to render Private PKI (operator becomes
+    the CA) or Public PKI (CSR + handoff to Vault PKI / ACME / AD CS /
+    EJBCA / commercial CA) and distribute per-component certs across
+    every Splunk Enterprise TLS surface — Splunk Web, splunkd REST, S2S,
+    HEC, KV Store (with dual-EKU enforcement), indexer cluster (including
+    the dedicated [replication_port-ssl://9887] channel), SHC, License
+    Manager, Deployment Server, Monitoring Console, Federated Search,
+    DMZ heavy forwarder, the UF fleet, Edge Processor, the SAML SP
+    signing cert, LDAPS trust, and the local splunk CLI cacert.pem.
+    Wires FIPS 140-2 / 140-3 mode through splunk-launch.conf, ships
+    three TLS algorithm presets (splunk-modern, fips-140-3, stig),
+    refuses default Splunk certs, and emits a delegated rotation
+    runbook that hands off rolling restart to splunk-indexer-cluster-setup.
