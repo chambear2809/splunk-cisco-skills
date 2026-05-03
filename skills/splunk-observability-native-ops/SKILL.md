@@ -58,12 +58,15 @@ Do not mark UI-only workflows as `api_apply`.
 
 4. Review `coverage-report.json`, `apply-plan.json`, `deeplinks.json`, and
    `handoff.md`.
-5. Apply only when explicitly requested:
+5. Apply only when explicitly requested. Point `--spec` at the same file you
+   rendered and validated (an absolute path, a repo-relative path like
+   `skills/splunk-observability-native-ops/templates/native-ops.example.yaml`,
+   or a working copy you maintain alongside your credentials):
 
    ```bash
    bash skills/splunk-observability-native-ops/scripts/setup.sh \
      --apply \
-     --spec native-ops.yaml \
+     --spec skills/splunk-observability-native-ops/templates/native-ops.example.yaml \
      --realm us0 \
      --token-file /tmp/splunk_o11y_token
    ```

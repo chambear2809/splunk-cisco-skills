@@ -44,6 +44,10 @@ Common starting points:
   `skills/splunk-enterprise-security-install/` for package install and
   `skills/splunk-enterprise-security-config/` for indexes, roles, data models,
   enrichment, detections, and operational validation.
+- If you need a broader Splunk security product route, start with
+  `skills/splunk-security-portfolio-setup/`; it routes Enterprise Security,
+  SOAR, Security Essentials, UBA, Attack Analyzer, ARI, and related offerings
+  to the supported setup, install-only, or handoff path.
 - If you need Splunk Observability Cloud OTel collection on Kubernetes or a
   Linux host, start with `skills/splunk-observability-otel-collector-setup/`.
   The workflow renders Helm and Linux installer assets first, then applies only
@@ -63,6 +67,12 @@ Common starting points:
   `skills/splunk-federated-search-setup/`,
   `skills/splunk-index-lifecycle-smartstore-setup/`, or
   `skills/splunk-monitoring-console-setup/`.
+- If you need self-managed license, indexer-cluster, Edge Processor, or Splunk
+  Cloud ACS allowlist operations, start with
+  `skills/splunk-license-manager-setup/`,
+  `skills/splunk-indexer-cluster-setup/`,
+  `skills/splunk-edge-processor-setup/`, or
+  `skills/splunk-cloud-acs-allowlist-setup/`.
 - If you need external syslog or SNMP collection, start with
   `skills/splunk-connect-for-syslog-setup/` or
   `skills/splunk-connect-for-snmp-setup/`.
@@ -106,12 +116,14 @@ At a high level, the repo gives you seven layers of automation:
 5. **Platform administration workflows**: render and optionally apply
    self-managed Splunk Enterprise service configuration for Agent Management,
    Workload Management, Federated Search, SmartStore/index lifecycle, Monitoring
-   Console, and HEC service patterns. The HEC service workflow can also render
-   ACS-backed Splunk Cloud token payloads.
+   Console, HEC service patterns, license management, and indexer clusters. The
+   HEC service workflow can also render ACS-backed Splunk Cloud token payloads,
+   and the ACS allowlist workflow manages Cloud control-plane allowlists.
 6. **External collectors and observability**: render and optionally apply
-   customer-managed SC4S, SC4SNMP, and Splunk OTel Collector runtimes that send
-   data to Splunk Cloud, Splunk Enterprise HEC, or Splunk Observability Cloud,
-   and build reviewed Observability dashboard plans or API payload handoffs.
+   customer-managed SC4S, SC4SNMP, Splunk Edge Processor, and Splunk OTel
+   Collector runtimes that send data to Splunk Cloud, Splunk Enterprise HEC, or
+   Splunk Observability Cloud, and build reviewed Observability dashboard plans
+   or API payload handoffs.
 7. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
@@ -718,7 +730,13 @@ splunk-cisco-skills/
 │   │   │   ├── acs_helpers.sh           # ACS CLI wrappers
 │   │   │   ├── splunkbase_helpers.sh    # Splunkbase auth and downloads
 │   │   │   ├── host_bootstrap_helpers.sh # SSH/bootstrap helper functions
-│   │   │   └── configure_account_helpers.sh  # create-or-update pattern
+│   │   │   ├── configure_account_helpers.sh  # create-or-update pattern
+│   │   │   ├── cluster_helpers.sh       # indexer-cluster helper functions
+│   │   │   ├── license_helpers.sh       # Enterprise licensing helpers
+│   │   │   ├── edge_processor_helpers.sh # Edge Processor render helpers
+│   │   │   ├── deployment_helpers.sh    # rendered deployment helpers
+│   │   │   ├── registry_helpers.sh      # app registry and role lookups
+│   │   │   └── soar_helpers.sh          # SOAR install and handoff helpers
 │   │   └── scripts/
 │   │       ├── setup_credentials.sh
 │   │       ├── write_secret_file.sh
@@ -737,11 +755,21 @@ splunk-cisco-skills/
 │   ├── splunk-enterprise-kubernetes-setup/
 │   ├── splunk-enterprise-security-install/
 │   ├── splunk-enterprise-security-config/
+│   ├── splunk-security-portfolio-setup/
+│   ├── splunk-security-essentials-setup/
+│   ├── splunk-asset-risk-intelligence-setup/
+│   ├── splunk-attack-analyzer-setup/
+│   ├── splunk-uba-setup/
+│   ├── splunk-soar-setup/
 │   ├── splunk-observability-otel-collector-setup/
 │   ├── splunk-observability-dashboard-builder/
 │   ├── splunk-observability-native-ops/
 │   ├── splunk-connect-for-syslog-setup/
 │   ├── splunk-connect-for-snmp-setup/
+│   ├── splunk-license-manager-setup/
+│   ├── splunk-indexer-cluster-setup/
+│   ├── splunk-edge-processor-setup/
+│   ├── splunk-cloud-acs-allowlist-setup/
 │   ├── splunk-itsi-config/
 │   ├── splunk-itsi-setup/
 │   ├── splunk-mcp-server-setup/
@@ -880,6 +908,11 @@ Cloud SmartStore/storage lifecycle is managed by Splunk.
 Console configuration and renders `distsearch.conf` only for peer and
 search-group review because search peer trust and passwords must be handled
 through Splunk Web or an operator-controlled secure workflow.
+`splunk-license-manager-setup` and `splunk-indexer-cluster-setup` target
+self-managed Enterprise control planes; Splunk Cloud licensing and indexer
+clusters remain Splunk-managed. `splunk-cloud-acs-allowlist-setup` is the
+Cloud-side control-plane workflow for ACS feature allowlists and does not map
+to an Enterprise runtime role.
 
 The biggest Cloud-specific limitation is hybrid collection architectures. For
 example, Splunk Stream on Splunk Cloud uses a cloud-hosted `splunk_app_stream`
@@ -889,11 +922,15 @@ follows a similar principle for SC4S: the repo prepares Splunk and renders the
 collector runtime assets, but the SC4S syslog-ng container itself runs on
 customer-managed infrastructure rather than on the Cloud search tier.
 `splunk-connect-for-snmp-setup` follows the same external-collector model for
-SC4SNMP polling and traps. `splunk-observability-otel-collector-setup` extends
-that pattern to customer-managed Kubernetes or Linux OpenTelemetry Collector
-runtimes that send data to Splunk Observability Cloud and optional Splunk
-Platform HEC. In these workflows, the rendered apply paths are rerunnable
-install-or-upgrade entrypoints for customer-managed runtimes.
+SC4SNMP polling and traps. `splunk-edge-processor-setup` also follows a
+customer-managed runtime model: it renders Edge Processor instance and pipeline
+assets that join to a Splunk Cloud tenant or Splunk Enterprise data management
+node, and emits ACS allowlist handoffs when Cloud destinations need them.
+`splunk-observability-otel-collector-setup` extends that pattern to
+customer-managed Kubernetes or Linux OpenTelemetry Collector runtimes that send
+data to Splunk Observability Cloud and optional Splunk Platform HEC. In these
+workflows, the rendered apply paths are rerunnable install-or-upgrade
+entrypoints for customer-managed runtimes.
 `splunk-observability-dashboard-builder` is separate from runtime placement: it
 renders and validates native Observability Cloud dashboard API payloads and can
 apply them only when explicitly requested.

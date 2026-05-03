@@ -542,7 +542,7 @@ render_assets() {
     [[ "${JSON_OUTPUT}" == "true" ]] && extra_args+=(--json)
     [[ "${DRY_RUN}" == "true" ]] && extra_args+=(--dry-run)
     build_renderer_args
-    python3 "${RENDERER}" "${RENDER_ARGS[@]}" "${extra_args[@]}"
+    python3 "${RENDERER}" "${RENDER_ARGS[@]}" ${extra_args[@]+"${extra_args[@]}"}
 }
 
 prepare_render_package_path() {

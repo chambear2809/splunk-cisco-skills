@@ -20,6 +20,12 @@ Preview:
 bash skills/splunk-security-essentials-setup/scripts/setup.sh --dry-run
 ```
 
+Machine-readable preview (emits a single JSON object; useful for agents):
+
+```bash
+bash skills/splunk-security-essentials-setup/scripts/setup.sh --dry-run --json
+```
+
 Install and validate:
 
 ```bash

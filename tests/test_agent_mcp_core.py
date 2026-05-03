@@ -373,6 +373,54 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertTrue(preflight_plan["read_only"])
         self.assertFalse(apply_plan["read_only"])
 
+    def test_new_render_first_skills_read_only_phases(self) -> None:
+        # Covers skills added after the initial READ_ONLY_PHASE_SCRIPTS map:
+        # ACS allowlist, Edge Processor, Indexer Cluster, License Manager, SOAR.
+        cases = [
+            ("splunk-cloud-acs-allowlist-setup", ["--phase", "audit"], True),
+            ("splunk-cloud-acs-allowlist-setup", ["--phase", "validate"], True),
+            ("splunk-cloud-acs-allowlist-setup", ["--phase", "apply"], False),
+            ("splunk-edge-processor-setup", ["--phase", "preflight"], True),
+            ("splunk-edge-processor-setup", ["--phase", "apply"], False),
+            ("splunk-indexer-cluster-setup", ["--phase", "bundle-validate"], True),
+            ("splunk-indexer-cluster-setup", ["--phase", "bundle-status"], True),
+            ("splunk-indexer-cluster-setup", ["--phase", "rolling-restart"], False),
+            ("splunk-license-manager-setup", ["--phase", "validate"], True),
+            ("splunk-license-manager-setup", ["--phase", "apply"], False),
+            ("splunk-soar-setup", ["--phase", "cloud-onboard"], True),
+            ("splunk-soar-setup", ["--phase", "apply"], False),
+        ]
+        for skill, args, expected_read_only in cases:
+            plan = core.plan_skill_script(skill, "setup.sh", args)
+            self.assertEqual(
+                plan["read_only"],
+                expected_read_only,
+                msg=f"{skill} {args} read_only expected {expected_read_only}",
+            )
+
+    def test_flag_based_mode_skills_read_only_unless_apply(self) -> None:
+        # Observability native ops and dashboard builder use --apply as the
+        # mutation gate rather than a --phase arg.
+        native_render = core.plan_skill_script(
+            "splunk-observability-native-ops",
+            "setup.sh",
+            ["--render", "--spec", "spec.yaml"],
+        )
+        native_apply = core.plan_skill_script(
+            "splunk-observability-native-ops",
+            "setup.sh",
+            ["--apply", "--spec", "spec.yaml", "--token-file", "/tmp/t"],
+        )
+        dashboard_render = core.plan_skill_script(
+            "splunk-observability-dashboard-builder",
+            "setup.sh",
+            ["--spec", "dashboard.json"],
+        )
+
+        self.assertTrue(native_render["read_only"])
+        self.assertFalse(native_apply["read_only"])
+        self.assertTrue(dashboard_render["read_only"])
+
     def test_universal_forwarder_latest_smoke_is_read_only(self) -> None:
         plan = core.plan_skill_script(
             "splunk-universal-forwarder-setup",

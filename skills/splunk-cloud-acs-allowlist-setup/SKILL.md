@@ -54,7 +54,10 @@ warnings before any destructive change):
 bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh --phase apply
 ```
 
-Wait until ACS reports `Ready` after the apply:
+Wait until ACS reports `Ready` after the apply. `--phase status` runs only
+the already-rendered `wait-for-ready.sh`, so run a `render` or `apply` phase
+first (or re-run `--phase all` / `--phase apply`) to keep the rendered
+artifacts fresh:
 
 ```bash
 bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh --phase status

@@ -9,6 +9,42 @@ release section when cutting a release.
 
 ### Added
 
+- New Splunk security portfolio and readiness skills:
+  - `splunk-security-portfolio-setup` (router that resolves ES, SOAR,
+    Security Essentials, UBA, Attack Analyzer, ARI, and related offerings to
+    setup, install-only, bundled ES, or handoff workflows).
+  - `splunk-security-essentials-setup` (install and validate Splunk Security
+    Essentials `Splunk_Security_Essentials` with content recommendations and
+    starter posture dashboards).
+  - `splunk-asset-risk-intelligence-setup` (install and validate
+    `SplunkAssetRiskIntelligence` indexes, KV Store readiness, ARI roles, and
+    ES Exposure Analytics handoff).
+  - `splunk-attack-analyzer-setup` (install and validate `Splunk_TA_SAA` +
+    `Splunk_App_SAA`, the `saa` index, `saa_indexes` macro, and API key
+    handoff).
+  - `splunk-uba-setup` (validate legacy UBA integrations, optional Kafka app
+    placement, and ES Premier UEBA migration handoff).
+  - `splunk-soar-setup` (render and apply Splunk SOAR On-prem single + cluster
+    with external PG/GlusterFS/Elasticsearch, SOAR Cloud onboarding helper,
+    Automation Broker on Docker/Podman, Splunk-side SOAR apps, and ES
+    integration readiness; render-first with explicit apply phases).
+- New Splunk platform admin skills:
+  - `splunk-indexer-cluster-setup` (single-site, multisite, redundant manager
+    bootstrap plus cluster bundle validate/apply/rollback, rolling restart
+    modes, peer offline, maintenance, site migration, manager replacement).
+  - `splunk-license-manager-setup` (install licenses, activate groups,
+    configure peers and pools, audit usage and violations, validate version
+    compatibility).
+  - `splunk-edge-processor-setup` (Edge Processor instances + control plane,
+    Linux install via systemd / no-systemd / Docker, multi-instance scale-out,
+    source types / destinations / SPL2 pipelines, apply orchestration).
+  - `splunk-cloud-acs-allowlist-setup` (Splunk Cloud ACS IP allowlist
+    management for all seven features with IPv4 and IPv6, subnet limit
+    preflight, ACS lock-out protection, drift detection, optional Terraform
+    emission).
+- New `splunk-observability-native-ops` skill (detectors, alert routing,
+  Synthetics, APM, RUM, logs, and On-Call handoffs via a flag-based
+  `--render`/`--validate`/`--apply` workflow with coverage tagging).
 - New skill `splunk-enterprise-kubernetes-setup` covering Splunk Operator for
   Kubernetes (S1/C3/M4) and Splunk POD on Cisco UCS, with render-first
   preflight/apply/validate phases and `--dry-run`/`--json` output.
@@ -102,6 +138,18 @@ release section when cutting a release.
   `skills/shared/app_registry.json` (string of the form ``MAJOR.MINOR`` or
   ``MAJOR.MINOR.PATCH``). Seeded for `SA-ITOA`, `SplunkEnterpriseSecuritySuite`,
   and `Splunk_AI_Assistant_Cloud`. Missing/empty means "no declared minimum."
+
+### Agent / MCP
+
+- Extended `READ_ONLY_PHASE_SCRIPTS` in `agent/splunk_cisco_skills_mcp/core.py`
+  to cover the new render-first skills so MCP-driven runs of read-only phases
+  (`render`, `preflight`, `status`, `audit`, `validate`, `bundle-validate`,
+  `bundle-status`, `cloud-onboard`) do not require the mutation gate. Any
+  `--apply` invocation is still classified as mutating.
+- Added `READ_ONLY_UNLESS_APPLY_SCRIPTS` for flag-based skills
+  (`splunk-observability-native-ops`, `splunk-observability-dashboard-builder`)
+  that gate live mutations behind an explicit `--apply` rather than a
+  `--phase` argument.
 
 ### Security
 

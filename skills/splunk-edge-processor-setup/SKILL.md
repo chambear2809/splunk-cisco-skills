@@ -93,11 +93,23 @@ bash skills/splunk-edge-processor-setup/scripts/setup.sh --phase install-instanc
   --ep-tenant-url https://example.scs.splunk.com --ep-instances "ep01.example.com=systemd"
 ```
 
-Validate (live REST when `EP_API_BASE` is set, offline otherwise):
+Validate rendered assets (structural check only — fast, no network):
+
+```bash
+bash skills/splunk-edge-processor-setup/scripts/validate.sh
+```
+
+Validate live against the control plane REST (requires `--ep-api-base`,
+`--ep-api-token-file`, and `--ep-name`; `--ep-tenant-url` is used for handoff
+messages):
 
 ```bash
 bash skills/splunk-edge-processor-setup/scripts/validate.sh \
-  --ep-tenant-url https://example.scs.splunk.com --ep-name prod-ep
+  --live \
+  --ep-tenant-url https://example.scs.splunk.com \
+  --ep-name prod-ep \
+  --ep-api-base https://api.us-east-1.splunkcloud.com/<tenant>/edge-processor/v1 \
+  --ep-api-token-file /tmp/ep_api_token
 ```
 
 ## What It Renders

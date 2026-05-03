@@ -97,14 +97,19 @@ bash skills/splunk-soar-setup/scripts/setup.sh \
   --splunk-side-apps "app_for_soar=true,app_for_soar_export=true"
 ```
 
-Validate (single instance):
+Validate Splunk-side SOAR apps (reads credentials from the project-root
+`credentials` file, checks that `splunk_app_soar` is installed, and prints a
+handoff hint for the SOAR UI):
 
 ```bash
 bash skills/splunk-soar-setup/scripts/validate.sh \
-  --soar-platform onprem-single \
-  --soar-tenant-url https://soar01.example.com:8443 \
-  --soar-api-token-file /tmp/soar_api_token
+  --soar-url https://soar01.example.com:8443
 ```
+
+Add `--export` to also require the Splunk App for SOAR Export (Splunkbase
+3411). For SOAR server-side health checks, run the rendered
+`splunk-soar-rendered/validate.sh` after the server-side install phases
+complete.
 
 ## What It Renders
 

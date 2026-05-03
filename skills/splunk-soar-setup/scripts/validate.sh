@@ -84,7 +84,7 @@ if [[ ${FAIL} -eq 0 ]]; then
     else
         warn "No SOAR URL supplied; verify SOAR connectivity in the app UI"
     fi
-    warn "SOAR Cloud / SOAR On-premises server installation is not automated by this skill"
+    warn "This validator checks Splunk-side SOAR apps only; for server-side checks, run the rendered splunk-soar-rendered/validate.sh after install"
 fi
 
 log ""

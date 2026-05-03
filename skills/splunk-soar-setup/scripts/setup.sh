@@ -175,7 +175,7 @@ render_dir() { printf '%s' "${OUTPUT_DIR}"; }
 render_assets() {
     local extra_args=()
     [[ "${JSON_OUTPUT}" == "true" ]] && extra_args+=(--json)
-    python3 "${RENDERER}" "${RENDER_ARGS[@]}" "${extra_args[@]}"
+    python3 "${RENDERER}" "${RENDER_ARGS[@]}" ${extra_args[@]+"${extra_args[@]}"}
 }
 
 run_rendered() {

@@ -73,6 +73,37 @@ READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
     ("splunk-monitoring-console-setup", "setup.sh"): {"render", "preflight", "status"},
     ("splunk-enterprise-kubernetes-setup", "setup.sh"): {"render", "preflight", "status"},
     ("splunk-universal-forwarder-setup", "setup.sh"): {"render", "download", "status"},
+    ("splunk-cloud-acs-allowlist-setup", "setup.sh"): {
+        "render",
+        "preflight",
+        "status",
+        "audit",
+        "validate",
+    },
+    ("splunk-edge-processor-setup", "setup.sh"): {"render", "preflight"},
+    ("splunk-indexer-cluster-setup", "setup.sh"): {
+        "render",
+        "preflight",
+        "bundle-validate",
+        "bundle-status",
+        "status",
+        "validate",
+    },
+    ("splunk-license-manager-setup", "setup.sh"): {
+        "render",
+        "preflight",
+        "status",
+        "validate",
+    },
+    ("splunk-soar-setup", "setup.sh"): {"render", "preflight", "cloud-onboard"},
+}
+# Scripts that use flag-based mode toggles (not --phase) and are read-only
+# whenever --apply is NOT present. These skills render assets locally or run
+# validate-only flows by default; the only way they can mutate external state
+# is an explicit --apply. Any --apply invocation is still treated as mutating.
+READ_ONLY_UNLESS_APPLY_SCRIPTS: set[tuple[str, str]] = {
+    ("splunk-observability-native-ops", "setup.sh"),
+    ("splunk-observability-dashboard-builder", "setup.sh"),
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it.
@@ -345,6 +376,11 @@ def _arg_value(args: list[str], flag_name: str) -> str | None:
 
 
 def _phase_invocation_is_read_only(pair: tuple[str, str], args: list[str]) -> bool:
+    # Flag-based mode skills: read-only whenever --apply is NOT present.
+    # Applies to skills that don't take a --phase argument and instead gate
+    # live mutations behind an explicit --apply toggle.
+    if pair in READ_ONLY_UNLESS_APPLY_SCRIPTS:
+        return "--apply" not in args
     allowed_phases = READ_ONLY_PHASE_SCRIPTS.get(pair)
     if not allowed_phases:
         return False

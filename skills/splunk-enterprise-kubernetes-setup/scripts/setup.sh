@@ -317,7 +317,7 @@ render_assets() {
     if [[ "${JSON_OUTPUT}" == "true" ]]; then
         extra_args+=(--json)
     fi
-    python3 "${RENDERER}" "${RENDER_ARGS[@]}" "${extra_args[@]}"
+    python3 "${RENDERER}" "${RENDER_ARGS[@]}" ${extra_args[@]+"${extra_args[@]}"}
 }
 
 render_dir() {
