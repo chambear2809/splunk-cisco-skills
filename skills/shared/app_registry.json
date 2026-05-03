@@ -891,6 +891,22 @@
       "notes": "Self-managed Splunk Enterprise Kubernetes runtime workflow using SOK Helm assets or Splunk POD installer assets."
     },
     {
+      "skill": "splunk-enterprise-public-exposure-hardening",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "On-prem Splunk Enterprise public-internet exposure hardening workflow for Splunk Web, HEC, S2S, and splunkd REST edge surfaces. Renders Splunk-side overlays plus reverse-proxy, WAF, firewall, and operator handoff assets; Cloud is not a target."
+    },
+    {
       "skill": "splunk-itsi-setup",
       "role_support": {
         "search-tier": "required",

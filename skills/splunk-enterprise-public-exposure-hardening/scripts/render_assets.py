@@ -2646,9 +2646,10 @@ echo "VALIDATE PASSED. Report: $report"
 # ---------------------------------------------------------------------------
 
 def render_readme(args: argparse.Namespace) -> str:
+    hec_line = f"\nHEC FQDN: `{args.hec_fqdn}`" if args.hec_fqdn else ""
     return f"""# Splunk Public Exposure Hardening — Rendered Assets
 
-Public FQDN: `{args.public_fqdn}`{(f"`\nHEC FQDN: `{args.hec_fqdn}`" if args.hec_fqdn else '')}
+Public FQDN: `{args.public_fqdn}`{hec_line}
 Topology:    `{args.topology}`
 Splunk version target: `{args.splunk_version}` (SVD floor enforced)
 
