@@ -54,7 +54,55 @@
         "label": "`cisco-secure-access-setup`",
         "cloud_install_path": "ACS Splunkbase",
         "cloud_config_path": "REST via `org_accounts`, `update_settings`, and related app APIs",
-        "notes": "Cisco EULA license-ack required. The local package is the Secure Access app (`cisco-cloud-security`), not the separate add-on listing. Covers org onboarding plus dashboard settings/bootstrap."
+        "notes": "Cisco EULA license-ack required. Secure Access automation installs both the event add-on and dashboard app, then covers org onboarding plus dashboard settings/bootstrap."
+      },
+      {
+        "kind": "app",
+        "app_name": "TA-cisco-cloud-security-addon",
+        "label": "`cisco-secure-access-setup` add-on",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Add-on event inputs and log-index settings",
+        "notes": "Cisco EULA license-ack required. Required companion add-on for Secure Access, Umbrella, and Cloudlock event-log ingestion."
+      },
+      {
+        "kind": "app",
+        "app_name": "ta_cisco_webex_add_on_for_splunk",
+        "label": "`splunk-app-install` Webex add-on",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Configure Webex REST API inputs in the add-on UI or vendor docs",
+        "notes": "Install-only route from `cisco-product-setup`; product-specific input automation is not implemented in this repo."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_cisco-ucs",
+        "label": "`splunk-app-install` Cisco UCS add-on",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Configure UCS Manager inputs in the add-on UI or supported Splunk docs",
+        "notes": "Install-only route from `cisco-product-setup`; product-specific input automation is not implemented in this repo."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_cisco-esa",
+        "label": "`splunk-app-install` Cisco ESA add-on",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Configure ESA log forwarding or SC4S collection outside this repo",
+        "notes": "Install-only route from `cisco-product-setup`; product-specific input automation is not implemented in this repo."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_cisco-wsa",
+        "label": "`splunk-app-install` Cisco WSA add-on",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Configure WSA log forwarding or SC4S collection outside this repo",
+        "notes": "Install-only route from `cisco-product-setup`; product-specific input automation is not implemented in this repo."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_Talos_Intelligence",
+        "label": "`splunk-app-install` Cisco Talos intelligence",
+        "cloud_install_path": "ACS Splunkbase for supported ES Cloud stacks",
+        "cloud_config_path": "Finish setup in the supported Enterprise Security / SOAR workflow",
+        "notes": "Install-only route from `cisco-product-setup`; Splunk documents this app for Splunk Enterprise Security Cloud."
       },
       {
         "kind": "app",
@@ -112,6 +160,23 @@
         "cloud_install_path": "ACS Splunkbase",
         "cloud_config_path": "No post-install REST config needed",
         "notes": "Premium product; requires ITSI license. Enables ThousandEyes ITSI integration."
+      },
+      {
+        "kind": "app",
+        "app_name": "SplunkEnterpriseSecuritySuite",
+        "label": "`splunk-enterprise-security-install`",
+        "cloud_install_path": "Splunk Support coordinated ES service workflow",
+        "cloud_config_path": "`splunk-enterprise-security-config` validation plus Splunk Support for Cloud-managed indexer-side changes",
+        "notes": "Premium SIEM product. On-prem installs prefer the local ES package when present, fall back to Splunkbase app 263, then run essinstall."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-enterprise-security-config",
+        "label": "`splunk-enterprise-security-config`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No additional app install; requires ES already provisioned",
+        "cloud_config_path": "REST validation and supported search-tier settings; Splunk Cloud indexer-side changes remain support-managed",
+        "notes": "Operational ES configuration workflow for indexes, roles, CIM data models, enrichment, detections, risk, and validation."
       },
       {
         "kind": "app",
@@ -225,6 +290,24 @@
         "cloud_install_path": "No Splunk Cloud app install; SC4SNMP runtime is rendered for customer-managed Docker Compose or Kubernetes",
         "cloud_config_path": "ACS for indexes/HEC where available, search-tier REST for validation, rendered compose/Helm assets for runtime",
         "notes": "External SNMP collector pattern. Modeled as a workflow row rather than a Splunk app package."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-observability-otel-collector-setup",
+        "label": "`splunk-observability-otel-collector-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; OTel Collector runtime is rendered for customer-managed Kubernetes clusters or Linux hosts",
+        "cloud_config_path": "Rendered Helm values, Kubernetes secret helpers, Linux installer wrappers, and optional HEC token handoff scripts using file-based tokens",
+        "notes": "External OpenTelemetry Collector workflow for Observability metrics, traces, profiling, Kubernetes events, discovery, auto-instrumentation, and optional Splunk Platform HEC logs with splunk-hec-service-setup handoff helpers."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-observability-dashboard-builder",
+        "label": "`splunk-observability-dashboard-builder`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; renders Splunk Observability Cloud dashboard groups, charts, dashboards, and apply plans",
+        "cloud_config_path": "Validate and optionally apply classic Observability dashboard API payloads; access tokens stay file-based and are never placed in chat or command arguments",
+        "notes": "Dashboard composition workflow for Observability dashboard groups, charts, variables, detector links, runbooks, rendered API payloads, and optional applies."
       },
       {
         "kind": "workflow",
@@ -431,6 +514,32 @@
       "notes": "External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets."
     },
     {
+      "skill": "splunk-observability-otel-collector-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup."
+    },
+    {
+      "skill": "splunk-observability-dashboard-builder",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Splunk Observability Cloud dashboard render/apply workflow; no Splunk Platform runtime placement."
+    },
+    {
       "skill": "splunk-agent-management-setup",
       "role_support": {
         "search-tier": "supported",
@@ -556,6 +665,32 @@
       "notes": "Search-tier workflow for ITSI content-pack bootstrap, validation, and service-topology automation."
     },
     {
+      "skill": "splunk-enterprise-security-install",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Premium search-tier SIEM app install and essinstall workflow for standalone search heads or SHC deployers."
+    },
+    {
+      "skill": "splunk-enterprise-security-config",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "indexer"
+      ],
+      "notes": "ES operational configuration workflow for search-tier objects and index-tier ES index readiness."
+    },
+    {
       "skill": "splunk-ai-assistant-setup",
       "role_support": {
         "search-tier": "required",
@@ -626,7 +761,9 @@
       "splunkbase_id": "7538",
       "label": "Cisco Catalyst Add-on for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-catalyst-add-on-for-splunk_*"],
+      "package_patterns": [
+        "cisco-catalyst-add-on-for-splunk_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",
@@ -649,7 +786,9 @@
       "splunkbase_id": "7777",
       "label": "Cisco DC Networking App for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-dc-networking_*"],
+      "package_patterns": [
+        "cisco-dc-networking_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",
@@ -672,8 +811,12 @@
       "splunkbase_id": "7539",
       "label": "Cisco Enterprise Networking for Splunk Platform",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-enterprise-networking-for-splunk-platform_*"],
-      "install_requires": ["7538"],
+      "package_patterns": [
+        "cisco-enterprise-networking-for-splunk-platform_*"
+      ],
+      "install_requires": [
+        "7538"
+      ],
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -696,7 +839,9 @@
       "splunkbase_id": "6872",
       "label": "Cisco Catalyst Enhanced Netflow Add-on for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-catalyst-enhanced-netflow-add-on-for-splunk_*"],
+      "package_patterns": [
+        "cisco-catalyst-enhanced-netflow-add-on-for-splunk_*"
+      ],
       "role_support": {
         "search-tier": "none",
         "indexer": "none",
@@ -719,7 +864,9 @@
       "splunkbase_id": "7404",
       "label": "Cisco Security Cloud",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-security-cloud_*"],
+      "package_patterns": [
+        "cisco-security-cloud_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",
@@ -742,7 +889,34 @@
       "splunkbase_id": "5558",
       "label": "Cisco Secure Access App for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-secure-access-app-for-splunk_*"],
+      "package_patterns": [
+        "cisco-secure-access-app-for-splunk_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "cisco-secure-access-setup",
+      "app_name": "TA-cisco-cloud-security-addon",
+      "splunkbase_id": "7569",
+      "label": "Cisco Secure Access Add-on for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": [
+        "cisco-secure-access-add-on-for-splunk_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",
@@ -765,7 +939,9 @@
       "splunkbase_id": "7828",
       "label": "Cisco Intersight Add-On for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-intersight-add-on-for-splunk_*"],
+      "package_patterns": [
+        "cisco-intersight-add-on-for-splunk_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",
@@ -788,7 +964,9 @@
       "splunkbase_id": "3471",
       "label": "Cisco Splunk Add-on for AppDynamics",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
-      "package_patterns": ["cisco-splunk-add-on-for-appdynamics_*"],
+      "package_patterns": [
+        "cisco-splunk-add-on-for-appdynamics_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",
@@ -811,7 +989,9 @@
       "splunkbase_id": "5580",
       "label": "Splunk Add-on for Cisco Meraki",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-meraki-add-on-for-splunk_*"],
+      "package_patterns": [
+        "cisco-meraki-add-on-for-splunk_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",
@@ -829,12 +1009,139 @@
       }
     },
     {
+      "skill": "splunk-app-install",
+      "app_name": "ta_cisco_webex_add_on_for_splunk",
+      "splunkbase_id": "8365",
+      "label": "Webex Add-on for Splunk",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": [
+        "webex-add-on-for-splunk_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-app-install",
+      "app_name": "Splunk_TA_cisco-ucs",
+      "splunkbase_id": "2731",
+      "label": "Splunk Add-on for Cisco UCS",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-cisco-ucs_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-app-install",
+      "app_name": "Splunk_TA_cisco-esa",
+      "splunkbase_id": "1761",
+      "label": "Splunk Add-on for Cisco ESA",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-cisco-esa_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-app-install",
+      "app_name": "Splunk_TA_cisco-wsa",
+      "splunkbase_id": "1747",
+      "label": "Splunk Add-on for Cisco WSA",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-cisco-wsa_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-app-install",
+      "app_name": "Splunk_TA_Talos_Intelligence",
+      "splunkbase_id": "7557",
+      "label": "Cisco Talos Intelligence for Enterprise Security Cloud",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "cisco-talos-intelligence-for-enterprise-security-cloud_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
       "skill": "splunk-stream-setup",
       "app_name": "splunk_app_stream",
       "splunkbase_id": "1809",
       "label": "Splunk App for Stream",
       "license_ack_url": "",
-      "package_patterns": ["splunk-app-for-stream_*"],
+      "package_patterns": [
+        "splunk-app-for-stream_*"
+      ],
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -857,7 +1164,9 @@
       "splunkbase_id": "5238",
       "label": "Splunk Add-on for Stream Forwarders",
       "license_ack_url": "",
-      "package_patterns": ["splunk-add-on-for-stream-forwarders_*"],
+      "package_patterns": [
+        "splunk-add-on-for-stream-forwarders_*"
+      ],
       "role_support": {
         "search-tier": "none",
         "indexer": "none",
@@ -880,7 +1189,9 @@
       "splunkbase_id": "5234",
       "label": "Splunk Add-on for Stream Wire Data",
       "license_ack_url": "",
-      "package_patterns": ["splunk-add-on-for-stream-wire-data_*"],
+      "package_patterns": [
+        "splunk-add-on-for-stream-wire-data_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "required",
@@ -903,7 +1214,9 @@
       "splunkbase_id": "7719",
       "label": "Cisco ThousandEyes App for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["cisco-thousandeyes-app-for-splunk_*"],
+      "package_patterns": [
+        "cisco-thousandeyes-app-for-splunk_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",
@@ -926,7 +1239,10 @@
       "splunkbase_id": "1841",
       "label": "Splunk IT Service Intelligence",
       "license_ack_url": "",
-      "package_patterns": ["splunk-it-service-intelligence_*", "itsi_*"],
+      "package_patterns": [
+        "splunk-it-service-intelligence_*",
+        "itsi_*"
+      ],
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -949,8 +1265,12 @@
       "splunkbase_id": "5391",
       "label": "Splunk App for Content Packs",
       "license_ack_url": "",
-      "package_patterns": ["splunk-app-for-content-packs_*"],
-      "install_requires": ["1841"],
+      "package_patterns": [
+        "splunk-app-for-content-packs_*"
+      ],
+      "install_requires": [
+        "1841"
+      ],
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -968,12 +1288,39 @@
       }
     },
     {
+      "skill": "splunk-enterprise-security-install",
+      "app_name": "SplunkEnterpriseSecuritySuite",
+      "splunkbase_id": "263",
+      "label": "Splunk Enterprise Security",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-enterprise-security_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
       "skill": "splunk-ai-assistant-setup",
       "app_name": "Splunk_AI_Assistant_Cloud",
       "splunkbase_id": "7245",
       "label": "Splunk AI Assistant for SPL",
       "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
-      "package_patterns": ["splunk-ai-assistant-for-spl_*"],
+      "package_patterns": [
+        "splunk-ai-assistant-for-spl_*"
+      ],
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -996,7 +1343,9 @@
       "splunkbase_id": "",
       "label": "Splunk MCP Server",
       "license_ack_url": "",
-      "package_patterns": ["splunk-mcp-server_*"],
+      "package_patterns": [
+        "splunk-mcp-server_*"
+      ],
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -1019,7 +1368,9 @@
       "splunkbase_id": "8485",
       "label": "Cisco Spaces Add-on for Splunk",
       "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
-      "package_patterns": ["spaces-add-on-for-splunk_*"],
+      "package_patterns": [
+        "spaces-add-on-for-splunk_*"
+      ],
       "role_support": {
         "search-tier": "supported",
         "indexer": "none",

@@ -128,7 +128,7 @@ When summarizing preview output for a beginner, use this shape:
 Preview result:
 - Ready to create/update: <services, KPIs, dependencies, packs>
 - Needs attention before apply: <missing apps, indexes, macros, searches>
-- Will stay manual: <content-pack module steps or dashboard tuning>
+- Will stay manual: <content-pack module steps without a safe configured_outcome>
 - Recommended next command: <apply or validate command>
 ```
 
@@ -140,4 +140,4 @@ A beginner setup is ready to hand off when:
 - Apply finishes without prerequisite errors.
 - Validate passes or returns only known manual follow-up items.
 - The generated report identifies installed packs, created services, dependency
-  edges, and remaining module or dashboard steps.
+  edges, configured outcomes, and remaining module steps.

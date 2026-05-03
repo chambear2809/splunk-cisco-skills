@@ -261,6 +261,111 @@ class SplunkRestClient:
         entries = self._normalize_entries(response)
         return entries[0] if entries else {}
 
+    def dispatch_saved_search(self, app_name: str, search_name: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        response = self._request_form(
+            "POST",
+            f"/servicesNS/nobody/{quote(app_name)}/saved/searches/{quote(search_name)}/dispatch",
+            payload=payload or {},
+        )
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else (response if isinstance(response, dict) else {"response": response})
+
+    def dispatch_search(self, search: str, payload: dict[str, Any] | None = None, app_name: str | None = None) -> dict[str, Any]:
+        dispatch_payload = dict(payload or {})
+        dispatch_payload["search"] = search
+        path = f"/servicesNS/nobody/{quote(app_name)}/search/jobs" if app_name else "/services/search/jobs"
+        response = self._request_form("POST", path, payload=dispatch_payload)
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else (response if isinstance(response, dict) else {"response": response})
+
+    def get_data_model(self, app_name: str, model_name: str) -> dict[str, Any] | None:
+        try:
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/datamodel/model/{quote(model_name)}")
+        except KeyError:
+            return None
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else None
+
+    def update_data_model(self, app_name: str, model_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request_form(
+            "POST",
+            f"/servicesNS/nobody/{quote(app_name)}/datamodel/model/{quote(model_name)}",
+            payload=payload,
+        )
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else {}
+
+    def get_ui_view(self, app_name: str, view_name: str) -> dict[str, Any] | None:
+        try:
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/data/ui/views/{quote(view_name)}")
+        except KeyError:
+            return None
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else None
+
+    def create_ui_view(self, app_name: str, view_name: str, xml: str, changelog: str | None = None) -> dict[str, Any]:
+        payload = {"name": view_name, "eai:data": xml}
+        if changelog:
+            payload["eai:changelog"] = changelog
+        response = self._request_form("POST", f"/servicesNS/nobody/{quote(app_name)}/data/ui/views", payload=payload)
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else {}
+
+    def update_ui_view(self, app_name: str, view_name: str, xml: str, changelog: str | None = None) -> dict[str, Any]:
+        payload = {"eai:data": xml}
+        if changelog:
+            payload["eai:changelog"] = changelog
+        response = self._request_form(
+            "POST",
+            f"/servicesNS/nobody/{quote(app_name)}/data/ui/views/{quote(view_name)}",
+            payload=payload,
+        )
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else {}
+
+    def get_ui_nav(self, app_name: str, nav_name: str = "default") -> dict[str, Any] | None:
+        try:
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/data/ui/nav/{quote(nav_name)}")
+        except KeyError:
+            return None
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else None
+
+    def update_ui_nav(self, app_name: str, xml: str, nav_name: str = "default") -> dict[str, Any]:
+        response = self._request_form(
+            "POST",
+            f"/servicesNS/nobody/{quote(app_name)}/data/ui/nav/{quote(nav_name)}",
+            payload={"eai:data": xml},
+        )
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else {}
+
+    def get_lookup_file(self, app_name: str, lookup_name: str) -> dict[str, Any] | None:
+        try:
+            response = self._request("GET", f"/servicesNS/nobody/{quote(app_name)}/data/lookup-table-files/{quote(lookup_name)}")
+        except KeyError:
+            return None
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else None
+
+    def create_lookup_file(self, app_name: str, lookup_name: str, staged_path: str) -> dict[str, Any]:
+        response = self._request_form(
+            "POST",
+            f"/servicesNS/nobody/{quote(app_name)}/data/lookup-table-files",
+            payload={"name": lookup_name, "eai:data": staged_path},
+        )
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else {}
+
+    def update_lookup_file(self, app_name: str, lookup_name: str, staged_path: str) -> dict[str, Any]:
+        response = self._request_form(
+            "POST",
+            f"/servicesNS/nobody/{quote(app_name)}/data/lookup-table-files/{quote(lookup_name)}",
+            payload={"eai:data": staged_path},
+        )
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else {}
+
     def get_conf_stanza(self, app_name: str, conf_name: str, stanza_name: str) -> dict[str, Any] | None:
         try:
             response = self._request(
@@ -271,6 +376,26 @@ class SplunkRestClient:
             return None
         entries = self._normalize_entries(response)
         return entries[0] if entries else None
+
+    def create_conf_stanza(self, app_name: str, conf_name: str, stanza_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        stanza_payload = dict(payload)
+        stanza_payload["name"] = stanza_name
+        response = self._request_form(
+            "POST",
+            f"/servicesNS/nobody/{quote(app_name)}/configs/conf-{quote(conf_name)}",
+            payload=stanza_payload,
+        )
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else {}
+
+    def update_conf_stanza(self, app_name: str, conf_name: str, stanza_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        response = self._request_form(
+            "POST",
+            f"/servicesNS/nobody/{quote(app_name)}/configs/conf-{quote(conf_name)}/{quote(stanza_name)}",
+            payload=payload,
+        )
+        entries = self._normalize_entries(response)
+        return entries[0] if entries else {}
 
     def list_inputs(self, app_name: str | None = None) -> list[dict[str, Any]]:
         entries = self._normalize_entries(self._request("GET", "/services/data/inputs/all", params={"count": 0}))

@@ -38,6 +38,8 @@ ALLOWED_KEYS = [
     "SPLUNK_CLOUD_STACK",
     "SPLUNK_CLOUD_SEARCH_HEAD",
     "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS",
+    "SPLUNK_O11Y_REALM",
+    "SPLUNK_O11Y_TOKEN_FILE",
     "ACS_SERVER",
     "STACK_USERNAME",
     "STACK_PASSWORD",
@@ -272,6 +274,22 @@ class TestCredentialParsing(unittest.TestCase):
         result = parse_credential_file(text)
         self.assertEqual(result["SPLUNK_REMOTE_TMPDIR"], "/var/tmp")
         self.assertEqual(result["SPLUNK_REMOTE_SUDO"], "true")
+
+    def test_observability_cloud_keys_allowed(self):
+        text = textwrap.dedent("""\
+            SPLUNK_O11Y_REALM="us1"
+            SPLUNK_O11Y_TOKEN_FILE="/tmp/splunk_o11y_api_token"
+            PROFILE_o11y__SPLUNK_O11Y_REALM="eu0"
+            PROFILE_o11y__SPLUNK_O11Y_TOKEN_FILE="/tmp/eu0_o11y_token"
+        """)
+
+        flat = parse_credential_file(text)
+        profile = parse_credential_file(text, "o11y")
+
+        self.assertEqual(flat["SPLUNK_O11Y_REALM"], "us1")
+        self.assertEqual(flat["SPLUNK_O11Y_TOKEN_FILE"], "/tmp/splunk_o11y_api_token")
+        self.assertEqual(profile["SPLUNK_O11Y_REALM"], "eu0")
+        self.assertEqual(profile["SPLUNK_O11Y_TOKEN_FILE"], "/tmp/eu0_o11y_token")
 
 
 class TestCredentialFileRoundtrip(unittest.TestCase):

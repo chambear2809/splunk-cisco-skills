@@ -73,8 +73,11 @@
       "product_key": "vulnerability_intelligence"
     },
     "cisco_evm": {
-      "automation_state": "manual_gap",
-      "manual_gap_reason": "The SCAN catalog maps Endpoint Visibility Module into Cisco Security Cloud, but the repo's current security-cloud wrapper does not expose a distinct EVM product flow."
+      "route_type": "app_install_only",
+      "install_apps": [
+        "CiscoSecurityCloud"
+      ],
+      "notes": "Cisco Security Cloud ships EVM knowledge objects and dashboards, but EVM telemetry is not configured through a CiscoSecurityCloud modular input in this repo. Install/validate Cisco Security Cloud here, then feed EVM sourcetypes through the supported upstream EVM pipeline."
     },
     "cisco_secure_access": {
       "route_type": "secure_access"
@@ -111,6 +114,41 @@
     },
     "cisco_thousandeyes": {
       "route_type": "thousandeyes"
+    },
+    "cisco_esa": {
+      "route_type": "app_install_only",
+      "install_apps": [
+        "Splunk_TA_cisco-esa"
+      ],
+      "notes": "Installs the Splunk-supported Cisco ESA add-on. Configure ESA log forwarding or SC4S collection outside this product router, then validate the app and sourcetypes."
+    },
+    "cisco_talos": {
+      "route_type": "app_install_only",
+      "install_apps": [
+        "Splunk_TA_Talos_Intelligence"
+      ],
+      "notes": "Installs Cisco Talos Intelligence for Enterprise Security Cloud. This integration requires a supported Splunk Enterprise Security Cloud deployment; finish Talos setup in the ES/SOAR workflow."
+    },
+    "cisco_ucs": {
+      "route_type": "app_install_only",
+      "install_apps": [
+        "Splunk_TA_cisco-ucs"
+      ],
+      "notes": "Installs the Splunk-supported Cisco UCS add-on. Configure UCS Manager inputs in the add-on UI or supported Splunk docs."
+    },
+    "cisco_wsa": {
+      "route_type": "app_install_only",
+      "install_apps": [
+        "Splunk_TA_cisco-wsa"
+      ],
+      "notes": "Installs the Splunk-supported Cisco WSA add-on. Configure WSA log forwarding or SC4S collection outside this product router, then validate the app and sourcetypes."
+    },
+    "cisco_webex": {
+      "route_type": "app_install_only",
+      "install_apps": [
+        "ta_cisco_webex_add_on_for_splunk"
+      ],
+      "notes": "Installs the Webex Add-on for Splunk. Configure Webex REST API inputs in the add-on UI or vendor documentation."
     },
     "cisco_spaces": {
       "route_type": "spaces"

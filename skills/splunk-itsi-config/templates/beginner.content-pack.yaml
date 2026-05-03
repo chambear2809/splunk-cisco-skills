@@ -38,7 +38,8 @@ packs:
     saved_search_action: disable
     install_all: true
     backfill: false
-    prefix: "Starter - "
+    # Keep empty unless you have reviewed the current Content Packs prefix known issue.
+    prefix: ""
     index_macro_value: index="thousandeyes"
 
     # Example generic catalog entry. Keep commented until needed.
@@ -54,3 +55,19 @@ packs:
     #       - app: DA-ITSI-CP-microsoft-365
     #         name: Microsoft 365 Entity Discovery
     #         enabled: false
+    #     macros:
+    #       - app: DA-ITSI-CP-microsoft-365
+    #         name: itsi-cp-microsoft-365-indexes
+    #         definition: index="o365"
+    #     service_imports:
+    #       - title: Import reviewed services
+    #         app: SA-ITOA
+    #         search: '| inputlookup reviewed_services.csv | table service_title | itsiimportobjects'
+    #         expected_service_count: 50
+    #         allow_service_import: false
+    #     lookup_file_uploads:
+    #       - app: DA-ITSI-CP-microsoft-365
+    #         name: ownership.csv
+    #         staged_path: /opt/splunk/var/run/splunk/lookup_tmp/ownership.csv
+    #         create: true
+    #         allow_lookup_file_upload: false

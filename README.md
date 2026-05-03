@@ -37,6 +37,18 @@ Common starting points:
 - If you need Splunk Enterprise on Kubernetes, start with
   `skills/splunk-enterprise-kubernetes-setup/`. The workflow renders assets by
   default and only applies them when you request an apply phase.
+- If you need Splunk Enterprise Security, start with
+  `skills/splunk-enterprise-security-install/` for package install and
+  `skills/splunk-enterprise-security-config/` for indexes, roles, data models,
+  enrichment, detections, and operational validation.
+- If you need Splunk Observability Cloud OTel collection on Kubernetes or a
+  Linux host, start with `skills/splunk-observability-otel-collector-setup/`.
+  The workflow renders Helm and Linux installer assets first, then applies only
+  when requested.
+- If you need Splunk Observability Cloud dashboards, use
+  `skills/splunk-observability-dashboard-builder/` to turn an operational goal
+  into validated classic Observability dashboard API payloads, with modern
+  dashboard features called out as advisory work.
 - If you need Splunk platform administration services, start with
   `skills/splunk-agent-management-setup/`,
   `skills/splunk-workload-management-setup/`,
@@ -69,7 +81,7 @@ operations do **not** use the search-tier REST API in cloud mode.
 
 ## What This Repository Covers
 
-At a high level, the repo gives you six layers of automation:
+At a high level, the repo gives you seven layers of automation:
 
 1. **Host bootstrap**: download Splunk Enterprise packages, install them on
    Linux hosts, and configure standalone or single-site clustered search-tier,
@@ -88,7 +100,11 @@ At a high level, the repo gives you six layers of automation:
    Workload Management, Federated Search, SmartStore/index lifecycle, Monitoring
    Console, and HEC service patterns. The HEC service workflow can also render
    ACS-backed Splunk Cloud token payloads.
-6. **Validation**: confirm the app is installed, the expected objects exist, and
+6. **External collectors and observability**: render and optionally apply
+   customer-managed SC4S, SC4SNMP, and Splunk OTel Collector runtimes that send
+   data to Splunk Cloud, Splunk Enterprise HEC, or Splunk Observability Cloud,
+   and build reviewed Observability dashboard plans or API payload handoffs.
+7. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
 Most of the repo follows the same pattern:
@@ -116,7 +132,7 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards |
 | `cisco-appdynamics-setup` | `Splunk_TA_AppDynamics` | Configure AppDynamics controller and analytics connections, inputs, and dashboards |
 | `cisco-security-cloud-setup` | `CiscoSecurityCloud` | Install and configure product-specific Cisco Security Cloud inputs with dashboard-ready defaults |
-| `cisco-secure-access-setup` | `cisco-cloud-security` | Install and configure Secure Access org accounts, app settings, and dashboard prerequisites |
+| `cisco-secure-access-setup` | `cisco-cloud-security` + `TA-cisco-cloud-security-addon` | Install and configure Secure Access org accounts, event add-on prerequisites, app settings, and dashboard prerequisites |
 | `cisco-spaces-setup` | `ta_cisco_spaces` | Configure Cisco Spaces meta stream accounts, firehose inputs, and activation tokens |
 | `cisco-dc-networking-setup` | `cisco_dc_networking_app_for_splunk` | Configure ACI, Nexus Dashboard, and Nexus 9K data collection |
 | `cisco-intersight-setup` | `Splunk_TA_Cisco_Intersight` | Configure Cisco Intersight account, index, and inputs |
@@ -125,6 +141,8 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
 | `splunk-itsi-config` | Native ITSI objects, service trees, and supported ITSI content packs | Preview, apply, and validate ITSI entities, services, KPIs, dependencies, template links, service trees, NEAPs, and selected content packs from YAML specs |
+| `splunk-enterprise-security-install` | `SplunkEnterpriseSecuritySuite` | Install, post-install, and validate Splunk Enterprise Security on standalone search heads or SHC deployers |
+| `splunk-enterprise-security-config` | Splunk Enterprise Security configuration | Configure ES indexes, roles, data models, enrichment, detections, and operational validation |
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant for SPL; drive Enterprise cloud-connected onboarding |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
@@ -136,6 +154,8 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-monitoring-console-setup` | Splunk Monitoring Console | Render and validate self-managed distributed or standalone Monitoring Console assets, including auto-config, peer/group review, forwarder monitoring, and platform alerts |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-enterprise-kubernetes-setup` | Splunk Enterprise on Kubernetes | Render, preflight, apply, and validate SOK S1/C3/M4 or Splunk POD on Cisco UCS |
+| `splunk-observability-otel-collector-setup` | Splunk Observability Cloud OTel Collector | Render, apply, and validate Splunk Distribution of OpenTelemetry Collector assets for Kubernetes clusters and Linux hosts, including Splunk Platform HEC token handoff helpers |
+| `splunk-observability-dashboard-builder` | Splunk Observability Cloud dashboards | Render, validate, and optionally apply classic Observability dashboard groups, charts, and dashboards from natural-language, JSON, or YAML specs |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
 | `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render or apply Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
 | `splunk-connect-for-snmp-setup` | SC4SNMP external collector | Prepare Splunk HEC/indexes and render or apply Docker Compose or Helm assets for Splunk Connect for SNMP |
@@ -327,6 +347,19 @@ STACK_USERNAME=""
 STACK_PASSWORD=""
 STACK_TOKEN_USER=""
 ```
+
+For Splunk Observability Cloud, the credentials file can include the realm and
+the local file path containing the Observability API token:
+
+```bash
+SPLUNK_O11Y_REALM="us0"
+SPLUNK_O11Y_TOKEN_FILE="/tmp/splunk_o11y_api_token"
+```
+
+Keep the token value out of `credentials`. Create or update the token file with
+`bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_o11y_api_token`,
+then pass no token flag when using the Observability dashboard builder or OTel
+Collector setup scripts.
 
 `SPLUNK_PLATFORM` is optional. In normal use, scripts infer the target from the
 current operation plus your Cloud/REST settings. If one credentials file
@@ -653,6 +686,8 @@ splunk-cisco-skills/
 │   └── run-splunk-mcp.js        # tracked bridge for Splunk MCP Server
 ├── sc4s-rendered/               # local generated SC4S output, gitignored
 ├── sc4snmp-rendered/            # local generated SC4SNMP output, gitignored
+├── splunk-*-rendered/            # local generated platform and OTel output, gitignored
+├── ta-for-indexers-rendered/     # local generated ES indexer bundle, gitignored
 ├── skills/
 │   ├── shared/
 │   │   ├── app_registry.json   # single source of truth for Splunkbase IDs
@@ -679,6 +714,10 @@ splunk-cisco-skills/
 │   ├── splunk-monitoring-console-setup/
 │   ├── splunk-enterprise-host-setup/
 │   ├── splunk-enterprise-kubernetes-setup/
+│   ├── splunk-enterprise-security-install/
+│   ├── splunk-enterprise-security-config/
+│   ├── splunk-observability-otel-collector-setup/
+│   ├── splunk-observability-dashboard-builder/
 │   ├── splunk-connect-for-syslog-setup/
 │   ├── splunk-connect-for-snmp-setup/
 │   ├── splunk-itsi-config/
@@ -828,8 +867,14 @@ follows a similar principle for SC4S: the repo prepares Splunk and renders the
 collector runtime assets, but the SC4S syslog-ng container itself runs on
 customer-managed infrastructure rather than on the Cloud search tier.
 `splunk-connect-for-snmp-setup` follows the same external-collector model for
-SC4SNMP polling and traps. In both workflows, the rendered apply paths are
-rerunnable install-or-upgrade entrypoints for customer-managed runtimes.
+SC4SNMP polling and traps. `splunk-observability-otel-collector-setup` extends
+that pattern to customer-managed Kubernetes or Linux OpenTelemetry Collector
+runtimes that send data to Splunk Observability Cloud and optional Splunk
+Platform HEC. In these workflows, the rendered apply paths are rerunnable
+install-or-upgrade entrypoints for customer-managed runtimes.
+`splunk-observability-dashboard-builder` is separate from runtime placement: it
+renders and validates native Observability Cloud dashboard API payloads and can
+apply them only when explicitly requested.
 `splunk-enterprise-kubernetes-setup` is for self-managed Splunk Enterprise on
 Kubernetes: either Splunk Operator for Kubernetes on an existing cluster, or
 Splunk POD on Cisco UCS with the Splunk Kubernetes Installer.

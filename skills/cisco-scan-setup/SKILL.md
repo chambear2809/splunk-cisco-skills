@@ -20,17 +20,26 @@ indexes, configure data inputs, or require vendor-specific credentials.
 
 ## Package Model
 
-**Local package in `splunk-ta/` is the primary install source.**
-This app does not currently have a Splunkbase listing. Use `splunk-app-install`
-with a local package path:
+**Splunkbase is the public install source; `splunk-ta/` is the local cache
+for offline installs and product-catalog builds.** SCAN is listed on
+Splunkbase as app ID `8566`. Use `splunk-app-install` with the Splunkbase ID
+when a fresh download or public Cloud install is available:
 
 ```bash
 bash skills/splunk-app-install/scripts/install_app.sh \
-  --source local --file splunk-ta/splunk-cisco-app-navigator-scan_1024.tar.gz
+  --source splunkbase --app-id 8566
 ```
 
-For Splunk Cloud (ACS), upload as a private app. After installation, use this
-skill to verify the catalog, run the initial sync, and validate the deployment.
+For offline Enterprise installs or private review copies, place the downloaded
+package in `splunk-ta/` and run this skill's `setup.sh`; it installs the newest
+matching local package. The product repo's `cisco-product-setup` catalog is
+also generated from the newest local SCAN tarball, using the embedded
+`default/app.conf` app version when cached filenames do not include a dotted
+version.
+
+For Splunk Cloud (ACS), prefer the Splunkbase install path. Use private app
+upload only for pre-vetted local packages. After installation, use this skill
+to verify the catalog, run the initial sync, and validate the deployment.
 
 ## Agent Behavior — Credentials
 
@@ -167,7 +176,8 @@ private app upload completes.
    reach S3, catalog sync will fail but the app still functions with its
    shipped default catalog.
 3. **synccatalog dryrun is required**: Despite `searchbnf.conf` marking
-   `dryrun` as optional, the Python command errors if `dryrun` is omitted.
+   `dryrun` as optional, the Python command yields an error event and exits
+   early if `dryrun` is omitted, producing no useful output.
    Always pass `dryrun=true` or `dryrun=false` explicitly.
 4. **min_app_version gating**: The S3 products.conf may include a
    `min_app_version` header. If the installed app version is below this
@@ -177,14 +187,17 @@ private app upload completes.
 6. **Lookup replication denied**: `distsearch.conf` excludes the large
    `scan_splunkbase_apps.csv.gz` from search-head replication. Each SHC
    member must run `synclookup` independently (or use the scheduled search).
-7. **No Splunkbase listing**: Install from the local package in `splunk-ta/`.
-   For Splunk Cloud, upload as a private app.
+7. **Splunkbase listing available**: SCAN is Splunkbase app ID `8566`. Keep a
+   local package in `splunk-ta/` when you need offline Enterprise installs or
+   to regenerate the product repo catalog from a reviewed package.
 8. **Restart behavior**: SCAN does not create indexes, so a restart is
    typically only needed if Splunk requires one after app installation.
 9. **Non-atomic sync**: `synccatalog` writes the file before reloading.
    A failure after write but before reload leaves the file updated on disk
-   without Splunk seeing the changes. Run `| synccatalog dryrun=true` or
-   POST to the `_reload` endpoint to recover.
+   without Splunk seeing the changes. POST to the `_reload` endpoint
+   (`/services/configs/conf-products/_reload`) to force Splunk to pick up
+   the already-written file. Run `| synccatalog dryrun=true` separately to
+   diagnose version state, not to trigger a reload.
 10. **cisco-product-setup dependency**: The `cisco-product-setup` skill
     reads the SCAN tarball at build-time to generate `catalog.json`. At
     runtime, live SCAN features (installed app detection, data flow

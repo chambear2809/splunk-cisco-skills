@@ -122,6 +122,48 @@ packs:
         - app: DA-ITSI-CP-microsoft-365
           name: Microsoft 365 Entity Discovery
           enabled: false
+      data_model_accelerations:
+        - app: DA-ITSI-CP-microsoft-365
+          name: Microsoft365
+          enabled: true
+          earliest_time: -7d
+      lookup_updates:
+        - title: Refresh Microsoft 365 owner lookup
+          app: DA-ITSI-CP-microsoft-365
+          search: '| makeresults | eval owner="platform" | outputlookup microsoft_365_owner_lookup.csv'
+          allow_dispatch: false
+      lookup_file_uploads:
+        - title: Replace staged Microsoft 365 owner lookup
+          app: DA-ITSI-CP-microsoft-365
+          name: microsoft_365_owner_lookup.csv
+          staged_path: /opt/splunk/var/run/splunk/lookup_tmp/microsoft_365_owner_lookup.csv
+          create: false
+          allow_lookup_file_upload: false
+          allow_lookup_file_replace: false
+      kpi_backfills:
+        - title: Backfill Microsoft 365 KPI summaries
+          app: DA-ITSI-CP-microsoft-365
+          saved_search: Microsoft 365 KPI Summary Backfill
+          dispatch.earliest_time: -7d
+          dispatch.latest_time: now
+          allow_dispatch: false
+      service_imports:
+        - title: Import Microsoft 365 services
+          app: SA-ITOA
+          search: '| inputlookup microsoft_365_services.csv | table service_title | itsiimportobjects'
+          expected_service_count: 50
+          uses_service_templates: false
+          allow_service_import: false
+      props:
+        - app: DA-ITSI-CP-microsoft-365
+          stanza: o365:management:activity
+          fields:
+            KV_MODE: json
+      transforms:
+        - app: DA-ITSI-CP-microsoft-365
+          stanza: o365_extract_example
+          REGEX: '"workload":"([^"]+)"'
+          FORMAT: workload::$1
 
   - title: Third-Party APM
     resolution: skip

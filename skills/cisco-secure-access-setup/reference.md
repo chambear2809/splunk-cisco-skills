@@ -1,21 +1,25 @@
 # Cisco Secure Access — Reference
 
-Reference for the local Cisco Secure Access App for Splunk package.
+Reference for the Cisco Secure Access App for Splunk package and its required
+event add-on.
 
 ## Package Identity
 
 | Property | Value |
 |---|---|
 | App name | `cisco-cloud-security` |
-| Splunkbase ID | `5558` |
-| Local package pattern | `cisco-secure-access-app-for-splunk_*` |
+| Add-on name | `TA-cisco-cloud-security-addon` |
+| Splunkbase IDs | `5558` app, `7569` add-on |
+| Local package patterns | `cisco-secure-access-app-for-splunk_*`, `cisco-secure-access-add-on-for-splunk_*` |
 | Local package in repo | `splunk-ta/cisco-secure-access-app-for-splunk_1053.tgz` |
 | Packaged version inspected | `1.0.53` |
 
 ## Important Note
 
-The local package in this repo is the **Cisco Secure Access App for Splunk**,
-not the separate “Cisco Secure Access Add-on for Splunk” listing on Splunkbase.
+The Secure Access workflow needs both package types. The app provides
+dashboards plus the custom account/settings endpoints documented below. The
+add-on provides the event-log ingestion path and log-index settings used by
+Secure Access, Umbrella, and Cloudlock data.
 
 ## Core Automation Endpoint
 
@@ -104,7 +108,7 @@ focuses on `org_accounts`.
 
 ## Modular Inputs
 
-The package ships these modular input kinds in `inputs.conf.spec`:
+The app package ships these modular input kinds in `inputs.conf.spec`:
 
 - `cloudlock://<name>`
 - `cloudlock_health_check://<name>`
@@ -116,9 +120,14 @@ The package ships these modular input kinds in `inputs.conf.spec`:
 The `org_accounts` endpoint provisions the app discovery and private app inputs
 for you when the corresponding indexes are supplied.
 
+The add-on package supplies the event-log ingestion inputs and index settings
+that are not created by the app-only package. Keep `TA-cisco-cloud-security-addon`
+installed before validating production event-log coverage.
+
 ## Validation Checklist
 
 - `cisco-cloud-security` is installed
+- `TA-cisco-cloud-security-addon` is installed
 - at least one org account exists, or the expected `orgId` can be fetched
 - optional `investigate_index`, `privateapp_index`, and `appdiscovery_index`
   fields are present when requested
@@ -126,4 +135,3 @@ for you when the corresponding indexes are supplied.
 - `dashboard_settings` and `refresh_rate` are initialized when dashboard defaults are desired
 - optional `cloudlock_settings`, `selected_destination_lists`, and `s3_indexes`
   are present when those dashboard features are in scope
-

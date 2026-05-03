@@ -354,6 +354,8 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 out('[{"name":"3.6.3"}]')
             if "splunkbase.splunk.com/api/v1/app/5558/release/" in url:
                 out('[{"name":"1.0.53"}]')
+            if "splunkbase.splunk.com/api/v1/app/7569/release/" in url:
+                out('[{"name":"1.0.50"}]')
 
             if "/services/auth/login" in path:
                 out("<response><sessionKey>test-session</sessionKey></response>")
@@ -517,6 +519,7 @@ class ShellScriptRegressionBase(unittest.TestCase):
             mapping = {
                 "7404": ("CiscoSecurityCloud", "3.6.3"),
                 "5558": ("cisco-cloud-security", "1.0.53"),
+                "7569": ("TA-cisco-cloud-security-addon", "1.0.50"),
             }
             app_id = ""
             version = ""
@@ -535,6 +538,8 @@ class ShellScriptRegressionBase(unittest.TestCase):
                 app_name, default_version = ("CiscoSecurityCloud", "3.6.3")
             elif "cisco-secure-access-app-for-splunk" in file_path:
                 app_name, default_version = ("cisco-cloud-security", "1.0.53")
+            elif "cisco-secure-access-add-on-for-splunk" in file_path:
+                app_name, default_version = ("TA-cisco-cloud-security-addon", "1.0.50")
             else:
                 raise SystemExit(1)
 
@@ -1290,4 +1295,3 @@ class ShellScriptRegressionBase(unittest.TestCase):
         env["SPLUNK_CREDENTIALS_FILE"] = str(credentials_file)
         env["STREAM_STATE"] = str(state_file)
         return env
-

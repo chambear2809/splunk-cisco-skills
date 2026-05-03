@@ -20,7 +20,9 @@ Local secret files are intentionally ignored:
 
 - `credentials`
 - `template.local`
-- rendered SC4S, SC4SNMP, and Splunk MCP output directories
+- rendered deployment output directories, including SC4S, SC4SNMP, Splunk MCP,
+  Splunk Enterprise Security indexer bundles, Splunk OTel Collector assets, and
+  Splunk Observability dashboard payloads
 - `splunk-mcp-rendered/.env.splunk-mcp`
 
 Use `skills/shared/scripts/write_secret_file.sh` to create temporary secret

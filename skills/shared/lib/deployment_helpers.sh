@@ -326,9 +326,13 @@ deployment_bundle_apply_current_profile() {
 
     # Stage credentials as a target-local file; SSH targets cannot read a local
     # mktemp path from the remote shell.
+    #
+    # Use newline-delimited storage (user on line 1, password on line 2) so
+    # passwords containing ':' do not corrupt the read. The remote `splunk`
+    # CLI accepts the same `username\npassword\n` order on stdin.
     cred_file="$(mktemp)"
     chmod 600 "${cred_file}"
-    printf '%s:%s' "${auth_user}" "${auth_pass}" > "${cred_file}"
+    printf '%s\n%s\n' "${auth_user}" "${auth_pass}" > "${cred_file}"
     staged_cred_file="$(hbs_stage_file_for_execution "${execution_mode}" "${cred_file}" "splunk-bundle-cred.$$")" || {
         rm -f "${cred_file}"
         return 1
@@ -340,9 +344,7 @@ deployment_bundle_apply_current_profile() {
 set -euo pipefail
 cred_file=$(printf '%q' "${staged_cred_file}")
 trap 'rm -f "\${cred_file}"' EXIT INT TERM
-auth_value="\$(cat "\${cred_file}")"
-auth_user="\${auth_value%%:*}"
-auth_pass="\${auth_value#*:}"
+{ IFS= read -r auth_user; IFS= read -r auth_pass; } < "\${cred_file}"
 printf '%s\n%s\n' "\${auth_user}" "\${auth_pass}" | $(printf '%q' "${splunk_home}/bin/splunk") apply shcluster-bundle -target $(printf '%q' "${target_uri}") -answer-yes
 EOF
 )"
@@ -352,9 +354,7 @@ EOF
 set -euo pipefail
 cred_file=$(printf '%q' "${staged_cred_file}")
 trap 'rm -f "\${cred_file}"' EXIT INT TERM
-auth_value="\$(cat "\${cred_file}")"
-auth_user="\${auth_value%%:*}"
-auth_pass="\${auth_value#*:}"
+{ IFS= read -r auth_user; IFS= read -r auth_pass; } < "\${cred_file}"
 printf '%s\n%s\n' "\${auth_user}" "\${auth_pass}" | $(printf '%q' "${splunk_home}/bin/splunk") apply cluster-bundle -answer-yes
 EOF
 )"

@@ -2,25 +2,30 @@
 name: cisco-secure-access-setup
 description: >-
   Install and configure the Cisco Secure Access App for Splunk
-  (cisco-cloud-security). Supports org account creation, investigate index,
-  private app index, and app discovery index provisioning. Use when the user
-  asks about Cisco Secure Access, app ID 5558, cisco-cloud-security, or Secure Access dashboards.
+  (cisco-cloud-security) and required event Add-on
+  (TA-cisco-cloud-security-addon). Supports org account creation, investigate
+  index, private app index, and app discovery index provisioning. Use when the
+  user asks about Cisco Secure Access, app IDs 5558/7569, cisco-cloud-security,
+  or Secure Access dashboards.
 ---
 
 # Cisco Secure Access Setup
 
 Automates installation and core account configuration of the **Cisco Secure
-Access App for Splunk** (`cisco-cloud-security`).
+Access App for Splunk** (`cisco-cloud-security`) plus the required **Cisco
+Secure Access Add-on for Splunk** (`TA-cisco-cloud-security-addon`).
 
 ## Package Model
 
 **Pull from Splunkbase first (latest version), fall back to `splunk-ta/`.**
-Use the setup script with `--install` to install app ID `5558`. The shared
-installer falls back to the local package
-`cisco-secure-access-app-for-splunk_*.tgz` when needed.
+Use the setup script with `--install` to install add-on ID `7569` and app ID
+`5558`. The shared installer falls back to local packages
+`cisco-secure-access-add-on-for-splunk_*` and
+`cisco-secure-access-app-for-splunk_*` when needed.
 
-This repo’s local package is the **App for Splunk** (`cisco-cloud-security`),
-not the separate Splunkbase add-on package.
+The app hosts dashboards and account/settings endpoints. The add-on is required
+for Secure Access, Umbrella, and Cloudlock event-log ingestion and index
+settings.
 
 ## Agent Behavior — Credentials
 
@@ -51,13 +56,14 @@ Splunk Enterprise or Splunk Cloud.
 | Search-tier API | `SPLUNK_SEARCH_API_URI` env var (legacy alias: `SPLUNK_URI`) |
 | Cloud stack | `SPLUNK_CLOUD_STACK` for Cloud installs |
 | App name | `cisco-cloud-security` |
-| Splunkbase ID | `5558` |
+| Add-on name | `TA-cisco-cloud-security-addon` |
+| Splunkbase IDs | `5558` app, `7569` add-on |
 | Credentials | Project-root `credentials` file (falls back to `~/.splunk/credentials`) |
 | Skill scripts | `skills/cisco-secure-access-setup/scripts/` |
 
 ## Setup Workflow
 
-### Step 1: Install The App
+### Step 1: Install The Add-On And App
 
 ```bash
 bash skills/cisco-secure-access-setup/scripts/setup.sh --install
@@ -133,8 +139,11 @@ To access them: **Apps → Cisco Secure Access App for Splunk**
 1. Org account must be created (Step 2) so the app has a valid API connection.
 2. App settings must be configured for dashboard readiness (Step 3), including
    terms acceptance and optional role bootstrap.
-3. Modular inputs must be running and delivering events to the configured indexes
-   (`investigate_index`, `privateapp_index`, `appdiscovery_index`).
+3. The required add-on must be installed so event-log ingestion and log-index
+   settings are present.
+4. Modular inputs must be running and delivering events to the configured indexes
+   (`investigate_index`, `privateapp_index`, `appdiscovery_index`, and the
+   Secure Access event indexes configured in the add-on).
 
 The `--apply-dashboard-defaults` flag in Step 3 initializes the app's stored
 dashboard settings (refresh rate, Cloudlock, destination lists, S3 index
@@ -150,6 +159,7 @@ search-tier REST.
 The current skill automates:
 
 - OAuth/org account creation and update
+- required add-on and app installation
 - investigate index registration
 - private app index registration
 - app discovery index registration

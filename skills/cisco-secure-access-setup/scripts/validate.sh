@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="cisco-cloud-security"
+ADDON_NAME="TA-cisco-cloud-security-addon"
 ORG_ID=""
 SK=""
 
@@ -68,6 +69,12 @@ else
         pass "App installed (version: ${version})"
     else
         fail "App not found — install Cisco Secure Access first"
+    fi
+    if rest_check_app "$SK" "$SPLUNK_URI" "$ADDON_NAME" 2>/dev/null; then
+        version=$(rest_get_app_version "$SK" "$SPLUNK_URI" "$ADDON_NAME" 2>/dev/null || echo "unknown")
+        pass "Add-on installed (version: ${version})"
+    else
+        fail "Add-on not found - install Cisco Secure Access add-on first"
     fi
 fi
 

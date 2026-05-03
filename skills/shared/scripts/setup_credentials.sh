@@ -180,6 +180,17 @@ if [[ "${add_cloud}" =~ ^[yY] ]]; then
     esac
 fi
 
+splunk_o11y_realm=""
+splunk_o11y_token_file=""
+echo ""
+read -rp "Add Splunk Observability Cloud settings? [y/N]: " add_o11y
+if [[ "${add_o11y}" =~ ^[yY] ]]; then
+    read -rp "Observability realm (example: us0): " splunk_o11y_realm
+    echo "Observability API tokens stay in a separate chmod 600 file."
+    echo "Use: bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_o11y_api_token"
+    read -rp "Path to Observability API token file: " splunk_o11y_token_file
+fi
+
 echo ""
 read -rp "Do you also want to add Splunkbase / splunk.com credentials? [y/N]: " add_sb
 sb_user=""
@@ -218,6 +229,8 @@ stack_username_q=$(quote_credential_value "${stack_username}")
 stack_password_q=$(quote_credential_value "${stack_password}")
 stack_token_q=$(quote_credential_value "${stack_token}")
 stack_token_user_q=$(quote_credential_value "${stack_token_user}")
+splunk_o11y_realm_q=$(quote_credential_value "${splunk_o11y_realm}")
+splunk_o11y_token_file_q=$(quote_credential_value "${splunk_o11y_token_file}")
 sb_user_q=$(quote_credential_value "${sb_user}")
 sb_pass_q=$(quote_credential_value "${sb_pass}")
 splunk_com_user_q=$(quote_credential_value "${splunk_com_user}")
@@ -267,6 +280,8 @@ STACK_USERNAME=${stack_username_q}
 STACK_PASSWORD=${stack_password_q}
 STACK_TOKEN=${stack_token_q}
 STACK_TOKEN_USER=${stack_token_user_q}
+SPLUNK_O11Y_REALM=${splunk_o11y_realm_q}
+SPLUNK_O11Y_TOKEN_FILE=${splunk_o11y_token_file_q}
 SB_USER=${sb_user_q}
 SB_PASS=${sb_pass_q}
 SPLUNK_USERNAME=${splunk_com_user_q}

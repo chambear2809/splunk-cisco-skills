@@ -1,0 +1,88 @@
+# Splunk Observability OTel Collector intake template
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Create token files separately with:
+#   bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_o11y_token
+
+[observability]
+realm = "us0"
+deployment_environment = "prod"
+
+[kubernetes]
+enabled = true
+namespace = "splunk-otel"
+release_name = "splunk-otel-collector"
+cluster_name = "example-cluster"
+distribution = ""
+cloud_provider = ""
+chart_version = ""
+kube_context = ""
+o11y_ingest_url = ""
+o11y_api_url = ""
+priority_class_name = ""
+render_priority_class = false
+windows_nodes = false
+cluster_receiver_enabled = true
+agent_host_network = true
+enable_platform_persistent_queue = false
+platform_persistent_queue_path = "/var/addon/splunk/exporter_queue"
+enable_platform_fsync = false
+enable_secure_app = false
+enable_prometheus_autodetect = false
+enable_istio_autodetect = false
+enable_obi = false
+install_operator_crds = true
+enable_certmanager = false
+
+[kubernetes.platform_hec_logs]
+enabled = false
+url = "https://splunk.example.com:8088/services/collector"
+index = "k8s_logs"
+render_helper = false
+hec_platform = "cloud"
+hec_token_name = "splunk_otel_k8s_logs"
+hec_description = "Managed by splunk-observability-otel-collector-setup"
+hec_default_index = "k8s_logs"
+hec_allowed_indexes = "k8s_logs"
+hec_source = ""
+hec_sourcetype = ""
+hec_use_ack = false
+hec_port = 8088
+hec_enable_ssl = true
+hec_splunk_home = "/opt/splunk"
+hec_app_name = "splunk_httpinput"
+hec_restart_splunk = true
+hec_s2s_indexes_validation = "disabled_for_internal"
+
+[linux]
+enabled = true
+execution = "local"
+host = ""
+ssh_user = ""
+ssh_port = 22
+ssh_key_file = ""
+mode = "agent"
+memory_mib = 512
+listen_interface = "0.0.0.0"
+api_url = ""
+ingest_url = ""
+trace_url = ""
+hec_url = ""
+collector_config = ""
+service_user = ""
+service_group = ""
+skip_collector_repo = false
+repo_channel = "primary"
+instrumentation_mode = "systemd"
+instrumentation_sdks = ""
+npm_path = ""
+otlp_endpoint = ""
+otlp_endpoint_protocol = ""
+metrics_exporter = ""
+logs_exporter = "otlp"
+instrumentation_version = ""
+service_name = ""
+godebug = ""
+enable_obi = false
+obi_version = ""
+obi_install_dir = ""

@@ -92,7 +92,7 @@ override the selected profile's role metadata.
 
 ### Skill Roles
 
-The current skills fall into four architectural roles:
+The current skills fall into five architectural roles:
 
 - **Collector/setup skills** — install apps, create indexes, configure accounts,
   and enable inputs. Examples: AppDynamics, Catalyst, DC Networking,
@@ -101,12 +101,19 @@ The current skills fall into four architectural roles:
   mappings or search-time parsing context but rely on a separate ingestion path.
   Example: `cisco-catalyst-enhanced-netflow-setup`.
 - **Search-time / visualization skills** — configure macros, saved searches, or
-  data model behavior on top of data collected elsewhere. Example:
-  `cisco-enterprise-networking-setup`.
+  data model behavior on top of data collected elsewhere. Examples:
+  `cisco-enterprise-networking-setup`, `splunk-itsi-config`, and
+  `splunk-enterprise-security-config`. Splunk Observability dashboard planning
+  is covered by `splunk-observability-dashboard-builder`, which does not target
+  a Splunk Platform runtime role.
+- **External collector skills** — prepare Splunk-side objects and render
+  customer-managed runtimes outside Splunk. Examples:
+  `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup`, and
+  `splunk-observability-otel-collector-setup`.
 - **Platform/package skills** — manage generic app delivery or multi-component
   app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`,
-  `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup`,
-  `splunk-enterprise-host-setup`, `splunk-itsi-setup`, and
+  `splunk-enterprise-host-setup`, `splunk-enterprise-kubernetes-setup`,
+  `splunk-enterprise-security-install`, `splunk-itsi-setup`, and
   `splunk-mcp-server-setup`.
 
 ### CI And Validation
@@ -482,6 +489,31 @@ SC4SNMP onto the Splunk Cloud search tier. The skill prepares the Splunk-side
 objects and renders runtime assets for customer-managed Docker Compose or
 Kubernetes infrastructure.
 
+### External OpenTelemetry Collector
+
+```mermaid
+flowchart LR
+  Workloads["Kubernetes / Linux workloads"]
+  Collector["Splunk OTel Collector\n(customer-managed runtime)"]
+  O11y["Splunk Observability Cloud\n(metrics, traces, profiling, events)"]
+  PlatformHEC["Splunk Platform HEC\n(optional container logs)"]
+
+  Workloads -->|"metrics / traces / logs"| Collector
+  Collector -->|"Observability ingest"| O11y
+  Collector -->|"optional HEC logs"| PlatformHEC
+```
+
+**Implementation guardrail**: `splunk-observability-otel-collector-setup` does
+not install anything on the Splunk Cloud search tier. It renders Kubernetes
+Helm values, Kubernetes secret helpers, and Linux installer wrappers for
+customer-managed runtimes, with Observability and optional Platform HEC tokens
+kept in local secret files.
+
+`splunk-observability-dashboard-builder` is the companion workflow for Splunk
+Observability Cloud dashboards. It renders and validates classic dashboard API
+payloads and can apply them only when explicitly requested, but it does not
+install collectors or belong on a Splunk Enterprise role.
+
 ### Search-Time And Premium Apps
 
 Some skills do not own the collection path at all. They sit on top of existing
@@ -499,3 +531,6 @@ flowchart LR
   and can enable data model acceleration for the visualization app.
 - `splunk-itsi-setup` installs and validates the premium app layer that other
   skills may integrate with.
+- `splunk-enterprise-security-install` installs ES and runs `essinstall`;
+  `splunk-enterprise-security-config` handles ES indexes, roles, data models,
+  enrichment, detections, risk, and operational validation.

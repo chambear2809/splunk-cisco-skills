@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Observability OTel Collector"
+  short_description: "Deploy Splunk OTel Collector to Kubernetes and Linux"
+  default_prompt: >-
+    Use $splunk-observability-otel-collector-setup to render and optionally
+    apply Splunk Observability Cloud OTel Collector deployments, including
+    Splunk Platform HEC token handoff helpers when Kubernetes logs need HEC.

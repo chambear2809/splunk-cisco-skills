@@ -47,6 +47,8 @@ For Cloud-specific install and API behavior, see
 | `splunk-app-install` | Supported | Supported | Supported | Supported | None | None | Generic package delivery skill; actual package compatibility comes from the package or app metadata. |
 | `splunk-connect-for-syslog-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4S runtime assets. |
 | `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets. |
+| `splunk-observability-otel-collector-setup` | Supported | None | None | None | Required | External collector | External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup. |
+| `splunk-observability-dashboard-builder` | None | None | None | None | None | None | Splunk Observability Cloud dashboard render/apply workflow; no Splunk Platform runtime placement. |
 | `splunk-agent-management-setup` | Supported | Supported | Supported | Supported | None | HF or UF | Agent Management control-plane workflow for server classes, deployment apps, and deployment clients; do not target indexer cluster peers or SHC members directly. |
 | `splunk-workload-management-setup` | Supported | Supported | None | None | None | None | Self-managed Enterprise Workload Management workflow for Linux search heads and indexers. |
 | `splunk-hec-service-setup` | Supported | Supported | Supported | None | None | HF | Reusable HEC token and service configuration workflow for Enterprise HEC tiers or Splunk Cloud ACS-managed HEC. |
@@ -57,6 +59,8 @@ For Cloud-specific install and API behavior, see
 | `splunk-enterprise-kubernetes-setup` | Supported | Supported | None | None | None | None | Self-managed Splunk Enterprise Kubernetes runtime workflow using SOK Helm assets or Splunk POD installer assets. |
 | `splunk-itsi-setup` | Required | None | None | None | None | None | Premium search-tier app for ITSI dashboards and service analytics. |
 | `splunk-itsi-config` | Required | None | None | None | None | None | Search-tier workflow for ITSI content-pack bootstrap, validation, and service-topology automation. |
+| `splunk-enterprise-security-install` | Required | None | None | None | None | None | Premium search-tier SIEM app install and essinstall workflow for standalone search heads or SHC deployers. |
+| `splunk-enterprise-security-config` | Required | Supported | None | None | None | Indexer | ES operational configuration workflow for search-tier objects and index-tier ES index readiness. |
 | `splunk-ai-assistant-setup` | Required | None | None | None | None | None | Search-tier AI assistant app with cloud-backed inference, app UI settings, and KV Store-backed local chat state. |
 | `splunk-mcp-server-setup` | Required | None | None | None | None | None | Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays. |
 | `splunk-stream-setup` | Required | Supported | Required | Supported | None | HF or UF | Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects. |
@@ -73,15 +77,22 @@ For Cloud-specific install and API behavior, see
 | `splunk_app_stream_ipfix_cisco_hsl` | `cisco-catalyst-enhanced-netflow-setup` | None | None | Supported | Supported | None |
 | `CiscoSecurityCloud` | `cisco-security-cloud-setup` | Supported | None | Supported | None | None |
 | `cisco-cloud-security` | `cisco-secure-access-setup` | Supported | None | Supported | None | None |
+| `TA-cisco-cloud-security-addon` | `cisco-secure-access-setup` | Supported | None | Supported | None | None |
 | `Splunk_TA_Cisco_Intersight` | `cisco-intersight-setup` | Supported | None | Supported | None | None |
 | `Splunk_TA_AppDynamics` | `cisco-appdynamics-setup` | Supported | None | Supported | None | None |
 | `Splunk_TA_cisco_meraki` | `cisco-meraki-ta-setup` | Supported | None | Supported | None | None |
+| `ta_cisco_webex_add_on_for_splunk` | `splunk-app-install` | Supported | None | Supported | None | None |
+| `Splunk_TA_cisco-ucs` | `splunk-app-install` | Supported | None | Supported | None | None |
+| `Splunk_TA_cisco-esa` | `splunk-app-install` | Supported | Supported | Supported | None | None |
+| `Splunk_TA_cisco-wsa` | `splunk-app-install` | Supported | Supported | Supported | None | None |
+| `Splunk_TA_Talos_Intelligence` | `splunk-app-install` | Required | None | None | None | None |
 | `splunk_app_stream` | `splunk-stream-setup` | Required | None | None | None | None |
 | `Splunk_TA_stream` | `splunk-stream-setup` | None | None | Required | Supported | None |
 | `Splunk_TA_stream_wire_data` | `splunk-stream-setup` | Supported | Required | Supported | None | None |
 | `ta_cisco_thousandeyes` | `cisco-thousandeyes-setup` | Supported | None | Supported | None | None |
 | `SA-ITOA` | `splunk-itsi-setup` | Required | None | None | None | None |
 | `DA-ITSI-ContentLibrary` | `splunk-itsi-config` | Required | None | None | None | None |
+| `SplunkEnterpriseSecuritySuite` | `splunk-enterprise-security-install` | Required | None | None | None | None |
 | `Splunk_AI_Assistant_Cloud` | `splunk-ai-assistant-setup` | Required | None | None | None | None |
 | `Splunk_MCP_Server` | `splunk-mcp-server-setup` | Required | None | None | None | None |
 | `ta_cisco_spaces` | `cisco-spaces-setup` | Supported | None | Supported | None | None |

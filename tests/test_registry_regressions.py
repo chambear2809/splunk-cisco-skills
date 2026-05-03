@@ -139,6 +139,8 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("splunk-index-lifecycle-smartstore-setup", skill_topologies)
         self.assertIn("splunk-monitoring-console-setup", skill_topologies)
         self.assertIn("splunk-enterprise-kubernetes-setup", skill_topologies)
+        self.assertIn("splunk-observability-otel-collector-setup", skill_topologies)
+        self.assertIn("splunk-observability-dashboard-builder", skill_topologies)
         self.assertIn("splunk-app-install", skill_topologies)
 
         for skill, topology in skill_topologies.items():
@@ -153,6 +155,13 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(sc4s["role_support"]["external-collector"], "required")
         sc4snmp = skill_topologies["splunk-connect-for-snmp-setup"]
         self.assertEqual(sc4snmp["role_support"]["external-collector"], "required")
+        observability_otel = skill_topologies["splunk-observability-otel-collector-setup"]
+        self.assertEqual(observability_otel["role_support"]["external-collector"], "required")
+        self.assertEqual(observability_otel["cloud_pairing"], ["external-collector"])
+        observability_dashboards = skill_topologies["splunk-observability-dashboard-builder"]
+        self.assertTrue(
+            all(value == "none" for value in observability_dashboards["role_support"].values())
+        )
         enterprise_k8s = skill_topologies["splunk-enterprise-kubernetes-setup"]
         self.assertEqual(enterprise_k8s["role_support"]["external-collector"], "none")
         self.assertEqual(enterprise_k8s["cloud_pairing"], [])
@@ -212,6 +221,9 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         secure_access_entry = next(
             app for app in registry.get("apps", []) if app.get("splunkbase_id") == "5558"
         )
+        secure_access_addon_entry = next(
+            app for app in registry.get("apps", []) if app.get("splunkbase_id") == "7569"
+        )
 
         self.assertEqual(security_cloud_entry["skill"], "cisco-security-cloud-setup")
         self.assertEqual(security_cloud_entry["app_name"], "CiscoSecurityCloud")
@@ -223,6 +235,39 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             "cisco-secure-access-app-for-splunk_*",
             secure_access_entry.get("package_patterns", []),
         )
+        self.assertEqual(secure_access_addon_entry["skill"], "cisco-secure-access-setup")
+        self.assertEqual(secure_access_addon_entry["app_name"], "TA-cisco-cloud-security-addon")
+        self.assertIn(
+            "cisco-secure-access-add-on-for-splunk_*",
+            secure_access_addon_entry.get("package_patterns", []),
+        )
+
+    def test_public_cisco_install_only_registry_entries_are_present(self):
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        apps_by_id = {
+            app["splunkbase_id"]: app
+            for app in registry.get("apps", [])
+        }
+
+        expected = {
+            "8365": ("ta_cisco_webex_add_on_for_splunk", "webex-add-on-for-splunk_*"),
+            "2731": ("Splunk_TA_cisco-ucs", "splunk-add-on-for-cisco-ucs_*"),
+            "1761": ("Splunk_TA_cisco-esa", "splunk-add-on-for-cisco-esa_*"),
+            "1747": ("Splunk_TA_cisco-wsa", "splunk-add-on-for-cisco-wsa_*"),
+            "7557": (
+                "Splunk_TA_Talos_Intelligence",
+                "cisco-talos-intelligence-for-enterprise-security-cloud_*",
+            ),
+        }
+
+        for app_id, (app_name, package_pattern) in expected.items():
+            with self.subTest(app_id=app_id):
+                entry = apps_by_id[app_id]
+                self.assertEqual(entry["skill"], "splunk-app-install")
+                self.assertEqual(entry["app_name"], app_name)
+                self.assertIn(package_pattern, entry.get("package_patterns", []))
 
     def test_content_library_registry_entry_is_present(self):
         registry = json.loads(

@@ -91,6 +91,8 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("splunk-enterprise-host-setup", workflow_rows)
         self.assertIn("splunk-enterprise-kubernetes-setup", workflow_rows)
         self.assertIn("splunk-mcp-server-setup", workflow_rows)
+        self.assertIn("splunk-observability-otel-collector-setup", workflow_rows)
+        self.assertIn("splunk-observability-dashboard-builder", workflow_rows)
 
     def test_generated_docs_cover_appdynamics_sc4s_host_bootstrap_and_numeric_stream_ids(self) -> None:
         self.assertIn("| `cisco-appdynamics-setup` | 3471 |", self.cloud_matrix)
@@ -105,6 +107,8 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("| `splunk-monitoring-console-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-enterprise-host-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-enterprise-kubernetes-setup` | N/A |", self.cloud_matrix)
+        self.assertIn("| `splunk-observability-otel-collector-setup` | N/A |", self.cloud_matrix)
+        self.assertIn("| `splunk-observability-dashboard-builder` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-ai-assistant-setup` | 7245 |", self.cloud_matrix)
         self.assertIn("| `splunk-mcp-server-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-stream-setup` search-tier app | 1809 |", self.cloud_matrix)

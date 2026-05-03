@@ -8,6 +8,10 @@ APP_NAME="cisco-cloud-security"
 APP_LABEL="Cisco Secure Access App for Splunk"
 APP_ID="5558"
 PACKAGE_PATTERN="cisco-secure-access-app-for-splunk_*"
+ADDON_NAME="TA-cisco-cloud-security-addon"
+ADDON_LABEL="Cisco Secure Access Add-on for Splunk"
+ADDON_ID="7569"
+ADDON_PACKAGE_PATTERN="cisco-secure-access-add-on-for-splunk_*"
 APP_INSTALL_SCRIPT="${APP_INSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh}"
 PROJECT_TA_DIR="${SCRIPT_DIR}/../../../splunk-ta"
 TA_CACHE="${TA_CACHE:-${PROJECT_TA_DIR}}"
@@ -23,7 +27,7 @@ Cisco Secure Access Setup
 Usage: $(basename "$0") [OPTIONS]
 
 Options:
-  --install                  Install the app first
+  --install                  Install the required add-on and app first
   --no-restart               Skip restart when --install is used
   --help                     Show this help
 
@@ -42,6 +46,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 find_local_package() {
+    local pattern="$1"
     python3 -c "
 import fnmatch
 import sys
@@ -66,10 +71,11 @@ for raw_dir in sys.argv[2:]:
         if fnmatch.fnmatch(name, pattern):
             print(resolved, end='')
             raise SystemExit(0)
-" "${PACKAGE_PATTERN}" "${PROJECT_TA_DIR}" "${TA_CACHE}" 2>/dev/null || true
+" "${pattern}" "${PROJECT_TA_DIR}" "${TA_CACHE}" 2>/dev/null || true
 }
 
 resolve_latest_version() {
+    local app_id="$1"
     if ! _set_splunkbase_curl_tls_args; then
         log "ERROR: Could not configure Splunkbase TLS settings for version resolution."
         log "Check SPLUNKBASE_CA_CERT (must be a readable file) or unset it to use system roots."
@@ -77,7 +83,7 @@ resolve_latest_version() {
     fi
     # shellcheck disable=SC2154  # _tls_verify_args is populated by _set_splunkbase_curl_tls_args.
     curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
-        "https://splunkbase.splunk.com/api/v1/app/${APP_ID}/release/" 2>/dev/null \
+        "https://splunkbase.splunk.com/api/v1/app/${app_id}/release/" 2>/dev/null \
         | python3 -c "
 import json
 import sys
@@ -95,39 +101,40 @@ ensure_session() {
     SK=$(get_session_key "${SPLUNK_URI}") || { log "ERROR: Could not authenticate to Splunk."; exit 1; }
 }
 
-install_app_package() {
+install_one_package() {
+    local app_name="$1" app_label="$2" app_id="$3" package_pattern="$4"
     local version package_path
 
     ensure_session
-    if rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME"; then
-        log "${APP_LABEL} already installed — skipping install."
+    if rest_check_app "$SK" "$SPLUNK_URI" "${app_name}"; then
+        log "${app_label} already installed - skipping install."
         return 0
     fi
 
-    version="$(resolve_latest_version)"
+    version="$(resolve_latest_version "${app_id}")"
     if [[ -n "${version}" ]]; then
-        log "Trying Splunkbase install for ${APP_LABEL} (app ID ${APP_ID}, version ${version})..."
+        log "Trying Splunkbase install for ${app_label} (app ID ${app_id}, version ${version})..."
         if [[ "${RESTART_SPLUNK}" == "true" ]]; then
-            if bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${APP_ID}" --app-version "${version}" --no-update; then
+            if bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${app_id}" --app-version "${version}" --no-update; then
                 return 0
             fi
         else
-            if bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${APP_ID}" --app-version "${version}" --no-update --no-restart; then
+            if bash "${APP_INSTALL_SCRIPT}" --source splunkbase --app-id "${app_id}" --app-version "${version}" --no-update --no-restart; then
                 return 0
             fi
         fi
-        log "Splunkbase install failed for ${APP_LABEL}; falling back to local package."
+        log "Splunkbase install failed for ${app_label}; falling back to local package."
     else
-        log "WARNING: Could not resolve the latest Splunkbase version for app ID ${APP_ID}; using local fallback if available."
+        log "WARNING: Could not resolve the latest Splunkbase version for app ID ${app_id}; using local fallback if available."
     fi
 
-    package_path="$(find_local_package)"
+    package_path="$(find_local_package "${package_pattern}")"
     if [[ -z "${package_path}" ]]; then
-        log "ERROR: No local package matching ${PACKAGE_PATTERN} found in ${PROJECT_TA_DIR} or ${TA_CACHE}."
+        log "ERROR: No local package matching ${package_pattern} found in ${PROJECT_TA_DIR} or ${TA_CACHE}."
         exit 1
     fi
 
-    log "Installing ${APP_LABEL} from ${package_path}..."
+    log "Installing ${app_label} from ${package_path}..."
     if [[ "${RESTART_SPLUNK}" == "true" ]]; then
         bash "${APP_INSTALL_SCRIPT}" --source local --file "${package_path}" --no-update
     else
@@ -135,15 +142,26 @@ install_app_package() {
     fi
 }
 
+install_app_package() {
+    install_one_package "${ADDON_NAME}" "${ADDON_LABEL}" "${ADDON_ID}" "${ADDON_PACKAGE_PATTERN}"
+    install_one_package "${APP_NAME}" "${APP_LABEL}" "${APP_ID}" "${PACKAGE_PATTERN}"
+}
+
 report_status() {
-    local version
-    if ! rest_check_app "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null; then
+    local app_version addon_version
+    if ! rest_check_app "$SK" "$SPLUNK_URI" "${ADDON_NAME}" 2>/dev/null; then
+        log "ERROR: ${ADDON_LABEL} is not installed. Re-run with --install or install app ID ${ADDON_ID} first."
+        exit 1
+    fi
+    if ! rest_check_app "$SK" "$SPLUNK_URI" "${APP_NAME}" 2>/dev/null; then
         log "ERROR: ${APP_LABEL} is not installed. Re-run with --install or install app ID ${APP_ID} first."
         exit 1
     fi
 
-    version=$(rest_get_app_version "$SK" "$SPLUNK_URI" "$APP_NAME" 2>/dev/null || echo "unknown")
-    log "Installed app: ${APP_NAME} (version: ${version})"
+    addon_version=$(rest_get_app_version "$SK" "$SPLUNK_URI" "${ADDON_NAME}" 2>/dev/null || echo "unknown")
+    app_version=$(rest_get_app_version "$SK" "$SPLUNK_URI" "${APP_NAME}" 2>/dev/null || echo "unknown")
+    log "Installed app: ${ADDON_NAME} (version: ${addon_version})"
+    log "Installed app: ${APP_NAME} (version: ${app_version})"
     log "Use configure_account.sh to create or update one Secure Access org account."
     log "Then use configure_settings.sh to bootstrap app terms, dashboard settings, and optional Cloudlock or destination-list features."
 }

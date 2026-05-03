@@ -211,6 +211,20 @@ teardown() {
     [[ "$output" =~ "Splunk Enterprise Kubernetes Validation" ]]
 }
 
+@test "observability otel collector setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Observability OTel Collector setup" ]]
+    [[ "$output" =~ "--render-platform-hec-helper" ]]
+}
+
+@test "observability otel collector validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Observability OTel Collector validation" ]]
+    [[ "$output" =~ "--check-platform-hec" ]]
+}
+
 @test "agent management setup --help exits 0" {
     run bash "${PROJECT_ROOT}/skills/splunk-agent-management-setup/scripts/setup.sh" --help
     [ "$status" -eq 0 ]
@@ -281,6 +295,34 @@ teardown() {
     run bash "${PROJECT_ROOT}/skills/splunk-monitoring-console-setup/scripts/validate.sh" --help
     [ "$status" -eq 0 ]
     [[ "$output" =~ "Splunk Monitoring Console Validation" ]]
+}
+
+@test "enterprise security install setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Enterprise Security Install" ]]
+}
+
+@test "enterprise security install validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Enterprise Security Install Validation" ]]
+}
+
+@test "enterprise security config setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Enterprise Security Configuration" ]]
+    [[ "$output" =~ "--spec PATH" ]]
+    [[ "$output" =~ "--mode preview|apply|validate|inventory|export" ]]
+    [[ "$output" =~ "--baseline" ]]
+    [[ "$output" =~ "--all-indexes" ]]
+}
+
+@test "enterprise security config validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Enterprise Security Configuration Validation" ]]
 }
 
 @test "enterprise host smoke latest resolution --help exits 0" {
@@ -381,6 +423,232 @@ teardown() {
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Unknown option" ]]
     [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security install rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security install rejects --source without value" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --source
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security install rejects invalid deployment type" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" \
+      --deployment-type invalid
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "--deployment-type must be search_head or shc_deployer" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security install exposes new preflight and bundle flags in help" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "--preflight-only" ]]
+    [[ "$output" =~ "--skip-preflight" ]]
+    [[ "$output" =~ "--confirm-upgrade" ]]
+    [[ "$output" =~ "--backup-notice PATH" ]]
+    [[ "$output" =~ "--set-shc-limits" ]]
+    [[ "$output" =~ "--allow-deployment-client" ]]
+    [[ "$output" =~ "--apply-bundle" ]]
+    [[ "$output" =~ "--shc-target-uri URI" ]]
+    [[ "$output" =~ "--generate-ta-for-indexers DIR" ]]
+    [[ "$output" =~ "--deploy-ta-for-indexers CM_URI" ]]
+    [[ "$output" =~ "--backup-kvstore" ]]
+    [[ "$output" =~ "--uninstall" ]]
+}
+
+@test "enterprise security install rejects --backup-notice without value" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --backup-notice
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security install rejects --shc-target-uri without value" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --shc-target-uri
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+}
+
+@test "enterprise security install rejects --generate-ta-for-indexers without value" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --generate-ta-for-indexers
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+}
+
+@test "enterprise security install rejects --deploy-ta-for-indexers without value" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --deploy-ta-for-indexers
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+}
+
+@test "ta_for_indexers generator --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/generate_ta_for_indexers.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk_TA_ForIndexers Generator" ]]
+    [[ "$output" =~ "--package PATH" ]]
+    [[ "$output" =~ "--output-dir DIR" ]]
+}
+
+@test "ta_for_indexers generator rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/generate_ta_for_indexers.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+}
+
+@test "ta_for_indexers generator extracts Splunk_TA_ForIndexers when ES package present" {
+    if ! ls "${PROJECT_ROOT}/splunk-ta/splunk-enterprise-security_"*.spl >/dev/null 2>&1; then
+        skip "Local ES package is not present; skip extraction smoke test"
+    fi
+    out_dir="${MOCK_DIR}/ta-fi-extract"
+    mkdir -p "${out_dir}"
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/generate_ta_for_indexers.sh" \
+        --output-dir "${out_dir}" --force
+    [ "$status" -eq 0 ]
+    # The last stdout line is the generated file path.
+    generated_path="$(printf '%s\n' "$output" | tail -1)"
+    [ -f "${generated_path}" ]
+    [[ "${generated_path}" =~ Splunk_TA_ForIndexers ]]
+}
+
+@test "enterprise security install generate-only path runs without Splunk credentials" {
+    if ! ls "${PROJECT_ROOT}/splunk-ta/splunk-enterprise-security_"*.spl >/dev/null 2>&1; then
+        skip "Local ES package is not present; skip extraction smoke test"
+    fi
+    empty_creds="${MOCK_DIR}/empty_creds"
+    : > "${empty_creds}"
+    out_dir="${MOCK_DIR}/ta-fi-via-setup"
+    mkdir -p "${out_dir}"
+    run env SPLUNK_CREDENTIALS_FILE="${empty_creds}" bash \
+        "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" \
+        --generate-ta-for-indexers "${out_dir}"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Generate Splunk_TA_ForIndexers" ]]
+    [[ ! "$output" =~ "ERROR: Splunk credentials are required" ]]
+}
+
+@test "enterprise security config rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security config rejects --enable-dm without value" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --enable-dm
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security config rejects invalid declarative mode" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --mode nope
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "--mode must be preview, apply, validate, inventory, or export" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security config requires --apply for apply mode" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --mode apply
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Declarative apply mode requires --apply" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security config rejects --apply with non-apply mode" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --mode preview --apply
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "--apply cannot be combined with --mode preview" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security config previews JSON spec without writes" {
+    spec_path="${MOCK_DIR}/es-config.json"
+    printf '{"baseline":{"enabled":true,"lookup_order":true},"indexes":{"groups":["exposure"]}}' > "${spec_path}"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --spec "${spec_path}" --mode preview
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ '"mode": "preview"' ]]
+    [[ "$output" =~ "ea_discovery" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security config writes preview output file" {
+    output_path="${MOCK_DIR}/preview.json"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --output "${output_path}"
+    [ "$status" -eq 0 ]
+    [[ -s "${output_path}" ]]
+    run grep -q '"mode": "preview"' "${output_path}"
+    [ "$status" -eq 0 ]
+}
+
+@test "enterprise security config combines declarative spec with imperative shortcuts" {
+    spec_path="${MOCK_DIR}/es-config-combo.json"
+    printf '{"baseline":{"enabled":true,"lookup_order":true}}' > "${spec_path}"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" \
+        --spec "${spec_path}" \
+        --mode preview \
+        --baseline
+    [ "$status" -ne 0 ]
+    # Declarative phase ran (preview JSON appears in stdout) AND the script
+    # then announced the imperative phase before failing because there are
+    # no real Splunk credentials in the test env.
+    [[ "$output" =~ "imperative phase" ]] || [[ "$output" =~ "imperative" ]]
+    [[ "$output" =~ '"mode": "preview"' ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "enterprise security config strict flag rejects unknown sections" {
+    spec_path="${MOCK_DIR}/es-config-typo.json"
+    printf '{"valdation":{"searches":[]}}' > "${spec_path}"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" \
+        --spec "${spec_path}" \
+        --mode preview \
+        --strict
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Strict mode" ]] || [[ "$output" =~ "unknown top-level" ]]
+    [[ "$output" =~ "valdation" ]]
+}
+
+@test "enterprise security config --stop-on-error appears in help text" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-config/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "--stop-on-error" ]]
+    [[ "$output" =~ "--strict" ]]
+}
+
+@test "enterprise security install --force-apply-bundle appears in help text" {
+    run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "--force-apply-bundle" ]]
+}
+
+@test "deployment helpers preserve passwords containing colons" {
+    # Inline reproduction of the newline-delimited credential file logic
+    # added to skills/shared/lib/deployment_helpers.sh. Verifies that a
+    # password with ':' is recovered intact, which would have silently
+    # truncated under the old `auth_value%%:*` colon split.
+    cred_file="${MOCK_DIR}/cred-with-colon"
+    printf '%s\n%s\n' 'admin' 'p:a:s:s' > "${cred_file}"
+    chmod 600 "${cred_file}"
+    run bash -c '
+set -euo pipefail
+{ IFS= read -r auth_user; IFS= read -r auth_pass; } < "$1"
+printf "user=%s\npass=%s\n" "${auth_user}" "${auth_pass}"
+' _ "${cred_file}"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "user=admin" ]]
+    [[ "$output" =~ "pass=p:a:s:s" ]]
 }
 
 @test "security-cloud configure_product --help exits 0" {
@@ -501,6 +769,27 @@ teardown() {
 
 @test "enterprise kubernetes validate rejects unknown flag" {
     run bash "${PROJECT_ROOT}/skills/splunk-enterprise-kubernetes-setup/scripts/validate.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "observability otel collector setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "observability otel collector setup rejects missing flag values" {
+    run bash "${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh" --realm
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "observability otel collector validate rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/validate.sh" --bogus
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Unknown option" ]]
     [[ ! "$output" =~ "unbound variable" ]]

@@ -52,7 +52,7 @@ def skill_instructions(skill: str) -> str:
     annotations=READ_LOCAL,
 )
 def skill_reference(skill: str) -> str:
-    """Return a skill's reference.md file."""
+    """Return a skill's reference.md file or aggregated references/*.md files."""
     return core.read_skill_file(skill, "reference")
 
 

@@ -1,6 +1,6 @@
 {
   "description": "Generated from the packaged SCAN catalog plus skills/cisco-product-setup/catalog_overrides.json.",
-  "product_count": 75,
+  "product_count": 83,
   "products": [
     {
       "accepted_non_secret_keys": [
@@ -15,7 +15,7 @@
       "addon_uid": "7538",
       "aliases": [],
       "app_viz": "cisco-catalyst-app",
-      "app_viz_2": "",
+      "app_viz_2": "cisco_ios",
       "app_viz_label": "Cisco Enterprise Networking for Splunk Platform",
       "app_viz_uid": "7539",
       "automation_state": "automated",
@@ -43,7 +43,7 @@
         "capwap",
         "wireless ap"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/wireless/access-points/index.html",
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/wireless/access-points/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco access points",
@@ -114,6 +114,206 @@
     },
     {
       "accepted_non_secret_keys": [
+        "auth_type",
+        "hostname",
+        "login_domain",
+        "name",
+        "port",
+        "proxy_enabled",
+        "username",
+        "verify_ssl"
+      ],
+      "addon": "cisco_dc_networking_app_for_splunk",
+      "addon_label": "Cisco DC Networking",
+      "addon_uid": "7777",
+      "aliases": [],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "automated",
+      "category": "networking",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [
+        "home_page",
+        "fabric_dashboard",
+        "tenant_dashboard"
+      ],
+      "description": "Cisco Application Centric Infrastructure (ACI) \u2014 policy-driven data center automation with application profiles, micro-segmentation, and fabric-wide health monitoring.",
+      "display_name": "Cisco ACI",
+      "id": "cisco_aci",
+      "install_apps": [
+        "cisco_dc_networking_app_for_splunk"
+      ],
+      "keywords": [
+        "aci",
+        "apic",
+        "application centric infrastructure",
+        "epg",
+        "micro-segmentation",
+        "sdn",
+        "software defined networking",
+        "nexus one",
+        "contract",
+        "bridge domain",
+        "tenant",
+        "multi-site orchestrator"
+      ],
+      "learn_more_url": "https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/solution-overview-c22-741487.html",
+      "manual_gap_reason": "",
+      "normalized_search_terms": [
+        "cisco aci",
+        "aci",
+        "apic",
+        "application centric infrastructure",
+        "epg",
+        "micro segmentation",
+        "sdn",
+        "software defined networking",
+        "nexus one",
+        "contract",
+        "bridge domain",
+        "tenant",
+        "multi site orchestrator"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [
+        "auth_type",
+        "login_domain",
+        "port",
+        "proxy_enabled",
+        "verify_ssl"
+      ],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "cisco-dc-networking-setup",
+      "required_non_secret_keys": [
+        "hostname",
+        "name",
+        "username"
+      ],
+      "required_secret_keys": [],
+      "route": {
+        "account_type": "aci",
+        "default_index": "cisco_aci",
+        "default_name": "ACI_PROD",
+        "input_type": "aci"
+      },
+      "route_type": "dc_networking",
+      "search_terms": [
+        "cisco_aci",
+        "cisco aci",
+        "Cisco ACI",
+        "aci",
+        "apic",
+        "application centric infrastructure",
+        "epg",
+        "micro-segmentation",
+        "sdn",
+        "software defined networking",
+        "nexus one",
+        "contract",
+        "bridge domain",
+        "tenant",
+        "multi-site orchestrator"
+      ],
+      "secret_keys": [
+        "password"
+      ],
+      "sourcetypes": [
+        "cisco:dc:aci:authentication",
+        "cisco:dc:aci:class",
+        "cisco:dc:aci:health",
+        "cisco:dc:aci:stats",
+        "cisco:dc:aci:syslog"
+      ],
+      "status": "active",
+      "subcategory": "data_center_net",
+      "template_checks": {
+        "ini_sections": [
+          "aci_account"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-dc-networking-setup/template.example"
+      ],
+      "value_proposition": "Unified ACI fabric visibility in Splunk for faster root-cause analysis and compliance verification."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "TA-cisco_acs",
+      "addon_label": "Technology Add-on for Cisco Secure Access Control Server (ACS)",
+      "addon_uid": "1811",
+      "aliases": [
+        "Cisco Secure ACS"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_legacy",
+      "category": "security",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Cisco Secure Access Control Server (ACS) was a policy-driven access control platform providing centralized RADIUS and TACACS+ authentication, authorization, and accounting. ACS has been retired by Cisco and superseded by Cisco Identity Services Engine (ISE).",
+      "display_name": "Cisco ACS",
+      "id": "cisco_acs",
+      "install_apps": [],
+      "keywords": [
+        "acs",
+        "access control server",
+        "tacacs",
+        "radius",
+        "aaa",
+        "authentication authorization accounting"
+      ],
+      "learn_more_url": "https://www.cisco.com/c/en/us/support/security/retired.html",
+      "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco acs",
+        "cisco secure acs",
+        "acs",
+        "access control server",
+        "tacacs",
+        "radius",
+        "aaa",
+        "authentication authorization accounting"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_acs",
+        "cisco acs",
+        "Cisco ACS",
+        "Cisco Secure ACS",
+        "acs",
+        "access control server",
+        "tacacs",
+        "radius",
+        "aaa",
+        "authentication authorization accounting"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [
+        "cisco:acs"
+      ],
+      "status": "retired",
+      "subcategory": "identity_access",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Stream ACS authentication, authorization, and accounting events into Splunk for centralized network access visibility and compliance auditing."
+    },
+    {
+      "accepted_non_secret_keys": [
         "host",
         "name",
         "use_ca_cert",
@@ -125,7 +325,7 @@
       "addon_uid": "7538",
       "aliases": [],
       "app_viz": "cisco-catalyst-app",
-      "app_viz_2": "",
+      "app_viz_2": "cisco_ios",
       "app_viz_label": "Cisco Enterprise Networking for Splunk Platform",
       "app_viz_uid": "7539",
       "automation_state": "automated",
@@ -153,7 +353,7 @@
         "mpls",
         "segment routing"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/routers/asr-1000-series-aggregation-services-routers/index.html",
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/routers/asr-1000-series-aggregation-services-routers/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco asr",
@@ -353,7 +553,13 @@
         "apm",
         "application performance monitoring",
         "business transactions",
-        "full stack observability"
+        "full stack observability",
+        "fso",
+        "cisco observability platform",
+        "dash",
+        "brum",
+        "dbmon",
+        "infrastructure monitoring"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/full-stack-observability/appdynamics/index.html",
       "manual_gap_reason": "",
@@ -365,7 +571,13 @@
         "apm",
         "application performance monitoring",
         "business transactions",
-        "full stack observability"
+        "full stack observability",
+        "fso",
+        "cisco observability platform",
+        "dash",
+        "brum",
+        "dbmon",
+        "infrastructure monitoring"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -400,7 +612,13 @@
         "apm",
         "application performance monitoring",
         "business transactions",
-        "full stack observability"
+        "full stack observability",
+        "fso",
+        "cisco observability platform",
+        "dash",
+        "brum",
+        "dbmon",
+        "infrastructure monitoring"
       ],
       "secret_keys": [
         "client_secret"
@@ -428,122 +646,6 @@
         "skills/cisco-appdynamics-setup/template.example"
       ],
       "value_proposition": "Correlate APM metrics, traces, and business transactions with infrastructure data in Splunk for unified observability."
-    },
-    {
-      "accepted_non_secret_keys": [
-        "auth_type",
-        "hostname",
-        "login_domain",
-        "name",
-        "port",
-        "proxy_enabled",
-        "username",
-        "verify_ssl"
-      ],
-      "addon": "cisco_dc_networking_app_for_splunk",
-      "addon_label": "Cisco DC Networking",
-      "addon_uid": "7777",
-      "aliases": [],
-      "app_viz": "",
-      "app_viz_2": "",
-      "app_viz_label": "",
-      "app_viz_uid": "",
-      "automation_state": "automated",
-      "category": "networking",
-      "companion_skills": [],
-      "conditional_required_secret_rules": [],
-      "dashboards": [
-        "fabric_dashboard",
-        "tenant_dashboard"
-      ],
-      "description": "Policy-driven data center automation with application profiles, micro-segmentation, and fabric-wide health monitoring.",
-      "display_name": "Cisco Application Centric Infrastructure (Cisco ACI)",
-      "id": "cisco_aci",
-      "install_apps": [
-        "cisco_dc_networking_app_for_splunk"
-      ],
-      "keywords": [
-        "aci",
-        "apic",
-        "application centric infrastructure",
-        "epg",
-        "micro-segmentation",
-        "sdn",
-        "software defined networking"
-      ],
-      "learn_more_url": "https://www.cisco.com/c/en/us/solutions/collateral/data-center-virtualization/application-centric-infrastructure/solution-overview-c22-741487.html",
-      "manual_gap_reason": "",
-      "normalized_search_terms": [
-        "cisco aci",
-        "cisco application centric infrastructure cisco aci",
-        "cisco application centric infrastructure",
-        "aci",
-        "apic",
-        "application centric infrastructure",
-        "epg",
-        "micro segmentation",
-        "sdn",
-        "software defined networking"
-      ],
-      "notes": "",
-      "optional_non_secret_keys": [
-        "auth_type",
-        "login_domain",
-        "port",
-        "proxy_enabled",
-        "verify_ssl"
-      ],
-      "prereq_apps": [],
-      "prereq_labels": [],
-      "primary_skill": "cisco-dc-networking-setup",
-      "required_non_secret_keys": [
-        "hostname",
-        "name",
-        "username"
-      ],
-      "required_secret_keys": [],
-      "route": {
-        "account_type": "aci",
-        "default_index": "cisco_aci",
-        "default_name": "ACI_PROD",
-        "input_type": "aci"
-      },
-      "route_type": "dc_networking",
-      "search_terms": [
-        "cisco_aci",
-        "cisco aci",
-        "Cisco Application Centric Infrastructure (Cisco ACI)",
-        "Cisco Application Centric Infrastructure",
-        "Cisco ACI",
-        "aci",
-        "apic",
-        "application centric infrastructure",
-        "epg",
-        "micro-segmentation",
-        "sdn",
-        "software defined networking"
-      ],
-      "secret_keys": [
-        "password"
-      ],
-      "sourcetypes": [
-        "cisco:dc:aci:authentication",
-        "cisco:dc:aci:class",
-        "cisco:dc:aci:health",
-        "cisco:dc:aci:stats",
-        "cisco:dc:aci:syslog"
-      ],
-      "status": "active",
-      "subcategory": "data_center_net",
-      "template_checks": {
-        "ini_sections": [
-          "aci_account"
-        ]
-      },
-      "template_paths": [
-        "skills/cisco-dc-networking-setup/template.example"
-      ],
-      "value_proposition": "Unified ACI fabric visibility in Splunk for faster root-cause analysis and compliance verification."
     },
     {
       "accepted_non_secret_keys": [],
@@ -630,7 +732,7 @@
       "conditional_required_secret_rules": [],
       "dashboards": [],
       "description": "Provides SaaS Security Posture Management (SSPM) to help organizations secure SaaS applications by identifying configuration risks, monitoring user activity, and enforcing best practices.",
-      "display_name": "Cisco AppOmni (SaaS Security Posture)",
+      "display_name": "Cisco AppOmni",
       "id": "cisco_appomni",
       "install_apps": [],
       "keywords": [
@@ -645,8 +747,6 @@
       "manual_gap_reason": "No local setup route is defined for this product yet.",
       "normalized_search_terms": [
         "cisco appomni",
-        "cisco appomni saas security posture",
-        "saas security posture",
         "appomni",
         "sspm",
         "saas posture management",
@@ -666,9 +766,7 @@
       "search_terms": [
         "cisco_appomni",
         "cisco appomni",
-        "Cisco AppOmni (SaaS Security Posture)",
         "Cisco AppOmni",
-        "SaaS Security Posture",
         "appomni",
         "sspm",
         "saas posture management",
@@ -683,6 +781,170 @@
       "template_checks": {},
       "template_paths": [],
       "value_proposition": "Continuously monitor SaaS app configurations and data access to eliminate shadow access and misconfigurations."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [
+        "Cisco Secure Cloud Insights"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_roadmap",
+      "category": "security",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "External attack surface monitoring platform (formerly Secure Cloud Insights) that continuously discovers, inventories, and assesses internet-facing assets across an organization's digital footprint. Identifies exposed services, misconfigurations, certificate issues, and vulnerabilities visible from an attacker's perspective via automated reconnaissance and risk scoring.",
+      "display_name": "Cisco Attack Surface Management (ASM)",
+      "id": "cisco_attack_surface_management",
+      "install_apps": [],
+      "keywords": [
+        "asm",
+        "attack surface management",
+        "secure cloud insights",
+        "external attack surface",
+        "easm",
+        "asset discovery",
+        "exposure management",
+        "internet-facing assets"
+      ],
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/attack-surface-management/index.html",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco attack surface management",
+        "cisco attack surface management asm",
+        "asm",
+        "cisco secure cloud insights",
+        "attack surface management",
+        "secure cloud insights",
+        "external attack surface",
+        "easm",
+        "asset discovery",
+        "exposure management",
+        "internet facing assets"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_attack_surface_management",
+        "cisco attack surface management",
+        "Cisco Attack Surface Management (ASM)",
+        "Cisco Attack Surface Management",
+        "ASM",
+        "Cisco Secure Cloud Insights",
+        "asm",
+        "attack surface management",
+        "secure cloud insights",
+        "external attack surface",
+        "easm",
+        "asset discovery",
+        "exposure management",
+        "internet-facing assets"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "threat_intelligence",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest Cisco ASM asset discovery findings, exposure alerts, and risk scores into Splunk to correlate external attack surface intelligence with internal security telemetry for proactive vulnerability prioritization."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [
+        "Cisco BroadSoft",
+        "BroadSoft BroadWorks"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_roadmap",
+      "category": "collaboration",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Large-scale on-premises and hybrid cloud calling platform serving service providers and enterprises with carrier-grade SIP-based voice, unified communications, and hosted collaboration features. Generates CDRs (Call Detail Records), audit logs, alarm syslog, and XSP/XSI API event data. Architecturally distinct from both CUCM (enterprise PBX) and Webex Calling (cloud-native).",
+      "display_name": "Cisco BroadWorks",
+      "id": "cisco_broadworks",
+      "install_apps": [],
+      "keywords": [
+        "broadworks",
+        "ucaas",
+        "service provider",
+        "hosted pbx",
+        "sip calling",
+        "cdr",
+        "call detail records",
+        "xsp",
+        "xsi",
+        "broadsoft"
+      ],
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/unified-communications/broadworks/index.html",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco broadworks",
+        "cisco broadsoft",
+        "broadsoft broadworks",
+        "broadworks",
+        "ucaas",
+        "service provider",
+        "hosted pbx",
+        "sip calling",
+        "cdr",
+        "call detail records",
+        "xsp",
+        "xsi",
+        "broadsoft"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_broadworks",
+        "cisco broadworks",
+        "Cisco BroadWorks",
+        "Cisco BroadSoft",
+        "BroadSoft BroadWorks",
+        "broadworks",
+        "ucaas",
+        "service provider",
+        "hosted pbx",
+        "sip calling",
+        "cdr",
+        "call detail records",
+        "xsp",
+        "xsi",
+        "broadsoft"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "meetings_calling",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest BroadWorks CDRs, alarm logs, and audit events into Splunk for service provider call analytics, fraud detection, platform health monitoring, and SLA compliance reporting."
     },
     {
       "accepted_non_secret_keys": [],
@@ -707,7 +969,11 @@
         "bug search tool",
         "bst",
         "cisco defect",
-        "bug analytics"
+        "bug analytics",
+        "field notice",
+        "eox",
+        "end of life",
+        "caveat"
       ],
       "learn_more_url": "https://developer.cisco.com/docs/support-apis/bug/",
       "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
@@ -717,7 +983,11 @@
         "bug search tool",
         "bst",
         "cisco defect",
-        "bug analytics"
+        "bug analytics",
+        "field notice",
+        "eox",
+        "end of life",
+        "caveat"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -735,7 +1005,11 @@
         "bug search tool",
         "bst",
         "cisco defect",
-        "bug analytics"
+        "bug analytics",
+        "field notice",
+        "eox",
+        "end of life",
+        "caveat"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -761,7 +1035,7 @@
       "addon_uid": "7538",
       "aliases": [],
       "app_viz": "cisco-catalyst-app",
-      "app_viz_2": "",
+      "app_viz_2": "cisco_ios",
       "app_viz_label": "Cisco Enterprise Networking for Splunk Platform",
       "app_viz_uid": "7539",
       "automation_state": "automated",
@@ -788,7 +1062,7 @@
         "service provider routing",
         "multi-terabit"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/routers/carrier-routing-system/index.html",
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/routers/carrier-routing-system/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco crs",
@@ -884,7 +1158,7 @@
         "events_and_incident_viewer"
       ],
       "description": "Network management solution leveraging AI to connect, secure, and automate network operations for routers, switches, and access points. Supports cloud and on-premises deployments with a single pane of glass.",
-      "display_name": "Cisco Catalyst Center",
+      "display_name": "Cisco Catalyst Center (DNAC)",
       "id": "cisco_catalyst_center",
       "install_apps": [
         "TA_cisco_catalyst",
@@ -897,20 +1171,33 @@
         "intent-based networking",
         "sd-access",
         "network assurance",
-        "pxGrid"
+        "pxGrid",
+        "campus network",
+        "campus fabric",
+        "wired wireless convergence",
+        "cisco networking cloud",
+        "encrypted traffic analytics",
+        "eta"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/products/collateral/cloud-systems-management/dna-center/nb-06-dna-center-so-cte-en.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco catalyst center",
+        "cisco catalyst center dnac",
+        "dnac",
         "cisco dna center",
         "catalyst center",
-        "dnac",
         "dna center",
         "intent based networking",
         "sd access",
         "network assurance",
-        "pxgrid"
+        "pxgrid",
+        "campus network",
+        "campus fabric",
+        "wired wireless convergence",
+        "cisco networking cloud",
+        "encrypted traffic analytics",
+        "eta"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -936,7 +1223,9 @@
       "search_terms": [
         "cisco_catalyst_center",
         "cisco catalyst center",
+        "Cisco Catalyst Center (DNAC)",
         "Cisco Catalyst Center",
+        "DNAC",
         "Cisco DNA Center",
         "catalyst center",
         "dnac",
@@ -944,15 +1233,18 @@
         "intent-based networking",
         "sd-access",
         "network assurance",
-        "pxGrid"
+        "pxGrid",
+        "campus network",
+        "campus fabric",
+        "wired wireless convergence",
+        "cisco networking cloud",
+        "encrypted traffic analytics",
+        "eta"
       ],
       "secret_keys": [
         "password"
       ],
       "sourcetypes": [
-        "cisco:catalyst:center:compliance:report",
-        "cisco:catalyst:center:inventory:report",
-        "cisco:catalyst:syslog",
         "cisco:dnac:audit:logs",
         "cisco:dnac:client",
         "cisco:dnac:clienthealth",
@@ -1003,7 +1295,7 @@
         "performance"
       ],
       "description": "Cisco Catalyst\u2122 SD-WAN connects any user to any application with integrated capabilities for multicloud, security, predictive automation, and enhanced network visibility \u2014 all on a Secure Access Service Edge (SASE)-enabled architecture. It also simplifies network operations by providing granular network insights, automation, and predictivity that not only heighten network integrity but also deliver an optimal application experience.",
-      "display_name": "Cisco Catalyst SD-WAN",
+      "display_name": "Cisco Catalyst SD-WAN (vManage)",
       "id": "cisco_catalyst_sdwan",
       "install_apps": [
         "TA_cisco_catalyst",
@@ -1016,21 +1308,36 @@
         "vmanage",
         "vedge",
         "catalyst sd-wan",
-        "wan optimization"
+        "wan optimization",
+        "sase",
+        "secure access service edge",
+        "cedge",
+        "omp",
+        "tloc",
+        "bfd",
+        "cflowd"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/solutions/networking/sdwan/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco catalyst sdwan",
+        "cisco catalyst sd wan vmanage",
         "cisco catalyst sd wan",
+        "vmanage",
         "viptela sd wan",
         "sd wan",
         "sdwan",
         "viptela",
-        "vmanage",
         "vedge",
         "catalyst sd wan",
-        "wan optimization"
+        "wan optimization",
+        "sase",
+        "secure access service edge",
+        "cedge",
+        "omp",
+        "tloc",
+        "bfd",
+        "cflowd"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -1056,7 +1363,9 @@
       "search_terms": [
         "cisco_catalyst_sdwan",
         "cisco catalyst sdwan",
+        "Cisco Catalyst SD-WAN (vManage)",
         "Cisco Catalyst SD-WAN",
+        "vManage",
         "Viptela SD-WAN",
         "sd-wan",
         "sdwan",
@@ -1064,13 +1373,21 @@
         "vmanage",
         "vedge",
         "catalyst sd-wan",
-        "wan optimization"
+        "wan optimization",
+        "sase",
+        "secure access service edge",
+        "cedge",
+        "omp",
+        "tloc",
+        "bfd",
+        "cflowd"
       ],
       "secret_keys": [
         "password"
       ],
       "sourcetypes": [
         "cisco:firewall:logs",
+        "cisco:sdwan:*",
         "cisco:sdwan:acl:logs",
         "cisco:sdwan:alert:off",
         "cisco:sdwan:alert:on",
@@ -1095,6 +1412,7 @@
         "cisco:sdwan:utd:logs",
         "cisco:sdwan:utdhealth",
         "cisco:sgacl:logs",
+        "cisco:viptela",
         "stream:netflow"
       ],
       "status": "active",
@@ -1122,7 +1440,7 @@
       "addon_uid": "7538",
       "aliases": [],
       "app_viz": "cisco-catalyst-app",
-      "app_viz_2": "",
+      "app_viz_2": "cisco_ios",
       "app_viz_label": "Cisco Enterprise Networking for Splunk Platform",
       "app_viz_uid": "7539",
       "automation_state": "automated",
@@ -1135,7 +1453,7 @@
         "network_insights"
       ],
       "description": "Enterprise campus and branch layer-2/3 switches including the Catalyst 9200, 9300, 9400, 9500, and 9600 (flagship campus), as well as the Catalyst 1000/1200/1300 (compact/SMB), 2960-X/XR (access), 3560/3650/3750/3850 (distribution), 4500/4900 (modular), and 6500/6800 (6000-series chassis) families \u2014 providing PoE, stacking, SD-Access, and advanced QoS for wired network infrastructure.",
-      "display_name": "Cisco Catalyst Switches",
+      "display_name": "Cisco Catalyst Switches (IOS)",
       "id": "cisco_catalyst_switches",
       "install_apps": [
         "TA_cisco_catalyst",
@@ -1150,12 +1468,23 @@
         "catalyst 9600",
         "2960",
         "3850",
-        "campus switch"
+        "campus switch",
+        "ios",
+        "ios-xe",
+        "campus network",
+        "encrypted traffic analytics",
+        "eta",
+        "stackwise",
+        "poe",
+        "voice vlan",
+        "smartnet"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/switches/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco catalyst switches",
+        "cisco catalyst switches ios",
+        "ios",
         "catalyst switch",
         "catalyst 9200",
         "catalyst 9300",
@@ -1164,7 +1493,15 @@
         "catalyst 9600",
         "2960",
         "3850",
-        "campus switch"
+        "campus switch",
+        "ios xe",
+        "campus network",
+        "encrypted traffic analytics",
+        "eta",
+        "stackwise",
+        "poe",
+        "voice vlan",
+        "smartnet"
       ],
       "notes": "Catalyst Switch dashboards depend on Catalyst Center telemetry rather than a switch-only collector.",
       "optional_non_secret_keys": [
@@ -1190,7 +1527,9 @@
       "search_terms": [
         "cisco_catalyst_switches",
         "cisco catalyst switches",
+        "Cisco Catalyst Switches (IOS)",
         "Cisco Catalyst Switches",
+        "IOS",
         "catalyst switch",
         "catalyst 9200",
         "catalyst 9300",
@@ -1199,7 +1538,16 @@
         "catalyst 9600",
         "2960",
         "3850",
-        "campus switch"
+        "campus switch",
+        "ios",
+        "ios-xe",
+        "campus network",
+        "encrypted traffic analytics",
+        "eta",
+        "stackwise",
+        "poe",
+        "voice vlan",
+        "smartnet"
       ],
       "secret_keys": [
         "password"
@@ -1331,6 +1679,7 @@
       "display_name": "Cisco Cloudlock Cloud Access Security Broker (CASB)",
       "id": "cisco_cloudlock",
       "install_apps": [
+        "TA-cisco-cloud-security-addon",
         "cisco-cloud-security"
       ],
       "keywords": [
@@ -1442,6 +1791,78 @@
     },
     {
       "accepted_non_secret_keys": [],
+      "addon": "TA-CMX",
+      "addon_label": "Cisco CMX Add-on for Splunk",
+      "addon_uid": "3496",
+      "aliases": [],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_legacy",
+      "category": "networking",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Cisco Connected Mobile Experiences (CMX) was a location analytics platform that leveraged Wi-Fi infrastructure to provide real-time location tracking, proximity analytics, and engagement insights. CMX has been retired by Cisco and superseded by Cisco Spaces.",
+      "display_name": "Cisco CMX",
+      "id": "cisco_cmx",
+      "install_apps": [],
+      "keywords": [
+        "cmx",
+        "connected mobile experiences",
+        "location analytics",
+        "wifi analytics",
+        "venue analytics",
+        "proximity"
+      ],
+      "learn_more_url": "https://www.cisco.com/c/en/us/support/security/retired.html",
+      "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco cmx",
+        "cmx",
+        "connected mobile experiences",
+        "location analytics",
+        "wifi analytics",
+        "venue analytics",
+        "proximity"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_cmx",
+        "cisco cmx",
+        "Cisco CMX",
+        "cmx",
+        "connected mobile experiences",
+        "location analytics",
+        "wifi analytics",
+        "venue analytics",
+        "proximity"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [
+        "cmxactive",
+        "cmxanalytics",
+        "cmxfloor",
+        "cmxhttp",
+        "cmxmap"
+      ],
+      "status": "retired",
+      "subcategory": "campus_wireless",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest CMX location, analytics, and presence data into Splunk for venue intelligence, visitor flow analysis, and operational reporting."
+    },
+    {
+      "accepted_non_secret_keys": [],
       "addon": "",
       "addon_label": "",
       "addon_uid": "",
@@ -1469,7 +1890,7 @@
         "environmental sensors",
         "collaboration hardware"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/collaboration-endpoints/index.html",
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/collaboration-endpoints/index.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
       "normalized_search_terms": [
         "cisco collab hardware",
@@ -1522,43 +1943,55 @@
     },
     {
       "accepted_non_secret_keys": [],
-      "addon": "TA-CMX",
-      "addon_label": "Cisco CMX Add-on for Splunk",
-      "addon_uid": "3496",
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
       "aliases": [],
       "app_viz": "",
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "unsupported_legacy",
+      "automation_state": "unsupported_roadmap",
       "category": "networking",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
       "dashboards": [],
-      "description": "Cisco CMX was a location analytics platform that leveraged Wi-Fi infrastructure to provide real-time location tracking, proximity analytics, and engagement insights. CMX has been retired by Cisco and superseded by Cisco Spaces.",
-      "display_name": "Cisco Connected Mobile Experiences (Cisco CMX)",
-      "id": "cisco_cmx",
+      "description": "AI-powered network automation platform providing unified management, service health monitoring, traffic engineering, and BGP route observability across multivendor IP networks. Crosswork Network Controller automates provisioning and optimization; Crosswork Network Insights delivers cloud-based routing event security and control plane visibility.",
+      "display_name": "Cisco Crosswork",
+      "id": "cisco_crosswork",
       "install_apps": [],
       "keywords": [
-        "cmx",
-        "connected mobile experiences",
-        "location analytics",
-        "wifi analytics",
-        "venue analytics",
-        "proximity"
+        "crosswork",
+        "crosswork network controller",
+        "crosswork network insights",
+        "bgp monitoring",
+        "bgp route analytics",
+        "network automation",
+        "traffic engineering",
+        "service health",
+        "nso",
+        "network services orchestrator",
+        "wan automation engine",
+        "segment routing",
+        "mpls"
       ],
-      "learn_more_url": "https://www.cisco.com/c/en/us/support/security/retired.html",
-      "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/software/crosswork-network-controller/index.html",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
       "normalized_search_terms": [
-        "cisco cmx",
-        "cisco connected mobile experiences cisco cmx",
-        "cisco connected mobile experiences",
-        "cmx",
-        "connected mobile experiences",
-        "location analytics",
-        "wifi analytics",
-        "venue analytics",
-        "proximity"
+        "cisco crosswork",
+        "crosswork",
+        "crosswork network controller",
+        "crosswork network insights",
+        "bgp monitoring",
+        "bgp route analytics",
+        "network automation",
+        "traffic engineering",
+        "service health",
+        "nso",
+        "network services orchestrator",
+        "wan automation engine",
+        "segment routing",
+        "mpls"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -1570,31 +2003,115 @@
       "route": {},
       "route_type": "",
       "search_terms": [
-        "cisco_cmx",
-        "cisco cmx",
-        "Cisco Connected Mobile Experiences (Cisco CMX)",
-        "Cisco Connected Mobile Experiences",
-        "Cisco CMX",
-        "cmx",
-        "connected mobile experiences",
-        "location analytics",
-        "wifi analytics",
-        "venue analytics",
-        "proximity"
+        "cisco_crosswork",
+        "cisco crosswork",
+        "Cisco Crosswork",
+        "crosswork",
+        "crosswork network controller",
+        "crosswork network insights",
+        "bgp monitoring",
+        "bgp route analytics",
+        "network automation",
+        "traffic engineering",
+        "service health",
+        "nso",
+        "network services orchestrator",
+        "wan automation engine",
+        "segment routing",
+        "mpls"
       ],
       "secret_keys": [],
-      "sourcetypes": [
-        "cmxactive",
-        "cmxanalytics",
-        "cmxfloor",
-        "cmxhttp",
-        "cmxmap"
-      ],
-      "status": "retired",
-      "subcategory": "campus_wireless",
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "routing_wan",
       "template_checks": {},
       "template_paths": [],
-      "value_proposition": "Ingest CMX location, analytics, and presence data into Splunk for venue intelligence, visitor flow analysis, and operational reporting."
+      "value_proposition": "Ingest Crosswork network automation events, BGP route anomalies, and service health metrics into Splunk for correlated network operations intelligence and proactive issue remediation."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [
+        "Cisco NSO",
+        "Tail-f NCS"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_roadmap",
+      "category": "networking",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Model-driven network automation and orchestration platform (formerly Tail-f NCS) for multi-vendor service provisioning, configuration management, and lifecycle automation. Uses YANG models and NETCONF/RESTCONF to abstract device differences and enable intent-based networking. Distinct from Crosswork Network Controller/Insights \u2014 NSO is the foundational orchestration engine used by service providers and large enterprises for automated service delivery across thousands of devices.",
+      "display_name": "Cisco Crosswork NSO",
+      "id": "cisco_crosswork_nso",
+      "install_apps": [],
+      "keywords": [
+        "nso",
+        "network services orchestrator",
+        "tail-f",
+        "ncs",
+        "yang",
+        "netconf",
+        "restconf",
+        "service orchestration",
+        "network automation",
+        "intent-based networking"
+      ],
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/cloud-systems-management/network-services-orchestrator/index.html",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco crosswork nso",
+        "cisco nso",
+        "tail f ncs",
+        "nso",
+        "network services orchestrator",
+        "tail f",
+        "ncs",
+        "yang",
+        "netconf",
+        "restconf",
+        "service orchestration",
+        "network automation",
+        "intent based networking"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_crosswork_nso",
+        "cisco crosswork nso",
+        "Cisco Crosswork NSO",
+        "Cisco NSO",
+        "Tail-f NCS",
+        "nso",
+        "network services orchestrator",
+        "tail-f",
+        "ncs",
+        "yang",
+        "netconf",
+        "restconf",
+        "service orchestration",
+        "network automation",
+        "intent-based networking"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "routing_wan",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest NSO transaction logs, commit history, service lifecycle events, and device sync status into Splunk for network change auditing, service assurance, and automated remediation analytics."
     },
     {
       "accepted_non_secret_keys": [
@@ -1618,7 +2135,7 @@
       ],
       "conditional_required_secret_rules": [],
       "dashboards": [
-        "cyber_vision_syslog_vulnerability_overview"
+        "overview"
       ],
       "description": "Cisco Cyber Vision is a comprehensive solution designed to ensure the continuity, resilience, and safety of industrial operations by providing continuous visibility into Industrial Control Systems (ICS) and controlling the risks of cyber attacks. It offers full visibility into industrial networks and OT security posture, enabling asset owners to reduce the attack surface, segment the industrial network, and enforce cybersecurity policies.",
       "display_name": "Cisco Cyber Vision (CCV)",
@@ -1634,7 +2151,12 @@
         "ics visibility",
         "scada",
         "operational technology asset discovery",
-        "iot security"
+        "iot security",
+        "industrial threat defense",
+        "purdue model",
+        "modbus",
+        "profinet",
+        "industrial protocol"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/products/collateral/security/cyber-vision/cyber-vision-aag.html",
       "manual_gap_reason": "",
@@ -1647,7 +2169,12 @@
         "ics visibility",
         "scada",
         "operational technology asset discovery",
-        "iot security"
+        "iot security",
+        "industrial threat defense",
+        "purdue model",
+        "modbus",
+        "profinet",
+        "industrial protocol"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -1681,7 +2208,12 @@
         "ics visibility",
         "scada",
         "operational technology asset discovery",
-        "iot security"
+        "iot security",
+        "industrial threat defense",
+        "purdue model",
+        "modbus",
+        "profinet",
+        "industrial protocol"
       ],
       "secret_keys": [
         "api_token"
@@ -1812,7 +2344,7 @@
         "duo_overview"
       ],
       "description": "Zero trust is the future of information security - and Duo is your rock-solid foundation. Duo secures your workforce, taking access security beyond the corporate network perimeter to protect your data at every authentication attempt, from any device, anywhere.",
-      "display_name": "Cisco Duo Security (Duo)",
+      "display_name": "Cisco Duo Security",
       "id": "cisco_duo",
       "install_apps": [
         "CiscoSecurityCloud"
@@ -1825,23 +2357,34 @@
         "2fa",
         "device trust",
         "adaptive access",
-        "sso"
+        "sso",
+        "zero trust",
+        "cisco security cloud",
+        "user protection suite",
+        "passwordless",
+        "fido2",
+        "phishing resistant mfa"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/duo/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco duo",
-        "cisco duo security duo",
         "cisco duo security",
-        "duo",
         "duo security",
+        "duo",
         "mfa",
         "multi factor authentication",
         "two factor",
         "2fa",
         "device trust",
         "adaptive access",
-        "sso"
+        "sso",
+        "zero trust",
+        "cisco security cloud",
+        "user protection suite",
+        "passwordless",
+        "fido2",
+        "phishing resistant mfa"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -1874,9 +2417,7 @@
       "search_terms": [
         "cisco_duo",
         "cisco duo",
-        "Cisco Duo Security (Duo)",
         "Cisco Duo Security",
-        "Duo",
         "Duo Security",
         "duo",
         "mfa",
@@ -1885,7 +2426,13 @@
         "2fa",
         "device trust",
         "adaptive access",
-        "sso"
+        "sso",
+        "zero trust",
+        "cisco security cloud",
+        "user protection suite",
+        "passwordless",
+        "fido2",
+        "phishing resistant mfa"
       ],
       "secret_keys": [
         "ikey",
@@ -2026,140 +2573,6 @@
     },
     {
       "accepted_non_secret_keys": [],
-      "addon": "",
-      "addon_label": "",
-      "addon_uid": "",
-      "aliases": [],
-      "app_viz": "",
-      "app_viz_2": "",
-      "app_viz_label": "",
-      "app_viz_uid": "",
-      "automation_state": "unsupported_roadmap",
-      "category": "security",
-      "companion_skills": [],
-      "conditional_required_secret_rules": [],
-      "dashboards": [],
-      "description": "Proprietary Cisco capability embedded in Catalyst and Nexus switches that detects malware and threats in encrypted traffic without decryption \u2014 using Initial Data Packet (IDP) metadata, Sequence of Packet Lengths and Times (SPLT), and TLS fingerprinting to identify anomalous encrypted flows.",
-      "display_name": "Cisco Encrypted Traffic Analytics (ETA)",
-      "id": "cisco_eta",
-      "install_apps": [],
-      "keywords": [
-        "encrypted traffic analytics",
-        "eta",
-        "encrypted malware detection",
-        "splt",
-        "idp",
-        "tls analytics"
-      ],
-      "learn_more_url": "https://www.cisco.com/c/en/us/solutions/collateral/enterprise-networks/encrypted-traffic-analytics/white-paper-c11-739809.html",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
-      "normalized_search_terms": [
-        "cisco eta",
-        "cisco encrypted traffic analytics eta",
-        "cisco encrypted traffic analytics",
-        "eta",
-        "encrypted traffic analytics",
-        "encrypted malware detection",
-        "splt",
-        "idp",
-        "tls analytics"
-      ],
-      "notes": "",
-      "optional_non_secret_keys": [],
-      "prereq_apps": [],
-      "prereq_labels": [],
-      "primary_skill": "",
-      "required_non_secret_keys": [],
-      "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
-      "search_terms": [
-        "cisco_eta",
-        "cisco eta",
-        "Cisco Encrypted Traffic Analytics (ETA)",
-        "Cisco Encrypted Traffic Analytics",
-        "ETA",
-        "encrypted traffic analytics",
-        "eta",
-        "encrypted malware detection",
-        "splt",
-        "idp",
-        "tls analytics"
-      ],
-      "secret_keys": [],
-      "sourcetypes": [],
-      "status": "roadmap",
-      "subcategory": "network_security",
-      "template_checks": {},
-      "template_paths": [],
-      "value_proposition": "A future Splunk TA for ETA telemetry could deliver a \"Better Together\" differentiator that competitors cannot replicate \u2014 enabling SOC teams to detect encrypted malware, C2 communications, and data exfiltration without breaking encryption or deploying inline decryption appliances."
-    },
-    {
-      "accepted_non_secret_keys": [],
-      "addon": "",
-      "addon_label": "",
-      "addon_uid": "",
-      "aliases": [],
-      "app_viz": "",
-      "app_viz_2": "",
-      "app_viz_label": "",
-      "app_viz_uid": "",
-      "automation_state": "unsupported_roadmap",
-      "category": "security",
-      "companion_skills": [],
-      "conditional_required_secret_rules": [],
-      "dashboards": [],
-      "description": "Advanced visibility engine integrated into Cisco Secure Firewall that identifies applications and threats within encrypted TLS 1.3 traffic using AI/ML-powered fingerprinting \u2014 without requiring decryption, man-in-the-middle proxies, or breaking end-to-end encryption.",
-      "display_name": "Cisco Encrypted Visibility Engine (EVE)",
-      "id": "cisco_eve",
-      "install_apps": [],
-      "keywords": [
-        "encrypted visibility engine",
-        "eve",
-        "tls fingerprint",
-        "encrypted application identification"
-      ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/firewalls/encrypted-visibility-engine.html",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
-      "normalized_search_terms": [
-        "cisco eve",
-        "cisco encrypted visibility engine eve",
-        "cisco encrypted visibility engine",
-        "eve",
-        "encrypted visibility engine",
-        "tls fingerprint",
-        "encrypted application identification"
-      ],
-      "notes": "",
-      "optional_non_secret_keys": [],
-      "prereq_apps": [],
-      "prereq_labels": [],
-      "primary_skill": "",
-      "required_non_secret_keys": [],
-      "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
-      "search_terms": [
-        "cisco_eve",
-        "cisco eve",
-        "Cisco Encrypted Visibility Engine (EVE)",
-        "Cisco Encrypted Visibility Engine",
-        "EVE",
-        "encrypted visibility engine",
-        "eve",
-        "tls fingerprint",
-        "encrypted application identification"
-      ],
-      "secret_keys": [],
-      "sourcetypes": [],
-      "status": "roadmap",
-      "subcategory": "network_security",
-      "template_checks": {},
-      "template_paths": [],
-      "value_proposition": "A Splunk integration for EVE could surface encrypted-application identification events and threat verdicts \u2014 paired with ETA, it would give SOC teams complete encrypted-traffic visibility that no other vendor can deliver, fulfilling the \"Better Together\" narrative."
-    },
-    {
-      "accepted_non_secret_keys": [],
       "addon": "CiscoSecurityCloud",
       "addon_label": "Cisco Security Cloud",
       "addon_uid": "7404",
@@ -2168,7 +2581,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "automated",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -2178,7 +2591,9 @@
       "description": "Provides enhanced visibility and telemetry from endpoints, supporting advanced threat detection and response as part of Cisco's security portfolio.",
       "display_name": "Cisco Endpoint Visibility Module (EVM)",
       "id": "cisco_evm",
-      "install_apps": [],
+      "install_apps": [
+        "CiscoSecurityCloud"
+      ],
       "keywords": [
         "evm",
         "endpoint visibility module",
@@ -2187,7 +2602,7 @@
         "endpoint telemetry"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/secure-client/index.html",
-      "manual_gap_reason": "The SCAN catalog maps Endpoint Visibility Module into Cisco Security Cloud, but the repo's current security-cloud wrapper does not expose a distinct EVM product flow.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco evm",
         "cisco endpoint visibility module evm",
@@ -2198,15 +2613,18 @@
         "flow to process",
         "endpoint telemetry"
       ],
-      "notes": "",
+      "notes": "Cisco Security Cloud ships EVM knowledge objects and dashboards, but EVM telemetry is not configured through a CiscoSecurityCloud modular input in this repo. Install/validate Cisco Security Cloud here, then feed EVM sourcetypes through the supported upstream EVM pipeline.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-app-install",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "configuration": "manual",
+        "validation": "installed_apps"
+      },
+      "route_type": "app_install_only",
       "search_terms": [
         "cisco_evm",
         "cisco evm",
@@ -2232,6 +2650,96 @@
       "template_checks": {},
       "template_paths": [],
       "value_proposition": "Bridge the network/endpoint gap by correlating flow data with process-level context for faster investigations."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [
+        "Cisco Expressway-C",
+        "Cisco Expressway-E",
+        "Cisco VCS Expressway"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "manual_gap",
+      "category": "collaboration",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Video firewall traversal and B2B calling gateway \u2014 enables secure video collaboration across enterprise boundaries without opening inbound firewall ports. Active successor to the retired Cisco TelePresence Video Communication Server (TVCS). Provides SIP/H.323 interworking, MRA (Mobile and Remote Access) for Jabber/Webex clients, and Microsoft interoperability.",
+      "display_name": "Cisco Expressway",
+      "id": "cisco_expressway",
+      "install_apps": [],
+      "keywords": [
+        "expressway",
+        "video gateway",
+        "firewall traversal",
+        "mra",
+        "mobile remote access",
+        "b2b calling",
+        "sip trunk",
+        "h323",
+        "jabber mra",
+        "telepresence gateway"
+      ],
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/unified-communications/expressway-series/index.html",
+      "manual_gap_reason": "No local setup route is defined for this product yet.",
+      "normalized_search_terms": [
+        "cisco expressway",
+        "cisco expressway c",
+        "cisco expressway e",
+        "cisco vcs expressway",
+        "expressway",
+        "video gateway",
+        "firewall traversal",
+        "mra",
+        "mobile remote access",
+        "b2b calling",
+        "sip trunk",
+        "h323",
+        "jabber mra",
+        "telepresence gateway"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_expressway",
+        "cisco expressway",
+        "Cisco Expressway",
+        "Cisco Expressway-C",
+        "Cisco Expressway-E",
+        "Cisco VCS Expressway",
+        "expressway",
+        "video gateway",
+        "firewall traversal",
+        "mra",
+        "mobile remote access",
+        "b2b calling",
+        "sip trunk",
+        "h323",
+        "jabber mra",
+        "telepresence gateway"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [
+        "cisco:tvcs"
+      ],
+      "status": "active",
+      "subcategory": "voice_telephony",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest Expressway syslog events into Splunk for video infrastructure monitoring, firewall traversal troubleshooting, and MRA session analytics."
     },
     {
       "accepted_non_secret_keys": [
@@ -2292,7 +2800,12 @@
         "extended detection and response",
         "incident response",
         "soc",
-        "threat response"
+        "threat response",
+        "cisco security cloud",
+        "securex",
+        "ai assistant",
+        "attack path analysis",
+        "automated investigation"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/xdr/index.html",
       "manual_gap_reason": "",
@@ -2304,7 +2817,12 @@
         "extended detection and response",
         "incident response",
         "soc",
-        "threat response"
+        "threat response",
+        "cisco security cloud",
+        "securex",
+        "ai assistant",
+        "attack path analysis",
+        "automated investigation"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -2342,7 +2860,12 @@
         "extended detection and response",
         "incident response",
         "soc",
-        "threat response"
+        "threat response",
+        "cisco security cloud",
+        "securex",
+        "ai assistant",
+        "attack path analysis",
+        "automated investigation"
       ],
       "secret_keys": [
         "access_token",
@@ -2377,6 +2900,75 @@
       "app_viz_label": "",
       "app_viz_uid": "",
       "automation_state": "unsupported_roadmap",
+      "category": "networking",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Hyperconverged infrastructure platform combining compute, storage, and networking into a unified cluster managed through Intersight or HX Connect. Runs the HX Data Platform for distributed storage with native replication, deduplication, and compression. Distinct from UCS (compute-only) \u2014 HyperFlex adds software-defined storage and can be managed via Intersight alongside UCS.",
+      "display_name": "Cisco HyperFlex",
+      "id": "cisco_hyperflex",
+      "install_apps": [],
+      "keywords": [
+        "hyperflex",
+        "hx",
+        "hci",
+        "hyperconverged",
+        "hx data platform",
+        "software defined storage",
+        "hx connect"
+      ],
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/computing/hyperconverged-infrastructure/index.html",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco hyperflex",
+        "hyperflex",
+        "hx",
+        "hci",
+        "hyperconverged",
+        "hx data platform",
+        "software defined storage",
+        "hx connect"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_hyperflex",
+        "cisco hyperflex",
+        "Cisco HyperFlex",
+        "hyperflex",
+        "hx",
+        "hci",
+        "hyperconverged",
+        "hx data platform",
+        "software defined storage",
+        "hx connect"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "compute_infra",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest HyperFlex cluster health metrics, storage performance telemetry, replication status, and hardware alerts into Splunk for unified HCI operations monitoring alongside UCS and Intersight data."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_roadmap",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -2389,7 +2981,9 @@
         "hypershield",
         "distributed firewall",
         "autonomous security",
-        "ai firewall"
+        "ai firewall",
+        "ai native security",
+        "self qualifying update"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/hypershield/index.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
@@ -2398,7 +2992,9 @@
         "hypershield",
         "distributed firewall",
         "autonomous security",
-        "ai firewall"
+        "ai firewall",
+        "ai native security",
+        "self qualifying update"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -2416,7 +3012,9 @@
         "hypershield",
         "distributed firewall",
         "autonomous security",
-        "ai firewall"
+        "ai firewall",
+        "ai native security",
+        "self qualifying update"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -2471,7 +3069,7 @@
         "itdr",
         "lateral movement"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/identity-intelligence/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/solutions/security/identity-intelligence/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco identity intelligence",
@@ -2637,7 +3235,13 @@
         "802.1x",
         "trustsec",
         "sgacl",
-        "guest access"
+        "guest access",
+        "zero trust",
+        "sd-access",
+        "posture",
+        "profiling",
+        "byod",
+        "guest portal"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/identity-services-engine/index.html",
       "manual_gap_reason": "",
@@ -2654,7 +3258,13 @@
         "802 1x",
         "trustsec",
         "sgacl",
-        "guest access"
+        "guest access",
+        "zero trust",
+        "sd access",
+        "posture",
+        "profiling",
+        "byod",
+        "guest portal"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -2692,7 +3302,13 @@
         "802.1x",
         "trustsec",
         "sgacl",
-        "guest access"
+        "guest access",
+        "zero trust",
+        "sd-access",
+        "posture",
+        "profiling",
+        "byod",
+        "guest portal"
       ],
       "secret_keys": [
         "password"
@@ -2751,9 +3367,13 @@
         "ir8100",
         "ir8340",
         "ot networking",
-        "din rail"
+        "din rail",
+        "industrial threat defense",
+        "iot gateway",
+        "iec 62443",
+        "resilient network"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/industrial-ethernet-switches/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/industrial-switches/index.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
       "normalized_search_terms": [
         "cisco industrial networking",
@@ -2769,7 +3389,11 @@
         "ir8100",
         "ir8340",
         "ot networking",
-        "din rail"
+        "din rail",
+        "industrial threat defense",
+        "iot gateway",
+        "iec 62443",
+        "resilient network"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -2796,7 +3420,11 @@
         "ir8100",
         "ir8340",
         "ot networking",
-        "din rail"
+        "din rail",
+        "industrial threat defense",
+        "iot gateway",
+        "iec 62443",
+        "resilient network"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -2894,7 +3522,7 @@
       "addon_uid": "7538",
       "aliases": [],
       "app_viz": "cisco-catalyst-app",
-      "app_viz_2": "",
+      "app_viz_2": "cisco_ios",
       "app_viz_label": "Cisco Enterprise Networking for Splunk Platform",
       "app_viz_uid": "7539",
       "automation_state": "automated",
@@ -3012,7 +3640,7 @@
         "activity_monitor"
       ],
       "description": "Cloud-based infrastructure management \u2014 lifecycle management, monitoring, and optimization for UCS and HyperFlex.",
-      "display_name": "Cisco Intersight (Intersight)",
+      "display_name": "Cisco Intersight",
       "id": "cisco_intersight",
       "install_apps": [
         "Splunk_TA_Cisco_Intersight"
@@ -3024,11 +3652,10 @@
         "workload optimization",
         "hyperflex"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/cloud-systems-management/intersight/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/computing/hybrid-cloud-operations/intersight-platform/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco intersight",
-        "cisco intersight intersight",
         "intersight",
         "ucs management",
         "cloud operations",
@@ -3057,9 +3684,7 @@
       "search_terms": [
         "cisco_intersight",
         "cisco intersight",
-        "Cisco Intersight (Intersight)",
         "Cisco Intersight",
-        "Intersight",
         "intersight",
         "ucs management",
         "cloud operations",
@@ -3074,15 +3699,20 @@
         "cisco:intersight:alarms",
         "cisco:intersight:auditrecords",
         "cisco:intersight:compute",
+        "cisco:intersight:contract",
         "cisco:intersight:contracts",
         "cisco:intersight:custom:inventory",
         "cisco:intersight:custom:metrics",
+        "cisco:intersight:fabric",
+        "cisco:intersight:license",
         "cisco:intersight:licenses",
         "cisco:intersight:metrics",
+        "cisco:intersight:network",
         "cisco:intersight:networkelements",
         "cisco:intersight:networkobjects",
         "cisco:intersight:pools",
         "cisco:intersight:profiles",
+        "cisco:intersight:target",
         "cisco:intersight:targets"
       ],
       "status": "active",
@@ -3116,7 +3746,7 @@
       "conditional_required_secret_rules": [],
       "dashboards": [],
       "description": "Carrier-grade routing platforms running IOS-XR \u2014 including the Network Convergence System (NCS 540, 560, 5500, 5700) for SP aggregation, metro Ethernet, and 5G backhaul, and the Silicon One-powered 8000 Series for backbone and peering fabrics \u2014 delivering 100G/400G density, segment routing, EVPN, and model-driven telemetry (gRPC/gNMI) at carrier scale.",
-      "display_name": "Cisco IOS-XR Platforms (NCS / 8000 Series)",
+      "display_name": "Cisco IOS-XR Platforms",
       "id": "cisco_iosxr_platforms",
       "install_apps": [],
       "keywords": [
@@ -3137,13 +3767,11 @@
         "grpc",
         "gnmi"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/routers/network-convergence-system/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/sdwan-routers/network-convergence-system-5700-series/index.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
       "normalized_search_terms": [
         "cisco iosxr platforms",
-        "cisco ios xr platforms ncs 8000 series",
         "cisco ios xr platforms",
-        "ncs 8000 series",
         "ncs",
         "8000 series",
         "ios xr",
@@ -3173,9 +3801,7 @@
       "search_terms": [
         "cisco_iosxr_platforms",
         "cisco iosxr platforms",
-        "Cisco IOS-XR Platforms (NCS / 8000 Series)",
         "Cisco IOS-XR Platforms",
-        "NCS / 8000 Series",
         "NCS",
         "8000 Series",
         "ios xr",
@@ -3226,7 +3852,7 @@
         "irs_dashboard"
       ],
       "description": "Isovalent Runtime Security is an eBPF-based technology for runtime security visibility and enforcement for Kubernetes workloads and Linux VMs. It provides deep runtime and network visibility to support threat detection, incident investigation, and security compliance.",
-      "display_name": "Cisco Isovalent (Isovalent)",
+      "display_name": "Cisco Isovalent",
       "id": "cisco_isovalent",
       "install_apps": [
         "CiscoSecurityCloud"
@@ -3245,7 +3871,6 @@
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco isovalent",
-        "cisco isovalent isovalent",
         "isovalent",
         "ebpf",
         "cilium",
@@ -3279,9 +3904,7 @@
       "search_terms": [
         "cisco_isovalent",
         "cisco isovalent",
-        "Cisco Isovalent (Isovalent)",
         "Cisco Isovalent",
-        "Isovalent",
         "isovalent",
         "ebpf",
         "cilium",
@@ -3295,8 +3918,8 @@
       "sourcetypes": [
         "cisco:isovalent",
         "cisco:isovalent:alert",
-        "cisco:isovalent:processConnect",
-        "cisco:isovalent:processExec",
+        "cisco:isovalent:processconnect",
+        "cisco:isovalent:processexec",
         "cisco:isovalent:telemetry:network",
         "cisco:isovalent:telemetry:process"
       ],
@@ -3395,8 +4018,8 @@
       "sourcetypes": [
         "cisco:isovalent:edge_processor",
         "cisco:isovalent:edge_processor:alert",
-        "cisco:isovalent:edge_processor:processConnect",
-        "cisco:isovalent:edge_processor:processExec",
+        "cisco:isovalent:edge_processor:processconnect",
+        "cisco:isovalent:edge_processor:processexec",
         "cisco:isovalent:edge_processor:telemetry:network",
         "cisco:isovalent:edge_processor:telemetry:process"
       ],
@@ -3438,9 +4061,10 @@
         "fibre channel",
         "fcoe",
         "storage networking",
-        "fabric switch"
+        "fabric switch",
+        "nexus one"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/cloud-networking-switches/mds-series/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/cloud-networking-switches/storage-area-networking/index.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
       "normalized_search_terms": [
         "cisco mds switches",
@@ -3451,7 +4075,8 @@
         "fibre channel",
         "fcoe",
         "storage networking",
-        "fabric switch"
+        "fabric switch",
+        "nexus one"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -3472,7 +4097,8 @@
         "fibre channel",
         "fcoe",
         "storage networking",
-        "fabric switch"
+        "fabric switch",
+        "nexus one"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -3550,9 +4176,9 @@
     },
     {
       "accepted_non_secret_keys": [],
-      "addon": "SA_cisco_meeting_server",
-      "addon_label": "Supporting App for Cisco Meeting Server",
-      "addon_uid": "8413",
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
       "aliases": [],
       "app_viz": "",
       "app_viz_2": "",
@@ -3576,8 +4202,8 @@
         "webrtc",
         "call bridge"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/conferencing/meeting-server/index.html",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon SA_cisco_meeting_server.",
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/conferencing/meeting-server/index.html",
+      "manual_gap_reason": "No local setup route is defined for this product yet.",
       "normalized_search_terms": [
         "cisco meeting server",
         "cisco meeting server cms",
@@ -3612,7 +4238,7 @@
       ],
       "secret_keys": [],
       "sourcetypes": [
-        "cms_cdr"
+        "cisco:ms"
       ],
       "status": "active",
       "subcategory": "meetings_calling",
@@ -3629,16 +4255,16 @@
         "org_id",
         "region"
       ],
-      "addon": "TA_cisco_catalyst",
-      "addon_label": "Cisco Catalyst Add-on for Splunk",
-      "addon_uid": "7538",
+      "addon": "Splunk_TA_cisco_meraki",
+      "addon_label": "Cisco Meraki Add-on for Splunk",
+      "addon_uid": "5580",
       "aliases": [
         "Meraki"
       ],
-      "app_viz": "cisco-catalyst-app",
+      "app_viz": "",
       "app_viz_2": "",
-      "app_viz_label": "Cisco Enterprise Networking for Splunk Platform",
-      "app_viz_uid": "7539",
+      "app_viz_label": "",
+      "app_viz_uid": "",
       "automation_state": "automated",
       "category": "networking",
       "companion_skills": [
@@ -3650,7 +4276,7 @@
         "network_insights"
       ],
       "description": "Cloud-managed networking \u2014 wireless, switching, security, and SD-WAN managed through the Meraki dashboard.",
-      "display_name": "Cisco Meraki (Meraki)",
+      "display_name": "Cisco Meraki",
       "id": "cisco_meraki",
       "install_apps": [
         "Splunk_TA_cisco_meraki",
@@ -3661,20 +4287,33 @@
         "cloud managed networking",
         "meraki dashboard",
         "meraki api",
-        "meraki sd-wan",
-        "client analytics"
+        "meraki sdwan",
+        "client analytics",
+        "cisco networking cloud",
+        "meraki mx",
+        "meraki mr",
+        "meraki ms",
+        "meraki mt",
+        "meraki mv",
+        "wireless lan"
       ],
       "learn_more_url": "https://meraki.cisco.com/",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco meraki",
-        "cisco meraki meraki",
         "meraki",
         "cloud managed networking",
         "meraki dashboard",
         "meraki api",
-        "meraki sd wan",
-        "client analytics"
+        "meraki sdwan",
+        "client analytics",
+        "cisco networking cloud",
+        "meraki mx",
+        "meraki mr",
+        "meraki ms",
+        "meraki mt",
+        "meraki mv",
+        "wireless lan"
       ],
       "notes": "This repo prefers the dedicated Meraki TA and can also apply the Enterprise Networking companion dashboards used by the SCAN catalog.",
       "optional_non_secret_keys": [
@@ -3700,15 +4339,21 @@
       "search_terms": [
         "cisco_meraki",
         "cisco meraki",
-        "Cisco Meraki (Meraki)",
         "Cisco Meraki",
         "Meraki",
         "meraki",
         "cloud managed networking",
         "meraki dashboard",
         "meraki api",
-        "meraki sd-wan",
-        "client analytics"
+        "meraki sdwan",
+        "client analytics",
+        "cisco networking cloud",
+        "meraki mx",
+        "meraki mr",
+        "meraki ms",
+        "meraki mt",
+        "meraki mv",
+        "wireless lan"
       ],
       "secret_keys": [
         "api_key"
@@ -3725,7 +4370,9 @@
         "meraki:audit",
         "meraki:cameras",
         "meraki:devices",
+        "meraki:devicesavailabilities",
         "meraki:devicesavailabilitieschangehistory",
+        "meraki:devicesuplinkslossandlatency",
         "meraki:devicesuplinksaddressesbydevice",
         "meraki:firmwareupgrades",
         "meraki:licensescotermlicenses",
@@ -3886,76 +4533,6 @@
     },
     {
       "accepted_non_secret_keys": [],
-      "addon": "",
-      "addon_label": "",
-      "addon_uid": "",
-      "aliases": [],
-      "app_viz": "",
-      "app_viz_2": "",
-      "app_viz_label": "",
-      "app_viz_uid": "",
-      "automation_state": "unsupported_roadmap",
-      "category": "networking",
-      "companion_skills": [],
-      "conditional_required_secret_rules": [],
-      "dashboards": [],
-      "description": "Foundational network telemetry signal \u2014 NetFlow v5/v9 and IPFIX exported by virtually every Cisco router, switch, and firewall, providing per-flow traffic metadata including source/destination IPs, ports, protocols, byte/packet counts, and application identification for network behavior analytics.",
-      "display_name": "Cisco NetFlow / IPFIX",
-      "id": "cisco_netflow",
-      "install_apps": [],
-      "keywords": [
-        "netflow",
-        "ipfix",
-        "flexible netflow",
-        "netflow v9",
-        "flow data",
-        "traffic analytics",
-        "flow telemetry"
-      ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/ios-nx-os-software/ios-netflow/index.html",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
-      "normalized_search_terms": [
-        "cisco netflow",
-        "cisco netflow ipfix",
-        "netflow",
-        "ipfix",
-        "flexible netflow",
-        "netflow v9",
-        "flow data",
-        "traffic analytics",
-        "flow telemetry"
-      ],
-      "notes": "",
-      "optional_non_secret_keys": [],
-      "prereq_apps": [],
-      "prereq_labels": [],
-      "primary_skill": "",
-      "required_non_secret_keys": [],
-      "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
-      "search_terms": [
-        "cisco_netflow",
-        "cisco netflow",
-        "Cisco NetFlow / IPFIX",
-        "netflow",
-        "ipfix",
-        "flexible netflow",
-        "netflow v9",
-        "flow data",
-        "traffic analytics",
-        "flow telemetry"
-      ],
-      "secret_keys": [],
-      "sourcetypes": [],
-      "status": "roadmap",
-      "subcategory": "routing_wan",
-      "template_checks": {},
-      "template_paths": [],
-      "value_proposition": "A dedicated Cisco NetFlow TA could eliminate the current 3-app dependency (Splunk Stream + Stream Forwarders + Enhanced Netflow Add-on) and deliver first-class flow visibility, baked into the Static Base Layer for MTTI reduction and network behavior analytics."
-    },
-    {
-      "accepted_non_secret_keys": [],
       "addon": "TA_cisco-candid",
       "addon_label": "Cisco Network Assurance Engine Add-on for Splunk Enterprise (Cisco NAE)",
       "addon_uid": "3820",
@@ -3978,7 +4555,8 @@
         "network assurance engine",
         "candid",
         "intent verification",
-        "aci assurance"
+        "aci assurance",
+        "nexus one"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/support/security/retired.html",
       "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
@@ -3988,7 +4566,8 @@
         "network assurance engine",
         "candid",
         "intent verification",
-        "aci assurance"
+        "aci assurance",
+        "nexus one"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -4007,7 +4586,8 @@
         "network assurance engine",
         "candid",
         "intent verification",
-        "aci assurance"
+        "aci assurance",
+        "nexus one"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -4053,7 +4633,9 @@
         "nvzflow",
         "anyconnect nvm",
         "secure client nvm",
-        "endpoint flow"
+        "endpoint flow",
+        "user protection suite",
+        "cisco security cloud"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/secure-client/resources.html",
       "manual_gap_reason": "",
@@ -4066,7 +4648,9 @@
         "nvzflow",
         "anyconnect nvm",
         "secure client nvm",
-        "endpoint flow"
+        "endpoint flow",
+        "user protection suite",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -4100,7 +4684,9 @@
         "nvzflow",
         "anyconnect nvm",
         "secure client nvm",
-        "endpoint flow"
+        "endpoint flow",
+        "user protection suite",
+        "cisco security cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -4162,7 +4748,8 @@
         "nexus dashboard orchestrator",
         "ndi",
         "ndo",
-        "fabric controller"
+        "fabric controller",
+        "nexus one"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/cloud-networking/nexus-platform/index.html",
       "manual_gap_reason": "",
@@ -4175,7 +4762,8 @@
         "nexus dashboard orchestrator",
         "ndi",
         "ndo",
-        "fabric controller"
+        "fabric controller",
+        "nexus one"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -4212,7 +4800,8 @@
         "nexus dashboard orchestrator",
         "ndi",
         "ndo",
-        "fabric controller"
+        "fabric controller",
+        "nexus one"
       ],
       "secret_keys": [
         "password"
@@ -4265,7 +4854,8 @@
         "nexus hyperfabric",
         "hyperfabric",
         "cloud managed fabric",
-        "dcn"
+        "dcn",
+        "nexus one"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/support/data-center-networking/nexus-hyperfabric/series.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
@@ -4274,7 +4864,8 @@
         "nexus hyperfabric",
         "hyperfabric",
         "cloud managed fabric",
-        "dcn"
+        "dcn",
+        "nexus one"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -4292,7 +4883,8 @@
         "nexus hyperfabric",
         "hyperfabric",
         "cloud managed fabric",
-        "dcn"
+        "dcn",
+        "nexus one"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -4328,7 +4920,7 @@
         "dashboard"
       ],
       "description": "High-performance data center switches - spine/leaf fabrics, VXLAN, and NX-OS telemetry.",
-      "display_name": "Cisco Nexus Switches (NEX)",
+      "display_name": "Cisco Nexus Switches",
       "id": "cisco_nexus",
       "install_apps": [
         "cisco_dc_networking_app_for_splunk"
@@ -4342,15 +4934,18 @@
         "n9k",
         "spine leaf",
         "vxlan",
-        "data center switch"
+        "data center switch",
+        "nexus one",
+        "vpc",
+        "fabric extender",
+        "fex",
+        "fabricpath"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/switches/nexus-9000-series-switches/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/cloud-networking-switches/nexus-9000-switches/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco nexus",
-        "cisco nexus switches nex",
         "cisco nexus switches",
-        "nex",
         "nexus",
         "nx os",
         "nxos",
@@ -4359,7 +4954,12 @@
         "n9k",
         "spine leaf",
         "vxlan",
-        "data center switch"
+        "data center switch",
+        "nexus one",
+        "vpc",
+        "fabric extender",
+        "fex",
+        "fabricpath"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -4386,9 +4986,7 @@
       "search_terms": [
         "cisco_nexus",
         "cisco nexus",
-        "Cisco Nexus Switches (NEX)",
         "Cisco Nexus Switches",
-        "NEX",
         "nexus",
         "nx-os",
         "nxos",
@@ -4397,7 +4995,12 @@
         "n9k",
         "spine leaf",
         "vxlan",
-        "data center switch"
+        "data center switch",
+        "nexus one",
+        "vpc",
+        "fabric extender",
+        "fex",
+        "fabricpath"
       ],
       "secret_keys": [
         "password"
@@ -4446,9 +5049,11 @@
         "pluggable",
         "optical power",
         "bit error rate",
-        "predictive failure"
+        "predictive failure",
+        "nexus one",
+        "routed optical networking"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/interfaces-modules/transceiver-modules/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/optics-transceiver-modules/index.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
       "normalized_search_terms": [
         "cisco optics cmis",
@@ -4461,7 +5066,9 @@
         "pluggable",
         "optical power",
         "bit error rate",
-        "predictive failure"
+        "predictive failure",
+        "nexus one",
+        "routed optical networking"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -4484,7 +5091,9 @@
         "pluggable",
         "optical power",
         "bit error rate",
-        "predictive failure"
+        "predictive failure",
+        "nexus one",
+        "routed optical networking"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -4520,9 +5129,16 @@
         "service mesh",
         "api security",
         "cloud workload protection",
-        "calisti"
+        "calisti",
+        "cloud native",
+        "kubernetes security",
+        "cisco ai defense",
+        "cspm",
+        "cwpp",
+        "cloud posture",
+        "runtime protection"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/panoptica/index.html",
+      "learn_more_url": "",
       "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
       "normalized_search_terms": [
         "cisco panoptica",
@@ -4532,7 +5148,14 @@
         "service mesh",
         "api security",
         "cloud workload protection",
-        "calisti"
+        "calisti",
+        "cloud native",
+        "kubernetes security",
+        "cisco ai defense",
+        "cspm",
+        "cwpp",
+        "cloud posture",
+        "runtime protection"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -4553,7 +5176,14 @@
         "service mesh",
         "api security",
         "cloud workload protection",
-        "calisti"
+        "calisti",
+        "cloud native",
+        "kubernetes security",
+        "cisco ai defense",
+        "cspm",
+        "cwpp",
+        "cloud posture",
+        "runtime protection"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -4639,82 +5269,6 @@
     },
     {
       "accepted_non_secret_keys": [],
-      "addon": "ti-cisco-vuln",
-      "addon_label": "Cisco PSIRT openVuln API Add-on for Splunk",
-      "addon_uid": "5183",
-      "aliases": [],
-      "app_viz": "",
-      "app_viz_2": "",
-      "app_viz_label": "",
-      "app_viz_uid": "",
-      "automation_state": "unsupported_legacy",
-      "category": "security",
-      "companion_skills": [],
-      "conditional_required_secret_rules": [],
-      "dashboards": [],
-      "description": "Cisco PSIRT manages the receipt, investigation, and public reporting of security vulnerability information related to Cisco products and networks. The openVuln API provides machine-consumable access to Cisco security advisories. NOTE: The Splunkbase add-on for this product may be archived.",
-      "display_name": "Cisco Product Security Incident Response Team (PSIRT)",
-      "id": "cisco_psirt",
-      "install_apps": [],
-      "keywords": [
-        "psirt",
-        "openvuln",
-        "security advisory",
-        "cve advisory",
-        "patch management",
-        "vulnerability disclosure"
-      ],
-      "learn_more_url": "https://developer.cisco.com/psirt/",
-      "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
-      "normalized_search_terms": [
-        "cisco psirt",
-        "cisco product security incident response team psirt",
-        "cisco product security incident response team",
-        "psirt",
-        "openvuln",
-        "security advisory",
-        "cve advisory",
-        "patch management",
-        "vulnerability disclosure"
-      ],
-      "notes": "",
-      "optional_non_secret_keys": [],
-      "prereq_apps": [],
-      "prereq_labels": [],
-      "primary_skill": "",
-      "required_non_secret_keys": [],
-      "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
-      "search_terms": [
-        "cisco_psirt",
-        "cisco psirt",
-        "Cisco Product Security Incident Response Team (PSIRT)",
-        "Cisco Product Security Incident Response Team",
-        "PSIRT",
-        "psirt",
-        "openvuln",
-        "security advisory",
-        "cve advisory",
-        "patch management",
-        "vulnerability disclosure"
-      ],
-      "secret_keys": [],
-      "sourcetypes": [
-        "cisco:vuln:advisories",
-        "cisco:vuln:advisories:cvrf:note",
-        "cisco:vuln:advisories:cvrf:product",
-        "cisco:vuln:advisories:cvrf:summary",
-        "cisco:vuln:advisories:cvrf:vuln"
-      ],
-      "status": "deprecated",
-      "subcategory": "threat_response",
-      "template_checks": {},
-      "template_paths": [],
-      "value_proposition": "Ingest Cisco PSIRT security advisories and vulnerability data into Splunk for proactive vulnerability management and prioritized patching."
-    },
-    {
-      "accepted_non_secret_keys": [],
       "addon": "TA-skylight-for-splunk",
       "addon_label": "TA Accedian Skylight powered Security",
       "addon_uid": "5409",
@@ -4741,7 +5295,7 @@
         "sla monitoring",
         "synthetic testing"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/provider-connectivity-assurance/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/software/provider-connectivity-assurance/index.html",
       "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
       "normalized_search_terms": [
         "cisco provider connectivity assurance",
@@ -4784,6 +5338,87 @@
     },
     {
       "accepted_non_secret_keys": [],
+      "addon": "ti-cisco-vuln",
+      "addon_label": "Cisco PSIRT openVuln API Add-on for Splunk",
+      "addon_uid": "5183",
+      "aliases": [],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_legacy",
+      "category": "security",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Cisco Product Security Incident Response Team (PSIRT) manages the receipt, investigation, and public reporting of security vulnerability information related to Cisco products and networks. The openVuln API provides machine-consumable access to Cisco security advisories. NOTE: The Splunkbase add-on for this product may be archived.",
+      "display_name": "Cisco PSIRT",
+      "id": "cisco_psirt",
+      "install_apps": [],
+      "keywords": [
+        "psirt",
+        "openvuln",
+        "security advisory",
+        "cve advisory",
+        "patch management",
+        "vulnerability disclosure",
+        "openVuln api",
+        "critical advisory",
+        "high advisory"
+      ],
+      "learn_more_url": "https://developer.cisco.com/psirt/",
+      "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco psirt",
+        "psirt",
+        "openvuln",
+        "security advisory",
+        "cve advisory",
+        "patch management",
+        "vulnerability disclosure",
+        "openvuln api",
+        "critical advisory",
+        "high advisory"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_psirt",
+        "cisco psirt",
+        "Cisco PSIRT",
+        "psirt",
+        "openvuln",
+        "security advisory",
+        "cve advisory",
+        "patch management",
+        "vulnerability disclosure",
+        "openVuln api",
+        "critical advisory",
+        "high advisory"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [
+        "cisco:vuln:advisories",
+        "cisco:vuln:advisories:cvrf:note",
+        "cisco:vuln:advisories:cvrf:product",
+        "cisco:vuln:advisories:cvrf:summary",
+        "cisco:vuln:advisories:cvrf:vuln"
+      ],
+      "status": "deprecated",
+      "subcategory": "threat_response",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest Cisco PSIRT security advisories and vulnerability data into Splunk for proactive vulnerability management and prioritized patching."
+    },
+    {
+      "accepted_non_secret_keys": [],
       "addon": "",
       "addon_label": "",
       "addon_uid": "",
@@ -4800,7 +5435,7 @@
       "conditional_required_secret_rules": [],
       "dashboards": [],
       "description": "DDoS mitigation, bot management, WAF, and API protection powered by Radware.",
-      "display_name": "Cisco Radware (DDoS and Application Security)",
+      "display_name": "Cisco Radware",
       "id": "cisco_radware",
       "install_apps": [],
       "keywords": [
@@ -4816,8 +5451,6 @@
       "manual_gap_reason": "No local setup route is defined for this product yet.",
       "normalized_search_terms": [
         "cisco radware",
-        "cisco radware ddos and application security",
-        "ddos and application security",
         "radware",
         "ddos",
         "anti ddos",
@@ -4838,9 +5471,7 @@
       "search_terms": [
         "cisco_radware",
         "cisco radware",
-        "Cisco Radware (DDoS and Application Security)",
         "Cisco Radware",
-        "DDoS and Application Security",
         "Radware",
         "radware",
         "ddos",
@@ -4895,6 +5526,7 @@
       "display_name": "Cisco Secure Access (SSE)",
       "id": "cisco_secure_access",
       "install_apps": [
+        "TA-cisco-cloud-security-addon",
         "cisco-cloud-security"
       ],
       "keywords": [
@@ -4905,7 +5537,11 @@
         "swg",
         "secure web gateway",
         "casb",
-        "remote access"
+        "remote access",
+        "sase",
+        "secure access service edge",
+        "cisco security cloud",
+        "user protection suite"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/secure-access/index.html",
       "manual_gap_reason": "",
@@ -4919,7 +5555,11 @@
         "swg",
         "secure web gateway",
         "casb",
-        "remote access"
+        "remote access",
+        "sase",
+        "secure access service edge",
+        "cisco security cloud",
+        "user protection suite"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -4964,15 +5604,21 @@
         "swg",
         "secure web gateway",
         "casb",
-        "remote access"
+        "remote access",
+        "sase",
+        "secure access service edge",
+        "cisco security cloud",
+        "user protection suite"
       ],
       "secret_keys": [
         "api_key",
         "api_secret"
       ],
       "sourcetypes": [
+        "cisco:cloud_security:appdiscovery",
         "cisco:cloud_security:audit",
         "cisco:cloud_security:dlp",
+        "cisco:cloud_security:dns",
         "cisco:cloud_security:fileevent",
         "cisco:cloud_security:firewall",
         "cisco:cloud_security:intrusion",
@@ -4981,7 +5627,15 @@
         "cisco:cloud_security:ravpn",
         "cisco:cloud_security:ztna",
         "cisco:cloud_security:ztnaenrollment",
-        "cisco:cloud_security:ztnaflow"
+        "cisco:cloud_security:ztnaflow",
+        "cisco:secure_access:*",
+        "cisco:secure_access:security_events_andalerts",
+        "cisco:secure_access:security_events_dlp",
+        "cisco:secure_access:security_events_dns",
+        "cisco:secure_access:security_events_intrusion",
+        "cisco:secure_access:security_events_ravpn",
+        "cisco:secure_access:security_events_web",
+        "cisco:secure_access:security_events_ztna"
       ],
       "status": "active",
       "subcategory": "cloud_security",
@@ -5010,46 +5664,53 @@
     },
     {
       "accepted_non_secret_keys": [],
-      "addon": "TA-cisco_acs",
-      "addon_label": "Technology Add-on for Cisco Secure Access Control Server (ACS)",
-      "addon_uid": "1811",
+      "addon": "CiscoSecurityCloud",
+      "addon_label": "Cisco Security Cloud",
+      "addon_uid": "7404",
       "aliases": [
-        "Cisco Secure ACS"
+        "Cisco Stealthwatch Cloud"
       ],
       "app_viz": "",
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "unsupported_legacy",
+      "automation_state": "manual_gap",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
       "dashboards": [],
-      "description": "Cisco Secure Access Control Server (ACS) was a policy-driven access control platform providing centralized RADIUS and TACACS+ authentication, authorization, and accounting. ACS has been retired by Cisco and superseded by Cisco Identity Services Engine (ISE).",
-      "display_name": "Cisco Secure Access Control Server (Cisco ACS)",
-      "id": "cisco_acs",
+      "description": "Cloud-native network detection and response \u2014 monitors public cloud (AWS, Azure, GCP), private network, and SaaS environments for threats without deploying sensors or agents. Uses entity modeling and behavioral analytics on VPC Flow Logs, cloud provider telemetry, and NetFlow. Originally Stealthwatch Cloud; now unified under the Cisco Security Cloud alongside Secure Network Analytics (on-prem SNA). Data flows through XDR into the Security Cloud app.",
+      "display_name": "Cisco Secure Cloud Analytics (SCA)",
+      "id": "cisco_secure_cloud_analytics",
       "install_apps": [],
       "keywords": [
-        "acs",
-        "access control server",
-        "tacacs",
-        "radius",
-        "aaa",
-        "authentication authorization accounting"
+        "sca",
+        "secure cloud analytics",
+        "stealthwatch cloud",
+        "cloud ndr",
+        "cloud threat detection",
+        "vpc flow logs",
+        "entity modeling",
+        "behavioral analytics",
+        "cloud visibility",
+        "xdr"
       ],
-      "learn_more_url": "https://www.cisco.com/c/en/us/support/security/retired.html",
-      "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/security-analytics/secure-cloud-analytics/index.html",
+      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon CiscoSecurityCloud.",
       "normalized_search_terms": [
-        "cisco acs",
-        "cisco secure access control server cisco acs",
-        "cisco secure access control server",
-        "cisco secure acs",
-        "acs",
-        "access control server",
-        "tacacs",
-        "radius",
-        "aaa",
-        "authentication authorization accounting"
+        "cisco secure cloud analytics",
+        "cisco secure cloud analytics sca",
+        "sca",
+        "cisco stealthwatch cloud",
+        "secure cloud analytics",
+        "stealthwatch cloud",
+        "cloud ndr",
+        "cloud threat detection",
+        "vpc flow logs",
+        "entity modeling",
+        "behavioral analytics",
+        "cloud visibility",
+        "xdr"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -5061,28 +5722,30 @@
       "route": {},
       "route_type": "",
       "search_terms": [
-        "cisco_acs",
-        "cisco acs",
-        "Cisco Secure Access Control Server (Cisco ACS)",
-        "Cisco Secure Access Control Server",
-        "Cisco ACS",
-        "Cisco Secure ACS",
-        "acs",
-        "access control server",
-        "tacacs",
-        "radius",
-        "aaa",
-        "authentication authorization accounting"
+        "cisco_secure_cloud_analytics",
+        "cisco secure cloud analytics",
+        "Cisco Secure Cloud Analytics (SCA)",
+        "Cisco Secure Cloud Analytics",
+        "SCA",
+        "Cisco Stealthwatch Cloud",
+        "sca",
+        "secure cloud analytics",
+        "stealthwatch cloud",
+        "cloud ndr",
+        "cloud threat detection",
+        "vpc flow logs",
+        "entity modeling",
+        "behavioral analytics",
+        "cloud visibility",
+        "xdr"
       ],
       "secret_keys": [],
-      "sourcetypes": [
-        "cisco:acs"
-      ],
-      "status": "retired",
-      "subcategory": "identity_access",
+      "sourcetypes": [],
+      "status": "active",
+      "subcategory": "network_security",
       "template_checks": {},
       "template_paths": [],
-      "value_proposition": "Stream ACS authentication, authorization, and accounting events into Splunk for centralized network access visibility and compliance auditing."
+      "value_proposition": "Extend network threat detection from on-prem (SNA) to public cloud and SaaS \u2014 surfacing cloud-native alerts, entity risk scores, and behavioral anomalies in Splunk for unified SOC visibility across hybrid environments."
     },
     {
       "accepted_non_secret_keys": [],
@@ -5097,17 +5760,19 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "automated",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
       "dashboards": [
-        "cisco_esa_dashboard"
+        "application"
       ],
-      "description": "Cisco Secure Email Gateway formerly Cisco Email Security Appliance (ESA) is an Email security gateway \u2014 anti-spam, anti-malware, DLP, encryption, and advanced phishing protection for inbound and outbound email.",
-      "display_name": "Cisco Secure Email Gateway",
+      "description": "Email security gateway \u2014 anti-spam, anti-malware, DLP, encryption, and advanced phishing protection for inbound and outbound email. Formerly Cisco Email Security Appliance (ESA).",
+      "display_name": "Cisco Secure Email Gateway (ESA)",
       "id": "cisco_esa",
-      "install_apps": [],
+      "install_apps": [
+        "Splunk_TA_cisco-esa"
+      ],
       "keywords": [
         "esa",
         "email security appliance",
@@ -5115,36 +5780,46 @@
         "anti-spam",
         "email gateway",
         "dlp",
-        "message tracking"
+        "message tracking",
+        "cisco security cloud",
+        "secure email gateway"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/email-security/index.html",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon Splunk_TA_cisco-esa.",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/secure-email/index.html",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco esa",
+        "cisco secure email gateway esa",
         "cisco secure email gateway",
+        "esa",
         "cisco email security appliance",
         "cisco ironport email security appliance",
-        "esa",
         "email security appliance",
         "ironport",
         "anti spam",
         "email gateway",
         "dlp",
-        "message tracking"
+        "message tracking",
+        "cisco security cloud",
+        "secure email gateway"
       ],
-      "notes": "",
+      "notes": "Installs the Splunk-supported Cisco ESA add-on. Configure ESA log forwarding or SC4S collection outside this product router, then validate the app and sourcetypes.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-app-install",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "configuration": "manual",
+        "validation": "installed_apps"
+      },
+      "route_type": "app_install_only",
       "search_terms": [
         "cisco_esa",
         "cisco esa",
+        "Cisco Secure Email Gateway (ESA)",
         "Cisco Secure Email Gateway",
+        "ESA",
         "Cisco Email Security Appliance",
         "Cisco IronPort Email Security Appliance",
         "esa",
@@ -5153,7 +5828,9 @@
         "anti-spam",
         "email gateway",
         "dlp",
-        "message tracking"
+        "message tracking",
+        "cisco security cloud",
+        "secure email gateway"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -5217,7 +5894,11 @@
         "advanced malware protection",
         "edr",
         "endpoint detection",
-        "threat hunting"
+        "threat hunting",
+        "cisco security cloud",
+        "xdr endpoint",
+        "orbital",
+        "malware defense"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/endpoint-security/secure-endpoint/index.html",
       "manual_gap_reason": "",
@@ -5232,7 +5913,11 @@
         "advanced malware protection",
         "edr",
         "endpoint detection",
-        "threat hunting"
+        "threat hunting",
+        "cisco security cloud",
+        "xdr endpoint",
+        "orbital",
+        "malware defense"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -5277,7 +5962,11 @@
         "advanced malware protection",
         "edr",
         "endpoint detection",
-        "threat hunting"
+        "threat hunting",
+        "cisco security cloud",
+        "xdr endpoint",
+        "orbital",
+        "malware defense"
       ],
       "secret_keys": [
         "api_key"
@@ -5321,7 +6010,8 @@
         "sea",
         "ot remote access",
         "industrial privileged access",
-        "ot zero trust"
+        "ot zero trust",
+        "industrial threat defense"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/industrial-security/secure-equipment-access/index.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
@@ -5332,7 +6022,8 @@
         "secure equipment access",
         "ot remote access",
         "industrial privileged access",
-        "ot zero trust"
+        "ot zero trust",
+        "industrial threat defense"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -5353,7 +6044,8 @@
         "sea",
         "ot remote access",
         "industrial privileged access",
-        "ot zero trust"
+        "ot zero trust",
+        "industrial threat defense"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -5413,7 +6105,22 @@
         "estreamer",
         "firesight",
         "intrusion prevention",
-        "firewall"
+        "firewall",
+        "hybrid mesh firewall",
+        "industrial threat defense",
+        "fmc",
+        "firewall management center",
+        "anyconnect",
+        "vpn",
+        "secure client vpn",
+        "remote access vpn",
+        "security analytics and logging",
+        "sal",
+        "encrypted visibility engine",
+        "eve",
+        "snort",
+        "secure firewall cloud native",
+        "sfcn"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/firewalls/index.html",
       "manual_gap_reason": "",
@@ -5432,7 +6139,22 @@
         "ngfw",
         "firesight",
         "intrusion prevention",
-        "firewall"
+        "firewall",
+        "hybrid mesh firewall",
+        "industrial threat defense",
+        "fmc",
+        "firewall management center",
+        "anyconnect",
+        "vpn",
+        "secure client vpn",
+        "remote access vpn",
+        "security analytics and logging",
+        "sal",
+        "encrypted visibility engine",
+        "eve",
+        "snort",
+        "secure firewall cloud native",
+        "sfcn"
       ],
       "notes": "Choose the Secure Firewall collection mode with --set variant api, estreamer, syslog, or asa_syslog.",
       "optional_non_secret_keys": [],
@@ -5566,7 +6288,22 @@
         "estreamer",
         "firesight",
         "intrusion prevention",
-        "firewall"
+        "firewall",
+        "hybrid mesh firewall",
+        "industrial threat defense",
+        "fmc",
+        "firewall management center",
+        "anyconnect",
+        "vpn",
+        "secure client vpn",
+        "remote access vpn",
+        "security analytics and logging",
+        "sal",
+        "encrypted visibility engine",
+        "eve",
+        "snort",
+        "secure firewall cloud native",
+        "sfcn"
       ],
       "secret_keys": [
         "password",
@@ -5575,7 +6312,8 @@
       "sourcetypes": [
         "cisco:asa",
         "cisco:ftd:syslog",
-        "cisco:sfw:estreamer"
+        "cisco:sfw:estreamer",
+        "cisco:sfw:policy"
       ],
       "status": "active",
       "subcategory": "network_security",
@@ -5610,7 +6348,7 @@
       "conditional_required_secret_rules": [],
       "dashboards": [],
       "description": "Cisco Secure IPS (formerly Cisco IPS) was a dedicated intrusion prevention appliance. The standalone IPS appliance line has been retired by Cisco; IPS functionality is now integrated into Cisco Secure Firewall (Firepower).",
-      "display_name": "Cisco Secure Intrusion Prevention System (Cisco Secure IPS)",
+      "display_name": "Cisco Secure IPS",
       "id": "cisco_secure_ips",
       "install_apps": [],
       "keywords": [
@@ -5625,8 +6363,6 @@
       "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
       "normalized_search_terms": [
         "cisco secure ips",
-        "cisco secure intrusion prevention system cisco secure ips",
-        "cisco secure intrusion prevention system",
         "cisco intrusion prevention system",
         "secure ips",
         "intrusion prevention system",
@@ -5647,8 +6383,6 @@
       "search_terms": [
         "cisco_secure_ips",
         "cisco secure ips",
-        "Cisco Secure Intrusion Prevention System (Cisco Secure IPS)",
-        "Cisco Secure Intrusion Prevention System",
         "Cisco Secure IPS",
         "Cisco Intrusion Prevention System",
         "secure ips",
@@ -5711,7 +6445,7 @@
         "behavioral analysis",
         "sample submission"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/threat-grid/index.html",
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/security/threat-grid/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco secure malware analytics",
@@ -5827,7 +6561,12 @@
         "ndr",
         "encrypted traffic analytics",
         "eta",
-        "netflow analytics"
+        "netflow analytics",
+        "cisco security cloud",
+        "network detection and response",
+        "flow analytics",
+        "flow collector",
+        "anomaly detection"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/security-analytics/secure-network-analytics/index.html",
       "manual_gap_reason": "",
@@ -5840,7 +6579,12 @@
         "ndr",
         "encrypted traffic analytics",
         "eta",
-        "netflow analytics"
+        "netflow analytics",
+        "cisco security cloud",
+        "network detection and response",
+        "flow analytics",
+        "flow collector",
+        "anomaly detection"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -5885,7 +6629,12 @@
         "ndr",
         "encrypted traffic analytics",
         "eta",
-        "netflow analytics"
+        "netflow analytics",
+        "cisco security cloud",
+        "network detection and response",
+        "flow analytics",
+        "flow collector",
+        "anomaly detection"
       ],
       "secret_keys": [
         "password"
@@ -5944,7 +6693,9 @@
         "tetration",
         "microsegmentation",
         "workload protection",
-        "zero trust segmentation"
+        "zero trust segmentation",
+        "ebpf",
+        "distributed firewall"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/secure-workload/index.html",
       "manual_gap_reason": "",
@@ -5957,7 +6708,9 @@
         "tetration",
         "microsegmentation",
         "workload protection",
-        "zero trust segmentation"
+        "zero trust segmentation",
+        "ebpf",
+        "distributed firewall"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -5994,7 +6747,9 @@
         "tetration",
         "microsegmentation",
         "workload protection",
-        "zero trust segmentation"
+        "zero trust segmentation",
+        "ebpf",
+        "distributed firewall"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -6102,7 +6857,8 @@
         "cdo",
         "defense orchestrator",
         "firewall policy",
-        "policy orchestration"
+        "policy orchestration",
+        "hybrid mesh firewall"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/security-cloud-control/index.html",
       "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
@@ -6113,7 +6869,8 @@
         "cdo",
         "defense orchestrator",
         "firewall policy",
-        "policy orchestration"
+        "policy orchestration",
+        "hybrid mesh firewall"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -6133,7 +6890,8 @@
         "cdo",
         "defense orchestrator",
         "firewall policy",
-        "policy orchestration"
+        "policy orchestration",
+        "hybrid mesh firewall"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -6142,6 +6900,93 @@
       "template_checks": {},
       "template_paths": [],
       "value_proposition": "A future Splunk integration could surface firewall policy-change audit trails, compliance drift events, and orchestration job outcomes \u2014 enabling SecOps teams to correlate policy changes with security incidents across the entire firewall estate."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_roadmap",
+      "category": "networking",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Cisco SONiC (Software for Open Networking in the Cloud) \u2014 open-source Network Operating System running on Cisco 8000 Series Silicon One routers \u2014 providing disaggregated, Linux-based networking with rsyslogd, SAI (Switch Abstraction Interface), BGP, LLDP, and container-based microservices (orchagent, syncd, teamd) for hyperscale data center and WAN fabrics. NOTE: SONiC is a distinct NOS from IOS XR \u2014 the same Cisco 8000 hardware can run either. SC4S currently supports Dell SONiC; Cisco SONiC uses a similar rsyslog format but needs its own sourcetype and CIM-mapped TA for field extractions.",
+      "display_name": "Cisco SONiC",
+      "id": "cisco_sonic",
+      "install_apps": [],
+      "keywords": [
+        "sonic",
+        "open nos",
+        "disaggregated",
+        "silicon one",
+        "8000 series",
+        "hyperscale",
+        "sai",
+        "switch abstraction interface",
+        "orchagent",
+        "syncd",
+        "rsyslog",
+        "bgp",
+        "lldp"
+      ],
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/sdwan-routers/8000-series/sonic/index.html",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco sonic",
+        "sonic",
+        "open nos",
+        "disaggregated",
+        "silicon one",
+        "8000 series",
+        "hyperscale",
+        "sai",
+        "switch abstraction interface",
+        "orchagent",
+        "syncd",
+        "rsyslog",
+        "bgp",
+        "lldp"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_sonic",
+        "cisco sonic",
+        "Cisco SONiC",
+        "sonic",
+        "open nos",
+        "disaggregated",
+        "silicon one",
+        "8000 series",
+        "hyperscale",
+        "sai",
+        "switch abstraction interface",
+        "orchagent",
+        "syncd",
+        "rsyslog",
+        "bgp",
+        "lldp"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "data_center_net",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "A dedicated Splunk TA for Cisco SONiC could ingest rsyslog events from orchagent, syncd, teamd, and BGP subsystems \u2014 mapping them to CIM (Network Traffic, Authentication, Change) and giving hyperscale and SP NOCs the same operational visibility they have for IOS XR platforms, but for open NOS deployments."
     },
     {
       "accepted_non_secret_keys": [
@@ -6164,7 +7009,7 @@
       "companion_skills": [],
       "conditional_required_secret_rules": [],
       "dashboards": [],
-      "description": "Cloud-based location services and IoT platform (successor to Cisco CMX/DNA Spaces) providing indoor positioning, asset tracking, environmental monitoring, and occupancy analytics for smart buildings and campus environments using Catalyst and Meraki AP infrastructure.",
+      "description": "Cloud-based location services and IoT platform (successor to Cisco CMX/DNA Spaces) providing indoor positioning, asset tracking, environmental monitoring, and occupancy analytics for smart buildings and campus environments using Catalyst and Meraki AP infrastructure. A third-party add-on by Tjene (Splunk Partner) exists on Splunkbase but lacks props.conf \u2014 data arrives un-normalised.",
       "display_name": "Cisco Spaces",
       "id": "cisco_spaces",
       "install_apps": [
@@ -6177,7 +7022,10 @@
         "indoor positioning",
         "asset tracking",
         "occupancy analytics",
-        "smart building"
+        "smart building",
+        "location analytics",
+        "cisco networking cloud",
+        "tjene"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/solutions/enterprise-networks/dna-spaces/index.html",
       "manual_gap_reason": "",
@@ -6188,7 +7036,10 @@
         "indoor positioning",
         "asset tracking",
         "occupancy analytics",
-        "smart building"
+        "smart building",
+        "location analytics",
+        "cisco networking cloud",
+        "tjene"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -6221,12 +7072,17 @@
         "indoor positioning",
         "asset tracking",
         "occupancy analytics",
-        "smart building"
+        "smart building",
+        "location analytics",
+        "cisco networking cloud",
+        "tjene"
       ],
       "secret_keys": [
         "activation_token"
       ],
-      "sourcetypes": [],
+      "sourcetypes": [
+        "cisco:spaces:firehose"
+      ],
       "status": "active",
       "subcategory": "campus_wireless",
       "template_checks": {
@@ -6249,7 +7105,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "automated",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -6257,9 +7113,11 @@
         "talos_logs"
       ],
       "description": "Threat intelligence \u2014 IP/domain/file reputation, vulnerability research, and incident response from Cisco's threat intelligence group.",
-      "display_name": "Cisco Talos (Talos)",
+      "display_name": "Cisco Talos",
       "id": "cisco_talos",
-      "install_apps": [],
+      "install_apps": [
+        "Splunk_TA_Talos_Intelligence"
+      ],
       "keywords": [
         "talos",
         "threat intelligence",
@@ -6270,10 +7128,9 @@
         "snort"
       ],
       "learn_more_url": "https://talosintelligence.com/",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon Splunk_TA_Talos_Intelligence.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco talos",
-        "cisco talos talos",
         "talos",
         "threat intelligence",
         "ioc",
@@ -6282,21 +7139,22 @@
         "file reputation",
         "snort"
       ],
-      "notes": "",
+      "notes": "Installs Cisco Talos Intelligence for Enterprise Security Cloud. This integration requires a supported Splunk Enterprise Security Cloud deployment; finish Talos setup in the ES/SOAR workflow.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-app-install",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "configuration": "manual",
+        "validation": "installed_apps"
+      },
+      "route_type": "app_install_only",
       "search_terms": [
         "cisco_talos",
         "cisco talos",
-        "Cisco Talos (Talos)",
         "Cisco Talos",
-        "Talos",
         "talos",
         "threat intelligence",
         "ioc",
@@ -6320,43 +7178,45 @@
       "addon": "",
       "addon_label": "",
       "addon_uid": "",
-      "aliases": [
-        "Cisco VCS"
-      ],
+      "aliases": [],
       "app_viz": "",
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "unsupported_legacy",
-      "category": "collaboration",
+      "automation_state": "unsupported_roadmap",
+      "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
       "dashboards": [],
-      "description": "Video conferencing session control and firewall traversal platform \u2014 enables rich video collaboration across and beyond enterprise networks for organizations using Cisco TelePresence conferencing applications.",
-      "display_name": "Cisco TelePresence Video Communication Server (TVCS)",
-      "id": "cisco_tvcs",
+      "description": "Network telemetry brokering platform that ingests, filters, transforms, and routes telemetry data (NetFlow v5/v9, IPFIX, VPC/NSG Flow Logs, syslog) from multiple sources to multiple consumers across hybrid cloud environments. Acts as a centralized telemetry fabric between network devices and analytics tools.",
+      "display_name": "Cisco Telemetry Broker (CTB)",
+      "id": "cisco_telemetry_broker",
       "install_apps": [],
       "keywords": [
-        "tvcs",
-        "vcs",
-        "telepresence",
-        "video communication server",
-        "expressway",
-        "firewall traversal"
+        "telemetry broker",
+        "ctb",
+        "telemetry brokering",
+        "netflow broker",
+        "ipfix broker",
+        "flow logs",
+        "telemetry routing",
+        "telemetry pipeline",
+        "data broker"
       ],
-      "learn_more_url": "https://www.cisco.com/c/en/us/products/collateral/unified-communications/telepresence-video-communication-server-vcs/eos-eol-notice-c51-743969.html",
-      "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/security-analytics/telemetry-broker/index.html",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
       "normalized_search_terms": [
-        "cisco tvcs",
-        "cisco telepresence video communication server tvcs",
-        "cisco telepresence video communication server",
-        "tvcs",
-        "cisco vcs",
-        "vcs",
-        "telepresence",
-        "video communication server",
-        "expressway",
-        "firewall traversal"
+        "cisco telemetry broker",
+        "cisco telemetry broker ctb",
+        "ctb",
+        "telemetry broker",
+        "telemetry brokering",
+        "netflow broker",
+        "ipfix broker",
+        "flow logs",
+        "telemetry routing",
+        "telemetry pipeline",
+        "data broker"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -6368,28 +7228,28 @@
       "route": {},
       "route_type": "",
       "search_terms": [
-        "cisco_tvcs",
-        "cisco tvcs",
-        "Cisco TelePresence Video Communication Server (TVCS)",
-        "Cisco TelePresence Video Communication Server",
-        "TVCS",
-        "Cisco VCS",
-        "tvcs",
-        "vcs",
-        "telepresence",
-        "video communication server",
-        "expressway",
-        "firewall traversal"
+        "cisco_telemetry_broker",
+        "cisco telemetry broker",
+        "Cisco Telemetry Broker (CTB)",
+        "Cisco Telemetry Broker",
+        "CTB",
+        "telemetry broker",
+        "ctb",
+        "telemetry brokering",
+        "netflow broker",
+        "ipfix broker",
+        "flow logs",
+        "telemetry routing",
+        "telemetry pipeline",
+        "data broker"
       ],
       "secret_keys": [],
-      "sourcetypes": [
-        "cisco:tvcs"
-      ],
-      "status": "retired",
-      "subcategory": "voice_telephony",
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "network_security",
       "template_checks": {},
       "template_paths": [],
-      "value_proposition": "Ingest TVCS syslog and CDR events into Splunk for video infrastructure monitoring, call quality analytics, and firewall traversal troubleshooting."
+      "value_proposition": "Ingest Cisco Telemetry Broker operational health, pipeline metrics, and data routing events into Splunk for monitoring CTB performance and ensuring telemetry delivery integrity across the analytics pipeline."
     },
     {
       "accepted_non_secret_keys": [
@@ -6410,10 +7270,10 @@
       "aliases": [
         "ThousandEyes"
       ],
-      "app_viz": "",
+      "app_viz": "cisco-catalyst-app",
       "app_viz_2": "",
-      "app_viz_label": "",
-      "app_viz_uid": "",
+      "app_viz_label": "Cisco Enterprise Networking for Splunk Platform",
+      "app_viz_uid": "7539",
       "automation_state": "automated",
       "category": "observability",
       "companion_skills": [],
@@ -6434,7 +7294,14 @@
         "dem",
         "internet visibility",
         "path visualization",
-        "synthetic monitoring"
+        "synthetic monitoring",
+        "internet insights",
+        "full stack observability",
+        "fso",
+        "cloud agent",
+        "enterprise agent",
+        "network path",
+        "outage detection"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/software/internet-cloud-intelligence/index.html",
       "manual_gap_reason": "",
@@ -6447,7 +7314,14 @@
         "dem",
         "internet visibility",
         "path visualization",
-        "synthetic monitoring"
+        "synthetic monitoring",
+        "internet insights",
+        "full stack observability",
+        "fso",
+        "cloud agent",
+        "enterprise agent",
+        "network path",
+        "outage detection"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -6486,7 +7360,14 @@
         "dem",
         "internet visibility",
         "path visualization",
-        "synthetic monitoring"
+        "synthetic monitoring",
+        "internet insights",
+        "full stack observability",
+        "fso",
+        "cloud agent",
+        "enterprise agent",
+        "network path",
+        "outage detection"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -6495,6 +7376,7 @@
         "cisco:thousandeyes:event",
         "cisco:thousandeyes:metric",
         "cisco:thousandeyes:path-vis",
+        "cisco:thousandeyes:refresh-tokens",
         "cisco:thousandeyes:trace"
       ],
       "status": "active",
@@ -6508,6 +7390,75 @@
         "skills/cisco-thousandeyes-setup/template.example"
       ],
       "value_proposition": "End-to-end path visibility from user to application across every network hop."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [
+        "Cisco VCS"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_legacy",
+      "category": "collaboration",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Cisco TelePresence Video Communication Server (TVCS) \u2014 video conferencing session control and firewall traversal platform that enables rich video collaboration across and beyond enterprise networks for organizations using Cisco TelePresence conferencing applications.",
+      "display_name": "Cisco TVCS",
+      "id": "cisco_tvcs",
+      "install_apps": [],
+      "keywords": [
+        "tvcs",
+        "vcs",
+        "telepresence",
+        "video communication server",
+        "firewall traversal"
+      ],
+      "learn_more_url": "https://www.cisco.com/c/en/us/products/collateral/unified-communications/telepresence-video-communication-server-vcs/eos-eol-notice-c51-743969.html",
+      "manual_gap_reason": "This product is retired or deprecated in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco tvcs",
+        "cisco vcs",
+        "tvcs",
+        "vcs",
+        "telepresence",
+        "video communication server",
+        "firewall traversal"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_tvcs",
+        "cisco tvcs",
+        "Cisco TVCS",
+        "Cisco VCS",
+        "tvcs",
+        "vcs",
+        "telepresence",
+        "video communication server",
+        "firewall traversal"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [
+        "cisco:tvcs"
+      ],
+      "status": "retired",
+      "subcategory": "voice_telephony",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest TVCS syslog and CDR events into Splunk for video infrastructure monitoring, call quality analytics, and firewall traversal troubleshooting."
     },
     {
       "accepted_non_secret_keys": [
@@ -6548,6 +7499,7 @@
       "display_name": "Cisco Umbrella",
       "id": "cisco_umbrella",
       "install_apps": [
+        "TA-cisco-cloud-security-addon",
         "cisco-cloud-security"
       ],
       "keywords": [
@@ -6557,7 +7509,12 @@
         "dns layer",
         "web filtering",
         "sig",
-        "secure internet gateway"
+        "secure internet gateway",
+        "cisco security cloud",
+        "user protection suite",
+        "investigate",
+        "roaming security",
+        "roaming client"
       ],
       "learn_more_url": "https://umbrella.cisco.com/",
       "manual_gap_reason": "",
@@ -6569,7 +7526,12 @@
         "dns layer",
         "web filtering",
         "sig",
-        "secure internet gateway"
+        "secure internet gateway",
+        "cisco security cloud",
+        "user protection suite",
+        "investigate",
+        "roaming security",
+        "roaming client"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -6612,7 +7574,12 @@
         "dns layer",
         "web filtering",
         "sig",
-        "secure internet gateway"
+        "secure internet gateway",
+        "cisco security cloud",
+        "user protection suite",
+        "investigate",
+        "roaming security",
+        "roaming client"
       ],
       "secret_keys": [
         "api_key",
@@ -6621,8 +7588,11 @@
       "sourcetypes": [
         "cisco:cloud_security:appdiscovery",
         "cisco:cloud_security:audit",
+        "cisco:cloud_security:dlp",
         "cisco:cloud_security:dns",
-        "cisco:cloud_security:ip"
+        "cisco:cloud_security:firewall",
+        "cisco:cloud_security:ip",
+        "cisco:cloud_security:proxy"
       ],
       "status": "active",
       "subcategory": "cloud_security",
@@ -6686,6 +7656,7 @@
       "display_name": "Cisco Umbrella Investigate",
       "id": "cisco_umbrella_investigate",
       "install_apps": [
+        "TA-cisco-cloud-security-addon",
         "cisco-cloud-security"
       ],
       "keywords": [
@@ -6782,16 +7753,16 @@
     },
     {
       "accepted_non_secret_keys": [],
-      "addon": "TA_cisco_cdr",
-      "addon_label": "TA for Cisco CDR Reporting and Analytics",
-      "addon_uid": "4434",
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
       "aliases": [
         "Cisco CallManager"
       ],
-      "app_viz": "cisco_cdr",
+      "app_viz": "",
       "app_viz_2": "",
-      "app_viz_label": "Cisco CDR Reporting and Analytics",
-      "app_viz_uid": "669",
+      "app_viz_label": "",
+      "app_viz_uid": "",
       "automation_state": "manual_gap",
       "category": "collaboration",
       "companion_skills": [],
@@ -6809,10 +7780,16 @@
         "voip",
         "jabber",
         "cdr",
-        "cmr"
+        "cmr",
+        "sip",
+        "h323",
+        "cti",
+        "jtapi",
+        "presence",
+        "cisco phone"
       ],
-      "learn_more_url": "https://www.webex.com/us/en/products/suite/enterprise-cloud-calling/CUCM.html",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon TA_cisco_cdr and viz app cisco_cdr.",
+      "learn_more_url": "https://www.webex.com/cloud-calling.html",
+      "manual_gap_reason": "No local setup route is defined for this product yet.",
       "normalized_search_terms": [
         "cisco cucm",
         "cisco unified communications manager cucm",
@@ -6825,7 +7802,13 @@
         "voip",
         "jabber",
         "cdr",
-        "cmr"
+        "cmr",
+        "sip",
+        "h323",
+        "cti",
+        "jtapi",
+        "presence",
+        "cisco phone"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -6850,16 +7833,17 @@
         "voip",
         "jabber",
         "cdr",
-        "cmr"
+        "cmr",
+        "sip",
+        "h323",
+        "cti",
+        "jtapi",
+        "presence",
+        "cisco phone"
       ],
       "secret_keys": [],
       "sourcetypes": [
-        "cube_cdr",
-        "cube_cdr_compact",
-        "cube_syslog",
-        "cucm_audit",
-        "cucm_cdr",
-        "cucm_cmr"
+        "cisco:ucm"
       ],
       "status": "active",
       "subcategory": "voice_telephony",
@@ -6877,7 +7861,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "automated",
       "category": "networking",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -6887,7 +7871,9 @@
       "description": "Unified computing \u2014 server, networking, and storage access in a single integrated architecture for data center and cloud.",
       "display_name": "Cisco Unified Computing System (UCS)",
       "id": "cisco_ucs",
-      "install_apps": [],
+      "install_apps": [
+        "Splunk_TA_cisco-ucs"
+      ],
       "keywords": [
         "ucs",
         "unified computing system",
@@ -6896,10 +7882,14 @@
         "cimc",
         "ucsm",
         "c-series",
-        "b-series"
+        "b-series",
+        "x-series",
+        "x-fabric",
+        "hyperflex",
+        "intersight managed"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/servers-unified-computing/index.html",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon Splunk_TA_cisco-ucs.",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/computing/servers-unified-computing-systems/index.html",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco ucs",
         "cisco unified computing system ucs",
@@ -6911,17 +7901,24 @@
         "cimc",
         "ucsm",
         "c series",
-        "b series"
+        "b series",
+        "x series",
+        "x fabric",
+        "hyperflex",
+        "intersight managed"
       ],
-      "notes": "",
+      "notes": "Installs the Splunk-supported Cisco UCS add-on. Configure UCS Manager inputs in the add-on UI or supported Splunk docs.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-app-install",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "configuration": "manual",
+        "validation": "installed_apps"
+      },
+      "route_type": "app_install_only",
       "search_terms": [
         "cisco_ucs",
         "cisco ucs",
@@ -6935,7 +7932,11 @@
         "cimc",
         "ucsm",
         "c-series",
-        "b-series"
+        "b-series",
+        "x-series",
+        "x-fabric",
+        "hyperflex",
+        "intersight managed"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -7065,27 +8066,31 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "automated",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
       "dashboards": [
-        "cisco_wsa_dashboard"
+        "application"
       ],
       "description": "Secure web gateway \u2014 URL filtering, malware scanning, application visibility, and data loss prevention for web traffic.",
       "display_name": "Cisco Web Security Appliance (WSA)",
       "id": "cisco_wsa",
-      "install_apps": [],
+      "install_apps": [
+        "Splunk_TA_cisco-wsa"
+      ],
       "keywords": [
         "wsa",
         "secure web appliance",
         "web proxy",
         "url filtering",
         "content filtering",
-        "ironport web"
+        "ironport web",
+        "cisco security cloud",
+        "secure web gateway"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/web-security-appliance/index.html",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon Splunk_TA_cisco-wsa.",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/security/secure-web-appliance/index.html",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco wsa",
         "cisco web security appliance wsa",
@@ -7096,17 +8101,22 @@
         "web proxy",
         "url filtering",
         "content filtering",
-        "ironport web"
+        "ironport web",
+        "cisco security cloud",
+        "secure web gateway"
       ],
-      "notes": "",
+      "notes": "Installs the Splunk-supported Cisco WSA add-on. Configure WSA log forwarding or SC4S collection outside this product router, then validate the app and sourcetypes.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-app-install",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "configuration": "manual",
+        "validation": "installed_apps"
+      },
+      "route_type": "app_install_only",
       "search_terms": [
         "cisco_wsa",
         "cisco wsa",
@@ -7119,12 +8129,15 @@
         "web proxy",
         "url filtering",
         "content filtering",
-        "ironport web"
+        "ironport web",
+        "cisco security cloud",
+        "secure web gateway"
       ],
       "secret_keys": [],
       "sourcetypes": [
         "cisco:wsa:l4tm",
         "cisco:wsa:squid",
+        "cisco:wsa:squid:new",
         "cisco:wsa:syslog",
         "cisco:wsa:w3c",
         "cisco:wsa:w3c:recommended"
@@ -7137,68 +8150,82 @@
     },
     {
       "accepted_non_secret_keys": [],
-      "addon": "TA_cisco_cdr",
-      "addon_label": "TA for Cisco CDR Reporting and Analytics",
-      "addon_uid": "4434",
+      "addon": "ta_cisco_webex_add_on_for_splunk",
+      "addon_label": "Webex Add-on for Splunk",
+      "addon_uid": "8365",
       "aliases": [
         "WebEx Communications"
       ],
-      "app_viz": "cisco_cdr",
-      "app_viz_2": "ta_cisco_webex_add_on_for_splunk",
-      "app_viz_label": "Cisco CDR Reporting and Analytics",
-      "app_viz_uid": "669",
-      "automation_state": "manual_gap",
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "automated",
       "category": "collaboration",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
       "dashboards": [],
       "description": "All-in-one collaboration - meetings, messaging, calling, and whiteboarding in a unified cloud platform.",
-      "display_name": "Cisco Webex (Webex)",
+      "display_name": "Cisco Webex",
       "id": "cisco_webex",
-      "install_apps": [],
+      "install_apps": [
+        "ta_cisco_webex_add_on_for_splunk"
+      ],
       "keywords": [
         "webex",
         "webex meetings",
         "webex calling",
         "webex teams",
         "webex events",
-        "video conferencing"
+        "video conferencing",
+        "webex connect",
+        "messaging",
+        "webex devices",
+        "collaboration"
       ],
       "learn_more_url": "https://www.webex.com/",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon TA_cisco_cdr and viz app cisco_cdr.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco webex",
-        "cisco webex webex",
-        "webex",
         "webex communications",
+        "webex",
         "webex meetings",
         "webex calling",
         "webex teams",
         "webex events",
-        "video conferencing"
+        "video conferencing",
+        "webex connect",
+        "messaging",
+        "webex devices",
+        "collaboration"
       ],
-      "notes": "",
+      "notes": "Installs the Webex Add-on for Splunk. Configure Webex REST API inputs in the add-on UI or vendor documentation.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-app-install",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "configuration": "manual",
+        "validation": "installed_apps"
+      },
+      "route_type": "app_install_only",
       "search_terms": [
         "cisco_webex",
         "cisco webex",
-        "Cisco Webex (Webex)",
         "Cisco Webex",
-        "Webex",
         "WebEx Communications",
         "webex",
         "webex meetings",
         "webex calling",
         "webex teams",
         "webex events",
-        "video conferencing"
+        "video conferencing",
+        "webex connect",
+        "messaging",
+        "webex devices",
+        "collaboration"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -7217,6 +8244,186 @@
       "value_proposition": "Stream Webex meeting telemetry, call detail records, and admin audit events into Splunk for collaboration analytics."
     },
     {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [
+        "Cisco Webex Contact Center",
+        "WxCC"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_roadmap",
+      "category": "collaboration",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Cisco's next-generation contact center platform providing omnichannel customer engagement (voice, chat, email, social), AI-powered agent assistance, workforce optimization, interaction analytics, and real-time supervisor dashboards. Available as both a cloud-native SaaS (CCaaS) offering and an on-premises deployment for organizations that cannot send data to the cloud. WxCC is the strategic successor to Cisco UCCE/UCCX.",
+      "display_name": "Cisco Webex Contact Center (WxCC)",
+      "id": "cisco_webex_contact_center",
+      "install_apps": [],
+      "keywords": [
+        "webex contact center",
+        "wxcc",
+        "ccaas",
+        "cloud contact center",
+        "omnichannel",
+        "customer experience",
+        "cx",
+        "agent desktop",
+        "ivr",
+        "interactive voice response",
+        "workforce optimization",
+        "wfo",
+        "supervisor",
+        "quality management",
+        "recording"
+      ],
+      "learn_more_url": "https://www.webex.com/contact-center.html",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco webex contact center",
+        "cisco webex contact center wxcc",
+        "wxcc",
+        "webex contact center",
+        "ccaas",
+        "cloud contact center",
+        "omnichannel",
+        "customer experience",
+        "cx",
+        "agent desktop",
+        "ivr",
+        "interactive voice response",
+        "workforce optimization",
+        "wfo",
+        "supervisor",
+        "quality management",
+        "recording"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_webex_contact_center",
+        "cisco webex contact center",
+        "Cisco Webex Contact Center (WxCC)",
+        "Cisco Webex Contact Center",
+        "WxCC",
+        "webex contact center",
+        "wxcc",
+        "ccaas",
+        "cloud contact center",
+        "omnichannel",
+        "customer experience",
+        "cx",
+        "agent desktop",
+        "ivr",
+        "interactive voice response",
+        "workforce optimization",
+        "wfo",
+        "supervisor",
+        "quality management",
+        "recording"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "contact_center",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest Webex Contact Center CDRs, agent performance metrics, queue analytics, and interaction events into Splunk for contact center operations intelligence, SLA monitoring, and workforce planning."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [
+        "Control Hub"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "unsupported_roadmap",
+      "category": "collaboration",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Centralized cloud management portal for all Webex services \u2014 users, devices, calling, meetings, messaging, and contact center. Provides analytics dashboards, troubleshooting tools, security/compliance settings, and audit logging across the Webex platform.",
+      "display_name": "Cisco Webex Control Hub",
+      "id": "cisco_webex_control_hub",
+      "install_apps": [],
+      "keywords": [
+        "control hub",
+        "webex admin",
+        "webex management",
+        "admin portal",
+        "device management",
+        "webex analytics",
+        "webex troubleshooting",
+        "compliance",
+        "audit",
+        "webex provisioning"
+      ],
+      "learn_more_url": "https://admin.webex.com",
+      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "normalized_search_terms": [
+        "cisco webex control hub",
+        "control hub",
+        "webex admin",
+        "webex management",
+        "admin portal",
+        "device management",
+        "webex analytics",
+        "webex troubleshooting",
+        "compliance",
+        "audit",
+        "webex provisioning"
+      ],
+      "notes": "",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {},
+      "route_type": "",
+      "search_terms": [
+        "cisco_webex_control_hub",
+        "cisco webex control hub",
+        "Cisco Webex Control Hub",
+        "Control Hub",
+        "control hub",
+        "webex admin",
+        "webex management",
+        "admin portal",
+        "device management",
+        "webex analytics",
+        "webex troubleshooting",
+        "compliance",
+        "audit",
+        "webex provisioning"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [],
+      "status": "roadmap",
+      "subcategory": "meetings_calling",
+      "template_checks": {},
+      "template_paths": [],
+      "value_proposition": "Ingest Control Hub audit logs, device telemetry, and admin events into Splunk for unified Webex governance, compliance monitoring, and operational analytics."
+    },
+    {
       "accepted_non_secret_keys": [
         "host",
         "name",
@@ -7229,7 +8436,7 @@
       "addon_uid": "7538",
       "aliases": [],
       "app_viz": "cisco-catalyst-app",
-      "app_viz_2": "",
+      "app_viz_2": "cisco_ios",
       "app_viz_label": "Cisco Enterprise Networking for Splunk Platform",
       "app_viz_uid": "7539",
       "automation_state": "automated",
@@ -7255,9 +8462,11 @@
         "ap management",
         "rogue ap detection",
         "flexconnect",
-        "aireos"
+        "aireos",
+        "cisco wireless",
+        "campus network"
       ],
-      "learn_more_url": "https://www.cisco.com/site/us/en/products/wireless/wireless-lan-controller/index.html",
+      "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/wireless/wireless-lan-controllers/index.html",
       "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco wlc",
@@ -7269,7 +8478,9 @@
         "ap management",
         "rogue ap detection",
         "flexconnect",
-        "aireos"
+        "aireos",
+        "cisco wireless",
+        "campus network"
       ],
       "notes": "WLC dashboards depend on Catalyst Center telemetry rather than a standalone WLC collector.",
       "optional_non_secret_keys": [
@@ -7304,7 +8515,9 @@
         "ap management",
         "rogue ap detection",
         "flexconnect",
-        "aireos"
+        "aireos",
+        "cisco wireless",
+        "campus network"
       ],
       "secret_keys": [
         "password"
@@ -7327,5 +8540,5 @@
       "value_proposition": "Stream WLC trap, syslog, and client-session data into Splunk for wireless fleet health and rogue-AP detection."
     }
   ],
-  "scan_package": "splunk-cisco-app-navigator-1.0.12.tar.gz"
+  "scan_package": "splunk-cisco-app-navigator-scan_1025.tar.gz"
 }

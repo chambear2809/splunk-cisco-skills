@@ -279,6 +279,10 @@ class CiscoTARegressionTests(ShellScriptRegressionBase):
 
             install_lines = install_log.read_text(encoding="utf-8").splitlines()
             self.assertTrue(
+                any("--app-id 7569" in line for line in install_lines),
+                msg="Cisco Secure Access add-on install was not invoked through the shared installer",
+            )
+            self.assertTrue(
                 any("--app-id 5558" in line for line in install_lines),
                 msg="Cisco Secure Access install was not invoked through the shared installer",
             )

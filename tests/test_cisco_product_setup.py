@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import shlex
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -88,6 +90,14 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertEqual(payload["status"], "resolved")
         self.assertEqual(payload["matches"][0]["id"], "cisco_duo")
 
+    def test_resolve_ai_defense_prefers_active_product_over_legacy_keyword(self) -> None:
+        for query in ("Cisco AI Defense", "cisco_ai_defense"):
+            with self.subTest(query=query):
+                result, payload = self.run_resolver_json(query)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertEqual(payload["status"], "resolved")
+                self.assertEqual(payload["matches"][0]["id"], "cisco_ai_defense")
+
     def test_resolve_cisco_is_ambiguous(self) -> None:
         result = self.run_command(
             "bash",
@@ -107,6 +117,35 @@ class CiscoProductSetupTests(unittest.TestCase):
         ]
         ordered = sorted(paths, key=self.module.scan_package_sort_key)
         self.assertEqual(ordered[-1].name, "splunk-cisco-app-navigator-1.0.20.tar.gz")
+
+    def test_scan_package_sort_key_uses_embedded_app_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            old_package = Path(tmpdir) / "splunk-cisco-app-navigator-1.0.12.tar.gz"
+            latest_package = Path(tmpdir) / "splunk-cisco-app-navigator-scan_1025.tar.gz"
+            self.write_scan_package(old_package, "1.0.12")
+            self.write_scan_package(latest_package, "1.0.25")
+
+            ordered = sorted(
+                [latest_package, old_package],
+                key=self.module.scan_package_sort_key,
+            )
+
+        self.assertEqual(ordered[-1].name, latest_package.name)
+
+    @staticmethod
+    def write_scan_package(path: Path, version: str) -> None:
+        payload = f"""
+[id]
+name = splunk-cisco-app-navigator
+version = {version}
+
+[launcher]
+version = {version}
+""".lstrip().encode("utf-8")
+        info = tarfile.TarInfo("splunk-cisco-app-navigator/default/app.conf")
+        info.size = len(payload)
+        with tarfile.open(path, "w:gz") as archive:
+            archive.addfile(info, io.BytesIO(payload))
 
     def test_dry_run_aci_surfaces_route_template_and_dashboards(self) -> None:
         result = self.run_command(
@@ -140,6 +179,88 @@ class CiscoProductSetupTests(unittest.TestCase):
         self.assertIn(ta_line, result.stdout)
         self.assertIn(app_line, result.stdout)
         self.assertLess(result.stdout.index(ta_line), result.stdout.index(app_line))
+
+    def test_dry_run_secure_access_installs_required_addon_before_app(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "Cisco Secure Access",
+            "--dry-run",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        addon_line = "  - TA-cisco-cloud-security-addon [7569] Cisco Secure Access Add-on for Splunk"
+        app_line = "  - cisco-cloud-security [5558] Cisco Secure Access App for Splunk"
+        self.assertIn(addon_line, result.stdout)
+        self.assertIn(app_line, result.stdout)
+        self.assertLess(result.stdout.index(addon_line), result.stdout.index(app_line))
+
+    def test_dry_run_evm_routes_to_security_cloud_install_only(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_evm",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["route"]["type"], "app_install_only")
+        self.assertEqual(payload["resolved_product"]["primary_skill"], "splunk-app-install")
+        self.assertEqual(payload["install_apps"][0]["app_name"], "CiscoSecurityCloud")
+        self.assertEqual(payload["missing_values_for_configure"], [])
+        self.assertIn("upstream EVM pipeline", payload["resolved_product"]["notes"])
+
+    def test_dry_run_webex_routes_to_public_addon_install_only(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_webex",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["route"]["type"], "app_install_only")
+        self.assertEqual(payload["resolved_product"]["primary_skill"], "splunk-app-install")
+        self.assertEqual(payload["install_apps"][0]["app_name"], "ta_cisco_webex_add_on_for_splunk")
+        self.assertEqual(payload["install_apps"][0]["splunkbase_id"], "8365")
+        self.assertIn("Splunk REST app status validation", payload["workflow_scripts"])
+
+    def test_public_cisco_addons_route_to_install_only_handoffs(self) -> None:
+        expected = {
+            "cisco_esa": ("Splunk_TA_cisco-esa", "1761"),
+            "cisco_talos": ("Splunk_TA_Talos_Intelligence", "7557"),
+            "cisco_ucs": ("Splunk_TA_cisco-ucs", "2731"),
+            "cisco_wsa": ("Splunk_TA_cisco-wsa", "1747"),
+        }
+
+        for product_id, (app_name, app_id) in expected.items():
+            with self.subTest(product_id=product_id):
+                result = self.run_command(
+                    "bash",
+                    str(SETUP_SCRIPT),
+                    "--catalog",
+                    str(self.catalog_path),
+                    "--product",
+                    product_id,
+                    "--dry-run",
+                    "--json",
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["route"]["type"], "app_install_only")
+                self.assertEqual(payload["resolved_product"]["primary_skill"], "splunk-app-install")
+                self.assertEqual(payload["install_apps"][0]["app_name"], app_name)
+                self.assertEqual(payload["install_apps"][0]["splunkbase_id"], app_id)
 
     def test_dry_run_secure_firewall_requires_variant(self) -> None:
         result = self.run_command(

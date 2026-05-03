@@ -51,6 +51,8 @@ allowed_keys = [
     "SPLUNK_CLOUD_STACK",
     "SPLUNK_CLOUD_SEARCH_HEAD",
     "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS",
+    "SPLUNK_O11Y_REALM",
+    "SPLUNK_O11Y_TOKEN_FILE",
     "ACS_SERVER",
     "STACK_USERNAME",
     "STACK_PASSWORD",
@@ -182,7 +184,8 @@ flat_target_keys = {
     "SPLUNK_USER", "SPLUNK_PASS",
     "SPLUNK_CA_CERT",
     "SPLUNK_CLOUD_STACK", "SPLUNK_CLOUD_SEARCH_HEAD",
-    "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS", "ACS_SERVER",
+    "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS", "SPLUNK_O11Y_REALM",
+    "SPLUNK_O11Y_TOKEN_FILE", "ACS_SERVER",
     "STACK_USERNAME", "STACK_PASSWORD", "STACK_TOKEN", "STACK_TOKEN_USER",
     "SPLUNK_USERNAME", "SPLUNK_PASSWORD", "SB_USER", "SB_PASS",
     "SPLUNK_VERIFY_SSL", "SPLUNKBASE_VERIFY_SSL", "SPLUNKBASE_CA_CERT",
@@ -346,6 +349,10 @@ resolve_cluster_manager_credential_profile() {
     if [[ -n "${SPLUNK_CLUSTER_MANAGER_PROFILE:-}" ]]; then
         printf '%s' "${SPLUNK_CLUSTER_MANAGER_PROFILE}"
     fi
+}
+
+load_observability_cloud_settings() {
+    _load_credential_values_from_file "${_CRED_FILE}"
 }
 
 _search_profile_overrides_key() {

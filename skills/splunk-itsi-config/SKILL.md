@@ -142,7 +142,7 @@ an ITSI YAML spec or in chat.
   - `install_all: true`
   - `backfill: false`
   - `prefix: ""`
-- Post-install module flows are explicit workflow state. The skill automates install/validation and reports remaining module tasks as machine-readable `follow_up_steps`; pack-specific service imports, sandbox publish, entity discovery, saved-search enablement, macro tuning, and navigation adjustments can be automated through `configured_outcome`, native sections, or topology sections when a safe declarative payload is available. Unsupported `configured_outcome` task types, such as lookup updates, data model acceleration, KPI backfill, service discovery/import, alert integration, dashboard tuning, and navigation updates, are reported as warning steps instead of being silently ignored.
+- Post-install module flows are explicit workflow state. The skill automates install/validation and reports remaining module tasks as machine-readable `follow_up_steps`; guarded service imports backed by `itsiimportobjects`, entity discovery, saved-search enablement, macro tuning, props/transforms or other app-local conf stanza tuning, Enterprise staged lookup-file create/replace, lookup refresh searches, KPI backfill dispatches, data model acceleration, dashboard XML, and navigation XML can be automated through `configured_outcome`, native sections, or topology sections when a safe declarative payload is available. Unsupported `configured_outcome` task types, such as module-driven service discovery, alert integration wizards, and sandbox publish, are reported as warning steps instead of being silently ignored.
 
 ## Topology Workflow Rules
 

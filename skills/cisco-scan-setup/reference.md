@@ -9,9 +9,9 @@ operational notes.
 | Item | Value |
 |---|---|
 | App name | `splunk-cisco-app-navigator` |
-| Splunkbase listing | Not available — install from local package |
-| Install source | `splunk-ta/splunk-cisco-app-navigator-scan_*.tar.gz` |
-| Cloud install | ACS private app upload |
+| Splunkbase listing | `https://splunkbase.splunk.com/app/8566` |
+| Install source | Splunkbase app ID `8566`; local cache in `splunk-ta/splunk-cisco-app-navigator-*.tar.gz` |
+| Cloud install | ACS Splunkbase install; private app upload for vetted local packages |
 | Catalog size | 93+ Cisco product entries |
 | Saved searches | 42+ catalog analysis and gap detection searches |
 
@@ -67,7 +67,7 @@ API dispatch endpoint.
 
 ### Automated Sync
 
-SCAN includes a scheduled search (`scan_catalog_sync`) that runs daily. Manual
+SCAN includes a scheduled search (`SCAN - Splunkbase Catalog Sync`) that runs daily. Manual
 sync is only needed for immediate freshness.
 
 ## Saved Searches (42+)
@@ -114,11 +114,11 @@ replication because the file is large. Each SHC member should run
 
 | Platform | Install Method | Post-Install |
 |---|---|---|
-| Splunk Enterprise | `install_app.sh --source local` | Run `setup.sh`, optionally `--sync` |
-| Splunk Cloud | ACS private app upload | Run `setup.sh` for post-install verification |
+| Splunk Enterprise | `install_app.sh --source splunkbase --app-id 8566`, or local cache fallback | Run `setup.sh`, optionally `--sync` |
+| Splunk Cloud | ACS Splunkbase app install, or private app upload for vetted local packages | Run `setup.sh` for post-install verification |
 
 SCAN does not create indexes, configure data inputs, or require ACS index
-management. The ACS step for Cloud is only the app upload.
+management. The ACS step for Cloud is only the app install or update.
 
 ## REST API Endpoints Used
 

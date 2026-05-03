@@ -1,0 +1,79 @@
+# Splunk Observability dashboard builder example.
+# Copy this to a working YAML file and replace metric names after discovery.
+api_version: splunk-observability-dashboard-builder/v1
+mode: classic-api
+realm: us0
+dashboard_group:
+  name: Checkout Service Operations
+  description: Custom dashboards for checkout service reliability.
+dashboard:
+  name: Checkout Service Golden Signals
+  description: Latency, traffic, errors, and saturation for checkout.
+  chart_density: DEFAULT
+  filters:
+    variables:
+      - property: deployment.environment
+        alias: Environment
+        value:
+          - prod
+        required: true
+        restricted: false
+      - property: service.name
+        alias: Service
+        value:
+          - checkout
+        required: true
+        restricted: false
+charts:
+  - id: latency-p95
+    name: p95 latency
+    description: Checkout service p95 latency by environment.
+    type: TimeSeriesChart
+    plot_type: LineChart
+    row: 0
+    column: 0
+    width: 6
+    height: 1
+    y_axis_label: ms
+    unit: Millisecond
+    program_text: |
+      A = data('service.request.duration', filter=filter('service.name', 'checkout')).percentile(95, by=['deployment.environment']).publish(label='p95 latency')
+    publish_label_options:
+      - label: p95 latency
+        displayName: p95 latency
+        valueUnit: Millisecond
+        yAxis: 0
+  - id: error-rate
+    name: Error rate
+    description: Checkout error ratio.
+    type: TimeSeriesChart
+    plot_type: AreaChart
+    row: 0
+    column: 6
+    width: 6
+    height: 1
+    y_axis_label: percent
+    program_text: |
+      errors = data('service.errors', filter=filter('service.name', 'checkout')).sum(by=['deployment.environment'])
+      requests = data('service.requests', filter=filter('service.name', 'checkout')).sum(by=['deployment.environment'])
+      (errors / requests * 100).publish(label='error rate')
+  - id: request-rate
+    name: Request rate
+    type: SingleValue
+    row: 1
+    column: 0
+    width: 4
+    height: 1
+    program_text: |
+      data('service.requests', filter=filter('service.name', 'checkout')).sum().publish(label='requests')
+    value_suffix: req/s
+  - id: assumptions
+    name: Assumptions and follow-up
+    type: Text
+    row: 1
+    column: 4
+    width: 8
+    height: 1
+    markdown: |
+      Validate metric names with live metadata before applying this dashboard.
+      Modern service maps and logs charts are UI/advisory features unless a public API is verified.

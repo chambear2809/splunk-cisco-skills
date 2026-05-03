@@ -1,0 +1,4 @@
+interface:
+  display_name: "Splunk Observability Dashboard Builder"
+  short_description: "Render safe Splunk Observability dashboard plans"
+  default_prompt: "Use $splunk-observability-dashboard-builder to turn a natural-language dashboard request into reviewed Splunk Observability Cloud dashboard specs and API payloads."

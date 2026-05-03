@@ -42,6 +42,10 @@ class FakeContentPackClient:
         previews: dict[tuple[str, str], object] | None = None,
         macros: dict[tuple[str, str], dict] | None = None,
         saved_searches: dict[tuple[str, str], dict] | None = None,
+        data_models: dict[tuple[str, str], dict] | None = None,
+        ui_views: dict[tuple[str, str], dict] | None = None,
+        ui_navs: dict[tuple[str, str], dict] | None = None,
+        lookups: dict[tuple[str, str], dict] | None = None,
         macro_lists: dict[str, list[dict]] | None = None,
         inputs: dict[str, list[dict]] | None = None,
         confs: dict[tuple[str, str, str], dict] | None = None,
@@ -58,6 +62,10 @@ class FakeContentPackClient:
         self.previews = dict(previews or {})
         self.macros = dict(macros or {})
         self.saved_searches = dict(saved_searches or {})
+        self.data_models = dict(data_models or {})
+        self.ui_views = dict(ui_views or {})
+        self.ui_navs = dict(ui_navs or {})
+        self.lookups = dict(lookups or {})
         self.macro_lists = dict(macro_lists or {})
         self.inputs = dict(inputs or {})
         self.confs = dict(confs or {})
@@ -71,6 +79,16 @@ class FakeContentPackClient:
         self.refresh_calls = 0
         self.macro_updates: list[tuple[str, str, dict]] = []
         self.saved_search_updates: list[tuple[str, str, dict]] = []
+        self.data_model_updates: list[tuple[str, str, dict]] = []
+        self.ui_view_updates: list[tuple[str, str, str, str | None]] = []
+        self.ui_view_creates: list[tuple[str, str, str, str | None]] = []
+        self.ui_nav_updates: list[tuple[str, str, str]] = []
+        self.search_dispatches: list[tuple[str, str, dict]] = []
+        self.saved_search_dispatches: list[tuple[str, str, dict]] = []
+        self.lookup_file_creates: list[tuple[str, str, str]] = []
+        self.lookup_file_updates: list[tuple[str, str, str]] = []
+        self.conf_stanza_creates: list[tuple[str, str, str, dict]] = []
+        self.conf_stanza_updates: list[tuple[str, str, str, dict]] = []
 
     def get_app(self, app_name: str):
         if app_name not in self.apps:
@@ -136,6 +154,58 @@ class FakeContentPackClient:
         self.saved_searches[(app_name, search_name)] = dict(payload)
         return dict(payload)
 
+    def dispatch_saved_search(self, app_name: str, search_name: str, payload: dict | None = None):
+        self.saved_search_dispatches.append((app_name, search_name, dict(payload or {})))
+        return {"sid": f"saved:{search_name}"}
+
+    def dispatch_search(self, search: str, payload: dict | None = None, app_name: str | None = None):
+        self.search_dispatches.append((app_name or "", search, dict(payload or {})))
+        return {"sid": "search:1"}
+
+    def get_data_model(self, app_name: str, model_name: str):
+        return self.data_models.get((app_name, model_name))
+
+    def update_data_model(self, app_name: str, model_name: str, payload: dict):
+        self.data_model_updates.append((app_name, model_name, dict(payload)))
+        current = dict(self.data_models.get((app_name, model_name), {}))
+        current.update(payload)
+        self.data_models[(app_name, model_name)] = current
+        return current
+
+    def get_ui_view(self, app_name: str, view_name: str):
+        return self.ui_views.get((app_name, view_name))
+
+    def create_ui_view(self, app_name: str, view_name: str, xml: str, changelog: str | None = None):
+        self.ui_view_creates.append((app_name, view_name, xml, changelog))
+        self.ui_views[(app_name, view_name)] = {"eai:data": xml}
+        return {"name": view_name, "eai:data": xml}
+
+    def update_ui_view(self, app_name: str, view_name: str, xml: str, changelog: str | None = None):
+        self.ui_view_updates.append((app_name, view_name, xml, changelog))
+        self.ui_views[(app_name, view_name)] = {"eai:data": xml}
+        return {"name": view_name, "eai:data": xml}
+
+    def get_ui_nav(self, app_name: str, nav_name: str = "default"):
+        return self.ui_navs.get((app_name, nav_name))
+
+    def update_ui_nav(self, app_name: str, xml: str, nav_name: str = "default"):
+        self.ui_nav_updates.append((app_name, nav_name, xml))
+        self.ui_navs[(app_name, nav_name)] = {"eai:data": xml}
+        return {"name": nav_name, "eai:data": xml}
+
+    def get_lookup_file(self, app_name: str, lookup_name: str):
+        return self.lookups.get((app_name, lookup_name))
+
+    def create_lookup_file(self, app_name: str, lookup_name: str, staged_path: str):
+        self.lookup_file_creates.append((app_name, lookup_name, staged_path))
+        self.lookups[(app_name, lookup_name)] = {"eai:data": f"/opt/splunk/etc/apps/{app_name}/lookups/{lookup_name}"}
+        return dict(self.lookups[(app_name, lookup_name)])
+
+    def update_lookup_file(self, app_name: str, lookup_name: str, staged_path: str):
+        self.lookup_file_updates.append((app_name, lookup_name, staged_path))
+        self.lookups[(app_name, lookup_name)] = {"eai:data": f"/opt/splunk/etc/apps/{app_name}/lookups/{lookup_name}"}
+        return dict(self.lookups[(app_name, lookup_name)])
+
     def list_macros(self, app_name: str):
         return list(self.macro_lists.get(app_name, []))
 
@@ -144,6 +214,18 @@ class FakeContentPackClient:
 
     def get_conf_stanza(self, app_name: str, conf_name: str, stanza_name: str):
         return self.confs.get((app_name, conf_name, stanza_name))
+
+    def create_conf_stanza(self, app_name: str, conf_name: str, stanza_name: str, payload: dict):
+        self.conf_stanza_creates.append((app_name, conf_name, stanza_name, dict(payload)))
+        self.confs[(app_name, conf_name, stanza_name)] = dict(payload)
+        return dict(payload)
+
+    def update_conf_stanza(self, app_name: str, conf_name: str, stanza_name: str, payload: dict):
+        self.conf_stanza_updates.append((app_name, conf_name, stanza_name, dict(payload)))
+        current = dict(self.confs.get((app_name, conf_name, stanza_name), {}))
+        current.update(payload)
+        self.confs[(app_name, conf_name, stanza_name)] = current
+        return current
 
     def list_endpoint_entries(self, app_name: str, endpoint_name: str):
         return list(self.endpoints.get((app_name, endpoint_name), []))
@@ -588,7 +670,7 @@ class ContentPackTests(unittest.TestCase):
                                 "enabled": True,
                             }
                         ],
-                        "lookup_updates": [{"name": "itsi_kpi_attributes"}],
+                        "service_discovery": [{"name": "Third Party APM Discovery Module"}],
                     },
                 }
             ],
@@ -605,10 +687,419 @@ class ContentPackTests(unittest.TestCase):
         outcome_statuses = {(step["kind"], step["title"]): step["status"] for step in run["configured_outcome"]["steps"]}
         self.assertIn(("macro", "itsi-cp-third-party-apm-indexes"), outcome_steps)
         self.assertIn(("saved_search", "Third Party APM Entity Discovery"), outcome_steps)
-        self.assertEqual(outcome_statuses[("unsupported_outcome", "lookup_updates")], "warn")
+        self.assertEqual(outcome_statuses[("unsupported_outcome", "service_discovery")], "warn")
         self.assertTrue(any(finding["check"] == "configured_outcome" and finding["status"] == "warn" for finding in run["findings"]))
         self.assertFalse(client.macro_updates)
         self.assertFalse(client.saved_search_updates)
+
+    def test_configured_outcome_supports_rest_handoff_blocks(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[
+                {
+                    "id": "DA-ITSI-CP-example-glass-tables",
+                    "title": "Example Glass Tables",
+                    "version": "1.0.0",
+                    "installed_versions": [],
+                }
+            ],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {"glass_table": [{"id": "gt-1"}]}},
+            data_models={
+                ("DA-ITSI-CP-example-glass-tables", "ExampleModel"): {"acceleration": '{"enabled": false}'},
+            },
+            ui_views={
+                ("DA-ITSI-CP-example-glass-tables", "example_dashboard"): {"eai:data": "<dashboard><label>Old</label></dashboard>"},
+            },
+            ui_navs={
+                ("DA-ITSI-CP-example-glass-tables", "default"): {"eai:data": "<nav/>"},
+            },
+            saved_searches={
+                ("DA-ITSI-CP-example-glass-tables", "Backfill Example KPI"): {"search": 'index=itsi_summary | stats count'},
+            },
+        )
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "data_model_accelerations": [
+                            {"name": "ExampleModel", "enabled": True, "earliest_time": "-7d"},
+                        ],
+                        "dashboards": [
+                            {
+                                "name": "example_dashboard",
+                                "xml": "<dashboard><label>New</label></dashboard>",
+                                "changelog": "codex update",
+                            }
+                        ],
+                        "navigation_updates": {"xml": "<nav><view name=\"example_dashboard\" /></nav>"},
+                        "lookup_updates": [
+                            {
+                                "title": "Refresh lookup",
+                                "search": '| makeresults | eval key="value" | outputlookup example.csv',
+                                "allow_dispatch": True,
+                            }
+                        ],
+                        "kpi_backfills": [
+                            {
+                                "saved_search": "Backfill Example KPI",
+                                "allow_dispatch": True,
+                                "dispatch.earliest_time": "-7d",
+                                "dispatch.latest_time": "now",
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        self.assertEqual(len(client.data_model_updates), 1)
+        self.assertEqual(
+            client.data_model_updates[0],
+            (
+                "DA-ITSI-CP-example-glass-tables",
+                "ExampleModel",
+                {"acceleration": '{"enabled": true, "earliest_time": "-7d"}'},
+            ),
+        )
+        self.assertEqual(
+            client.ui_view_updates,
+            [
+                (
+                    "DA-ITSI-CP-example-glass-tables",
+                    "example_dashboard",
+                    "<dashboard><label>New</label></dashboard>",
+                    "codex update",
+                )
+            ],
+        )
+        self.assertEqual(client.ui_nav_updates, [("DA-ITSI-CP-example-glass-tables", "default", "<nav><view name=\"example_dashboard\" /></nav>")])
+        self.assertEqual(client.search_dispatches[0][0], "DA-ITSI-CP-example-glass-tables")
+        self.assertEqual(client.search_dispatches[0][1], '| makeresults | eval key="value" | outputlookup example.csv')
+        self.assertEqual(
+            client.saved_search_dispatches,
+            [
+                (
+                    "DA-ITSI-CP-example-glass-tables",
+                    "Backfill Example KPI",
+                    {"dispatch.earliest_time": "-7d", "dispatch.latest_time": "now", "exec_mode": "normal"},
+                )
+            ],
+        )
+        self.assertTrue(any(finding["check"] == "configured_outcome" and finding["status"] == "pass" for finding in result["runs"][0]["findings"]))
+
+    def test_configured_outcome_supports_guarded_service_imports_and_lookup_file_uploads(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[{"id": "DA-ITSI-CP-example-glass-tables", "title": "Example Glass Tables", "version": "1.0.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {}},
+            saved_searches={
+                (
+                    ITSI_APP,
+                    "Import Example Services",
+                ): {
+                    "search": '| makeresults | eval service_title="Example" | table service_title | itsiimportobjects'
+                }
+            },
+            lookups={
+                (
+                    "DA-ITSI-CP-example-glass-tables",
+                    "owners.csv",
+                ): {"eai:data": "/opt/splunk/etc/apps/DA-ITSI-CP-example-glass-tables/lookups/owners.csv"}
+            },
+        )
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "service_imports": [
+                            {
+                                "title": "Import example services",
+                                "saved_search": "Import Example Services",
+                                "expected_service_count": 2,
+                                "uses_service_templates": True,
+                                "allow_service_import": True,
+                                "dispatch.earliest_time": "-15m",
+                            }
+                        ],
+                        "lookup_file_uploads": [
+                            {
+                                "app": "DA-ITSI-CP-example-glass-tables",
+                                "name": "owners.csv",
+                                "staged_path": "/opt/splunk/var/run/splunk/lookup_tmp/owners.csv",
+                                "allow_lookup_file_upload": True,
+                                "allow_lookup_file_replace": True,
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        self.assertEqual(
+            client.saved_search_dispatches,
+            [
+                (
+                    ITSI_APP,
+                    "Import Example Services",
+                    {"dispatch.earliest_time": "-15m", "exec_mode": "normal"},
+                )
+            ],
+        )
+        self.assertEqual(
+            client.lookup_file_updates,
+            [
+                (
+                    "DA-ITSI-CP-example-glass-tables",
+                    "owners.csv",
+                    "/opt/splunk/var/run/splunk/lookup_tmp/owners.csv",
+                )
+            ],
+        )
+        steps = result["runs"][0]["configured_outcome"]["steps"]
+        self.assertTrue(any(step["kind"] == "service_import" and step["status"] == "pass" for step in steps), steps)
+        self.assertTrue(any(step["kind"] == "lookup_file_upload" and step["status"] == "pass" for step in steps), steps)
+        self.assertTrue(any(finding["check"] == "configured_outcome" and finding["status"] == "pass" for finding in result["runs"][0]["findings"]))
+
+    def test_configured_outcome_rejects_unreviewed_service_imports_and_lookup_uploads(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[{"id": "DA-ITSI-CP-example-glass-tables", "title": "Example Glass Tables", "version": "1.0.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {}},
+            saved_searches={
+                (
+                    ITSI_APP,
+                    "Import Example Services",
+                ): {
+                    "search": '| makeresults | eval service_title="Example" | table service_title | itsiimportobjects'
+                }
+            },
+            lookups={
+                (
+                    "DA-ITSI-CP-example-glass-tables",
+                    "owners.csv",
+                ): {"eai:data": "/opt/splunk/etc/apps/DA-ITSI-CP-example-glass-tables/lookups/owners.csv"}
+            },
+        )
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "service_imports": [{"saved_search": "Import Example Services"}],
+                        "lookup_file_uploads": [
+                            {
+                                "app": "DA-ITSI-CP-example-glass-tables",
+                                "name": "owners.csv",
+                                "staged_path": "/opt/splunk/var/run/splunk/lookup_tmp/owners.csv",
+                                "allow_lookup_file_upload": True,
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        steps = result["runs"][0]["configured_outcome"]["steps"]
+        self.assertTrue(any(step["kind"] == "service_import" and step["status"] == "error" and "allow_service_import" in step["detail"] for step in steps), steps)
+        self.assertTrue(any(step["kind"] == "lookup_file_upload" and step["status"] == "error" and "allow_lookup_file_replace" in step["detail"] for step in steps), steps)
+        self.assertFalse(client.saved_search_dispatches)
+        self.assertFalse(client.lookup_file_updates)
+
+    def test_configured_outcome_rejects_cloud_lookup_uploads_and_unsafe_service_imports(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[{"id": "DA-ITSI-CP-example-glass-tables", "title": "Example Glass Tables", "version": "1.0.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {}},
+        )
+        spec = {
+            "connection": {"platform": "cloud"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "service_imports": [
+                            {
+                                "title": "Missing import command",
+                                "search": '| makeresults | eval service_title="Example" | table service_title',
+                                "allow_service_import": True,
+                            },
+                            {
+                                "title": "Oversized service import",
+                                "search": '| makeresults | eval service_title="Example" | table service_title | itsiimportobjects',
+                                "expected_service_count": 1001,
+                                "allow_service_import": True,
+                            },
+                        ],
+                        "lookup_file_uploads": [
+                            {
+                                "app": "DA-ITSI-CP-example-glass-tables",
+                                "name": "owners.csv",
+                                "staged_path": "/opt/splunk/var/run/splunk/lookup_tmp/owners.csv",
+                                "create": True,
+                                "allow_lookup_file_upload": True,
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        steps = result["runs"][0]["configured_outcome"]["steps"]
+        self.assertTrue(any(step["kind"] == "service_import" and "itsiimportobjects" in step["detail"] for step in steps), steps)
+        self.assertTrue(any(step["kind"] == "service_import" and "1,000 services" in step["detail"] for step in steps), steps)
+        self.assertTrue(any(step["kind"] == "lookup_file_upload" and "Splunk Enterprise only" in step["detail"] for step in steps), steps)
+        self.assertFalse(client.search_dispatches)
+        self.assertFalse(client.lookup_file_creates)
+
+    def test_configured_outcome_service_import_raw_search_takes_precedence_over_saved_search(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[{"id": "DA-ITSI-CP-example-glass-tables", "title": "Example Glass Tables", "version": "1.0.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {}},
+            saved_searches={
+                (ITSI_APP, "Stale Import Search"): {"search": "| makeresults | table service_title"},
+            },
+        )
+        raw_search = '| makeresults | eval service_title="Example" | table service_title | itsiimportobjects'
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "service_imports": [
+                            {
+                                "title": "Import from reviewed raw search",
+                                "search": raw_search,
+                                "saved_search": "Stale Import Search",
+                                "allow_service_import": True,
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        self.assertEqual(client.search_dispatches, [(ITSI_APP, raw_search, {"exec_mode": "normal"})])
+        self.assertFalse(client.saved_search_dispatches)
+        steps = result["runs"][0]["configured_outcome"]["steps"]
+        self.assertTrue(any(step["kind"] == "service_import" and step["status"] == "pass" for step in steps), steps)
+
+    def test_configured_outcome_dispatches_require_explicit_apply_guard(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[{"id": "DA-ITSI-CP-example-glass-tables", "title": "Example Glass Tables", "version": "1.0.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {}},
+        )
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "lookup_updates": [{"title": "Unsafe lookup", "search": "| makeresults | outputlookup unsafe.csv"}],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        steps = result["runs"][0]["configured_outcome"]["steps"]
+        self.assertTrue(any(step["kind"] == "lookup_update" and step["status"] == "error" and "allow_dispatch" in step["detail"] for step in steps), steps)
+        self.assertFalse(client.search_dispatches)
+
+    def test_configured_outcome_supports_props_transforms_and_generic_conf_stanzas(self) -> None:
+        client = FakeContentPackClient(
+            apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "DA-ITSI-CP-example-glass-tables"},
+            catalog=[{"id": "DA-ITSI-CP-example-glass-tables", "title": "Example Glass Tables", "version": "1.0.0", "installed_versions": []}],
+            previews={("DA-ITSI-CP-example-glass-tables", "1.0.0"): {}},
+            confs={
+                ("DA-ITSI-CP-example-glass-tables", "props", "example:sourcetype"): {"KV_MODE": "auto"},
+                ("DA-ITSI-CP-example-glass-tables", "transforms", "example_extract"): {"REGEX": "old"},
+            },
+        )
+        spec = {
+            "connection": {"platform": "enterprise"},
+            "packs": [
+                {
+                    "profile": "example_glass_tables",
+                    "configured_outcome": {
+                        "props": [
+                            {"stanza": "example:sourcetype", "fields": {"KV_MODE": "json", "SHOULD_LINEMERGE": False}},
+                        ],
+                        "transforms": [
+                            {"stanza": "example_extract", "REGEX": "new", "FORMAT": "field::$1"},
+                        ],
+                        "conf_stanzas": [
+                            {
+                                "conf": "eventtypes",
+                                "stanza": "example_event",
+                                "search": 'index="example"',
+                                "create": True,
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            result = ContentPackWorkflow(client, tempdir).run(spec, "apply")
+
+        self.assertEqual(
+            client.conf_stanza_updates,
+            [
+                (
+                    "DA-ITSI-CP-example-glass-tables",
+                    "props",
+                    "example:sourcetype",
+                    {"KV_MODE": "json", "SHOULD_LINEMERGE": "false"},
+                ),
+                (
+                    "DA-ITSI-CP-example-glass-tables",
+                    "transforms",
+                    "example_extract",
+                    {"REGEX": "new", "FORMAT": "field::$1"},
+                ),
+            ],
+        )
+        self.assertEqual(
+            client.conf_stanza_creates,
+            [
+                (
+                    "DA-ITSI-CP-example-glass-tables",
+                    "eventtypes",
+                    "example_event",
+                    {"search": 'index="example"'},
+                )
+            ],
+        )
+        steps = result["runs"][0]["configured_outcome"]["steps"]
+        self.assertTrue(any(step["kind"] == "props" and step["status"] == "pass" for step in steps), steps)
+        self.assertTrue(any(step["kind"] == "transforms" and step["status"] == "pass" for step in steps), steps)
+        self.assertTrue(any(step["kind"] == "conf_stanza" and step["status"] == "pass" for step in steps), steps)
 
     def test_configured_outcome_apply_records_error_when_macro_or_saved_search_missing(self) -> None:
         client = FakeContentPackClient(
@@ -714,6 +1205,51 @@ class ContentPackTests(unittest.TestCase):
         self.assertEqual(result["runs"][0]["profile"], "microsoft_365")
         self.assertEqual(result["runs"][0]["title"], "Microsoft 365")
 
+    def test_profiles_cover_documented_content_packs_25(self) -> None:
+        documented_titles = {
+            "Amazon Web Services Dashboards and Reports",
+            "Cisco Data Center",
+            "Cisco Enterprise Networks",
+            "Cisco ThousandEyes",
+            "Example Glass Tables",
+            "ITE Work Alert Routing",
+            "ITSI Monitoring and Alerting",
+            "Microsoft 365",
+            "Microsoft Exchange",
+            "Monitoring Citrix",
+            "Monitoring Microsoft Windows",
+            "Monitoring Pivotal Cloud Foundry",
+            "Monitoring Splunk as a Service",
+            "Monitoring Unix and Linux",
+            "NetApp Data ONTAP Dashboards and Reports",
+            "ServiceNow",
+            "Shared IT Infrastructure Components",
+            "SOAR System Logs",
+            "Splunk AppDynamics",
+            "Splunk Observability Cloud",
+            "Splunk Synthetic Monitoring",
+            "Third-Party APM",
+            "Unix Dashboards and Reports",
+            "VMware Dashboards and Reports",
+            "VMware Monitoring",
+            "Windows Dashboards and Reports",
+        }
+        local_titles = {str(profile["title"]) for profile in PACK_PROFILES.values()}
+
+        self.assertEqual(local_titles, documented_titles)
+        self.assertEqual(len(PACK_PROFILES), len(documented_titles))
+
+    def test_cisco_product_coverage_notes_distinguish_official_packs_from_native_modeling(self) -> None:
+        reference_text = (ROOT / "skills" / "splunk-itsi-config" / "references" / "content_packs.md").read_text(encoding="utf-8")
+
+        for profile in ("cisco_data_center", "cisco_enterprise_networks", "cisco_thousandeyes", "splunk_appdynamics"):
+            self.assertIn(profile, reference_text)
+        for product_family in ("Secure Access", "Intersight", "Spaces", "ISE", "SD-WAN", "Cyber Vision", "Enhanced NetFlow", "Webex", "UCS"):
+            self.assertIn(product_family, reference_text)
+        self.assertIn("not a missing local profile", reference_text)
+        self.assertIn("native", reference_text)
+        self.assertIn("topology", reference_text)
+
     def test_install_payload_uses_safe_defaults_and_boolean_serialization(self) -> None:
         payload = build_install_payload(
             {
@@ -738,6 +1274,99 @@ class ContentPackTests(unittest.TestCase):
                 "prefix": "CP-",
             },
         )
+
+    def test_prefix_validation_warns_about_content_pack_25_template_link_issue(self) -> None:
+        findings = validate_profile(
+            FakeContentPackClient(),
+            {"profile": "example_glass_tables", "prefix": "CP-"},
+            PACK_PROFILES["example_glass_tables"],
+            "DA-ITSI-CP-example-glass-tables",
+        )
+
+        self.assertTrue(
+            any(
+                finding["status"] == "warn"
+                and finding["check"] == "known_issue"
+                and "prefix" in finding["message"]
+                and "service templates and KPIs" in finding["message"]
+                for finding in findings
+            ),
+            findings,
+        )
+
+    def test_cisco_profiles_surface_current_splunk_known_issues(self) -> None:
+        data_center_findings = validate_profile(
+            FakeContentPackClient(),
+            {"profile": "cisco_data_center"},
+            PACK_PROFILES["cisco_data_center"],
+            "DA-ITSI-CP-cisco-data-center",
+        )
+        enterprise_findings = validate_profile(
+            FakeContentPackClient(),
+            {"profile": "cisco_enterprise_networks"},
+            PACK_PROFILES["cisco_enterprise_networks"],
+            "DA-ITSI-CP-enterprise-networking",
+        )
+
+        self.assertTrue(
+            any(finding["check"] == "known_issue" and "case" in finding["message"] for finding in data_center_findings),
+            data_center_findings,
+        )
+        self.assertTrue(
+            any(finding["check"] == "known_issue" and "cisco_catalyst_host" in finding["message"] for finding in enterprise_findings),
+            enterprise_findings,
+        )
+        self.assertTrue(
+            any(finding["check"] == "known_issue" and "not filtered by the selected Catalyst Center Host" in finding["message"] for finding in enterprise_findings),
+            enterprise_findings,
+        )
+
+    def test_profiles_enforce_documented_content_pack_25_required_prerequisites(self) -> None:
+        scenarios = [
+            (
+                "pivotal_cloud_foundry",
+                set(),
+                "DA-ITSI-CP-pivotal-cloud-foundry",
+                "Splunk Firehose Nozzle for PCF",
+            ),
+            (
+                "servicenow",
+                {"Splunk_TA_snow"},
+                "DA-ITSI-CP-servicenow",
+                "Dendrogram Viz",
+            ),
+            (
+                "windows_dashboards_reports",
+                {"Splunk_TA_windows"},
+                "DA-ITSI-CP-windows-dashboards",
+                "Splunk Supporting Add-on for Active Directory",
+            ),
+            (
+                "soar_system_logs",
+                {"Splunk_TA_nix", "Splunk_SA_Scientific_Python_linux_x86_64"},
+                "DA-ITSI-CP-soar-system-logs",
+                "Splunk App for SOAR",
+            ),
+        ]
+
+        for profile, apps, pack_app, missing_label in scenarios:
+            with self.subTest(profile=profile):
+                findings = validate_profile(
+                    FakeContentPackClient(apps=apps),
+                    {"profile": profile},
+                    PACK_PROFILES[profile],
+                    pack_app,
+                )
+
+                self.assertTrue(
+                    any(
+                        finding["status"] == "error"
+                        and finding["check"] == "app"
+                        and missing_label in finding["message"]
+                        for finding in findings
+                    ),
+                    findings,
+                )
 
     def test_missing_content_library_guidance_differs_for_enterprise_and_cloud(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -978,14 +1607,17 @@ class ContentPackTests(unittest.TestCase):
                     },
                     inputs={
                         "TA_cisco_catalyst": [
+                            {"title": "cisco_catalyst_dnac_devicehealth://prod", "disabled": 0, "index": "catalyst"},
                             {"title": "cisco_catalyst_dnac_issue://prod", "disabled": 0, "index": "catalyst"},
-                            {"title": "cisco_catalyst_dnac_networkhealth://prod", "disabled": 0, "index": "catalyst"},
                             {"title": "cisco_catalyst_dnac_securityadvisory://prod", "disabled": 0, "index": "catalyst"},
+                            {"title": "cisco_catalyst_dnac_site_topology://prod", "disabled": 0, "index": "catalyst"},
                         ],
                         "Splunk_TA_cisco_meraki": [
                             {"title": "cisco_meraki_assurance_alerts://prod", "disabled": 0, "index": "meraki"},
-                            {"title": "cisco_meraki_devices://prod", "disabled": 0, "index": "meraki"},
+                            {"title": "cisco_meraki_device_availabilities_change_history://prod", "disabled": 0, "index": "meraki"},
+                            {"title": "cisco_meraki_organization_networks://prod", "disabled": 0, "index": "meraki"},
                             {"title": "cisco_meraki_organizations://prod", "disabled": 0, "index": "meraki"},
+                            {"title": "cisco_meraki_wireless_packet_loss_by_device://prod", "disabled": 0, "index": "meraki"},
                         ],
                     },
                 ),
@@ -1110,14 +1742,27 @@ class ContentPackTests(unittest.TestCase):
             },
             inputs={
                 "TA_cisco_catalyst": [
+                    {"name": "cvf_device", "eai:type": "cisco_catalyst_dnac_devicehealth", "disabled": 0, "index": "catalyst"},
                     {"name": "cvf_issue", "eai:type": "cisco_catalyst_dnac_issue", "disabled": 0, "index": "catalyst"},
-                    {"name": "cvf_health", "eai:type": "cisco_catalyst_dnac_networkhealth", "disabled": 0, "index": "catalyst"},
                     {"name": "cvf_adv", "eai:type": "cisco_catalyst_dnac_securityadvisory", "disabled": 0, "index": "catalyst"},
+                    {"name": "cvf_site", "eai:type": "cisco_catalyst_dnac_site_topology", "disabled": 0, "index": "catalyst"},
                 ],
                 "Splunk_TA_cisco_meraki": [
                     {"name": "cvf_alerts", "eai:type": "cisco_meraki_assurance_alerts", "disabled": 0, "index": "meraki"},
-                    {"name": "cvf_devices", "eai:type": "cisco_meraki_devices", "disabled": 0, "index": "meraki"},
+                    {
+                        "name": "cvf_availability_history",
+                        "eai:type": "cisco_meraki_device_availabilities_change_history",
+                        "disabled": 0,
+                        "index": "meraki",
+                    },
+                    {"name": "cvf_org_networks", "eai:type": "cisco_meraki_organization_networks", "disabled": 0, "index": "meraki"},
                     {"name": "cvf_orgs", "eai:type": "cisco_meraki_organizations", "disabled": 0, "index": "meraki"},
+                    {
+                        "name": "cvf_wireless_loss",
+                        "eai:type": "cisco_meraki_wireless_packet_loss_by_device",
+                        "disabled": 0,
+                        "index": "meraki",
+                    },
                 ],
             },
         )
@@ -1130,6 +1775,52 @@ class ContentPackTests(unittest.TestCase):
         )
 
         self.assertFalse(any(finding["status"] == "error" and finding["check"] == "input" for finding in findings), findings)
+
+    def test_cisco_enterprise_requires_current_25_input_families(self) -> None:
+        client = FakeContentPackClient(
+            apps={"TA_cisco_catalyst", "Splunk_TA_cisco_meraki"},
+            macros={
+                ("DA-ITSI-CP-enterprise-networking", "itsi_cp_catalyst_center_index"): {"definition": 'index="catalyst"'},
+                ("Splunk_TA_cisco_meraki", "meraki_index"): {"definition": 'index="meraki"'},
+            },
+            inputs={
+                "TA_cisco_catalyst": [
+                    {"title": "cisco_catalyst_dnac_issue://prod", "disabled": 0, "index": "catalyst"},
+                    {"title": "cisco_catalyst_dnac_networkhealth://prod", "disabled": 0, "index": "catalyst"},
+                    {"title": "cisco_catalyst_dnac_securityadvisory://prod", "disabled": 0, "index": "catalyst"},
+                ],
+                "Splunk_TA_cisco_meraki": [
+                    {"title": "cisco_meraki_assurance_alerts://prod", "disabled": 0, "index": "meraki"},
+                    {"title": "cisco_meraki_devices://prod", "disabled": 0, "index": "meraki"},
+                    {"title": "cisco_meraki_organizations://prod", "disabled": 0, "index": "meraki"},
+                ],
+            },
+            endpoints={
+                ("TA_cisco_catalyst", "TA_cisco_catalyst_account"): [{"name": "catc-prod"}],
+                ("Splunk_TA_cisco_meraki", "Splunk_TA_cisco_meraki_account"): [{"name": "meraki-prod"}],
+            },
+        )
+
+        findings = validate_profile(
+            client,
+            {"profile": "cisco_enterprise_networks"},
+            PACK_PROFILES["cisco_enterprise_networks"],
+            "DA-ITSI-CP-enterprise-networking",
+        )
+        error_messages = [
+            finding["message"]
+            for finding in findings
+            if finding["status"] == "error" and finding["check"] == "input"
+        ]
+
+        self.assertTrue(any("Catalyst Device Health input is missing or disabled" in message for message in error_messages), findings)
+        self.assertTrue(any("Catalyst Site Topology input is missing or disabled" in message for message in error_messages), findings)
+        self.assertTrue(
+            any("Meraki Device Availabilities Change History input is missing or disabled" in message for message in error_messages),
+            findings,
+        )
+        self.assertTrue(any("Meraki Organizations Networks input is missing or disabled" in message for message in error_messages), findings)
+        self.assertTrue(any("Meraki Wireless Packet Loss by Device input is missing or disabled" in message for message in error_messages), findings)
 
     def test_cisco_data_center_reports_missing_nexus_dashboard_account(self) -> None:
         client = FakeContentPackClient(
@@ -1168,8 +1859,20 @@ class ContentPackTests(unittest.TestCase):
             inputs={
                 "Splunk_TA_cisco_meraki": [
                     {"name": "cvf_alerts", "eai:type": "cisco_meraki_assurance_alerts", "disabled": 0, "index": "meraki"},
-                    {"name": "cvf_devices", "eai:type": "cisco_meraki_devices", "disabled": 0, "index": "meraki"},
+                    {
+                        "name": "cvf_availability_history",
+                        "eai:type": "cisco_meraki_device_availabilities_change_history",
+                        "disabled": 0,
+                        "index": "meraki",
+                    },
+                    {"name": "cvf_org_networks", "eai:type": "cisco_meraki_organization_networks", "disabled": 0, "index": "meraki"},
                     {"name": "cvf_orgs", "eai:type": "cisco_meraki_organizations", "disabled": 0, "index": "meraki"},
+                    {
+                        "name": "cvf_wireless_loss",
+                        "eai:type": "cisco_meraki_wireless_packet_loss_by_device",
+                        "disabled": 0,
+                        "index": "meraki",
+                    },
                 ]
             },
         )
@@ -1260,14 +1963,17 @@ class ContentPackTests(unittest.TestCase):
             },
             inputs={
                 "TA_cisco_catalyst": [
+                    {"title": "cisco_catalyst_dnac_devicehealth://prod", "disabled": 0, "index": "catalyst"},
                     {"title": "cisco_catalyst_dnac_issue://prod", "disabled": 0, "index": "catalyst"},
-                    {"title": "cisco_catalyst_dnac_networkhealth://prod", "disabled": 0, "index": "catalyst"},
                     {"title": "cisco_catalyst_dnac_securityadvisory://prod", "disabled": 0, "index": "catalyst"},
+                    {"title": "cisco_catalyst_dnac_site_topology://prod", "disabled": 0, "index": "catalyst"},
                 ],
                 "Splunk_TA_cisco_meraki": [
                     {"title": "cisco_meraki_assurance_alerts://prod", "disabled": 0, "index": "meraki"},
-                    {"title": "cisco_meraki_devices://prod", "disabled": 0, "index": "meraki"},
+                    {"title": "cisco_meraki_device_availabilities_change_history://prod", "disabled": 0, "index": "meraki"},
+                    {"title": "cisco_meraki_organization_networks://prod", "disabled": 0, "index": "meraki"},
                     {"title": "cisco_meraki_organizations://prod", "disabled": 0, "index": "meraki"},
+                    {"title": "cisco_meraki_wireless_packet_loss_by_device://prod", "disabled": 0, "index": "meraki"},
                 ],
             },
         )
@@ -1518,14 +2224,17 @@ class ContentPackTests(unittest.TestCase):
                     {"title": "cisco_nexus_dashboard://switches_prod", "disabled": 0},
                 ],
                 "TA_cisco_catalyst": [
+                    {"title": "cisco_catalyst_dnac_devicehealth://prod", "disabled": 0, "index": "catalyst"},
                     {"title": "cisco_catalyst_dnac_issue://prod", "disabled": 0, "index": "catalyst"},
-                    {"title": "cisco_catalyst_dnac_networkhealth://prod", "disabled": 0, "index": "catalyst"},
                     {"title": "cisco_catalyst_dnac_securityadvisory://prod", "disabled": 0, "index": "catalyst"},
+                    {"title": "cisco_catalyst_dnac_site_topology://prod", "disabled": 0, "index": "catalyst"},
                 ],
                 "Splunk_TA_cisco_meraki": [
                     {"title": "cisco_meraki_assurance_alerts://prod", "disabled": 0, "index": "meraki"},
-                    {"title": "cisco_meraki_devices://prod", "disabled": 0, "index": "meraki"},
+                    {"title": "cisco_meraki_device_availabilities_change_history://prod", "disabled": 0, "index": "meraki"},
+                    {"title": "cisco_meraki_organization_networks://prod", "disabled": 0, "index": "meraki"},
                     {"title": "cisco_meraki_organizations://prod", "disabled": 0, "index": "meraki"},
+                    {"title": "cisco_meraki_wireless_packet_loss_by_device://prod", "disabled": 0, "index": "meraki"},
                 ],
             },
         )

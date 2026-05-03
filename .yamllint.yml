@@ -1,8 +1,11 @@
 extends: default
 
 ignore: |
+  skills/splunk-connect-for-snmp-setup/templates/compose/docker-compose.yml
+  skills/splunk-connect-for-snmp-setup/templates/kubernetes/namespace.yaml
   skills/splunk-connect-for-snmp-setup/templates/kubernetes/values.yaml
   skills/splunk-connect-for-syslog-setup/templates/host/docker-compose.yml
+  skills/splunk-connect-for-syslog-setup/templates/kubernetes/namespace.yaml
   skills/splunk-connect-for-syslog-setup/templates/kubernetes/values.yaml
 
 rules:

@@ -1,0 +1,537 @@
+# Splunk Enterprise Security configuration-as-code example.
+#
+# Preview is read-only:
+#   bash skills/splunk-enterprise-security-config/scripts/setup.sh --spec skills/splunk-enterprise-security-config/templates/es-config.example.yaml
+#
+# Writes require --apply:
+#   bash skills/splunk-enterprise-security-config/scripts/setup.sh --spec es-config.yaml --apply --validate
+#
+# Do not put passwords, tokens, session keys, OAuth secrets, or API keys in this
+# file. Use the repo credentials file for Splunk login and secret_file handoffs
+# for integration-specific secrets.
+
+connection:
+  # Optional non-secret overrides. Credentials still come from credentials files.
+  base_url: https://splunk-search.example.com:8089
+  platform: enterprise
+  verify_ssl: true
+  cloud_support:
+    # Set true for Splunk Cloud preview/export evidence packages. The engine
+    # reports ACS-supported inventory/readiness and Support handoff steps only.
+    evidence_package: false
+
+baseline:
+  enabled: true
+  lookup_order: true
+  managed_roles:
+    - ess_analyst
+    - ess_user
+  all_indexes: false
+
+indexes:
+  groups:
+    - core
+    - ueba
+    - pci
+    - exposure
+    - mission_control
+    - dlx
+  custom:
+    - name: secops_custom
+      datatype: event
+      max_size_mb: 512000
+
+roles:
+  - name: ess_analyst
+    allowed_indexes:
+      - main
+      - notable
+      - risk
+      - threat_activity
+      - endpoint
+      - network
+      - authentication
+    default_indexes:
+      - main
+      - endpoint
+      - network
+      - authentication
+  - name: ess_user
+    allowed_indexes:
+      - main
+      - notable
+      - risk
+      - threat_activity
+    default_indexes:
+      - main
+
+data_models:
+  - name: Authentication
+    acceleration: true
+    constraint:
+      app: Splunk_SA_CIM
+      macro: cim_Authentication_indexes
+      indexes:
+        - authentication
+        - wineventlog
+        - okta
+  - name: Network_Traffic
+    acceleration: true
+    constraint:
+      app: Splunk_SA_CIM
+      macro: cim_Network_Traffic_indexes
+      indexes:
+        - firewall
+        - proxy
+        - network
+
+exposure_analytics:
+  asset_identity_population:
+    assets:
+      enabled: false
+      cron_schedule: "*/15 * * * *"
+      max_populate: 500000
+      fields:
+        - ip
+        - mac
+        - nt_host
+        - dns
+        - priority
+        - cim_entity_zone
+    identities:
+      enabled: false
+      cron_schedule: "*/15 * * * *"
+      max_populate: 500000
+  processing_searches:
+    - name: ea_srch_ip_asset_process
+      enabled: false
+  sources:
+    - name: cloud_inventory_source
+      apply: false
+      conflict_policy: create_only
+      entity_type: asset
+      endpoint: /servicesNS/nobody/exposure-analytics/configs/conf-ea_sources
+  enrichment_rules:
+    - name: asset_owner_enrichment
+      apply: false
+      conflict_policy: create_only
+      endpoint: /servicesNS/nobody/exposure-analytics/configs/conf-ea_enrichment_rules
+
+assets:
+  - name: corporate_assets
+    enabled: true
+    lookup_file: corporate_assets.csv
+    lookup_upload:
+      # Set apply: true only when the local CSV path is present and should be
+      # uploaded through Splunk lookup-file REST. File contents are never
+      # exported.
+      apply: false
+      file: lookups/corporate_assets.csv
+      acl:
+        sharing: app
+        read: "*"
+        write: admin
+    lookup_definition: corporate_assets_lookup
+    fields_list:
+      - ip
+      - nt_host
+      - dns
+      - owner
+      - priority
+      - category
+    category: corporate
+    rank: 10
+    generating_search:
+      # Optional: provide explicit Asset and Identity Builder SPL when LDAP or
+      # cloud-provider workflows populate a lookup through a scheduled search.
+      # New searches default to disabled unless enabled is true.
+      name: ES - Generate Corporate Assets Lookup
+      enabled: false
+      cron_schedule: "17 */6 * * *"
+      search: |
+        | inputlookup corporate_assets_source.csv
+        | outputlookup corporate_assets.csv
+
+identities:
+  - name: corporate_identities
+    enabled: true
+    lookup_file: corporate_identities.csv
+    lookup_upload:
+      apply: false
+      file: lookups/corporate_identities.csv
+      acl:
+        sharing: app
+        read: "*"
+        write: admin
+    lookup_definition: corporate_identities_lookup
+    fields_list:
+      - identity
+      - nick
+      - email
+      - bunit
+      - category
+      - priority
+    category: corporate
+    rank: 10
+
+threat_intel:
+  threatlists:
+    - name: internal_ipv4_blocklist
+      enabled: false
+      type: threatlist
+      url: https://feeds.example.com/iocs/ipv4.csv
+      interval: 43200
+      weight: 60
+      fields:
+        ip: ip
+        description: description
+  uploads:
+    - name: local_csv_iocs
+      file: lookups/local_iocs.csv
+      format: csv
+      apply: false
+      collection: local_iocs
+      description: Locally curated CSV indicators
+  tim_cloud: false
+
+detections:
+  inventory: true
+  existing:
+    - name: Excessive Failed Logins
+      app: SA-AccessProtection
+      enabled: false
+      cron_schedule: "*/15 * * * *"
+      annotations:
+        mitre_attack:
+          - T1110
+      action_notable:
+        param.security_domain: access
+        param.urgency: medium
+  custom:
+    - name: Custom - Privileged Login From New Location
+      enabled: false
+      cron_schedule: "*/30 * * * *"
+      search: >-
+        | tstats count from datamodel=Authentication.Authentication
+        where Authentication.action=success
+        by Authentication.user Authentication.src Authentication.dest
+        | rename Authentication.* as *
+        | where count > 0
+      actions:
+        - risk
+      action_risk:
+        param._risk_object: user
+        param._risk_object_type: user
+        param._risk_score: 20
+      annotations:
+        mitre_attack:
+          - T1078
+
+risk:
+  factors:
+    - name: privileged_identity_modifier
+      description: Increase risk for privileged identities
+      disabled: 0
+      score: 20
+  risk_rules:
+    - name: Custom - High Risk Identity
+      create: true
+      enabled: false
+      risk_score: 50
+      search: >-
+        | tstats sum(All_Risk.calculated_risk_score) as risk_score
+        from datamodel=Risk.All_Risk by All_Risk.risk_object
+        | rename All_Risk.risk_object as risk_object
+        | where risk_score >= 100
+
+urgency:
+  matrix:
+    - stanza: high|high
+      urgency: critical
+    - stanza: medium|high
+      urgency: high
+    - stanza: low|high
+      urgency: medium
+
+adaptive_response:
+  app: SplunkEnterpriseSecuritySuite
+  notable:
+    default_owner: unassigned
+    default_status: "1"
+  risk:
+    param._risk_score: "25"
+  finding:
+    group_by: "user,src"
+
+notable_suppressions:
+  - name: suppress_internal_scanners
+    enabled: false
+    comment: Suppresses scheduled scanner noise
+    search: 'index=notable src_category="scanner"'
+
+log_review:
+  statuses:
+    - name: "5"
+      label: Resolved
+      is_default: false
+      end: true
+  dispositions:
+    - name: "1"
+      label: True Positive - Actioned
+  settings:
+    default_owner: unassigned
+
+review_statuses:
+  notable:
+    - id: "6"
+      label: Waiting on Vendor
+      rank: 55
+      end: false
+      editable: true
+  investigation:
+    - id: "10"
+      label: Legal Hold
+      end: true
+      editable: false
+
+use_cases:
+  - name: access_protection
+    category: access
+    description: Monitor and respond to access-protection findings
+    disabled: 0
+
+governance:
+  - name: pci
+    label: PCI DSS v4
+    description: Payment-card industry compliance framework
+
+macros:
+  - name: es_security_data_indexes
+    definition: "(index=notable OR index=risk OR index=threat_activity)"
+
+eventtypes:
+  - name: es_privileged_logins
+    search: "tag=authentication action=success user_category=privileged"
+    description: Privileged user successful login events
+    priority: "1"
+    tags: es_privileged,authentication
+
+tags:
+  - field: user_category
+    value: privileged
+    tags:
+      - es_privileged
+
+navigation:
+  app: SplunkEnterpriseSecuritySuite
+  xml: |
+    <nav search_view="search" color="#65A637">
+      <view name="ess_home" default="true" label="Security Posture" />
+      <view name="incident_review" label="Incident Review" />
+    </nav>
+
+glass_tables:
+  - name: soc_overview
+    xml: |
+      <dashboard version="2" theme="dark">
+        <label>SOC Overview</label>
+        <row>
+          <panel>
+            <title>Open Notables</title>
+            <single>
+              <search><query>| tstats count where index=notable</query></search>
+            </single>
+          </panel>
+        </row>
+      </dashboard>
+
+workflow_actions:
+  - name: open_servicenow_incident
+    app: SA-ThreatIntelligence
+    display_location: event_menu
+    fields:
+      - src
+      - dest
+    label: Open ServiceNow incident
+    link_uri: "https://servicenow.example.invalid/incident.do?src=$src$"
+    link_method: get
+    link_target: blank
+    type: link
+  - name: pivot_to_risk
+    app: SA-ThreatIntelligence
+    display_location: field_menu
+    fields:
+      - risk_object
+    label: Pivot to Risk timeline
+    link_uri: "/app/SplunkEnterpriseSecuritySuite/risk_analysis?form.risk_object=$risk_object$"
+    type: link
+
+kv_collections:
+  - name: custom_asset_enrichment
+    app: SA-IdentityManagement
+    fields:
+      ip: string
+      owner: string
+      region: string
+    accelerated_fields:
+      by_ip:
+        ip: 1
+    replicate: true
+    enforceTypes: true
+
+findings:
+  intermediate_findings:
+    use_current_time: false
+
+intelligence_management:
+  subscribed: false
+  enclave_ids: []
+  im_scs_url: ""
+  is_talos_query_enabled: true
+  tenant_pairing_required: true
+
+es_ai_settings:
+  settings:
+    telemetry_opt_in: false
+    is_ai_assistant_active: true
+    ai_triage_enabled: false
+  triage_agent_dispatch_settings:
+    max_findings_per_run: 10
+    queue_age_limit_hours: 2
+
+dlx_settings:
+  scheduler:
+    poll_interval: 30
+  worker:
+    concurrency: 5
+  search:
+    confidence_threshold: 50
+    default_max_results_per_query: 500
+
+content_library:
+  install: true
+  app_ids:
+    # Splunk ES Content Update (ESCU) is Splunkbase app 3449.
+    content_update: "3449"
+    # SA-ContentLibrary is treated as bundled/presence-checked unless your
+    # environment has a separately supported app id.
+    # SA-ContentLibrary: "0000"
+  escu:
+    subscription: enterprise
+    auto_update: true
+    enabled_stories:
+      - endpoint_security
+    enabled_detections:
+      - "ESCU - Detect New Local Admin Account"
+  content_packs:
+    - name: cloud_security
+      enabled: true
+
+mission_control:
+  settings:
+    default_queue: tier1
+  queues:
+    - name: tier1
+      title: Tier 1 Queue
+      apply: false
+      description: Initial triage queue
+  response_templates:
+    - name: phishing_triage
+      title: Phishing Triage
+      apply: false
+  response_plans:
+    - name: credential_compromise
+      title: Credential Compromise
+      apply: false
+  private_overrides:
+    - conf: mc_rate_limit
+      stanza: limits
+      values:
+        burst: "10"
+      private_override: true
+      apply: false
+      backup_export: ""
+      confirm_id: ""
+
+integrations:
+  soar:
+    enabled: true
+    preflight: true
+    tenant_pairing_required: true
+    password_file: secret-files/soar-admin-password
+    cert_bundle_file: secret-files/soar-cert-bundle.pem
+    tenant_pairing:
+      host: https://soar.example.com
+      role_mapping:
+        - ess_analyst
+  attack_analyzer:
+    enabled: false
+    preflight: true
+    support_required: true
+  tim_cloud:
+    enabled: false
+    preflight: true
+    tenant_pairing_required: true
+    token_file: secret-files/tim-cloud-token
+  behavioral_analytics:
+    enabled: false
+    local_conf:
+      app: SplunkEnterpriseSecuritySuite
+      conf: cloud_integrations
+      stanza: behavioral_analytics
+      values:
+        disabled: 1
+  splunk_cloud_connect:
+    enabled: false
+    preflight: true
+    support_required: true
+
+ta_for_indexers:
+  enabled: true
+  expected_package: Splunk_TA_ForIndexers
+  cluster_manager: cm01.example.com
+  deploy_strategy: preview_only
+  deploy: true
+  replace_existing: false
+  overwrite_policy: preview_only
+  backup_export: ""
+  confirm_id: ""
+  conflict_checks_clean: false
+  output_dir: ta-for-indexers-rendered
+
+content_governance:
+  test_mode: false
+  content_importer:
+    disabled: 0
+    import_mode: preview
+  content_versioning:
+    apply: false
+    mode: production
+    rollback:
+      apply: false
+      target: previous
+      backup_export: ""
+      confirm_id: ""
+    delete:
+      apply: false
+      target: retired_package
+      backup_export: ""
+      confirm_id: ""
+
+package_conf_coverage:
+  # Inventory/export-only safety net for every .conf family shipped in the
+  # local ES package, including internal Mission Control and package-owned
+  # registration files. Use first-class sections above for supported writes.
+  inventory: true
+  include_live: false
+  families: all
+  max_entries_per_family: 25
+
+validation:
+  searches:
+    - name: notable_index_smoke
+      search: "| tstats count where index=notable"
+    - name: risk_datamodel_smoke
+      search: "| tstats count from datamodel=Risk.All_Risk"
+    - name: asset_identity_smoke
+      search: '| makeresults | eval src="192.0.2.10", user="alice" | `get_asset(src)` | `get_identity4events(user)`'

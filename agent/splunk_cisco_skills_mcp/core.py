@@ -65,6 +65,7 @@ READ_ONLY_SCRIPT_NAMES: set[str] = {
 }
 
 DIRECT_SECRET_FLAGS = {
+    "--access-token",
     "--activation-code",
     "--analytics-secret",
     "--api-key",
@@ -72,11 +73,15 @@ DIRECT_SECRET_FLAGS = {
     "--api-token",
     "--bearer-token",
     "--client-secret",
+    "--hec-token",
+    "--o11y-token",
     "--password",
+    "--platform-hec-token",
     "--proxy-password",
     "--refresh-token",
     "--secret",
     "--skey",
+    "--sf-token",
     "--token",
 }
 
@@ -101,6 +106,7 @@ NON_SECRET_VALUE_KEYS = {
 }
 
 SECRET_FILE_FLAGS = {
+    "--access-token-file",
     "--activation-code-file",
     "--analytics-secret-file",
     "--api-key-file",
@@ -112,7 +118,9 @@ SECRET_FILE_FLAGS = {
     "--discovery-secret-file",
     "--hec-token-file",
     "--idxc-secret-file",
+    "--o11y-token-file",
     "--password-file",
+    "--platform-hec-token-file",
     "--pkcs-certificate-file",
     "--proxy-password-file",
     "--secret-file",
@@ -474,20 +482,39 @@ def _truncate(value: str) -> str:
     return value[:MAX_OUTPUT_CHARS] + f"\n...[truncated {omitted} chars]"
 
 
+def _skill_reference_files(skill_dir: Path) -> list[Path]:
+    files: list[Path] = []
+    primary = skill_dir / "reference.md"
+    if primary.is_file():
+        files.append(primary)
+    references_dir = skill_dir / "references"
+    if references_dir.is_dir():
+        files.extend(
+            sorted(path for path in references_dir.glob("*.md") if path.is_file())
+        )
+    return files
+
+
 def list_skills() -> dict[str, Any]:
     skills: list[dict[str, Any]] = []
     for skill_dir in _skill_dirs():
         skill_md = skill_dir / "SKILL.md"
         metadata = _frontmatter(skill_md.read_text(encoding="utf-8"))
         scripts_dir = skill_dir / "scripts"
-        scripts = sorted(path.name for path in scripts_dir.iterdir() if path.is_file()) if scripts_dir.exists() else []
+        scripts = (
+            sorted(path.name for path in scripts_dir.iterdir() if path.is_file())
+            if scripts_dir.exists()
+            else []
+        )
+        reference_files = _skill_reference_files(skill_dir)
         skills.append(
             {
                 "name": metadata.get("name", skill_dir.name),
                 "description": metadata.get("description", ""),
                 "path": str(skill_md.relative_to(REPO_ROOT)),
                 "has_template": (skill_dir / "template.example").is_file(),
-                "has_reference": (skill_dir / "reference.md").is_file(),
+                "has_reference": bool(reference_files),
+                "reference_files": [str(path.relative_to(skill_dir)) for path in reference_files],
                 "has_mcp_tools": (skill_dir / "mcp_tools.json").is_file(),
                 "scripts": scripts,
             }
@@ -503,7 +530,20 @@ def read_skill_file(skill: str, file_name: str) -> str:
     }
     if file_name not in allowed:
         raise SkillMCPError(f"Unsupported skill resource: {file_name}")
-    path = _skill_dir(skill) / allowed[file_name]
+    skill_dir = _skill_dir(skill)
+    if file_name == "reference":
+        reference_files = _skill_reference_files(skill_dir)
+        if not reference_files:
+            raise SkillMCPError(f"{skill} does not have reference.md or references/*.md")
+        if len(reference_files) == 1:
+            return reference_files[0].read_text(encoding="utf-8")
+        chunks = []
+        for path in reference_files:
+            rel_path = path.relative_to(skill_dir)
+            text = path.read_text(encoding="utf-8")
+            chunks.append(f"# {rel_path}\n\n{text}")
+        return "\n\n".join(chunks)
+    path = skill_dir / allowed[file_name]
     if not path.is_file():
         raise SkillMCPError(f"{skill} does not have {allowed[file_name]}")
     return path.read_text(encoding="utf-8")
@@ -555,7 +595,7 @@ def list_cisco_products(state: str | None = None) -> dict[str, Any]:
     if not CATALOG_PATH.is_file():
         raise SkillMCPError(
             f"Cisco product catalog not found at {CATALOG_PATH}. "
-            "Run skills/cisco-product-setup/scripts/build_catalog.py first."
+            "Run skills/cisco-product-setup/scripts/build_catalog.py --write first."
         )
     try:
         catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))

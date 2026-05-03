@@ -961,6 +961,11 @@ print_command_plan() {
             echo "  - skills/cisco-secure-access-setup/scripts/configure_settings.sh"
             echo "  - skills/cisco-secure-access-setup/scripts/validate.sh"
             ;;
+        app_install_only)
+            echo "Workflow scripts:"
+            echo "  - skills/splunk-app-install/scripts/install_app.sh"
+            echo "  - Splunk REST app status validation"
+            ;;
         dc_networking)
             echo "Workflow scripts:"
             echo "  - skills/cisco-dc-networking-setup/scripts/setup.sh"
@@ -1170,6 +1175,10 @@ workflow_scripts_by_route = {
         "skills/cisco-secure-access-setup/scripts/configure_account.sh",
         "skills/cisco-secure-access-setup/scripts/configure_settings.sh",
         "skills/cisco-secure-access-setup/scripts/validate.sh",
+    ],
+    "app_install_only": [
+        "skills/splunk-app-install/scripts/install_app.sh",
+        "Splunk REST app status validation",
     ],
     "dc_networking": [
         "skills/cisco-dc-networking-setup/scripts/setup.sh",
@@ -1629,10 +1638,16 @@ run_spaces_configure() {
     "${cmd[@]}"
 }
 
+run_app_install_only_configure() {
+    log "No product-specific configure phase is automated for $(product_field display_name)."
+    log "Install validation is covered here; follow the product notes or vendor docs for post-install input setup."
+}
+
 run_configure_phase() {
     case "${ROUTE_TYPE}" in
         security_cloud_product|security_cloud_variant) run_security_cloud_configure ;;
         secure_access) run_secure_access_configure ;;
+        app_install_only) run_app_install_only_configure ;;
         dc_networking) run_dc_networking_configure ;;
         catalyst_stack) run_catalyst_stack_configure ;;
         meraki) run_meraki_configure ;;
@@ -1645,6 +1660,22 @@ run_configure_phase() {
             exit 1
             ;;
     esac
+}
+
+validate_install_only_apps() {
+    local app_name version failures=0
+    ensure_wrapper_session
+    while IFS= read -r app_name || [[ -n "${app_name}" ]]; do
+        [[ -n "${app_name}" ]] || continue
+        if rest_check_app "$SK" "$SPLUNK_URI" "${app_name}"; then
+            version="$(rest_get_app_version "$SK" "$SPLUNK_URI" "${app_name}" 2>/dev/null || echo "unknown")"
+            log "Installed app present: ${app_name} (version: ${version})"
+        else
+            log "ERROR: Required app is not installed: ${app_name}"
+            failures=$((failures + 1))
+        fi
+    done < <(product_list install_apps)
+    (( failures == 0 )) || exit 1
 }
 
 run_validation_phase() {
@@ -1665,6 +1696,9 @@ run_validation_phase() {
             else
                 bash "${SCRIPT_DIR}/../../cisco-secure-access-setup/scripts/validate.sh"
             fi
+            ;;
+        app_install_only)
+            validate_install_only_apps
             ;;
         dc_networking)
             bash "${SCRIPT_DIR}/../../cisco-dc-networking-setup/scripts/validate.sh"

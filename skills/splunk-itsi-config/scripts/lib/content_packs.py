@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 import os
 from pathlib import Path
 import re
@@ -16,6 +17,7 @@ from urllib.parse import urlparse
 from .common import (
     ValidationError,
     bool_from_any,
+    compact,
     ensure_dir,
     extract_indexes_from_expression,
     infer_platform,
@@ -49,25 +51,31 @@ DEFAULT_APP_INSTALL_SCRIPT = (
 )
 SUPPORTED_CONFIGURED_OUTCOME_KEYS = {
     "native",
+    "data_model_accelerations",
+    "data_models",
+    "dashboards",
+    "kpi_backfills",
+    "lookup_file_uploads",
+    "lookup_files",
+    "lookup_updates",
+    "lookups",
     "macros",
     "macro_updates",
+    "navigation_updates",
+    "props",
     "saved_searches",
+    "service_imports",
     "entity_discovery_searches",
+    "transforms",
+    "conf_stanzas",
+    "config_stanzas",
 }
 DOCUMENTED_MANUAL_OUTCOME_HINTS = {
-    "lookup_updates": "lookup updates",
-    "lookups": "lookup updates",
-    "data_model_accelerations": "data model acceleration",
-    "data_models": "data model acceleration",
-    "kpi_backfills": "KPI backfill",
     "backfills": "KPI backfill",
     "correlation_searches": "correlation-search or alert enablement",
     "alert_integrations": "alert integration",
-    "service_imports": "service import",
     "service_discovery": "service discovery",
     "sandbox_publish": "sandbox publish",
-    "navigation_updates": "navigation update",
-    "dashboards": "dashboard tuning",
 }
 
 ITSI_HEALTH_APPS: list[dict[str, str]] = [
@@ -177,10 +185,11 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
         ],
         "post_install_steps": [
             "Import Cisco Nexus Dashboard services from the service import module.",
+            "Before importing, ensure Nexus Dashboard service names are unique when compared case-insensitively.",
             "Publish the Cisco Nexus Dashboard sandbox after the pre-check passes.",
             "Enable Cisco Nexus Dashboard services either in the sandbox or after publish.",
             "Enable the Nexus Dashboard entity discovery search.",
-            "Configure Nexus Dashboard alerts integration for ITSI.",
+            "Configure Nexus Dashboard alerts integration for ITSI, using the Cisco Nexus Dashboard integration on ITSI 4.21.x or the generic alerts integration on ITSI 4.20.x.",
             "Review KPI thresholds and configure KPI alerting.",
         ],
     },
@@ -192,12 +201,15 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
             {"label": "Cisco Meraki Add-on for Splunk", "candidates": ["Splunk_TA_cisco_meraki"]},
         ],
         "required_inputs": [
+            {"app": "TA_cisco_catalyst", "pattern": "cisco_catalyst_dnac_devicehealth://", "label": "Catalyst Device Health input"},
             {"app": "TA_cisco_catalyst", "pattern": "cisco_catalyst_dnac_issue://", "label": "Catalyst issues input"},
-            {"app": "TA_cisco_catalyst", "pattern": "cisco_catalyst_dnac_networkhealth://", "label": "Catalyst network health input"},
             {"app": "TA_cisco_catalyst", "pattern": "cisco_catalyst_dnac_securityadvisory://", "label": "Catalyst advisory input"},
+            {"app": "TA_cisco_catalyst", "pattern": "cisco_catalyst_dnac_site_topology://", "label": "Catalyst Site Topology input"},
             {"app": "Splunk_TA_cisco_meraki", "pattern": "cisco_meraki_assurance_alerts://", "label": "Meraki assurance alerts input"},
-            {"app": "Splunk_TA_cisco_meraki", "pattern": "cisco_meraki_devices://", "label": "Meraki devices input"},
+            {"app": "Splunk_TA_cisco_meraki", "pattern": "cisco_meraki_device_availabilities_change_history://", "label": "Meraki Device Availabilities Change History input"},
+            {"app": "Splunk_TA_cisco_meraki", "pattern": "cisco_meraki_organization_networks://", "label": "Meraki Organizations Networks input"},
             {"app": "Splunk_TA_cisco_meraki", "pattern": "cisco_meraki_organizations://", "label": "Meraki organizations input"},
+            {"app": "Splunk_TA_cisco_meraki", "pattern": "cisco_meraki_wireless_packet_loss_by_device://", "label": "Meraki Wireless Packet Loss by Device input"},
         ],
         "macro_checks": [
             {"macro": "itsi_cp_catalyst_center_index", "source_app": "TA_cisco_catalyst", "source_fields": ["index"]},
@@ -214,6 +226,7 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
             "Enable the Catalyst Center and Meraki services if they remain disabled.",
             "Enable the Catalyst Center and Meraki entity discovery searches.",
             "Configure Catalyst Center and Meraki alerts integration for ITSI.",
+            "For existing Catalyst Center alerts integration connections created before Catalyst Add-on 3.0.0 compatibility fixes, verify drilldown host fields use cisco_catalyst_host.",
             "Review KPI thresholds and KPI alerting.",
         ],
     },
@@ -442,7 +455,7 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     "pivotal_cloud_foundry": _catalog_profile(
         "Monitoring Pivotal Cloud Foundry",
         pack_app_candidates=["DA-ITSI-CP-pivotal-cloud-foundry", "DA-ITSI-CP-pcf"],
-        companion_app_checks=[
+        required_apps=[
             {"label": "Splunk Firehose Nozzle for PCF", "candidates": ["splunk-firehose-nozzle", "Splunk_TA_pcf", "TA-pivotal-cloud-foundry"]},
         ],
         post_install_steps=[
@@ -482,8 +495,6 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
         pack_app_candidates=["DA-ITSI-CP-servicenow"],
         required_apps=[
             {"label": "Splunk Add-on for ServiceNow", "candidates": ["Splunk_TA_snow", "Splunk_TA_servicenow"]},
-        ],
-        companion_app_checks=[
             {"label": "Dendrogram Viz", "candidates": ["dendrogram-viz", "dendrogram_app", "DA-ITSI-DendrogramViz"]},
         ],
         post_install_steps=[
@@ -506,7 +517,7 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
         pack_app_candidates=["DA-ITSI-CP-soar-system-logs"],
         required_apps=[
             {"label": "Splunk Add-on for Unix and Linux", "candidates": ["Splunk_TA_nix"]},
-            {"label": "Splunk App for SOAR", "candidates": ["phantom", "Splunk_SA_Scientific_Python_linux_x86_64", "splunk_app_soar"]},
+            {"label": "Splunk App for SOAR", "candidates": ["phantom", "splunk_app_soar"]},
         ],
         post_install_steps=[
             "Confirm SOAR and Unix/Linux log data is ingested into the expected indexes.",
@@ -581,8 +592,8 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     "windows_dashboards_reports": _catalog_profile(
         "Windows Dashboards and Reports",
         pack_app_candidates=["DA-ITSI-CP-windows-dashboards"],
-        required_apps=[{"label": "Splunk Add-on for Windows", "candidates": ["Splunk_TA_windows"]}],
-        companion_app_checks=[
+        required_apps=[
+            {"label": "Splunk Add-on for Windows", "candidates": ["Splunk_TA_windows"]},
             {"label": "Splunk Supporting Add-on for Active Directory", "candidates": ["SA-ldapsearch", "Splunk_SA_LDAPSearch", "TA-DomainController-2012R2"]},
         ],
         post_install_steps=[
@@ -1903,6 +1914,46 @@ def _check_custom_index_overrides(
     )
 
 
+def _check_current_content_pack_known_issues(
+    findings: list[dict[str, str]],
+    pack_spec: dict[str, Any],
+    *,
+    profile_name: str,
+) -> None:
+    prefix = str(pack_spec.get("prefix") or "").strip()
+    if prefix:
+        findings.append(
+            _finding(
+                "warn",
+                "known_issue",
+                "Splunk App for Content Packs 2.5.0 has a known issue where installing content packs with a prefix can leave imported services unlinked from their service templates and KPIs. Avoid prefix for service-import packs, or verify service-template links after install.",
+            )
+        )
+    if profile_name == "cisco_data_center":
+        findings.append(
+            _finding(
+                "warn",
+                "known_issue",
+                "Content Pack for Cisco Data Center 1.0.0 has a known issue where the Nexus Dashboard service import module does not support service names that differ only by case. Normalize those names before import.",
+            )
+        )
+    if profile_name == "cisco_enterprise_networks":
+        findings.append(
+            _finding(
+                "warn",
+                "known_issue",
+                "Splunk App for Content Packs 2.5.0 has a known issue where Cisco Enterprise Networks service import options are not filtered by the selected Catalyst Center Host. Select only services from the intended controller, or intentionally select services across controllers.",
+            )
+        )
+        findings.append(
+            _finding(
+                "warn",
+                "known_issue",
+                "Existing Cisco Catalyst Center alerts integration connections created before the Catalyst Add-on 3.0.0 field rename fix can still reference cisco_dnac_host. Review those connections and update drilldown host fields to cisco_catalyst_host.",
+            )
+        )
+
+
 def validate_profile(
     client: Any,
     pack_spec: dict[str, Any],
@@ -1911,6 +1962,7 @@ def validate_profile(
 ) -> list[dict[str, str]]:
     findings: list[dict[str, str]] = []
     profile_name = str(pack_spec.get("profile") or "").strip()
+    _check_current_content_pack_known_issues(findings, pack_spec, profile_name=profile_name)
     if profile_meta.get("generic_catalog_profile"):
         findings.append(
             _finding(
@@ -2220,6 +2272,576 @@ def _run_saved_search_outcomes(client: Any, result: dict[str, Any], searches: li
         _record_outcome_step(result, "pass", "saved_search", search_name, f"Updated saved search in app {app_name}.")
 
 
+CONF_STANZA_RESERVED_KEYS = {
+    "app",
+    "conf",
+    "conf_name",
+    "config",
+    "create",
+    "fields",
+    "file",
+    "name",
+    "payload",
+    "settings",
+    "stanza",
+    "title",
+    "values",
+}
+
+
+def _conf_stanza_payload(stanza_spec: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for key in ("fields", "settings", "values", "payload"):
+        value = stanza_spec.get(key)
+        if value is None:
+            continue
+        if not isinstance(value, dict):
+            raise ValidationError(f"Configuration stanza '{key}' must be a mapping when provided.")
+        payload.update(deepcopy(value))
+    payload.update(
+        {
+            key: deepcopy(value)
+            for key, value in stanza_spec.items()
+            if key not in CONF_STANZA_RESERVED_KEYS
+        }
+    )
+    payload = compact(payload)
+    if not payload:
+        raise ValidationError("Configuration stanza entries require at least one field to manage.")
+    return {key: ("true" if value is True else "false" if value is False else str(value)) for key, value in payload.items()}
+
+
+def _run_conf_stanza_outcomes(
+    client: Any,
+    result: dict[str, Any],
+    stanza_specs: list[Any],
+    mode: str,
+    pack_app_name: str,
+    *,
+    fixed_conf_name: str | None = None,
+) -> None:
+    for index, stanza_spec in enumerate(stanza_specs):
+        kind = fixed_conf_name or "conf_stanza"
+        if not isinstance(stanza_spec, dict):
+            _record_outcome_step(result, "error", kind, f"{kind}[{index}]", "Configuration stanza entries must be mappings.")
+            continue
+        app_name = str(stanza_spec.get("app") or pack_app_name).strip()
+        conf_name = str(fixed_conf_name or stanza_spec.get("conf") or stanza_spec.get("conf_name") or stanza_spec.get("file") or "").strip()
+        stanza_name = str(stanza_spec.get("stanza") or stanza_spec.get("name") or stanza_spec.get("title") or "").strip()
+        if not app_name or not conf_name or not stanza_name:
+            _record_outcome_step(result, "error", kind, stanza_name or f"{kind}[{index}]", "Configuration stanza entries require app/conf/stanza.")
+            continue
+        try:
+            payload = _conf_stanza_payload(stanza_spec)
+        except ValidationError as exc:
+            _record_outcome_step(result, "error", kind, stanza_name, str(exc))
+            continue
+        current = client.get_conf_stanza(app_name, conf_name, stanza_name) if hasattr(client, "get_conf_stanza") else None
+        desired_subset = {key: str(value) for key, value in payload.items()}
+        current_subset = {key: str((current or {}).get(key)) for key in desired_subset}
+        matches = bool(current) and current_subset == desired_subset
+        if mode == "validate":
+            _record_outcome_step(
+                result,
+                "pass" if matches else "error",
+                kind,
+                stanza_name,
+                "Configuration stanza matches." if matches else "Configuration stanza does not match or is missing.",
+            )
+            continue
+        if mode == "preview":
+            action = "noop" if matches else ("create" if not current and bool_from_any(stanza_spec.get("create")) else "update")
+            _record_outcome_step(result, "pass", kind, stanza_name, f"Would {action} {conf_name}.conf stanza in app {app_name}.")
+            continue
+        try:
+            if current:
+                if not hasattr(client, "update_conf_stanza"):
+                    _record_outcome_step(result, "error", kind, stanza_name, "Configured client cannot update configuration stanzas.")
+                    continue
+                client.update_conf_stanza(app_name, conf_name, stanza_name, payload)
+            elif bool_from_any(stanza_spec.get("create")):
+                if not hasattr(client, "create_conf_stanza"):
+                    _record_outcome_step(result, "error", kind, stanza_name, "Configured client cannot create configuration stanzas.")
+                    continue
+                client.create_conf_stanza(app_name, conf_name, stanza_name, payload)
+            else:
+                _record_outcome_step(
+                    result,
+                    "error",
+                    kind,
+                    stanza_name,
+                    f"{conf_name}.conf stanza '{stanza_name}' was not found in app {app_name}; set create: true to create it.",
+                )
+                continue
+        except (KeyError, ValidationError) as exc:
+            _record_outcome_step(result, "error", kind, stanza_name, f"Configuration stanza update failed: {exc}")
+            continue
+        _record_outcome_step(result, "pass", kind, stanza_name, f"Applied {conf_name}.conf stanza in app {app_name}.")
+
+
+def _data_model_acceleration_payload(model_spec: dict[str, Any]) -> dict[str, Any]:
+    acceleration = deepcopy(model_spec.get("acceleration") or {})
+    if not isinstance(acceleration, dict):
+        raise ValidationError("Data model acceleration entries must use acceleration as a mapping.")
+    for source_key, target_key in (
+        ("enabled", "enabled"),
+        ("earliest_time", "earliest_time"),
+        ("cron_schedule", "cron_schedule"),
+    ):
+        if source_key in model_spec and source_key not in acceleration:
+            acceleration[target_key] = model_spec[source_key]
+    if "enabled" in acceleration:
+        acceleration["enabled"] = bool_from_any(acceleration["enabled"])
+    if not acceleration:
+        raise ValidationError("Data model acceleration entries require enabled, earliest_time, cron_schedule, or acceleration.")
+    return {"acceleration": json.dumps(acceleration)}
+
+
+def _current_data_model_acceleration(current: dict[str, Any] | None) -> dict[str, Any]:
+    raw = (current or {}).get("acceleration")
+    if isinstance(raw, dict):
+        return deepcopy(raw)
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return {"raw": raw}
+        return parsed if isinstance(parsed, dict) else {"raw": raw}
+    return {}
+
+
+def _run_data_model_acceleration_outcomes(client: Any, result: dict[str, Any], models: list[Any], mode: str, pack_app_name: str) -> None:
+    for index, model_spec in enumerate(models):
+        if not isinstance(model_spec, dict):
+            _record_outcome_step(result, "error", "data_model", f"data_model[{index}]", "Data model entries must be mappings.")
+            continue
+        app_name = str(model_spec.get("app") or pack_app_name).strip()
+        model_name = str(model_spec.get("name") or model_spec.get("model") or model_spec.get("title") or "").strip()
+        if not app_name or not model_name:
+            _record_outcome_step(result, "error", "data_model", model_name or f"data_model[{index}]", "Data model entries require app/name.")
+            continue
+        try:
+            payload = _data_model_acceleration_payload(model_spec)
+        except ValidationError as exc:
+            _record_outcome_step(result, "error", "data_model", model_name, str(exc))
+            continue
+        current = client.get_data_model(app_name, model_name) if hasattr(client, "get_data_model") else None
+        desired = json.loads(str(payload["acceleration"]))
+        current_acceleration = _current_data_model_acceleration(current)
+        matches = bool(current) and all(str(current_acceleration.get(key)) == str(value) for key, value in desired.items())
+        if mode == "validate":
+            _record_outcome_step(
+                result,
+                "pass" if matches else "error",
+                "data_model",
+                model_name,
+                "Data model acceleration matches." if matches else "Data model acceleration does not match or data model is missing.",
+            )
+            continue
+        if mode == "preview":
+            action = "noop" if matches else "update"
+            _record_outcome_step(result, "pass", "data_model", model_name, f"Would {action} data model acceleration in app {app_name}.")
+            continue
+        if not hasattr(client, "update_data_model"):
+            _record_outcome_step(result, "error", "data_model", model_name, "Configured client cannot update data models.")
+            continue
+        if not current:
+            _record_outcome_step(result, "error", "data_model", model_name, f"Data model '{model_name}' was not found in app {app_name}.")
+            continue
+        try:
+            client.update_data_model(app_name, model_name, payload)
+        except (KeyError, ValidationError) as exc:
+            _record_outcome_step(result, "error", "data_model", model_name, f"Data model acceleration update failed: {exc}")
+            continue
+        _record_outcome_step(result, "pass", "data_model", model_name, f"Updated data model acceleration in app {app_name}.")
+
+
+def _xml_from_spec(spec: dict[str, Any], label: str) -> str:
+    if spec.get("xml") is not None:
+        return str(spec["xml"])
+    if spec.get("eai:data") is not None:
+        return str(spec["eai:data"])
+    file_path = str(spec.get("file") or spec.get("path") or "").strip()
+    if file_path:
+        try:
+            return Path(file_path).read_text(encoding="utf-8")
+        except OSError as exc:
+            raise ValidationError(f"{label} XML file could not be read: {exc}") from exc
+    raise ValidationError(f"{label} entries require xml, eai:data, file, or path.")
+
+
+def _run_dashboard_outcomes(client: Any, result: dict[str, Any], dashboards: list[Any], mode: str, pack_app_name: str) -> None:
+    for index, dashboard_spec in enumerate(dashboards):
+        if not isinstance(dashboard_spec, dict):
+            _record_outcome_step(result, "error", "dashboard", f"dashboard[{index}]", "Dashboard entries must be mappings.")
+            continue
+        app_name = str(dashboard_spec.get("app") or pack_app_name).strip()
+        view_name = str(dashboard_spec.get("name") or dashboard_spec.get("view") or dashboard_spec.get("title") or "").strip()
+        if not app_name or not view_name:
+            _record_outcome_step(result, "error", "dashboard", view_name or f"dashboard[{index}]", "Dashboard entries require app/name.")
+            continue
+        try:
+            xml = _xml_from_spec(dashboard_spec, "Dashboard")
+        except ValidationError as exc:
+            _record_outcome_step(result, "error", "dashboard", view_name, str(exc))
+            continue
+        current = client.get_ui_view(app_name, view_name) if hasattr(client, "get_ui_view") else None
+        current_xml = str((current or {}).get("eai:data") or "")
+        matches = bool(current) and current_xml == xml
+        if mode == "validate":
+            _record_outcome_step(result, "pass" if matches else "error", "dashboard", view_name, "Dashboard XML matches." if matches else "Dashboard XML does not match or dashboard is missing.")
+            continue
+        if mode == "preview":
+            action = "noop" if matches else ("create" if not current and bool_from_any(dashboard_spec.get("create")) else "update")
+            _record_outcome_step(result, "pass", "dashboard", view_name, f"Would {action} dashboard in app {app_name}.")
+            continue
+        changelog = str(dashboard_spec.get("changelog") or "").strip() or None
+        try:
+            if current:
+                if not hasattr(client, "update_ui_view"):
+                    _record_outcome_step(result, "error", "dashboard", view_name, "Configured client cannot update dashboards.")
+                    continue
+                client.update_ui_view(app_name, view_name, xml, changelog=changelog)
+            elif bool_from_any(dashboard_spec.get("create")):
+                if not hasattr(client, "create_ui_view"):
+                    _record_outcome_step(result, "error", "dashboard", view_name, "Configured client cannot create dashboards.")
+                    continue
+                client.create_ui_view(app_name, view_name, xml, changelog=changelog)
+            else:
+                _record_outcome_step(result, "error", "dashboard", view_name, f"Dashboard '{view_name}' was not found in app {app_name}; set create: true to create it.")
+                continue
+        except (KeyError, ValidationError) as exc:
+            _record_outcome_step(result, "error", "dashboard", view_name, f"Dashboard update failed: {exc}")
+            continue
+        _record_outcome_step(result, "pass", "dashboard", view_name, f"Applied dashboard XML in app {app_name}.")
+
+
+def _run_navigation_outcomes(client: Any, result: dict[str, Any], nav_specs: list[Any], mode: str, pack_app_name: str) -> None:
+    for index, nav_spec in enumerate(nav_specs):
+        if not isinstance(nav_spec, dict):
+            _record_outcome_step(result, "error", "navigation", f"navigation[{index}]", "Navigation entries must be mappings.")
+            continue
+        app_name = str(nav_spec.get("app") or pack_app_name).strip()
+        nav_name = str(nav_spec.get("name") or nav_spec.get("nav") or "default").strip() or "default"
+        if not app_name:
+            _record_outcome_step(result, "error", "navigation", nav_name, "Navigation entries require app.")
+            continue
+        try:
+            xml = _xml_from_spec(nav_spec, "Navigation")
+        except ValidationError as exc:
+            _record_outcome_step(result, "error", "navigation", nav_name, str(exc))
+            continue
+        current = client.get_ui_nav(app_name, nav_name) if hasattr(client, "get_ui_nav") else None
+        matches = bool(current) and str((current or {}).get("eai:data") or "") == xml
+        if mode == "validate":
+            _record_outcome_step(result, "pass" if matches else "error", "navigation", nav_name, "Navigation XML matches." if matches else "Navigation XML does not match or nav object is missing.")
+            continue
+        if mode == "preview":
+            action = "noop" if matches else "update"
+            _record_outcome_step(result, "pass", "navigation", nav_name, f"Would {action} navigation XML in app {app_name}.")
+            continue
+        if not current:
+            _record_outcome_step(result, "error", "navigation", nav_name, f"Navigation object '{nav_name}' was not found in app {app_name}.")
+            continue
+        if not hasattr(client, "update_ui_nav"):
+            _record_outcome_step(result, "error", "navigation", nav_name, "Configured client cannot update navigation XML.")
+            continue
+        try:
+            client.update_ui_nav(app_name, xml, nav_name=nav_name)
+        except (KeyError, ValidationError) as exc:
+            _record_outcome_step(result, "error", "navigation", nav_name, f"Navigation update failed: {exc}")
+            continue
+        _record_outcome_step(result, "pass", "navigation", nav_name, f"Updated navigation XML in app {app_name}.")
+
+
+def _dispatch_payload(dispatch_spec: dict[str, Any]) -> dict[str, Any]:
+    excluded = {
+        "allow_large_template_import",
+        "allow_dispatch",
+        "allow_lookup_file_replace",
+        "allow_lookup_file_upload",
+        "allow_service_import",
+        "allow_non_outputlookup",
+        "allow_unverified_service_import",
+        "app",
+        "expected_service_count",
+        "kind",
+        "links_service_templates",
+        "module",
+        "name",
+        "namespace",
+        "saved_search",
+        "search",
+        "service_count",
+        "title",
+        "type",
+        "uses_service_templates",
+    }
+    payload = {key: value for key, value in dispatch_spec.items() if key not in excluded}
+    payload.setdefault("exec_mode", "normal")
+    return payload
+
+
+def _search_writes_lookup(search: str) -> bool:
+    return bool(re.search(r"\|\s*outputlookup\b", search, flags=re.IGNORECASE))
+
+
+def _search_imports_itsi_objects(search: str) -> bool:
+    return bool(re.search(r"\|\s*itsiimportobjects\b", search, flags=re.IGNORECASE))
+
+
+def _optional_positive_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed >= 0 else None
+
+
+def _run_service_import_outcomes(client: Any, result: dict[str, Any], imports: list[Any], mode: str) -> None:
+    for index, import_spec in enumerate(imports):
+        if not isinstance(import_spec, dict):
+            _record_outcome_step(result, "error", "service_import", f"service_import[{index}]", "Service-import entries must be mappings.")
+            continue
+        app_name = str(import_spec.get("app") or import_spec.get("namespace") or ITSI_APP).strip()
+        title = str(import_spec.get("title") or import_spec.get("saved_search") or import_spec.get("name") or f"service_import[{index}]").strip()
+        search = str(import_spec.get("search") or "").strip()
+        saved_search = str(import_spec.get("saved_search") or "").strip() if not search else ""
+        if not app_name:
+            _record_outcome_step(result, "error", "service_import", title, "Service imports require an app namespace.")
+            continue
+        if import_spec.get("module") and not (search or saved_search):
+            _record_outcome_step(
+                result,
+                "warn",
+                "service_import",
+                title,
+                "Module-driven service imports are still UI-driven; provide a search or saved_search containing '| itsiimportobjects' for automation.",
+            )
+            continue
+        current_saved_search = None
+        if saved_search and hasattr(client, "get_saved_search"):
+            current_saved_search = client.get_saved_search(app_name, saved_search)
+            search = str((current_saved_search or {}).get("search") or search).strip()
+        if not search and not saved_search:
+            _record_outcome_step(result, "warn", "service_import", title, "Service imports require search or saved_search containing '| itsiimportobjects'.")
+            continue
+        if search and not _search_imports_itsi_objects(search):
+            _record_outcome_step(result, "error", "service_import", title, "Service import searches must include '| itsiimportobjects'.")
+            continue
+        if saved_search and not search and mode != "preview":
+            _record_outcome_step(
+                result,
+                "error",
+                "service_import",
+                title,
+                "Service import saved searches must be readable so configured_outcome can verify they include '| itsiimportobjects'.",
+            )
+            continue
+        raw_expected_count = import_spec.get("expected_service_count")
+        if raw_expected_count in (None, ""):
+            raw_expected_count = import_spec.get("service_count")
+        expected_count = _optional_positive_int(raw_expected_count)
+        if raw_expected_count not in (None, "") and expected_count is None:
+            _record_outcome_step(result, "error", "service_import", title, "expected_service_count/service_count must be a non-negative integer when provided.")
+            continue
+        uses_templates = bool_from_any(import_spec.get("uses_service_templates") or import_spec.get("links_service_templates"))
+        if expected_count is not None and expected_count > 1000:
+            _record_outcome_step(result, "error", "service_import", title, "ITSI service imports should be split before exceeding 1,000 services.")
+            continue
+        if uses_templates and expected_count is not None and expected_count > 300 and not bool_from_any(import_spec.get("allow_large_template_import")):
+            _record_outcome_step(
+                result,
+                "error",
+                "service_import",
+                title,
+                "ITSI template-linked service imports should be split into 200-300 service batches unless allow_large_template_import is explicitly set.",
+            )
+            continue
+        if mode == "validate":
+            status = "pass" if search or current_saved_search else "error"
+            detail = "Service import dispatch target is defined." if status == "pass" else "Service import dispatch target is missing."
+            _record_outcome_step(result, status, "service_import", title, detail)
+            continue
+        if mode == "preview":
+            _record_outcome_step(result, "pass", "service_import", title, f"Would dispatch {'saved search' if saved_search else 'search'} in app {app_name}.")
+            continue
+        if not bool_from_any(import_spec.get("allow_service_import")):
+            _record_outcome_step(result, "error", "service_import", title, "Set allow_service_import: true after operator review.")
+            continue
+        try:
+            if saved_search:
+                if not hasattr(client, "dispatch_saved_search"):
+                    raise ValidationError("Configured client cannot dispatch saved searches.")
+                response = client.dispatch_saved_search(app_name, saved_search, _dispatch_payload(import_spec))
+            else:
+                if not hasattr(client, "dispatch_search"):
+                    raise ValidationError("Configured client cannot dispatch searches.")
+                response = client.dispatch_search(search, _dispatch_payload(import_spec), app_name=app_name)
+        except (KeyError, ValidationError) as exc:
+            _record_outcome_step(result, "error", "service_import", title, f"Service import dispatch failed: {exc}")
+            continue
+        sid = response.get("sid") if isinstance(response, dict) else None
+        suffix = f" sid={sid}" if sid else ""
+        _record_outcome_step(result, "pass", "service_import", title, f"Dispatched {'saved search' if saved_search else 'search'} in app {app_name}.{suffix}")
+
+
+LOOKUP_STAGING_RE = re.compile(r"(^|[\\/])lookup_tmp([\\/]|$)")
+
+
+def _lookup_staging_path(path: str) -> bool:
+    return bool(LOOKUP_STAGING_RE.search(path.strip()))
+
+
+def _run_lookup_file_upload_outcomes(
+    client: Any,
+    result: dict[str, Any],
+    uploads: list[Any],
+    mode: str,
+    pack_app_name: str,
+    platform: str,
+) -> None:
+    for index, upload_spec in enumerate(uploads):
+        if not isinstance(upload_spec, dict):
+            _record_outcome_step(result, "error", "lookup_file_upload", f"lookup_file_upload[{index}]", "Lookup file upload entries must be mappings.")
+            continue
+        app_name = str(upload_spec.get("app") or pack_app_name).strip()
+        lookup_name = str(upload_spec.get("name") or upload_spec.get("lookup") or upload_spec.get("file_name") or upload_spec.get("filename") or "").strip()
+        title = str(upload_spec.get("title") or lookup_name or f"lookup_file_upload[{index}]").strip()
+        staged_path = str(
+            upload_spec.get("staged_path")
+            or upload_spec.get("staging_path")
+            or upload_spec.get("source_path")
+            or upload_spec.get("eai:data")
+            or ""
+        ).strip()
+        if not app_name or not lookup_name:
+            _record_outcome_step(result, "error", "lookup_file_upload", title, "Lookup file uploads require app/name.")
+            continue
+        if platform == "cloud":
+            _record_outcome_step(
+                result,
+                "error" if mode != "preview" else "warn",
+                "lookup_file_upload",
+                title,
+                "Core data/lookup-table-files upload and replace endpoints are documented for Splunk Enterprise only; use lookup_updates/outputlookup or a supported app/API on Splunk Cloud.",
+            )
+            continue
+        if not staged_path:
+            hint = "Use staged_path pointing under Splunk's lookup_tmp staging area."
+            if upload_spec.get("file") or upload_spec.get("path") or upload_spec.get("local_file"):
+                hint = "Local file bytes are not uploaded by the core endpoint; stage the file under Splunk's lookup_tmp directory and set staged_path."
+            _record_outcome_step(result, "error", "lookup_file_upload", title, hint)
+            continue
+        if not _lookup_staging_path(staged_path):
+            _record_outcome_step(result, "error", "lookup_file_upload", title, "staged_path must be under Splunk's lookup_tmp staging directory.")
+            continue
+        current = client.get_lookup_file(app_name, lookup_name) if hasattr(client, "get_lookup_file") else None
+        if mode == "validate":
+            _record_outcome_step(
+                result,
+                "pass" if current else "error",
+                "lookup_file_upload",
+                title,
+                "Lookup file exists." if current else "Lookup file is missing.",
+            )
+            continue
+        if mode == "preview":
+            action = "replace" if current else ("create" if bool_from_any(upload_spec.get("create")) else "create-blocked")
+            _record_outcome_step(result, "pass", "lookup_file_upload", title, f"Would {action} lookup file {lookup_name} in app {app_name} from staged_path.")
+            continue
+        if not bool_from_any(upload_spec.get("allow_lookup_file_upload")):
+            _record_outcome_step(result, "error", "lookup_file_upload", title, "Set allow_lookup_file_upload: true after operator review.")
+            continue
+        try:
+            if current:
+                if not bool_from_any(upload_spec.get("allow_lookup_file_replace")):
+                    _record_outcome_step(result, "error", "lookup_file_upload", title, "Set allow_lookup_file_replace: true to replace an existing lookup file.")
+                    continue
+                if not hasattr(client, "update_lookup_file"):
+                    raise ValidationError("Configured client cannot replace lookup files.")
+                client.update_lookup_file(app_name, lookup_name, staged_path)
+            elif bool_from_any(upload_spec.get("create")):
+                if not hasattr(client, "create_lookup_file"):
+                    raise ValidationError("Configured client cannot create lookup files.")
+                client.create_lookup_file(app_name, lookup_name, staged_path)
+            else:
+                _record_outcome_step(result, "error", "lookup_file_upload", title, f"Lookup file '{lookup_name}' was not found in app {app_name}; set create: true to create it.")
+                continue
+        except (KeyError, ValidationError) as exc:
+            _record_outcome_step(result, "error", "lookup_file_upload", title, f"Lookup file upload failed: {exc}")
+            continue
+        _record_outcome_step(result, "pass", "lookup_file_upload", title, f"Applied lookup file {lookup_name} in app {app_name}.")
+
+
+def _run_dispatch_outcomes(
+    client: Any,
+    result: dict[str, Any],
+    dispatches: list[Any],
+    mode: str,
+    pack_app_name: str,
+    *,
+    kind: str,
+    require_outputlookup: bool = False,
+) -> None:
+    for index, dispatch_spec in enumerate(dispatches):
+        if not isinstance(dispatch_spec, dict):
+            _record_outcome_step(result, "error", kind, f"{kind}[{index}]", "Dispatch entries must be mappings.")
+            continue
+        app_name = str(dispatch_spec.get("app") or pack_app_name).strip()
+        title = str(dispatch_spec.get("title") or dispatch_spec.get("name") or dispatch_spec.get("saved_search") or f"{kind}[{index}]").strip()
+        search = str(dispatch_spec.get("search") or "").strip()
+        saved_search = str(dispatch_spec.get("saved_search") or dispatch_spec.get("name") or "").strip() if not search else ""
+        current_saved_search = None
+        if saved_search and hasattr(client, "get_saved_search"):
+            current_saved_search = client.get_saved_search(app_name, saved_search)
+            search = str((current_saved_search or {}).get("search") or search).strip()
+        if require_outputlookup and not bool_from_any(dispatch_spec.get("allow_non_outputlookup")):
+            if search and not _search_writes_lookup(search):
+                _record_outcome_step(result, "error", kind, title, "Lookup update searches must include '| outputlookup' unless allow_non_outputlookup is true.")
+                continue
+            if saved_search and not search and mode != "preview":
+                _record_outcome_step(
+                    result,
+                    "error",
+                    kind,
+                    title,
+                    "Lookup update saved searches must be readable so configured_outcome can verify they include '| outputlookup', or set allow_non_outputlookup: true after operator review.",
+                )
+                continue
+        if not search and not saved_search:
+            _record_outcome_step(result, "warn", kind, title, f"{kind.replace('_', ' ')} requires search or saved_search for automation.")
+            continue
+        if mode == "validate":
+            status = "pass" if search or current_saved_search else "error"
+            detail = "Dispatch target is defined." if status == "pass" else "Dispatch target is missing."
+            _record_outcome_step(result, status, kind, title, detail)
+            continue
+        if mode == "preview":
+            _record_outcome_step(result, "pass", kind, title, f"Would dispatch {'saved search' if saved_search else 'search'} in app {app_name}.")
+            continue
+        if not bool_from_any(dispatch_spec.get("allow_dispatch")):
+            _record_outcome_step(result, "error", kind, title, "Set allow_dispatch: true after operator review.")
+            continue
+        try:
+            if saved_search:
+                if not hasattr(client, "dispatch_saved_search"):
+                    raise ValidationError("Configured client cannot dispatch saved searches.")
+                response = client.dispatch_saved_search(app_name, saved_search, _dispatch_payload(dispatch_spec))
+            else:
+                if not hasattr(client, "dispatch_search"):
+                    raise ValidationError("Configured client cannot dispatch searches.")
+                response = client.dispatch_search(search, _dispatch_payload(dispatch_spec), app_name=app_name)
+        except (KeyError, ValidationError) as exc:
+            _record_outcome_step(result, "error", kind, title, f"Dispatch failed: {exc}")
+            continue
+        sid = response.get("sid") if isinstance(response, dict) else None
+        suffix = f" sid={sid}" if sid else ""
+        _record_outcome_step(result, "pass", kind, title, f"Dispatched {'saved search' if saved_search else 'search'} in app {app_name}.{suffix}")
+
+
 def _run_configured_outcome(
     client: Any,
     pack_spec: dict[str, Any],
@@ -2234,6 +2856,7 @@ def _run_configured_outcome(
     if not isinstance(outcome_spec, dict):
         raise ValidationError("configured_outcome must be a mapping when provided.")
     result: dict[str, Any] = {"mode": mode, "steps": []}
+    platform = infer_platform(base_spec)
     native_spec = outcome_spec.get("native")
     if native_spec is not None:
         if not isinstance(native_spec, dict):
@@ -2258,6 +2881,50 @@ def _run_configured_outcome(
         mode,
         pack_app_name,
     )
+    _run_conf_stanza_outcomes(client, result, listify(outcome_spec.get("props")), mode, pack_app_name, fixed_conf_name="props")
+    _run_conf_stanza_outcomes(client, result, listify(outcome_spec.get("transforms")), mode, pack_app_name, fixed_conf_name="transforms")
+    _run_conf_stanza_outcomes(
+        client,
+        result,
+        listify(outcome_spec.get("conf_stanzas") or outcome_spec.get("config_stanzas")),
+        mode,
+        pack_app_name,
+    )
+    _run_data_model_acceleration_outcomes(
+        client,
+        result,
+        listify(outcome_spec.get("data_model_accelerations") or outcome_spec.get("data_models")),
+        mode,
+        pack_app_name,
+    )
+    _run_dashboard_outcomes(client, result, listify(outcome_spec.get("dashboards")), mode, pack_app_name)
+    _run_navigation_outcomes(client, result, listify(outcome_spec.get("navigation_updates")), mode, pack_app_name)
+    _run_lookup_file_upload_outcomes(
+        client,
+        result,
+        listify(outcome_spec.get("lookup_file_uploads") or outcome_spec.get("lookup_files")),
+        mode,
+        pack_app_name,
+        platform,
+    )
+    _run_dispatch_outcomes(
+        client,
+        result,
+        listify(outcome_spec.get("lookup_updates") or outcome_spec.get("lookups")),
+        mode,
+        pack_app_name,
+        kind="lookup_update",
+        require_outputlookup=True,
+    )
+    _run_dispatch_outcomes(
+        client,
+        result,
+        listify(outcome_spec.get("kpi_backfills")),
+        mode,
+        pack_app_name,
+        kind="kpi_backfill",
+    )
+    _run_service_import_outcomes(client, result, listify(outcome_spec.get("service_imports")), mode)
     _record_unsupported_outcome_steps(result, outcome_spec)
     return result
 

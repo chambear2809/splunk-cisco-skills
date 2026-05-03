@@ -61,6 +61,80 @@ class SplunkRestClientTests(unittest.TestCase):
             {"status": "missing", "message": "not found"},
         )
 
+    def test_conf_stanza_helpers_use_namespaced_config_routes(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, dict | None]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            if path == "/servicesNS/nobody/DA-ITSI-CP-example/configs/conf-props/example%3Asourcetype":
+                return {"entry": [{"name": "example:sourcetype", "content": {"KV_MODE": "auto"}}]}
+            raise AssertionError(path)
+
+        def fake_request_form(method, path, params=None, payload=None):
+            calls.append((method, path, dict(payload or {})))
+            return {"entry": [{"name": payload.get("name", "example:sourcetype"), "content": dict(payload or {})}]}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+        client._request_form = fake_request_form  # type: ignore[attr-defined]
+
+        self.assertEqual(
+            client.get_conf_stanza("DA-ITSI-CP-example", "props", "example:sourcetype"),
+            {"KV_MODE": "auto", "name": "example:sourcetype"},
+        )
+        client.update_conf_stanza("DA-ITSI-CP-example", "props", "example:sourcetype", {"KV_MODE": "json"})
+        client.create_conf_stanza("DA-ITSI-CP-example", "transforms", "example_extract", {"REGEX": "new"})
+
+        self.assertEqual(
+            calls,
+            [
+                ("GET", "/servicesNS/nobody/DA-ITSI-CP-example/configs/conf-props/example%3Asourcetype", None),
+                ("POST", "/servicesNS/nobody/DA-ITSI-CP-example/configs/conf-props/example%3Asourcetype", {"KV_MODE": "json"}),
+                ("POST", "/servicesNS/nobody/DA-ITSI-CP-example/configs/conf-transforms", {"REGEX": "new", "name": "example_extract"}),
+            ],
+        )
+
+    def test_lookup_file_helpers_use_namespaced_lookup_routes(self) -> None:
+        client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
+        calls: list[tuple[str, str, dict | None]] = []
+
+        def fake_request(method, path, params=None, payload=None):
+            calls.append((method, path, payload))
+            if path == "/servicesNS/nobody/DA-ITSI-CP-example/data/lookup-table-files/owners.csv":
+                return {"entry": [{"name": "owners.csv", "content": {"eai:data": "/opt/splunk/etc/apps/DA-ITSI-CP-example/lookups/owners.csv"}}]}
+            raise AssertionError(path)
+
+        def fake_request_form(method, path, params=None, payload=None):
+            calls.append((method, path, dict(payload or {})))
+            return {"entry": [{"name": payload.get("name", "owners.csv"), "content": dict(payload or {})}]}
+
+        client._request = fake_request  # type: ignore[attr-defined]
+        client._request_form = fake_request_form  # type: ignore[attr-defined]
+
+        self.assertEqual(
+            client.get_lookup_file("DA-ITSI-CP-example", "owners.csv"),
+            {"eai:data": "/opt/splunk/etc/apps/DA-ITSI-CP-example/lookups/owners.csv", "name": "owners.csv"},
+        )
+        client.create_lookup_file("DA-ITSI-CP-example", "owners.csv", "/opt/splunk/var/run/splunk/lookup_tmp/owners.csv")
+        client.update_lookup_file("DA-ITSI-CP-example", "owners.csv", "/opt/splunk/var/run/splunk/lookup_tmp/owners.csv")
+
+        self.assertEqual(
+            calls,
+            [
+                ("GET", "/servicesNS/nobody/DA-ITSI-CP-example/data/lookup-table-files/owners.csv", None),
+                (
+                    "POST",
+                    "/servicesNS/nobody/DA-ITSI-CP-example/data/lookup-table-files",
+                    {"name": "owners.csv", "eai:data": "/opt/splunk/var/run/splunk/lookup_tmp/owners.csv"},
+                ),
+                (
+                    "POST",
+                    "/servicesNS/nobody/DA-ITSI-CP-example/data/lookup-table-files/owners.csv",
+                    {"eai:data": "/opt/splunk/var/run/splunk/lookup_tmp/owners.csv"},
+                ),
+            ],
+        )
+
     def test_content_pack_catalog_falls_back_to_legacy_route_and_normalizes_live_items_success(self) -> None:
         client = SplunkRestClient(ClientConfig(base_url="https://example.com", verify_ssl=False, username=None, password=None, session_key="token"))
         calls: list[tuple[str, str]] = []

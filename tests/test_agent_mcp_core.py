@@ -21,6 +21,20 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertIn("setup.sh", skills["cisco-product-setup"]["scripts"])
         self.assertFalse(skills["cisco-product-setup"]["has_template"])
 
+    def test_list_skills_exposes_references_directory(self) -> None:
+        payload = core.list_skills()
+        skills = {item["name"]: item for item in payload["skills"]}
+        dashboard_skill = skills["splunk-observability-dashboard-builder"]
+
+        self.assertTrue(dashboard_skill["has_reference"])
+        self.assertEqual(
+            dashboard_skill["reference_files"],
+            ["references/classic-api.md", "references/coverage.md"],
+        )
+        reference_text = core.read_skill_file("splunk-observability-dashboard-builder", "reference")
+        self.assertIn("# references/classic-api.md", reference_text)
+        self.assertIn("# references/coverage.md", reference_text)
+
     def test_cisco_product_plan_uses_json_dry_run(self) -> None:
         with tempfile.NamedTemporaryFile() as password_file:
             plan = core.plan_cisco_product_setup(

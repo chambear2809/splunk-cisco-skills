@@ -84,6 +84,30 @@ def normalize(value: str) -> str:
     return re.sub(r"\s+", " ", lowered).strip()
 
 
+def display_aliases(display_name: str) -> list[str]:
+    aliases = [display_name]
+    no_parens = re.sub(r"\s*\([^)]*\)", "", display_name).strip()
+    if no_parens and no_parens != display_name:
+        aliases.append(no_parens)
+    for match in re.findall(r"\(([^)]+)\)", display_name):
+        aliases.append(match.strip())
+        for piece in re.split(r"[/,]", match):
+            piece = piece.strip()
+            if piece:
+                aliases.append(piece)
+    return aliases
+
+
+def state_rank(product: dict) -> int:
+    state = product.get("automation_state", "")
+    return {
+        "automated": 0,
+        "manual_gap": 1,
+        "unsupported_roadmap": 2,
+        "unsupported_legacy": 3,
+    }.get(state, 4)
+
+
 if list_products:
     if json_output:
         print(json.dumps({"products": products}, indent=2, sort_keys=True))
@@ -103,30 +127,47 @@ if list_products:
 
 
 query_norm = normalize(query)
-exact = []
-fuzzy = []
+ranked_matches = []
 for product in products:
     terms = product.get("normalized_search_terms", [])
-    if query_norm in terms:
-        exact.append(product)
-        continue
-    if any(query_norm and query_norm in term for term in terms):
-        fuzzy.append(product)
+    display_terms = {normalize(alias) for alias in display_aliases(product.get("display_name", ""))}
+    alias_terms = {normalize(alias) for alias in product.get("aliases", [])}
+    product_id = str(product.get("id", ""))
+    score = None
+
+    if query == product_id or query_norm == normalize(product_id):
+        score = 0
+    elif query_norm in display_terms:
+        score = 1
+    elif query_norm in alias_terms:
+        score = 2
+    elif query_norm in terms:
+        score = 3
+    elif any(query_norm and query_norm in term for term in terms):
+        score = 4
+
+    if score is not None:
+        ranked_matches.append((score, state_rank(product), product))
 
 status = "not_found"
 matches = []
-if len(exact) == 1:
-    status = "resolved"
-    matches = exact
-elif len(exact) > 1:
-    status = "ambiguous"
-    matches = exact
-elif len(fuzzy) == 1:
-    status = "resolved"
-    matches = fuzzy
-elif len(fuzzy) > 1:
-    status = "ambiguous"
-    matches = fuzzy
+if ranked_matches:
+    ranked_matches.sort(
+        key=lambda item: (
+            item[0],
+            item[1],
+            item[2].get("display_name", "").lower(),
+            item[2].get("id", ""),
+        )
+    )
+    best_score = ranked_matches[0][0]
+    best_state_rank = ranked_matches[0][1]
+    matches = [
+        product
+        for score, product_state_rank, product in ranked_matches
+        if score == best_score and product_state_rank == best_state_rank
+    ]
+    status = "resolved" if len(matches) == 1 else "ambiguous"
 
 payload = {
     "status": status,

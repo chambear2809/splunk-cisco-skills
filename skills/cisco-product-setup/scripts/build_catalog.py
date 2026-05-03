@@ -17,6 +17,7 @@ SKILL_ROOT = REPO_ROOT / "skills/cisco-product-setup"
 CATALOG_PATH = SKILL_ROOT / "catalog.json"
 OVERRIDES_PATH = SKILL_ROOT / "catalog_overrides.json"
 SCAN_GLOB = "splunk-cisco-app-navigator-*.tar.gz"
+SCAN_APP_CONF_MEMBER = "splunk-cisco-app-navigator/default/app.conf"
 SCAN_PRODUCTS_MEMBER = "splunk-cisco-app-navigator/default/products.conf"
 SECURITY_CLOUD_PRODUCTS_PATH = REPO_ROOT / "skills/cisco-security-cloud-setup/products.json"
 REGISTRY_PATH = REPO_ROOT / "skills/shared/app_registry.json"
@@ -110,9 +111,50 @@ def find_scan_package(explicit: str) -> Path:
     return matches[-1]
 
 
+def scan_app_version(scan_package: Path) -> str:
+    if not scan_package.is_file():
+        return ""
+
+    try:
+        with tarfile.open(scan_package, "r:gz") as archive:
+            raw = archive.extractfile(SCAN_APP_CONF_MEMBER)
+            if raw is None:
+                return ""
+            text = raw.read().decode("utf-8")
+    except (OSError, tarfile.TarError, UnicodeDecodeError):
+        return ""
+
+    parser = configparser.ConfigParser(strict=False)
+    parser.optionxform = str
+    try:
+        parser.read_file(io.StringIO(text))
+    except configparser.Error:
+        return ""
+
+    return parser.get(
+        "id",
+        "version",
+        fallback=parser.get("launcher", "version", fallback=""),
+    ).strip()
+
+
+def version_sort_tuple(raw: str) -> tuple[int, ...]:
+    # Only dotted decimal versions (e.g. "1.2.3", "1.0") are sortable as
+    # numeric tuples here. Pre-release suffixes ("1.2.3-rc1", "1.0a2") fall
+    # through to an empty tuple by design; callers (e.g. scan_package_sort_key)
+    # then fall back to the filename regex which still uses dotted decimals,
+    # so a "1.2.3-rc1" SCAN package sorts immediately after "1.2.3" by name.
+    if not re.fullmatch(r"\d+(?:\.\d+)+", raw):
+        return ()
+    return tuple(int(part) for part in raw.split("."))
+
+
 def scan_package_sort_key(path: Path) -> tuple[tuple[int, ...], str]:
-    match = re.search(r"(\d+(?:\.\d+)+)", path.name)
-    version = tuple(int(part) for part in match.group(1).split(".")) if match else ()
+    app_version = scan_app_version(path)
+    version = version_sort_tuple(app_version)
+    if not version:
+        match = re.search(r"(\d+(?:\.\d+)+)", path.name)
+        version = version_sort_tuple(match.group(1)) if match else ()
     return version, path.name
 
 
@@ -340,6 +382,8 @@ def build_security_cloud_variant_route(
             + override.get("extra_optional_non_secret_keys", [])
         ),
         "secret_keys": sorted_unique(list(accepted_secret) + override.get("extra_secret_keys", [])),
+        "required_secret_keys": [],
+        "conditional_required_secret_rules": [],
         "route": {
             "variant_key": variant_key,
             "default_variant": override.get("default_variant", ""),
@@ -397,7 +441,7 @@ def build_secure_access_route(override: dict) -> dict:
         "route_type": "secure_access",
         "primary_skill": "cisco-secure-access-setup",
         "companion_skills": [],
-        "install_apps": ["cisco-cloud-security"],
+        "install_apps": ["TA-cisco-cloud-security-addon", "cisco-cloud-security"],
         "template_paths": [TEMPLATE_PATHS["secure_access"]],
         "template_checks": merge_template_checks(
             env_var_check(*template_vars), override.get("template_checks")
@@ -410,6 +454,30 @@ def build_secure_access_route(override: dict) -> dict:
             "apply_dashboard_defaults": True,
             "bootstrap_roles": True,
             "accept_terms": True,
+        },
+    }
+
+
+def build_app_install_only_route(product: dict, override: dict) -> dict:
+    install_apps = unique_ordered(list(override.get("install_apps", [])))
+    if not install_apps:
+        install_apps = unique_ordered([product.get("addon", ""), product.get("app_viz", "")])
+    return {
+        "route_type": "app_install_only",
+        "primary_skill": "splunk-app-install",
+        "companion_skills": [],
+        "install_apps": install_apps,
+        "template_paths": [],
+        "template_checks": {},
+        "required_non_secret_keys": [],
+        "optional_non_secret_keys": [],
+        "accepted_non_secret_keys": [],
+        "secret_keys": [],
+        "required_secret_keys": [],
+        "conditional_required_secret_rules": [],
+        "route": {
+            "configuration": "manual",
+            "validation": "installed_apps",
         },
     }
 
@@ -628,6 +696,8 @@ def build_route(product: dict, override: dict, security_products: dict) -> dict:
         return build_security_cloud_variant_route(override, security_products)
     if route_type == "secure_access":
         return build_secure_access_route(override)
+    if route_type == "app_install_only":
+        return build_app_install_only_route(product, override)
     if route_type == "dc_networking":
         return build_dc_networking_route(override)
     if route_type == "catalyst_stack":
@@ -832,7 +902,11 @@ def main() -> int:
             return 1
         return 0
 
-    CATALOG_PATH.write_text(rendered, encoding="utf-8")
+    if args.write:
+        CATALOG_PATH.write_text(rendered, encoding="utf-8")
+        return 0
+
+    print(rendered, end="")
     return 0
 
 

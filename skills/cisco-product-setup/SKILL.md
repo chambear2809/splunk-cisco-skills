@@ -69,3 +69,7 @@ output lists for the resolved product.
 - `catalog.json` is the generated runtime catalog.
 - `scripts/build_catalog.py --check` verifies that `catalog.json` matches the
   current SCAN package and overrides.
+- `scripts/build_catalog.py --write` regenerates `catalog.json` after editing
+  `catalog_overrides.json` or refreshing the SCAN package in `splunk-ta/`.
+  Without a mode flag the script prints the catalog to stdout instead of
+  writing it.

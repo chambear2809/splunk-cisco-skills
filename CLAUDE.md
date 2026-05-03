@@ -32,6 +32,8 @@ The user can also invoke skills directly as slash commands (e.g. `/cisco-catalys
 | `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
 | `splunk-itsi-setup` | `SA-ITOA` | Install and validate Splunk ITSI; integration readiness for ThousandEyes |
 | `splunk-itsi-config` | Native ITSI objects, service trees, and supported ITSI content packs | Preview, apply, and validate ITSI entities, services, KPIs, dependencies, template links, service trees, NEAPs, and selected content packs from YAML specs |
+| `splunk-enterprise-security-install` | `SplunkEnterpriseSecuritySuite` | Install, post-install, and validate Splunk Enterprise Security on standalone search heads or SHC deployers |
+| `splunk-enterprise-security-config` | Splunk Enterprise Security configuration | Configure ES indexes, roles, data models, enrichment, detections, and operational validation |
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant for SPL; drive Enterprise cloud-connected onboarding |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
@@ -43,6 +45,8 @@ The user can also invoke skills directly as slash commands (e.g. `/cisco-catalys
 | `splunk-monitoring-console-setup` | Splunk Monitoring Console | Render and validate self-managed distributed or standalone Monitoring Console assets, including auto-config, peer/group review, forwarder monitoring, and platform alerts |
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-enterprise-kubernetes-setup` | Splunk Enterprise on Kubernetes | Render, preflight, apply, and validate SOK S1/C3/M4 or Splunk POD on Cisco UCS |
+| `splunk-observability-otel-collector-setup` | Splunk Observability Cloud OTel Collector | Render, apply, and validate Splunk Distribution of OpenTelemetry Collector assets for Kubernetes clusters and Linux hosts, including Splunk Platform HEC token handoff helpers |
+| `splunk-observability-dashboard-builder` | Splunk Observability Cloud dashboards | Render, validate, and optionally apply classic Observability dashboard groups, charts, and dashboards from natural-language, JSON, or YAML specs |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
 | `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render or apply Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
 | `splunk-connect-for-snmp-setup` | SC4SNMP external collector | Prepare Splunk HEC/indexes and render or apply Docker Compose or Helm assets for Splunk Connect for SNMP |
@@ -96,6 +100,11 @@ fall back to `~/.splunk/credentials`, and honor `SPLUNK_CREDENTIALS_FILE` for al
 files. Run `bash skills/shared/scripts/setup_credentials.sh` to create the file
 interactively, or copy and edit `credentials.example`.
 
+Splunk Observability Cloud skills read `SPLUNK_O11Y_REALM` and
+`SPLUNK_O11Y_TOKEN_FILE` from the same credentials file. Store only the realm
+and token-file path there; keep the Observability API token value in a separate
+chmod 600 file.
+
 ## Secure Credential Handling Rules
 
 ### Agent Rules
@@ -135,6 +144,9 @@ interactively, or copy and edit `credentials.example`.
    ```
    Then pass the file path to the script (e.g., `--password-file /tmp/secret_file`).
    Instruct the user to delete the file after use.
+
+   Splunk Observability Cloud API tokens follow the same pattern: set
+   `SPLUNK_O11Y_TOKEN_FILE` to the local file path, never to the token value.
 
 7. You MAY freely ask for non-secret values: account names, hostnames, IP addresses,
    regions, index names, organization IDs, client IDs, and other configuration values

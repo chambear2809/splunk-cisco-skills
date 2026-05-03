@@ -32,7 +32,7 @@ COMPATIBILITY_ROWS = [
         "area": "Content-pack installation",
         "status": "supported",
         "coverage": "content_pack catalog/status/detail, preview, install, refresh, app/bootstrap checks, generic catalog-title/pack-id installs, profile metadata for the documented Content Packs 2.5 catalog",
-        "notes": "Install remains conservative: preview first, no destructive resolution defaults, and profile runs emit machine-readable automation_scope/follow_up_steps. configured_outcome can automate safe native, macro, and saved-search handoff tasks after install.",
+        "notes": "Install remains conservative: preview first, no destructive resolution defaults, and profile runs emit machine-readable automation_scope/follow_up_steps. configured_outcome can automate safe native, macro, saved-search, app-local props/transforms or generic conf stanza, data-model acceleration, dashboard XML, navigation XML, Enterprise staged lookup-file create/replace, lookup refresh dispatch, KPI backfill dispatch, and guarded itsiimportobjects service-import dispatch tasks after install.",
     },
     {
         "area": "Drift and readiness reporting",
