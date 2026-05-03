@@ -1,0 +1,71 @@
+# Splunk Observability NVIDIA GPU Integration spec
+#
+# Copy this file to template.local and fill in non-secret values only.
+
+api_version: splunk-observability-nvidia-gpu-integration/v1
+
+# Splunk Observability realm. Used for the base collector hand-off.
+realm: us0
+
+# Cluster identity (lands on every metric).
+cluster_name: "lab-cluster"
+distribution: kubernetes  # openshift | kubernetes | eks | gke
+
+# Receiver creator name. DEFAULT: dcgm-cisco (not 'nvidia').
+# Why: when autodetect.prometheus=true on the Splunk OTel chart, the chart
+# enables receiver_creator/nvidia for control-plane metrics. Naming our
+# custom GPU receiver receiver_creator/nvidia collides with the chart's
+# autodetect receiver, silently breaking GPU discovery. Always use a
+# distinct name.
+receiver_creator_name: dcgm-cisco
+
+# DCGM scrape settings. The discovery rule matches BOTH label conventions:
+#   app == "nvidia-dcgm-exporter"                   (older standalone)
+#   app.kubernetes.io/name == "nvidia-dcgm-exporter" (newer GPU Operator)
+dcgm:
+  port: 9400
+  scrape_interval_seconds: 10
+  metrics_path: /metrics
+
+# Filter mode for the metrics/nvidia-metrics pipeline.
+#   none   = unfiltered (default; all DCGM_FI_* series flow to O11y)
+#   strict = canonical signalfx allow-list (cardinality control)
+filter:
+  mode: none
+  extra_metrics: []   # additional metric names to include (strict mode only)
+
+# DCGM pod-label gap fix (--enable-dcgm-pod-labels). When true, the renderer
+# emits a Kubernetes patch that:
+#   1. Sets DCGM_EXPORTER_KUBERNETES_ENABLE_POD_LABELS=true and
+#      DCGM_EXPORTER_KUBERNETES_ENABLE_POD_UID=true on the DCGM Exporter pod.
+#   2. Creates a ClusterRole + ClusterRoleBinding for the DCGM ServiceAccount
+#      (so it can read pods + namespaces from the K8s API).
+#   3. Enables AutoMount ServiceAccountToken on the DCGM ServiceAccount.
+#   4. Adds a kubelet-path volume mount.
+#
+# Apply the patch with `kubectl apply -f dcgm-pod-labels-patch/` after render.
+# This is needed because the GPU Operator does NOT expose pod labels in
+# DCGM_FI_* metrics by default.
+enable_dcgm_pod_labels: false
+dcgm_namespace: nvidia-gpu-operator       # used only when enable_dcgm_pod_labels=true
+dcgm_service_account: nvidia-dcgm-exporter # used only when enable_dcgm_pod_labels=true
+
+# Dashboards: GPU util / memory / temp / power / clocks / PCIe / energy /
+# profiling activity.
+dashboards:
+  enabled: true
+
+# Detectors: starter detectors for common GPU SLO patterns.
+detectors:
+  enabled: true
+  thresholds:
+    gpu_temp_ceiling_celsius: 85           # Major: GPU thermal limit
+    gpu_power_floor_watts: 50              # Warning: unexpected power loss
+    gpu_utilization_pct_floor: 10          # Info: under-utilized GPU (cost optimization)
+    energy_consumption_joules_anomaly: 0   # Disabled by default; set to a baseline value to enable
+
+# Hand-offs.
+handoffs:
+  base_collector: true
+  dashboard_builder: true
+  native_ops: true

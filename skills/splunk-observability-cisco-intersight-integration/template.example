@@ -1,0 +1,58 @@
+# Splunk Observability Cisco Intersight Integration spec
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Intersight API credentials are NOT in this file -- create the K8s Secret
+# out-of-band:
+#   kubectl create secret generic intersight-api-credentials -n intersight-otel \
+#     --from-file=intersight-key-id=/tmp/intersight_key_id \
+#     --from-file=intersight-key=/tmp/intersight_private_key.pem
+
+api_version: splunk-observability-cisco-intersight-integration/v1
+
+# Splunk Observability realm. Used for the base collector hand-off.
+realm: us0
+
+# Cluster identity (lands on every metric).
+cluster_name: "lab-cluster"
+distribution: kubernetes  # openshift | kubernetes | eks | gke
+
+# intersight-otel namespace + Secret name. The renderer outputs Namespace +
+# Secret manifest stubs. The user creates the actual Secret out-of-band.
+intersight_otel:
+  namespace: intersight-otel
+  secret_name: intersight-api-credentials
+  key_id_secret_key: intersight-key-id      # the K8s Secret data key holding the Intersight key ID
+  key_pem_secret_key: intersight-key         # the K8s Secret data key holding the private key PEM
+  image: "ghcr.io/intersight/intersight-otel:latest"   # adjust to your private image registry if needed
+
+# OTLP endpoint to send metrics to. Defaults to the Splunk OTel collector
+# agent service in the splunk-otel namespace; override when your collector
+# ns/release differs.
+collector:
+  release: splunk-otel-collector
+  namespace: splunk-otel
+  otlp_port: 4317                            # gRPC
+
+# Intersight collection interval (seconds). Larger UCS estates may need to
+# stretch this to manage Intersight API rate limits.
+collection_interval: 60
+
+# Dashboards: starter UCS power/thermal/fan/network/alarms charts.
+dashboards:
+  enabled: true
+
+# Detectors: starter detectors aligned with common UCS SLO patterns.
+detectors:
+  enabled: true
+  thresholds:
+    alarm_count_delta_per_5m_max: 5         # Critical: spike in active alarms
+    security_advisory_delta_per_24h_max: 0  # Major: any new security advisory
+    host_temp_ceiling_celsius: 80           # Major: chassis overheat
+    host_power_floor_watts: 50              # Warning: unexpected power loss
+    fan_speed_floor_rpm: 1000               # Warning: fan failure indicator
+
+# Hand-offs.
+handoffs:
+  base_collector: true
+  dashboard_builder: true
+  native_ops: true

@@ -1,0 +1,11 @@
+interface:
+  display_name: "Splunk Observability Cisco Nexus Integration"
+  short_description: "Send Cisco Nexus 9000 metrics to Splunk O11y via the OTel cisco_os receiver"
+  default_prompt: >-
+    Use $splunk-observability-cisco-nexus-integration to render and validate
+    a Splunk OTel collector cisco_os receiver overlay (multi-device +
+    global-scrapers format) for Cisco Nexus 9000 fabric monitoring.
+    Apply happens via the rendered handoff-base-collector.sh which merges
+    the overlay into splunk-observability-otel-collector-setup.
+    Standalone and reusable -- composed by the AI Pod umbrella, but
+    works for any data center.

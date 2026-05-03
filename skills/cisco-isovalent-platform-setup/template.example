@@ -1,0 +1,89 @@
+# Cisco Isovalent Platform Setup intake template
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Never put the Isovalent license key here -- pass it via
+# --isovalent-license-file pointing at a chmod-600 file.
+
+api_version: cisco-isovalent-platform-setup/v1
+
+# Edition: oss (cilium/cilium + cilium/tetragon from helm.cilium.io, public)
+# or enterprise (isovalent/* from helm.isovalent.com, license required).
+edition: oss
+
+# Optional EKS-AWS mirror for Cilium (oci://public.ecr.aws/eks/cilium/cilium).
+# Use this on EKS Hybrid Nodes where AWS-supported builds are preferred.
+eks_mirror: false
+
+# Cluster identity. cluster_name lands in Tetragon export attributes so
+# Splunk searches can scope by cluster.
+cluster_name: "lab-cluster"
+
+# Namespaces. Cilium and DNS proxy live in kube-system by convention;
+# Tetragon and Hubble Enterprise have their own namespaces.
+namespaces:
+  cilium: kube-system
+  tetragon: tetragon
+  hubble_enterprise: kube-system
+  cilium_dnsproxy: kube-system
+  hubble_timescape: hubble-timescape
+
+# Cilium values overrides. Leave empty to use the skill defaults.
+cilium:
+  hubble:
+    enabled: true
+    relay:
+      enabled: true
+    metrics:
+      # Hubble metrics on port 9965 are the input for the
+      # splunk-observability-isovalent-integration scrape.
+      enabled:
+        - dns:labelsContext=source_namespace,destination_namespace
+        - drop
+        - tcp
+        - flow
+        - port-distribution
+        - icmp
+        - http
+        - flow_export
+      enableOpenMetrics: true
+      serviceMonitor:
+        enabled: false  # set true if you also run a Prometheus operator stack
+
+# Tetragon values overrides. The skill defaults configure file-based export
+# at /var/run/cilium/tetragon/tetragon.log so the OTel collector overlay in
+# splunk-observability-isovalent-integration can pick the file up via
+# extraFileLogs.filelog/tetragon. Override export.mode below to use the
+# stdout or (DEPRECATED) fluentd splunk_hec path instead.
+tetragon:
+  enable_events:
+    network: true
+  export:
+    mode: file              # file (default) | stdout | fluentd
+    directory: /var/run/cilium/tetragon
+    filename: tetragon.log
+
+# Optional Tetragon TracingPolicy starter. The skill renders a basic
+# network-monitoring policy by default.
+tracing_policy:
+  enabled: true
+  name: network-monitoring
+
+# Enterprise-only optional add-ons. Setting any of these to true requires
+# --edition enterprise and (for hubble_enterprise) the private chart access.
+enterprise_addons:
+  hubble_enterprise: false
+  cilium_dnsproxy: false
+  hubble_timescape: false
+
+# EKS BYOCNI preflight. When true, the rendered preflight script checks for
+# the AWS VPC CNI and warns if found. Renders an eksctl example when
+# requested.
+eks_byocni:
+  enable_preflight: true
+  render_eksctl_example: true
+
+# Kernel preflight. The skill renders a kernel >= 5.10 check on the nodes
+# the operator selects.
+kernel_preflight:
+  enable: true
+  minimum_version: "5.10"

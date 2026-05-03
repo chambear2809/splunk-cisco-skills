@@ -1,0 +1,11 @@
+interface:
+  display_name: "Splunk Observability ThousandEyes Integration"
+  short_description: "Wire ThousandEyes to Splunk Observability Cloud (Streams, APM connector, full TE asset lifecycle, O11y dashboards/detectors)"
+  default_prompt: >-
+    Use $splunk-observability-thousandeyes-integration to render and
+    optionally apply the TE -> Splunk Observability Cloud integration:
+    Integration 1.0 OpenTelemetry stream, Integrations 2.0 APM connector,
+    full TE asset lifecycle (tests, alert rules, labels, tags, TE-side
+    dashboards, Templates), and per-test-type O11y dashboards/detectors
+    handed off to splunk-observability-dashboard-builder and
+    splunk-observability-native-ops.

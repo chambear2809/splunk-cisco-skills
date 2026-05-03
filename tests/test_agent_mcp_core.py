@@ -153,7 +153,17 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertTrue(plan["read_only"])
 
     def test_oncall_setup_apply_invocations_are_treated_as_mutating(self) -> None:
-        for mutation_flag in ("--apply", "--send-alert", "--install-splunk-app", "--uninstall"):
+        # --self-test is a mutation flag because the script's own argv parser
+        # flips SEND_ALERT=true on --self-test, which fires synthetic INFO +
+        # RECOVERY alerts against the live On-Call REST endpoint.
+        mutation_flags = (
+            "--apply",
+            "--send-alert",
+            "--install-splunk-app",
+            "--uninstall",
+            "--self-test",
+        )
+        for mutation_flag in mutation_flags:
             with self.subTest(mutation_flag=mutation_flag):
                 plan = core.plan_skill_script(
                     "splunk-oncall-setup",
@@ -161,6 +171,21 @@ class AgentMCPCoreTests(unittest.TestCase):
                     [mutation_flag, "--spec", "skills/splunk-oncall-setup/templates/oncall.example.yaml"],
                 )
                 self.assertFalse(plan["read_only"])
+        # --dry-run downgrades any of the above mutation invocations to a
+        # read-only preview because the scripts honour DRY_RUN end-to-end.
+        for mutation_flag in mutation_flags:
+            with self.subTest(mutation_flag=mutation_flag, dry_run=True):
+                plan = core.plan_skill_script(
+                    "splunk-oncall-setup",
+                    "setup.sh",
+                    [
+                        mutation_flag,
+                        "--dry-run",
+                        "--spec",
+                        "skills/splunk-oncall-setup/templates/oncall.example.yaml",
+                    ],
+                )
+                self.assertTrue(plan["read_only"])
 
     def test_native_ops_apply_invocations_are_treated_as_mutating(self) -> None:
         plan = core.plan_skill_script(
@@ -498,6 +523,45 @@ class AgentMCPCoreTests(unittest.TestCase):
 
         self.assertTrue(plan["read_only"])
 
+    def test_observability_native_ops_apply_dry_run_is_read_only(self) -> None:
+        plan = core.plan_skill_script(
+            "splunk-observability-native-ops",
+            "setup.sh",
+            [
+                "--apply",
+                "--dry-run",
+                "--spec",
+                "skills/splunk-observability-native-ops/templates/native-ops.example.yaml",
+            ],
+        )
+
+        self.assertTrue(plan["read_only"])
+
+    def test_render_first_phase_skills_dry_run_downgrades_apply(self) -> None:
+        # Each of these skills has a --phase apply / similar mutating phase
+        # AND honours --dry-run as a clean short-circuit (rendered scripts
+        # are logged, never executed). The MCP must classify those previews
+        # as read-only so operators can see what apply would do without
+        # opening the SPLUNK_SKILLS_MCP_ALLOW_MUTATION gate.
+        cases = [
+            ("splunk-cloud-acs-allowlist-setup", ["--phase", "apply"]),
+            ("splunk-edge-processor-setup", ["--phase", "apply"]),
+            ("splunk-federated-search-setup", ["--phase", "apply"]),
+            ("splunk-indexer-cluster-setup", ["--phase", "rolling-restart"]),
+            ("splunk-license-manager-setup", ["--phase", "apply"]),
+            ("splunk-soar-setup", ["--phase", "onprem-single"]),
+        ]
+        for skill, args in cases:
+            with self.subTest(skill=skill):
+                # Without --dry-run the apply phase is mutating.
+                mutating = core.plan_skill_script(skill, "setup.sh", args)
+                self.assertFalse(mutating["read_only"], msg=f"{skill} {args}")
+                # With --dry-run it must downgrade to read-only.
+                preview = core.plan_skill_script(
+                    skill, "setup.sh", [*args, "--dry-run"]
+                )
+                self.assertTrue(preview["read_only"], msg=f"{skill} {args} --dry-run")
+
     def test_resolve_product_list_products_is_read_only(self) -> None:
         plan = core.plan_skill_script(
             "cisco-product-setup",
@@ -629,13 +693,117 @@ class AgentMCPCoreTests(unittest.TestCase):
         for skill in (
             "splunk-cloud-acs-allowlist-setup",
             "splunk-edge-processor-setup",
+            "splunk-enterprise-public-exposure-hardening",
             "splunk-indexer-cluster-setup",
             "splunk-license-manager-setup",
+            "splunk-observability-cloud-integration-setup",
+            "splunk-oncall-setup",
             "splunk-soar-setup",
         ):
             with self.subTest(skill=skill):
                 plan = core.plan_skill_script(skill, "smoke_offline.sh", [])
                 self.assertTrue(plan["read_only"])
+
+    def test_enterprise_public_exposure_phase_classification(self) -> None:
+        cases = [
+            (["--phase", "render"], True),
+            (["--phase", "preflight"], True),
+            (["--phase", "validate"], True),
+            (["--phase", "apply"], False),
+            (["--phase", "all"], False),
+            (["--phase", "render", "--apply"], False),
+            (["--dry-run", "--phase", "apply"], True),
+        ]
+        for args, expected_read_only in cases:
+            with self.subTest(args=args):
+                plan = core.plan_skill_script(
+                    "splunk-enterprise-public-exposure-hardening", "setup.sh", args
+                )
+                self.assertEqual(plan["read_only"], expected_read_only)
+
+    def test_observability_cloud_integration_setup_classification(self) -> None:
+        # Render-only / inspect-only modes stay read-only.
+        for args in (
+            [],
+            ["--render", "--spec", "spec.yaml"],
+            ["--validate", "--spec", "spec.yaml"],
+            ["--doctor", "--spec", "spec.yaml"],
+            ["--discover", "--spec", "spec.yaml"],
+            ["--explain", "--spec", "spec.yaml"],
+            ["--list-sim-templates"],
+            ["--render-sim-templates", "k8s_metrics_aggregation"],
+            ["--rollback", "pairing", "--spec", "spec.yaml"],
+            ["--make-default-deeplink", "--realm", "us0"],
+        ):
+            with self.subTest(args=args):
+                plan = core.plan_skill_script(
+                    "splunk-observability-cloud-integration-setup", "setup.sh", args
+                )
+                self.assertTrue(plan["read_only"], msg=f"{args}")
+        # Mutation modes flip to read_only=False.
+        for args in (
+            ["--apply", "pairing", "--spec", "spec.yaml"],
+            ["--quickstart", "--spec", "spec.yaml"],
+            ["--quickstart-enterprise", "--spec", "spec.yaml"],
+            ["--enable-token-auth", "--spec", "spec.yaml"],
+        ):
+            with self.subTest(args=args):
+                plan = core.plan_skill_script(
+                    "splunk-observability-cloud-integration-setup", "setup.sh", args
+                )
+                self.assertFalse(plan["read_only"], msg=f"{args}")
+        # --dry-run downgrades a mutating mode to a read-only preview.
+        for args in (
+            ["--apply", "pairing", "--dry-run", "--spec", "spec.yaml"],
+            ["--quickstart", "--dry-run", "--spec", "spec.yaml"],
+        ):
+            with self.subTest(args=args, dry_run=True):
+                plan = core.plan_skill_script(
+                    "splunk-observability-cloud-integration-setup", "setup.sh", args
+                )
+                self.assertTrue(plan["read_only"], msg=f"{args}")
+
+    def test_apply_aware_integration_setups_classification(self) -> None:
+        # Skills with an --apply mode in their setup.sh wrapper.
+        for skill in (
+            "cisco-thousandeyes-mcp-setup",
+            "splunk-observability-thousandeyes-integration",
+            "cisco-isovalent-platform-setup",
+        ):
+            with self.subTest(skill=skill, mode="render"):
+                plan = core.plan_skill_script(skill, "setup.sh", ["--render"])
+                self.assertTrue(plan["read_only"])
+            with self.subTest(skill=skill, mode="apply"):
+                plan = core.plan_skill_script(skill, "setup.sh", ["--apply"])
+                self.assertFalse(plan["read_only"])
+            with self.subTest(skill=skill, mode="apply+dry-run"):
+                plan = core.plan_skill_script(
+                    skill, "setup.sh", ["--apply", "--dry-run"]
+                )
+                self.assertTrue(plan["read_only"])
+
+    def test_render_only_observability_integrations_are_always_read_only(self) -> None:
+        # These five wrappers do not expose --apply at all; the rendered
+        # helpers (helm install, kubectl apply, etc.) are run separately
+        # by the operator, so any invocation through the MCP is read-only.
+        skills = (
+            "splunk-observability-cisco-nexus-integration",
+            "splunk-observability-cisco-intersight-integration",
+            "splunk-observability-isovalent-integration",
+            "splunk-observability-nvidia-gpu-integration",
+            "splunk-observability-cisco-ai-pod-integration",
+        )
+        for skill in skills:
+            for args in (
+                [],
+                ["--render"],
+                ["--validate"],
+                ["--dry-run"],
+                ["--render", "--explain"],
+            ):
+                with self.subTest(skill=skill, args=args):
+                    plan = core.plan_skill_script(skill, "setup.sh", args)
+                    self.assertTrue(plan["read_only"])
 
     def test_matches_mutation_flag_handles_prefix_and_equals_form(self) -> None:
         patterns = ("--apply-", "--splunk-prep")

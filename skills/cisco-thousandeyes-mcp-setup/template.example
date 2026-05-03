@@ -1,0 +1,78 @@
+# Cisco ThousandEyes MCP Server Setup intake template
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Never put the ThousandEyes API token here — pass it via --te-token-file
+# pointing at a chmod-600 file. Create the file without exposing it in
+# shell history with:
+#   bash skills/shared/scripts/write_secret_file.sh /tmp/te_api_token
+
+api_version: cisco-thousandeyes-mcp-setup/v1
+
+# Which MCP clients to render configurations for. Pick one or more.
+# Valid values: cursor, claude, codex, vscode, kiro.
+clients:
+  - cursor
+  - claude
+  - codex
+  - vscode
+  - kiro
+
+# Authentication flow:
+#   bearer  — OAuth Bearer Token (simplest; shares the org-wide 240 req/min
+#             rate limit across every integration using a standard API token).
+#   oauth2  — OAuth2 client flow (browser consent; each OAuth2 client gets
+#             its own 240 req/min limit; recommended when multiple AI
+#             assistants share a TE org).
+auth: bearer
+
+# Cursor-specific options.
+cursor:
+  # When true, the rendered cursor.mcp.json includes a comment pointing at
+  # the Cisco ThousandEyes Cursor Marketplace plugin
+  # (cursor.com/marketplace/cisco-thousand-eyes). The marketplace plugin is
+  # a turnkey alternative to the manual config.
+  marketplace_plugin_link: true
+  # Workspace vs user-scope config:
+  #   user      — ~/.cursor/mcp.json
+  #   workspace — <repo>/.cursor/mcp.json
+  scope: user
+
+# Claude Code (Desktop or web) options.
+claude:
+  # Claude Desktop and Claude (web, paid plans) both support the custom
+  # connector flow at Settings > Connectors > Add custom connector. The
+  # rendered claude.mcp.json + README walk the user through that flow.
+  custom_connector_name: "ThousandEyes MCP Server"
+  # When true, render the auto-allow tools instructions for Configure
+  # > Auto-allow.
+  auto_allow_read_only: true
+
+# Codex options.
+codex:
+  # MCP server name for `codex mcp add ...`. Must be alphanumeric+underscore.
+  server_name: thousandeyes
+  # When true, the rendered Codex registration helper removes any prior
+  # registration with the same name before adding the new one.
+  replace_existing: true
+
+# VS Code options.
+vscode:
+  # When true, render an inputs[] block with the ${input:te-key} prompt
+  # string pattern so the API token is entered at runtime and never
+  # written to settings.json.
+  use_input_prompt: true
+
+# AWS Kiro options.
+kiro:
+  # When true, the rendered Kiro config uses the OAuth2 browser flow
+  # (no token file). When false, it uses the OAuth Bearer Token via
+  # mcp-remote@latest with the AUTH_TOKEN env var.
+  use_oauth2: false
+
+# Tool gating. The write/Instant-Test tool group consumes ThousandEyes
+# units (Run Instant Test) and can mutate TE state (Create/Update/Delete
+# Synthetic Test, Deploy Template). Set this to true ONLY if you want
+# the rendered configs to enable these tools where the client supports
+# per-tool gating; otherwise the rendered README surfaces the warning
+# and instructs the operator how to enable them after manual review.
+accept_write_tools: false

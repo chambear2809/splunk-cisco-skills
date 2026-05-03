@@ -1,0 +1,81 @@
+# Splunk Observability Cisco Nexus Integration spec
+#
+# Copy this file to template.local and fill in non-secret values only.
+# SSH credentials for Nexus devices are NOT in this file -- create a K8s
+# Secret out-of-band:
+#   kubectl create secret generic cisco-nexus-ssh \
+#     --from-literal=username=splunk-otel \
+#     --from-file=password=/tmp/nexus_password \
+#     -n splunk-otel
+
+api_version: splunk-observability-cisco-nexus-integration/v1
+
+# Splunk Observability realm. Used for the base collector hand-off.
+realm: us0
+
+# Cluster identity (lands on every metric via OTel resourcedetection).
+cluster_name: "lab-cluster"
+distribution: kubernetes  # openshift | kubernetes | eks | gke
+
+# K8s Secret name + namespace for SSH credentials. Create the Secret
+# manually as documented above. The skill renders only the manifest stub.
+ssh_secret:
+  name: cisco-nexus-ssh
+  namespace: splunk-otel
+  username_key: username
+  password_key: password         # OR key_file_key (when using SSH key auth)
+  key_file_key: ""               # set instead of password_key for SSH key auth
+
+# Cisco Nexus devices. Each device gets a cisco_os receiver entry. Use the
+# `--nexus-device name:host` CLI flag for inline overrides; this list is
+# the canonical source.
+devices:
+  - name: core-switch-01
+    host: 192.168.1.10
+    port: 22
+  - name: core-switch-02
+    host: 192.168.1.11
+    port: 22
+
+# cisco_os scrapers. The receiver supports `system` and `interfaces` scrapers
+# (per upstream contrib v0.149.0+). Toggle each to control what gets
+# collected.
+scrapers:
+  system:
+    enabled: true
+    metrics:
+      cisco_device_up: true
+      system_cpu_utilization: true
+      system_memory_utilization: true
+  interfaces:
+    enabled: true
+    metrics:
+      system_network_io: true
+      system_network_errors: true
+      system_network_packet_dropped: true
+      system_network_packet_count: true
+      system_network_interface_status: true
+
+# Collection interval (seconds) per device. Larger fabrics may need to
+# stretch this to manage Nexus CPU load.
+collection_interval: 60
+timeout: 30
+
+# Dashboards: starter charts for the most common Nexus visibility patterns.
+dashboards:
+  enabled: true
+
+# Detectors: starter detectors aligned with common SLO patterns.
+detectors:
+  enabled: true
+  thresholds:
+    interface_status_down_count_max: 0       # Critical: any interface down
+    packet_drop_rate_per_min_max: 100        # Major: drops per minute
+    cpu_utilization_pct_max: 85              # Warning: sustained high CPU
+    memory_utilization_pct_max: 85           # Warning: sustained high memory
+
+# Hand-offs.
+handoffs:
+  base_collector: true
+  dashboard_builder: true
+  native_ops: true

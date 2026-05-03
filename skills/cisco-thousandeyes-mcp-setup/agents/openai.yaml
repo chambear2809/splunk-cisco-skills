@@ -1,0 +1,8 @@
+interface:
+  display_name: "Cisco ThousandEyes MCP Server"
+  short_description: "Register the official ThousandEyes MCP server with Cursor / Claude / Codex / VS Code / Kiro"
+  default_prompt: >-
+    Use $cisco-thousandeyes-mcp-setup to render and optionally apply
+    Model Context Protocol client configurations for the official
+    ThousandEyes MCP Server (https://api.thousandeyes.com/mcp), gating
+    write tools behind an explicit opt-in flag.

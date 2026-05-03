@@ -1,0 +1,82 @@
+# Splunk Observability Isovalent Integration spec
+#
+# Copy this file to template.local and fill in non-secret values only.
+# The skill reads tokens from chmod-600 files passed through:
+#   --o11y-token-file              (Splunk Observability Org access token, passed through to base collector)
+#   --platform-hec-token-file      (Splunk Platform HEC token; or --render-platform-hec-helper)
+# NEVER put tokens in this file.
+
+api_version: splunk-observability-isovalent-integration/v1
+
+# Splunk Observability realm. Used for the base collector hand-off.
+realm: us0
+
+# Cluster identity. Lands on every metric and log via the OTel resourcedetection
+# processor + extraFileLogs resource attributes.
+cluster_name: "lab-cluster"
+distribution: openshift  # openshift | kubernetes | eks | gke
+
+# Splunk Platform target identity for the Tetragon log path.
+splunk_platform:
+  enabled: true
+  index: cisco_isovalent
+  sourcetype: cisco:isovalent              # broad sourcetype; captures everything Tetragon emits
+  also_render_processexec_routing: true    # also tag a derived sourcetype cisco:isovalent:processExec
+                                            # so the Cisco Security Cloud App field aliases work.
+  hec_url: ""                               # required when --platform-hec-token-file is set; auto-derived from --render-platform-hec-helper
+  insecure_skip_verify: false               # set true ONLY when the HEC cert is self-signed
+
+# Tetragon log export coordination. The default file-based path requires
+# Tetragon to write to the same directory we mount via hostPath. Override
+# only if cisco-isovalent-platform-setup was configured with a different
+# export directory.
+tetragon_export:
+  mode: file                                  # file (default) | stdout | fluentd (DEPRECATED)
+  host_path: /var/run/cilium/tetragon
+  filename_pattern: "*.log"
+
+# Optional Hubble Enterprise routing. When the operator deployed
+# isovalent/hubble-enterprise (private chart), the events also write to
+# /var/run/cilium/tetragon (default Hubble Enterprise behavior). The
+# extraFileLogs block already picks them up — no extra config needed.
+
+# OTel collector overlay knobs. Seven scrape jobs are emitted by default.
+# Set entries below to false to suppress a specific job.
+scrape:
+  cilium_agent_9962: true       # cilium agent metrics
+  hubble_metrics_9965: true     # hubble metrics on the cilium agent pod
+  cilium_envoy_9964: true       # cilium envoy proxy metrics
+  cilium_operator_9963: true    # cilium operator metrics
+  tetragon_2112: true           # tetragon agent metrics
+  tetragon_operator_2113: true  # tetragon operator metrics
+  cilium_dnsproxy: false        # set true if isovalent/cilium-dnsproxy is installed
+
+# filter/includemetrics allow-list. Skill defaults match the production-validated
+# Gruve allow-list (atl-ocp2 reference). Override when you need additional
+# series; values in this list ARE forwarded to Splunk Observability Cloud.
+metric_allowlist:
+  extra: []                  # extra metric names to add (preserves the default set)
+
+# Dashboards: token-scrubbed re-exports of the reference Cilium/Hubble JSON.
+# The skill ships placeholder paths; supply --dashboards-source PATH to point
+# at a directory of source dashboard JSON to re-export.
+dashboards:
+  enabled: true
+  source_dir: ""             # if set, copy + scrub from this directory
+
+# Detectors: starter detectors for the most common cilium/hubble/tetragon
+# alert patterns. Override thresholds per environment.
+detectors:
+  enabled: true
+  thresholds:
+    cilium_drop_rate_per_s: 100
+    hubble_dns_failure_rate: 0.05
+    tetragon_event_rate_per_s: 1000
+
+# Hand-offs. Render the matching helper script for each downstream skill.
+handoffs:
+  base_collector: true
+  hec_service: true
+  cisco_security_cloud: true
+  dashboard_builder: true
+  native_ops: true

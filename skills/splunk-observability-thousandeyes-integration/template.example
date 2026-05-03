@@ -1,0 +1,133 @@
+# Splunk Observability ThousandEyes Integration spec
+#
+# Copy this file locally (e.g. template.local) and fill in non-secret values.
+# The skill reads tokens from chmod-600 files passed through:
+#   --te-token-file               (TE Bearer token; Streams + Tests + ...)
+#   --o11y-ingest-token-file      (Splunk Observability Org access token)
+#   --o11y-api-token-file         (Splunk Observability User API access token)
+# NEVER put tokens in this file.
+
+api_version: splunk-observability-thousandeyes-integration/v1
+
+# Splunk Observability Cloud realm. Used for OTLP ingest URL and SignalFlow.
+# Valid: us0, us1, eu0, eu1, eu2, au0, jp0, sg0, us2-gcp.
+realm: us0
+
+# ThousandEyes account group ID (string). Required when not the default
+# account group. Read-only helpers can list these via list-account-groups.sh.
+account_group_id: "1234"
+
+# --- Integration 1.0 OpenTelemetry stream ---------------------------------
+# When enabled, renders the POST /v7/streams payload that ThousandEyes uses
+# to push OTLP data to Splunk Observability Cloud's ingest endpoint.
+stream:
+  enabled: true
+  signal: metric                  # metric (default) | trace | log
+  endpoint_type: http             # http (default; OTLP/HTTP protobuf) | grpc
+  data_model_version: v2          # v1 | v2 (default)
+  # Override the auto-derived ingest URL. Leave blank to use the canonical
+  # https://ingest.<realm>.signalfx.com/v2/datapoint/otlp form for HTTP, or
+  # https://ingest.<realm>.signalfx.com:443 for grpc.
+  endpoint_url: ""
+  # Test selection. Use exactly one of the three modes below.
+  test_match: []                  # list of {id: "<int>", domain: cea|endpoint}
+  filters:
+    test_types: []                # list of canonical TE OTel v2 type names
+  mode: ""                        # "all" to omit testMatch (stream every enabled test)
+
+# --- Integrations 2.0 Splunk Observability APM connector ------------------
+# When enabled, renders the generic connector + splunk-observability-apm
+# operation assignment for TE -> Splunk APM trace linking.
+apm_connector:
+  enabled: true
+  connector_name: "Splunk Observability APM"
+  operation_name: "Splunk Observability APM"
+  # Override the auto-derived API URL. Leave blank to use the canonical
+  # https://api.<realm>.signalfx.com form.
+  api_url: ""
+
+# --- TE asset lifecycle (optional) ----------------------------------------
+# Each block below is independently render-and-apply-able. Apply gates
+# behind --i-accept-te-mutations.
+
+# Tests to create or update via POST /v7/tests/{type}.
+tests: []
+# Each entry shape:
+#   - type: http-server            # one of the canonical TE test types
+#     name: "Checkout availability"
+#     target: "https://example.com/checkout"   # or url, server, etc. per test type
+#     interval: 60                  # seconds; valid: 60,120,300,600,900,1800,3600
+#     enabled: true
+#     alerts_enabled: false
+#     agents: []                    # list of agent IDs (use list-agents.sh)
+#     alert_rules: []               # list of alert rule IDs
+
+# Alert rules to create or update via POST /v7/alerts/rules.
+alert_rules: []
+# Each entry shape:
+#   - name: "agent-to-server latency p95"
+#     test_type: agent-to-server
+#     severity: Warning             # Info | Warning | Major | Critical
+#     direction: increase           # increase | decrease
+#     threshold: 200                # value
+#     window_seconds: 120
+#     min_sources: 1
+#     notifications: []             # list of notification objects
+
+# Labels and tags for organizing TE tests.
+labels: []                          # [{ name: "checkout", color: "#0066cc" }]
+tags: []                            # [{ name: "tier:1" }]
+
+# TE-side dashboards (POST /v7/dashboards). Distinct from Splunk O11y
+# dashboards (those are handed off to splunk-observability-dashboard-builder).
+te_dashboards: []                   # [{ name, description, widgets: [...] }]
+
+# TE Templates. Credentials in template_body MUST be Handlebars placeholders;
+# plain text values are rejected by the TE API with HTTP 400.
+templates: []
+# Each entry shape:
+#   - name: "RAG service health"
+#     description: "..."
+#     template_body: { ... }        # full TE template object with {{handlebars}}
+
+# --- Splunk O11y dashboards / detectors hand-off --------------------------
+# When enabled, renders one starter SignalFlow dashboard spec per test type
+# (consumable by splunk-observability-dashboard-builder) plus matching
+# starter detector specs (consumable by splunk-observability-native-ops).
+dashboards:
+  enabled: true
+  # If empty, use the union of stream.filters.test_types and the test_types
+  # represented in tests[]. Override here to render dashboards for additional
+  # types not actively streamed.
+  test_types: []
+
+detectors:
+  enabled: true
+  test_types: []
+  # Per-test-type thresholds. Skill ships safe starter values; override to
+  # match SLOs.
+  thresholds:
+    agent-to-server:
+      latency_ms_max: 200
+      loss_pct_max: 1.0
+      jitter_ms_max: 30
+    agent-to-agent:
+      latency_ms_max: 200
+      loss_pct_max: 1.0
+      jitter_ms_max: 30
+    http-server:
+      availability_floor: 0.99
+      duration_p95_ms: 1000
+    bgp:
+      reachability_floor: 0.99
+    voice:
+      mos_floor: 4.0
+
+# --- Hand-offs ------------------------------------------------------------
+# Renders helper scripts that emit the exact setup.sh commands for each
+# downstream skill. The user runs them after reviewing the output dir.
+handoffs:
+  dashboard_builder: true
+  native_ops: true
+  mcp_setup: true
+  splunk_platform_ta: true

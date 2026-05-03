@@ -1,0 +1,12 @@
+interface:
+  display_name: "Splunk Observability Cisco Intersight Integration"
+  short_description: "Send Cisco Intersight (UCS) metrics to Splunk O11y via a separate intersight-otel deployment"
+  default_prompt: >-
+    Use $splunk-observability-cisco-intersight-integration to render and
+    validate the Intersight OTel deployment manifests (separate
+    intersight-otel namespace, Secret stub, Deployment, ConfigMap pointing
+    at the agent OTLP gRPC endpoint) plus dashboards/detectors for UCS
+    power/thermal, fan, network, alarms, advisories, VM inventory. Apply
+    happens via the rendered handoff scripts (kubectl apply for the manifests,
+    then merge of the OTLP-receiver overlay into splunk-observability-otel-collector-setup).
+    Standalone and reusable -- composed by the AI Pod umbrella.

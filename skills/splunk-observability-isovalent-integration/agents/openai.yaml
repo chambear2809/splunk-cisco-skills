@@ -1,0 +1,14 @@
+interface:
+  display_name: "Splunk Observability Isovalent Integration"
+  short_description: "Wire installed Cilium / Hubble / Tetragon to Splunk Observability Cloud + Splunk Platform"
+  default_prompt: >-
+    Use $splunk-observability-isovalent-integration to render and validate
+    the Splunk OTel collector overlay (seven prometheus scrape jobs +
+    filter/includemetrics) and the file-based Splunk Platform logs path
+    (extraFileLogs.filelog/tetragon + hostPath mount + splunkhec exporter,
+    sourcetype cisco:isovalent / index cisco_isovalent). Apply happens via
+    the rendered handoff-*.sh scripts (base collector merge through
+    splunk-observability-otel-collector-setup, HEC token via
+    splunk-hec-service-setup, Cisco Security Cloud App Tetragon input via
+    cisco-security-cloud-setup, dashboards via splunk-observability-dashboard-builder,
+    detectors via splunk-observability-native-ops).

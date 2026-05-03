@@ -1,0 +1,3 @@
+Wire an installed Isovalent platform (Cilium / Hubble / Tetragon) to Splunk Observability Cloud and Splunk Platform: render the Splunk OTel collector overlay (seven prometheus/isovalent_* scrape jobs with metric filtering) plus the file-based Tetragon log path via the OTel filelog receiver and hostPath mount, with handoffs to splunk-hec-service-setup, splunk-observability-dashboard-builder, splunk-observability-native-ops, and cisco-security-cloud-setup.
+
+Read and follow the instructions in skills/splunk-observability-isovalent-integration/SKILL.md to help the user. If more detail is needed, also read skills/splunk-observability-isovalent-integration/reference.md.

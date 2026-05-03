@@ -1,0 +1,113 @@
+# Splunk Observability Cisco AI Pod Integration spec (umbrella)
+#
+# Copy this file to template.local and fill in non-secret values only.
+# This skill composes the Nexus / Intersight / GPU child skills' renders.
+# Each child has its own template.example you can also customize directly.
+
+api_version: splunk-observability-cisco-ai-pod-integration/v1
+
+# Splunk Observability realm.
+realm: us0
+
+# Cluster identity. Must match the actual cluster name (lands on every metric).
+cluster_name: "atl-ai-pod"
+distribution: openshift  # openshift (default for AI Pod) | kubernetes | eks | gke
+
+# Composition: which child skills to invoke. Each child reads its own
+# template.example unless overridden via the override paths below.
+children:
+  nexus:
+    enabled: true
+    spec_override: ""    # path to a custom spec for the Nexus child; empty = child default
+  intersight:
+    enabled: true
+    spec_override: ""
+  nvidia_gpu:
+    enabled: true
+    spec_override: ""
+
+# AI-Pod-specific scrape configs. Each block here is on top of what the
+# child skills' overlays already produce.
+
+# NIM scrape mode:
+#   receiver_creator (default; simpler, no extra RBAC) -- pod label match
+#   endpoints (production OpenShift) -- kubernetes_sd_configs role=endpoints
+#                                       with namespace + service-name regex,
+#                                       requires the rbac.customRules patch.
+nim:
+  enabled: true
+  scrape_mode: receiver_creator           # receiver_creator | endpoints
+  port: 8000
+  metrics_path: /v1/metrics
+  endpoints_namespaces:                   # only used when scrape_mode=endpoints
+    - nvidia-inference
+    - nvidia-nemo
+  endpoints_service_regex: ""             # regex over Service names (e.g. "llama.*|nim-.*"); empty = match all
+  endpoints_port_regex: "api|http"
+  models:                                 # used to render starter dashboards/detectors
+    - llama-3.1-8b-instruct
+    - llama-3.1-70b
+    - nim-embedding
+    - nim-reranking
+
+vllm:
+  enabled: true
+  port: 8000
+  metrics_path: /metrics
+  pod_label: vllm
+
+milvus:
+  enabled: true
+  port: 9091
+  pod_label: milvus
+
+storage:
+  trident:
+    enabled: true
+    port: 8001
+    pod_label: "controller.csi.trident.netapp.io"
+  portworx:
+    enabled: true
+    ports: [17001, 17018]
+    pod_label: portworx
+
+redfish:
+  enabled: true
+  port: 9210
+  pod_label: redfish-exporter
+  paths:
+    - /health
+    - /performance
+  scrape_intervals_seconds:
+    health: 180
+    performance: 60
+
+# Dual-pipeline filtering:
+#   filtered metrics pipeline (~75 metric allow-list) for routine telemetry
+#   unfiltered specialized pipelines for AI Pod dashboards
+# Set this to false ONLY if you have a specific reason to disable the
+# unfiltered specialized pipelines.
+dual_pipeline_filtering: true
+
+# Workshop multi-tenant pattern: per-namespace SA + ClusterRoleBinding +
+# SCC for shared cluster-receiver scenarios (Splunk Workshop AI Pod path).
+workshop_mode:
+  enabled: false
+  participant_namespace_prefix: workshop-participant
+  participant_count: 30
+
+# K8s container logs to Splunk Platform via splunk-hec-service-setup.
+splunk_platform_logs:
+  enabled: false                          # opt-in; not enabled by default
+  hec_index: cisco_ai_pod
+  hec_token_name: splunk_otel_ai_pod_logs
+
+# Hand-offs.
+handoffs:
+  base_collector: true
+  hec_service: true
+  dashboard_builder: true
+  native_ops: true
+
+# Optional: enable the DCGM pod-label gap fix in the GPU child skill.
+enable_dcgm_pod_labels: false

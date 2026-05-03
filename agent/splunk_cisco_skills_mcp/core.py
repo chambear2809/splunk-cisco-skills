@@ -62,19 +62,55 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     ("splunk-agent-management-setup", "setup.sh"),
     ("splunk-asset-risk-intelligence-setup", "setup.sh"),
     ("splunk-attack-analyzer-setup", "setup.sh"),
+    # splunk-cloud-acs-allowlist-setup, splunk-edge-processor-setup,
+    # splunk-federated-search-setup, splunk-indexer-cluster-setup,
+    # splunk-license-manager-setup, splunk-soar-setup all share the same
+    # render-first --dry-run contract: the renderer runs with --dry-run,
+    # any rendered script is only logged ("DRY RUN: ..."), and the wrapper
+    # exits 0 before any mutating step. Allowlisting them here lets
+    # operators preview --phase apply / --phase rolling-restart / etc.
+    # under the read-only classification.
+    ("splunk-cloud-acs-allowlist-setup", "setup.sh"),
+    ("splunk-edge-processor-setup", "setup.sh"),
     ("splunk-enterprise-kubernetes-setup", "setup.sh"),
+    # splunk-enterprise-public-exposure-hardening uses --phase + --dry-run.
+    # The --dry-run preview always exits before any rendered script runs.
+    ("splunk-enterprise-public-exposure-hardening", "setup.sh"),
+    ("splunk-federated-search-setup", "setup.sh"),
     ("splunk-hec-service-setup", "setup.sh"),
     ("splunk-index-lifecycle-smartstore-setup", "setup.sh"),
+    ("splunk-indexer-cluster-setup", "setup.sh"),
     ("splunk-itsi-setup", "setup.sh"),
+    ("splunk-license-manager-setup", "setup.sh"),
     ("splunk-monitoring-console-setup", "setup.sh"),
     ("splunk-observability-cloud-integration-setup", "setup.sh"),
     ("splunk-observability-dashboard-builder", "setup.sh"),
+    # splunk-observability-native-ops --dry-run is forwarded into
+    # o11y_native_api.py, which skips live SignalFx / Splunk On-Call API
+    # writes. The token-file readability check is also short-circuited
+    # when --dry-run is set, so --apply --dry-run is a true preview path.
+    ("splunk-observability-native-ops", "setup.sh"),
     ("splunk-observability-otel-collector-setup", "setup.sh"),
+    # splunk-oncall-setup --dry-run skips API/HEC writes even when the
+    # caller also passes --apply, --send-alert, or --install-splunk-app.
+    ("splunk-oncall-setup", "setup.sh"),
     ("splunk-security-essentials-setup", "setup.sh"),
     ("splunk-security-portfolio-setup", "setup.sh"),
+    ("splunk-soar-setup", "setup.sh"),
     ("splunk-uba-setup", "setup.sh"),
     ("splunk-universal-forwarder-setup", "setup.sh"),
     ("splunk-workload-management-setup", "setup.sh"),
+    # New TE / MCP / Isovalent / AI Pod skills (eight). Each is render-first;
+    # --apply (or --apply STEPS) opts in to mutating action and is separately
+    # gated by the READ_ONLY_UNLESS_FLAG_SCRIPTS map below.
+    ("cisco-thousandeyes-mcp-setup", "setup.sh"),
+    ("splunk-observability-thousandeyes-integration", "setup.sh"),
+    ("cisco-isovalent-platform-setup", "setup.sh"),
+    ("splunk-observability-isovalent-integration", "setup.sh"),
+    ("splunk-observability-cisco-nexus-integration", "setup.sh"),
+    ("splunk-observability-cisco-intersight-integration", "setup.sh"),
+    ("splunk-observability-nvidia-gpu-integration", "setup.sh"),
+    ("splunk-observability-cisco-ai-pod-integration", "setup.sh"),
 }
 READ_ONLY_LIST_SCRIPTS: set[tuple[str, str]] = {
     ("cisco-product-setup", "setup.sh"),
@@ -102,6 +138,15 @@ READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
         "render",
         "preflight",
         "status",
+        "validate",
+    },
+    # splunk-enterprise-public-exposure-hardening render/preflight/validate
+    # phases only render assets or run rendered preflight/validate scripts,
+    # which inspect the search head without changing it. apply/all run the
+    # search-head apply script and remain mutating.
+    ("splunk-enterprise-public-exposure-hardening", "setup.sh"): {
+        "render",
+        "preflight",
         "validate",
     },
     ("splunk-federated-search-setup", "setup.sh"): {
@@ -146,13 +191,17 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
     ("splunk-observability-dashboard-builder", "setup.sh"): ("--apply",),
     # splunk-oncall-setup mutates Splunk On-Call (or the Splunk-side companion
     # apps, or the REST endpoint) only when --apply, --send-alert,
-    # --install-splunk-app, or --uninstall is passed. Without any of those,
-    # the script renders + validates only.
+    # --install-splunk-app, --uninstall, or --self-test is passed. Without
+    # any of those, the script renders + validates only. --self-test is a
+    # mutation gate because the script's own argv parser flips SEND_ALERT
+    # to true on --self-test, which fires synthetic INFO + RECOVERY alerts
+    # against the live On-Call REST endpoint.
     ("splunk-oncall-setup", "setup.sh"): (
         "--apply",
         "--send-alert",
         "--install-splunk-app",
         "--uninstall",
+        "--self-test",
     ),
     ("splunk-oncall-setup", "splunk_side_install.sh"): (
         "--apply",
@@ -182,6 +231,25 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
         "--apply-",
         "--splunk-prep",
     ),
+    # cisco-thousandeyes-mcp-setup, splunk-observability-thousandeyes-integration,
+    # and cisco-isovalent-platform-setup expose --apply; the other five
+    # observability-* integration wrappers only render manifests/helpers that
+    # the operator applies separately (helm install, kubectl apply, etc.) and
+    # therefore have no --apply flag in their argv parser. Listing those five
+    # with the ("--apply",) sentinel is correct and intentional: the pattern
+    # never matches an argv token they accept, so they are always classified
+    # as read-only when invoked through the MCP wrapper. Keep the entry so
+    # the (skill, script) pair is allowlisted explicitly and so adding a
+    # future --apply mode to one of these scripts immediately re-enables the
+    # mutation gate without code changes here.
+    ("cisco-thousandeyes-mcp-setup", "setup.sh"): ("--apply",),
+    ("splunk-observability-thousandeyes-integration", "setup.sh"): ("--apply",),
+    ("cisco-isovalent-platform-setup", "setup.sh"): ("--apply",),
+    ("splunk-observability-isovalent-integration", "setup.sh"): ("--apply",),
+    ("splunk-observability-cisco-nexus-integration", "setup.sh"): ("--apply",),
+    ("splunk-observability-cisco-intersight-integration", "setup.sh"): ("--apply",),
+    ("splunk-observability-nvidia-gpu-integration", "setup.sh"): ("--apply",),
+    ("splunk-observability-cisco-ai-pod-integration", "setup.sh"): ("--apply",),
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it. The smoke_*
@@ -207,6 +275,16 @@ DIRECT_SECRET_FLAGS = {
     "--client-secret",
     "--hec-token",
     "--integration-key",
+    # Intersight API key flags rejected by splunk-observability-cisco-intersight-integration
+    # and splunk-observability-cisco-ai-pod-integration umbrella (the intersight key ID is
+    # not strictly secret, but key material always flows through file-based flags).
+    "--intersight-key",
+    "--intersight-key-id",
+    # Isovalent license key rejected by cisco-isovalent-platform-setup.
+    "--isovalent-license",
+    "--isovalent-pull-secret",
+    "--license",
+    "--license-key",
     "--o11y-token",
     "--on-call-api-key",
     "--oncall-api-key",
@@ -214,12 +292,16 @@ DIRECT_SECRET_FLAGS = {
     "--password",
     "--platform-hec-token",
     "--proxy-password",
+    "--pull-secret",
     "--refresh-token",
     "--rest-key",
     "--secret",
     "--service-account-password",
     "--skey",
     "--sf-token",
+    # ThousandEyes bearer token rejected by cisco-thousandeyes-mcp-setup and
+    # splunk-observability-thousandeyes-integration.
+    "--te-token",
     "--token",
     "--vo-api-key",
     "--x-vo-api-key",
@@ -261,6 +343,18 @@ SECRET_FILE_FLAGS = {
     "--hec-token-file",
     "--idxc-secret-file",
     "--integration-key-file",
+    # Intersight API credential file refs (used by splunk-observability-cisco-intersight-integration
+    # and the splunk-observability-cisco-ai-pod-integration umbrella).
+    "--intersight-key-file",
+    "--intersight-key-id-file",
+    # Isovalent Enterprise license + pull-secret file refs (cisco-isovalent-platform-setup).
+    "--isovalent-license-file",
+    "--isovalent-pull-secret-file",
+    # Splunk O11y access token, split by scope. The Org access token is for
+    # ingest paths; the User API access token is for admin/dashboard/SignalFlow
+    # calls (see splunk-observability-thousandeyes-integration).
+    "--o11y-api-token-file",
+    "--o11y-ingest-token-file",
     "--o11y-token-file",
     "--oncall-api-key-file",
     "--org-token-file",
@@ -274,6 +368,9 @@ SECRET_FILE_FLAGS = {
     "--snmpv3-secrets-file",
     "--soar-automation-token-file",
     "--splunk-cloud-admin-jwt-file",
+    # ThousandEyes bearer token file ref (cisco-thousandeyes-mcp-setup +
+    # splunk-observability-thousandeyes-integration).
+    "--te-token-file",
     "--token-file",
     "--write-hec-token-file",
     "--write-token-file",

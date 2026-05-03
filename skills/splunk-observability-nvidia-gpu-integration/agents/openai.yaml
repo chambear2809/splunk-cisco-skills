@@ -1,0 +1,14 @@
+interface:
+  display_name: "Splunk Observability NVIDIA GPU Integration"
+  short_description: "Send NVIDIA GPU telemetry (DCGM Exporter) to Splunk O11y; works for any GPU cluster"
+  default_prompt: >-
+    Use $splunk-observability-nvidia-gpu-integration to render and validate
+    a Splunk OTel collector overlay with receiver_creator/dcgm-cisco
+    (parameterized; explicitly avoids collision with the chart's
+    autodetect receiver_creator/nvidia), dual-label DCGM discovery rule,
+    and an unfiltered metrics/nvidia-metrics pipeline. Optional
+    --enable-dcgm-pod-labels patch fixes the well-known GPU Operator
+    pod-label gap. Apply happens via the rendered handoff-base-collector.sh
+    which merges the overlay into splunk-observability-otel-collector-setup,
+    plus optional kubectl apply of the rendered DCGM pod-labels RBAC patch.
+    Standalone and reusable -- composed by the AI Pod umbrella.

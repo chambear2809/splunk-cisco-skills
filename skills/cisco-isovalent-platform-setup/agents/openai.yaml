@@ -1,0 +1,10 @@
+interface:
+  display_name: "Cisco Isovalent Platform Setup"
+  short_description: "Install Cilium / Tetragon / Hubble Enterprise on Kubernetes (OSS or Enterprise edition); NOT a Splunk TA installer"
+  default_prompt: >-
+    Use $cisco-isovalent-platform-setup to render and optionally apply the
+    Isovalent platform install lifecycle on a Kubernetes cluster: Cilium
+    (CNI), Tetragon (eBPF runtime security), and optionally Hubble
+    Enterprise / cilium-dnsproxy / Hubble Timescape. Edition split via
+    --edition oss|enterprise. The platform install is a prerequisite for
+    splunk-observability-isovalent-integration.

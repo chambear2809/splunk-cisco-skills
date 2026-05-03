@@ -1,0 +1,3 @@
+Send NVIDIA GPU telemetry (DCGM Exporter) to Splunk Observability Cloud. Renders a Splunk OTel collector overlay with receiver_creator/dcgm-cisco (custom name to avoid colliding with the chart's autodetect/nvidia), dual-label DCGM discovery rule, and a dedicated unfiltered metrics pipeline. Optional --enable-dcgm-pod-labels flag emits the RBAC + DaemonSet patch that fixes the well-known GPU Operator pod-label gap. Standalone and reusable; composed by the AI Pod umbrella.
+
+Read and follow the instructions in skills/splunk-observability-nvidia-gpu-integration/SKILL.md to help the user. If more detail is needed, also read skills/splunk-observability-nvidia-gpu-integration/reference.md.
