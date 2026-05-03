@@ -34,6 +34,9 @@ Common starting points:
   setup skill.
 - If you need Linux host bootstrap, start with
   `skills/splunk-enterprise-host-setup/`.
+- If you need lightweight Universal Forwarder runtime bootstrap, start with
+  `skills/splunk-universal-forwarder-setup/`; use Agent Management separately
+  for server classes and deployment apps.
 - If you need Splunk Enterprise on Kubernetes, start with
   `skills/splunk-enterprise-kubernetes-setup/`. The workflow renders assets by
   default and only applies them when you request an apply phase.
@@ -49,6 +52,10 @@ Common starting points:
   `skills/splunk-observability-dashboard-builder/` to turn an operational goal
   into validated classic Observability dashboard API payloads, with modern
   dashboard features called out as advisory work.
+- If you need native Splunk Observability Cloud operations, use
+  `skills/splunk-observability-native-ops/` for detectors, alert routing,
+  Synthetics tests and artifacts, APM topology/traces, RUM sessions, modern
+  logs chart handoffs, and On-Call workflows.
 - If you need Splunk platform administration services, start with
   `skills/splunk-agent-management-setup/`,
   `skills/splunk-workload-management-setup/`,
@@ -83,9 +90,10 @@ operations do **not** use the search-tier REST API in cloud mode.
 
 At a high level, the repo gives you seven layers of automation:
 
-1. **Host bootstrap**: download Splunk Enterprise packages, install them on
-   Linux hosts, and configure standalone or single-site clustered search-tier,
-   indexer, and heavy-forwarder roles.
+1. **Host bootstrap**: download Splunk Enterprise or Universal Forwarder
+   packages, install them on customer-managed hosts, and configure standalone
+   or single-site clustered search-tier, indexer, heavy-forwarder, or
+   lightweight forwarder roles.
 2. **Kubernetes runtime bootstrap**: render and optionally apply Splunk
    Operator for Kubernetes or Splunk POD deployment assets for full Splunk
    Enterprise.
@@ -143,9 +151,15 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-itsi-config` | Native ITSI objects, service trees, and supported ITSI content packs | Preview, apply, and validate ITSI entities, services, KPIs, dependencies, template links, service trees, NEAPs, and selected content packs from YAML specs |
 | `splunk-enterprise-security-install` | `SplunkEnterpriseSecuritySuite` | Install, post-install, and validate Splunk Enterprise Security on standalone search heads or SHC deployers |
 | `splunk-enterprise-security-config` | Splunk Enterprise Security configuration | Configure ES indexes, roles, data models, enrichment, detections, and operational validation |
+| `splunk-security-portfolio-setup` | Splunk security product router | Resolve ES, SOAR, Security Essentials, UBA, Attack Analyzer, ARI, and related security offerings to setup, install-only, bundled ES, or handoff workflows |
+| `splunk-security-essentials-setup` | `Splunk_Security_Essentials` | Install and validate Splunk Security Essentials, content recommendations, and starter posture dashboards |
+| `splunk-asset-risk-intelligence-setup` | `SplunkAssetRiskIntelligence` | Install and validate ARI indexes, KV Store readiness, ARI roles, and ES Exposure Analytics handoff |
+| `splunk-attack-analyzer-setup` | `Splunk_TA_SAA` + `Splunk_App_SAA` | Install and validate Attack Analyzer platform integration, the `saa` index, `saa_indexes` macro, and API key handoff |
+| `splunk-uba-setup` | Splunk UBA / UEBA readiness | Validate legacy UBA integrations, optional Kafka app placement, and ES Premier UEBA migration handoff |
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant for SPL; drive Enterprise cloud-connected onboarding |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
+| `splunk-universal-forwarder-setup` | Splunk Universal Forwarder runtime | Bootstrap Linux, macOS, and rendered Windows Universal Forwarders; enroll clients with deployment server, static indexers, or Splunk Cloud credentials package |
 | `splunk-agent-management-setup` | Splunk Agent Management | Render, apply, and validate server classes, deployment apps, and deployment client assets |
 | `splunk-workload-management-setup` | Splunk Workload Management | Render and validate workload pools, workload rules, admission-rule guardrails, and Linux workload prerequisites |
 | `splunk-hec-service-setup` | Splunk HTTP Event Collector | Prepare reusable HEC token configuration, allowed indexes, Enterprise inputs.conf assets, and Splunk Cloud ACS payloads |
@@ -156,9 +170,15 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-enterprise-kubernetes-setup` | Splunk Enterprise on Kubernetes | Render, preflight, apply, and validate SOK S1/C3/M4 or Splunk POD on Cisco UCS |
 | `splunk-observability-otel-collector-setup` | Splunk Observability Cloud OTel Collector | Render, apply, and validate Splunk Distribution of OpenTelemetry Collector assets for Kubernetes clusters and Linux hosts, including Splunk Platform HEC token handoff helpers |
 | `splunk-observability-dashboard-builder` | Splunk Observability Cloud dashboards | Render, validate, and optionally apply classic Observability dashboard groups, charts, and dashboards from natural-language, JSON, or YAML specs |
+| `splunk-observability-native-ops` | Splunk Observability Cloud native operations | Render, validate, and optionally apply supported native Observability operations for detectors, alert routing, Synthetics, APM, RUM, logs, and On-Call handoffs |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
 | `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render or apply Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
 | `splunk-connect-for-snmp-setup` | SC4SNMP external collector | Prepare Splunk HEC/indexes and render or apply Docker Compose or Helm assets for Splunk Connect for SNMP |
+| `splunk-license-manager-setup` | Splunk Enterprise license manager / peers / pools / groups / messages | Install licenses, switch groups, configure peers, allocate pools, audit usage and violations, validate version compatibility |
+| `splunk-soar-setup` | `splunk_soar-unpriv` (single + cluster) + `splunk_app_soar` (6361) + Splunk App for SOAR Export (3411) + Splunk SOAR Automation Broker | Install SOAR On-prem (single + cluster with external PG/GlusterFS/Elasticsearch), help with SOAR Cloud onboarding, install Automation Broker on Docker/Podman, install Splunk-side SOAR apps, ready ES integration, backup/restore |
+| `splunk-edge-processor-setup` | Splunk Edge Processor instances + cloud / Enterprise control plane | Add EP control-plane object, install instances on Linux (systemd or not), scale to multi-instance, manage source types / destinations / SPL2 pipelines, apply pipelines, validate health |
+| `splunk-indexer-cluster-setup` | Splunk Enterprise indexer cluster (single-site, multisite, redundant managers) | Bootstrap manager(s) / peers / SHs, manage cluster bundle (validate / apply / rollback), rolling restart (default / searchable / forced), peer offline (fast / enforce-counts), maintenance mode, single-site to multisite migration, manager replacement |
+| `splunk-cloud-acs-allowlist-setup` | Splunk Cloud ACS IP allowlists (all 7 features, IPv4 + IPv6) | Render plan, preflight (subnet limits, lock-out protection, FedRAMP carve-out), apply, audit / diff, optional Terraform emission |
 
 ## Vendor Package Policy
 
@@ -707,6 +727,7 @@ splunk-cisco-skills/
 │   ├── splunk-app-install/
 │   ├── splunk-ai-assistant-setup/
 │   ├── splunk-agent-management-setup/
+│   ├── splunk-universal-forwarder-setup/
 │   ├── splunk-workload-management-setup/
 │   ├── splunk-hec-service-setup/
 │   ├── splunk-federated-search-setup/
@@ -718,6 +739,7 @@ splunk-cisco-skills/
 │   ├── splunk-enterprise-security-config/
 │   ├── splunk-observability-otel-collector-setup/
 │   ├── splunk-observability-dashboard-builder/
+│   ├── splunk-observability-native-ops/
 │   ├── splunk-connect-for-syslog-setup/
 │   ├── splunk-connect-for-snmp-setup/
 │   ├── splunk-itsi-config/
@@ -875,6 +897,10 @@ install-or-upgrade entrypoints for customer-managed runtimes.
 `splunk-observability-dashboard-builder` is separate from runtime placement: it
 renders and validates native Observability Cloud dashboard API payloads and can
 apply them only when explicitly requested.
+`splunk-observability-native-ops` follows the same no-runtime-placement model
+for native Observability operations: it renders supported API payloads, API
+validation requests, deeplinks, and deterministic operator handoffs for UI-only
+surfaces.
 `splunk-enterprise-kubernetes-setup` is for self-managed Splunk Enterprise on
 Kubernetes: either Splunk Operator for Kubernetes on an existing cluster, or
 Splunk POD on Cisco UCS with the Splunk Kubernetes Installer.

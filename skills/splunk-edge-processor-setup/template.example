@@ -1,0 +1,45 @@
+# Splunk Edge Processor Worksheet
+#
+# Copy this file locally and fill in non-secret values. Token values
+# (EP API token, HEC token) belong in chmod 600 files only.
+
+phase: render
+
+# Control plane.
+ep_control_plane: cloud           # cloud | enterprise
+ep_tenant_url: https://example.scs.splunk.com
+ep_name: prod-ep
+
+# TLS settings for data inputs.
+ep_tls_mode: none                 # none | tls | mtls
+ep_tls_server_cert:               # path to PEM file
+ep_tls_server_key:                # path to PEM file
+ep_tls_ca_cert:                   # path to PEM file (mtls only)
+
+# EP instances. Comma-separated host=mode pairs.
+# mode: systemd | nosystemd | docker
+ep_instances: ep01.example.com=systemd
+
+# Sizing preflight target.
+ep_target_daily_gb: 50
+
+# Source types (comma-separated names).
+ep_source_types: syslog_router
+
+# Destinations. Comma-separated <name>=key=value pairs (semicolon-separated values inside a destination).
+# Required keys: type (s2s|hec|s3|syslog), name (auto-set from key)
+# Common keys: host, port, token_file, bucket, prefix, region, index_routing
+# Example:
+#   primary=type=s2s;host=idx-cluster.example.com;port=9997;index_routing=specify_for_no_index:summary
+#   archive=type=s3;bucket=splunk-archive;prefix=ep-overflow/;region=us-east-1
+ep_destinations: primary=type=s2s;host=idx-cluster.example.com;port=9997
+
+# Default destination (must match a destination name above).
+ep_default_destination: primary
+
+# Pipelines. Comma-separated <name>=key=value pairs (semicolons inside).
+# Required keys: partition (Keep|Remove), <field>=<operator>:<value>
+# Required keys: spl2_file, destination
+# Example:
+#   filter_dev=partition=Keep;sourcetype=app:dev;spl2_file=pipelines/filter_dev.spl2;destination=primary
+ep_pipelines: filter_dev=partition=Keep;sourcetype=app:dev;spl2_file=pipelines/filter_dev.spl2;destination=primary

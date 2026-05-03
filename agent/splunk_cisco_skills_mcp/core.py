@@ -59,6 +59,7 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     ("splunk-enterprise-kubernetes-setup", "setup.sh"),
     ("splunk-observability-otel-collector-setup", "setup.sh"),
     ("splunk-observability-dashboard-builder", "setup.sh"),
+    ("splunk-universal-forwarder-setup", "setup.sh"),
 }
 READ_ONLY_LIST_SCRIPTS: set[tuple[str, str]] = {
     ("cisco-product-setup", "setup.sh"),
@@ -71,6 +72,7 @@ READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
     ("splunk-index-lifecycle-smartstore-setup", "setup.sh"): {"render", "preflight", "status"},
     ("splunk-monitoring-console-setup", "setup.sh"): {"render", "preflight", "status"},
     ("splunk-enterprise-kubernetes-setup", "setup.sh"): {"render", "preflight", "status"},
+    ("splunk-universal-forwarder-setup", "setup.sh"): {"render", "download", "status"},
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it.
@@ -78,6 +80,7 @@ READ_ONLY_SCRIPT_NAMES: set[str] = {
     "validate.sh",
     "list_apps.sh",
     "resolve_product.sh",
+    "smoke_latest_resolution.sh",
 }
 
 DIRECT_SECRET_FLAGS = {
@@ -91,6 +94,8 @@ DIRECT_SECRET_FLAGS = {
     "--client-secret",
     "--hec-token",
     "--o11y-token",
+    "--on-call-api-key",
+    "--oncall-api-key",
     "--password",
     "--platform-hec-token",
     "--proxy-password",
@@ -99,6 +104,7 @@ DIRECT_SECRET_FLAGS = {
     "--skey",
     "--sf-token",
     "--token",
+    "--x-vo-api-key",
 }
 
 NON_SECRET_VALUE_KEYS = {
@@ -128,6 +134,7 @@ SECRET_FILE_FLAGS = {
     "--api-key-file",
     "--api-secret-file",
     "--api-token-file",
+    "--automation-token-file",
     "--bearer-token-file",
     "--client-secret-file",
     "--cloudlock-token-file",
@@ -135,6 +142,7 @@ SECRET_FILE_FLAGS = {
     "--hec-token-file",
     "--idxc-secret-file",
     "--o11y-token-file",
+    "--oncall-api-key-file",
     "--password-file",
     "--platform-hec-token-file",
     "--pkcs-certificate-file",
@@ -142,6 +150,7 @@ SECRET_FILE_FLAGS = {
     "--secret-file",
     "--shc-secret-file",
     "--snmpv3-secrets-file",
+    "--soar-automation-token-file",
     "--token-file",
     "--write-hec-token-file",
     "--write-token-file",
@@ -517,6 +526,81 @@ def _truncate(value: str) -> str:
     return value[:MAX_OUTPUT_CHARS] + f"\n...[truncated {omitted} chars]"
 
 
+# Defense-in-depth redaction for subprocess output that the MCP server
+# returns to the model. Scripts in this repo are expected to use file-based
+# secrets and never echo credentials, but a faulty `set -x`, a verbose
+# library, or an upstream Splunk REST error body can still leak material.
+# Patterns here are intentionally conservative: high-confidence lexical
+# secrets only, to avoid mangling legitimate output.
+_SECRET_REDACTIONS: tuple[tuple[re.Pattern[str], str], ...] = (
+    # PEM private key blocks (any algorithm).
+    (
+        re.compile(
+            r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?"
+            r"-----END [A-Z0-9 ]*PRIVATE KEY-----",
+            re.DOTALL,
+        ),
+        "-----BEGIN PRIVATE KEY-----[REDACTED]-----END PRIVATE KEY-----",
+    ),
+    # JWTs (three base64url segments).
+    (
+        re.compile(r"\beyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{4,}\b"),
+        "[REDACTED-JWT]",
+    ),
+    # HTTP Authorization headers: keep the scheme, redact the token.
+    (
+        re.compile(
+            r"(?i)(Authorization\s*:\s*(?:Bearer|Basic|Splunk|Token|Digest|MAC)\s+)"
+            r"[A-Za-z0-9+/=._\-]{6,}"
+        ),
+        r"\1[REDACTED]",
+    ),
+    # Splunk session-key headers in REST calls.
+    (
+        re.compile(r"(?i)(sessionKey\s*[:=]\s*)[A-Za-z0-9._\-]{6,}"),
+        r"\1[REDACTED]",
+    ),
+    # password=..., token=..., api_key=..., client_secret=..., etc. in URLs,
+    # form bodies, KEY=VALUE log lines, or JSON-ish snippets. Allows quotes
+    # around the value. Stops at whitespace, quote, comma, or ampersand to
+    # leave structure intact.
+    (
+        re.compile(
+            r"(?i)("
+            r"splunk[_-]?pass|splunk[_-]?password|sb[_-]?pass|sb[_-]?password|"
+            r"password|passwd|pwd|secret|"
+            r"api[_-]?key|api[_-]?secret|"
+            r"client[_-]?secret|access[_-]?token|refresh[_-]?token|"
+            r"bearer[_-]?token|hec[_-]?token|"
+            r"auth[_-]?token|session[_-]?key|skey|ikey|"
+            r"private[_-]?key"
+            r")"
+            r"(\s*[:=]\s*['\"]?)"
+            r"[^\s'\",&]{6,}"
+        ),
+        r"\1\2[REDACTED]",
+    ),
+)
+
+
+def _redact_secrets(value: str) -> str:
+    """Best-effort redact of credential-looking substrings in script output.
+
+    This is defense-in-depth and is not a guarantee. Callers must still
+    follow the repo's "no secrets in argv, file-backed secrets only" rules.
+    """
+    if not value:
+        return value
+    redacted = value
+    for pattern, replacement in _SECRET_REDACTIONS:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+
+
+def _truncate_and_redact(value: str) -> str:
+    return _truncate(_redact_secrets(value))
+
+
 def _skill_reference_files(skill_dir: Path) -> list[Path]:
     files: list[Path] = []
     primary = skill_dir / "reference.md"
@@ -659,15 +743,15 @@ def resolve_cisco_product(query: str) -> dict[str, Any]:
     except json.JSONDecodeError:
         payload = {
             "status": "error",
-            "raw_stdout": _truncate(result.stdout),
+            "raw_stdout": _truncate_and_redact(result.stdout),
             "returncode": result.returncode,
         }
         if result.stderr:
-            payload["stderr"] = _truncate(result.stderr)
+            payload["stderr"] = _truncate_and_redact(result.stderr)
         return payload
     payload["returncode"] = result.returncode
     if result.stderr:
-        payload["stderr"] = _truncate(result.stderr)
+        payload["stderr"] = _truncate_and_redact(result.stderr)
     return payload
 
 
@@ -814,15 +898,15 @@ def plan_cisco_product_setup(
     try:
         dry_run = json.loads(dry_run_result.stdout or "{}")
     except json.JSONDecodeError as exc:
-        detail = _truncate(dry_run_result.stderr or dry_run_result.stdout)
+        detail = _truncate_and_redact(dry_run_result.stderr or dry_run_result.stdout)
         raise SkillMCPError(
             f"Cisco product dry-run did not return JSON: {detail}"
         ) from exc
     dry_run["returncode"] = dry_run_result.returncode
     if dry_run_result.stderr:
-        dry_run["stderr"] = _truncate(dry_run_result.stderr)
+        dry_run["stderr"] = _truncate_and_redact(dry_run_result.stderr)
     if dry_run_result.returncode != 0:
-        message = dry_run.get("stderr") or _truncate(dry_run_result.stdout)
+        message = dry_run.get("stderr") or _truncate_and_redact(dry_run_result.stdout)
         raise SkillMCPError(f"Cisco product dry-run failed: {message}")
 
     summary = f"Cisco product setup for {product} ({phase})"
@@ -927,8 +1011,8 @@ def execute_plan(
     return {
         "plan_hash": plan_hash,
         "returncode": result.returncode,
-        "stdout": _truncate(result.stdout),
-        "stderr": _truncate(result.stderr),
+        "stdout": _truncate_and_redact(result.stdout),
+        "stderr": _truncate_and_redact(result.stderr),
         "command": plan.command,
         "cwd": plan.cwd,
         "timed_out": result.timed_out,

@@ -36,7 +36,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--blacklist", default="")
     parser.add_argument("--filter-type", choices=("whitelist", "blacklist"), default="whitelist")
     parser.add_argument("--machine-types-filter", default="")
-    parser.add_argument("--restart-splunkd", choices=("true", "false"), default="false")
+    parser.add_argument("--restart-splunkd", choices=("true", "false"), default="false",
+        help="Server-side serverclass restartSplunkd setting (controls whether the deployment client restarts splunkd after applying the bundle).")
+    parser.add_argument("--client-restart-splunkd", choices=("true", "false"), default="true",
+        help="If true (default), the rendered apply-deployment-client.sh restarts the local splunkd after writing deploymentclient.conf. Set to false when wiring deploymentclient.conf into a base app or another orchestrator that handles the restart.")
     parser.add_argument("--state-on-client", choices=("enabled", "disabled", "noop"), default="enabled")
     parser.add_argument("--agent-manager-uri", default="")
     parser.add_argument("--client-name", default="")
@@ -246,12 +249,23 @@ cp serverclass.conf "${{system_local}}/serverclass.conf"
 """
         ),
         "apply-deployment-client.sh": make_script(
-            f"""splunk_home={splunk_home}
-client_app="${{splunk_home}}/etc/apps/{args.deployment_app_name}_deploymentclient"
-mkdir -p "${{client_app}}/local"
-cp deploymentclient.conf "${{client_app}}/local/deploymentclient.conf"
-"${{splunk_home}}/bin/splunk" restart
-"""
+            (
+                f"splunk_home={splunk_home}\n"
+                f"client_app=\"${{splunk_home}}/etc/apps/{args.deployment_app_name}_deploymentclient\"\n"
+                "mkdir -p \"${client_app}/local\"\n"
+                "cp deploymentclient.conf \"${client_app}/local/deploymentclient.conf\"\n"
+                + (
+                    "\"${splunk_home}/bin/splunk\" restart\n"
+                    if args.client_restart_splunkd == "true"
+                    else (
+                        "# --client-restart-splunkd=false: rendered without an automatic\n"
+                        "# splunkd restart. The new deploymentclient.conf does not take\n"
+                        "# effect until splunkd restarts; sequence the restart externally.\n"
+                        "echo \"deploymentclient.conf installed at ${client_app}/local/deploymentclient.conf.\"\n"
+                        "echo \"Restart splunkd to activate (skipped because --client-restart-splunkd=false).\"\n"
+                    )
+                )
+            )
         ),
         "status.sh": make_script(
             f"""splunk_home={splunk_home}

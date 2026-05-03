@@ -95,7 +95,7 @@ fi
 log ""
 log "--- Data Flow Check ---"
 for idx in "cisco_aci" "cisco_nd" "cisco_nexus_9k"; do
-    event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where index=${idx}" "count" 2>/dev/null || echo "0")
+    event_count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" "| tstats count where index=${idx} earliest=-1h@h latest=now" "count" 2>/dev/null || echo "0")
     if [[ "${event_count}" -gt 0 ]]; then
         pass "Index '${idx}' has ${event_count} events in the last hour"
     else

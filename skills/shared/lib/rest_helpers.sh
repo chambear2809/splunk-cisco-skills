@@ -243,6 +243,50 @@ get_session_key() {
     printf '%s' "${sk}"
 }
 
+# get_session_key_from_password_file <uri> <password_file> [user]
+#
+# Mints a Splunk session key without ever placing the admin password on argv.
+# The password is read from disk by curl itself via the `--data-urlencode
+# password@<file>` form, so it never appears in `ps`, /proc/*/cmdline, or
+# the shell's command history. The username is not secret and is allowed on
+# argv.
+#
+# Use this in any script that reads the admin password from a file
+# (`SPLUNK_ADMIN_PASSWORD_FILE`, `--admin-password-file`, etc.) and then
+# needs to call Splunk REST. After the call, hand the returned session key
+# to `splunk_curl` / `splunk_curl_post` for all subsequent REST work; those
+# helpers already keep the session key off argv via `-K <(...)`.
+get_session_key_from_password_file() {
+    local uri="${1:-}"
+    local pw_file="${2:-}"
+    local user="${3:-admin}"
+    local sk
+
+    if [[ -z "${uri}" || -z "${pw_file}" ]]; then
+        log "ERROR: get_session_key_from_password_file requires <uri> <password_file>"
+        return 1
+    fi
+    if [[ ! -s "${pw_file}" ]]; then
+        log "ERROR: Splunk admin password file missing or empty: ${pw_file}"
+        return 1
+    fi
+
+    _set_splunk_curl_tls_args || return 1
+    sk=$(curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        --connect-timeout 10 --max-time 30 \
+        --data-urlencode "username=${user}" \
+        --data-urlencode "password@${pw_file}" \
+        "${uri}/services/auth/login" 2>/dev/null \
+        | sed -n 's/.*<sessionKey>\([^<]*\)<.*/\1/p' || true)
+
+    if [[ -z "${sk}" ]]; then
+        echo "ERROR: Failed to obtain session key from ${uri} using ${pw_file}." >&2
+        verify_search_api_connectivity "${uri}" 2>&1 | while IFS= read -r line; do echo "${line}" >&2; done
+        return 1
+    fi
+    printf '%s' "${sk}"
+}
+
 # Known limitation: passing the session key via `-K <(printf ...)` keeps it
 # off curl's argv (so it does not show up in `ps aux` to other users), but
 # the FIFO file descriptor backing the process substitution is briefly

@@ -2,8 +2,27 @@
 """Regression tests for app_registry.json and deployment role matrices."""
 
 import json
+from collections import Counter
 
 from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase
+
+
+# Skill directories under skills/ that intentionally have no entry in
+# skill_topologies. Currently empty: every on-disk skill should appear.
+SKILL_TOPOLOGY_EXEMPTIONS: set[str] = set()
+
+
+def _on_disk_skill_dirs() -> set[str]:
+    skills_root = REPO_ROOT / "skills"
+    out: set[str] = set()
+    for entry in skills_root.iterdir():
+        if not entry.is_dir():
+            continue
+        if entry.name == "shared":
+            continue
+        if (entry / "SKILL.md").is_file():
+            out.add(entry.name)
+    return out
 
 
 class RegistryRegressionTests(ShellScriptRegressionBase):
@@ -133,6 +152,7 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("splunk-connect-for-syslog-setup", skill_topologies)
         self.assertIn("splunk-connect-for-snmp-setup", skill_topologies)
         self.assertIn("splunk-agent-management-setup", skill_topologies)
+        self.assertIn("splunk-universal-forwarder-setup", skill_topologies)
         self.assertIn("splunk-workload-management-setup", skill_topologies)
         self.assertIn("splunk-hec-service-setup", skill_topologies)
         self.assertIn("splunk-federated-search-setup", skill_topologies)
@@ -141,6 +161,7 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("splunk-enterprise-kubernetes-setup", skill_topologies)
         self.assertIn("splunk-observability-otel-collector-setup", skill_topologies)
         self.assertIn("splunk-observability-dashboard-builder", skill_topologies)
+        self.assertIn("splunk-observability-native-ops", skill_topologies)
         self.assertIn("splunk-app-install", skill_topologies)
 
         for skill, topology in skill_topologies.items():
@@ -162,11 +183,18 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertTrue(
             all(value == "none" for value in observability_dashboards["role_support"].values())
         )
+        observability_native_ops = skill_topologies["splunk-observability-native-ops"]
+        self.assertTrue(
+            all(value == "none" for value in observability_native_ops["role_support"].values())
+        )
         enterprise_k8s = skill_topologies["splunk-enterprise-kubernetes-setup"]
         self.assertEqual(enterprise_k8s["role_support"]["external-collector"], "none")
         self.assertEqual(enterprise_k8s["cloud_pairing"], [])
         agent_management = skill_topologies["splunk-agent-management-setup"]
         self.assertEqual(agent_management["role_support"]["universal-forwarder"], "supported")
+        universal_forwarder = skill_topologies["splunk-universal-forwarder-setup"]
+        self.assertEqual(universal_forwarder["role_support"]["universal-forwarder"], "required")
+        self.assertEqual(universal_forwarder["cloud_pairing"], ["universal-forwarder"])
         workload_management = skill_topologies["splunk-workload-management-setup"]
         self.assertEqual(workload_management["role_support"]["indexer"], "supported")
         self.assertEqual(workload_management["role_support"]["heavy-forwarder"], "none")
@@ -295,3 +323,182 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(content_library_entry["app_name"], "DA-ITSI-ContentLibrary")
         self.assertEqual(content_library_entry.get("install_requires"), ["1841"])
         self.assertIn("splunk-app-for-content-packs_*", content_library_entry.get("package_patterns", []))
+
+    def test_app_registry_splunkbase_ids_are_unique(self):
+        """Two registry entries must not share the same Splunkbase ID.
+
+        Many tests look up apps via the dict comprehension
+        ``{app["splunkbase_id"]: app}``; duplicate IDs would silently shadow
+        each other and weaken the asserts. Empty IDs are allowed only when
+        marked ``"N/A"`` (e.g. private packages).
+        """
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+
+        all_ids = [
+            app.get("splunkbase_id", "")
+            for app in registry.get("apps", [])
+        ]
+        # Filter out the documented "no public ID" sentinel and empty IDs;
+        # the other registry tests cover the presence rules separately.
+        numeric_ids = [sb_id for sb_id in all_ids if sb_id and sb_id != "N/A"]
+        duplicates = [sb_id for sb_id, count in Counter(numeric_ids).items() if count > 1]
+        self.assertEqual(
+            duplicates,
+            [],
+            msg=f"Duplicate Splunkbase IDs in app_registry.json: {duplicates}",
+        )
+
+    def test_skill_topologies_have_no_orphans_against_filesystem(self):
+        """Every on-disk skills/<name>/SKILL.md must appear in skill_topologies.
+
+        Catches the case where a contributor adds a new skill directory but
+        forgets to register it in app_registry.json, which would otherwise
+        only surface when generated docs go out of date.
+        """
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        topology_skills = {
+            entry["skill"] for entry in registry.get("skill_topologies", [])
+        }
+        on_disk = _on_disk_skill_dirs() - SKILL_TOPOLOGY_EXEMPTIONS
+
+        missing = sorted(on_disk - topology_skills)
+        self.assertEqual(
+            missing,
+            [],
+            msg=(
+                "Skills present on disk but missing from app_registry.json "
+                f"skill_topologies: {missing}. Add a topology entry or, "
+                "if intentional, list the skill in SKILL_TOPOLOGY_EXEMPTIONS "
+                "in tests/test_registry_regressions.py with a justification."
+            ),
+        )
+
+    def test_skill_topologies_have_no_dangling_entries_against_filesystem(self):
+        """Every skill_topologies entry must point at an on-disk skill dir.
+
+        Catches stale topology rows after a skill is renamed or removed.
+        """
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        topology_skills = {
+            entry["skill"] for entry in registry.get("skill_topologies", [])
+        }
+        on_disk = _on_disk_skill_dirs()
+
+        dangling = sorted(topology_skills - on_disk)
+        self.assertEqual(
+            dangling,
+            [],
+            msg=(
+                "skill_topologies references skills that have no "
+                f"corresponding skills/<name>/SKILL.md on disk: {dangling}."
+            ),
+        )
+
+    def test_app_registry_app_skills_resolve_to_known_skill_dirs(self):
+        """Every apps[].skill must point at an on-disk skill dir."""
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        on_disk = _on_disk_skill_dirs()
+        bad = sorted(
+            {
+                app["skill"]
+                for app in registry.get("apps", [])
+                if app.get("skill") and app["skill"] not in on_disk
+            }
+        )
+        self.assertEqual(
+            bad,
+            [],
+            msg=f"app_registry.json apps[] reference unknown skill dirs: {bad}",
+        )
+
+    def test_min_splunk_version_field_is_well_formed_when_present(self):
+        """``min_splunk_version`` is optional but must be a SemVer-ish string.
+
+        The field documents the lowest Splunk Enterprise / Cloud Platform
+        release the app supports. Skill preflight scripts can read it via
+        future ``shared_registry_app_min_splunk_version_*`` helpers.
+
+        Allowed shape: ``MAJOR.MINOR`` or ``MAJOR.MINOR.PATCH`` where each
+        component is an unsigned integer. Empty / missing is allowed and
+        means "no declared minimum."
+        """
+        import re
+
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        version_re = re.compile(r"^\d+\.\d+(\.\d+)?$")
+
+        offenders = []
+        for app in registry.get("apps", []):
+            value = app.get("min_splunk_version")
+            if value is None or value == "":
+                continue
+            if not isinstance(value, str) or not version_re.fullmatch(value):
+                offenders.append(f"{app.get('app_name')}: {value!r}")
+
+        self.assertEqual(
+            offenders,
+            [],
+            msg=(
+                "min_splunk_version must be a string of the form MAJOR.MINOR "
+                "or MAJOR.MINOR.PATCH. Offenders: " + ", ".join(offenders)
+            ),
+        )
+
+        # Sanity: the seeded entries are present so the contract is exercised.
+        seeded = {
+            app["app_name"]: app.get("min_splunk_version", "")
+            for app in registry.get("apps", [])
+            if app.get("min_splunk_version")
+        }
+        self.assertIn("SA-ITOA", seeded)
+        self.assertIn("SplunkEnterpriseSecuritySuite", seeded)
+        self.assertIn("Splunk_AI_Assistant_Cloud", seeded)
+
+    def test_cisco_scan_setup_scripts_have_expected_invariants(self):
+        """Structural invariants of the cisco-scan-setup scripts.
+
+        The cisco-product-setup router depends on a healthy SCAN catalog,
+        so any silent regression in the SCAN setup/validate scripts has a
+        large blast radius. These checks pin the load-bearing pieces.
+        """
+        setup_text = (
+            REPO_ROOT / "skills/cisco-scan-setup/scripts/setup.sh"
+        ).read_text(encoding="utf-8")
+        validate_text = (
+            REPO_ROOT / "skills/cisco-scan-setup/scripts/validate.sh"
+        ).read_text(encoding="utf-8")
+
+        # setup.sh contract
+        self.assertIn('APP_NAME="splunk-cisco-app-navigator"', setup_text)
+        self.assertIn('PACKAGE_GLOB="splunk-cisco-app-navigator-*.tar.gz"', setup_text)
+        self.assertIn("source \"${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh\"", setup_text)
+        self.assertIn("/configs/conf-products", setup_text)
+        self.assertIn("data/transforms/lookups/scan_splunkbase_apps", setup_text)
+        self.assertIn("synccatalog", setup_text)
+        self.assertIn("synclookup", setup_text)
+        self.assertIn("warn_if_current_skill_role_unsupported", setup_text)
+        # secrets must come from the credentials helper, never from argv
+        self.assertNotIn("--password ", setup_text)
+        self.assertNotIn("--token ", setup_text)
+
+        # validate.sh contract
+        self.assertIn('APP_NAME="splunk-cisco-app-navigator"', validate_text)
+        self.assertIn('SYNC_SEARCH_NAME="SCAN - Splunkbase Catalog Sync"', validate_text)
+        # Guardrail thresholds: keep these in sync with the SCAN package
+        # under skills/cisco-product-setup/catalog.json.
+        self.assertIn("MIN_PRODUCT_COUNT=", validate_text)
+        self.assertIn("MIN_SAVED_SEARCH_COUNT=", validate_text)
+        self.assertIn("--- Splunkbase Lookup ---", validate_text)
+        self.assertIn("--- Catalog Sync Connectivity ---", validate_text)
+        self.assertIn("--- Saved Searches ---", validate_text)
+        self.assertIn("--- Scheduled Sync Job ---", validate_text)

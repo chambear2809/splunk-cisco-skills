@@ -105,7 +105,9 @@ The current skills fall into five architectural roles:
   `cisco-enterprise-networking-setup`, `splunk-itsi-config`, and
   `splunk-enterprise-security-config`. Splunk Observability dashboard planning
   is covered by `splunk-observability-dashboard-builder`, which does not target
-  a Splunk Platform runtime role.
+  a Splunk Platform runtime role. Native Observability operations are covered by
+  `splunk-observability-native-ops`, which renders supported API payloads,
+  validation requests, deeplinks, and handoffs for UI-only surfaces.
 - **External collector skills** — prepare Splunk-side objects and render
   customer-managed runtimes outside Splunk. Examples:
   `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup`, and
@@ -186,6 +188,41 @@ flowchart TB
 - Direct search-head resolution via ACS to bypass SHC propagation delays
 - Public IP auto-added to search-api allowlist
 - Stack-local credentials swapped in for 8089 auth
+
+### Splunk Cloud Stack Types: Victoria vs Classic
+
+Splunk Cloud Platform ships in two architectural variants. Most ACS automation
+in this repo works on either, but the available product surface differs:
+
+| Aspect | Victoria | Classic |
+|---|---|---|
+| Default for new stacks | Yes (since 2023) | Pre-existing stacks; new stacks rare |
+| ACS API surface | Full coverage of apps, indexes, HEC, allowlists, restart, federated providers | Same core surface; some newer endpoints (e.g. FSS3) are Victoria-only |
+| Self-service Splunkbase installs | Broader (most public apps work) | Narrower; some apps require Splunk Cloud Support |
+| Premium app installs (ES, ITSI) | Coordinate with Splunk Support; ACS install paths exist for some Victoria stacks | Splunk Cloud Support managed |
+| Search Head Cluster | Always-clustered; no standalone SH | Always-clustered |
+| AI Assistant for SPL | Self-service via ACS Splunkbase install on eligible commercial regions | Coordinate with Splunk Cloud Support |
+| Federated Search Service v3 (FSS3) | Supported | Not supported (use FSS2S only) |
+| Region availability | Most modern AWS regions | Reduced footprint |
+
+**How to identify the stack type for a given deployment:** there is no single
+ACS field that returns "Victoria" or "Classic" directly. Operators can check
+`acs status current-stack` and look at the deployment metadata, or contact
+Splunk Cloud Support. When a skill behaves differently between the two
+variants, the skill's `reference.md` calls it out explicitly:
+
+| Skill | Stack-type sensitivity |
+|---|---|
+| `splunk-federated-search-setup` | FSS3 is Victoria-only; FSS2S works on both |
+| `splunk-ai-assistant-setup` | Self-service install requires Victoria + eligible commercial region |
+| `splunk-enterprise-security-install` | Cloud installs are Splunk-managed regardless of variant; this skill targets self-managed search heads only |
+| `splunk-itsi-setup` / `splunk-itsi-config` | Cloud installs are Splunk-managed regardless of variant; native config workflow runs against the search tier |
+| `splunk-mcp-server-setup` | Private package; install requires coordination with Splunk regardless of variant |
+
+When automating against Splunk Cloud, prefer behavior that does not branch on
+stack type. When the underlying product genuinely requires one variant, fail
+fast with a clear message that tells the operator to verify their stack type
+with Splunk Cloud Support rather than retrying.
 
 ### ACS Deployment Caveats
 
@@ -513,6 +550,11 @@ kept in local secret files.
 Observability Cloud dashboards. It renders and validates classic dashboard API
 payloads and can apply them only when explicitly requested, but it does not
 install collectors or belong on a Splunk Enterprise role.
+
+`splunk-observability-native-ops` is the native operations companion. It covers
+detectors, alert routing, Synthetics, APM topology and trace workflows, RUM
+sessions, modern logs chart handoffs, and On-Call handoffs without claiming a
+Splunk Platform runtime placement.
 
 ### Search-Time And Premium Apps
 

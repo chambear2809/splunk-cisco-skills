@@ -85,6 +85,19 @@ bash skills/cisco-catalyst-enhanced-netflow-setup/scripts/setup.sh
 
 The setup script confirms that the add-on is installed and reports whether the
 same target also has `Splunk_TA_stream` configured with a NetFlow receiver.
+If the receiver still needs to be created, render the Stream handoff plan:
+
+```bash
+bash skills/cisco-catalyst-enhanced-netflow-setup/scripts/setup.sh \
+  --stream-receiver-plan \
+  --forwarder-ip 10.0.10.25 \
+  --splunk-web-url https://splunk.example.com:8000 \
+  --netflow-ip 0.0.0.0 \
+  --netflow-port 9995
+```
+
+The handoff uses `splunk-stream-setup` because `Splunk_TA_stream` owns the
+NetFlow/IPFIX receiver settings.
 
 ### Step 3: Validate
 
@@ -105,13 +118,15 @@ and optional consumer apps.
 ## Key Learnings / Known Issues
 
 1. **No app-local setup surface**: There are no accounts or inputs to configure
-   inside this add-on. Installation plus receiver-path validation is the real workflow.
+   inside this add-on. Installation plus receiver-path planning/validation is
+   the real workflow.
 2. **Forwarder-side target**: The package manifest targets `_forwarders`, so do
    not treat this like a Cloud search-tier app.
 3. **Existing NetFlow path required**: This add-on only contributes field
-   mappings. It does not create the NetFlow/IPFIX receiver itself.
-4. **Stream alignment matters**: If the host should receive NetFlow/IPFIX, use
-   the `splunk-stream-setup` skill to configure `Splunk_TA_stream`.
+   mappings. Receiver creation is delegated to the generated
+   `splunk-stream-setup` handoff.
+4. **Stream alignment matters**: If the host should receive NetFlow/IPFIX,
+   render the Stream receiver plan and run it against the forwarder-side target.
 5. **Dashboard consumption is optional**: The add-on is most often used to add
    extra dashboard coverage for `cisco-catalyst-app`, but it can be installed
    independently on the parsing tier.

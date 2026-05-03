@@ -352,6 +352,24 @@ teardown() {
     [[ "$output" =~ "Latest Resolution Smoke Test" ]]
 }
 
+@test "universal forwarder setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-universal-forwarder-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Universal Forwarder Setup" ]]
+}
+
+@test "universal forwarder validate --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-universal-forwarder-setup/scripts/validate.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Universal Forwarder Validation" ]]
+}
+
+@test "universal forwarder smoke latest resolution --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-universal-forwarder-setup/scripts/smoke_latest_resolution.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Universal Forwarder Latest Resolution Smoke Test" ]]
+}
+
 @test "sc4s setup rejects invalid vendor port protocol" {
     run bash "${PROJECT_ROOT}/skills/splunk-connect-for-syslog-setup/scripts/setup.sh" \
       --render-host \
@@ -826,4 +844,62 @@ printf "user=%s\npass=%s\n" "${auth_user}" "${auth_pass}"
     run bash "${PROJECT_ROOT}/skills/cisco-security-cloud-setup/scripts/validate.sh" --bogus
     [ "$status" -eq 1 ]
     [[ "$output" =~ "Unknown option" ]]
+}
+
+# --- cisco-scan-setup smoke flags ---
+
+@test "scan setup --help exits 0 and prints usage" {
+    run bash "${PROJECT_ROOT}/skills/cisco-scan-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk Cisco App Navigator" ]]
+    [[ "$output" =~ "--sync" ]]
+    [[ "$output" =~ "--no-restart" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "scan setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/cisco-scan-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "scan setup --sync flag is parsed without invocation error" {
+    # Parse-only smoke: with no credentials and a missing package, the script
+    # must reach a logical error path (credential or package error) rather
+    # than fail in argument parsing.
+    run bash "${PROJECT_ROOT}/skills/cisco-scan-setup/scripts/setup.sh" --sync --no-restart
+    # Either credential failure (exit 1) or package-not-found (exit 1).
+    [ "$status" -ne 0 ]
+    [[ ! "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+# --- security-cloud / secure-access data-flow flags ---
+
+@test "security-cloud validate accepts --skip-data-flow without parser error" {
+    run bash "${PROJECT_ROOT}/skills/cisco-security-cloud-setup/scripts/validate.sh" --skip-data-flow
+    # Without credentials this must fail at auth, not at flag parsing.
+    [[ ! "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "security-cloud validate rejects --data-flow-earliest without value" {
+    run bash "${PROJECT_ROOT}/skills/cisco-security-cloud-setup/scripts/validate.sh" --data-flow-earliest
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "secure-access validate accepts --skip-data-flow without parser error" {
+    run bash "${PROJECT_ROOT}/skills/cisco-secure-access-setup/scripts/validate.sh" --skip-data-flow
+    [[ ! "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "secure-access validate rejects --data-flow-earliest without value" {
+    run bash "${PROJECT_ROOT}/skills/cisco-secure-access-setup/scripts/validate.sh" --data-flow-earliest
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "requires a value" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
 }

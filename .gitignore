@@ -7,7 +7,14 @@ splunk-ta/*.spl
 splunk-ta/*.tar.gz
 splunk-ta/*.rpm
 splunk-ta/*.deb
+splunk-ta/*.msi
+splunk-ta/*.dmg
+splunk-ta/*.pkg
+splunk-ta/*.txz
+splunk-ta/*.p5p
+splunk-ta/*.Z
 splunk-ta/.latest-splunk-enterprise-*.json
+splunk-ta/.latest-splunk-universal-forwarder-*.json
 
 # --- Also ignore the splunk_ta directory ---
 splunk_ta/
@@ -55,9 +62,16 @@ projects/tmp-*
 /splunk-federated-search-rendered/
 /splunk-smartstore-rendered/
 /splunk-monitoring-console-rendered/
+/splunk-universal-forwarder-rendered/
 /splunk-enterprise-k8s-rendered/
 /splunk-observability-otel-rendered/
 /splunk-observability-dashboard-rendered/
+/splunk-observability-native-rendered/
+/splunk-edge-processor-rendered/
+/splunk-indexer-cluster-rendered/
+/splunk-license-manager-rendered/
+/splunk-cloud-acs-allowlist-rendered/
+/splunk-soar-rendered/
 /ta-for-indexers-rendered/
 /splunk-mcp-rendered/*
 !/splunk-mcp-rendered/run-splunk-mcp.js

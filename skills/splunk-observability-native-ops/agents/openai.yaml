@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Observability Native Ops"
+  short_description: "Render native Observability detectors, APM, RUM, Synthetics, logs, and On-Call plans"
+  default_prompt: >-
+    Use $splunk-observability-native-ops to render and optionally apply native
+    Splunk Observability Cloud operational objects with explicit coverage
+    status for API-backed, deeplink, and handoff-only workflows.

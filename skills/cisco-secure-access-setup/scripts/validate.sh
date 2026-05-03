@@ -8,6 +8,8 @@ APP_NAME="cisco-cloud-security"
 ADDON_NAME="TA-cisco-cloud-security-addon"
 ORG_ID=""
 SK=""
+SKIP_DATA_FLOW=false
+DATA_FLOW_EARLIEST="-1h@h"
 
 PASS=0
 FAIL=0
@@ -26,6 +28,8 @@ Usage: $(basename "$0") [OPTIONS]
 
 Options:
   --org-id ID                Validate one specific org account
+  --skip-data-flow           Skip the per-index 'tstats' event-flow probe
+  --data-flow-earliest TIME  Earliest time for the event-flow probe (default: -1h@h)
   --help                     Show this help
 EOF
     exit "${1:-0}"
@@ -34,10 +38,27 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --org-id) require_arg "$1" $# || exit 1; ORG_ID="$2"; shift 2 ;;
+        --skip-data-flow) SKIP_DATA_FLOW=true; shift ;;
+        --data-flow-earliest) require_arg "$1" $# || exit 1; DATA_FLOW_EARLIEST="$2"; shift 2 ;;
         --help) usage ;;
         *) log "Unknown option: $1" >&2; usage 1 ;;
     esac
 done
+
+probe_index_event_flow() {
+    local idx="$1"
+    local label="$2"
+    [[ -z "${idx}" ]] && return 0
+    local count
+    count=$(rest_oneshot_search "$SK" "$SPLUNK_URI" \
+        "| tstats count where index=${idx} earliest=${DATA_FLOW_EARLIEST} latest=now" \
+        "count" 2>/dev/null || echo "0")
+    if [[ "${count}" =~ ^[0-9]+$ ]] && [[ "${count}" -gt 0 ]]; then
+        pass "${label} index '${idx}' has ${count} events since ${DATA_FLOW_EARLIEST}"
+    else
+        warn "${label} index '${idx}' has no events since ${DATA_FLOW_EARLIEST} (may be normal if just configured)"
+    fi
+}
 
 org_accounts_get() {
     local query="$1"
@@ -109,6 +130,14 @@ except Exception:
         if [[ -n "${investigate_idx}" ]]; then pass "Investigate index configured: ${investigate_idx}"; else info "Investigate index not configured"; fi
         if [[ -n "${privateapp_idx}" ]]; then pass "Private Apps index configured: ${privateapp_idx}"; else info "Private Apps index not configured"; fi
         if [[ -n "${appdiscovery_idx}" ]]; then pass "App Discovery index configured: ${appdiscovery_idx}"; else info "App Discovery index not configured"; fi
+
+        if ! $SKIP_DATA_FLOW; then
+            log ""
+            log "--- Data Flow (org-account indexes) ---"
+            probe_index_event_flow "${investigate_idx}" "Investigate"
+            probe_index_event_flow "${privateapp_idx}" "Private Apps"
+            probe_index_event_flow "${appdiscovery_idx}" "App Discovery"
+        fi
     elif [[ "${http_code}" == "404" ]]; then
         fail "Org account '${ORG_ID}' not found"
     else
@@ -264,6 +293,15 @@ if [[ -n "${dns_idx}${proxy_idx}${firewall_idx}${dlp_idx}${ravpn_idx}" ]]; then
     [[ -n "${firewall_idx}" ]] && info "Firewall index: ${firewall_idx}"
     [[ -n "${dlp_idx}" ]] && info "DLP index: ${dlp_idx}"
     [[ -n "${ravpn_idx}" ]] && info "RA VPN index: ${ravpn_idx}"
+    if ! $SKIP_DATA_FLOW; then
+        log ""
+        log "--- Data Flow (S3-backed indexes) ---"
+        probe_index_event_flow "${dns_idx}" "DNS"
+        probe_index_event_flow "${proxy_idx}" "Proxy"
+        probe_index_event_flow "${firewall_idx}" "Firewall"
+        probe_index_event_flow "${dlp_idx}" "DLP"
+        probe_index_event_flow "${ravpn_idx}" "RA VPN"
+    fi
 else
     info "S3-backed dashboard indexes not configured"
 fi

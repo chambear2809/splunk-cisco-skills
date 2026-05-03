@@ -581,6 +581,10 @@ if ! command -v mcp-remote >/dev/null 2>&1; then
   exit 1
 fi
 
+# Single-quote the header so bash does NOT expand SPLUNK_MCP_TOKEN here.
+# mcp-remote performs ${VAR} substitution on --header values at runtime
+# using the inherited environment, which keeps the bearer token out of
+# argv (process listings) while still sending the real value upstream.
 exec mcp-remote "${SPLUNK_MCP_URL}" --header 'Authorization: Bearer ${SPLUNK_MCP_TOKEN}'
 EOF
 )"
@@ -711,7 +715,12 @@ function findMcpRemote() {
 }
 
 const { cmd, args: prefixArgs } = findMcpRemote();
+// Pass the literal placeholder so mcp-remote performs ${VAR} substitution
+// at runtime against the inherited env. This keeps SPLUNK_MCP_TOKEN out of
+// argv (visible to `ps`) while still sending the real bearer value
+// upstream. mcpToken is read above only to fail fast if it is unset.
 const tokenHeader = "Authorization: Bearer ${SPLUNK_MCP_TOKEN}";
+void mcpToken;
 const child = spawn(
   cmd,
   [...prefixArgs, mcpUrl, "--header", tokenHeader],

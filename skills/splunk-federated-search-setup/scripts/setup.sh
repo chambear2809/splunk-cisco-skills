@@ -85,7 +85,8 @@ REST apply (--apply-target rest) reads:
   SPLUNK_REST_URI=https://<sh>:8089
   SPLUNK_REST_USER=admin
   SPLUNK_REST_PASSWORD_FILE=/path/to/admin_pw   # chmod 600, no newline
-  SPLUNK_REST_VERIFY_SSL=true|false             # default true
+  SPLUNK_VERIFY_SSL=true|false                  # default true (canonical)
+                                                # Legacy alias: SPLUNK_REST_VERIFY_SSL (still honored)
 
 EOF
     exit "${exit_code}"

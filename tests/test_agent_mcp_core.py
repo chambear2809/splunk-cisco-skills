@@ -124,6 +124,21 @@ class AgentMCPCoreTests(unittest.TestCase):
                 ["--password", "secret-value"],
             )
 
+    def test_generic_script_plan_rejects_oncall_direct_secret_flags(self) -> None:
+        cases = [
+            ["--oncall-api-key", "secret-value"],
+            ["--on-call-api-key=secret-value"],
+            ["--x-vo-api-key", "secret-value"],
+        ]
+        for args in cases:
+            with self.subTest(args=args):
+                with self.assertRaisesRegex(core.SkillMCPError, "Direct secret flag"):
+                    core.plan_skill_script(
+                        "splunk-observability-native-ops",
+                        "setup.sh",
+                        args,
+                    )
+
     def test_generic_script_plan_allows_file_based_secret_flags(self) -> None:
         plan = core.plan_skill_script(
             "cisco-catalyst-ta-setup",
@@ -337,6 +352,11 @@ class AgentMCPCoreTests(unittest.TestCase):
             "setup.sh",
             ["--phase", "render"],
         )
+        uf_download_plan = core.plan_skill_script(
+            "splunk-universal-forwarder-setup",
+            "setup.sh",
+            ["--phase", "download"],
+        )
         preflight_plan = core.plan_skill_script(
             "splunk-workload-management-setup",
             "setup.sh",
@@ -349,8 +369,18 @@ class AgentMCPCoreTests(unittest.TestCase):
         )
 
         self.assertTrue(render_plan["read_only"])
+        self.assertTrue(uf_download_plan["read_only"])
         self.assertTrue(preflight_plan["read_only"])
         self.assertFalse(apply_plan["read_only"])
+
+    def test_universal_forwarder_latest_smoke_is_read_only(self) -> None:
+        plan = core.plan_skill_script(
+            "splunk-universal-forwarder-setup",
+            "smoke_latest_resolution.sh",
+            ["--target-os", "linux", "--package-type", "tgz"],
+        )
+
+        self.assertTrue(plan["read_only"])
 
     def test_observability_dashboard_apply_dry_run_is_read_only(self) -> None:
         plan = core.plan_skill_script(
@@ -434,6 +464,75 @@ class AgentMCPCoreTests(unittest.TestCase):
                 "them, or move them to secret_keys. Offenders: " + ", ".join(offenders)
             ),
         )
+
+
+class SecretRedactionTests(unittest.TestCase):
+    """Defense-in-depth redaction of MCP subprocess output."""
+
+    def test_redacts_authorization_bearer_header(self) -> None:
+        text = "GET /api HTTP/1.1\nAuthorization: Bearer abcdef1234567890token\n"
+        redacted = core._redact_secrets(text)
+        self.assertNotIn("abcdef1234567890token", redacted)
+        self.assertIn("Authorization: Bearer [REDACTED]", redacted)
+
+    def test_redacts_authorization_splunk_session(self) -> None:
+        text = 'curl -H "Authorization: Splunk abc123sessiondef456"'
+        redacted = core._redact_secrets(text)
+        self.assertNotIn("abc123sessiondef456", redacted)
+        self.assertIn("Authorization: Splunk [REDACTED]", redacted)
+
+    def test_redacts_kv_pairs_with_secret_names(self) -> None:
+        text = (
+            "ERROR: failed login for password=hunter2supersecret on host x\n"
+            "client_secret = 'abc123def456ghi789' from config"
+        )
+        redacted = core._redact_secrets(text)
+        self.assertNotIn("hunter2supersecret", redacted)
+        self.assertNotIn("abc123def456ghi789", redacted)
+        self.assertIn("password=[REDACTED]", redacted)
+        self.assertIn("client_secret = '[REDACTED]", redacted)
+
+    def test_redacts_splunk_password_environment_names(self) -> None:
+        text = "SPLUNK_PASS=abcdef123456 SB_PASS='fedcba654321'"
+        redacted = core._redact_secrets(text)
+        self.assertNotIn("abcdef123456", redacted)
+        self.assertNotIn("fedcba654321", redacted)
+        self.assertIn("SPLUNK_PASS=[REDACTED]", redacted)
+        self.assertIn("SB_PASS='[REDACTED]", redacted)
+
+    def test_redacts_jwt(self) -> None:
+        # Synthetic three-segment JWT-shaped string.
+        text = "token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ0ZXN0In0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+        redacted = core._redact_secrets(text)
+        self.assertNotIn("SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c", redacted)
+        self.assertIn("[REDACTED-JWT]", redacted)
+
+    def test_redacts_pem_private_key_block(self) -> None:
+        text = (
+            "Found cert and key:\n"
+            "-----BEGIN RSA PRIVATE KEY-----\n"
+            "MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQ\n"
+            "VERY_SENSITIVE_KEY_MATERIAL_HERE\n"
+            "-----END RSA PRIVATE KEY-----\n"
+            "OK\n"
+        )
+        redacted = core._redact_secrets(text)
+        self.assertNotIn("VERY_SENSITIVE_KEY_MATERIAL_HERE", redacted)
+        self.assertIn("[REDACTED]", redacted)
+
+    def test_does_not_mangle_short_or_non_secret_values(self) -> None:
+        # Short values (<6 chars after KEY=) and unrelated text pass through.
+        text = "name=alice region=usa retries=3 timeout=30s\nLooks fine here.\n"
+        self.assertEqual(core._redact_secrets(text), text)
+
+    def test_redaction_is_applied_in_truncate_helper(self) -> None:
+        text = "Authorization: Bearer abcdef1234567890token"
+        out = core._truncate_and_redact(text)
+        self.assertNotIn("abcdef1234567890token", out)
+        self.assertIn("[REDACTED]", out)
+
+    def test_truncate_and_redact_handles_empty(self) -> None:
+        self.assertEqual(core._truncate_and_redact(""), "")
 
 
 if __name__ == "__main__":

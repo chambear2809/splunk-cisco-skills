@@ -171,6 +171,14 @@
       },
       {
         "kind": "app",
+        "app_name": "DA-ITSI-ContentLibrary",
+        "label": "`splunk-itsi-config` content library",
+        "cloud_install_path": "ACS Splunkbase or Splunk Support / Cloud App Request",
+        "cloud_config_path": "Content pack catalog refresh, preview, install, and validate through ITSI REST workflows",
+        "notes": "Requires ITSI app 1841. Used by splunk-itsi-config for supported content-pack workflows."
+      },
+      {
+        "kind": "app",
         "app_name": "SplunkEnterpriseSecuritySuite",
         "label": "`splunk-enterprise-security-install`",
         "cloud_install_path": "Splunk Support coordinated ES service workflow",
@@ -185,6 +193,79 @@
         "cloud_install_path": "No additional app install; requires ES already provisioned",
         "cloud_config_path": "REST validation and supported search-tier settings; Splunk Cloud indexer-side changes remain support-managed",
         "notes": "Operational ES configuration workflow for indexes, roles, CIM data models, enrichment, detections, risk, and validation."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-security-portfolio-setup",
+        "label": "`splunk-security-portfolio-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Delegates to the routed Splunk security product install path for the resolved product",
+        "cloud_config_path": "Delegates to the routed setup, config, or explicit handoff workflow after resolving the security product catalog entry",
+        "notes": "Top-level Splunk security product router/audit workflow covering Enterprise Security, Security Essentials, SOAR, UBA, Attack Analyzer, Asset and Risk Intelligence, and associated security offerings."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_Security_Essentials",
+        "label": "`splunk-security-essentials-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Search-tier validation plus product UI checklist for Data Inventory Introspection, Content Mapping, app configuration, and optional posture dashboards",
+        "notes": "Search-head-only app. Safe to install alongside Enterprise Security and has no indexer impact."
+      },
+      {
+        "kind": "app",
+        "app_name": "SplunkAssetRiskIntelligence",
+        "label": "`splunk-asset-risk-intelligence-setup`",
+        "cloud_install_path": "ACS Splunkbase or Cloud app request for restricted entitlement; local package fallback when provided",
+        "cloud_config_path": "ACS/REST index readiness for ari_staging, ari_asset, ari_internal, and ari_ta plus KV Store, roles, and ES Exposure Analytics handoff",
+        "notes": "Restricted Asset and Risk Intelligence app; ES 8.5+ Exposure Analytics configuration routes to splunk-enterprise-security-config."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_SAA",
+        "label": "`splunk-attack-analyzer-setup` add-on",
+        "cloud_install_path": "ACS Splunkbase or local package",
+        "cloud_config_path": "Create/validate saa index and configure tenant/input settings through supported add-on UI or handoff using file-based API key material",
+        "notes": "Splunk Add-on for Splunk Attack Analyzer. The setup workflow installs it with the companion dashboard app by default."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_App_SAA",
+        "label": "`splunk-attack-analyzer-setup` app",
+        "cloud_install_path": "ACS Splunkbase or local package",
+        "cloud_config_path": "Search-tier macro validation for saa_indexes and dashboard readiness",
+        "notes": "Splunk App for Splunk Attack Analyzer. The setup workflow defaults saa_indexes to index=saa."
+      },
+      {
+        "kind": "app",
+        "app_name": "splunk_app_soar",
+        "label": "`splunk-soar-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Configure SOAR service connections in the app UI using file-based auth material; Enterprise distributed deployments also require indexer-side placement",
+        "notes": "Splunk App for SOAR imports SOAR data and remote-search capabilities into the Splunk platform; it does not install a SOAR server."
+      },
+      {
+        "kind": "app",
+        "app_name": "phantom",
+        "label": "`splunk-soar-setup` export app",
+        "cloud_install_path": "ACS Splunkbase or Cloud support workflow",
+        "cloud_config_path": "Configure Splunk platform to SOAR server export settings, role alignment, TLS trust, and retry behavior",
+        "notes": "Splunk App for SOAR Export is optional and used when Splunk platform data flows to SOAR."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk-UBA-SA-Kafka",
+        "label": "`splunk-uba-setup` Kafka app",
+        "cloud_install_path": "ACS Splunkbase or local package when still required by an existing UBA deployment",
+        "cloud_config_path": "Readiness validation only; standalone UBA server lifecycle remains a manual/professional-services handoff",
+        "notes": "Optional legacy UBA Kafka ingestion app. New UEBA work should route to Enterprise Security Premier UEBA."
+      },
+      {
+        "kind": "app",
+        "app_name": "DA-ESS-ContentUpdate",
+        "label": "`splunk-enterprise-security-config` content update",
+        "cloud_install_path": "ACS Splunkbase or ES Cloud managed content workflow",
+        "cloud_config_path": "Configured through the ES content library workflow for ESCU subscription, story/detection enablement, and content-pack toggles",
+        "notes": "Splunk ES Content Update is registered under ES configuration, not as a separate security product skill."
       },
       {
         "kind": "app",
@@ -211,6 +292,15 @@
         "cloud_install_path": "Not a Splunk Cloud install path; renders customer-managed Agent Management assets",
         "cloud_config_path": "Rendered serverclass.conf, deployment apps, and deploymentclient.conf for Enterprise deployment-server style workflows",
         "notes": "Splunk Enterprise 10.x Agent Management workflow for full Enterprise instances, forwarders, and OTel fleet overview."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-universal-forwarder-setup",
+        "label": "`splunk-universal-forwarder-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; customer-managed UF runtime forwards to Splunk Enterprise or Splunk Cloud",
+        "cloud_config_path": "Local/SSH UF install and enrollment, rendered Windows MSI bootstrap, or Splunk Cloud Universal Forwarder credentials package install",
+        "notes": "Runtime bootstrap workflow for Universal Forwarders. Server classes and deployment apps remain delegated to splunk-agent-management-setup."
       },
       {
         "kind": "workflow",
@@ -316,6 +406,51 @@
         "cloud_install_path": "No Splunk Cloud app install; renders Splunk Observability Cloud dashboard groups, charts, dashboards, and apply plans",
         "cloud_config_path": "Validate and optionally apply classic Observability dashboard API payloads; access tokens stay file-based and are never placed in chat or command arguments",
         "notes": "Dashboard composition workflow for Observability dashboard groups, charts, variables, detector links, runbooks, rendered API payloads, and optional applies."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-observability-native-ops",
+        "label": "`splunk-observability-native-ops`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; renders native Splunk Observability Cloud operations and handoff plans",
+        "cloud_config_path": "Validate and optionally apply Observability API payloads for detectors, teams, alert routing, Synthetics, and APM trace/topology checks; render deeplinks and handoffs for SLOs, RUM, service maps, modern logs charts, and On-Call workflows with file-based secrets",
+        "notes": "Native Observability operations workflow; complements OTel collection and classic dashboard rendering without Splunk Platform runtime placement."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-license-manager-setup",
+        "label": "`splunk-license-manager-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Not a Splunk Cloud install path; Splunk Cloud licensing is Splunk-managed",
+        "cloud_config_path": "Renders self-managed Enterprise license install commands, REST license group / pool payloads, and per-peer `splunk edit licenser-localpeer` wrappers",
+        "notes": "Self-managed Splunk Enterprise license manager / peer / pool / group lifecycle. Co-locates with cluster-manager, MC, deployment server, SHC deployer, search head, or indexer."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-edge-processor-setup",
+        "label": "`splunk-edge-processor-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; Edge Processor runtime is rendered for customer-managed Linux hosts and joined to a Splunk Cloud Platform tenant or Splunk Enterprise 10.0+ data management node",
+        "cloud_config_path": "Renders EP control-plane object (TLS / mTLS), source types, destinations (Splunk S2S, Splunk HEC, Amazon S3, syslog), SPL2 pipelines, apply-objects orchestrator, per-host install (systemd / no-systemd / Docker), and forwarder outputs.conf",
+        "notes": "Default-destination guard prevents silent data loss. Emits ACS allowlist hand-off stub for s2s + hec features when destinations target Splunk Cloud."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-indexer-cluster-setup",
+        "label": "`splunk-indexer-cluster-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Not a Splunk Cloud install path; Splunk Cloud indexer clusters are Splunk-managed",
+        "cloud_config_path": "Renders self-managed Enterprise single-site or multisite cluster manager, peer, and SH server.conf snippets; sequenced bootstrap; cluster bundle validate / status / apply / rollback; rolling restart (default / searchable / forced); peer offline (fast / enforce-counts); maintenance mode; manager redundancy (HAProxy + DNS); migration to multisite; non-clustered-to-clustered migration",
+        "notes": "Sits above splunk-enterprise-host-setup (per-host install). Emits a license-peers hand-off stub for splunk-license-manager-setup."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-cloud-acs-allowlist-setup",
+        "label": "`splunk-cloud-acs-allowlist-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; manages Splunk Cloud ACS IP allowlists for all 7 ACS features",
+        "cloud_config_path": "Renders desired-state plan for acs / search-api / hec / s2s / search-ui / idm-api / idm-ui (IPv4 + IPv6); preflight enforces AWS 200/feature + 230/group and GCP 200/feature limits; lock-out protection refuses acs feature edits without operator IP; status polling on /adminconfig/v2/status; optional terraform-snippets.tf via splunk/scp",
+        "notes": "Explicit user-driven counterpart to acs_helpers.sh acs_ensure_search_api_access. FedRAMP High excluded (Splunk Support only)."
       },
       {
         "kind": "workflow",
@@ -548,6 +683,18 @@
       "notes": "Splunk Observability Cloud dashboard render/apply workflow; no Splunk Platform runtime placement."
     },
     {
+      "skill": "splunk-observability-native-ops",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Splunk Observability Cloud native operations render/apply workflow; no Splunk Platform runtime placement."
+    },
+    {
       "skill": "splunk-agent-management-setup",
       "role_support": {
         "search-tier": "supported",
@@ -561,6 +708,20 @@
         "universal-forwarder"
       ],
       "notes": "Agent Management control-plane workflow for server classes, deployment apps, and deployment clients; do not target indexer cluster peers or SHC members directly."
+    },
+    {
+      "skill": "splunk-universal-forwarder-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "required",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "universal-forwarder"
+      ],
+      "notes": "Customer-managed Universal Forwarder runtime bootstrap and enrollment workflow; complements Agent Management server-class and deployment-app workflows."
     },
     {
       "skill": "splunk-workload-management-setup",
@@ -699,6 +860,138 @@
         "indexer"
       ],
       "notes": "ES operational configuration workflow for search-tier objects and index-tier ES index readiness."
+    },
+    {
+      "skill": "splunk-security-portfolio-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Security product router/audit workflow that resolves product names and delegates to first-class setup skills, existing ES workflows, generic install-only routes, or explicit handoff classifications."
+    },
+    {
+      "skill": "splunk-security-essentials-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-head-only Splunk Security Essentials app; no indexer, forwarder, or collector placement."
+    },
+    {
+      "skill": "splunk-soar-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "indexer",
+        "external-collector"
+      ],
+      "notes": "Splunk platform-side SOAR integration apps belong on search heads and, for Enterprise distributed deployments, indexers; Automation Broker and SOAR On-prem servers are represented as external-collector handoffs."
+    },
+    {
+      "skill": "splunk-license-manager-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Self-managed Splunk Enterprise license manager and license peer workflow. Co-locates with cluster manager, MC, deployment server, SHC deployer, search head, or indexer."
+    },
+    {
+      "skill": "splunk-indexer-cluster-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "required",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Self-managed Splunk Enterprise indexer cluster bootstrap and operations workflow. Sits above splunk-enterprise-host-setup (per-host install) and emits a license-peers handoff stub for splunk-license-manager-setup."
+    },
+    {
+      "skill": "splunk-edge-processor-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Splunk Edge Processor instances run as a customer-managed external collector tier (Linux, systemd / no-systemd / Docker) joined to a Splunk Cloud Platform tenant or Splunk Enterprise 10.0+ data management node. Emits an ACS allowlist handoff stub for s2s + hec features when destinations target Splunk Cloud."
+    },
+    {
+      "skill": "splunk-cloud-acs-allowlist-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Splunk Cloud ACS IP allowlist control-plane workflow; manages all 7 ACS features (acs / search-api / hec / s2s / search-ui / idm-api / idm-ui) for IPv4 + IPv6. No Splunk Enterprise role placement."
+    },
+    {
+      "skill": "splunk-uba-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "indexer"
+      ],
+      "notes": "Readiness and migration workflow for existing UBA/UEBA deployments; standalone UBA server installation is not automated, and optional Kafka app placement is search-tier focused."
+    },
+    {
+      "skill": "splunk-attack-analyzer-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "indexer",
+        "heavy-forwarder"
+      ],
+      "notes": "Installs the Splunk Attack Analyzer add-on and dashboard app, creates/validates the saa index, and aligns the saa_indexes macro; API credentials remain file-based handoff material."
+    },
+    {
+      "skill": "splunk-asset-risk-intelligence-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "indexer"
+      ],
+      "notes": "Restricted ARI app with search-tier UI/KV Store requirements and index-tier readiness for ari_staging, ari_asset, ari_internal, and ari_ta."
     },
     {
       "skill": "splunk-ai-assistant-setup",
@@ -1278,6 +1571,7 @@
         "splunk-it-service-intelligence_*",
         "itsi_*"
       ],
+      "min_splunk_version": "8.0",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -1331,6 +1625,7 @@
       "package_patterns": [
         "splunk-enterprise-security_*"
       ],
+      "min_splunk_version": "9.0",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -1348,6 +1643,224 @@
       }
     },
     {
+      "skill": "splunk-security-essentials-setup",
+      "app_name": "Splunk_Security_Essentials",
+      "splunkbase_id": "3435",
+      "label": "Splunk Security Essentials",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-security-essentials_*"
+      ],
+      "min_splunk_version": "9.0",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-asset-risk-intelligence-setup",
+      "app_name": "SplunkAssetRiskIntelligence",
+      "splunkbase_id": "7180",
+      "label": "Splunk Asset and Risk Intelligence",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-asset-and-risk-intelligence_*"
+      ],
+      "min_splunk_version": "9.0",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-attack-analyzer-setup",
+      "app_name": "Splunk_TA_SAA",
+      "splunkbase_id": "6999",
+      "label": "Splunk Add-on for Splunk Attack Analyzer",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-splunk-attack-analyzer_*"
+      ],
+      "min_splunk_version": "9.0",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-attack-analyzer-setup",
+      "app_name": "Splunk_App_SAA",
+      "splunkbase_id": "7000",
+      "label": "Splunk App for Splunk Attack Analyzer",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-app-for-splunk-attack-analyzer_*"
+      ],
+      "install_requires": [
+        "6999"
+      ],
+      "min_splunk_version": "9.0",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-soar-setup",
+      "app_name": "splunk_app_soar",
+      "splunkbase_id": "6361",
+      "label": "Splunk App for SOAR",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-app-for-soar_*"
+      ],
+      "min_splunk_version": "10.0",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-soar-setup",
+      "app_name": "phantom",
+      "splunkbase_id": "3411",
+      "label": "Splunk App for SOAR Export",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-app-for-soar-export_*"
+      ],
+      "install_requires": [
+        "6361"
+      ],
+      "min_splunk_version": "10.2",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-uba-setup",
+      "app_name": "Splunk-UBA-SA-Kafka",
+      "splunkbase_id": "4147",
+      "label": "Splunk UBA Kafka Ingestion App",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-uba-kafka-ingestion-app_*",
+        "splunk-uba-sa-kafka_*"
+      ],
+      "min_splunk_version": "9.2",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
+      "skill": "splunk-enterprise-security-config",
+      "app_name": "DA-ESS-ContentUpdate",
+      "splunkbase_id": "3449",
+      "label": "Splunk ES Content Update",
+      "license_ack_url": "https://www.apache.org/licenses/LICENSE-2.0",
+      "package_patterns": [
+        "splunk-es-content-update_*"
+      ],
+      "install_requires": [
+        "263"
+      ],
+      "min_splunk_version": "8.0",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
+    {
       "skill": "splunk-ai-assistant-setup",
       "app_name": "Splunk_AI_Assistant_Cloud",
       "splunkbase_id": "7245",
@@ -1356,6 +1869,7 @@
       "package_patterns": [
         "splunk-ai-assistant-for-spl_*"
       ],
+      "min_splunk_version": "9.2",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",

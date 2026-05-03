@@ -195,4 +195,5 @@ authentication:
 | `SPLUNK_REST_URI` | `https://<search-head>:<management-port>` |
 | `SPLUNK_REST_USER` | Admin user with `admin_all_objects` (FSS3 requires this). |
 | `SPLUNK_REST_PASSWORD_FILE` | Local-only file containing the admin password. |
-| `SPLUNK_REST_VERIFY_SSL` | `true` (default) or `false` for self-signed dev clusters. |
+| `SPLUNK_VERIFY_SSL` | `true` (default) or `false` for self-signed dev clusters. Canonical name shared with the rest of the skill suite. |
+| `SPLUNK_REST_VERIFY_SSL` | Legacy alias for `SPLUNK_VERIFY_SSL`. Honored as a fallback when the canonical variable is unset. Prefer `SPLUNK_VERIFY_SSL` in new automation. |

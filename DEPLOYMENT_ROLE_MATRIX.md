@@ -49,7 +49,9 @@ For Cloud-specific install and API behavior, see
 | `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets. |
 | `splunk-observability-otel-collector-setup` | Supported | None | None | None | Required | External collector | External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup. |
 | `splunk-observability-dashboard-builder` | None | None | None | None | None | None | Splunk Observability Cloud dashboard render/apply workflow; no Splunk Platform runtime placement. |
+| `splunk-observability-native-ops` | None | None | None | None | None | None | Splunk Observability Cloud native operations render/apply workflow; no Splunk Platform runtime placement. |
 | `splunk-agent-management-setup` | Supported | Supported | Supported | Supported | None | HF or UF | Agent Management control-plane workflow for server classes, deployment apps, and deployment clients; do not target indexer cluster peers or SHC members directly. |
+| `splunk-universal-forwarder-setup` | None | None | None | Required | None | UF | Customer-managed Universal Forwarder runtime bootstrap and enrollment workflow; complements Agent Management server-class and deployment-app workflows. |
 | `splunk-workload-management-setup` | Supported | Supported | None | None | None | None | Self-managed Enterprise Workload Management workflow for Linux search heads and indexers. |
 | `splunk-hec-service-setup` | Supported | Supported | Supported | None | None | HF | Reusable HEC token and service configuration workflow for Enterprise HEC tiers or Splunk Cloud ACS-managed HEC. |
 | `splunk-federated-search-setup` | Required | None | None | None | None | Search tier | Federated Search Head workflow covering Federated Search for Splunk (FSS2S, type=splunk) in standard or transparent mode and Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud only). Renders multi-provider/multi-index assets, file-based apply for Enterprise SHs and SHC deployers, REST apply for both Enterprise and Splunk Cloud, the global federated-search enable/disable switch, and a connectivityStatus probe. |
@@ -61,6 +63,16 @@ For Cloud-specific install and API behavior, see
 | `splunk-itsi-config` | Required | None | None | None | None | None | Search-tier workflow for ITSI content-pack bootstrap, validation, and service-topology automation. |
 | `splunk-enterprise-security-install` | Required | None | None | None | None | None | Premium search-tier SIEM app install and essinstall workflow for standalone search heads or SHC deployers. |
 | `splunk-enterprise-security-config` | Required | Supported | None | None | None | Indexer | ES operational configuration workflow for search-tier objects and index-tier ES index readiness. |
+| `splunk-security-portfolio-setup` | Supported | None | Supported | None | None | None | Security product router/audit workflow that resolves product names and delegates to first-class setup skills, existing ES workflows, generic install-only routes, or explicit handoff classifications. |
+| `splunk-security-essentials-setup` | Required | None | None | None | None | None | Search-head-only Splunk Security Essentials app; no indexer, forwarder, or collector placement. |
+| `splunk-soar-setup` | Required | Supported | None | None | Supported | Indexer or External collector | Splunk platform-side SOAR integration apps belong on search heads and, for Enterprise distributed deployments, indexers; Automation Broker and SOAR On-prem servers are represented as external-collector handoffs. |
+| `splunk-license-manager-setup` | Supported | Supported | None | None | None | None | Self-managed Splunk Enterprise license manager and license peer workflow. Co-locates with cluster manager, MC, deployment server, SHC deployer, search head, or indexer. |
+| `splunk-indexer-cluster-setup` | Supported | Required | None | None | None | None | Self-managed Splunk Enterprise indexer cluster bootstrap and operations workflow. Sits above splunk-enterprise-host-setup (per-host install) and emits a license-peers handoff stub for splunk-license-manager-setup. |
+| `splunk-edge-processor-setup` | None | None | None | None | Supported | External collector | Splunk Edge Processor instances run as a customer-managed external collector tier (Linux, systemd / no-systemd / Docker) joined to a Splunk Cloud Platform tenant or Splunk Enterprise 10.0+ data management node. Emits an ACS allowlist handoff stub for s2s + hec features when destinations target Splunk Cloud. |
+| `splunk-cloud-acs-allowlist-setup` | None | None | None | None | None | None | Splunk Cloud ACS IP allowlist control-plane workflow; manages all 7 ACS features (acs / search-api / hec / s2s / search-ui / idm-api / idm-ui) for IPv4 + IPv6. No Splunk Enterprise role placement. |
+| `splunk-uba-setup` | Supported | Supported | None | None | None | Indexer | Readiness and migration workflow for existing UBA/UEBA deployments; standalone UBA server installation is not automated, and optional Kafka app placement is search-tier focused. |
+| `splunk-attack-analyzer-setup` | Required | Supported | Supported | None | None | Indexer or HF | Installs the Splunk Attack Analyzer add-on and dashboard app, creates/validates the saa index, and aligns the saa_indexes macro; API credentials remain file-based handoff material. |
+| `splunk-asset-risk-intelligence-setup` | Required | Supported | None | None | None | Indexer | Restricted ARI app with search-tier UI/KV Store requirements and index-tier readiness for ari_staging, ari_asset, ari_internal, and ari_ta. |
 | `splunk-ai-assistant-setup` | Required | None | None | None | None | None | Search-tier AI assistant app with cloud-backed inference, app UI settings, and KV Store-backed local chat state. |
 | `splunk-mcp-server-setup` | Required | None | None | None | None | None | Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays. |
 | `splunk-stream-setup` | Required | Supported | Required | Supported | None | HF or UF | Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects. |
@@ -94,6 +106,14 @@ For Cloud-specific install and API behavior, see
 | `SA-ITOA` | `splunk-itsi-setup` | Required | None | None | None | None |
 | `DA-ITSI-ContentLibrary` | `splunk-itsi-config` | Required | None | None | None | None |
 | `SplunkEnterpriseSecuritySuite` | `splunk-enterprise-security-install` | Required | None | None | None | None |
+| `Splunk_Security_Essentials` | `splunk-security-essentials-setup` | Required | None | None | None | None |
+| `SplunkAssetRiskIntelligence` | `splunk-asset-risk-intelligence-setup` | Required | None | None | None | None |
+| `Splunk_TA_SAA` | `splunk-attack-analyzer-setup` | Supported | None | Supported | None | None |
+| `Splunk_App_SAA` | `splunk-attack-analyzer-setup` | Required | None | None | None | None |
+| `splunk_app_soar` | `splunk-soar-setup` | Required | Supported | None | None | None |
+| `phantom` | `splunk-soar-setup` | Required | Supported | None | None | None |
+| `Splunk-UBA-SA-Kafka` | `splunk-uba-setup` | Required | None | None | None | None |
+| `DA-ESS-ContentUpdate` | `splunk-enterprise-security-config` | Required | None | None | None | None |
 | `Splunk_AI_Assistant_Cloud` | `splunk-ai-assistant-setup` | Required | None | None | None | None |
 | `Splunk_MCP_Server` | `splunk-mcp-server-setup` | Required | None | None | None | None |
 | `ta_cisco_spaces` | `cisco-spaces-setup` | Supported | None | Supported | None | None |

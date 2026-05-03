@@ -1,0 +1,40 @@
+# Splunk SOAR Worksheet
+#
+# Copy this file locally and fill in non-secret values. Secret values
+# (admin password, JWT token, postgres/pgbouncer passwords) belong in chmod
+# 600 files only.
+
+phase: render
+soar_platform: onprem-single   # onprem-single | onprem-cluster | cloud
+
+# On-prem common
+soar_home: /opt/soar
+soar_https_port: 8443
+soar_port_forward: false
+soar_hostname: soar01.example.com
+soar_tgz: /tmp/splunk_soar-unpriv-8.5.0.tgz
+soar_fips: auto                # auto | require | disable
+
+# On-prem cluster only
+soar_hosts: soar01,soar02,soar03
+soar_ssh_user: splunk
+
+# External services (cluster only)
+external_pg: mode=local,host=db01,port=5432
+external_gluster: gluster01,gluster02
+external_es: es01,es02,es03
+load_balancer: haproxy01
+
+# Cloud only
+soar_tenant_url: https://example.splunkcloudgc.com/soar
+soar_cloud_admin_email: cloud-admin@example.com
+
+# Automation Broker
+automation_broker: runtime=docker,fips=auto,image_source=dockerhub
+
+# Splunk-side apps to install on the connected Splunk Enterprise / Cloud.
+# 6361 = Splunk App for SOAR; 3411 = Splunk App for SOAR Export.
+splunk_side_apps: app_for_soar=true,app_for_soar_export=true
+
+# ES integration readiness toggle
+es_integration_readiness: true

@@ -1,0 +1,39 @@
+# Splunk License Manager Worksheet
+#
+# Copy this file locally and fill in non-secret values. Secret values
+# (admin password, license pass4SymmKey) belong in chmod 600 files only.
+
+phase: render
+
+# License manager management URI. Default management port is 8089.
+license_manager_uri: https://lm01.example.com:8089
+
+# License manager hostname for SSH-based apply (peers phase).
+license_manager_host: lm01.example.com
+license_manager_ssh_user: splunk
+
+# Comma-separated list of paths to .lic files (must exist locally before apply).
+license_files: /etc/splunk/enterprise.lic
+
+# License group to activate on the manager. Allowed: Enterprise, Forwarder,
+# Free, Trial, Download-Trial.
+license_group: Enterprise
+
+# License pools. Comma-separated key=value spec, one per pool.
+# Required keys: name, stack_id, quota
+# Optional keys: slaves (default *), description
+# quota accepts MAX or a byte count (e.g. 107374182400 for 100 GB).
+pool_specs:
+  - name=ent_main,stack_id=enterprise,quota=MAX,description=All indexers
+
+# Comma-separated list of license peer hostnames to configure.
+peer_hosts: idx01.example.com,idx02.example.com,idx03.example.com
+peer_ssh_user: splunk
+
+# Apply target. Allowed: manager, peers, all.
+apply_target: all
+
+# Co-location hint: which other Splunk role this LM is colocated with.
+# Allowed: cluster-manager, monitoring-console, deployment-server,
+# shc-deployer, search-head, indexer, dedicated.
+colocated_with: cluster-manager

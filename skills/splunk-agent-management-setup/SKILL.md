@@ -64,6 +64,12 @@ bash skills/splunk-agent-management-setup/scripts/setup.sh \
 - Deployment clients are configured with
   `serverRepositoryLocationPolicy = rejectAlways` by default so apps land under
   `$SPLUNK_HOME/etc/apps` unless the operator changes it.
+- The rendered `apply-deployment-client.sh` runs `splunk restart` after writing
+  `deploymentclient.conf` because the new configuration only takes effect after
+  splunkd restarts. Pass `--client-restart-splunkd false` if another
+  orchestrator (image bake, configuration management) is responsible for the
+  restart; the rendered script will then install the file and exit without
+  restarting.
 
 ## Validation
 

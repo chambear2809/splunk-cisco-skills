@@ -1,0 +1,121 @@
+# Pre-commit hooks for the splunk-cisco-skills repo.
+#
+# Install once:
+#   pip install pre-commit
+#   pre-commit install
+#
+# Run manually against the whole tree:
+#   pre-commit run --all-files
+#
+# These hooks chain the same checks documented in CONTRIBUTING.md so
+# contributors get fast local feedback before pushing. The hooks are
+# intentionally fast (lint + structural validators); the full pytest /
+# bats / shellcheck suite is left to CI and to the explicit commands in
+# CONTRIBUTING.md.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: |
+          (?x)^(
+            splunk-mcp-rendered/.*|
+            splunk-observability-dashboard-rendered/.*
+          )$
+      - id: end-of-file-fixer
+        exclude: |
+          (?x)^(
+            splunk-mcp-rendered/.*|
+            splunk-observability-dashboard-rendered/.*
+          )$
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-json
+        exclude: ^skills/cisco-product-setup/catalog\.json$
+      - id: check-yaml
+        # Skip YAML files with custom tags / multi-doc oddities the generic
+        # parser doesn't like; .yamllint.yml is the canonical YAML linter.
+        exclude: |
+          (?x)^(
+            \.github/.*|
+            skills/splunk-itsi-config/.*|
+            skills/splunk-observability-otel-collector-setup/agents/.*
+          )$
+      - id: check-symlinks
+      - id: detect-private-key
+
+  - repo: local
+    hooks:
+      - id: bash-syntax
+        name: bash -n on all skills/**/*.sh
+        entry: bash -c 'for f in "$@"; do bash -n "$f" || exit 1; done' --
+        language: system
+        files: ^skills/.*\.sh$
+
+      - id: skill-frontmatter
+        name: SKILL.md frontmatter contract
+        entry: python3 tests/check_skill_frontmatter.py
+        language: system
+        pass_filenames: false
+        files: ^skills/.*/SKILL\.md$
+
+      - id: repo-readiness
+        name: Repository readiness (catalog parity, symlinks, gitignore)
+        entry: python3 tests/check_repo_readiness.py
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)^(
+            README\.md|
+            AGENTS\.md|
+            CLAUDE\.md|
+            \.mcp\.json|
+            \.cursor/mcp\.json|
+            \.cursor/skills/.*|
+            \.claude/commands/.*|
+            agent/.*|
+            skills/.*|
+            requirements-agent\.txt|
+            CHANGELOG\.md|
+            CONTRIBUTING\.md|
+            SECURITY\.md|
+            \.gitattributes
+          )$
+
+      - id: deployment-docs-fresh
+        name: generate_deployment_docs.py --check (registry vs generated docs)
+        entry: python3 skills/shared/scripts/generate_deployment_docs.py --check
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)^(
+            skills/shared/app_registry\.json|
+            skills/shared/scripts/generate_deployment_docs\.py|
+            CLOUD_DEPLOYMENT_MATRIX\.md|
+            DEPLOYMENT_ROLE_MATRIX\.md
+          )$
+
+      - id: ruff-lint
+        name: ruff (Python lint)
+        entry: ruff check
+        language: system
+        pass_filenames: false
+        files: \.py$
+        args: [skills/, tests/, agent/]
+
+      - id: yamllint-targets
+        name: yamllint (.github + ITSI templates + Observability agents)
+        entry: yamllint -c .yamllint.yml
+        language: system
+        pass_filenames: false
+        files: |
+          (?x)^(
+            \.yamllint\.yml|
+            \.github/.*\.ya?ml|
+            skills/splunk-itsi-config/templates/.*|
+            skills/splunk-itsi-config/agents/.*|
+            skills/splunk-observability-otel-collector-setup/agents/.*
+          )$
+        args: [.github/, skills/splunk-itsi-config/templates, skills/splunk-itsi-config/agents]

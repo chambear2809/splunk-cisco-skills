@@ -22,6 +22,7 @@ BLACKLIST=""
 FILTER_TYPE="whitelist"
 MACHINE_TYPES_FILTER=""
 RESTART_SPLUNKD="false"
+CLIENT_RESTART_SPLUNKD="true"
 STATE_ON_CLIENT="enabled"
 AGENT_MANAGER_URI=""
 CLIENT_NAME=""
@@ -52,7 +53,8 @@ Options:
   --blacklist CSV
   --filter-type whitelist|blacklist
   --machine-types-filter VALUE
-  --restart-splunkd true|false
+  --restart-splunkd true|false           # serverclass setting (server side)
+  --client-restart-splunkd true|false    # whether apply-deployment-client.sh restarts splunkd locally (default: true)
   --state-on-client enabled|disabled|noop
   --agent-manager-uri URI
   --client-name NAME
@@ -82,6 +84,7 @@ while [[ $# -gt 0 ]]; do
         --filter-type) require_arg "$1" $# || exit 1; FILTER_TYPE="$2"; shift 2 ;;
         --machine-types-filter) require_arg "$1" $# || exit 1; MACHINE_TYPES_FILTER="$2"; shift 2 ;;
         --restart-splunkd) require_arg "$1" $# || exit 1; RESTART_SPLUNKD="$2"; shift 2 ;;
+        --client-restart-splunkd) require_arg "$1" $# || exit 1; CLIENT_RESTART_SPLUNKD="$2"; shift 2 ;;
         --state-on-client) require_arg "$1" $# || exit 1; STATE_ON_CLIENT="$2"; shift 2 ;;
         --agent-manager-uri) require_arg "$1" $# || exit 1; AGENT_MANAGER_URI="$2"; shift 2 ;;
         --client-name) require_arg "$1" $# || exit 1; CLIENT_NAME="$2"; shift 2 ;;
@@ -116,6 +119,7 @@ validate_args() {
     validate_choice "${PHASE}" render preflight apply status all
     validate_choice "${FILTER_TYPE}" whitelist blacklist
     validate_choice "${RESTART_SPLUNKD}" true false
+    validate_choice "${CLIENT_RESTART_SPLUNKD}" true false
     validate_choice "${STATE_ON_CLIENT}" enabled disabled noop
     validate_choice "${REPOSITORY_LOCATION_POLICY}" acceptSplunkHome acceptAlways rejectAlways
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
@@ -142,6 +146,7 @@ build_renderer_args() {
         --filter-type "${FILTER_TYPE}"
         --machine-types-filter "${MACHINE_TYPES_FILTER}"
         --restart-splunkd "${RESTART_SPLUNKD}"
+        --client-restart-splunkd "${CLIENT_RESTART_SPLUNKD}"
         --state-on-client "${STATE_ON_CLIENT}"
         --agent-manager-uri "${AGENT_MANAGER_URI}"
         --client-name "${CLIENT_NAME}"

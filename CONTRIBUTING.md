@@ -44,6 +44,29 @@ brew install bats-core shellcheck
 On Linux, install the equivalent `bats` and `shellcheck` packages for your
 distribution.
 
+## Pre-commit (Optional but Recommended)
+
+The repo ships a `.pre-commit-config.yaml` that wires up the lightweight
+checks below into git pre-commit hooks. Install once:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Run against the whole tree at any time:
+
+```bash
+pre-commit run --all-files
+```
+
+Hooks include trailing-whitespace, JSON/YAML validity, private-key detection,
+`bash -n` on every skill script, the SKILL frontmatter contract, the
+repo-readiness check (catalog parity / symlinks), `generate_deployment_docs.py
+--check`, `ruff`, and `yamllint`. The full pytest / bats / shellcheck suite is
+intentionally not in pre-commit: keep those in CI and in the explicit commands
+below for fast local feedback.
+
 ## Required Checks
 
 Run the focused checks for the area you changed, then run the full suite before

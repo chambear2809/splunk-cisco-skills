@@ -6,6 +6,7 @@
 _HOST_BOOTSTRAP_HELPERS_LOADED=true
 
 HBS_ENTERPRISE_DOWNLOAD_PAGE_URL="${HBS_ENTERPRISE_DOWNLOAD_PAGE_URL:-https://www.splunk.com/en_us/download/splunk-enterprise.html}"
+HBS_UNIVERSAL_FORWARDER_DOWNLOAD_PAGE_URL="${HBS_UNIVERSAL_FORWARDER_DOWNLOAD_PAGE_URL:-https://www.splunk.com/en_us/download/universal-forwarder.html}"
 HBS_LATEST_METADATA_MAX_AGE_SECONDS="${HBS_LATEST_METADATA_MAX_AGE_SECONDS:-2592000}"
 
 hbs_is_interactive() {
@@ -121,6 +122,12 @@ hbs_detect_package_type() {
         *.tar.gz|*.tgz) printf '%s' "tgz" ;;
         *.rpm) printf '%s' "rpm" ;;
         *.deb) printf '%s' "deb" ;;
+        *.msi) printf '%s' "msi" ;;
+        *.dmg) printf '%s' "dmg" ;;
+        *.pkg) printf '%s' "pkg" ;;
+        *.txz) printf '%s' "txz" ;;
+        *.p5p) printf '%s' "p5p" ;;
+        *.tar.z|*.z) printf '%s' "tar-z" ;;
         *)
             echo "ERROR: Could not detect package type from '${source_path}'." >&2
             return 1
@@ -135,7 +142,7 @@ import os
 import re
 
 source = os.environ.get("HBS_PACKAGE_SOURCE", "")
-match = re.search(r"splunk-(\d+(?:\.\d+)+)-", os.path.basename(source))
+match = re.search(r"splunk(?:forwarder)?-(\d+(?:\.\d+)+)-", os.path.basename(source))
 if match:
     print(match.group(1), end="")
 '
@@ -282,6 +289,24 @@ print(cache_dir / f".latest-splunk-enterprise-{package_type}.json", end="")
 PY
 }
 
+hbs_latest_universal_forwarder_metadata_path() {
+    local cache_dir="${1:-}"
+    local target_os="${2:-}"
+    local target_arch="${3:-}"
+    local package_type="${4:-}"
+    python3 - "${cache_dir}" "${target_os}" "${target_arch}" "${package_type}" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+cache_dir = Path(sys.argv[1]).resolve()
+target_os = re.sub(r"[^A-Za-z0-9_.-]+", "-", sys.argv[2]).strip("-").lower()
+target_arch = re.sub(r"[^A-Za-z0-9_.-]+", "-", sys.argv[3]).strip("-").lower()
+package_type = re.sub(r"[^A-Za-z0-9_.-]+", "-", sys.argv[4]).strip("-").lower()
+print(cache_dir / f".latest-splunk-universal-forwarder-{target_os}-{target_arch}-{package_type}.json", end="")
+PY
+}
+
 hbs_latest_enterprise_metadata_field() {
     local metadata_json="${1:-}"
     local field_name="${2:-}"
@@ -381,6 +406,98 @@ required = [
     "sha512",
     "sha512_url",
     "source_page_url",
+    "version",
+]
+if any(not data.get(key) for key in required):
+    raise SystemExit(1)
+
+age_seconds = int(time.time()) - int(data["cached_at_epoch"])
+if age_seconds > max_age_seconds:
+    raise SystemExit(2)
+
+print(json.dumps(data, sort_keys=True), end="")
+PY
+}
+
+hbs_write_latest_universal_forwarder_metadata_cache() {
+    local cache_dir="${1:-}"
+    local target_os="${2:-}"
+    local target_arch="${3:-}"
+    local package_type="${4:-}"
+    local metadata_json="${5:-}"
+    local metadata_path tmp_file
+
+    metadata_path="$(hbs_latest_universal_forwarder_metadata_path "${cache_dir}" "${target_os}" "${target_arch}" "${package_type}")"
+    tmp_file="$(mktemp)"
+
+    if ! HBS_METADATA_JSON="${metadata_json}" python3 -c '
+from pathlib import Path
+import json
+import os
+import sys
+import time
+
+path = Path(sys.argv[1])
+data = json.loads(os.environ["HBS_METADATA_JSON"])
+required = [
+    "filename",
+    "package_type",
+    "package_url",
+    "sha512",
+    "sha512_url",
+    "source_page_url",
+    "target_arch",
+    "target_os",
+    "version",
+]
+missing = [key for key in required if not data.get(key)]
+if missing:
+    raise SystemExit(1)
+now = int(time.time())
+data["cached_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now))
+data["cached_at_epoch"] = now
+path.parent.mkdir(parents=True, exist_ok=True)
+Path(sys.argv[2]).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+' "${metadata_path}" "${tmp_file}"; then
+        rm -f "${tmp_file}"
+        echo "ERROR: Failed to write latest Splunk Universal Forwarder metadata cache ${metadata_path}." >&2
+        return 1
+    fi
+
+    mv -f "${tmp_file}" "${metadata_path}"
+}
+
+hbs_read_latest_universal_forwarder_metadata_cache() {
+    local cache_dir="${1:-}"
+    local target_os="${2:-}"
+    local target_arch="${3:-}"
+    local package_type="${4:-}"
+    local max_age_seconds="${5:-${HBS_LATEST_METADATA_MAX_AGE_SECONDS}}"
+    local metadata_path
+
+    metadata_path="$(hbs_latest_universal_forwarder_metadata_path "${cache_dir}" "${target_os}" "${target_arch}" "${package_type}")"
+    python3 - "${metadata_path}" "${max_age_seconds}" <<'PY'
+from pathlib import Path
+import json
+import sys
+import time
+
+path = Path(sys.argv[1])
+max_age_seconds = int(sys.argv[2])
+if not path.is_file():
+    raise SystemExit(1)
+
+data = json.loads(path.read_text(encoding="utf-8"))
+required = [
+    "cached_at_epoch",
+    "filename",
+    "package_type",
+    "package_url",
+    "sha512",
+    "sha512_url",
+    "source_page_url",
+    "target_arch",
+    "target_os",
     "version",
 ]
 if any(not data.get(key) for key in required):
@@ -711,6 +828,430 @@ hbs_resolve_latest_enterprise_download_url() {
     version="$(hbs_latest_enterprise_metadata_field "${metadata_json}" "version")"
     url="$(hbs_latest_enterprise_metadata_field "${metadata_json}" "package_url")"
     printf '%s\t%s' "${version}" "${url}"
+}
+
+hbs_normalize_universal_forwarder_package_type() {
+    local package_type="${1:-auto}"
+    case "${package_type}" in
+        tar.Z|tar.z|z|Z) printf '%s' "tar-z" ;;
+        tar-gz|tar.gz) printf '%s' "tgz" ;;
+        *) printf '%s' "${package_type}" ;;
+    esac
+}
+
+hbs_resolve_latest_universal_forwarder_download_metadata() {
+    local target_os="${1:-linux}"
+    local target_arch="${2:-auto}"
+    local package_type="${3:-tgz}"
+    local page_url="${4:-${HBS_UNIVERSAL_FORWARDER_DOWNLOAD_PAGE_URL}}"
+    local page_text metadata normalized_package_type
+
+    normalized_package_type="$(hbs_normalize_universal_forwarder_package_type "${package_type}")"
+    case "${target_os}" in
+        auto|linux|macos|osx|darwin|windows|freebsd|solaris|aix) ;;
+        *)
+            echo "ERROR: Unsupported target OS '${target_os}' for latest Splunk Universal Forwarder resolution." >&2
+            return 1
+            ;;
+    esac
+    case "${normalized_package_type}" in
+        auto|tgz|rpm|deb|msi|dmg|pkg|txz|p5p|tar-z) ;;
+        *)
+            echo "ERROR: Unsupported package type '${package_type}' for latest Splunk Universal Forwarder resolution." >&2
+            return 1
+            ;;
+    esac
+
+    page_text="$(hbs_fetch_url_text "${page_url}")" || {
+        echo "ERROR: Failed to fetch Splunk Universal Forwarder download page ${page_url}." >&2
+        return 1
+    }
+
+    metadata="$(HBS_UF_PAGE_TEXT="${page_text}" python3 - "${target_os}" "${target_arch}" "${normalized_package_type}" "${page_url}" <<'PY'
+import html
+import json
+import os
+import re
+import sys
+from pathlib import PurePosixPath
+from urllib.parse import urlparse
+
+
+TARGET_OS_RAW = sys.argv[1].lower()
+TARGET_ARCH_RAW = sys.argv[2].lower()
+PACKAGE_TYPE_RAW = sys.argv[3].lower()
+PAGE_URL = sys.argv[4]
+TEXT = html.unescape(os.environ["HBS_UF_PAGE_TEXT"])
+
+
+def version_key(raw_version):
+    return tuple(int(token) for token in raw_version.split("."))
+
+
+def normalize_os(value):
+    aliases = {
+        "auto": "auto",
+        "darwin": "macos",
+        "mac": "macos",
+        "macos": "macos",
+        "osx": "macos",
+        "windows": "windows",
+        "win": "windows",
+        "linux": "linux",
+        "freebsd": "freebsd",
+        "solaris": "solaris",
+        "sunos": "solaris",
+        "aix": "aix",
+    }
+    return aliases.get((value or "").lower(), value.lower())
+
+
+def normalize_package_type(value):
+    value = (value or "").lower().lstrip(".")
+    aliases = {
+        "auto": "auto",
+        "tar.gz": "tgz",
+        "tar-gz": "tgz",
+        "z": "tar-z",
+        "tar.z": "tar-z",
+        "tar-z": "tar-z",
+    }
+    return aliases.get(value, value)
+
+
+def normalize_arch(value, target_os):
+    value = (value or "auto").lower().replace("_", "-")
+    if value in {"", "auto"}:
+        return "auto"
+    if target_os == "windows":
+        return {
+            "amd64": "x64",
+            "x86-64": "x64",
+            "x86_64": "x64",
+            "x64": "x64",
+            "i386": "x86",
+            "i686": "x86",
+            "386": "x86",
+            "x86": "x86",
+        }.get(value, value)
+    if target_os == "linux":
+        return {
+            "x64": "amd64",
+            "x86-64": "amd64",
+            "x86_64": "amd64",
+            "amd64": "amd64",
+            "aarch64": "arm64",
+            "arm64": "arm64",
+            "ppc64le": "ppc64le",
+            "s390x": "s390x",
+        }.get(value, value)
+    if target_os == "macos":
+        return {
+            "x64": "intel",
+            "x86-64": "intel",
+            "x86_64": "intel",
+            "amd64": "intel",
+            "intel": "intel",
+            "arm64": "universal2",
+            "aarch64": "universal2",
+            "m1": "universal2",
+            "m2": "universal2",
+            "m3": "universal2",
+            "universal": "universal2",
+            "universal2": "universal2",
+        }.get(value, value)
+    if target_os == "freebsd":
+        if value in {"amd64", "x64", "x86-64", "x86_64"}:
+            return "freebsd14-amd64"
+        return value
+    if target_os == "solaris":
+        if value in {"x64", "x86-64", "x86_64"}:
+            return "amd64"
+        return value
+    if target_os == "aix":
+        return {"ppc": "powerpc", "ppc64": "powerpc"}.get(value, value)
+    return value
+
+
+def default_arch(target_os):
+    return {
+        "windows": "x64",
+        "linux": "amd64",
+        "macos": "universal2",
+        "freebsd": "freebsd14-amd64",
+        "solaris": "amd64",
+        "aix": "powerpc",
+    }.get(target_os, "amd64")
+
+
+def infer_os(url_platform):
+    value = normalize_os(url_platform)
+    if value == "osx":
+        return "macos"
+    return value
+
+
+def infer_package_type(filename):
+    lower = filename.lower()
+    if lower.endswith((".tar.gz", ".tgz")):
+        return "tgz"
+    if lower.endswith(".tar.z") or lower.endswith(".z"):
+        return "tar-z"
+    for suffix in ("rpm", "deb", "msi", "dmg", "pkg", "txz", "p5p"):
+        if lower.endswith("." + suffix):
+            return suffix
+    return ""
+
+
+def filename_version(filename):
+    match = re.search(r"splunkforwarder-(\d+(?:\.\d+)+)-", filename)
+    return match.group(1) if match else ""
+
+
+def infer_arch(filename, target_os, package_type, data_arch=""):
+    lower = filename.lower()
+    if target_os == "windows":
+        if "windows-x86." in lower:
+            return "x86"
+        if "windows-x64." in lower:
+            return "x64"
+        return normalize_arch(data_arch, target_os)
+    if target_os == "linux":
+        if "s390x" in lower:
+            return "s390x"
+        if "ppc64le" in lower:
+            return "ppc64le"
+        if "arm64" in lower or "aarch64" in lower:
+            return "arm64"
+        if "amd64" in lower or "x86_64" in lower:
+            return "amd64"
+        return normalize_arch(data_arch, target_os)
+    if target_os == "macos":
+        if "universal2" in lower:
+            return "universal2"
+        if "intel" in lower:
+            return "intel"
+        return normalize_arch(data_arch, target_os)
+    if target_os == "freebsd":
+        match = re.search(r"freebsd(?P<major>\d+)-(?P<arch>[a-z0-9_ -]+?)\.(?:tgz|txz)$", lower)
+        if match:
+            return f"freebsd{match.group('major')}-{normalize_arch(match.group('arch'), 'linux')}"
+        return normalize_arch(data_arch, target_os)
+    if target_os == "solaris":
+        if "solaris-sparc" in lower:
+            return "sparc"
+        if "solaris-amd64" in lower:
+            return "amd64"
+        return normalize_arch(data_arch, target_os)
+    if target_os == "aix":
+        if "aix-powerpc" in lower:
+            return "powerpc"
+        return normalize_arch(data_arch, target_os)
+    return normalize_arch(data_arch, target_os)
+
+
+def apply_metadata(target_os, package_type):
+    if target_os == "linux" and package_type in {"tgz", "rpm", "deb"}:
+        return "local-ssh"
+    if target_os == "macos" and package_type == "tgz":
+        return "local-ssh"
+    if target_os == "macos" and package_type == "dmg":
+        return "download-only"
+    if target_os == "windows" and package_type == "msi":
+        return "render-only"
+    return "unsupported-v1"
+
+
+def parse_attrs(tag):
+    return {
+        name.lower(): html.unescape(value)
+        for name, value in re.findall(r'([A-Za-z0-9_-]+)="([^"]*)"', tag)
+    }
+
+
+def url_parts(url):
+    parsed = urlparse(url)
+    parts = PurePosixPath(parsed.path).parts
+    try:
+        release_index = parts.index("releases")
+        version = parts[release_index + 1]
+        platform = parts[release_index + 2]
+    except (ValueError, IndexError):
+        return "", "", PurePosixPath(parsed.path).name
+    return version, platform, PurePosixPath(parsed.path).name
+
+
+explicit_page_versions = sorted(
+    set(re.findall(r"Splunk Universal Forwarder\s+(\d+(?:\.\d+)+)", TEXT)),
+    key=version_key,
+)
+release_versions = sorted(
+    set(re.findall(r"/products/universalforwarder/releases/(\d+(?:\.\d)+)/", TEXT)),
+    key=version_key,
+)
+if explicit_page_versions:
+    page_version = explicit_page_versions[-1]
+elif release_versions:
+    page_version = release_versions[-1]
+else:
+    raise SystemExit(1)
+
+raw_candidates = []
+for tag in re.findall(r"<a\b[^>]*>", TEXT, flags=re.IGNORECASE | re.DOTALL):
+    attrs = parse_attrs(tag)
+    package_url = attrs.get("data-link", "")
+    sha512_url = attrs.get("data-sha512", "")
+    data_version = attrs.get("data-version", "")
+    if "/products/universalforwarder/releases/" not in package_url:
+        continue
+    if not sha512_url:
+        continue
+    version, platform, filename = url_parts(package_url)
+    if not filename or filename.endswith((".sha512", ".md5", ".sig")):
+        continue
+    package_type = infer_package_type(filename)
+    target_os = infer_os(platform)
+    target_arch = infer_arch(filename, target_os, package_type, attrs.get("data-arch", ""))
+    raw_candidates.append(
+        {
+            "filename": filename,
+            "package_type": package_type,
+            "package_url": package_url,
+            "sha512_url": sha512_url,
+            "source_page_url": PAGE_URL,
+            "target_arch": target_arch,
+            "target_os": target_os,
+            "url_platform": platform,
+            "version": version,
+            "data_version": data_version,
+            "v1_apply": apply_metadata(target_os, package_type),
+        }
+    )
+
+if not raw_candidates:
+    url_pattern = re.compile(
+        r"https://download\.splunk\.com/products/universalforwarder/releases/"
+        r"(?P<version>\d+(?:\.\d)+)/(?P<platform>[^/\s\"'<>]+)/"
+        r"(?P<filename>splunkforwarder-[^\s\"'<>]+?\.(?:tgz|tar\.gz|rpm|deb|msi|dmg|pkg|txz|p5p|tar\.Z|Z))",
+        flags=re.IGNORECASE,
+    )
+    seen_urls = set()
+    for match in url_pattern.finditer(TEXT):
+        package_url = match.group(0)
+        if package_url in seen_urls or package_url.endswith((".sha512", ".md5", ".sig")):
+            continue
+        seen_urls.add(package_url)
+        version = match.group("version")
+        platform = match.group("platform")
+        filename = match.group("filename")
+        package_type = infer_package_type(filename)
+        target_os = infer_os(platform)
+        target_arch = infer_arch(filename, target_os, package_type)
+        raw_candidates.append(
+            {
+                "filename": filename,
+                "package_type": package_type,
+                "package_url": package_url,
+                "sha512_url": f"{package_url}.sha512",
+                "source_page_url": PAGE_URL,
+                "target_arch": target_arch,
+                "target_os": target_os,
+                "url_platform": platform,
+                "version": version,
+                "data_version": version,
+                "v1_apply": apply_metadata(target_os, package_type),
+            }
+        )
+
+candidates = []
+for item in raw_candidates:
+    version = item["version"]
+    filename = item["filename"]
+    if version != page_version:
+        continue
+    if item.get("data_version") and item["data_version"] != page_version:
+        continue
+    if filename_version(filename) != version:
+        continue
+    candidates.append(item)
+
+target_os = normalize_os(TARGET_OS_RAW)
+if target_os == "auto":
+    target_os = "linux"
+package_type = normalize_package_type(PACKAGE_TYPE_RAW)
+if package_type == "auto":
+    package_type = {
+        "linux": "tgz",
+        "macos": "tgz",
+        "windows": "msi",
+        "freebsd": "tgz",
+        "solaris": "tar-z",
+        "aix": "tgz",
+    }.get(target_os, "tgz")
+target_arch = normalize_arch(TARGET_ARCH_RAW, target_os)
+if target_arch == "auto":
+    target_arch = default_arch(target_os)
+
+def arch_score(item):
+    arch = item["target_arch"]
+    if arch == target_arch:
+        return 0
+    if target_os == "freebsd" and target_arch == "amd64" and arch.endswith("-amd64"):
+        return 1
+    return 99
+
+def platform_major(item):
+    match = re.search(r"freebsd(\d+)-", item["target_arch"])
+    if match:
+        return int(match.group(1))
+    return 0
+
+matches = [
+    item
+    for item in candidates
+    if item["target_os"] == target_os
+    and item["package_type"] == package_type
+    and arch_score(item) < 99
+]
+matches = sorted(
+    matches,
+    key=lambda item: (version_key(item["version"]), -arch_score(item), platform_major(item)),
+    reverse=True,
+)
+if not matches:
+    raise SystemExit(1)
+
+best = matches[0]
+best_score = arch_score(best)
+same_rank = [
+    item
+    for item in matches
+    if version_key(item["version"]) == version_key(best["version"])
+    and item["target_os"] == best["target_os"]
+    and item["package_type"] == best["package_type"]
+    and arch_score(item) == best_score
+    and platform_major(item) == platform_major(best)
+]
+if len({item["package_url"] for item in same_rank}) != 1:
+    raise SystemExit(1)
+
+best = dict(best)
+best["requested_target_os"] = target_os
+best["requested_target_arch"] = target_arch
+best["requested_package_type"] = package_type
+print(json.dumps(best, sort_keys=True), end="")
+PY
+)" || {
+        echo "ERROR: Failed to parse the latest Splunk Universal Forwarder ${target_os}/${target_arch}/${normalized_package_type} download URL from ${page_url}." >&2
+        return 1
+    }
+
+    if [[ -z "${metadata}" ]]; then
+        echo "ERROR: Latest Splunk Universal Forwarder metadata was incomplete for ${target_os}/${target_arch}/${normalized_package_type}." >&2
+        return 1
+    fi
+
+    printf '%s' "${metadata}"
 }
 
 hbs_download_file() {

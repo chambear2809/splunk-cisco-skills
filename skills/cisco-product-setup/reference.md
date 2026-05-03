@@ -15,6 +15,7 @@ This skill is a router over the existing Cisco setup skills in this repo.
 | `intersight` | `cisco-intersight-setup` | Intersight |
 | `thousandeyes` | `cisco-thousandeyes-setup` | ThousandEyes |
 | `appdynamics` | `cisco-appdynamics-setup` | AppDynamics |
+| `spaces` | `cisco-spaces-setup` | Cisco Spaces (meta stream / firehose) |
 | `app_install_only` | `splunk-app-install` | Cisco Webex, UCS, ESA, WSA, Talos, EVM/SCA app validation |
 
 ## Partial Handoff Routes
@@ -41,3 +42,9 @@ This skill is a router over the existing Cisco setup skills in this repo.
   a product-specific collector that does not exist.
 - Meraki is a local override: SCAN maps it to the Catalyst visualization stack,
   while this repo also has a dedicated Meraki TA setup flow.
+- Optional companions not routed here:
+  - `cisco-catalyst-enhanced-netflow-setup` adds the optional NetFlow / IPFIX
+    stream mapping app for richer Catalyst NetFlow dashboards. It is a
+    forwarder-side install with no per-product router stanza; reach it directly
+    or through `cisco-enterprise-networking-setup` when NetFlow dashboards are
+    requested.

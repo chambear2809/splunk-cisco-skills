@@ -101,8 +101,19 @@ When no flags are passed, the setup script performs install plus validation.
   private upload of a downloaded archive.
 - Splunk Cloud self-service installs are supported only on eligible commercial
   stacks and supported regions.
-- This skill does not automate Cloud-side onboarding because the Enterprise
-  cloud-connected flow does not apply there.
+- Cloud-side onboarding can require Splunk Web and/or Splunk Support actions,
+  so the skill treats it as a first-class handoff instead of a hidden setup
+  step. Render the handoff plan with:
+
+```bash
+python3 skills/splunk-ai-assistant-setup/scripts/cloud_onboarding_plan.py \
+  --platform cloud \
+  --stack my-stack
+```
+
+- The generated plan includes the supported ACS install/update command,
+  validation checks, and the manual Cloud onboarding gates to complete in
+  Splunk Web or a Splunk Support / Cloud App Request.
 
 **Splunk Enterprise (cloud connected)**
 
@@ -145,6 +156,13 @@ bash skills/splunk-ai-assistant-setup/scripts/setup.sh \
 - The remaining blocker after form submission is the Splunk-issued activation
   code/token, which may not be available immediately
 - Proxy credentials and activation codes are read from local files only
+- To preview the Enterprise onboarding sequence without making REST calls, run:
+
+```bash
+python3 skills/splunk-ai-assistant-setup/scripts/cloud_onboarding_plan.py \
+  --platform enterprise \
+  --region usa
+```
 
 ### Step 3: Validate
 

@@ -1,0 +1,42 @@
+# Splunk Universal Forwarder Setup Intake
+#
+# Copy to template.local before filling values. Do not put secret values here.
+
+# Target platform.
+TARGET_OS=linux
+TARGET_ARCH=auto
+EXECUTION=local
+
+# Package source.
+# URL=latest resolves the current official Splunk UF package and verifies
+# Splunk's published SHA512 checksum. SOURCE can be auto, splunk-auth, remote,
+# or local.
+SOURCE=auto
+URL=latest
+PACKAGE_TYPE=auto
+# FILE=/path/to/splunkforwarder-package
+
+# Runtime defaults.
+SPLUNK_HOME=/opt/splunkforwarder
+SERVICE_USER=splunkfwd
+
+# File-based admin seed. Create with:
+# bash skills/shared/scripts/write_secret_file.sh /tmp/uf_admin_password
+ADMIN_USER=admin
+ADMIN_PASSWORD_FILE=/tmp/uf_admin_password
+
+# Enrollment mode: none, deployment-server, enterprise-indexers, splunk-cloud.
+ENROLL=deployment-server
+
+# Deployment server enrollment.
+DEPLOYMENT_SERVER=deploymentserver.example.com:8089
+CLIENT_NAME=
+PHONE_HOME_INTERVAL=60
+
+# Static Enterprise indexer enrollment.
+SERVER_LIST=idx01.example.com:9997,idx02.example.com:9997
+USE_ACK=true
+
+# Splunk Cloud enrollment. Download this from the Splunk Cloud Universal
+# Forwarder app and keep the package local.
+CLOUD_CREDENTIALS_PACKAGE=/tmp/splunkclouduf.spl

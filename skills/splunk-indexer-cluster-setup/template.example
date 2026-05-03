@@ -1,0 +1,48 @@
+# Splunk Indexer Cluster Worksheet
+#
+# Copy this file locally and fill in non-secret values. Secret values belong
+# in chmod 600 files only.
+
+phase: render
+cluster_mode: single-site         # single-site | multisite
+cluster_label: prod
+cluster_manager_uri: https://cm01.example.com:8089
+
+# Manager hosts. Provide one for non-redundant; provide >=2 for redundancy.
+manager_hosts: cm01.example.com
+manager_redundancy: false
+manager_switchover_mode: disabled  # auto | manual | disabled
+manager_lb_uri:                   # LB endpoint when redundancy=true
+manager_dns_name:                 # DNS endpoint when redundancy=true
+
+# Single-site factors. Ignored when cluster_mode=multisite.
+replication_factor: 3
+search_factor: 2
+
+# Multisite factors. Ignored when cluster_mode=single-site.
+available_sites: site1,site2
+site_replication_factor: origin:2,total:3
+site_search_factor: origin:1,total:2
+site_mappings:                   # e.g. default_mapping:site1 (used during migration)
+
+# Peers and SHs. Multisite uses host=siteN syntax.
+peer_hosts: idx01.example.com=site1,idx02.example.com=site1,idx03.example.com=site2
+sh_hosts: sh01.example.com=site1
+forwarder_hosts:                 # comma-separated, used to render outputs.conf snippets
+peer_ssh_user: splunk
+sh_ssh_user: splunk
+manager_ssh_user: splunk
+
+# Per-host advanced.
+replication_port: 9887           # peer-to-peer replication channel
+percent_peers_to_restart: 10     # rolling-restart slot percentage
+rolling_restart_default: searchable  # searchable_force | searchable | shutdown | restart
+
+# Bundle apps to stage under manager-apps/. Comma-separated paths.
+bundle_apps:
+
+# Migration knobs (used by --phase migrate-to-multisite).
+migrate_keep_legacy_factors: true
+
+# Indexer discovery for forwarders.
+indexer_discovery_tag: idxc_main

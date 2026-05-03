@@ -621,3 +621,85 @@ platform_create_index() {
         rest_create_index "${sk}" "${uri}" "${idx}" "${max_size}" "${index_type}"
     fi
 }
+
+# IP allowlist describe / diff helpers used by splunk-cloud-acs-allowlist-setup.
+#
+# Per Splunk ACS CLI docs (acs ip-allowlist --help / acs ip-allowlist-v6 --help):
+# IPv4 lives under `acs ip-allowlist {describe,create,delete}`.
+# IPv6 lives under the SEPARATE top-level group `acs ip-allowlist-v6 {describe,create,delete}`.
+# The read-only subcommand is `describe` (not `list`).
+
+acs_ipallowlist_describe() {
+    local feature="$1"
+    acs_command ip-allowlist describe "${feature}" 2>/dev/null \
+        | acs_extract_http_response_json \
+        | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    subs = data.get('subnets', []) if isinstance(data, dict) else []
+    print(','.join(sorted([s if isinstance(s, str) else s.get('subnet', '') for s in subs])))
+except Exception:
+    print('')
+" 2>/dev/null || echo ""
+}
+
+acs_ipallowlist_describe_v6() {
+    local feature="$1"
+    acs_command ip-allowlist-v6 describe "${feature}" 2>/dev/null \
+        | acs_extract_http_response_json \
+        | python3 -c "
+import json, sys
+try:
+    data = json.load(sys.stdin)
+    subs = data.get('subnets', []) if isinstance(data, dict) else []
+    print(','.join(sorted([s if isinstance(s, str) else s.get('subnet', '') for s in subs])))
+except Exception:
+    print('')
+" 2>/dev/null || echo ""
+}
+
+# acs_ipallowlist_apply_plan <feature> <family> <planned_csv>
+# Diffs the planned IPv4 (family=ipv4) or IPv6 (family=ipv6) allowlist against
+# live state and create/deletes to converge. Idempotent.
+acs_ipallowlist_apply_plan() {
+    local feature="$1" family="$2" planned="$3"
+    local live to_add to_remove cli_group
+    case "${family}" in
+        ipv4)
+            cli_group="ip-allowlist"
+            live="$(acs_ipallowlist_describe "${feature}")"
+            ;;
+        ipv6)
+            cli_group="ip-allowlist-v6"
+            live="$(acs_ipallowlist_describe_v6 "${feature}")"
+            ;;
+        *)
+            log "ERROR: acs_ipallowlist_apply_plan family must be ipv4|ipv6"
+            return 1
+            ;;
+    esac
+
+    to_add=$(python3 - "${planned}" "${live}" <<'PY'
+import sys
+planned = set(filter(None, sys.argv[1].split(',')))
+live = set(filter(None, sys.argv[2].split(',')))
+print(','.join(sorted(planned - live)))
+PY
+)
+    to_remove=$(python3 - "${planned}" "${live}" <<'PY'
+import sys
+planned = set(filter(None, sys.argv[1].split(',')))
+live = set(filter(None, sys.argv[2].split(',')))
+print(','.join(sorted(live - planned)))
+PY
+)
+
+    if [[ -n "${to_add}" ]]; then
+        acs_command "${cli_group}" create "${feature}" --subnets "${to_add}" >/dev/null
+    fi
+    if [[ -n "${to_remove}" ]]; then
+        acs_command "${cli_group}" delete "${feature}" --subnets "${to_remove}" >/dev/null
+    fi
+    log "OK: ${family} apply complete for feature ${feature} (added=${to_add:-0}, removed=${to_remove:-0})"
+}

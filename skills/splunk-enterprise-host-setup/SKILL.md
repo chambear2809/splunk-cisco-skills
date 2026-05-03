@@ -19,15 +19,16 @@ Bootstraps Linux hosts that should run **full Splunk Enterprise**.
 - A **heavy forwarder is not a separate package**. It is a full Splunk
   Enterprise install with forwarder-style configuration.
 - This skill is for **self-managed Splunk Enterprise** hosts only.
-- It models the deployment roles used elsewhere in this repo:
-  - `search-tier`
-  - `indexer`
+- The CLI takes the canonical role names below via `--host-bootstrap-role`:
+  - `standalone-search-tier`
+  - `standalone-indexer`
   - `heavy-forwarder`
-- It also covers the clustered control-plane roles needed to assemble those
-  tiers:
-  - cluster manager
-  - search head cluster deployer
-  - search head cluster member
+  - `cluster-manager`
+  - `indexer-peer`
+  - `shc-deployer`
+  - `shc-member`
+- The "standalone-" prefix marks single-instance roles; clustered indexer and
+  search-head-cluster control-plane roles use the unprefixed names above.
 
 ## Agent Behavior — Credentials
 
@@ -112,9 +113,22 @@ Useful phases:
 - `cluster` — apply clustered settings such as manager, peer, or SHC membership
 - `all` — run the full workflow
 
-Clustered-role upgrades are still **per-host only**. The script warns when you
-upgrade clustered roles, but it does not orchestrate rolling order or verify
-cluster health across multiple hosts.
+Clustered-role upgrades still execute through the per-host `setup.sh` path, but
+the skill can now render a rolling plan with one host per wave, pre/post
+validation commands, and cluster health gates:
+
+```bash
+python3 skills/splunk-enterprise-host-setup/scripts/rolling_upgrade_plan.py \
+  --role indexer-peer \
+  --hosts idx01.example.com,idx02.example.com,idx03.example.com \
+  --cluster-manager-host cm01.example.com \
+  --cluster-manager-uri https://cm01.example.com:8089 \
+  --admin-password-file /tmp/splunk_admin_password
+```
+
+The planner is render-only. It does not SSH, restart Splunk, or modify hosts;
+operators still run the generated per-host commands after each health gate is
+green.
 
 ### validate.sh
 
@@ -145,7 +159,7 @@ bash skills/splunk-enterprise-host-setup/scripts/smoke_latest_resolution.sh \
 - single-site clustering only
 - heavy forwarders default to `indexAndForward=false`
 - clustered heavy forwarders default to **indexer discovery**
-- search-tier roles enable Splunk Web by default
+- standalone-search-tier roles enable Splunk Web by default
 - SHC member adds require `--current-shc-member-uri` unless `--bootstrap-shc`
   is used to create a brand-new cluster
 

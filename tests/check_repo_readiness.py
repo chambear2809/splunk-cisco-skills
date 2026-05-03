@@ -60,13 +60,15 @@ TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"^splunk-federated-search-rendered/"),
     re.compile(r"^splunk-smartstore-rendered/"),
     re.compile(r"^splunk-monitoring-console-rendered/"),
+    re.compile(r"^splunk-universal-forwarder-rendered/"),
     re.compile(r"^splunk-enterprise-k8s-rendered/"),
     re.compile(r"^splunk-observability-otel-rendered/"),
     re.compile(r"^splunk-observability-dashboard-rendered/"),
     re.compile(r"^ta-for-indexers-rendered/"),
     re.compile(r"^splunk-mcp-rendered/(?!run-splunk-mcp\.js$)"),
     re.compile(r"^splunk-ta/_unpacked/"),
-    re.compile(r"^splunk-ta/.*\.(?:tgz|tar\.gz|spl|rpm|deb)$"),
+    re.compile(r"^splunk-ta/.*\.(?:tgz|tar\.gz|spl|rpm|deb|msi|dmg|pkg|txz|p5p|Z)$"),
+    re.compile(r"^splunk-ta/\.latest-splunk-universal-forwarder-.*\.json$"),
 ]
 
 

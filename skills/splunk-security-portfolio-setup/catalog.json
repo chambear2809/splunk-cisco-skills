@@ -1,0 +1,221 @@
+{
+  "last_verified": "2026-05-03",
+  "statuses": [
+    "first_class",
+    "existing_skill",
+    "install_only",
+    "partial",
+    "bundled_es",
+    "manual_gap"
+  ],
+  "entries": [
+    {
+      "key": "enterprise-security",
+      "name": "Splunk Enterprise Security",
+      "aliases": ["es", "enterprise security", "splunk es", "siem"],
+      "status": "existing_skill",
+      "route": ["splunk-enterprise-security-install", "splunk-enterprise-security-config"],
+      "splunkbase_ids": ["263"],
+      "notes": "Existing ES install/config skills are the source of truth."
+    },
+    {
+      "key": "security-essentials",
+      "name": "Splunk Security Essentials",
+      "aliases": ["sse", "security essentials", "splunk security essentials"],
+      "status": "first_class",
+      "route": ["splunk-security-essentials-setup"],
+      "splunkbase_ids": ["3435"],
+      "notes": "Search-tier app install and setup checklist validation."
+    },
+    {
+      "key": "soar",
+      "name": "Splunk SOAR",
+      "aliases": ["soar", "splunk soar", "phantom", "app for soar"],
+      "status": "first_class",
+      "route": ["splunk-soar-setup"],
+      "splunkbase_ids": ["6361", "3411"],
+      "notes": "Splunk platform apps and Automation Broker readiness only; does not install SOAR server."
+    },
+    {
+      "key": "soar-export",
+      "name": "Splunk App for SOAR Export",
+      "aliases": ["soar export", "splunk app for soar export", "phantom app for splunk"],
+      "status": "first_class",
+      "route": ["splunk-soar-setup"],
+      "route_args": ["--install-export-app"],
+      "splunkbase_ids": ["3411"],
+      "notes": "Optional Splunk platform to SOAR export app, handled by splunk-soar-setup without installing a SOAR server."
+    },
+    {
+      "key": "uba",
+      "name": "Splunk User Behavior Analytics",
+      "aliases": ["uba", "user behavior analytics", "ueba", "splunk uba"],
+      "status": "partial",
+      "route": ["splunk-uba-setup"],
+      "splunkbase_ids": ["4147"],
+      "notes": "Standalone UBA is end-of-sale as of 2025-12-12 with end-of-life/end-of-support on 2027-01-31; skill handles readiness, Kafka app, and ES Premier UEBA migration guidance."
+    },
+    {
+      "key": "attack-analyzer",
+      "name": "Splunk Attack Analyzer",
+      "aliases": ["attack analyzer", "splunk attack analyzer", "saa"],
+      "status": "first_class",
+      "route": ["splunk-attack-analyzer-setup"],
+      "splunkbase_ids": ["6999", "7000"],
+      "notes": "Installs app and add-on, prepares index and dashboard macro, then validates handoff state."
+    },
+    {
+      "key": "asset-risk-intelligence",
+      "name": "Splunk Asset and Risk Intelligence",
+      "aliases": ["ari", "asset and risk intelligence", "asset risk intelligence", "splunk ari"],
+      "status": "first_class",
+      "route": ["splunk-asset-risk-intelligence-setup"],
+      "splunkbase_ids": ["7180"],
+      "notes": "Installs restricted app package and prepares ARI indexes plus ES exposure analytics handoff."
+    },
+    {
+      "key": "mission-control",
+      "name": "Splunk Mission Control",
+      "aliases": ["mission control"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "Bundled ES 8.x component."
+    },
+    {
+      "key": "exposure-analytics",
+      "name": "Exposure Analytics",
+      "aliases": ["exposure analytics"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "ES capability; ARI integration routes here."
+    },
+    {
+      "key": "detection-studio",
+      "name": "Detection Studio",
+      "aliases": ["detection studio"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "ES detection lifecycle capability."
+    },
+    {
+      "key": "tim-cloud",
+      "name": "Splunk Threat Intelligence Management Cloud",
+      "aliases": ["tim cloud", "threat intelligence management", "splunk tim"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "ES threat intelligence workflow."
+    },
+    {
+      "key": "splunk-cloud-connect",
+      "name": "Splunk Cloud Connect",
+      "aliases": ["splunk cloud connect", "cloud connect"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "ES cloud integration readiness."
+    },
+    {
+      "key": "dlx",
+      "name": "DLX",
+      "aliases": ["dlx"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-install", "splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "ES packaged support component."
+    },
+    {
+      "key": "es-premier-ueba",
+      "name": "Enterprise Security Premier UEBA",
+      "aliases": ["es premier ueba", "premier ueba", "enterprise security ueba"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "Modern UEBA capability in Enterprise Security Premier; standalone UBA migration target."
+    },
+    {
+      "key": "security-content-update",
+      "name": "Splunk ES Content Update",
+      "aliases": ["escu", "security content update", "es content update", "da-ess-contentupdate"],
+      "status": "install_only",
+      "route": ["splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": ["3449"],
+      "notes": "Handled by ES content library workflow."
+    },
+    {
+      "key": "pci-compliance",
+      "name": "Splunk App for PCI Compliance",
+      "aliases": ["pci", "pci compliance"],
+      "status": "install_only",
+      "route": ["splunk-app-install"],
+      "splunkbase_ids": ["1143", "2897"],
+      "notes": "Restricted compliance app, not a public product-page security skill."
+    },
+    {
+      "key": "infosec",
+      "name": "InfoSec App for Splunk",
+      "aliases": ["infosec", "infosec app"],
+      "status": "install_only",
+      "route": ["splunk-app-install"],
+      "splunkbase_ids": ["4240"],
+      "notes": "Starter security dashboards."
+    },
+    {
+      "key": "cim",
+      "name": "Splunk Common Information Model",
+      "aliases": ["cim", "common information model"],
+      "status": "install_only",
+      "route": ["splunk-app-install"],
+      "splunkbase_ids": ["1621"],
+      "notes": "Shared semantic model add-on."
+    },
+    {
+      "key": "lookup-file-editing",
+      "name": "Splunk App for Lookup File Editing",
+      "aliases": ["lookup editor", "lookup file editing"],
+      "status": "install_only",
+      "route": ["splunk-app-install"],
+      "splunkbase_ids": ["1724"],
+      "notes": "Prerequisite for selected security apps."
+    },
+    {
+      "key": "mltk",
+      "name": "Splunk Machine Learning Toolkit",
+      "aliases": ["mltk", "ml toolkit", "machine learning toolkit", "splunk ai toolkit", "splunk_ml_toolkit"],
+      "status": "install_only",
+      "route": ["splunk-app-install"],
+      "splunkbase_ids": ["2890"],
+      "notes": "Not a security portfolio product, but referenced by ES detections that use ML and by selected security analytics workflows. Listed here so the router can resolve it instead of falling through to 'No matching entry'."
+    },
+    {
+      "key": "automation-broker",
+      "name": "Splunk Automation Broker",
+      "aliases": ["automation broker", "soar automation broker"],
+      "status": "partial",
+      "route": ["splunk-soar-setup"],
+      "route_args": ["--automation-broker-plan"],
+      "splunkbase_ids": [],
+      "notes": "Docker/Podman host readiness and handoff only."
+    },
+    {
+      "key": "fraud-analytics",
+      "name": "Splunk App for Fraud Analytics",
+      "aliases": ["fraud analytics", "splunk fraud analytics"],
+      "status": "manual_gap",
+      "route": ["splunk-app-install"],
+      "splunkbase_ids": [],
+      "notes": "Official docs point to a package tarball; keep as an explicit non-product manual gap."
+    }
+  ]
+}

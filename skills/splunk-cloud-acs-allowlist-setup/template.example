@@ -1,0 +1,55 @@
+# Splunk Cloud ACS Allowlist Worksheet
+#
+# Copy this file locally and fill in non-secret values. The skill reads the
+# Splunk Cloud stack and ACS token from the project credentials file
+# (STACK_TOKEN / STACK_TOKEN_USER / SPLUNK_CLOUD_STACK / ACS_SERVER) — never
+# put tokens here.
+
+phase: render
+
+# Comma-separated subset of ACS features to manage in this run.
+# Allowed values: acs, search-api, hec, s2s, search-ui, idm-api, idm-ui
+features: search-api,s2s,hec
+
+# IPv4 subnets per feature. Leave blank to skip that feature for IPv4.
+# Subnets must be CIDR notation (e.g. 198.51.100.0/24 or 198.51.100.5/32).
+acs_subnets:
+search_api_subnets: 198.51.100.0/24
+hec_subnets: 203.0.113.0/24
+s2s_subnets: 198.51.100.0/24,203.0.113.0/24
+search_ui_subnets:
+idm_api_subnets:
+idm_ui_subnets:
+
+# IPv6 subnets per feature. Leave blank to skip that feature for IPv6.
+acs_subnets_v6:
+search_api_subnets_v6:
+hec_subnets_v6:
+s2s_subnets_v6:
+search_ui_subnets_v6:
+idm_api_subnets_v6:
+idm_ui_subnets_v6:
+
+# Cloud provider for subnet limit math. Auto-detected by ACS in normal use.
+# Override only if you know your stack runs on GCP and want preflight to use
+# the GCP per-feature cap instead of AWS group caps.
+cloud_provider: aws
+
+# Premium SH targeting (optional). Only needed if your stack uses search-head
+# targeting for ACS operations.
+target_search_head:
+
+# Lock-out protection. Set to true ONLY after explicit confirmation that you
+# accept losing IP allowlist UI / Federated Search / Maintenance Windows /
+# Observability APIs / Limits when restricting the `acs` feature.
+allow_acs_lockout: false
+
+# Drift detection. true (default) refuses to apply when live state has drifted
+# from the previously rendered plan. false bypasses the check (use --force on
+# the CLI for a one-shot override).
+strict_drift: true
+
+# Emit a terraform-snippets.tf block using the splunk/scp provider that
+# mirrors the rendered plan, for users who want to manage allowlists from
+# Terraform alongside or after this skill.
+emit_terraform: false

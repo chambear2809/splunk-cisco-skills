@@ -123,7 +123,12 @@ function findMcpRemote() {
 }
 
 const { cmd, args: prefixArgs } = findMcpRemote();
+// Pass the literal placeholder so mcp-remote performs ${VAR} substitution
+// at runtime against the inherited env. This keeps SPLUNK_MCP_TOKEN out of
+// argv (visible to `ps`) while still sending the real bearer value
+// upstream. mcpToken is read above only to fail fast if it is unset.
 const tokenHeader = "Authorization: Bearer ${SPLUNK_MCP_TOKEN}";
+void mcpToken;
 const child = spawn(
   cmd,
   [...prefixArgs, mcpUrl, "--header", tokenHeader],

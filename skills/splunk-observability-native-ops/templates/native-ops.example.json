@@ -1,0 +1,153 @@
+{
+  "api_version": "splunk-observability-native-ops/v1",
+  "realm": "us0",
+  "teams": [
+    {
+      "name": "Checkout SRE",
+      "description": "Owns checkout service alerts and dashboards."
+    }
+  ],
+  "detectors": [
+    {
+      "name": "Checkout p95 latency",
+      "description": "Alert when checkout latency exceeds the SLO budget.",
+      "program_text": "latency = data('service.request.duration', filter=filter('service.name', 'checkout')).percentile(95).publish(label='latency')\ndetect(when(latency > threshold(750))).publish('latency_high')",
+      "tags": [
+        "checkout",
+        "production"
+      ],
+      "min_delay": 60000,
+      "max_delay": 120000,
+      "rules": [
+        {
+          "detect_label": "latency_high",
+          "severity": "Critical",
+          "description": "Checkout latency is above 750 ms.",
+          "runbook_url": "https://runbooks.example.com/checkout-latency",
+          "notifications": [
+            {
+              "type": "Email",
+              "email": "o11y-alerts@example.com"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "alert_routing": [
+    {
+      "kind": "integration",
+      "name": "Checkout webhook",
+      "type": "Webhook",
+      "payload": {
+        "name": "Checkout webhook",
+        "type": "Webhook",
+        "enabled": false
+      }
+    }
+  ],
+  "muting_rules": [
+    {
+      "name": "Checkout maintenance window",
+      "payload": {
+        "description": "Checkout maintenance window",
+        "startTime": 4102444800000,
+        "stopTime": 4102448400000
+      }
+    }
+  ],
+  "slo_links": [
+    {
+      "name": "Checkout availability SLO",
+      "payload": {
+        "name": "Checkout availability SLO",
+        "description": "Example SLO payload placeholder."
+      }
+    }
+  ],
+  "synthetics": [
+    {
+      "kind": "browser",
+      "name": "Checkout browser journey",
+      "payload": {
+        "name": "Checkout browser journey",
+        "url": "https://shop.example.com/checkout",
+        "frequency": 5,
+        "locations": [
+          "aws-us-east-1"
+        ]
+      },
+      "run_now": true,
+      "artifacts": [
+        {
+          "run_id": "latest",
+          "location_id": "aws-us-east-1",
+          "timestamp": 4102444800000,
+          "filename": "network.har"
+        }
+      ]
+    },
+    {
+      "kind": "run",
+      "test_id": "synthetic-checkout-browser"
+    }
+  ],
+  "apm": [
+    {
+      "kind": "service_map",
+      "name": "Checkout service map",
+      "service_name": "checkout",
+      "environment": "prod",
+      "time_range": "2026-05-01T00:00:00Z/2026-05-01T01:00:00Z"
+    },
+    {
+      "kind": "trace",
+      "trace_id": "abcdef0123456789",
+      "include_segments": true
+    }
+  ],
+  "rum": [
+    {
+      "kind": "session_search",
+      "name": "Checkout slow sessions",
+      "application": "checkout-web",
+      "environment": "prod",
+      "filters": {
+        "session_duration": ">30000",
+        "replay": "Present"
+      },
+      "metrics": [
+        "rum.page_view.count"
+      ]
+    }
+  ],
+  "logs": [
+    {
+      "name": "Checkout errors by service",
+      "query_language": "SPL2",
+      "query": "from main where service.name='checkout' and severity='error'",
+      "indexes": [
+        "main"
+      ],
+      "visualization": "log_timeline"
+    }
+  ],
+  "on_call": [
+    {
+      "kind": "rotation",
+      "team": "Checkout SRE",
+      "name": "Checkout primary",
+      "timezone": "America/New_York",
+      "shifts": [
+        {
+          "name": "Weekday primary",
+          "type": "partial_day",
+          "members": [
+            "alice",
+            "bob"
+          ]
+        }
+      ]
+    }
+  ]
+}

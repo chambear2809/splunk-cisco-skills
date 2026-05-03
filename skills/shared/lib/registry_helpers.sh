@@ -26,7 +26,21 @@ registry_path, section, match_field, match_value, target_path = sys.argv[1:6]
 try:
     with open(registry_path, encoding="utf-8") as handle:
         registry = json.load(handle)
-except Exception:
+except json.JSONDecodeError as exc:
+    # Surface a one-line diagnostic so a corrupt registry does not silently
+    # turn every role-aware check into "no metadata found". The caller still
+    # gets exit 0 + empty stdout, preserving existing best-effort behavior.
+    print(
+        f"WARNING: registry_helpers: failed to parse {registry_path}: "
+        f"{exc.msg} (line {exc.lineno}, col {exc.colno})",
+        file=sys.stderr,
+    )
+    raise SystemExit(0)
+except OSError as exc:
+    print(
+        f"WARNING: registry_helpers: could not read {registry_path}: {exc}",
+        file=sys.stderr,
+    )
     raise SystemExit(0)
 
 entries = registry.get(section, [])
@@ -101,7 +115,14 @@ import sys
 
 try:
     capabilities = json.loads(sys.argv[1])
-except Exception:
+except json.JSONDecodeError as exc:
+    # Internal helper: capabilities_json is built from registry data, so a
+    # decode error here is a real bug. Surface it without crashing callers.
+    print(
+        f"WARNING: registry_helpers: invalid capabilities JSON ({exc.msg}); "
+        "treating as no capabilities.",
+        file=sys.stderr,
+    )
     raise SystemExit(0)
 
 role = sys.argv[2]
