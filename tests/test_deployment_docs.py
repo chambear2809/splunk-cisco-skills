@@ -75,6 +75,7 @@ class DeploymentDocRegressionTests(unittest.TestCase):
                     workflow_rows.append(row["skill"])
 
         self.assertIn("Splunk_TA_AppDynamics", app_rows)
+        self.assertIn("splunk-cisco-app-navigator", app_rows)
         self.assertIn("Splunk_AI_Assistant_Cloud", app_rows)
         self.assertIn("splunk_app_stream", app_rows)
         self.assertIn("Splunk_TA_stream", app_rows)
@@ -96,6 +97,7 @@ class DeploymentDocRegressionTests(unittest.TestCase):
 
     def test_generated_docs_cover_appdynamics_sc4s_host_bootstrap_and_numeric_stream_ids(self) -> None:
         self.assertIn("| `cisco-appdynamics-setup` | 3471 |", self.cloud_matrix)
+        self.assertIn("| `cisco-scan-setup` | 8566 |", self.cloud_matrix)
         self.assertIn("| `cisco-product-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-connect-for-syslog-setup` | N/A |", self.cloud_matrix)
         self.assertIn("| `splunk-connect-for-snmp-setup` | N/A |", self.cloud_matrix)
@@ -115,6 +117,7 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("| `splunk-stream-setup` wire-data add-on | 5234 |", self.cloud_matrix)
         self.assertIn("| `splunk-stream-setup` forwarder add-on | 5238 |", self.cloud_matrix)
         self.assertIn("| `cisco-appdynamics-setup` | Supported |", self.role_matrix)
+        self.assertIn("| `cisco-scan-setup` | Required | None | None | None | None |", self.role_matrix)
         self.assertIn("| `splunk-ai-assistant-setup` | Required | None | None | None | None |", self.role_matrix)
         self.assertIn("| `cisco-product-setup` | Supported | None | Supported |", self.role_matrix)
         self.assertIn("| `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required |", self.role_matrix)

@@ -462,6 +462,11 @@ def build_app_install_only_route(product: dict, override: dict) -> dict:
     install_apps = unique_ordered(list(override.get("install_apps", [])))
     if not install_apps:
         install_apps = unique_ordered([product.get("addon", ""), product.get("app_viz", "")])
+    handoff = override.get(
+        "handoff",
+        "Install and validate the listed app(s), then complete product-specific "
+        "input setup in the app UI or vendor-supported workflow.",
+    )
     return {
         "route_type": "app_install_only",
         "primary_skill": "splunk-app-install",
@@ -478,6 +483,44 @@ def build_app_install_only_route(product: dict, override: dict) -> dict:
         "route": {
             "configuration": "manual",
             "validation": "installed_apps",
+            "handoff": handoff,
+        },
+    }
+
+
+def build_workflow_handoff_route(product: dict, override: dict) -> dict:
+    primary_skill = override["primary_skill"]
+    companion_skills = unique_ordered(list(override.get("companion_skills", [])))
+    workflow_scripts = unique_ordered(list(override.get("workflow_scripts", [])))
+    install_apps = unique_ordered(list(override.get("install_apps", [])))
+    sourcetypes = unique_ordered(list(product.get("sourcetypes", [])))
+    handoff = override.get(
+        "handoff",
+        "Use the listed workflow scripts to render/apply collector assets, then "
+        "validate the product sourcetypes in Splunk.",
+    )
+    return {
+        "route_type": "workflow_handoff",
+        "primary_skill": primary_skill,
+        "companion_skills": companion_skills,
+        "install_apps": install_apps,
+        "template_paths": list(override.get("template_paths", [])),
+        "template_checks": dict(override.get("template_checks", {})),
+        "required_non_secret_keys": sorted_unique(list(override.get("required_non_secret_keys", []))),
+        "optional_non_secret_keys": sorted_unique(list(override.get("optional_non_secret_keys", []))),
+        "accepted_non_secret_keys": sorted_unique(
+            list(override.get("required_non_secret_keys", []))
+            + list(override.get("optional_non_secret_keys", []))
+        ),
+        "secret_keys": sorted_unique(list(override.get("secret_keys", []))),
+        "required_secret_keys": sorted_unique(list(override.get("required_secret_keys", []))),
+        "conditional_required_secret_rules": list(
+            override.get("conditional_required_secret_rules", [])
+        ),
+        "route": {
+            "handoff": handoff,
+            "sourcetypes": sourcetypes,
+            "workflow_scripts": workflow_scripts,
         },
     }
 
@@ -698,6 +741,8 @@ def build_route(product: dict, override: dict, security_products: dict) -> dict:
         return build_secure_access_route(override)
     if route_type == "app_install_only":
         return build_app_install_only_route(product, override)
+    if route_type == "workflow_handoff":
+        return build_workflow_handoff_route(product, override)
     if route_type == "dc_networking":
         return build_dc_networking_route(override)
     if route_type == "catalyst_stack":
@@ -775,7 +820,7 @@ def build_catalog(scan_package: Path) -> dict:
             "manual_gap_reason": "",
         }
 
-        if automation_state == "automated":
+        if automation_state in {"automated", "partial"} and "route_type" in override:
             route_meta = build_route(product, override, security_products)
             entry.update(
                 {
@@ -800,13 +845,24 @@ def build_catalog(scan_package: Path) -> dict:
             entry["manual_gap_reason"] = override.get(
                 "manual_gap_reason", generic_manual_gap_reason(product)
             )
+        elif automation_state == "no_plans_available":
+            entry["manual_gap_reason"] = override.get(
+                "manual_gap_reason",
+                "No verified local setup workflow is available for this product yet.",
+            )
         elif automation_state == "unsupported_legacy":
             entry["manual_gap_reason"] = (
-                "This product is retired or deprecated in the SCAN catalog."
+                override.get(
+                    "manual_gap_reason",
+                    "This product is retired or deprecated in the SCAN catalog.",
+                )
             )
         elif automation_state == "unsupported_roadmap":
             entry["manual_gap_reason"] = (
-                "This product is a roadmap / coverage-gap item in the SCAN catalog."
+                override.get(
+                    "manual_gap_reason",
+                    "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+                )
             )
 
         for skill_name in [entry["primary_skill"], *entry["companion_skills"]]:

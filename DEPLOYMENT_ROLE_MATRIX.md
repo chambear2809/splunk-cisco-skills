@@ -52,7 +52,7 @@ For Cloud-specific install and API behavior, see
 | `splunk-agent-management-setup` | Supported | Supported | Supported | Supported | None | HF or UF | Agent Management control-plane workflow for server classes, deployment apps, and deployment clients; do not target indexer cluster peers or SHC members directly. |
 | `splunk-workload-management-setup` | Supported | Supported | None | None | None | None | Self-managed Enterprise Workload Management workflow for Linux search heads and indexers. |
 | `splunk-hec-service-setup` | Supported | Supported | Supported | None | None | HF | Reusable HEC token and service configuration workflow for Enterprise HEC tiers or Splunk Cloud ACS-managed HEC. |
-| `splunk-federated-search-setup` | Required | None | None | None | None | None | Search-tier workflow for Splunk-to-Splunk federated providers, standard-mode federated indexes, and SHC federated index replication settings. |
+| `splunk-federated-search-setup` | Required | None | None | None | None | Search tier | Federated Search Head workflow covering Federated Search for Splunk (FSS2S, type=splunk) in standard or transparent mode and Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud only). Renders multi-provider/multi-index assets, file-based apply for Enterprise SHs and SHC deployers, REST apply for both Enterprise and Splunk Cloud, the global federated-search enable/disable switch, and a connectivityStatus probe. |
 | `splunk-index-lifecycle-smartstore-setup` | None | Required | None | None | None | None | Self-managed indexer workflow for SmartStore remote volumes, retention policy, cache manager settings, and low-level remote-storage localization limits. |
 | `splunk-monitoring-console-setup` | Required | None | None | None | None | None | Search-tier Monitoring Console workflow for distributed or standalone mode, distributed search groups, forwarder monitoring, platform alerts, and peer status review. |
 | `splunk-enterprise-host-setup` | Supported | Supported | Supported | None | None | None | Linux host bootstrap workflow for self-managed Splunk Enterprise search tiers, indexers, cluster managers, SHC members, and heavy forwarders. |
@@ -71,6 +71,7 @@ For Cloud-specific install and API behavior, see
 
 | App / Package | Skill | Search Tier | Indexer | Heavy Forwarder | Universal Forwarder | External Collector |
 | --- | --- | --- | --- | --- | --- | --- |
+| `splunk-cisco-app-navigator` | `cisco-scan-setup` | Required | None | None | None | None |
 | `TA_cisco_catalyst` | `cisco-catalyst-ta-setup` | Supported | None | Supported | None | None |
 | `cisco_dc_networking_app_for_splunk` | `cisco-dc-networking-setup` | Supported | None | Supported | None | None |
 | `cisco-catalyst-app` | `cisco-enterprise-networking-setup` | Required | None | None | None | None |

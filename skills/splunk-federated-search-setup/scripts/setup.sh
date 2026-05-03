@@ -29,6 +29,11 @@ SHC_REPLICATION="true"
 MAX_PREVIEW_GENERATION_DURATION="0"
 MAX_PREVIEW_GENERATION_INPUTCOUNT="0"
 RESTART_SPLUNK="true"
+FEDERATED_SEARCH_ENABLED="true"
+SPEC_PATH=""
+PROVIDER_FRAGMENTS=()
+FEDERATED_INDEX_FRAGMENTS=()
+GLOBAL_TOGGLE=""
 
 usage() {
     local exit_code="${1:-0}"
@@ -37,30 +42,50 @@ Splunk Federated Search Setup
 
 Usage: $(basename "$0") [OPTIONS]
 
-Options:
+Spec input (preferred for multi-provider deployments):
+  --spec PATH                 YAML or JSON spec describing all providers and indexes
+                              (see skills/splunk-federated-search-setup/template.example)
+
+Repeated CLI flags (multi-provider without YAML):
+  --provider 'type=splunk,name=remote_prod,mode=standard,host_port=h:p,...'
+  --federated-index 'name=remote_main,provider=remote_prod,dataset_type=index,dataset_name=main'
+
+Single-provider back-compat flags:
   --mode standard|transparent
-  --phase render|preflight|apply|status|all
+  --remote-host-port HOST:PORT
+  --service-account USER
+  --password-file PATH
+  --provider-name NAME
+  --app-context APP
+  --use-fsh-knowledge-objects true|false
+  --federated-index-name NAME
+  --dataset-type index|metricindex|savedsearch|lastjob|datamodel|glue_table
+  --dataset-name NAME
+
+Workflow:
+  --phase render|preflight|apply|status|all|global-toggle
   --apply
-  --apply-target search-head|shc-deployer
+  --apply-target search-head|shc-deployer|rest
+  --global-toggle enable|disable
+                              For --phase global-toggle, choose direction.
   --dry-run
   --json
   --output-dir PATH
   --splunk-home PATH
   --app-name NAME
-  --provider-name NAME
-  --remote-host-port HOST:PORT
-  --service-account USER
-  --password-file PATH
-  --app-context APP
-  --use-fsh-knowledge-objects true|false
-  --federated-index-name NAME
-  --dataset-type index|metricindex|savedsearch|lastjob|datamodel
-  --dataset-name NAME
   --shc-replication true|false
   --max-preview-generation-duration SECONDS
   --max-preview-generation-inputcount ROWS
   --restart-splunk true|false
+  --federated-search-enabled true|false
+                              Captured in metadata.json; toggle via --phase global-toggle.
   --help
+
+REST apply (--apply-target rest) reads:
+  SPLUNK_REST_URI=https://<sh>:8089
+  SPLUNK_REST_USER=admin
+  SPLUNK_REST_PASSWORD_FILE=/path/to/admin_pw   # chmod 600, no newline
+  SPLUNK_REST_VERIFY_SSL=true|false             # default true
 
 EOF
     exit "${exit_code}"
@@ -90,6 +115,11 @@ while [[ $# -gt 0 ]]; do
         --max-preview-generation-duration) require_arg "$1" $# || exit 1; MAX_PREVIEW_GENERATION_DURATION="$2"; shift 2 ;;
         --max-preview-generation-inputcount) require_arg "$1" $# || exit 1; MAX_PREVIEW_GENERATION_INPUTCOUNT="$2"; shift 2 ;;
         --restart-splunk) require_arg "$1" $# || exit 1; RESTART_SPLUNK="$2"; shift 2 ;;
+        --federated-search-enabled) require_arg "$1" $# || exit 1; FEDERATED_SEARCH_ENABLED="$2"; shift 2 ;;
+        --spec) require_arg "$1" $# || exit 1; SPEC_PATH="$2"; shift 2 ;;
+        --provider) require_arg "$1" $# || exit 1; PROVIDER_FRAGMENTS+=("$2"); shift 2 ;;
+        --federated-index) require_arg "$1" $# || exit 1; FEDERATED_INDEX_FRAGMENTS+=("$2"); shift 2 ;;
+        --global-toggle) require_arg "$1" $# || exit 1; GLOBAL_TOGGLE="$2"; shift 2 ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -115,15 +145,29 @@ PY
 
 validate_args() {
     validate_choice "${MODE}" standard transparent
-    validate_choice "${PHASE}" render preflight apply status all
-    validate_choice "${APPLY_TARGET}" search-head shc-deployer
+    validate_choice "${PHASE}" render preflight apply status all global-toggle
+    validate_choice "${APPLY_TARGET}" search-head shc-deployer rest
     validate_choice "${USE_FSH_KNOWLEDGE_OBJECTS}" true false
-    validate_choice "${DATASET_TYPE}" index metricindex savedsearch lastjob datamodel
+    validate_choice "${DATASET_TYPE}" index metricindex savedsearch lastjob datamodel glue_table
     validate_choice "${SHC_REPLICATION}" true false
     validate_choice "${RESTART_SPLUNK}" true false
-    if [[ -z "${REMOTE_HOST_PORT}" || -z "${SERVICE_ACCOUNT}" ]]; then
-        log "ERROR: --remote-host-port and --service-account are required."
+    validate_choice "${FEDERATED_SEARCH_ENABLED}" true false
+    if [[ "${PHASE}" == "global-toggle" && -z "${GLOBAL_TOGGLE}" ]]; then
+        log "ERROR: --phase global-toggle requires --global-toggle enable|disable."
         exit 1
+    fi
+    if [[ -n "${GLOBAL_TOGGLE}" ]]; then
+        validate_choice "${GLOBAL_TOGGLE}" enable disable
+    fi
+    # When neither --spec nor any --provider fragments are given, the
+    # back-compat single-provider path requires --remote-host-port and
+    # --service-account just like before.
+    if [[ -z "${SPEC_PATH}" && ${#PROVIDER_FRAGMENTS[@]} -eq 0 ]]; then
+        if [[ -z "${REMOTE_HOST_PORT}" || -z "${SERVICE_ACCOUNT}" ]]; then
+            log "ERROR: --remote-host-port and --service-account are required for the single-provider back-compat flow."
+            log "       Use --spec PATH or --provider 'type=splunk,name=...' for the multi-provider flow."
+            exit 1
+        fi
     fi
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
         log "ERROR: --json is supported only for render-only or --dry-run workflows."
@@ -138,10 +182,10 @@ validate_args() {
 
 build_renderer_args() {
     RENDER_ARGS=(
-        --mode "${MODE}"
         --output-dir "${OUTPUT_DIR}"
         --splunk-home "${SPLUNK_HOME_VALUE}"
         --app-name "${APP_NAME}"
+        --mode "${MODE}"
         --provider-name "${PROVIDER_NAME}"
         --remote-host-port "${REMOTE_HOST_PORT}"
         --service-account "${SERVICE_ACCOUNT}"
@@ -155,7 +199,18 @@ build_renderer_args() {
         --max-preview-generation-duration "${MAX_PREVIEW_GENERATION_DURATION}"
         --max-preview-generation-inputcount "${MAX_PREVIEW_GENERATION_INPUTCOUNT}"
         --restart-splunk "${RESTART_SPLUNK}"
+        --federated-search-enabled "${FEDERATED_SEARCH_ENABLED}"
     )
+    if [[ -n "${SPEC_PATH}" ]]; then
+        RENDER_ARGS+=(--spec "${SPEC_PATH}")
+    fi
+    local fragment
+    for fragment in "${PROVIDER_FRAGMENTS[@]}"; do
+        RENDER_ARGS+=(--provider "${fragment}")
+    done
+    for fragment in "${FEDERATED_INDEX_FRAGMENTS[@]}"; do
+        RENDER_ARGS+=(--federated-index "${fragment}")
+    done
 }
 
 render_dir() {
@@ -183,11 +238,11 @@ run_rendered_script() {
 }
 
 apply_script() {
-    if [[ "${APPLY_TARGET}" == "shc-deployer" ]]; then
-        printf '%s' "apply-shc-deployer.sh"
-    else
-        printf '%s' "apply-search-head.sh"
-    fi
+    case "${APPLY_TARGET}" in
+        shc-deployer) printf '%s' "apply-shc-deployer.sh" ;;
+        rest) printf '%s' "apply-rest.sh" ;;
+        *) printf '%s' "apply-search-head.sh" ;;
+    esac
 }
 
 main() {
@@ -209,8 +264,21 @@ main() {
             ;;
         preflight) render_assets; run_rendered_script preflight.sh ;;
         apply) render_assets; run_rendered_script "$(apply_script)" ;;
-        status) run_rendered_script status.sh ;;
-        all) render_assets; run_rendered_script preflight.sh; run_rendered_script "$(apply_script)"; run_rendered_script status.sh ;;
+        status) render_assets; run_rendered_script status.sh ;;
+        global-toggle)
+            render_assets
+            if [[ "${GLOBAL_TOGGLE}" == "enable" ]]; then
+                run_rendered_script global-enable.sh
+            else
+                run_rendered_script global-disable.sh
+            fi
+            ;;
+        all)
+            render_assets
+            run_rendered_script preflight.sh
+            run_rendered_script "$(apply_script)"
+            run_rendered_script status.sh
+            ;;
     esac
 }
 

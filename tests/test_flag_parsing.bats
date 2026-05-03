@@ -303,6 +303,27 @@ teardown() {
     [[ "$output" =~ "Splunk Enterprise Security Install" ]]
 }
 
+@test "itsi setup --help exits 0" {
+    run bash "${PROJECT_ROOT}/skills/splunk-itsi-setup/scripts/setup.sh" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Splunk ITSI Setup" ]]
+}
+
+@test "itsi setup rejects unknown flag" {
+    run bash "${PROJECT_ROOT}/skills/splunk-itsi-setup/scripts/setup.sh" --bogus
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Unknown option" ]]
+    [[ ! "$output" =~ "unbound variable" ]]
+}
+
+@test "itsi setup dry-run json returns app installer plan" {
+    run bash "${PROJECT_ROOT}/skills/splunk-itsi-setup/scripts/setup.sh" --dry-run --json
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ '"app_id": "1841"' ]]
+    [[ "$output" =~ "install_app.sh" ]]
+    [[ "$output" =~ "validate.sh" ]]
+}
+
 @test "enterprise security install validate --help exits 0" {
     run bash "${PROJECT_ROOT}/skills/splunk-enterprise-security-install/scripts/validate.sh" --help
     [ "$status" -eq 0 ]

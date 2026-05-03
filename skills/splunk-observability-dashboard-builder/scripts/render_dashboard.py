@@ -497,7 +497,20 @@ def render(spec: dict[str, Any], output_dir: Path, clean: bool = True) -> dict[s
         payload = chart_payload(chart)
         path = output_dir / "charts" / filename
         path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        chart_plan.append({"key": key, "payload_file": f"charts/{filename}", "name": payload["name"]})
+        chart_plan.append(
+            {
+                "key": key,
+                "id": str(
+                    chart.get("chart_id")
+                    or chart.get("chartId")
+                    or chart.get("observability_id")
+                    or chart.get("api_id")
+                    or ""
+                ),
+                "payload_file": f"charts/{filename}",
+                "name": payload["name"],
+            }
+        )
 
     group = spec["dashboard_group"]
     group_payload = {
@@ -522,6 +535,7 @@ def render(spec: dict[str, Any], output_dir: Path, clean: bool = True) -> dict[s
         },
         "charts": chart_plan,
         "dashboard": {
+            "id": str(spec["dashboard"].get("id", "")),
             "payload_file": "dashboard.json",
             "name": spec["dashboard"]["name"],
         },

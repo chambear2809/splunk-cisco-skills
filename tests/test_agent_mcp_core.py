@@ -244,6 +244,13 @@ class AgentMCPCoreTests(unittest.TestCase):
                 payload = core.list_cisco_products(state=state)
                 self.assertIn("products", payload)
 
+    def test_list_cisco_products_accepts_unsupported_catalog_states(self) -> None:
+        self.assertIn(
+            "unsupported_legacy",
+            {product["automation_state"] for product in core.list_cisco_products()["products"]},
+        )
+        self.assertIn("unsupported_roadmap", core._VALID_PRODUCT_STATES)
+
     def test_claude_rule_uses_secret_writer_helper(self) -> None:
         text = (core.REPO_ROOT / ".claude/rules/credential-handling.md").read_text(
             encoding="utf-8"
@@ -322,6 +329,36 @@ class AgentMCPCoreTests(unittest.TestCase):
             "setup.sh",
             ["--dry-run", "--product", "Cisco ACI"],
         )
+        self.assertTrue(plan["read_only"])
+
+    def test_render_first_setup_phases_are_read_only_via_allowlist(self) -> None:
+        render_plan = core.plan_skill_script(
+            "splunk-agent-management-setup",
+            "setup.sh",
+            ["--phase", "render"],
+        )
+        preflight_plan = core.plan_skill_script(
+            "splunk-workload-management-setup",
+            "setup.sh",
+            ["--phase=preflight"],
+        )
+        apply_plan = core.plan_skill_script(
+            "splunk-hec-service-setup",
+            "setup.sh",
+            ["--phase", "apply"],
+        )
+
+        self.assertTrue(render_plan["read_only"])
+        self.assertTrue(preflight_plan["read_only"])
+        self.assertFalse(apply_plan["read_only"])
+
+    def test_observability_dashboard_apply_dry_run_is_read_only(self) -> None:
+        plan = core.plan_skill_script(
+            "splunk-observability-dashboard-builder",
+            "setup.sh",
+            ["--apply", "--dry-run", "--spec", "dashboard.json"],
+        )
+
         self.assertTrue(plan["read_only"])
 
     def test_resolve_product_list_products_is_read_only(self) -> None:

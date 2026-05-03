@@ -147,6 +147,14 @@
       },
       {
         "kind": "app",
+        "app_name": "splunk-cisco-app-navigator",
+        "label": "`cisco-scan-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Search-tier REST validation and optional S3 catalog sync",
+        "notes": "Cisco EULA license-ack required. Search-head-only catalog app; no data inputs, indexes, or forwarder deployment."
+      },
+      {
+        "kind": "app",
         "app_name": "ta_cisco_thousandeyes",
         "label": "`cisco-thousandeyes-setup`",
         "cloud_install_path": "ACS Splunkbase",
@@ -227,9 +235,9 @@
         "skill": "splunk-federated-search-setup",
         "label": "`splunk-federated-search-setup`",
         "splunkbase_id": "N/A",
-        "cloud_install_path": "No Splunk Cloud app install; Federated Search is native platform configuration",
-        "cloud_config_path": "Rendered self-managed Enterprise federated.conf/indexes.conf assets; Splunk Cloud deployments should use supported Federated Search UI or API workflows",
-        "notes": "Splunk-to-Splunk standard or transparent federated provider workflow with standard-mode federated index and SHC replication guardrails."
+        "cloud_install_path": "No Splunk Cloud app install; Federated Search is native platform configuration on the Federated Search Head",
+        "cloud_config_path": "REST apply path (`apply-rest.sh`) targets Splunk Cloud `/services/data/federated/{provider,index,settings/general}` directly; Splunk Cloud cannot edit federated.conf, so `aws_s3` providers are rendered as REST payloads with AWS Glue/S3/KMS prerequisites docs; admin user must hold `admin_all_objects`",
+        "notes": "Complete Federated Search product surface: FSS2S (`type=splunk`) standard or transparent mode with multi-provider/multi-index render, FSS3 (`type=aws_s3`, Splunk Cloud only) REST payloads, file-based and REST apply paths, global federated-search enable/disable, SHC `conf_replication_include.indexes` deployer asset, and live `connectivityStatus` probe."
       },
       {
         "kind": "workflow",
@@ -589,8 +597,10 @@
         "universal-forwarder": "none",
         "external-collector": "none"
       },
-      "cloud_pairing": [],
-      "notes": "Search-tier workflow for Splunk-to-Splunk federated providers, standard-mode federated indexes, and SHC federated index replication settings."
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Federated Search Head workflow covering Federated Search for Splunk (FSS2S, type=splunk) in standard or transparent mode and Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud only). Renders multi-provider/multi-index assets, file-based apply for Enterprise SHs and SHC deployers, REST apply for both Enterprise and Splunk Cloud, the global federated-search enable/disable switch, and a connectivityStatus probe."
     },
     {
       "skill": "splunk-index-lifecycle-smartstore-setup",
@@ -755,6 +765,31 @@
     }
   ],
   "apps": [
+    {
+      "skill": "cisco-scan-setup",
+      "app_name": "splunk-cisco-app-navigator",
+      "splunkbase_id": "8566",
+      "label": "Splunk Cisco App Navigator",
+      "license_ack_url": "https://www.cisco.com/c/dam/en_us/about/doing_business/docs/test/EULA_EN.pdf",
+      "package_patterns": [
+        "splunk-cisco-app-navigator-*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      }
+    },
     {
       "skill": "cisco-catalyst-ta-setup",
       "app_name": "TA_cisco_catalyst",

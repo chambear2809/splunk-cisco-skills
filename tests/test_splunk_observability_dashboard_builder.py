@@ -281,6 +281,67 @@ def test_dry_run_apply_uses_rendered_sequence_without_network(tmp_path: Path) ->
     ]
 
 
+def test_dry_run_update_existing_uses_fetch_then_put_sequence(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    spec_path = tmp_path / "existing-dashboard.json"
+    spec = json.loads(EXAMPLE_SPEC.read_text(encoding="utf-8"))
+    spec["dashboard_group"]["id"] = "group-1"
+    spec["dashboard"]["id"] = "dashboard-1"
+    for index, chart in enumerate(spec["charts"], start=1):
+        chart["chart_id"] = f"chart-{index}"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+    result = run_setup(
+        "--apply",
+        "--update-existing",
+        "--dry-run",
+        "--spec",
+        str(spec_path),
+        "--output-dir",
+        str(output_dir),
+        "--realm",
+        "us0",
+    )
+
+    assert result.returncode == 0, result.stdout
+    payload = json.loads(result.stdout[result.stdout.index("{") :])
+    assert payload["dry_run"] is True
+    assert payload["mode"] == "update-existing"
+    assert [item["action"] for item in payload["sequence"]] == [
+        "fetch-dashboard",
+        "fetch-dashboard-group",
+        "update-dashboard-group",
+        "fetch-chart",
+        "update-chart",
+        "fetch-chart",
+        "update-chart",
+        "fetch-chart",
+        "update-chart",
+        "fetch-chart",
+        "update-chart",
+        "update-dashboard",
+    ]
+
+
+def test_update_existing_requires_dashboard_and_chart_ids(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+
+    result = run_setup(
+        "--apply",
+        "--update-existing",
+        "--dry-run",
+        "--spec",
+        str(EXAMPLE_SPEC),
+        "--output-dir",
+        str(output_dir),
+        "--realm",
+        "us0",
+    )
+
+    assert result.returncode == 1
+    assert "--update-existing requires dashboard.id" in result.stdout
+
+
 def test_apply_can_use_observability_credentials_defaults(tmp_path: Path) -> None:
     output_dir = tmp_path / "rendered"
     token_file = tmp_path / "o11y.token"

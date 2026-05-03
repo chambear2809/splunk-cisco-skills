@@ -1,30 +1,128 @@
 # Splunk Federated Search Setup Worksheet
 #
-# Non-secret values only. Do not store the service-account password here.
+# Multi-provider, multi-federated-index spec covering both Federated Search
+# for Splunk (FSS2S, type=splunk) and Federated Search for Amazon S3
+# (FSS3, type=aws_s3, Splunk Cloud Platform only).
+#
+# Non-secret values only. Service-account passwords for FSS2S providers
+# go in local-only password files referenced by `password_file`.
+# Create them without shell-history exposure with:
+#   bash skills/shared/scripts/write_secret_file.sh /tmp/federated_provider_password
+#
+# Splunk Cloud admins must POST aws_s3 providers via REST or the Web UI;
+# FSS3 cannot be configured by editing federated.conf in Cloud.
 
-mode: standard
 phase: render
-apply_target: search-head
+apply_target: search-head            # search-head | shc-deployer | rest
 
 splunk_home: /opt/splunk
 app_name: ZZZ_cisco_skills_federated_search
 
-provider_name: remote_prod
-remote_host_port: remote-sh.example.com:8089
-service_account: federated_svc
-password_file: /tmp/federated_provider_password
+# Global federated-search switch (POST /services/data/federated/settings/general).
+# Leave true on the Federated Search Head for FSS to operate at all.
+federated_search_enabled: true
 
-app_context: search
-use_fsh_knowledge_objects: false
-
-federated_index_name: remote_main
-dataset_type: index
-dataset_name: main
-
-shc_replication: true
+# federated.conf [general] preview generation limits. 0 = Splunk default (unlimited).
 max_preview_generation_duration: 0
 max_preview_generation_inputcount: 0
+
+# Search Head Cluster: required for replicating standard-mode federated index
+# definitions across SHC members. Sets [shclustering] conf_replication_include.indexes = true
+# in server.conf for the SHC deployer bundle.
+shc_replication: true
+
+# Restart Splunk after non-SHC apply. Ignored for shc-deployer (operator runs
+# `splunk apply shcluster-bundle`) and for the rest target (REST writes
+# typically take effect without a restart).
 restart_splunk: true
 
-# Create the password file without putting the secret in shell history:
-# bash skills/shared/scripts/write_secret_file.sh /tmp/federated_provider_password
+# Splunk-to-Splunk providers (FSS2S, type=splunk).
+# - Standard mode: requires app_context, requires federated indexes that
+#   reference the provider, and supports many providers per remote host
+#   (different app_context). useFSHKnowledgeObjects is forced to 0.
+# - Transparent mode: ignores app_context, does NOT use federated indexes,
+#   and does NOT support multiple providers pointing at the same remote
+#   host. useFSHKnowledgeObjects is forced to 1.
+# - Splunk Cloud→Splunk Enterprise federated search supports STANDARD MODE
+#   ONLY. Transparent mode is not supported in that direction.
+providers:
+  - name: remote_prod
+    type: splunk
+    mode: standard
+    host_port: remote-sh.example.com:8089
+    service_account: federated_svc
+    password_file: /tmp/federated_provider_password
+    app_context: search
+    disabled: false
+
+  # Example second provider against the SAME remote host but a different app
+  # context. Only valid in standard mode.
+  # - name: remote_prod_es
+  #   type: splunk
+  #   mode: standard
+  #   host_port: remote-sh.example.com:8089
+  #   service_account: federated_svc
+  #   password_file: /tmp/federated_provider_password
+  #   app_context: SplunkEnterpriseSecuritySuite
+  #   disabled: false
+
+  # Example transparent-mode provider. Service account role on remote must
+  # have list_search_head_clustering capability when the remote is an SHC
+  # so Splunk can detect duplicate transparent providers across members.
+  # - name: hybrid_migration
+  #   type: splunk
+  #   mode: transparent
+  #   host_port: legacy-cloud.splunkcloud.com:8089
+  #   service_account: hybrid_svc
+  #   password_file: /tmp/hybrid_provider_password
+  #   disabled: false
+
+  # Federated Search for Amazon S3 (FSS3). Splunk Cloud Platform ONLY.
+  # The renderer emits a REST payload (aws-s3-providers/<name>.json) and an
+  # AWS prerequisites README; it does not write federated.conf for aws_s3
+  # because FSS3 must be created through REST or Splunk Web. The Splunk
+  # admin user must hold admin_all_objects.
+  # - name: aws_logs
+  #   type: aws_s3
+  #   aws_account_id: "123456789012"   # 12-digit AWS account, quoted to keep YAML from coercing
+  #   aws_region: us-west-2            # must match Splunk Cloud deployment region
+  #   database: my_glue_db
+  #   data_catalog: arn:aws:glue:us-west-2:123456789012:catalog
+  #   aws_glue_tables_allowlist:
+  #     - access_logs
+  #     - app_logs
+  #   aws_s3_paths_allowlist:
+  #     - s3://my-bucket/access/
+  #     - s3://my-bucket/app/
+  #   aws_kms_keys_arn_allowlist:
+  #     - arn:aws:kms:us-west-2:123456789012:key/abc-1234
+  #   disabled: false
+
+# Federated indexes (standard mode FSS2S, plus FSS3 Glue-table mappings).
+# Transparent mode providers do NOT use federated indexes; entries that
+# reference a transparent-mode provider are rejected.
+#
+# dataset_type values:
+# - FSS2S: index | metricindex | savedsearch | lastjob | datamodel
+# - FSS3:  glue_table  (dataset_name is the Glue table name)
+federated_indexes:
+  - name: remote_main
+    provider: remote_prod
+    dataset_type: index
+    dataset_name: main
+    disabled: false
+
+  # - name: remote_metrics
+  #   provider: remote_prod
+  #   dataset_type: metricindex
+  #   dataset_name: cpu_metrics
+
+  # - name: remote_es_notable
+  #   provider: remote_prod_es
+  #   dataset_type: savedsearch
+  #   dataset_name: "Access - Authentication Failures - Rule"
+
+  # - name: aws_access_logs
+  #   provider: aws_logs
+  #   dataset_type: glue_table
+  #   dataset_name: access_logs

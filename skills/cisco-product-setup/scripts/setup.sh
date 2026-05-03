@@ -937,7 +937,9 @@ print_install_apps() {
 
 print_command_plan() {
     echo "Planned phases:"
-    if ${INSTALL_ONLY}; then
+    if [[ "${AUTOMATION_STATE}" == "partial" ]]; then
+        echo "  - handoff preview"
+    elif ${INSTALL_ONLY}; then
         echo "  - install only"
     elif ${CONFIGURE_ONLY}; then
         echo "  - configure only"
@@ -965,6 +967,16 @@ print_command_plan() {
             echo "Workflow scripts:"
             echo "  - skills/splunk-app-install/scripts/install_app.sh"
             echo "  - Splunk REST app status validation"
+            ;;
+        workflow_handoff)
+            echo "Workflow scripts:"
+            if [[ -z "$(product_field route.workflow_scripts)" ]]; then
+                echo "  - ${PRIMARY_SKILL}"
+            else
+                while IFS= read -r script_path || [[ -n "${script_path}" ]]; do
+                    [[ -n "${script_path}" ]] && echo "  - ${script_path}"
+                done < <(product_list route.workflow_scripts)
+            fi
             ;;
         dc_networking)
             echo "Workflow scripts:"
@@ -1038,6 +1050,9 @@ emit_summary() {
     fi
     if [[ -n "$(product_field notes)" ]]; then
         echo "Notes: $(product_field notes)"
+    fi
+    if [[ -n "$(product_field route.handoff)" ]]; then
+        echo "Handoff: $(product_field route.handoff)"
     fi
     if [[ -n "$(product_field manual_gap_reason)" ]]; then
         echo "Reason: $(product_field manual_gap_reason)"
@@ -1153,7 +1168,9 @@ default_keys = split_env("JSON_DEFAULT_KEYS")
 default_values = split_env("JSON_DEFAULT_VALUES")
 defaults = dict(zip(default_keys, default_values))
 
-if env_bool("JSON_INSTALL_ONLY"):
+if product.get("automation_state") == "partial":
+    phases = ["handoff"]
+elif env_bool("JSON_INSTALL_ONLY"):
     phases = ["install"]
 elif env_bool("JSON_CONFIGURE_ONLY"):
     phases = ["configure"]
@@ -1220,6 +1237,9 @@ workflow_scripts_by_route = {
         "skills/cisco-spaces-setup/scripts/validate.sh",
     ],
 }
+workflow_scripts = workflow_scripts_by_route.get(route_type, [])
+if route_type == "workflow_handoff":
+    workflow_scripts = product.get("route", {}).get("workflow_scripts", []) or workflow_scripts
 
 install_apps = []
 for app_name in product.get("install_apps", []) or []:
@@ -1261,6 +1281,8 @@ payload = {
         "variant_value": variant_value,
         "variants": variants,
         "defaults": defaults,
+        "handoff": product.get("route", {}).get("handoff", ""),
+        "sourcetypes": product.get("route", {}).get("sourcetypes", []),
     },
     "dashboards": product.get("dashboards", []) or [],
     "template_paths": product.get("template_paths", []) or [],
@@ -1271,7 +1293,7 @@ payload = {
     "required_secret_file_keys": split_env("JSON_REQUIRED_SECRET"),
     "missing_values_for_configure": split_env("JSON_MISSING_VALUES"),
     "planned_phases": phases,
-    "workflow_scripts": workflow_scripts_by_route.get(route_type, []),
+    "workflow_scripts": workflow_scripts,
 }
 
 json.dump(payload, sys.stdout, indent=2, sort_keys=True)
@@ -1758,6 +1780,9 @@ main() {
             emit_summary_json
         else
             emit_summary
+        fi
+        if [[ "${AUTOMATION_STATE}" == "partial" && "${DRY_RUN}" == "true" ]]; then
+            exit 0
         fi
         exit 1
     fi

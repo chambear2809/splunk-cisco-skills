@@ -26,6 +26,7 @@ Modes:
   --render              Validate and render classic API payloads
   --validate            Validate a spec and/or rendered payloads
   --apply               Render, then create dashboard group/charts/dashboard through the API
+  --update-existing     With --apply, fetch existing objects and PUT full updates by ID
   --discover-metrics    Query Observability metric metadata
   --dry-run             For apply, show API creation sequence without live writes
   --json                Emit JSON output where supported
@@ -46,6 +47,7 @@ EOF
 RENDER=false
 VALIDATE=false
 APPLY=false
+UPDATE_EXISTING=false
 DISCOVER_METRICS=false
 DRY_RUN=false
 JSON_OUTPUT=false
@@ -67,6 +69,7 @@ while [[ $# -gt 0 ]]; do
         --render) RENDER=true; shift ;;
         --validate) VALIDATE=true; shift ;;
         --apply) APPLY=true; RENDER=true; shift ;;
+        --update-existing) UPDATE_EXISTING=true; shift ;;
         --discover-metrics) DISCOVER_METRICS=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
@@ -152,14 +155,19 @@ if [[ "${APPLY}" == "true" ]]; then
         log "ERROR: --token-file is required and must be readable for --apply."
         exit 1
     fi
-    if [[ "${DRY_RUN}" != "true" ]]; then
+    if [[ "${DRY_RUN}" != "true" && "${UPDATE_EXISTING}" != "true" ]]; then
         log "WARN: --apply always CREATES new dashboard groups, charts, and dashboards in this version."
         log "      It does not update existing objects. Re-running --apply against the same plan"
         log "      will produce duplicate dashboards in Splunk Observability Cloud. To update an"
         log "      existing dashboard, GET it from the API, modify it, and PUT it back manually,"
         log "      or wait for the v2 reconciler that supports id-based updates."
+    elif [[ "${DRY_RUN}" != "true" ]]; then
+        log "INFO: --update-existing will GET existing dashboard/chart objects before PUT updates."
     fi
     apply_args=(apply --plan-dir "${OUTPUT_DIR}")
+    if [[ "${UPDATE_EXISTING}" == "true" ]]; then
+        apply_args+=(--update-existing)
+    fi
     if [[ -n "${TOKEN_FILE}" ]]; then
         apply_args+=(--token-file "${TOKEN_FILE}")
     fi

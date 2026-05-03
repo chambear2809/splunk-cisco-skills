@@ -79,6 +79,81 @@
       ],
       "notes": "Cisco Security Cloud ships EVM knowledge objects and dashboards, but EVM telemetry is not configured through a CiscoSecurityCloud modular input in this repo. Install/validate Cisco Security Cloud here, then feed EVM sourcetypes through the supported upstream EVM pipeline."
     },
+    "cisco_secure_cloud_analytics": {
+      "route_type": "app_install_only",
+      "install_apps": [
+        "CiscoSecurityCloud"
+      ],
+      "notes": "Cisco Security Cloud includes the Security Cloud Analytics knowledge surface, but this repo does not configure a standalone SCA modular input. Install/validate Cisco Security Cloud here, then feed SCA telemetry through the supported upstream SCA/XDR pipeline."
+    },
+    "cisco_cucm": {
+      "automation_state": "partial",
+      "route_type": "workflow_handoff",
+      "primary_skill": "splunk-connect-for-syslog-setup",
+      "workflow_scripts": [
+        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+      ],
+      "handoff": "Render or apply SC4S assets for CUCM syslog, then validate that cisco:ucm events are reaching the target index.",
+      "notes": "CUCM is syslog-sourcetype coverage in SCAN rather than a product-specific Splunk app. This route provides the SC4S handoff instead of pretending there is a dedicated CUCM installer."
+    },
+    "cisco_expressway": {
+      "automation_state": "partial",
+      "route_type": "workflow_handoff",
+      "primary_skill": "splunk-connect-for-syslog-setup",
+      "workflow_scripts": [
+        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+      ],
+      "handoff": "Render or apply SC4S assets for Expressway syslog, then validate that cisco:tvcs events are reaching the target index.",
+      "notes": "Expressway coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation."
+    },
+    "cisco_meeting_management": {
+      "automation_state": "partial",
+      "route_type": "workflow_handoff",
+      "primary_skill": "splunk-connect-for-syslog-setup",
+      "workflow_scripts": [
+        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+      ],
+      "handoff": "Render or apply SC4S assets for Meeting Management syslog, then validate cisco:mm:system:* and cisco:mm:audit events.",
+      "notes": "Meeting Management coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation."
+    },
+    "cisco_meeting_server": {
+      "automation_state": "partial",
+      "route_type": "workflow_handoff",
+      "primary_skill": "splunk-connect-for-syslog-setup",
+      "workflow_scripts": [
+        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+      ],
+      "handoff": "Render or apply SC4S assets for Cisco Meeting Server syslog, then validate that cisco:ms events are reaching the target index.",
+      "notes": "Meeting Server coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation."
+    },
+    "cisco_imc": {
+      "automation_state": "partial",
+      "route_type": "workflow_handoff",
+      "primary_skill": "splunk-connect-for-snmp-setup",
+      "companion_skills": [
+        "splunk-connect-for-syslog-setup"
+      ],
+      "workflow_scripts": [
+        "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+        "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+        "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+        "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+      ],
+      "handoff": "Render or apply SC4SNMP assets for IMC SNMP polling and use SC4S for syslog where needed, then validate cisco:infraops events.",
+      "notes": "IMC coverage is collector-oriented rather than a dedicated Splunk app. Start with SC4SNMP for SNMPv3 polling and pair with SC4S for syslog forwarding."
+    },
+    "cisco_appomni": {
+      "automation_state": "no_plans_available",
+      "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet."
+    },
+    "cisco_radware": {
+      "automation_state": "no_plans_available",
+      "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet."
+    },
     "cisco_secure_access": {
       "route_type": "secure_access"
     },

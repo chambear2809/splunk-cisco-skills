@@ -19,7 +19,7 @@ The default path is **classic-api**: create custom dashboard groups, charts, and
 - Reject direct token flags such as `--token`, `--access-token`, `--api-token`, `--o11y-token`, and `--sf-token`.
 - Prefer `SPLUNK_O11Y_REALM` and `SPLUNK_O11Y_TOKEN_FILE` from the repo `credentials` file when present; these store only the realm and token-file path, not the token value.
 - Render and validate before apply. Apply only when the user explicitly requests it.
-- Create new custom dashboards by default. Do not update existing charts or dashboards unless the user explicitly asks and the current object is fetched first.
+- Create new custom dashboards by default. Use `--update-existing` only when the user explicitly asks and the spec includes existing dashboard/chart IDs.
 
 ## Primary Workflow
 
@@ -63,13 +63,10 @@ The default path is **classic-api**: create custom dashboard groups, charts, and
      --token-file /tmp/splunk_o11y_api_token
    ```
 
-   > **WARNING: `--apply` always CREATES new dashboard groups, charts, and
-   > dashboards in this version.** It does not GET-then-PUT to update
-   > existing objects, so re-running `--apply` against the same spec will
-   > produce duplicate dashboards in Splunk Observability Cloud. To update
-   > an existing dashboard, follow the manual fetch-modify-PUT workflow in
-   > the **Update Existing Objects** section below, or wait for the v2
-   > reconciler that supports id-based updates.
+   > By default, `--apply` creates new dashboard groups, charts, and
+   > dashboards. Use `--update-existing` only with explicit existing object
+   > IDs in the spec; the apply client fetches the current objects before PUT
+   > so omitted writable fields are preserved where the API returns them.
    >
    > `--dry-run` is non-destructive and skips both the API calls and the
    > readable-token-file requirement, so CI preview-only jobs do not need
@@ -105,11 +102,11 @@ YAML specs require PyYAML in the Python interpreter used by `scripts/setup.sh`. 
 
 ## Update Existing Objects
 
-For existing charts or dashboards, use fetch-modify-put semantics:
+For existing charts or dashboards, use `--update-existing` with fetch-modify-PUT semantics:
 
-1. Fetch the existing object with the API.
-2. Modify only the intended properties.
-3. PUT the complete object back.
+1. Add `dashboard.id` and each chart's `chart_id` to the spec.
+2. Render and review the plan.
+3. Apply with `--apply --update-existing`.
 
 Do not create partial PUT payloads. The Observability chart API can null or remove writable properties omitted from updates.
 

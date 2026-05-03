@@ -15,13 +15,22 @@ This skill is a router over the existing Cisco setup skills in this repo.
 | `intersight` | `cisco-intersight-setup` | Intersight |
 | `thousandeyes` | `cisco-thousandeyes-setup` | ThousandEyes |
 | `appdynamics` | `cisco-appdynamics-setup` | AppDynamics |
+| `app_install_only` | `splunk-app-install` | Cisco Webex, UCS, ESA, WSA, Talos, EVM/SCA app validation |
+
+## Partial Handoff Routes
+
+| Route Type | Backing skill(s) | Typical products |
+|---|---|---|
+| `workflow_handoff` | `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup` | CUCM, Expressway, Meeting Management, Meeting Server, IMC |
 
 ## Output States
 
 | State | Meaning |
 |---|---|
 | `automated` | This repo can install and configure the product flow directly |
+| `partial` | This repo can point to a concrete collector or install/validation workflow, but live product-specific configuration is outside this router |
 | `manual_gap` | The SCAN catalog entry exists, but no local automation route is defined yet |
+| `no_plans_available` | The SCAN catalog entry is not safely actionable from current local repo automation |
 | `unsupported_legacy` | The product is retired or deprecated |
 | `unsupported_roadmap` | The product is a roadmap / coverage-gap item |
 

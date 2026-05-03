@@ -82,7 +82,10 @@ Chart and dashboard updates use overwrite semantics. To avoid losing fields:
 2. Modify the fetched object.
 3. PUT the complete object.
 
-The first implementation of this skill creates new groups, charts, and dashboards. Treat update workflows as a deliberate follow-up, not a default action.
+The skill creates new groups, charts, and dashboards by default. Use
+`scripts/setup.sh --apply --update-existing` only when the spec includes
+`dashboard.id` and a `chart_id` for every chart. The API helper fetches each
+existing object and merges the rendered payload before PUT.
 
 ## Modern Dashboard Caveat
 

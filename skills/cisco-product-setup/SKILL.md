@@ -14,10 +14,12 @@ Provides one product-aware entrypoint for Cisco setup requests.
 ## What It Does
 
 - Resolves a product name, alias, or keyword against the packaged SCAN catalog.
-- Classifies the product as `automated`, `manual_gap`,
-  `unsupported_legacy`, or `unsupported_roadmap`.
+- Classifies the product as `automated`, `partial`, `manual_gap`,
+  `no_plans_available`, `unsupported_legacy`, or `unsupported_roadmap`.
 - For automated products, delegates to the existing family skill already in
   this repo.
+- For partial products, returns a concrete collector or app-install handoff
+  path without claiming full product automation.
 - Uses the relevant family `template.example` file to show which non-secret
   values are required before configuration.
 
@@ -59,7 +61,11 @@ output lists for the resolved product.
 ## Product Coverage
 
 - Automated products use the existing Cisco family skills already in this repo.
+- Partial products list the backed collector or handoff workflow and succeed
+  in `--dry-run` previews, but do not perform live configuration through this
+  router.
 - Active products without a local route return `manual_gap`.
+- Products with no verified local route return `no_plans_available`.
 - Deprecated and retired products return `unsupported_legacy`.
 - Roadmap products return `unsupported_roadmap`.
 

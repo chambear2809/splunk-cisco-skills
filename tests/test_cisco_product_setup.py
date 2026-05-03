@@ -216,6 +216,23 @@ version = {version}
         self.assertEqual(payload["missing_values_for_configure"], [])
         self.assertIn("upstream EVM pipeline", payload["resolved_product"]["notes"])
 
+    def test_dry_run_sca_routes_to_security_cloud_install_only(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_secure_cloud_analytics",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["route"]["type"], "app_install_only")
+        self.assertEqual(payload["install_apps"][0]["app_name"], "CiscoSecurityCloud")
+        self.assertIn("SCA/XDR pipeline", payload["resolved_product"]["notes"])
+
     def test_dry_run_webex_routes_to_public_addon_install_only(self) -> None:
         result = self.run_command(
             "bash",
@@ -261,6 +278,58 @@ version = {version}
                 self.assertEqual(payload["resolved_product"]["primary_skill"], "splunk-app-install")
                 self.assertEqual(payload["install_apps"][0]["app_name"], app_name)
                 self.assertEqual(payload["install_apps"][0]["splunkbase_id"], app_id)
+
+    def test_active_collector_products_route_to_partial_handoffs(self) -> None:
+        expected = {
+            "cisco_cucm": ("splunk-connect-for-syslog-setup", "cisco:ucm"),
+            "cisco_expressway": ("splunk-connect-for-syslog-setup", "cisco:tvcs"),
+            "cisco_meeting_management": ("splunk-connect-for-syslog-setup", "cisco:mm:audit"),
+            "cisco_meeting_server": ("splunk-connect-for-syslog-setup", "cisco:ms"),
+            "cisco_imc": ("splunk-connect-for-snmp-setup", "cisco:infraops"),
+        }
+
+        for product_id, (primary_skill, sourcetype) in expected.items():
+            with self.subTest(product_id=product_id):
+                result = self.run_command(
+                    "bash",
+                    str(SETUP_SCRIPT),
+                    "--catalog",
+                    str(self.catalog_path),
+                    "--product",
+                    product_id,
+                    "--dry-run",
+                    "--json",
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["resolved_product"]["automation_state"], "partial")
+                self.assertEqual(payload["resolved_product"]["primary_skill"], primary_skill)
+                self.assertEqual(payload["route"]["type"], "workflow_handoff")
+                self.assertIn(sourcetype, payload["route"]["sourcetypes"])
+                self.assertTrue(payload["route"]["handoff"])
+                self.assertTrue(payload["workflow_scripts"])
+
+    def test_active_products_do_not_remain_manual_gaps(self) -> None:
+        catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        active_manual_gaps = [
+            product["id"]
+            for product in catalog["products"]
+            if product["status"] == "active"
+            and product["automation_state"] == "manual_gap"
+        ]
+
+        self.assertEqual(active_manual_gaps, [])
+
+    def test_under_development_products_are_not_actionable_manual_gaps(self) -> None:
+        catalog = json.loads(self.catalog_path.read_text(encoding="utf-8"))
+        states = {
+            product["id"]: product["automation_state"]
+            for product in catalog["products"]
+            if product["id"] in {"cisco_appomni", "cisco_radware"}
+        }
+
+        self.assertEqual(states["cisco_appomni"], "no_plans_available")
+        self.assertEqual(states["cisco_radware"], "no_plans_available")
 
     def test_dry_run_secure_firewall_requires_variant(self) -> None:
         result = self.run_command(

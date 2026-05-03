@@ -726,7 +726,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "no_plans_available",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -744,7 +744,7 @@
         "shadow access"
       ],
       "learn_more_url": "https://appomni.com",
-      "manual_gap_reason": "No local setup route is defined for this product yet.",
+      "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet.",
       "normalized_search_terms": [
         "cisco appomni",
         "appomni",
@@ -2622,6 +2622,7 @@
       "required_secret_keys": [],
       "route": {
         "configuration": "manual",
+        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
         "validation": "installed_apps"
       },
       "route_type": "app_install_only",
@@ -2665,7 +2666,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "partial",
       "category": "collaboration",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -2687,7 +2688,7 @@
         "telepresence gateway"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/products/unified-communications/expressway-series/index.html",
-      "manual_gap_reason": "No local setup route is defined for this product yet.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco expressway",
         "cisco expressway c",
@@ -2704,15 +2705,24 @@
         "jabber mra",
         "telepresence gateway"
       ],
-      "notes": "",
+      "notes": "Expressway coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-connect-for-syslog-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "handoff": "Render or apply SC4S assets for Expressway syslog, then validate that cisco:tvcs events are reaching the target index.",
+        "sourcetypes": [
+          "cisco:tvcs"
+        ],
+        "workflow_scripts": [
+          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+        ]
+      },
+      "route_type": "workflow_handoff",
       "search_terms": [
         "cisco_expressway",
         "cisco expressway",
@@ -3444,9 +3454,11 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "partial",
       "category": "networking",
-      "companion_skills": [],
+      "companion_skills": [
+        "splunk-connect-for-syslog-setup"
+      ],
       "conditional_required_secret_rules": [],
       "dashboards": [],
       "description": "Embedded baseboard management controller for Cisco UCS C-Series and S-Series servers \u2014 hardware health monitoring, remote console, firmware management via Web UI, CLI, XML API, Redfish, and SNMPv3.",
@@ -3463,7 +3475,7 @@
         "ipmi"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/products/collateral/servers-unified-computing/ucs-b-series-blade-servers/data_sheet_c78-728802.html",
-      "manual_gap_reason": "No local setup route is defined for this product yet.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco imc",
         "cisco integrated management controller imc",
@@ -3476,15 +3488,26 @@
         "redfish",
         "ipmi"
       ],
-      "notes": "",
+      "notes": "IMC coverage is collector-oriented rather than a dedicated Splunk app. Start with SC4SNMP for SNMPv3 polling and pair with SC4S for syslog forwarding.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-connect-for-snmp-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "handoff": "Render or apply SC4SNMP assets for IMC SNMP polling and use SC4S for syslog where needed, then validate cisco:infraops events.",
+        "sourcetypes": [
+          "cisco:infraops"
+        ],
+        "workflow_scripts": [
+          "skills/splunk-connect-for-snmp-setup/scripts/setup.sh",
+          "skills/splunk-connect-for-snmp-setup/scripts/validate.sh",
+          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+        ]
+      },
+      "route_type": "workflow_handoff",
       "search_terms": [
         "cisco_imc",
         "cisco imc",
@@ -4118,7 +4141,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "partial",
       "category": "collaboration",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -4135,7 +4158,7 @@
         "streaming"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/products/collateral/conferencing/meeting-server/datasheet-c78-742168.html",
-      "manual_gap_reason": "No local setup route is defined for this product yet.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco meeting management",
         "meeting management",
@@ -4144,15 +4167,25 @@
         "recording",
         "streaming"
       ],
-      "notes": "",
+      "notes": "Meeting Management coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-connect-for-syslog-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "handoff": "Render or apply SC4S assets for Meeting Management syslog, then validate cisco:mm:system:* and cisco:mm:audit events.",
+        "sourcetypes": [
+          "cisco:mm:system:*",
+          "cisco:mm:audit"
+        ],
+        "workflow_scripts": [
+          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+        ]
+      },
+      "route_type": "workflow_handoff",
       "search_terms": [
         "cisco_meeting_management",
         "cisco meeting management",
@@ -4184,7 +4217,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "partial",
       "category": "collaboration",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -4203,7 +4236,7 @@
         "call bridge"
       ],
       "learn_more_url": "https://www.cisco.com/c/en/us/products/conferencing/meeting-server/index.html",
-      "manual_gap_reason": "No local setup route is defined for this product yet.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco meeting server",
         "cisco meeting server cms",
@@ -4214,15 +4247,24 @@
         "webrtc",
         "call bridge"
       ],
-      "notes": "",
+      "notes": "Meeting Server coverage is syslog-sourcetype based. Use the SC4S workflow for collector assets and sourcetype validation.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-connect-for-syslog-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "handoff": "Render or apply SC4S assets for Cisco Meeting Server syslog, then validate that cisco:ms events are reaching the target index.",
+        "sourcetypes": [
+          "cisco:ms"
+        ],
+        "workflow_scripts": [
+          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+        ]
+      },
+      "route_type": "workflow_handoff",
       "search_terms": [
         "cisco_meeting_server",
         "cisco meeting server",
@@ -5429,7 +5471,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "no_plans_available",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -5448,7 +5490,7 @@
         "api protection"
       ],
       "learn_more_url": "https://www.radware.com",
-      "manual_gap_reason": "No local setup route is defined for this product yet.",
+      "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet.",
       "normalized_search_terms": [
         "cisco radware",
         "radware",
@@ -5674,7 +5716,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "automated",
       "category": "security",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -5682,7 +5724,9 @@
       "description": "Cloud-native network detection and response \u2014 monitors public cloud (AWS, Azure, GCP), private network, and SaaS environments for threats without deploying sensors or agents. Uses entity modeling and behavioral analytics on VPC Flow Logs, cloud provider telemetry, and NetFlow. Originally Stealthwatch Cloud; now unified under the Cisco Security Cloud alongside Secure Network Analytics (on-prem SNA). Data flows through XDR into the Security Cloud app.",
       "display_name": "Cisco Secure Cloud Analytics (SCA)",
       "id": "cisco_secure_cloud_analytics",
-      "install_apps": [],
+      "install_apps": [
+        "CiscoSecurityCloud"
+      ],
       "keywords": [
         "sca",
         "secure cloud analytics",
@@ -5696,7 +5740,7 @@
         "xdr"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/security/security-analytics/secure-cloud-analytics/index.html",
-      "manual_gap_reason": "No cisco-product-setup route is defined yet for this product's addon CiscoSecurityCloud.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco secure cloud analytics",
         "cisco secure cloud analytics sca",
@@ -5712,15 +5756,19 @@
         "cloud visibility",
         "xdr"
       ],
-      "notes": "",
+      "notes": "Cisco Security Cloud includes the Security Cloud Analytics knowledge surface, but this repo does not configure a standalone SCA modular input. Install/validate Cisco Security Cloud here, then feed SCA telemetry through the supported upstream SCA/XDR pipeline.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-app-install",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "configuration": "manual",
+        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
+        "validation": "installed_apps"
+      },
+      "route_type": "app_install_only",
       "search_terms": [
         "cisco_secure_cloud_analytics",
         "cisco secure cloud analytics",
@@ -5811,6 +5859,7 @@
       "required_secret_keys": [],
       "route": {
         "configuration": "manual",
+        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
         "validation": "installed_apps"
       },
       "route_type": "app_install_only",
@@ -7148,6 +7197,7 @@
       "required_secret_keys": [],
       "route": {
         "configuration": "manual",
+        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
         "validation": "installed_apps"
       },
       "route_type": "app_install_only",
@@ -7763,7 +7813,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "manual_gap",
+      "automation_state": "partial",
       "category": "collaboration",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -7789,7 +7839,7 @@
         "cisco phone"
       ],
       "learn_more_url": "https://www.webex.com/cloud-calling.html",
-      "manual_gap_reason": "No local setup route is defined for this product yet.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco cucm",
         "cisco unified communications manager cucm",
@@ -7810,15 +7860,24 @@
         "presence",
         "cisco phone"
       ],
-      "notes": "",
+      "notes": "CUCM is syslog-sourcetype coverage in SCAN rather than a product-specific Splunk app. This route provides the SC4S handoff instead of pretending there is a dedicated CUCM installer.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-connect-for-syslog-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "handoff": "Render or apply SC4S assets for CUCM syslog, then validate that cisco:ucm events are reaching the target index.",
+        "sourcetypes": [
+          "cisco:ucm"
+        ],
+        "workflow_scripts": [
+          "skills/splunk-connect-for-syslog-setup/scripts/setup.sh",
+          "skills/splunk-connect-for-syslog-setup/scripts/validate.sh"
+        ]
+      },
+      "route_type": "workflow_handoff",
       "search_terms": [
         "cisco_cucm",
         "cisco cucm",
@@ -7916,6 +7975,7 @@
       "required_secret_keys": [],
       "route": {
         "configuration": "manual",
+        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
         "validation": "installed_apps"
       },
       "route_type": "app_install_only",
@@ -8114,6 +8174,7 @@
       "required_secret_keys": [],
       "route": {
         "configuration": "manual",
+        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
         "validation": "installed_apps"
       },
       "route_type": "app_install_only",
@@ -8208,6 +8269,7 @@
       "required_secret_keys": [],
       "route": {
         "configuration": "manual",
+        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
         "validation": "installed_apps"
       },
       "route_type": "app_install_only",

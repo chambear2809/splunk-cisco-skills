@@ -269,6 +269,19 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
                 self.assertEqual(entry["app_name"], app_name)
                 self.assertIn(package_pattern, entry.get("package_patterns", []))
 
+    def test_scan_registry_entry_is_present(self):
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        entry = next(
+            app for app in registry.get("apps", []) if app.get("splunkbase_id") == "8566"
+        )
+
+        self.assertEqual(entry["skill"], "cisco-scan-setup")
+        self.assertEqual(entry["app_name"], "splunk-cisco-app-navigator")
+        self.assertIn("splunk-cisco-app-navigator-*", entry.get("package_patterns", []))
+        self.assertEqual(entry["role_support"]["search-tier"], "required")
+
     def test_content_library_registry_entry_is_present(self):
         registry = json.loads(
             (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")

@@ -51,10 +51,26 @@ MAX_STORED_PLANS = 256
 # argv flags, even if the script silently ignores unknown flags.
 READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     ("cisco-product-setup", "setup.sh"),
+    ("splunk-agent-management-setup", "setup.sh"),
+    ("splunk-workload-management-setup", "setup.sh"),
+    ("splunk-hec-service-setup", "setup.sh"),
+    ("splunk-index-lifecycle-smartstore-setup", "setup.sh"),
+    ("splunk-monitoring-console-setup", "setup.sh"),
+    ("splunk-enterprise-kubernetes-setup", "setup.sh"),
+    ("splunk-observability-otel-collector-setup", "setup.sh"),
+    ("splunk-observability-dashboard-builder", "setup.sh"),
 }
 READ_ONLY_LIST_SCRIPTS: set[tuple[str, str]] = {
     ("cisco-product-setup", "setup.sh"),
     ("cisco-product-setup", "resolve_product.sh"),
+}
+READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
+    ("splunk-agent-management-setup", "setup.sh"): {"render", "preflight", "status"},
+    ("splunk-workload-management-setup", "setup.sh"): {"render", "preflight", "status"},
+    ("splunk-hec-service-setup", "setup.sh"): {"render", "preflight", "status"},
+    ("splunk-index-lifecycle-smartstore-setup", "setup.sh"): {"render", "preflight", "status"},
+    ("splunk-monitoring-console-setup", "setup.sh"): {"render", "preflight", "status"},
+    ("splunk-enterprise-kubernetes-setup", "setup.sh"): {"render", "preflight", "status"},
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it.
@@ -308,6 +324,25 @@ def _validate_args(args: list[str]) -> list[str]:
         safe_args.append(arg)
         index += 1
     return safe_args
+
+
+def _arg_value(args: list[str], flag_name: str) -> str | None:
+    for index, arg in enumerate(args):
+        if arg == flag_name and index + 1 < len(args):
+            return args[index + 1]
+        if arg.startswith(f"{flag_name}="):
+            return arg.split("=", 1)[1]
+    return None
+
+
+def _phase_invocation_is_read_only(pair: tuple[str, str], args: list[str]) -> bool:
+    allowed_phases = READ_ONLY_PHASE_SCRIPTS.get(pair)
+    if not allowed_phases:
+        return False
+    if "--apply" in args:
+        return False
+    phase = _arg_value(args, "--phase") or "render"
+    return phase in allowed_phases
 
 
 def _hash_plan(command: list[str], kind: str, timeout_seconds: int) -> str:
@@ -584,7 +619,14 @@ def credential_status() -> dict[str, Any]:
     return {"active": active, "candidates": entries}
 
 
-_VALID_PRODUCT_STATES = {"automated", "partial", "manual_gap", "no_plans_available"}
+_VALID_PRODUCT_STATES = {
+    "automated",
+    "partial",
+    "manual_gap",
+    "no_plans_available",
+    "unsupported_legacy",
+    "unsupported_roadmap",
+}
 
 
 def list_cisco_products(state: str | None = None) -> dict[str, Any]:
@@ -784,11 +826,16 @@ def plan_cisco_product_setup(
         raise SkillMCPError(f"Cisco product dry-run failed: {message}")
 
     summary = f"Cisco product setup for {product} ({phase})"
+    automation_state = (
+        dry_run.get("resolved_product", {}).get("automation_state")
+        if isinstance(dry_run.get("resolved_product"), dict)
+        else ""
+    )
     plan = _store_plan(
         kind="cisco_product_setup",
         command=execute_command,
         summary=summary,
-        read_only=phase == "validate",
+        read_only=phase == "validate" or automation_state != "automated",
         timeout_seconds=timeout_seconds,
         dry_run=dry_run,
     )
@@ -809,13 +856,13 @@ def plan_skill_script(
     script_name = path.name
     pair = (skill, script_name)
     # A plan is read-only only when we can be certain the underlying script
-    # cannot mutate state. We classify three cases:
+    # cannot mutate state. We classify four cases:
     #   1. Scripts that are read-only by name (validate.sh, list_apps.sh, ...).
     #   2. Any script invoked with --help (universally a usage print).
-    #   3. cisco-product-setup setup.sh / resolve_product.sh with --dry-run or
-    #      --list-products. We do NOT extend this heuristic to other scripts
-    #      because most argument parsers reject unknown flags and would fail
-    #      rather than no-op, which would silently bypass the mutation gate.
+    #   3. Scripts with explicitly allowlisted --dry-run / --list-products
+    #      semantics.
+    #   4. Render-first setup wrappers invoked in render, preflight, or status
+    #      phases without --apply.
     if script_name in READ_ONLY_SCRIPT_NAMES:
         read_only = True
     elif "--help" in safe_args:
@@ -823,6 +870,8 @@ def plan_skill_script(
     elif "--dry-run" in safe_args and pair in READ_ONLY_DRY_RUN_SCRIPTS:
         read_only = True
     elif "--list-products" in safe_args and pair in READ_ONLY_LIST_SCRIPTS:
+        read_only = True
+    elif _phase_invocation_is_read_only(pair, safe_args):
         read_only = True
     else:
         read_only = False

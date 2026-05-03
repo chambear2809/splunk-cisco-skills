@@ -118,8 +118,42 @@ def replace_placeholders(value: Any, group_id: str, chart_ids: dict[str, str]) -
     return value
 
 
-def apply_plan(plan_dir: Path, realm: str, token_file: Path | None, dry_run: bool) -> dict[str, Any]:
+def merge_object(existing: dict[str, Any], rendered: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(existing)
+    merged.update(rendered)
+    return merged
+
+
+def require_update_ids(plan: dict[str, Any]) -> tuple[str, dict[str, str]]:
+    dashboard_id = str(plan.get("dashboard", {}).get("id", "") or "")
+    if not dashboard_id:
+        raise ApiError("--update-existing requires dashboard.id in the dashboard spec.")
+    chart_ids: dict[str, str] = {}
+    for chart in plan.get("charts", []):
+        key = str(chart.get("key", "") or "")
+        chart_id = str(chart.get("id", "") or "")
+        if not key:
+            raise ApiError("--update-existing requires every chart plan item to have a key.")
+        if not chart_id:
+            raise ApiError(
+                "--update-existing requires every chart to define chart_id "
+                f"(missing for chart key {key!r})."
+            )
+        chart_ids[key] = chart_id
+    return dashboard_id, chart_ids
+
+
+def apply_plan(
+    plan_dir: Path,
+    realm: str,
+    token_file: Path | None,
+    dry_run: bool,
+    update_existing: bool = False,
+) -> dict[str, Any]:
     plan = load_json(plan_dir / "apply-plan.json")
+    if update_existing:
+        return reconcile_plan(plan_dir, plan, realm, token_file, dry_run)
+
     effective_realm = realm or plan.get("realm", "")
     base = api_base(effective_realm)
     if plan.get("mode") != "classic-api":
@@ -174,6 +208,126 @@ def apply_plan(plan_dir: Path, realm: str, token_file: Path | None, dry_run: boo
     }
 
 
+def reconcile_plan(
+    plan_dir: Path,
+    plan: dict[str, Any],
+    realm: str,
+    token_file: Path | None,
+    dry_run: bool,
+) -> dict[str, Any]:
+    effective_realm = realm or plan.get("realm", "")
+    base = api_base(effective_realm)
+    if plan.get("mode") != "classic-api":
+        raise ApiError("Only classic-api apply plans can be reconciled.")
+
+    dashboard_id, chart_ids = require_update_ids(plan)
+    group_info = plan["dashboard_group"]
+    group_id = str(group_info.get("id", "") or "")
+    sequence = [{"action": "fetch-dashboard", "id": dashboard_id}]
+    if group_id:
+        sequence.extend(
+            [
+                {"action": "fetch-dashboard-group", "id": group_id},
+                {
+                    "action": "update-dashboard-group",
+                    "id": group_id,
+                    "payload_file": group_info["payload_file"],
+                },
+            ]
+        )
+    else:
+        sequence.append({"action": "use-current-dashboard-group", "from": dashboard_id})
+
+    for chart in plan["charts"]:
+        chart_id = chart_ids[chart["key"]]
+        sequence.extend(
+            [
+                {"action": "fetch-chart", "key": chart["key"], "id": chart_id},
+                {
+                    "action": "update-chart",
+                    "key": chart["key"],
+                    "id": chart_id,
+                    "payload_file": chart["payload_file"],
+                },
+            ]
+        )
+    sequence.append(
+        {
+            "action": "update-dashboard",
+            "id": dashboard_id,
+            "payload_file": plan["dashboard"]["payload_file"],
+        }
+    )
+
+    if dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            "mode": "update-existing",
+            "realm": effective_realm,
+            "sequence": sequence,
+        }
+
+    if token_file is None:
+        raise ApiError("--token-file is required for live apply (only --dry-run can omit it).")
+    token = read_token(token_file)
+
+    current_dashboard = request_json("GET", f"{base}/dashboard/{dashboard_id}", token)
+    if not group_id:
+        group = current_dashboard.get("group", {})
+        group_dict = group if isinstance(group, dict) else {}
+        group_id = str(
+            current_dashboard.get("groupId")
+            or current_dashboard.get("dashboardGroupId")
+            or group_dict.get("id", "")
+        )
+    if not group_id:
+        raise ApiError(
+            "Could not determine dashboard group ID. Set dashboard_group.id in the spec."
+        )
+
+    if str(group_info.get("id", "") or ""):
+        group_payload = load_json(plan_dir / group_info["payload_file"])
+        current_group = request_json("GET", f"{base}/dashboardgroup/{group_id}", token)
+        request_json(
+            "PUT",
+            f"{base}/dashboardgroup/{group_id}",
+            token,
+            merge_object(current_group, group_payload),
+        )
+
+    for chart in plan["charts"]:
+        chart_id = chart_ids[chart["key"]]
+        current_chart = request_json("GET", f"{base}/chart/{chart_id}", token)
+        chart_payload = load_json(plan_dir / chart["payload_file"])
+        request_json(
+            "PUT",
+            f"{base}/chart/{chart_id}",
+            token,
+            merge_object(current_chart, chart_payload),
+        )
+
+    dashboard_payload = replace_placeholders(
+        load_json(plan_dir / plan["dashboard"]["payload_file"]),
+        group_id,
+        chart_ids,
+    )
+    request_json(
+        "PUT",
+        f"{base}/dashboard/{dashboard_id}",
+        token,
+        merge_object(current_dashboard, dashboard_payload),
+    )
+    return {
+        "ok": True,
+        "mode": "update-existing",
+        "realm": effective_realm,
+        "dashboard_group_id": group_id,
+        "chart_ids": chart_ids,
+        "dashboard_id": dashboard_id,
+    }
+
+
 def normalize_metric_query(query: str) -> str:
     query = query.strip()
     if not query:
@@ -206,6 +360,7 @@ def main() -> int:
     # so CI preview-only jobs do not need a real token path on disk.
     apply_parser.add_argument("--token-file", type=Path, default=None)
     apply_parser.add_argument("--dry-run", action="store_true")
+    apply_parser.add_argument("--update-existing", action="store_true")
 
     discover_parser = subparsers.add_parser("discover-metrics")
     discover_parser.add_argument("--realm", required=True)
@@ -218,7 +373,13 @@ def main() -> int:
         if args.command == "apply":
             if not args.dry_run and args.token_file is None:
                 parser.error("apply requires --token-file unless --dry-run is set.")
-            result = apply_plan(args.plan_dir, args.realm, args.token_file, args.dry_run)
+            result = apply_plan(
+                args.plan_dir,
+                args.realm,
+                args.token_file,
+                args.dry_run,
+                update_existing=args.update_existing,
+            )
         elif args.command == "discover-metrics":
             result = discover_metrics(args.realm, args.token_file, args.query, args.limit)
         else:
