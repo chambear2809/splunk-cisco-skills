@@ -1,0 +1,186 @@
+# Splunk Platform <-> Splunk Observability Cloud Integration spec.
+#
+# Copy this file locally (e.g. template.local) and fill in the non-secret
+# values. The skill reads tokens and passwords from chmod-600 files passed
+# through --token-file, --admin-token-file, --org-token-file, and
+# --service-account-password-file. NEVER put tokens, passwords, JWTs, or any
+# other secret in this file.
+
+api_version: splunk-observability-cloud-integration-setup/v1
+
+# Target Splunk Platform deployment. `cloud` enables UID, ACS observability
+# commands, and the Discover app Configurations REST tabs. `enterprise`
+# disables UID/RBAC/Discover-app sections (marks them not_applicable) and
+# switches Log Observer Connect to the SE TLS-certificate path.
+target: cloud                         # cloud | enterprise
+
+# Splunk Observability Cloud realm. Must match the AWS region of the Splunk
+# Cloud Platform stack for default UID. Cross-region pairings require the
+# Splunk Account team and produce a support-tickets/cross-region-pairing.md
+# template.
+realm: us0                            # us0 / us1 / eu0 / eu1 / eu2 / au0 / jp0 / sg0 / us2-gcp
+
+# Splunk Cloud Platform stack identifier (the ACS stack). Required when
+# target=cloud. Falls back to SPLUNK_CLOUD_STACK from the credentials file.
+splunk_cloud_stack: example-stack
+
+# When true, the prerequisites section FAILs if the Splunk Cloud Platform
+# stack is older than 10.1.2507 (the version that ships the in-app
+# Configurations UI for Discover Splunk Observability Cloud). Set false to
+# allow render to degrade gracefully on older versions; the discover_app
+# section then renders an API-token-only fallback.
+discover_app_required: true
+
+# --- Token authentication -------------------------------------------------
+# Token authentication is off by default on the Splunk platform. UID
+# requires it on. The skill auto-renders the enable command and offers
+# `--enable-token-auth` to flip it. Set enforce: true to FAIL render when
+# disabled instead of warn.
+token_auth:
+  enforce: true
+
+# --- Pairing --------------------------------------------------------------
+# Unified Identity (UID) is the recommended path. Service Account (SA) is
+# the only path on Splunk Enterprise and is also useful on Splunk Cloud
+# Platform when a third-party IdP must remain the SSO provider for O11y.
+#
+# `multi_org` pairs additional Splunk Observability Cloud child orgs. The
+# entry with `make_default: true` becomes the default (rendered as a
+# Discover app deeplink because no public API exists for Make Default).
+pairing:
+  mode: unified_identity              # unified_identity | service_account
+  multi_org:
+    - realm: us0
+      label: production
+      make_default: true
+    - realm: us1
+      label: staging
+
+# --- Centralized RBAC -----------------------------------------------------
+# `enable_capabilities` is safe and reversible; it provisions the four
+# prepackaged roles (o11y_admin, o11y_power, o11y_read_only, o11y_usage)
+# on Splunk Cloud Platform. Propagation can take ~30 minutes.
+#
+# `enable_centralized_rbac` is destructive and irreversible without Splunk
+# Support: it locks Splunk Observability Cloud RBAC to Splunk Cloud
+# Platform; UID-mapped users without an o11y_* role get the "No access"
+# error. The renderer requires --i-accept-rbac-cutover at apply time AND
+# verifies every UID-mapped user has an o11y_* role before letting the
+# call go through.
+#
+# The `o11y_access` custom role is the gate role; every user that should
+# access Splunk Observability Cloud must hold it.
+centralized_rbac:
+  enable_capabilities: true
+  enable_centralized_rbac: false
+  o11y_access_role:
+    create: true
+    assign_to_roles: [user, power, sc_admin]
+
+# --- Related Content + Real Time Metrics ---------------------------------
+# `read_o11y_content` and `write_o11y_content` are required for Real Time
+# Metrics to render in the Splunk Cloud Platform UI. The four extra
+# capabilities are required for the Search & Reporting Related Content
+# previews fallback path (per the Splunk Cloud documentation).
+related_content:
+  enable: true
+  capabilities_to_grant:
+    - read_o11y_content
+    - write_o11y_content
+    - EXECUTE_SIGNAL_FLOW
+    - READ_APM_DATA
+    - READ_BASIC_UI_ACCESS
+    - READ_EVENT
+  assign_to_roles: [user, power, sc_admin]
+
+# --- Discover Splunk Observability Cloud app -----------------------------
+# The five Configurations tabs of the in-platform Discover app. Set
+# `automatic_ui_updates: true` to enable real-time previews. The access
+# tokens tab uses the file referenced by --token-file (or
+# SPLUNK_O11Y_TOKEN_FILE) — never inline the value.
+#
+# `read_permission_roles` are the Splunk roles that get Read permission on
+# the Discover app so non-admin users can see Related Content links in the
+# Search & Reporting page.
+discover_app:
+  related_content_discovery: true
+  test_related_content: deeplink_only
+  field_aliasing:
+    auto_field_mapping: true
+  automatic_ui_updates: true
+  access_tokens_realm_token_file_ref: SPLUNK_O11Y_TOKEN_FILE
+  read_permission_roles: [user, power, sc_admin]
+
+# --- Log Observer Connect ------------------------------------------------
+# Service-account user + dedicated role + workload rule + realm-IP allowlist
+# delta. The role gets edit_tokens_own + search, must NOT have
+# indexes_list_all, and gets a Standard search limit of `4 * users` along
+# with a 30-day window, 90-day earliest event time, and 1000 MB disk.
+#
+# `realm_ip_allowlist_handoff: true` produces an apply-acs-allowlist-loc.sh
+# stub that delegates to splunk-cloud-acs-allowlist-setup with the per-realm
+# /32 set baked in.
+log_observer_connect:
+  enable: true
+  service_account:
+    username: svc_log_observer
+    password_file_ref: --service-account-password-file
+  role:
+    name: log_observer_connect
+    base_role: user
+    indexes: [main, _audit_summary, security]
+    standard_search_limit_per_user: 4
+    expected_concurrent_users: 10
+    time_window_seconds: 2592000      # 30 days
+    earliest_event_seconds: 7776000   # 90 days
+    disk_space_mb: 1000
+  workload_rule_runtime_seconds: 300  # 5m abort
+  realm_ip_allowlist_handoff: true
+
+# --- Dashboard Studio O11y metrics ---------------------------------------
+# `validate_default_connection` checks that Splunk Cloud Platform has a
+# default Splunk Observability Cloud connection set so prepackaged
+# dashboards work for UID-SSO users. `render_sample_chart` writes a starter
+# Dashboard Studio JSON snippet that uses an O11y metric.
+dashboard_studio:
+  validate_default_connection: true
+  render_sample_chart: true
+
+# --- Splunk Infrastructure Monitoring Add-on (Splunk_TA_sim, 5247) -------
+# `install: true` hands off to splunk-app-install to install the add-on
+# from Splunkbase. The skill creates the named metrics index when missing,
+# configures the SIM account through the add-on's UCC custom REST handler
+# (Realm + org token + Advanced Settings: Job Start Rate=60, Event Search
+# Rate=30), and enables data collection for the account.
+#
+# `modular_inputs` picks SignalFlow programs from the curated catalog
+# (run `setup.sh --list-sim-templates` to see the full list). The renderer
+# strips the SAMPLE_ prefix so the programs actually run.
+#
+# `victoria_stack_hec_allowlist_handoff: auto` produces an
+# apply-acs-allowlist-hec.sh stub for Splunk Cloud Victoria stacks where
+# the search-head IP must be in the `hec` allowlist before the SIM Add-on
+# account can connect to the HEC receiver.
+sim_addon:
+  install: true
+  index_name: sim_metrics
+  account_name: production
+  org_token_file_ref: SPLUNK_O11Y_ORG_TOKEN_FILE
+  data_collection_enabled: true
+  modular_inputs:
+    - aws_ec2
+    - kubernetes
+    - os_hosts
+    - apm_errors
+    - apm_throughput
+    - rum
+  itsi_content_pack_handoff: true
+  victoria_stack_hec_allowlist_handoff: auto
+
+# --- Splunk Enterprise overrides -----------------------------------------
+# Only honored when target=enterprise. Switches Log Observer Connect to the
+# SE TLS-cert capture helper which extracts the first certificate in the
+# chain and renders the paste handoff for the Splunk Observability Cloud
+# Add new connection wizard.
+enterprise_overrides:
+  log_observer_connect_tls_cert_helper: true

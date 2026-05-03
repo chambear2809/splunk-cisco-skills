@@ -314,7 +314,14 @@ rest_set_global_conf() {
         "${SPLUNK_URI}/services/configs/conf-${conf}/${encoded_stanza}" \
         -w '\n%{http_code}' 2>/dev/null || echo "000")"
     http_code="$(printf '%s\n' "${response}" | tail -1)"
-    [[ "${http_code}" == "200" ]] && return 0
+    case "${http_code}" in
+        200|201|204) return 0 ;;
+        # 404 means the stanza does not yet exist, so fall through to create.
+        404) ;;
+        # Any other 2xx is unusual but should be treated as success rather
+        # than blindly attempting a create that would race the existing one.
+        2*) return 0 ;;
+    esac
 
     create_body="$(form_urlencode_pairs name "${stanza}")" || return 1
     if [[ -n "${body}" ]]; then
@@ -325,7 +332,7 @@ rest_set_global_conf() {
         -w '\n%{http_code}' 2>/dev/null || echo "000")"
     http_code="$(printf '%s\n' "${response}" | tail -1)"
     case "${http_code}" in
-        200|201|409) return 0 ;;
+        200|201|204|409) return 0 ;;
         *)
             log "ERROR: Set global conf-${conf}/${stanza} failed (HTTP ${http_code})."
             return 1

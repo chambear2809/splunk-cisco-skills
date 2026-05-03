@@ -64,6 +64,34 @@ def csv_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+# Pool names and peer hosts get interpolated into rendered file PATHS such as
+# `manager/pools/{pool}.json` and `peers/{host}/configure-peer.sh`. Without
+# validation, a value like `../../etc/passwd` could redirect a write outside
+# the operator's chosen output directory. We accept only the same character
+# class real Splunk pool names and peer hostnames use (letters, digits,
+# dot, underscore, hyphen).
+_POOL_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_HOST_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def validate_pool_name(name: str) -> str:
+    if not name or not _POOL_NAME_RE.fullmatch(name):
+        die(
+            f"--pool-specs name {name!r} is not a valid pool name "
+            "(allowed: letters, digits, '.', '_', '-')."
+        )
+    return name
+
+
+def validate_peer_host(host: str) -> str:
+    if not host or not _HOST_RE.fullmatch(host):
+        die(
+            f"--peer-hosts value {host!r} is not a valid hostname/IP token "
+            "(allowed: letters, digits, '.', '_', '-')."
+        )
+    return host
+
+
 def write_file(path: Path, content: str, executable: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -102,6 +130,7 @@ def parse_pool_specs(value: str) -> list[dict]:
             spec[key] = raw
         if "name" not in spec or "stack_id" not in spec or "quota" not in spec:
             die(f"--pool-specs entry missing required key (name/stack_id/quota): {spec!r}")
+        spec["name"] = validate_pool_name(spec["name"])
         if spec["stack_id"] not in VALID_STACK_IDS:
             die(f"--pool-specs stack_id must be one of {VALID_STACK_IDS}: {spec!r}")
         quota = spec["quota"]
@@ -121,7 +150,7 @@ def validate_args(args: argparse.Namespace) -> dict:
     for path in license_files:
         if not re.fullmatch(r"[A-Za-z0-9_./~:-]+", path):
             die(f"--license-files path contains unsupported characters: {path!r}")
-    peer_hosts = csv_list(args.peer_hosts)
+    peer_hosts = [validate_peer_host(h) for h in csv_list(args.peer_hosts)]
     pool_specs = parse_pool_specs(args.pool_specs)
     return {
         "license_files": license_files,

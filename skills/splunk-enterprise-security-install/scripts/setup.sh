@@ -880,13 +880,21 @@ run_uninstall() {
     log "  Uninstalling ${APP_NAME} and removable support apps..."
     local apps_to_remove=("${APP_NAME}" "${framework_apps[@]}")
     local remover="${APP_INSTALL_SCRIPT}"
+    local uninstall_log
     for app in "${apps_to_remove[@]}"; do
         if rest_check_app "${SK}" "${SPLUNK_URI}" "${app}" 2>/dev/null; then
-            if bash "${remover}" --uninstall --app-name "${app}" --no-restart >/dev/null 2>&1; then
+            uninstall_log="$(mktemp)"
+            if bash "${remover}" --uninstall --app-name "${app}" --no-restart \
+                >"${uninstall_log}" 2>&1; then
                 log "    removed ${app}"
             else
                 log "    WARN: uninstall request failed for ${app}; remove it manually from \$SPLUNK_HOME/etc/apps"
+                # Surface installer diagnostics so the operator can see why.
+                while IFS= read -r line; do
+                    log "      ${app}: ${line}"
+                done <"${uninstall_log}"
             fi
+            rm -f "${uninstall_log}"
         fi
     done
     log "  Uninstall complete. Restart Splunk to finalize."

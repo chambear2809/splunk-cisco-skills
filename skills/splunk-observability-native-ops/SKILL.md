@@ -26,17 +26,20 @@ Do not mark UI-only workflows as `api_apply`.
 
 ## Safety Rules
 
-- Never ask for Splunk Observability tokens, Splunk On-Call API keys, passwords,
-  or client secrets in conversation.
+- Never ask for Splunk Observability tokens, passwords, or client secrets in
+  conversation.
 - Never pass tokens or API keys on the command line or as environment-variable
   prefixes.
 - Use `--token-file` for Splunk Observability API tokens.
-- Use `--oncall-api-key-file` for Splunk On-Call API keys when an On-Call API
-  request is explicitly rendered.
 - Prefer `SPLUNK_O11Y_REALM` and `SPLUNK_O11Y_TOKEN_FILE` from the repo
   `credentials` file when present.
 - Reject direct secret flags such as `--token`, `--access-token`, `--api-token`,
-  `--sf-token`, `--oncall-api-key`, and `--x-vo-api-key`.
+  and `--sf-token`.
+
+Splunk On-Call API actions, the REST endpoint integration, the generic email
+endpoint, and the Splunk-side companion apps (Splunkbase 3546, 4886, 5863) all
+live in the dedicated `splunk-oncall-setup` skill. This skill renders only a
+deeplink-only handoff for the `on_call` section.
 
 ## Primary Workflow
 
@@ -88,8 +91,11 @@ Specs use `api_version: splunk-observability-native-ops/v1` and can include:
   Analyzer deeplinks, and business workflow handoffs.
 - `rum`: session search deeplinks, replay setup handoffs, and RUM/APM links.
 - `logs`: modern logs-chart intent handoffs using SPL1, SPL2, or JSON query specs.
-- `on_call`: Splunk On-Call rotations, shifts, escalation policies, routing keys,
-  calendar handoffs, and optional explicit public API requests.
+- `on_call`: deeplink-only handoff that points operators to the dedicated
+  `splunk-oncall-setup` skill. Use that skill for teams, users, rotations,
+  escalation policies, routing keys, paging policies, alert rules, maintenance
+  mode, incidents, REST endpoint alerts, and Splunk-side companion app
+  installs (Splunkbase 3546, 4886, 5863).
 
 For API endpoint details and current support boundaries, read
 `references/coverage.md` when the request touches a new or ambiguous surface.

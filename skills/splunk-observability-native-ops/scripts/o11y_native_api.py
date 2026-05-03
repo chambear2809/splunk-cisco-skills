@@ -25,7 +25,12 @@ class ApiError(Exception):
 def validate_action(action: dict[str, Any], index: int) -> None:
     path = str(action.get("path", ""))
     service = str(action.get("service", "o11y"))
-    if service not in {"o11y", "synthetics", "on_call"}:
+    if service == "on_call":
+        raise ApiError(
+            f"action {index} uses service=on_call; Splunk On-Call API actions live in "
+            "the splunk-oncall-setup skill, not splunk-observability-native-ops."
+        )
+    if service not in {"o11y", "synthetics"}:
         raise ApiError(f"action {index} uses unsupported service {service!r}.")
     if not path.startswith("/"):
         raise ApiError(f"action {index} path must start with '/': {path}")
@@ -60,6 +65,27 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ApiError(f"{path} must contain a JSON object.")
     return data
+
+
+def safe_plan_path(plan_dir: Path, relative: str) -> Path:
+    """Resolve a plan-relative file path and refuse to escape plan_dir.
+
+    Native-ops apply-plan.json records each action's ``payload_file`` as a
+    plan-relative path. A buggy or malicious plan could otherwise smuggle a
+    ``../../../etc/anything`` path; we reject any candidate that resolves
+    outside the plan directory.
+    """
+    if not isinstance(relative, str) or not relative:
+        raise ApiError(f"plan payload file must be a non-empty string (got {relative!r})")
+    plan_root = plan_dir.resolve()
+    candidate = (plan_root / relative).resolve()
+    try:
+        candidate.relative_to(plan_root)
+    except ValueError as exc:
+        raise ApiError(
+            f"plan payload file {relative!r} escapes plan directory {plan_root}"
+        ) from exc
+    return candidate
 
 
 def retry_after_seconds(exc: HTTPError, attempt: int) -> float:
@@ -121,15 +147,11 @@ def synthetics_api_base(realm: str) -> str:
     return f"{o11y_api_base(realm)}/synthetics"
 
 
-def on_call_api_base() -> str:
-    return "https://api.victorops.com/api-public/v1"
-
-
 def action_body(plan_dir: Path, action: dict[str, Any]) -> dict[str, Any] | None:
     payload_file = action.get("payload_file")
     if not payload_file:
         return None
-    return load_json(plan_dir / str(payload_file))
+    return load_json(safe_plan_path(plan_dir, str(payload_file)))
 
 
 def action_url(action: dict[str, Any], realm: str) -> str:
@@ -139,7 +161,11 @@ def action_url(action: dict[str, Any], realm: str) -> str:
     elif service == "synthetics":
         base = synthetics_api_base(realm)
     else:
-        base = on_call_api_base()
+        # service=on_call is rejected by validate_action above; render-only
+        # Splunk On-Call work has migrated to the splunk-oncall-setup skill.
+        raise ApiError(
+            f"unsupported service {service!r}; use the splunk-oncall-setup skill for Splunk On-Call work."
+        )
     path = str(action.get("path", ""))
     return f"{base}{path}"
 
@@ -170,8 +196,6 @@ def apply_plan(
     realm: str,
     token_file: Path | None,
     dry_run: bool,
-    oncall_api_id: str,
-    oncall_api_key_file: Path | None,
 ) -> dict[str, Any]:
     plan = load_json(plan_dir / "apply-plan.json")
     if plan.get("mode") != "native-ops":
@@ -186,18 +210,11 @@ def apply_plan(
     if token_file is None:
         raise ApiError("--token-file is required for live apply.")
     o11y_token = read_secret_file(token_file, "Observability token")
-    oncall_key = ""
-    if any(action.get("service") == "on_call" for action in plan.get("actions", [])):
-        if not oncall_api_id or oncall_api_key_file is None:
-            raise ApiError("--oncall-api-id and --oncall-api-key-file are required for live On-Call API actions.")
-        oncall_key = read_secret_file(oncall_api_key_file, "Splunk On-Call API key")
 
     responses: list[dict[str, Any]] = []
     for index, action in enumerate(plan.get("actions", []), start=1):
         service = action.get("service", "o11y")
         headers = {"X-SF-Token": o11y_token}
-        if service == "on_call":
-            headers = {"X-VO-Api-Id": oncall_api_id, "X-VO-Api-Key": oncall_key}
         body = action_body(plan_dir, action)
         method = str(action.get("method", "GET")).upper()
         url = action_url(action, effective_realm)
@@ -226,8 +243,6 @@ def main(argv: list[str] | None = None) -> int:
     apply_parser.add_argument("--realm", default="")
     apply_parser.add_argument("--token-file", type=Path)
     apply_parser.add_argument("--dry-run", action="store_true")
-    apply_parser.add_argument("--oncall-api-id", default="")
-    apply_parser.add_argument("--oncall-api-key-file", type=Path)
 
     args = parser.parse_args(argv)
     try:
@@ -237,8 +252,6 @@ def main(argv: list[str] | None = None) -> int:
                 args.realm,
                 args.token_file,
                 args.dry_run,
-                args.oncall_api_id,
-                args.oncall_api_key_file,
             )
         else:  # pragma: no cover - argparse prevents this.
             parser.error(f"unknown command {args.command}")

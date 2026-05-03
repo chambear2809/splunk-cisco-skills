@@ -118,17 +118,17 @@ APP_INSTALL_CMD=()
 VALIDATE_CMD=(bash "${VALIDATE_SCRIPT}" --index "${INDEX_NAME}")
 
 build_install_command() {
-    local app_id="$1" file_path="$2"
-    local -n out_ref="$3"
-    out_ref=(bash "${INSTALL_APP_SCRIPT}")
+    local app_id="$1" file_path="$2" out_name="$3"
+    local cmd=(bash "${INSTALL_APP_SCRIPT}")
     if [[ "${SOURCE}" == "splunkbase" ]]; then
-        out_ref+=(--source splunkbase --app-id "${app_id}" --no-update)
-        [[ -n "${APP_VERSION}" ]] && out_ref+=(--app-version "${APP_VERSION}")
+        cmd+=(--source splunkbase --app-id "${app_id}" --no-update)
+        [[ -n "${APP_VERSION}" ]] && cmd+=(--app-version "${APP_VERSION}")
     else
         [[ -n "${file_path}" ]] || { echo "ERROR: local source requires --app-file and --addon-file." >&2; exit 1; }
-        out_ref+=(--source local --file "${file_path}" --no-update)
+        cmd+=(--source local --file "${file_path}" --no-update)
     fi
-    [[ "${NO_RESTART}" == "true" ]] && out_ref+=(--no-restart)
+    [[ "${NO_RESTART}" == "true" ]] && cmd+=(--no-restart)
+    eval "${out_name}=(\"\${cmd[@]}\")"
     return 0
 }
 
@@ -241,8 +241,24 @@ fi
 warn_if_current_skill_role_unsupported
 
 if [[ "${INSTALL}" == "true" ]]; then
-    "${ADDON_INSTALL_CMD[@]}"
-    "${APP_INSTALL_CMD[@]}"
+    # Splunk_TA_SAA (6999) MUST be installed before Splunk_App_SAA (7000)
+    # because the dashboard app declares the add-on as a dependency. We run
+    # them in order with explicit failure messaging so the operator knows
+    # the system state if step 2 fails after step 1 succeeded.
+    log "Installing Splunk_TA_SAA (add-on, app id ${ADDON_APP_ID})"
+    if ! "${ADDON_INSTALL_CMD[@]}"; then
+        log "ERROR: Splunk_TA_SAA install failed; Splunk_App_SAA was NOT attempted."
+        exit 1
+    fi
+    log "Installing Splunk_App_SAA (dashboard app, app id ${VIS_APP_ID})"
+    if ! "${APP_INSTALL_CMD[@]}"; then
+        log "ERROR: Splunk_App_SAA install failed AFTER Splunk_TA_SAA succeeded."
+        log "       Splunk now has the add-on but no dashboard app. Either retry"
+        log "       the install once the underlying issue is resolved, or run"
+        log "       skills/splunk-app-install/scripts/uninstall_app.sh --app-name"
+        log "       Splunk_TA_SAA to roll back the add-on before re-running setup."
+        exit 1
+    fi
     create_index_if_needed
     configure_macro_if_needed
 fi

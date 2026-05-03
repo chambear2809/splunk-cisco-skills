@@ -67,6 +67,7 @@ projects/tmp-*
 /splunk-observability-otel-rendered/
 /splunk-observability-dashboard-rendered/
 /splunk-observability-native-rendered/
+/splunk-observability-cloud-integration-rendered/
 /splunk-edge-processor-rendered/
 /splunk-indexer-cluster-rendered/
 /splunk-license-manager-rendered/

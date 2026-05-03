@@ -134,20 +134,8 @@
   ],
   "on_call": [
     {
-      "kind": "rotation",
-      "team": "Checkout SRE",
-      "name": "Checkout primary",
-      "timezone": "America/New_York",
-      "shifts": [
-        {
-          "name": "Weekday primary",
-          "type": "partial_day",
-          "members": [
-            "alice",
-            "bob"
-          ]
-        }
-      ]
+      "name": "Checkout SRE handoff",
+      "note": "Run the splunk-oncall-setup skill for full Splunk On-Call coverage."
     }
   ]
 }

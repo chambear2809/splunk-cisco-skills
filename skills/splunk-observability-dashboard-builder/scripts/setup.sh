@@ -156,11 +156,11 @@ if [[ "${APPLY}" == "true" ]]; then
         exit 1
     fi
     if [[ "${DRY_RUN}" != "true" && "${UPDATE_EXISTING}" != "true" ]]; then
-        log "WARN: --apply always CREATES new dashboard groups, charts, and dashboards in this version."
-        log "      It does not update existing objects. Re-running --apply against the same plan"
-        log "      will produce duplicate dashboards in Splunk Observability Cloud. To update an"
-        log "      existing dashboard, GET it from the API, modify it, and PUT it back manually,"
-        log "      or wait for the v2 reconciler that supports id-based updates."
+        log "WARN: --apply will CREATE new dashboard groups, charts, and dashboards each run."
+        log "      Re-running against the same plan without --update-existing will produce"
+        log "      duplicate objects in Splunk Observability Cloud. Pass --update-existing to"
+        log "      reconcile by name (GET-then-PUT for matching dashboard groups, charts, and"
+        log "      dashboards), or use the upstream UI / API directly for ad-hoc edits."
     elif [[ "${DRY_RUN}" != "true" ]]; then
         log "INFO: --update-existing will GET existing dashboard/chart objects before PUT updates."
     fi

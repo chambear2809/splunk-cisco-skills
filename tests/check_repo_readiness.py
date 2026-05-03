@@ -64,6 +64,7 @@ TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"^splunk-enterprise-k8s-rendered/"),
     re.compile(r"^splunk-observability-otel-rendered/"),
     re.compile(r"^splunk-observability-dashboard-rendered/"),
+    re.compile(r"^splunk-observability-cloud-integration-rendered/"),
     re.compile(r"^ta-for-indexers-rendered/"),
     re.compile(r"^splunk-mcp-rendered/(?!run-splunk-mcp\.js$)"),
     re.compile(r"^splunk-ta/_unpacked/"),

@@ -13,6 +13,18 @@ description: >-
 
 Use this skill for the Splunk platform side of Splunk Attack Analyzer.
 
+## Prerequisites
+
+- A Splunk credentials file readable by the shared credential helper. If not
+  yet configured, run
+  `bash skills/shared/scripts/setup_credentials.sh`
+  or copy `credentials.example` and edit it (`chmod 600 credentials`).
+- Both Splunkbase apps come from the
+  [`splunk-app-install`](../splunk-app-install/SKILL.md) skill via
+  `skills/splunk-app-install/scripts/install_app.sh`. This wrapper handles
+  Splunkbase auth, ACS upload, and version pinning so the Attack Analyzer
+  setup never embeds those flows.
+
 ## Primary Commands
 
 Preview:
@@ -35,7 +47,11 @@ bash skills/splunk-attack-analyzer-setup/scripts/validate.sh
 
 ## Agent Behavior
 
-- Install both `Splunk_TA_SAA` and `Splunk_App_SAA` by default.
+- Install both `Splunk_TA_SAA` and `Splunk_App_SAA` by default. The add-on is
+  installed first; if it fails the dashboard app is **not** attempted, and if
+  the dashboard install fails after the add-on succeeded the script prints a
+  rollback hint pointing at
+  `skills/splunk-app-install/scripts/uninstall_app.sh`.
 - Create or validate the events index, defaulting to `saa`.
 - Configure the app macro `saa_indexes` to the selected index.
 - Never ask for or pass the Attack Analyzer API key in chat or argv; use

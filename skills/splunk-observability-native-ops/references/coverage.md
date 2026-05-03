@@ -42,9 +42,11 @@ UI workflows rather than stable write APIs:
 - SLO links render deeplinks and deterministic intent handoffs. Do not mark SLO
   payloads `api_apply` unless the renderer is explicitly updated for a
   documented public SLO write API and covered by live validation tests.
-- Splunk On-Call has its own public API and credential model. Use file-based
-  On-Call API keys only for explicit API requests; otherwise render rotations,
-  escalation policies, routing keys, and calendar handoffs.
+- Splunk On-Call has its own public API, credential model, REST endpoint
+  integration, and Splunkbase companion apps (3546, 4886, 5863). All of those
+  live in the dedicated `splunk-oncall-setup` skill. This skill renders only
+  a deeplink-only handoff for the `on_call` section that points operators to
+  `skills/splunk-oncall-setup/SKILL.md`.
 
 ## Source Anchors
 

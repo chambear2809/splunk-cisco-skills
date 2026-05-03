@@ -216,8 +216,32 @@
         "app_name": "SplunkAssetRiskIntelligence",
         "label": "`splunk-asset-risk-intelligence-setup`",
         "cloud_install_path": "ACS Splunkbase or Cloud app request for restricted entitlement; local package fallback when provided",
-        "cloud_config_path": "ACS/REST index readiness for ari_staging, ari_asset, ari_internal, and ari_ta plus KV Store, roles, and ES Exposure Analytics handoff",
-        "notes": "Restricted Asset and Risk Intelligence app; ES 8.5+ Exposure Analytics configuration routes to splunk-enterprise-security-config."
+        "cloud_config_path": "ACS/REST index readiness for ari_staging, ari_asset, ari_internal, and ari_ta plus KV Store, roles/capabilities, post-install configuration, data source, metric, response/audit, investigation, ES integration, Add-on, Echo, upgrade, and uninstall-prerequisite handoffs",
+        "notes": "Restricted Asset and Risk Intelligence app. Normal ES integration covers asset/identity sync and risk factors; ES 8.5+ Exposure Analytics routes to splunk-enterprise-security-config with ARI Asset/IP/Mac/User discovery sources only."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For Windows",
+        "label": "`splunk-asset-risk-intelligence-setup` Windows TA handoff",
+        "cloud_install_path": "Cloud app request or Splunkbase app 7214 for indexer-side package placement; Universal Forwarder deployment remains customer-managed",
+        "cloud_config_path": "Validate ari_ta index readiness and hand off local inputs.conf deployment plus ARI data source activation for Asset, Software, and optional Encryption sources",
+        "notes": "ARI Technical Add-on for Windows endpoint discovery. Deploy to indexers without local config and to Universal Forwarders with local inputs.conf."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For Linux",
+        "label": "`splunk-asset-risk-intelligence-setup` Linux TA handoff",
+        "cloud_install_path": "Cloud app request or Splunkbase app 7416 for indexer-side package placement; Universal Forwarder deployment remains customer-managed",
+        "cloud_config_path": "Validate ari_ta index readiness and hand off local inputs.conf deployment plus ARI data source activation for Asset and optional Encryption sources",
+        "notes": "ARI Technical Add-on for Linux endpoint discovery. Deploy to indexers without local config and to Universal Forwarders with local inputs.conf."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For macOS",
+        "label": "`splunk-asset-risk-intelligence-setup` macOS TA handoff",
+        "cloud_install_path": "Cloud app request or Splunkbase app 7417 for indexer-side package placement; Universal Forwarder deployment remains customer-managed",
+        "cloud_config_path": "Validate ari_ta index readiness and hand off local inputs.conf deployment plus ARI data source activation for Asset, Software, and optional Encryption sources",
+        "notes": "ARI Technical Add-on for macOS endpoint discovery. Deploy to indexers without local config and to Universal Forwarders with local inputs.conf."
       },
       {
         "kind": "app",
@@ -413,8 +437,17 @@
         "label": "`splunk-observability-native-ops`",
         "splunkbase_id": "N/A",
         "cloud_install_path": "No Splunk Cloud app install; renders native Splunk Observability Cloud operations and handoff plans",
-        "cloud_config_path": "Validate and optionally apply Observability API payloads for detectors, teams, alert routing, Synthetics, and APM trace/topology checks; render deeplinks and handoffs for SLOs, RUM, service maps, modern logs charts, and On-Call workflows with file-based secrets",
+        "cloud_config_path": "Validate and optionally apply Observability API payloads for detectors, teams, alert routing, Synthetics, and APM trace/topology checks; render deeplinks and handoffs for SLOs, RUM, service maps, modern logs charts, and On-Call deeplink handoffs (full On-Call coverage lives in splunk-oncall-setup)",
         "notes": "Native Observability operations workflow; complements OTel collection and classic dashboard rendering without Splunk Platform runtime placement."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-oncall-setup",
+        "label": "`splunk-oncall-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "Splunk-side companion apps install through ACS or REST: Splunkbase 3546 (victorops_app, alert action) on a search head or SHC deployer; Splunkbase 4886 (TA-splunk-add-on-for-victorops, public-API ingest) on a heavy forwarder; Splunkbase 5863 (splunkoncall, SOAR connector) installs through Splunk SOAR rather than splunk-app-install",
+        "cloud_config_path": "Render and apply the full Splunk On-Call lifecycle through the public API at api.victorops.com (X-VO-Api-Id + X-VO-Api-Key file-based auth) with per-endpoint rate-limit governors; send REST endpoint and generic email alerts; pre-create the four indexes the Add-on macros expect (victorops_users / victorops_teams / victorops_oncall / victorops_incidents); seed the alert-action mycollection KV-store; toggle the recovery_polling saved search; render ITSI NEAP, ES Adaptive Response, and Observability detector-recipient handoff stubs",
+        "notes": "Render-first lifecycle for Splunk On-Call (formerly VictorOps). Splunkbase apps: 3546 (victorops_app), 4886 (TA-splunk-add-on-for-victorops), 5863 (splunkoncall SOAR connector). Supersedes the partial on_call block in splunk-observability-native-ops which now defers via deeplink-only handoff."
       },
       {
         "kind": "workflow",
@@ -477,6 +510,23 @@
         "cloud_install_path": "ACS Splunkbase",
         "cloud_config_path": "REST via UCC custom stream/input handlers",
         "notes": "Cisco EULA license-ack required. Firehose streaming input for Cisco Spaces indoor location analytics."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-observability-cloud-integration-setup",
+        "label": "`splunk-observability-cloud-integration-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install of its own; orchestrates pairing + Discover-app + LOC + SIM Add-on (Splunkbase 5247) + cross-skill handoffs to splunk-cloud-acs-allowlist-setup, splunk-app-install, and splunk-itsi-config",
+        "cloud_config_path": "Render-first integration setup: token-auth flip, Unified Identity or Service Account pairing (acs observability + /adminconfig/v2/observability/sso-pairing), multi-org default-org deeplink, Centralized RBAC (enable-capabilities + enable-centralized-rbac), Discover Splunk Observability Cloud app five Configurations tabs, Log Observer Connect service-account user/role/workload rule, Related Content + Real Time Metrics capability assignments, Dashboard Studio O11y metrics, Splunk Infrastructure Monitoring Add-on account + curated SignalFlow modular inputs with MTS sizing preflight; file-based tokens only, --i-accept-rbac-cutover guard for the destructive RBAC step",
+        "notes": "Single skill that turns a Splunk Cloud Platform or Splunk Enterprise stack into a fully-paired Splunk Observability Cloud experience. Uses Splunk_TA_sim (Splunkbase 5247) for the in-Splunk navigation surface (sim SPL command + streaming modular inputs)."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_sim",
+        "label": "`splunk-observability-cloud-integration-setup` (SIM Add-on)",
+        "cloud_install_path": "ACS Splunkbase (id 5247); install on search heads + Inputs Data Manager",
+        "cloud_config_path": "REST via UCC custom account + modular-input handlers under /servicesNS/nobody/Splunk_TA_sim",
+        "notes": "Splunk Infrastructure Monitoring Add-on. Provides the sim SPL command and the splunk_infrastructure_monitoring_data_streams modular input. Hard cap: 250,000 MTS per modular input. Splunk Synthetic Monitoring Add-on (Splunkbase 5608) is archived (deprecated) and replaced by SIM streams."
       }
     ]
   },
@@ -693,6 +743,35 @@
       },
       "cloud_pairing": [],
       "notes": "Splunk Observability Cloud native operations render/apply workflow; no Splunk Platform runtime placement."
+    },
+    {
+      "skill": "splunk-observability-cloud-integration-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Splunk Platform <-> Splunk Observability Cloud pairing + Discover app + Log Observer Connect + Related Content + Real Time Metrics + Splunk Infrastructure Monitoring Add-on (Splunkbase 5247). Search-tier required; heavy-forwarder optional for ITSI / SIM modular-input streaming. Hands off Splunkbase install to splunk-app-install, ACS allowlist deltas to splunk-cloud-acs-allowlist-setup, and the Content Pack to splunk-itsi-config."
+    },
+    {
+      "skill": "splunk-oncall-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk On-Call (formerly VictorOps) lifecycle. Splunkbase 3546 (victorops_app) installs on a search head or SHC deployer; Splunkbase 4886 (TA-splunk-add-on-for-victorops) installs on a heavy forwarder and creates inputs for users, teams, on-call schedules, and incidents; Splunkbase 5863 (splunkoncall) is a SOAR connector. The dedicated `splunk-oncall-setup` skill is the canonical home for all Splunk On-Call work."
     },
     {
       "skill": "splunk-agent-management-setup",
@@ -991,7 +1070,7 @@
       "cloud_pairing": [
         "indexer"
       ],
-      "notes": "Restricted ARI app with search-tier UI/KV Store requirements and index-tier readiness for ari_staging, ari_asset, ari_internal, and ari_ta."
+      "notes": "Restricted ARI app with search-tier UI/KV Store requirements, index-tier readiness for ari_staging, ari_asset, ari_internal, and ari_ta, read-only validation, and lifecycle-complete handoffs for post-install, data sources, metrics, responses/audit, investigations, ES integration, Exposure Analytics, Add-ons, Echo, upgrade, and teardown prerequisites."
     },
     {
       "skill": "splunk-ai-assistant-setup",
@@ -1745,6 +1824,91 @@
       "latest_verified_date": "October 9, 2025"
     },
     {
+      "skill": "splunk-asset-risk-intelligence-setup",
+      "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For Windows",
+      "splunkbase_id": "7214",
+      "label": "Splunk Asset and Risk Intelligence Technical Add-on For Windows",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-asset-and-risk-intelligence-technical-add-on-for-windows_*"
+      ],
+      "min_splunk_version": "9.0",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "1.2.0",
+      "latest_verified_date": "September 17, 2025"
+    },
+    {
+      "skill": "splunk-asset-risk-intelligence-setup",
+      "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For Linux",
+      "splunkbase_id": "7416",
+      "label": "Splunk Asset and Risk Intelligence Technical Add-on For Linux",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-asset-and-risk-intelligence-technical-add-on-for-linux_*"
+      ],
+      "min_splunk_version": "9.0",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "1.2.0",
+      "latest_verified_date": "September 17, 2025"
+    },
+    {
+      "skill": "splunk-asset-risk-intelligence-setup",
+      "app_name": "Splunk Asset and Risk Intelligence Technical Add-on For macOS",
+      "splunkbase_id": "7417",
+      "label": "Splunk Asset and Risk Intelligence Technical Add-on For macOS",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-asset-and-risk-intelligence-technical-add-on-for-macos_*",
+        "splunk-asset-and-risk-intelligence-technical-add-on-for-mac-os_*"
+      ],
+      "min_splunk_version": "9.0",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "1.2.0",
+      "latest_verified_date": "September 17, 2025"
+    },
+    {
       "skill": "splunk-attack-analyzer-setup",
       "app_name": "Splunk_TA_SAA",
       "splunkbase_id": "6999",
@@ -2001,6 +2165,33 @@
       },
       "latest_verified_version": "1.0.7",
       "latest_verified_date": "February 18, 2026"
+    },
+    {
+      "skill": "splunk-observability-cloud-integration-setup",
+      "app_name": "Splunk_TA_sim",
+      "splunkbase_id": "5247",
+      "label": "Splunk Infrastructure Monitoring Add-on",
+      "package_patterns": [
+        "splunk-infrastructure-monitoring-add-on_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "Provides the sim SPL command + splunk_infrastructure_monitoring_data_streams modular input. Splunk Synthetic Monitoring Add-on (Splunkbase 5608) is archived and replaced by SIM streams; treat that legacy app as deprecated and do not install it.",
+      "latest_verified_version": "1.3.0",
+      "latest_verified_date": "February 6, 2026"
     }
   ]
 }

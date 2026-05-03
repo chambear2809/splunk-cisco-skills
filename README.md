@@ -76,6 +76,11 @@ Common starting points:
 - If you need external syslog or SNMP collection, start with
   `skills/splunk-connect-for-syslog-setup/` or
   `skills/splunk-connect-for-snmp-setup/`.
+- If you need to expose an on-prem Splunk Enterprise deployment to the public
+  internet, start with `skills/splunk-enterprise-public-exposure-hardening/`.
+  The workflow renders Splunk-side hardening plus nginx / HAProxy / firewall /
+  WAF reference templates, runs a 20-step preflight, and refuses to apply
+  without `--accept-public-exposure`.
 
 If you know the Cisco product name but not which TA or app it needs, start with
 `cisco-product-setup`. It resolves the product against the packaged SCAN
@@ -165,7 +170,7 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-enterprise-security-config` | Splunk Enterprise Security configuration | Configure ES indexes, roles, data models, enrichment, detections, and operational validation |
 | `splunk-security-portfolio-setup` | Splunk security product router | Resolve ES, SOAR, Security Essentials, UBA, Attack Analyzer, ARI, and related security offerings to setup, install-only, bundled ES, or handoff workflows |
 | `splunk-security-essentials-setup` | `Splunk_Security_Essentials` | Install and validate Splunk Security Essentials, content recommendations, and starter posture dashboards |
-| `splunk-asset-risk-intelligence-setup` | `SplunkAssetRiskIntelligence` | Install and validate ARI indexes, KV Store readiness, ARI roles, and ES Exposure Analytics handoff |
+| `splunk-asset-risk-intelligence-setup` | `SplunkAssetRiskIntelligence` | Install ARI app `7180`, prepare/validate `ari_staging`, `ari_asset`, `ari_internal`, and `ari_ta`, check KV Store, ARI roles/capabilities, saved searches, `ari_ta` data, and ES hints, then hand off post-install config, usage data review, event searches, data source priorities, metric exceptions, responses, audit, troubleshooting, release notes, normal ES risk factors, ES 8.5+ Exposure Analytics, ARI Add-ons `7214`/`7416`/`7417`, ARI Echo, upgrade, and uninstall prerequisites |
 | `splunk-attack-analyzer-setup` | `Splunk_TA_SAA` + `Splunk_App_SAA` | Install and validate Attack Analyzer platform integration, the `saa` index, `saa_indexes` macro, and API key handoff |
 | `splunk-uba-setup` | Splunk UBA / UEBA readiness | Validate legacy UBA integrations, optional Kafka app placement, and ES Premier UEBA migration handoff |
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant (formerly Splunk AI Assistant for SPL); drive Enterprise cloud-connected onboarding |
@@ -181,8 +186,10 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-enterprise-kubernetes-setup` | Splunk Enterprise on Kubernetes | Render, preflight, apply, and validate SOK S1/C3/M4 or Splunk POD on Cisco UCS |
 | `splunk-observability-otel-collector-setup` | Splunk Observability Cloud OTel Collector | Render, apply, and validate Splunk Distribution of OpenTelemetry Collector assets for Kubernetes clusters and Linux hosts, including Splunk Platform HEC token handoff helpers |
+| `splunk-observability-cloud-integration-setup` | Splunk Platform <-> Splunk Observability Cloud | Pair Splunk Cloud Platform / Splunk Enterprise with Splunk Observability Cloud end-to-end: token-auth flip, Unified Identity or Service Account pairing, multi-org default-org, Centralized RBAC, Discover Splunk Observability Cloud app's five Configurations tabs, Log Observer Connect (SCP + SE TLS), Related Content + Real Time Metrics, Dashboard Studio O11y metrics, and the Splunk Infrastructure Monitoring Add-on (Splunk_TA_sim, 5247) install + account + curated SignalFlow modular inputs |
 | `splunk-observability-dashboard-builder` | Splunk Observability Cloud dashboards | Render, validate, and optionally apply classic Observability dashboard groups, charts, and dashboards from natural-language, JSON, or YAML specs |
 | `splunk-observability-native-ops` | Splunk Observability Cloud native operations | Render, validate, and optionally apply supported native Observability operations for detectors, alert routing, Synthetics, APM, RUM, logs, and On-Call handoffs |
+| `splunk-oncall-setup` | Splunk On-Call (formerly VictorOps) | Render, validate, and apply On-Call teams, users, rotations, escalation policies, routing keys, incidents, REST/email alert payloads, and Splunk-side companion app handoffs |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
 | `splunk-connect-for-syslog-setup` | SC4S external collector | Prepare Splunk HEC/indexes and render or apply Docker, Podman, systemd, or Helm assets for Splunk Connect for Syslog |
 | `splunk-connect-for-snmp-setup` | SC4SNMP external collector | Prepare Splunk HEC/indexes and render or apply Docker Compose or Helm assets for Splunk Connect for SNMP |
@@ -191,6 +198,7 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-edge-processor-setup` | Splunk Edge Processor instances + cloud / Enterprise control plane | Add EP control-plane object, install instances on Linux (systemd or not), scale to multi-instance, manage source types / destinations / SPL2 pipelines, apply pipelines, validate health |
 | `splunk-indexer-cluster-setup` | Splunk Enterprise indexer cluster (single-site, multisite, redundant managers) | Bootstrap manager(s) / peers / SHs, manage cluster bundle (validate / apply / rollback), rolling restart (default / searchable / forced), peer offline (fast / enforce-counts), maintenance mode, single-site to multisite migration, manager replacement |
 | `splunk-cloud-acs-allowlist-setup` | Splunk Cloud ACS IP allowlists (all 7 features, IPv4 + IPv6) | Render plan, preflight (subnet limits, lock-out protection, FedRAMP carve-out), apply, audit / diff, optional Terraform emission |
+| `splunk-enterprise-public-exposure-hardening` | On-prem Splunk Enterprise public-internet exposure | Render Splunk-side hardening (web/server/inputs/outputs/authentication/authorize/limits/commands.conf + metadata) plus reverse-proxy (nginx/HAProxy) + firewall + WAF/CDN handoff; preflight 20-step + validate live probes; SVD floor enforcement; refuses to apply without `--accept-public-exposure` |
 
 ## Vendor Package Policy
 
@@ -764,12 +772,14 @@ splunk-cisco-skills/
 │   ├── splunk-observability-otel-collector-setup/
 │   ├── splunk-observability-dashboard-builder/
 │   ├── splunk-observability-native-ops/
+│   ├── splunk-oncall-setup/
 │   ├── splunk-connect-for-syslog-setup/
 │   ├── splunk-connect-for-snmp-setup/
 │   ├── splunk-license-manager-setup/
 │   ├── splunk-indexer-cluster-setup/
 │   ├── splunk-edge-processor-setup/
 │   ├── splunk-cloud-acs-allowlist-setup/
+│   ├── splunk-enterprise-public-exposure-hardening/
 │   ├── splunk-itsi-config/
 │   ├── splunk-itsi-setup/
 │   ├── splunk-mcp-server-setup/

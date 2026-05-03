@@ -1,0 +1,147 @@
+{
+  "api_version": "splunk-oncall-setup/v1",
+  "org_slug": "acme-corp",
+  "api_base": "https://api.victorops.com",
+  "default_routing_key": "catchall",
+  "users": [
+    {
+      "kind": "create",
+      "username": "alice",
+      "firstName": "Alice",
+      "lastName": "Anderson",
+      "email": "alice@example.com",
+      "role": "team_admin"
+    },
+    {
+      "kind": "create",
+      "username": "bob",
+      "firstName": "Bob",
+      "lastName": "Brown",
+      "email": "bob@example.com",
+      "role": "user"
+    }
+  ],
+  "teams": [
+    {
+      "kind": "create",
+      "name": "Checkout SRE",
+      "slug": "team-AbCd1234EXAMPLE",
+      "members": ["alice", "bob"],
+      "admins": ["alice"]
+    }
+  ],
+  "rotations": [
+    {
+      "kind": "create",
+      "team": "Checkout SRE",
+      "name": "Checkout primary",
+      "timezone": "America/New_York",
+      "shifts": [
+        {
+          "name": "Weekday primary",
+          "type": "partial_day",
+          "start_time": "09:00",
+          "end_time": "17:00",
+          "days_of_week": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+          "members": ["alice", "bob"]
+        }
+      ]
+    }
+  ],
+  "escalation_policies": [
+    {
+      "kind": "create",
+      "team": "Checkout SRE",
+      "name": "Checkout escalation",
+      "steps": [
+        {
+          "timeout_minutes": 0,
+          "targets": [
+            {"type": "rotation_group", "slug": "checkout-primary"}
+          ]
+        },
+        {
+          "timeout_minutes": 15,
+          "targets": [
+            {"type": "user", "slug": "alice"},
+            {"type": "user", "slug": "bob"}
+          ]
+        }
+      ]
+    }
+  ],
+  "routing_keys": [
+    {
+      "kind": "create",
+      "routingKey": "checkout",
+      "targets": [
+        {"team": "Checkout SRE", "policy": "Checkout escalation"}
+      ]
+    }
+  ],
+  "alert_rules": [
+    {
+      "kind": "create",
+      "alertField": "monitoring_tool",
+      "alertValueMatch": "splunk",
+      "matchType": "WILDCARD",
+      "rank": 1,
+      "stopFlag": false,
+      "routeKey": "checkout",
+      "annotations": [
+        {
+          "annotationType": "url",
+          "fieldName": "Runbook",
+          "fieldValue": "https://runbooks.example.com/${{entity_id}}"
+        }
+      ]
+    }
+  ],
+  "incidents": [
+    {
+      "kind": "create",
+      "summary": "Checkout HTTP 5xx burst",
+      "details": "Burst of 5xx from edge proxy.",
+      "userName": "alice",
+      "targets": [
+        {"type": "EscalationPolicy", "slug": "pol-checkout-escalation"}
+      ],
+      "isMultiResponder": false,
+      "state_start_time": 1735689600
+    }
+  ],
+  "rest_alerts": [
+    {
+      "alert_name": "critical_disk_low",
+      "message_type": "CRITICAL",
+      "entity_id": "disk_space/db01",
+      "entity_display_name": "Critically Low Disk Space on DB01",
+      "state_message": "The disk is full. Free space is 1%.",
+      "monitoring_tool": "splunk",
+      "routing_key": "checkout"
+    }
+  ],
+  "splunk_side": {
+    "alert_action_app": {
+      "splunkbase_id": 3546,
+      "app_name": "victorops_app",
+      "org_slug": "acme-corp",
+      "install_target": "search_head"
+    },
+    "add_on": {
+      "splunkbase_id": 4886,
+      "app_name": "TA-splunk-add-on-for-victorops",
+      "install_target": "heavy_forwarder",
+      "indexes": [
+        "victorops_users",
+        "victorops_teams",
+        "victorops_oncall",
+        "victorops_incidents"
+      ]
+    },
+    "soar_connector": {
+      "splunkbase_id": 5863,
+      "app_name": "splunkoncall"
+    }
+  }
+}

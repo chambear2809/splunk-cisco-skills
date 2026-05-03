@@ -34,7 +34,7 @@
       "status": "first_class",
       "route": ["splunk-soar-setup"],
       "splunkbase_ids": ["6361", "3411"],
-      "notes": "Splunk platform apps and Automation Broker readiness only; does not install SOAR server."
+      "notes": "Renders and runs SOAR On-prem unprivileged single-instance and cluster installers (Postgres + GlusterFS + Elasticsearch + HAProxy), drives SOAR Cloud onboarding checklists, installs Automation Broker on Docker/Podman, and installs the Splunk-side apps (6361, 3411). SOAR Cloud tenant provisioning and licensing remain Splunk-managed."
     },
     {
       "key": "soar-export",
@@ -70,8 +70,8 @@
       "aliases": ["ari", "asset and risk intelligence", "asset risk intelligence", "splunk ari"],
       "status": "first_class",
       "route": ["splunk-asset-risk-intelligence-setup"],
-      "splunkbase_ids": ["7180"],
-      "notes": "Installs restricted app package and prepares ARI indexes plus ES exposure analytics handoff."
+      "splunkbase_ids": ["7180", "7214", "7416", "7417"],
+      "notes": "Installs restricted ARI app package, prepares ARI indexes, validates KV Store/roles/capabilities/readiness, and covers post-install, data source, metric, response/audit, investigation, ES integration, ES 8.5+ Exposure Analytics, ARI Add-on, ARI Echo, upgrade, and uninstall-prerequisite handoffs."
     },
     {
       "key": "mission-control",

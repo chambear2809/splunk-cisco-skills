@@ -15,6 +15,7 @@ import signal
 import stat
 import subprocess
 import threading
+import time
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -45,6 +46,13 @@ MAX_OUTPUT_CHARS = 40000
 # output is suffixed with a truncation marker.
 MAX_OUTPUT_BYTES = 256 * 1024
 MAX_STORED_PLANS = 256
+# Maximum age (in seconds) of a stored plan before execute_plan refuses to
+# run it. Plans older than this are treated as expired so that a hash that
+# was generated, then sat unexecuted across a long pause / context switch,
+# cannot be quietly applied later — the operator must regenerate the plan
+# from the current state. Override at deployment time with
+# MCP_PLAN_TTL_SECONDS=<int>; values <= 0 disable the TTL guard entirely.
+PLAN_TTL_SECONDS = int(os.environ.get("MCP_PLAN_TTL_SECONDS", "3600"))
 
 # Scripts whose --dry-run / --list-products invocation is genuinely read-only.
 # Any (skill, script) pair NOT in this set is treated as mutating regardless of
@@ -52,14 +60,21 @@ MAX_STORED_PLANS = 256
 READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     ("cisco-product-setup", "setup.sh"),
     ("splunk-agent-management-setup", "setup.sh"),
-    ("splunk-workload-management-setup", "setup.sh"),
+    ("splunk-asset-risk-intelligence-setup", "setup.sh"),
+    ("splunk-attack-analyzer-setup", "setup.sh"),
+    ("splunk-enterprise-kubernetes-setup", "setup.sh"),
     ("splunk-hec-service-setup", "setup.sh"),
     ("splunk-index-lifecycle-smartstore-setup", "setup.sh"),
+    ("splunk-itsi-setup", "setup.sh"),
     ("splunk-monitoring-console-setup", "setup.sh"),
-    ("splunk-enterprise-kubernetes-setup", "setup.sh"),
-    ("splunk-observability-otel-collector-setup", "setup.sh"),
+    ("splunk-observability-cloud-integration-setup", "setup.sh"),
     ("splunk-observability-dashboard-builder", "setup.sh"),
+    ("splunk-observability-otel-collector-setup", "setup.sh"),
+    ("splunk-security-essentials-setup", "setup.sh"),
+    ("splunk-security-portfolio-setup", "setup.sh"),
+    ("splunk-uba-setup", "setup.sh"),
     ("splunk-universal-forwarder-setup", "setup.sh"),
+    ("splunk-workload-management-setup", "setup.sh"),
 }
 READ_ONLY_LIST_SCRIPTS: set[tuple[str, str]] = {
     ("cisco-product-setup", "setup.sh"),
@@ -80,7 +95,20 @@ READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
         "audit",
         "validate",
     },
-    ("splunk-edge-processor-setup", "setup.sh"): {"render", "preflight"},
+    # splunk-edge-processor-setup status/validate phases re-render assets and
+    # then run validate.sh on the control plane. validate.sh only reads via
+    # the EP API and never writes back, so these phases are pure inspection.
+    ("splunk-edge-processor-setup", "setup.sh"): {
+        "render",
+        "preflight",
+        "status",
+        "validate",
+    },
+    ("splunk-federated-search-setup", "setup.sh"): {
+        "render",
+        "preflight",
+        "status",
+    },
     ("splunk-indexer-cluster-setup", "setup.sh"): {
         "render",
         "preflight",
@@ -98,25 +126,79 @@ READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
     ("splunk-soar-setup", "setup.sh"): {"render", "preflight", "cloud-onboard"},
 }
 # Scripts that use flag-based mode toggles (not --phase) and are read-only
-# whenever --apply is NOT present. These skills render assets locally or run
-# validate-only flows by default; the only way they can mutate external state
-# is an explicit --apply. Any --apply invocation is still treated as mutating.
-READ_ONLY_UNLESS_APPLY_SCRIPTS: set[tuple[str, str]] = {
-    ("splunk-observability-native-ops", "setup.sh"),
-    ("splunk-observability-dashboard-builder", "setup.sh"),
+# whenever none of the listed mutation flag patterns are present. Each entry
+# maps (skill, script) to a tuple of patterns; a pattern ending in "-" is a
+# prefix match against the flag-only portion of the argv token (so "--apply-"
+# matches both "--apply-k8s" and "--apply-host"), otherwise it is an exact
+# flag match. The flag-only portion is the substring before "=" so that
+# "--flag=value" forms are also detected.
+#
+# Any matching invocation is still treated as mutating UNLESS the same
+# invocation also includes --dry-run AND the (skill, script) is in
+# READ_ONLY_DRY_RUN_SCRIPTS — that combined case is handled earlier in
+# plan_skill_script() and exists so operators can preview an --apply call
+# safely. That is why splunk-observability-dashboard-builder and
+# splunk-observability-otel-collector-setup appear in both this map and
+# READ_ONLY_DRY_RUN_SCRIPTS; do not "deduplicate" without first updating
+# plan_skill_script().
+READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
+    ("splunk-observability-native-ops", "setup.sh"): ("--apply",),
+    ("splunk-observability-dashboard-builder", "setup.sh"): ("--apply",),
+    # splunk-oncall-setup mutates Splunk On-Call (or the Splunk-side companion
+    # apps, or the REST endpoint) only when --apply, --send-alert,
+    # --install-splunk-app, or --uninstall is passed. Without any of those,
+    # the script renders + validates only.
+    ("splunk-oncall-setup", "setup.sh"): (
+        "--apply",
+        "--send-alert",
+        "--install-splunk-app",
+        "--uninstall",
+    ),
+    ("splunk-oncall-setup", "splunk_side_install.sh"): (
+        "--apply",
+        "--uninstall",
+    ),
+    # otel-collector mutates with --apply-k8s / --apply-linux only.
+    ("splunk-observability-otel-collector-setup", "setup.sh"): ("--apply-",),
+    # splunk-observability-cloud-integration-setup mutates only when --apply,
+    # --quickstart, --quickstart-enterprise, or --enable-token-auth is passed.
+    # All other modes (--render, --validate, --doctor, --discover, --explain,
+    # --rollback, --list-sim-templates, --make-default-deeplink) are
+    # render/inspect-only.
+    ("splunk-observability-cloud-integration-setup", "setup.sh"): (
+        "--apply",
+        "--quickstart",
+        "--quickstart-enterprise",
+        "--enable-token-auth",
+    ),
+    # SC4S / SC4SNMP mutate Splunk via --splunk-prep (creates indexes / HEC
+    # tokens) and the host with --apply-host / --apply-k8s / --apply-compose.
+    # Either gate triggers full mutation classification.
+    ("splunk-connect-for-syslog-setup", "setup.sh"): (
+        "--apply-",
+        "--splunk-prep",
+    ),
+    ("splunk-connect-for-snmp-setup", "setup.sh"): (
+        "--apply-",
+        "--splunk-prep",
+    ),
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
-# state). Validate scripts only check Splunk and never mutate it.
+# state). Validate scripts only check Splunk and never mutate it. The smoke_*
+# helpers render to a temp directory and assert the rendered artifacts; they
+# never touch live Splunk or the real filesystem outside their tmp tree.
 READ_ONLY_SCRIPT_NAMES: set[str] = {
     "validate.sh",
     "list_apps.sh",
     "resolve_product.sh",
     "smoke_latest_resolution.sh",
+    "smoke_offline.sh",
 }
 
 DIRECT_SECRET_FLAGS = {
     "--access-token",
     "--activation-code",
+    "--admin-token",
     "--analytics-secret",
     "--api-key",
     "--api-secret",
@@ -124,17 +206,22 @@ DIRECT_SECRET_FLAGS = {
     "--bearer-token",
     "--client-secret",
     "--hec-token",
+    "--integration-key",
     "--o11y-token",
     "--on-call-api-key",
     "--oncall-api-key",
+    "--org-token",
     "--password",
     "--platform-hec-token",
     "--proxy-password",
     "--refresh-token",
+    "--rest-key",
     "--secret",
+    "--service-account-password",
     "--skey",
     "--sf-token",
     "--token",
+    "--vo-api-key",
     "--x-vo-api-key",
 }
 
@@ -161,6 +248,7 @@ NON_SECRET_VALUE_KEYS = {
 SECRET_FILE_FLAGS = {
     "--access-token-file",
     "--activation-code-file",
+    "--admin-token-file",
     "--analytics-secret-file",
     "--api-key-file",
     "--api-secret-file",
@@ -172,16 +260,20 @@ SECRET_FILE_FLAGS = {
     "--discovery-secret-file",
     "--hec-token-file",
     "--idxc-secret-file",
+    "--integration-key-file",
     "--o11y-token-file",
     "--oncall-api-key-file",
+    "--org-token-file",
     "--password-file",
     "--platform-hec-token-file",
     "--pkcs-certificate-file",
     "--proxy-password-file",
     "--secret-file",
+    "--service-account-password-file",
     "--shc-secret-file",
     "--snmpv3-secrets-file",
     "--soar-automation-token-file",
+    "--splunk-cloud-admin-jwt-file",
     "--token-file",
     "--write-hec-token-file",
     "--write-token-file",
@@ -209,6 +301,10 @@ class PlannedCommand:
     read_only: bool
     timeout_seconds: int
     dry_run: dict[str, Any] | None = None
+    # Monotonic creation time; used by _consume_plan to enforce
+    # PLAN_TTL_SECONDS so an old hash cannot be replayed indefinitely.
+    # Defaulted via field(default_factory=) since this is a frozen dataclass.
+    created_at: float = 0.0
 
 
 _PLANS: "OrderedDict[str, PlannedCommand]" = OrderedDict()
@@ -375,12 +471,34 @@ def _arg_value(args: list[str], flag_name: str) -> str | None:
     return None
 
 
+def _matches_mutation_flag(args: list[str], patterns: tuple[str, ...]) -> bool:
+    """Return True if any argv token matches a mutation flag pattern.
+
+    Patterns ending in ``-`` are prefix matches (e.g. ``--apply-`` matches
+    ``--apply-k8s``, ``--apply-host``, ``--apply-linux``). All other patterns
+    must match the flag-only portion of the argv token exactly. The flag-only
+    portion is the substring before ``=`` so that ``--flag=value`` forms are
+    detected the same way as ``--flag value`` forms.
+    """
+    for arg in args:
+        flag = arg.split("=", 1)[0] if arg.startswith("--") else arg
+        for pattern in patterns:
+            if pattern.endswith("-"):
+                if flag.startswith(pattern):
+                    return True
+            elif flag == pattern:
+                return True
+    return False
+
+
 def _phase_invocation_is_read_only(pair: tuple[str, str], args: list[str]) -> bool:
-    # Flag-based mode skills: read-only whenever --apply is NOT present.
-    # Applies to skills that don't take a --phase argument and instead gate
-    # live mutations behind an explicit --apply toggle.
-    if pair in READ_ONLY_UNLESS_APPLY_SCRIPTS:
-        return "--apply" not in args
+    # Flag-based mode skills: read-only whenever none of the configured
+    # mutation flag patterns are present. Applies to skills that don't take
+    # a --phase argument and instead gate live mutations behind one or more
+    # explicit toggles (e.g. --apply, --apply-k8s, --splunk-prep).
+    flag_patterns = READ_ONLY_UNLESS_FLAG_SCRIPTS.get(pair)
+    if flag_patterns is not None:
+        return not _matches_mutation_flag(args, flag_patterns)
     allowed_phases = READ_ONLY_PHASE_SCRIPTS.get(pair)
     if not allowed_phases:
         return False
@@ -421,9 +539,12 @@ def _store_plan(
         read_only=read_only,
         timeout_seconds=timeout_seconds,
         dry_run=dry_run,
+        created_at=time.monotonic(),
     )
     with _PLANS_LOCK:
-        # Re-storing the same hash refreshes recency (move to end).
+        # Re-storing the same hash refreshes recency (move to end) AND its
+        # created_at timestamp, so the TTL clock restarts whenever the plan
+        # is re-confirmed by a fresh planner call.
         if plan_hash in _PLANS:
             _PLANS.move_to_end(plan_hash)
         _PLANS[plan_hash] = plan
@@ -434,15 +555,27 @@ def _store_plan(
 
 
 def _consume_plan(plan_hash: str) -> PlannedCommand | None:
-    """Atomically remove and return a plan, or None if absent.
+    """Atomically remove and return a plan, or None if absent or expired.
 
     Plans are single-use: once a client invokes execute_plan with a valid
     hash, the plan is consumed regardless of whether the subprocess succeeds
     or fails. This prevents replay of destructive commands and serializes
     concurrent execute_plan calls for the same hash (only the first wins).
+
+    Plans older than PLAN_TTL_SECONDS are also evicted on consume so a hash
+    that was generated and then sat unused across a long pause cannot be
+    silently applied later. Set MCP_PLAN_TTL_SECONDS=0 to disable.
     """
     with _PLANS_LOCK:
-        return _PLANS.pop(plan_hash, None)
+        plan = _PLANS.pop(plan_hash, None)
+    if plan is None:
+        return None
+    if PLAN_TTL_SECONDS > 0 and time.monotonic() - plan.created_at > PLAN_TTL_SECONDS:
+        # Treat an expired plan the same as a missing one: the operator must
+        # re-run the planner step to get a fresh hash. The plan was already
+        # popped above so there is nothing to clean up.
+        return None
+    return plan
 
 
 @dataclass(frozen=True)
@@ -650,6 +783,38 @@ def _skill_reference_files(skill_dir: Path) -> list[Path]:
     return files
 
 
+# Maximum size of any individual template file aggregated into the
+# skills://{skill}/template resource. Defends against a future skill
+# that ships a very large fixture under templates/. Individual file reads
+# via list_skill_template_files / read_skill_template_file are not
+# bounded by this constant.
+MAX_AGGREGATED_TEMPLATE_BYTES = 256 * 1024
+
+
+def _skill_template_files(skill_dir: Path) -> list[Path]:
+    """Return ordered template files for a skill.
+
+    Always lists ``template.example`` first (when present), then any files
+    under ``templates/`` sorted by relative path. Hidden files and binary
+    artifacts under ``templates/`` are excluded. Subdirectories are walked
+    recursively so multi-file fixtures (e.g. SC4S host vs. kubernetes,
+    Splunk Stream Cloud-HF NetFlow bundle) all show up.
+    """
+    files: list[Path] = []
+    primary = skill_dir / "template.example"
+    if primary.is_file():
+        files.append(primary)
+    templates_dir = skill_dir / "templates"
+    if templates_dir.is_dir():
+        for path in sorted(templates_dir.rglob("*")):
+            if not path.is_file():
+                continue
+            if any(part.startswith(".") for part in path.relative_to(templates_dir).parts):
+                continue
+            files.append(path)
+    return files
+
+
 def list_skills() -> dict[str, Any]:
     skills: list[dict[str, Any]] = []
     for skill_dir in _skill_dirs():
@@ -662,12 +827,14 @@ def list_skills() -> dict[str, Any]:
             else []
         )
         reference_files = _skill_reference_files(skill_dir)
+        template_files = _skill_template_files(skill_dir)
         skills.append(
             {
                 "name": metadata.get("name", skill_dir.name),
                 "description": metadata.get("description", ""),
                 "path": str(skill_md.relative_to(REPO_ROOT)),
-                "has_template": (skill_dir / "template.example").is_file(),
+                "has_template": bool(template_files),
+                "template_files": [str(path.relative_to(skill_dir)) for path in template_files],
                 "has_reference": bool(reference_files),
                 "reference_files": [str(path.relative_to(skill_dir)) for path in reference_files],
                 "has_mcp_tools": (skill_dir / "mcp_tools.json").is_file(),
@@ -698,10 +865,41 @@ def read_skill_file(skill: str, file_name: str) -> str:
             text = path.read_text(encoding="utf-8")
             chunks.append(f"# {rel_path}\n\n{text}")
         return "\n\n".join(chunks)
+    if file_name == "template":
+        template_files = _skill_template_files(skill_dir)
+        if not template_files:
+            raise SkillMCPError(
+                f"{skill} does not have template.example or templates/* files"
+            )
+        if len(template_files) == 1:
+            return _read_bounded_text(template_files[0], MAX_AGGREGATED_TEMPLATE_BYTES)
+        chunks = []
+        for path in template_files:
+            rel_path = path.relative_to(skill_dir)
+            text = _read_bounded_text(path, MAX_AGGREGATED_TEMPLATE_BYTES)
+            chunks.append(f"# {rel_path}\n\n{text}")
+        return "\n\n".join(chunks)
     path = skill_dir / allowed[file_name]
     if not path.is_file():
         raise SkillMCPError(f"{skill} does not have {allowed[file_name]}")
     return path.read_text(encoding="utf-8")
+
+
+def _read_bounded_text(path: Path, max_bytes: int) -> str:
+    """Read a text file, truncating the body once max_bytes is exceeded.
+
+    Falls back to ``utf-8`` decoding with ``replace`` errors so a binary
+    blob accidentally checked into ``templates/`` does not crash the
+    aggregation. The truncation marker preserves the operator's ability to
+    notice that the file was clipped.
+    """
+    raw = path.read_bytes()
+    if len(raw) <= max_bytes:
+        return raw.decode("utf-8", errors="replace")
+    return (
+        raw[:max_bytes].decode("utf-8", errors="replace")
+        + f"\n...[truncated {len(raw) - max_bytes} bytes from {path.name}]"
+    )
 
 
 def credential_status() -> dict[str, Any]:

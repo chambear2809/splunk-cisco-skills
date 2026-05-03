@@ -12,6 +12,31 @@ from tests.regression_helpers import REPO_ROOT
 
 
 REGISTRY_PATH = REPO_ROOT / "skills/shared/app_registry.json"
+ARI_REQUIRED_INDEXES = ["ari_staging", "ari_asset", "ari_internal", "ari_ta"]
+ARI_CAPABILITIES = {
+    "ari_manage_data_source_settings",
+    "ari_manage_metric_settings",
+    "ari_manage_report_exceptions",
+    "ari_dashboard_add_alerts",
+    "ari_edit_table_fields",
+    "ari_save_filters",
+    "ari_manage_filters",
+    "ari_manage_homepage_settings",
+}
+ARI_HANDOFF_KEYS = {
+    "preflight",
+    "post_install",
+    "admin",
+    "risk_compliance",
+    "response_audit",
+    "investigation",
+    "es_integration",
+    "exposure_analytics",
+    "addon",
+    "echo",
+    "upgrade",
+    "uninstall",
+}
 
 
 def run_bash(rel_path: str, *args: str) -> subprocess.CompletedProcess[str]:
@@ -116,6 +141,21 @@ def test_security_portfolio_registry_entries_are_complete() -> None:
     expected_apps = {
         "3435": ("splunk-security-essentials-setup", "Splunk_Security_Essentials", "9.0"),
         "7180": ("splunk-asset-risk-intelligence-setup", "SplunkAssetRiskIntelligence", "9.0"),
+        "7214": (
+            "splunk-asset-risk-intelligence-setup",
+            "Splunk Asset and Risk Intelligence Technical Add-on For Windows",
+            "9.0",
+        ),
+        "7416": (
+            "splunk-asset-risk-intelligence-setup",
+            "Splunk Asset and Risk Intelligence Technical Add-on For Linux",
+            "9.0",
+        ),
+        "7417": (
+            "splunk-asset-risk-intelligence-setup",
+            "Splunk Asset and Risk Intelligence Technical Add-on For macOS",
+            "9.0",
+        ),
         "6999": ("splunk-attack-analyzer-setup", "Splunk_TA_SAA", "9.0"),
         "7000": ("splunk-attack-analyzer-setup", "Splunk_App_SAA", "9.0"),
         "4147": ("splunk-uba-setup", "Splunk-UBA-SA-Kafka", "9.2"),
@@ -152,8 +192,16 @@ def test_security_portfolio_registry_entries_are_complete() -> None:
     assert topologies["splunk-soar-setup"]["role_support"]["external-collector"] == "supported"
     assert topologies["splunk-uba-setup"]["role_support"]["indexer"] == "supported"
     assert topologies["splunk-attack-analyzer-setup"]["cloud_pairing"] == ["indexer", "heavy-forwarder"]
+    for app_id in {"7214", "7416", "7417"}:
+        assert apps_by_id[app_id]["role_support"]["indexer"] == "supported"
+        assert apps_by_id[app_id]["role_support"]["universal-forwarder"] == "supported"
+        assert apps_by_id[app_id]["role_support"]["search-tier"] == "none"
+        assert apps_by_id[app_id]["capabilities"]["uf_safe"] is True
     assert "`splunk-security-portfolio-setup`" in cloud_labels
     assert "`splunk-enterprise-security-config` content update" in cloud_labels
+    assert "`splunk-asset-risk-intelligence-setup` Windows TA handoff" in cloud_labels
+    assert "`splunk-asset-risk-intelligence-setup` Linux TA handoff" in cloud_labels
+    assert "`splunk-asset-risk-intelligence-setup` macOS TA handoff" in cloud_labels
 
 
 def test_security_skill_dry_runs_emit_json_without_secret_values(tmp_path: Path) -> None:
@@ -191,7 +239,27 @@ def test_security_skill_dry_runs_emit_json_without_secret_values(tmp_path: Path)
         "--json",
     )
     assert ari["restricted_download"] is True
-    assert ari["indexes"] == ["ari_staging", "ari_asset", "ari_internal", "ari_ta"]
+    assert ari["app_id"] == "7180"
+    assert ari["latest_researched_version"] == "1.2.1"
+    assert ari["indexes"]["required"] == ARI_REQUIRED_INDEXES
+    assert ari["required_indexes"] == ARI_REQUIRED_INDEXES
+    assert set(ari["roles"]["included"]) == {"ari_admin", "ari_analyst"}
+    assert set(ari["capabilities"]["ari_admin_defaults"]) == ARI_CAPABILITIES
+    assert "9.1.3" in ari["compatibility"]["docs_signal"]["splunk_platform"]
+    assert set(ari["handoffs"]) == ARI_HANDOFF_KEYS
+    assert {entry["splunkbase_id"] for entry in ari["related_products"]["technical_addons"]} == {
+        "7214",
+        "7416",
+        "7417",
+    }
+    assert ari["related_products"]["echo"]["documented"] is True
+    assert ari["related_products"]["echo"]["splunkbase_id"] is None
+    assert "normal_integration" in ari["es_modes"]
+    assert "exposure_analytics_8_5_plus" in ari["es_modes"]
+    assert "upgrade" in ari["lifecycle"]
+    assert "uninstall" in ari["lifecycle"]
+    assert ari["sources"]["splunkbase_app"] == "https://splunkbase.splunk.com/app/7180"
+    assert ari["sources"]["addon_windows"] == "https://splunkbase.splunk.com/app/7214"
 
     soar_result = run_bash(
         "skills/splunk-soar-setup/scripts/setup.sh",
@@ -235,6 +303,141 @@ def test_security_skill_dry_runs_emit_json_without_secret_values(tmp_path: Path)
     )
     assert uba_kafka["kafka_app"]["app_id"] == "4147"
     assert "4147" in uba_kafka["kafka_install_command"]
+
+
+def test_asset_risk_intelligence_full_handoff_covers_all_surfaces() -> None:
+    payload = load_json_from_bash(
+        "skills/splunk-asset-risk-intelligence-setup/scripts/setup.sh",
+        "--dry-run",
+        "--json",
+        "--full-handoff",
+    )
+
+    assert set(payload["handoffs"]) == ARI_HANDOFF_KEYS
+    assert all(entry["selected"] for entry in payload["handoffs"].values())
+    assert set(payload["phases"]) == {
+        "preflight",
+        "post-install-handoff",
+        "admin-handoff",
+        "risk-handoff",
+        "response-audit-handoff",
+        "investigation-handoff",
+        "es-integration-handoff",
+        "exposure-analytics-handoff",
+        "addon-handoff",
+        "echo-handoff",
+        "upgrade-handoff",
+        "uninstall-handoff",
+    }
+
+    expected_surfaces = {
+        "post_install": {"Post-install configuration", "internal lookups", "enrichment rules"},
+        "admin": {"event searches", "data source activation", "source priorities", "field priorities", "field mappings", "inventory retention"},
+        "risk_compliance": {"metric exceptions", "identity risk scoring", "risk processing settings"},
+        "response_audit": {"responses", "audit reports", "operational logs", "license usage", "operational health"},
+        "investigation": {"asset investigation", "software investigation", "attack surface explorer", "field reference"},
+        "es_integration": {"ari_lookup_host()", "ari_lookup_ip()", "ari_risk_score", "ES risk factors"},
+        "exposure_analytics": {
+            "Splunk Asset and Risk Intelligence - Asset",
+            "Splunk Asset and Risk Intelligence - IP",
+            "Splunk Asset and Risk Intelligence - Mac",
+            "Splunk Asset and Risk Intelligence - User",
+        },
+        "addon": {"Windows technical add-on 7214", "Linux technical add-on 7416", "macOS technical add-on 7417"},
+        "echo": {"inventory sync", "asset association sync", "metric sync", "synchronization history"},
+        "upgrade": {"backup app and KV stores", "disable processing searches", "rerun post-install configuration"},
+        "uninstall": {"remove Enterprise Security integration first", "do not remove ARI indexes by default"},
+    }
+    for key, surfaces in expected_surfaces.items():
+        assert surfaces <= set(payload["handoffs"][key]["surfaces"])
+
+
+def test_asset_risk_intelligence_new_flags_appear_in_help() -> None:
+    result = run_bash("skills/splunk-asset-risk-intelligence-setup/scripts/setup.sh", "--help")
+    for flag in (
+        "--preflight-only",
+        "--full-handoff",
+        "--post-install-handoff",
+        "--admin-handoff",
+        "--risk-handoff",
+        "--response-audit-handoff",
+        "--investigation-handoff",
+        "--es-integration-handoff",
+        "--exposure-analytics-handoff",
+        "--addon-handoff",
+        "--echo-handoff",
+        "--upgrade-handoff",
+        "--uninstall-handoff",
+    ):
+        assert flag in result.stdout
+
+
+def test_asset_risk_intelligence_validation_guardrails_before_auth() -> None:
+    result = subprocess.run(
+        [
+            "bash",
+            str(REPO_ROOT / "skills/splunk-asset-risk-intelligence-setup/scripts/validate.sh"),
+            "--not-a-real-flag",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "Unknown option" in result.stderr
+    assert "Splunk Authentication" not in result.stdout
+
+    help_result = run_bash(
+        "skills/splunk-asset-risk-intelligence-setup/scripts/validate.sh",
+        "--help",
+    )
+    forbidden_promises = (
+        "delete index",
+        "index deletion",
+        "remove indexes",
+        "remove ES integration",
+        "disable ES integration",
+        "ServiceNow credentials",
+        "Echo credentials",
+        "deploy UF",
+        "deploy Universal Forwarder",
+    )
+    combined = help_result.stdout + help_result.stderr
+    for phrase in forbidden_promises:
+        assert phrase not in combined
+
+    validate_text = (
+        REPO_ROOT / "skills/splunk-asset-risk-intelligence-setup/scripts/validate.sh"
+    ).read_text(encoding="utf-8")
+    for phrase in forbidden_promises:
+        assert phrase not in validate_text
+
+
+def test_asset_risk_intelligence_validate_json_helpers_preserve_stdin() -> None:
+    script = REPO_ROOT / "skills/splunk-asset-risk-intelligence-setup/scripts/validate.sh"
+    probe = f"""
+set -euo pipefail
+tmp="$(mktemp)"
+awk '/^json_field_from_first_entry\\(\\)/,/^}}/ {{print}}' {script} > "$tmp"
+awk '/^count_json_entries\\(\\)/,/^}}/ {{print}}' {script} >> "$tmp"
+awk '/^capability_present\\(\\)/,/^}}/ {{print}}' {script} >> "$tmp"
+awk '/^parse_related_products\\(\\)/,/^}}/ {{print}}' {script} >> "$tmp"
+. "$tmp"
+rm -f "$tmp"
+test "$(printf '%s' '{{"entry":[{{"content":{{"version":"9.2.1"}}}}]}}' | json_field_from_first_entry version)" = "9.2.1"
+test "$(printf '%s' '{{"entry":[{{}},{{}}]}}' | count_json_entries)" = "2"
+printf '%s' '{{"entry":[{{"name":"ari_manage_filters","content":{{}}}}]}}' | capability_present ari_manage_filters
+test "$(printf '%s' '{{"entry":[{{"name":"Splunk Asset and Risk Intelligence Technical Add-on For Linux"}},{{"name":"Splunk Asset and Risk Intelligence Echo"}}]}}' | parse_related_products)" = "Echo, Linux TA"
+"""
+    result = subprocess.run(
+        ["bash", "-c", probe],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_attack_analyzer_interval_guardrail_rejects_too_fast_polling() -> None:

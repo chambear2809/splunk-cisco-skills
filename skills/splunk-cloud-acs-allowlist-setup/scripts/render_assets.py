@@ -384,8 +384,10 @@ PY
 #
 #    Operator candidates are:
 #      a) IPs / CIDRs explicitly passed via --operator-ip / --operator-ip-v6
-#         (preferred, especially for proxy / IPv6-only / private-egress
-#         paths where outbound discovery cannot see the real client).
+#         on `setup.sh` (preferred, especially for proxy / IPv6-only /
+#         private-egress paths where outbound discovery cannot see the
+#         real client). The renderer sees these as --operator-ips /
+#         --operator-ips-v6 internally.
 #      b) When the v4 list is empty, outbound discovery against multiple
 #         independent endpoints. We do NOT do v6 discovery automatically;
 #         operators on IPv6-only paths must pass --operator-ip-v6 if any

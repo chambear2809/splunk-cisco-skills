@@ -58,14 +58,15 @@ if [[ ${FAIL} -eq 0 ]]; then
 
     log ""
     log "--- Setup Checklist (manual) ---"
-    # These items cannot be verified from the search-tier REST API; they
-    # are product/UI gates that an operator must complete by hand. Surface
-    # them as INFO/WARN so the summary line does not falsely claim "ALL
-    # CHECKS PASSED" when no UI work has happened yet.
+    # These items cannot be verified from the search-tier REST API; they are
+    # product/UI gates that an operator must complete by hand. Surface them
+    # as INFO so a healthy install reports "ALL CHECKS PASSED" without a
+    # permanent WARN that operators learn to ignore. Posture dashboards are
+    # explicitly optional, so they ride at INFO too.
     info "Manual gate: complete Data Inventory Introspection in the SSE UI"
     info "Manual gate: complete Content Mapping for the in-scope sourcetypes"
     info "Manual gate: review app configuration (settings, roles, scheduling)"
-    warn "Optional posture dashboards require product/UI decisions after data inventory review"
+    info "Optional: enable posture dashboards in the SSE UI after the data inventory review"
 fi
 
 log ""

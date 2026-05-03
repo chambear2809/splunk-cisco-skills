@@ -177,6 +177,10 @@ emit_status_notes() {
     log "Standalone Splunk UBA end-of-sale: ${EOS_DATE}; end-of-support: ${END_OF_SUPPORT_DATE}."
     log "Migration guidance: route new UEBA work to Splunk Enterprise Security Premier UEBA."
     [[ -n "${UBA_HOST}" ]] && log "Existing UBA host handoff target: ${UBA_HOST}"
+    if [[ "${INSTALL}" == "true" && "${INSTALL_KAFKA_APP}" != "true" ]]; then
+        log "Default mode performs validation + handoff only; pass --install-kafka-app to install"
+        log "Splunkbase app ${KAFKA_APP_ID} (Splunk-UBA-SA-Kafka). No standalone UBA server is installed."
+    fi
 }
 
 build_commands

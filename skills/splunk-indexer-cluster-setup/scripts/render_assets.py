@@ -62,6 +62,24 @@ def csv_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+# Hostnames are interpolated into rendered file PATHS like
+# `cluster/peer-{host}/server.conf`. Without validation, a value like
+# `../../etc/passwd` could redirect a write outside the operator's chosen
+# output directory. We accept only DNS-style labels plus dot, underscore,
+# hyphen, and digits — the same character class real Splunk peer hosts
+# use. Anything else is rejected up front.
+_HOST_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def validate_host_token(host: str, kind: str) -> str:
+    if not host or not _HOST_RE.fullmatch(host):
+        die(
+            f"--{kind} value {host!r} is not a valid hostname/IP token "
+            "(allowed characters: letters, digits, '.', '_', '-')."
+        )
+    return host
+
+
 def write_file(path: Path, content: str, executable: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -78,7 +96,7 @@ def parse_host_site_pairs(value: str, kind: str, multisite: bool) -> list[dict]:
     for entry in csv_list(value):
         if "=" in entry:
             host, site = entry.split("=", 1)
-            host = host.strip()
+            host = validate_host_token(host.strip(), kind)
             site = site.strip()
             if not site or not re.fullmatch(r"site[0-9]+", site):
                 die(f"--{kind} site value must be siteN: {entry!r}")
@@ -86,7 +104,7 @@ def parse_host_site_pairs(value: str, kind: str, multisite: bool) -> list[dict]:
         else:
             if multisite:
                 die(f"--{kind} multisite entries require host=siteN: {entry!r}")
-            items.append({"host": entry, "site": None})
+            items.append({"host": validate_host_token(entry, kind), "site": None})
     return items
 
 
@@ -504,21 +522,50 @@ def render_redundancy(args: argparse.Namespace, manager_hosts: list[str]) -> dic
     if args.manager_redundancy != "true":
         return {}
     out = {}
-    out["lb-haproxy.cfg"] = """# Sample HAProxy config snippet. Adjust frontend/backend per your env.
-# Health check uses /services/cluster/manager/ha_active_status: 200=active, 503=standby.
-backend cluster_managers
-  mode http
-  option httpchk GET /services/cluster/manager/ha_active_status
-  http-check expect status 200
-""" + "\n".join(f"  server cm{i+1} {h}:8089 check ssl verify none inter 5s rise 2 fall 3" for i, h in enumerate(manager_hosts)) + "\n"
+    # The HAProxy template defaults to TLS verification (`ssl verify required
+    # ca-file <path>`). Operators on a private CA must point ca-file at their
+    # CA bundle (placeholder shown in the comment). The legacy `ssl verify
+    # none` posture is left as a commented-out line so anyone who needs lab
+    # behavior must consciously opt in.
+    out["lb-haproxy.cfg"] = (
+        "# Sample HAProxy config snippet. Adjust frontend/backend per your env.\n"
+        "# Health check uses /services/cluster/manager/ha_active_status: 200=active, 503=standby.\n"
+        "# Replace `ca-file /etc/ssl/certs/splunk-cluster-ca.pem` with the path to your\n"
+        "# Splunk management-port CA bundle. Do NOT change `verify required` to `verify none`\n"
+        "# in production: that disables TLS hostname/cert validation between HAProxy and the\n"
+        "# cluster managers.\n"
+        "backend cluster_managers\n"
+        "  mode http\n"
+        "  option httpchk GET /services/cluster/manager/ha_active_status\n"
+        "  http-check expect status 200\n"
+    ) + "\n".join(
+        f"  server cm{i+1} {h}:8089 check ssl verify required ca-file /etc/ssl/certs/splunk-cluster-ca.pem inter 5s rise 2 fall 3"
+        for i, h in enumerate(manager_hosts)
+    ) + "\n"
 
     out["dns-record-template.txt"] = f"""# Sample DNS record planning for cluster manager redundancy.
 # Use a CNAME or A record (e.g. cm.example.com) and update on failover.
 {', '.join(manager_hosts)}
 """
+    # ha-health-check.sh: TLS verification is enabled by default (no `-k`).
+    # Operators on a private CA can set CLUSTER_HA_CA_BUNDLE=/path/to/ca.pem
+    # to point curl at the right trust store, OR set CLUSTER_HA_INSECURE=true
+    # for lab use. We emit a stderr warning whenever the insecure path runs
+    # so it cannot quietly become the default in production.
     out["ha-health-check.sh"] = make_script(f"""# Health-check probe used by external monitoring or LB sanity checks.
+ca_args=()
+if [[ -n "${{CLUSTER_HA_CA_BUNDLE:-}}" ]]; then
+  if [[ ! -s "${{CLUSTER_HA_CA_BUNDLE}}" ]]; then
+    echo "ERROR: CLUSTER_HA_CA_BUNDLE not found or empty: ${{CLUSTER_HA_CA_BUNDLE}}" >&2
+    exit 1
+  fi
+  ca_args=(--cacert "${{CLUSTER_HA_CA_BUNDLE}}")
+elif [[ "${{CLUSTER_HA_INSECURE:-false}}" == "true" ]]; then
+  echo "WARNING: TLS verification disabled for cluster HA health checks (CLUSTER_HA_INSECURE=true). Use CLUSTER_HA_CA_BUNDLE=/path/to/ca.pem in production." >&2
+  ca_args=(-k)
+fi
 for mgr in {' '.join(shell_quote(h) for h in manager_hosts)}; do
-  status=$(curl -k -s -o /dev/null -w "%{{http_code}}" "https://${{mgr}}:8089/services/cluster/manager/ha_active_status" || echo "000")
+  status=$(curl "${{ca_args[@]}}" -s -o /dev/null -w "%{{http_code}}" "https://${{mgr}}:8089/services/cluster/manager/ha_active_status" || echo "000")
   echo "${{mgr}}: HTTP ${{status}} ($([[ "${{status}}" == "200" ]] && echo ACTIVE || echo STANDBY/DOWN))"
 done
 """)
@@ -752,10 +799,10 @@ def render_all(args: argparse.Namespace) -> dict:
 
     peers = parse_host_site_pairs(args.peer_hosts, "peer-hosts", multisite)
     shs = parse_host_site_pairs(args.sh_hosts, "sh-hosts", multisite)
-    managers = csv_list(args.manager_hosts)
+    managers = [validate_host_token(h, "manager-hosts") for h in csv_list(args.manager_hosts)]
     if not managers:
         managers = [parse_uri(args.cluster_manager_uri, "--cluster-manager-uri")[0]]
-    forwarders = csv_list(args.forwarder_hosts)
+    forwarders = [validate_host_token(h, "forwarder-hosts") for h in csv_list(args.forwarder_hosts)]
 
     if args.manager_redundancy == "true" and len(managers) < 2:
         die("--manager-redundancy=true requires at least 2 entries in --manager-hosts.")

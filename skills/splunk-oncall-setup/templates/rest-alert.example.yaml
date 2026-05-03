@@ -1,0 +1,49 @@
+# REST Endpoint Integration alert payloads. Pass to setup.sh --send-alert
+# along with --integration-key-file and --routing-key. Each entry is sent in
+# order; entries that share an entity_id deduplicate against the same
+# incident lifecycle.
+api_version: splunk-oncall-setup/v1
+rest_alerts:
+  - alert_name: critical_disk_low
+    message_type: CRITICAL
+    entity_id: disk_space/db01
+    entity_display_name: Critically Low Disk Space on DB01
+    state_message: |
+      The disk is really really full. Here is a bunch of information about
+      the problem and a link to the runbook.
+    monitoring_tool: splunk
+    hostname: db01.example.com
+    annotations:
+      - kind: url
+        title: Runbook
+        value: https://runbooks.example.com/disk-space
+      - kind: note
+        title: Note
+        value: Auto-resolves once free space recovers above 10%.
+      - kind: image
+        title: Graph
+        value: https://example.com/disk-graph.png
+
+  - alert_name: ack_disk_low
+    message_type: ACKNOWLEDGEMENT
+    entity_id: disk_space/db01
+    state_message: Investigating from runbook step 2.
+
+  - alert_name: warning_db_latency
+    message_type: WARNING
+    entity_id: db_latency/db01
+    entity_display_name: Elevated DB latency on DB01
+    state_message: 95th percentile query latency above 250 ms.
+    monitoring_tool: splunk
+
+  - alert_name: info_deploy_marker
+    message_type: INFO
+    entity_id: deploy/checkout-2026-06-01
+    entity_display_name: Checkout deploy started
+    state_message: Deploy 2026-06-01-1 starting; expect brief 5xx blip.
+    monitoring_tool: ci
+
+  - alert_name: recovery_disk_low
+    message_type: RECOVERY
+    entity_id: disk_space/db01
+    state_message: Disk space restored to 32% via log rotation.

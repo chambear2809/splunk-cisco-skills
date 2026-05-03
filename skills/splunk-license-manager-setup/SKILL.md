@@ -104,8 +104,14 @@ Under `splunk-license-manager-rendered/license/`:
 - `manager/pools/<name>.json` — desired-state pool definition.
 - `manager/apply-pools.sh` — POST/PUT/DELETE to converge pool list.
 - `peers/<host>/peer-server.conf` — `[license] manager_uri = ...` snippet.
-- `peers/<host>/configure-peer.sh` — SSH-friendly wrapper around
-  `splunk edit licenser-localpeer -manager_uri ... -auth admin:<pw>`.
+- `peers/<host>/configure-peer.sh` — runs locally on the operator workstation
+  and POSTs `manager_uri` to the peer's own
+  `https://<host>:8089/services/licenser/localpeer` REST endpoint using a
+  password file (`get_session_key_from_password_file`); no SSH and no
+  `splunk -auth admin:<pw>` argv on either host. Optionally requests a
+  splunkd restart over REST when `--restart-splunk=true`. Override the peer
+  URL with `PEER_MANAGEMENT_URL` (or just the port via
+  `PEER_MANAGEMENT_PORT`) for non-default deployments.
 - `validate.sh` — peers, usage, messages, version-compat checks.
 - `audit/<timestamp>/{groups,stacks,pools,licenses,messages,localpeer,usage,peers}.json`
   snapshots.

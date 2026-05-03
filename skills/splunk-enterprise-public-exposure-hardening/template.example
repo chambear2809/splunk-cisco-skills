@@ -1,0 +1,158 @@
+# Splunk Enterprise Public Internet Exposure Hardening Worksheet
+#
+# Copy this file locally (e.g. cp template.example my-deployment.yaml) and
+# fill in the non-secret values. Do NOT store passwords, pass4SymmKey
+# values, TLS private keys, or HEC tokens here. The renderer reads
+# secrets only from local files via *-file CLI flags.
+
+# ---------------------------------------------------------------------------
+# Topology
+# ---------------------------------------------------------------------------
+
+# single-search-head | shc-with-hec | shc-with-hec-and-hf
+topology: single-search-head
+
+# Public-facing FQDN that browsers/clients will use. Must have CA-signed cert.
+public_fqdn: splunk.example.com
+hec_fqdn: hec.example.com
+
+# CIDR(s) the reverse proxy / load balancer hosts live in.
+# Splunk has no XFF allowlist, so this CIDR is what acceptFrom restricts to.
+proxy_cidr: 10.0.10.0/24
+
+# Indexer cluster CIDR — only reachable to the SH and DMZ HF.
+indexer_cluster_cidr: 10.0.20.0/24
+
+# Bastion CIDR — what reaches /services, /servicesNS, /en-US/manager.
+bastion_cidr: 10.0.30.0/24
+
+# ---------------------------------------------------------------------------
+# Surface enables
+# ---------------------------------------------------------------------------
+
+enable_web: true
+enable_hec: true
+enable_s2s: true
+enable_splunkd_rest: false  # Public access to 8089 is NEVER allowed by this skill.
+
+# Optional HEC mTLS (highly recommended for public HEC).
+hec_mtls: false
+
+# ---------------------------------------------------------------------------
+# Splunk runtime
+# ---------------------------------------------------------------------------
+
+splunk_home: /opt/splunk
+service_user: splunk
+
+# Splunk version — used for SVD floor enforcement. The skill refuses to
+# apply if this is below the floor in references/cve-svd-floor.json.
+splunk_version: 10.2.2
+
+# ---------------------------------------------------------------------------
+# Crypto / TLS
+# ---------------------------------------------------------------------------
+
+# tls12 (default) emits sslVersions = tls1.2; tls12_13 emits tls1.2,tls1.3.
+tls_policy: tls12
+
+# Whether to render hardened S2S inputs.conf with requireClientCert=true.
+s2s_mtls: true
+
+# Whether to render hardened forwarder outputs.conf with sslVerifyServerCert=true.
+forwarder_mtls: true
+
+# CA bundle path that lives on the target host. Used by clients verifying
+# server certs and (when *_mtls=true) by the server verifying client certs.
+ca_bundle_path: /opt/splunk/etc/auth/cabundle.pem
+
+# Server cert + key paths on the target host. Production certs only —
+# preflight refuses if these resolve to default Splunk-shipped certs.
+server_cert_path: /opt/splunk/etc/auth/splunkweb/cert.pem
+server_key_path: /opt/splunk/etc/auth/splunkweb/privkey.pem
+
+# Subject Alternative Names you require on the leaf certificate.
+required_sans:
+  - splunk.example.com
+  - hec.example.com
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+# native | saml | reverse-proxy-sso
+auth_mode: saml
+
+# When auth_mode = saml: SAML IdP metadata file path on the local renderer
+# host (will be referenced by absolute path in authentication.conf).
+saml_idp_metadata_path: /etc/splunk-public-exposure/saml-idp-metadata.xml
+saml_entity_id: https://splunk.example.com/saml
+saml_signature_algorithm: RSA-SHA256
+
+# When auth_mode = reverse-proxy-sso: trustedIP for the proxy.
+proxy_sso_trusted_ip: 10.0.10.5
+
+# Local password policy for the break-glass admin (still required).
+min_password_length: 14
+expire_password_days: 90
+lockout_attempts: 5
+lockout_mins: 30
+password_history_count: 24
+
+# ---------------------------------------------------------------------------
+# Roles, capabilities, search guardrails
+# ---------------------------------------------------------------------------
+
+# Allowed indexes for the public_reader role (CSV).
+public_reader_allowed_indexes: main,summary
+
+# Search-time guardrails for the public_reader role.
+public_reader_srch_jobs_quota: 3
+public_reader_srch_max_time: 300
+public_reader_srch_time_win: 86400
+public_reader_srch_disk_quota: 100
+
+# ---------------------------------------------------------------------------
+# Ingest sizing
+# ---------------------------------------------------------------------------
+
+# HEC max_content_length in bytes. 838860800 (800 MB) is the Splunk default.
+# Renderer aligns proxy client_max_body_size with this.
+hec_max_content_length: 838860800
+
+# Per-IP rate limit on /en-US/account/login (requests per minute).
+login_rate_per_minute: 5
+
+# Streaming search proxy_read_timeout in seconds.
+streaming_search_timeout: 600
+
+# ---------------------------------------------------------------------------
+# Local-only secret file paths (NOT committed to git; chmod 600).
+# Use `bash skills/shared/scripts/write_secret_file.sh /tmp/<name>` to
+# create each one without the secret hitting shell history.
+# ---------------------------------------------------------------------------
+
+admin_password_file: /tmp/splunk_admin_password
+pass4symmkey_file: /tmp/splunk_pass4symmkey
+ssl_key_password_file: /tmp/splunk_ssl_key_password
+
+# Optional file paths only used in specific modes.
+saml_signing_cert_file: /tmp/splunk_saml_signing_cert
+saml_signing_key_file: /tmp/splunk_saml_signing_key
+hec_mtls_ca_bundle_file: /opt/splunk/etc/auth/hec_client_ca.pem
+
+# ---------------------------------------------------------------------------
+# External probe (used by preflight + validate to confirm 8089/8191/8065/9887
+# are NOT reachable from the internet). The command must accept "host port"
+# args and return zero only when the port is reachable.
+# ---------------------------------------------------------------------------
+
+external_probe_cmd: "ssh probe@bastion.example.com nc -zv"
+
+# ---------------------------------------------------------------------------
+# Operator acknowledgements
+# ---------------------------------------------------------------------------
+
+# Setting this to true is what the --accept-public-exposure flag captures.
+# Renderer will refuse to apply unless the flag is present at apply time.
+operator_acknowledges_public_exposure: false

@@ -50,6 +50,8 @@ For Cloud-specific install and API behavior, see
 | `splunk-observability-otel-collector-setup` | Supported | None | None | None | Required | External collector | External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup. |
 | `splunk-observability-dashboard-builder` | None | None | None | None | None | None | Splunk Observability Cloud dashboard render/apply workflow; no Splunk Platform runtime placement. |
 | `splunk-observability-native-ops` | None | None | None | None | None | None | Splunk Observability Cloud native operations render/apply workflow; no Splunk Platform runtime placement. |
+| `splunk-observability-cloud-integration-setup` | Required | None | Supported | None | None | Search tier | Splunk Platform <-> Splunk Observability Cloud pairing + Discover app + Log Observer Connect + Related Content + Real Time Metrics + Splunk Infrastructure Monitoring Add-on (Splunkbase 5247). Search-tier required; heavy-forwarder optional for ITSI / SIM modular-input streaming. Hands off Splunkbase install to splunk-app-install, ACS allowlist deltas to splunk-cloud-acs-allowlist-setup, and the Content Pack to splunk-itsi-config. |
+| `splunk-oncall-setup` | Supported | None | Supported | None | None | Search tier or HF | Splunk On-Call (formerly VictorOps) lifecycle. Splunkbase 3546 (victorops_app) installs on a search head or SHC deployer; Splunkbase 4886 (TA-splunk-add-on-for-victorops) installs on a heavy forwarder and creates inputs for users, teams, on-call schedules, and incidents; Splunkbase 5863 (splunkoncall) is a SOAR connector. The dedicated `splunk-oncall-setup` skill is the canonical home for all Splunk On-Call work. |
 | `splunk-agent-management-setup` | Supported | Supported | Supported | Supported | None | HF or UF | Agent Management control-plane workflow for server classes, deployment apps, and deployment clients; do not target indexer cluster peers or SHC members directly. |
 | `splunk-universal-forwarder-setup` | None | None | None | Required | None | UF | Customer-managed Universal Forwarder runtime bootstrap and enrollment workflow; complements Agent Management server-class and deployment-app workflows. |
 | `splunk-workload-management-setup` | Supported | Supported | None | None | None | None | Self-managed Enterprise Workload Management workflow for Linux search heads and indexers. |
@@ -72,7 +74,7 @@ For Cloud-specific install and API behavior, see
 | `splunk-cloud-acs-allowlist-setup` | None | None | None | None | None | None | Splunk Cloud ACS IP allowlist control-plane workflow; manages all 7 ACS features (acs / search-api / hec / s2s / search-ui / idm-api / idm-ui) for IPv4 + IPv6. No Splunk Enterprise role placement. |
 | `splunk-uba-setup` | Supported | Supported | None | None | None | Indexer | Readiness and migration workflow for existing UBA/UEBA deployments; standalone UBA server installation is not automated, and optional Kafka app placement is search-tier focused. |
 | `splunk-attack-analyzer-setup` | Required | Supported | Supported | None | None | Indexer or HF | Installs the Splunk Attack Analyzer add-on and dashboard app, creates/validates the saa index, and aligns the saa_indexes macro; API credentials remain file-based handoff material. |
-| `splunk-asset-risk-intelligence-setup` | Required | Supported | None | None | None | Indexer | Restricted ARI app with search-tier UI/KV Store requirements and index-tier readiness for ari_staging, ari_asset, ari_internal, and ari_ta. |
+| `splunk-asset-risk-intelligence-setup` | Required | Supported | None | None | None | Indexer | Restricted ARI app with search-tier UI/KV Store requirements, index-tier readiness for ari_staging, ari_asset, ari_internal, and ari_ta, read-only validation, and lifecycle-complete handoffs for post-install, data sources, metrics, responses/audit, investigations, ES integration, Exposure Analytics, Add-ons, Echo, upgrade, and teardown prerequisites. |
 | `splunk-ai-assistant-setup` | Required | None | None | None | None | None | Search-tier Splunk AI Assistant app with cloud-backed inference, Context and Model Runtime app UI settings, Agent Mode Cloud-region gating, and KV Store-backed local chat state. |
 | `splunk-mcp-server-setup` | Required | None | None | None | None | None | Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays. |
 | `splunk-stream-setup` | Required | Supported | Required | Supported | None | HF or UF | Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects. |
@@ -108,6 +110,9 @@ For Cloud-specific install and API behavior, see
 | `SplunkEnterpriseSecuritySuite` | `splunk-enterprise-security-install` | Required | None | None | None | None |
 | `Splunk_Security_Essentials` | `splunk-security-essentials-setup` | Required | None | None | None | None |
 | `SplunkAssetRiskIntelligence` | `splunk-asset-risk-intelligence-setup` | Required | None | None | None | None |
+| `Splunk Asset and Risk Intelligence Technical Add-on For Windows` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |
+| `Splunk Asset and Risk Intelligence Technical Add-on For Linux` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |
+| `Splunk Asset and Risk Intelligence Technical Add-on For macOS` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |
 | `Splunk_TA_SAA` | `splunk-attack-analyzer-setup` | Supported | None | Supported | None | None |
 | `Splunk_App_SAA` | `splunk-attack-analyzer-setup` | Required | None | None | None | None |
 | `splunk_app_soar` | `splunk-soar-setup` | Required | Supported | None | None | None |
@@ -117,6 +122,7 @@ For Cloud-specific install and API behavior, see
 | `Splunk_AI_Assistant_Cloud` | `splunk-ai-assistant-setup` | Required | None | None | None | None |
 | `Splunk_MCP_Server` | `splunk-mcp-server-setup` | Required | None | None | None | None |
 | `ta_cisco_spaces` | `cisco-spaces-setup` | Supported | None | Supported | None | None |
+| `Splunk_TA_sim` | `splunk-observability-cloud-integration-setup` | Required | None | Supported | None | None |
 
 ## Notes On Split Deployments
 

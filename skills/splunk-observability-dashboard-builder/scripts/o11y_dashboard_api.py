@@ -103,6 +103,34 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def safe_plan_path(plan_dir: Path, relative: str) -> Path:
+    """Resolve a plan-relative file path and refuse to escape plan_dir.
+
+    The renderer writes payload files under plan_dir and records their
+    relative paths inside apply-plan.json. A malicious or buggy plan
+    file could otherwise smuggle ``../../../etc/passwd`` into a
+    ``payload_file`` field, and ``plan_dir / "../../etc/passwd"`` would
+    happily resolve to a real path outside the plan tree. We reject any
+    candidate that is not contained under the resolved plan directory.
+    """
+    if not isinstance(relative, str) or not relative:
+        raise ApiError(f"plan payload file must be a non-empty string (got {relative!r})")
+    plan_root = plan_dir.resolve()
+    candidate = (plan_root / relative).resolve()
+    try:
+        candidate.relative_to(plan_root)
+    except ValueError as exc:
+        raise ApiError(
+            f"plan payload file {relative!r} escapes plan directory {plan_root}"
+        ) from exc
+    return candidate
+
+
+def load_plan_json(plan_dir: Path, relative: str) -> dict[str, Any]:
+    """Load a JSON file recorded in apply-plan.json with traversal protection."""
+    return load_json(safe_plan_path(plan_dir, relative))
+
+
 def replace_placeholders(value: Any, group_id: str, chart_ids: dict[str, str]) -> Any:
     if isinstance(value, str):
         if value == "${dashboard_group_id}":
@@ -178,7 +206,7 @@ def apply_plan(
         raise ApiError("--token-file is required for live apply (only --dry-run can omit it).")
     token = read_token(token_file)
     if not group_id:
-        group_payload = load_json(plan_dir / group_info["payload_file"])
+        group_payload = load_plan_json(plan_dir, group_info["payload_file"])
         group_response = request_json("POST", f"{base}/dashboardgroup", token, group_payload)
         group_id = str(group_response.get("id", ""))
         if not group_id:
@@ -186,14 +214,14 @@ def apply_plan(
 
     chart_ids: dict[str, str] = {}
     for chart in plan["charts"]:
-        payload = load_json(plan_dir / chart["payload_file"])
+        payload = load_plan_json(plan_dir, chart["payload_file"])
         response = request_json("POST", f"{base}/chart", token, payload)
         chart_id = str(response.get("id", ""))
         if not chart_id:
             raise ApiError(f"Chart creation response for {chart['key']} did not contain id.")
         chart_ids[chart["key"]] = chart_id
 
-    dashboard_payload = replace_placeholders(load_json(plan_dir / plan["dashboard"]["payload_file"]), group_id, chart_ids)
+    dashboard_payload = replace_placeholders(load_plan_json(plan_dir, plan["dashboard"]["payload_file"]), group_id, chart_ids)
     dashboard_response = request_json("POST", f"{base}/dashboard", token, dashboard_payload)
     dashboard_id = str(dashboard_response.get("id", ""))
     if not dashboard_id:
@@ -287,7 +315,7 @@ def reconcile_plan(
         )
 
     if str(group_info.get("id", "") or ""):
-        group_payload = load_json(plan_dir / group_info["payload_file"])
+        group_payload = load_plan_json(plan_dir, group_info["payload_file"])
         current_group = request_json("GET", f"{base}/dashboardgroup/{group_id}", token)
         request_json(
             "PUT",
@@ -299,7 +327,7 @@ def reconcile_plan(
     for chart in plan["charts"]:
         chart_id = chart_ids[chart["key"]]
         current_chart = request_json("GET", f"{base}/chart/{chart_id}", token)
-        chart_payload = load_json(plan_dir / chart["payload_file"])
+        chart_payload = load_plan_json(plan_dir, chart["payload_file"])
         request_json(
             "PUT",
             f"{base}/chart/{chart_id}",
@@ -308,7 +336,7 @@ def reconcile_plan(
         )
 
     dashboard_payload = replace_placeholders(
-        load_json(plan_dir / plan["dashboard"]["payload_file"]),
+        load_plan_json(plan_dir, plan["dashboard"]["payload_file"]),
         group_id,
         chart_ids,
     )

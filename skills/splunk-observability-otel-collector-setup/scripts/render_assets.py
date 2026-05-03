@@ -160,7 +160,22 @@ def parse_args() -> argparse.Namespace:
     bool_arg(parser, "enable-operator-crds", True)
     bool_arg(parser, "enable-certmanager", False)
     bool_arg(parser, "enable-secure-app", False)
-    return parser.parse_args()
+    args = parser.parse_args()
+    # Catch non-numeric or non-positive --gateway-replicas at parse time so
+    # the failure surfaces as a clean argparse-style error instead of an
+    # unhandled ValueError deep inside k8s_values() during rendering.
+    try:
+        replicas = int(args.gateway_replicas)
+    except (TypeError, ValueError):
+        parser.error(
+            f"--gateway-replicas must be an integer (got {args.gateway_replicas!r})"
+        )
+    if replicas < 1:
+        parser.error(
+            f"--gateway-replicas must be >= 1 (got {replicas})"
+        )
+    args.gateway_replicas = str(replicas)
+    return args
 
 
 def rendered_plan(args: argparse.Namespace) -> dict[str, object]:
@@ -432,8 +447,15 @@ kubectl {kube_prefix}"${{secret_args[@]}}" --dry-run=client -o yaml | kubectl {k
     )
 
     chart_version_line = ""
+    chart_version_warn_block = (
+        "echo \"WARN: helm-install.sh was rendered WITHOUT --chart-version; the install\" >&2\n"
+        "echo \"      will float to whatever splunk-otel-collector-chart tag the helm repo\" >&2\n"
+        "echo \"      currently advertises. Pin a known-good chart version with the\" >&2\n"
+        "echo \"      --chart-version flag on render to make this install reproducible.\" >&2\n"
+    )
     if args.chart_version:
         chart_version_line = f"    --version {shell_quote(args.chart_version)} \\\n"
+        chart_version_warn_block = ""
     helm_context_line = ""
     if args.kube_context:
         helm_context_line = f"    --kube-context {shell_quote(args.kube_context)} \\\n"
@@ -447,7 +469,7 @@ script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 namespace={shell_quote(args.namespace)}
 release_name={shell_quote(args.release_name)}
 
-helm repo add splunk-otel-collector-chart https://signalfx.github.io/splunk-otel-collector-chart --force-update
+{chart_version_warn_block}helm repo add splunk-otel-collector-chart https://signalfx.github.io/splunk-otel-collector-chart --force-update
 helm repo update splunk-otel-collector-chart
 helm upgrade --install "${{release_name}}" splunk-otel-collector-chart/splunk-otel-collector \\
     --namespace "${{namespace}}" \\

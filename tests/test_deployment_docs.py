@@ -77,6 +77,10 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("Splunk_TA_AppDynamics", app_rows)
         self.assertIn("splunk-cisco-app-navigator", app_rows)
         self.assertIn("Splunk_AI_Assistant_Cloud", app_rows)
+        self.assertIn("SplunkAssetRiskIntelligence", app_rows)
+        self.assertIn("Splunk Asset and Risk Intelligence Technical Add-on For Windows", app_rows)
+        self.assertIn("Splunk Asset and Risk Intelligence Technical Add-on For Linux", app_rows)
+        self.assertIn("Splunk Asset and Risk Intelligence Technical Add-on For macOS", app_rows)
         self.assertIn("splunk_app_stream", app_rows)
         self.assertIn("Splunk_TA_stream", app_rows)
         self.assertIn("Splunk_TA_stream_wire_data", app_rows)
@@ -122,8 +126,16 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("| `splunk-stream-setup` wire-data add-on | 5234 |", self.cloud_matrix)
         self.assertIn("| `splunk-stream-setup` forwarder add-on | 5238 |", self.cloud_matrix)
         self.assertIn("| `splunk-itsi-config` content library | 5391 |", self.cloud_matrix)
+        self.assertIn("| `splunk-asset-risk-intelligence-setup` | 7180 |", self.cloud_matrix)
+        self.assertIn("| `splunk-asset-risk-intelligence-setup` Windows TA handoff | 7214 |", self.cloud_matrix)
+        self.assertIn("| `splunk-asset-risk-intelligence-setup` Linux TA handoff | 7416 |", self.cloud_matrix)
+        self.assertIn("| `splunk-asset-risk-intelligence-setup` macOS TA handoff | 7417 |", self.cloud_matrix)
         self.assertIn("| `cisco-appdynamics-setup` | Supported |", self.role_matrix)
         self.assertIn("| `cisco-scan-setup` | Required | None | None | None | None |", self.role_matrix)
+        self.assertIn("| `splunk-asset-risk-intelligence-setup` | Required | Supported | None | None | None |", self.role_matrix)
+        self.assertIn("| `Splunk Asset and Risk Intelligence Technical Add-on For Windows` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |", self.role_matrix)
+        self.assertIn("| `Splunk Asset and Risk Intelligence Technical Add-on For Linux` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |", self.role_matrix)
+        self.assertIn("| `Splunk Asset and Risk Intelligence Technical Add-on For macOS` | `splunk-asset-risk-intelligence-setup` | None | Supported | None | Supported | None |", self.role_matrix)
         self.assertIn("| `splunk-ai-assistant-setup` | Required | None | None | None | None |", self.role_matrix)
         self.assertIn("| `cisco-product-setup` | Supported | None | Supported |", self.role_matrix)
         self.assertIn("| `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required |", self.role_matrix)
@@ -137,6 +149,35 @@ class DeploymentDocRegressionTests(unittest.TestCase):
         self.assertIn("| `splunk-enterprise-host-setup` | Supported | Supported | Supported |", self.role_matrix)
         self.assertIn("| `splunk-enterprise-kubernetes-setup` | Supported | Supported | None | None | None |", self.role_matrix)
         self.assertIn("| `splunk-observability-native-ops` | None | None | None | None | None |", self.role_matrix)
+
+    def test_ari_full_coverage_docs_are_visible(self) -> None:
+        ari_skill = (
+            REPO_ROOT / "skills/splunk-asset-risk-intelligence-setup/SKILL.md"
+        ).read_text(encoding="utf-8")
+        ari_reference = (
+            REPO_ROOT / "skills/splunk-asset-risk-intelligence-setup/reference.md"
+        ).read_text(encoding="utf-8")
+        combined = "\n".join(
+            [self.readme, self.cloud_matrix, self.role_matrix, ari_skill, ari_reference]
+        )
+
+        for phrase in (
+            "post-install config",
+            "usage data",
+            "ARI Add-ons",
+            "ARI Echo",
+            "Exposure Analytics",
+            "ES risk factors",
+            "event searches",
+            "data source priorities",
+            "metric exceptions",
+            "responses",
+            "audit",
+            "troubleshooting",
+            "release notes",
+        ):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, combined)
 
     def test_enterprise_install_docs_match_ssh_staging_behavior(self) -> None:
         stale_phrases = (

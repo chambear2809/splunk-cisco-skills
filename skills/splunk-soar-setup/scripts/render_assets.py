@@ -230,14 +230,25 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
     out["make-cluster-node.sh"] = make_script(cluster_body)
 
     primary = hosts[0] if hosts else "<primary-host>"
+    # backup.sh / restore.sh: pass SOAR_HOME and BACKUP_PATH to the remote bash
+    # via `bash -s --` positional args. The remote heredoc is single-quoted,
+    # which means the LOCAL shell does not expand $1/$2 — the values are only
+    # bound on the remote side after ssh has handed them through argv. This
+    # avoids the previous pattern that interpolated $BACKUP_PATH into a
+    # double-quoted ssh argument, where a value like `; rm -rf /` would have
+    # been executed remotely.
     backup_body = (
         f"SOAR_HOME={soar_home}\n"
         f'PRIMARY_HOST="{primary}"\n'
         f"SSH_USER={soar_ssh}\n"
-        'ssh -o StrictHostKeyChecking=accept-new "${SSH_USER}@${PRIMARY_HOST}" "\n'
-        "  cd ${SOAR_HOME}/bin\n"
-        "  phenv python backup.pyc --all\n"
-        '"\n'
+        'ssh -o StrictHostKeyChecking=accept-new \\\n'
+        '    "${SSH_USER}@${PRIMARY_HOST}" \\\n'
+        '    bash -s -- "${SOAR_HOME}" <<\'REMOTE\'\n'
+        "set -euo pipefail\n"
+        'soar_home="$1"\n'
+        'cd "${soar_home}/bin"\n'
+        "phenv python backup.pyc --all\n"
+        "REMOTE\n"
         'echo "OK: backup complete. Snapshot is in ${SOAR_HOME}/data/phantom_backups/ on ${PRIMARY_HOST}."\n'
     )
     out["backup.sh"] = make_script(backup_body)
@@ -247,10 +258,15 @@ def render_onprem_cluster(args: argparse.Namespace) -> dict:
         f'PRIMARY_HOST="{primary}"\n'
         f"SSH_USER={soar_ssh}\n"
         'BACKUP_PATH="${BACKUP_PATH:?set BACKUP_PATH=/path/to/phantom_backup_*.tgz on the primary host}"\n'
-        'ssh -o StrictHostKeyChecking=accept-new "${SSH_USER}@${PRIMARY_HOST}" "\n'
-        "  cd ${SOAR_HOME}/bin\n"
-        "  phenv python ibackup.pyc --restore --backup ${BACKUP_PATH}\n"
-        '"\n'
+        'ssh -o StrictHostKeyChecking=accept-new \\\n'
+        '    "${SSH_USER}@${PRIMARY_HOST}" \\\n'
+        '    bash -s -- "${SOAR_HOME}" "${BACKUP_PATH}" <<\'REMOTE\'\n'
+        "set -euo pipefail\n"
+        'soar_home="$1"\n'
+        'backup_path="$2"\n'
+        'cd "${soar_home}/bin"\n'
+        'phenv python ibackup.pyc --restore --backup "${backup_path}"\n'
+        "REMOTE\n"
         'echo "OK: restore complete. Verify cluster health via /rest/cluster_node."\n'
     )
     out["restore.sh"] = make_script(restore_body)

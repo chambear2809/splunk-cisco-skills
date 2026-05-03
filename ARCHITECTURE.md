@@ -92,7 +92,7 @@ override the selected profile's role metadata.
 
 ### Skill Roles
 
-The current skills fall into five architectural roles:
+The current skills fall into eight architectural roles:
 
 - **Collector/setup skills** — install apps, create indexes, configure accounts,
   and enable inputs. Examples: AppDynamics, Catalyst, DC Networking,
@@ -110,13 +110,44 @@ The current skills fall into five architectural roles:
   validation requests, deeplinks, and handoffs for UI-only surfaces.
 - **External collector skills** — prepare Splunk-side objects and render
   customer-managed runtimes outside Splunk. Examples:
-  `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup`, and
-  `splunk-observability-otel-collector-setup`.
+  `splunk-connect-for-syslog-setup`, `splunk-connect-for-snmp-setup`,
+  `splunk-observability-otel-collector-setup`, and
+  `splunk-edge-processor-setup` (Splunk-managed source-types,
+  destinations, and SPL2 pipelines on a customer-managed Linux instance tier).
 - **Platform/package skills** — manage generic app delivery or multi-component
   app stacks. Examples: `splunk-app-install`, `splunk-stream-setup`,
   `splunk-enterprise-host-setup`, `splunk-enterprise-kubernetes-setup`,
   `splunk-enterprise-security-install`, `splunk-itsi-setup`, and
   `splunk-mcp-server-setup`.
+- **Platform service skills** — render and manage cross-cutting Splunk
+  Enterprise platform services that other skills consume as a contract.
+  Examples: `splunk-hec-service-setup` (HTTP Event Collector tokens, allowed
+  indexes, ACS payloads), `splunk-federated-search-setup` (FSS2S/FSS3
+  providers and indexes), `splunk-index-lifecycle-smartstore-setup`
+  (SmartStore volumes and retention), `splunk-monitoring-console-setup`
+  (distributed/standalone MC), `splunk-workload-management-setup`
+  (cgroups workload pools and rules), `splunk-license-manager-setup`
+  (license manager + peers), `splunk-agent-management-setup` (server
+  classes / deployment apps), and `splunk-universal-forwarder-setup`
+  (UF runtime bootstrap).
+- **Cluster operations skills** — orchestrate multi-host Splunk Enterprise
+  deployments above per-host install. Example:
+  `splunk-indexer-cluster-setup` (single-site / multisite bootstrap, bundle
+  apply, rolling restart, peer offline, manager redundancy, and migration).
+- **Splunk security product skills** — install, configure readiness, and
+  validate the SIEM portfolio above the platform tier. Examples:
+  `splunk-enterprise-security-install`, `splunk-enterprise-security-config`
+  (operational ES configuration as code), `splunk-security-essentials-setup`,
+  `splunk-attack-analyzer-setup` (Splunk_TA_SAA + Splunk_App_SAA + index +
+  macro), `splunk-asset-risk-intelligence-setup` (ARI indexes, KV Store, and
+  ES Exposure Analytics handoff), `splunk-soar-setup` (On-prem single +
+  cluster, SOAR Cloud onboarding, Automation Broker, Splunk-side apps, and
+  ES integration), `splunk-uba-setup` (UBA / Premier UEBA migration
+  readiness), and `splunk-security-portfolio-setup` (router that resolves
+  product names to the right delegate skill).
+- **Splunk Cloud control-plane skills** — manage Cloud-only platform surfaces.
+  Example: `splunk-cloud-acs-allowlist-setup` (the seven ACS IP allowlist
+  features for IPv4 and IPv6 with subnet-limit and lock-out preflight).
 
 ### CI And Validation
 

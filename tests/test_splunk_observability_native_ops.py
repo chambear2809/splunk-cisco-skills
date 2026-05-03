@@ -362,26 +362,42 @@ def test_apm_rum_and_logs_render_validate_deeplink_or_handoff_not_false_apply(tm
             assert item["coverage"] in {"deeplink", "handoff"}
 
 
-def test_on_call_schedules_are_handoff_and_explicit_api_requests_are_separate(tmp_path: Path) -> None:
+def test_on_call_section_is_deeplink_only_handoff_pointing_to_oncall_skill(tmp_path: Path) -> None:
+    """The on_call section in native-ops is a deeplink-only handoff.
+
+    The full Splunk On-Call lifecycle lives in the dedicated
+    `splunk-oncall-setup` skill. This test pins the supersede behavior:
+    no `service: on_call` actions are emitted, and an `api_request` kind
+    is no longer recognized as a write path.
+    """
     spec_path = write_spec(
         tmp_path / "oncall.json",
         on_call=[
-            {"kind": "rotation", "name": "Primary rotation", "team": "Checkout SRE", "shifts": []},
-            {"kind": "api_request", "name": "List teams", "method": "GET", "path": "/teams"},
+            {"name": "Primary rotation handoff"},
         ],
     )
     output_dir = tmp_path / "rendered"
-    result = run_setup("--render", "--apply", "--dry-run", "--json", "--spec", str(spec_path), "--output-dir", str(output_dir))
+    result = run_setup("--render", "--spec", str(spec_path), "--output-dir", str(output_dir))
 
     assert result.returncode == 0, combined_output(result)
-    dry_run = json.loads(result.stdout)
-    assert any(
-        item["service"] == "on_call" and item["path"] == "/teams" and item["coverage"] == "api_validate"
-        for item in dry_run["sequence"]
-    )
     coverage = json.loads((output_dir / "coverage-report.json").read_text(encoding="utf-8"))
-    assert any(item["object_type"] == "on_call" and item["coverage"] == "handoff" for item in coverage["objects"])
-    assert any(item["object_type"] == "on_call" and item["coverage"] == "api_validate" for item in coverage["objects"])
+    plan = json.loads((output_dir / "apply-plan.json").read_text(encoding="utf-8"))
+
+    on_call_items = [item for item in coverage["objects"] if item["object_type"] == "on_call"]
+    assert on_call_items, "on_call should still produce a coverage entry"
+    assert all(item["coverage"] == "handoff" for item in on_call_items), (
+        "on_call entries must be handoff-only after the supersede"
+    )
+    assert not any(action.get("service") == "on_call" for action in plan["actions"]), (
+        "native-ops apply-plan must never emit on_call API actions"
+    )
+
+
+def test_oncall_secret_flags_are_rejected_with_redirect_to_oncall_skill(tmp_path: Path) -> None:
+    spec_path = write_spec(tmp_path / "oncall.json", on_call=[])
+    result = run_setup("--validate", "--spec", str(spec_path), "--oncall-api-key", "INLINE")
+    assert result.returncode == 1
+    assert "splunk-oncall-setup" in combined_output(result)
 
 
 def test_dry_run_json_is_deterministic_and_has_no_network_responses(tmp_path: Path) -> None:

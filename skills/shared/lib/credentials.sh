@@ -355,6 +355,16 @@ load_observability_cloud_settings() {
     _load_credential_values_from_file "${_CRED_FILE}"
 }
 
+# Load Splunk On-Call settings (SPLUNK_ONCALL_API_ID,
+# SPLUNK_ONCALL_API_KEY_FILE, SPLUNK_ONCALL_REST_INTEGRATION_KEY_FILE,
+# SPLUNK_ONCALL_DEFAULT_ROUTING_KEY) from the project credentials file.
+# Used by the splunk-oncall-setup skill. The API key and REST endpoint
+# integration key live in chmod-600 files and are never stored inline in
+# the credentials file or environment.
+load_oncall_settings() {
+    _load_credential_values_from_file "${_CRED_FILE}"
+}
+
 _search_profile_overrides_key() {
     case "${1:-}" in
         SPLUNK_HOST|SPLUNK_MGMT_PORT|SPLUNK_SEARCH_API_URI|SPLUNK_URI|SPLUNK_SSH_HOST|SPLUNK_SSH_PORT|SPLUNK_SSH_USER|SPLUNK_SSH_PASS|SPLUNK_REMOTE_TMPDIR|SPLUNK_REMOTE_SUDO|SPLUNK_USER|SPLUNK_PASS)

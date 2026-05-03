@@ -1,0 +1,12 @@
+interface:
+  display_name: "Splunk Platform <-> Splunk Observability Cloud Integration"
+  short_description: "Pair Splunk Cloud Platform / Splunk Enterprise with Splunk Observability Cloud end-to-end"
+  default_prompt: >-
+    Use $splunk-observability-cloud-integration-setup to render, validate,
+    apply, or diagnose the Splunk Platform <-> Splunk Observability Cloud
+    integration: Unified Identity or Service Account pairing, multi-org
+    default-org, Centralized RBAC, the Discover Splunk Observability Cloud
+    app's Configurations tabs, Log Observer Connect, Related Content
+    previews, Dashboard Studio O11y metrics, and the Splunk Infrastructure
+    Monitoring Add-on (Splunk_TA_sim, Splunkbase 5247) install + account +
+    curated SignalFlow modular inputs.

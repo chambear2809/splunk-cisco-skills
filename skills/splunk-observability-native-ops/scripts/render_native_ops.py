@@ -840,40 +840,33 @@ def render_logs(ctx: RenderContext, entries: list[Any]) -> None:
 
 
 def render_on_call(ctx: RenderContext, entries: list[Any]) -> None:
+    """Render On-Call entries as deeplink-only handoffs.
+
+    The full Splunk On-Call lifecycle (teams, users, rotations, escalation
+    policies, routing keys, scheduled overrides, paging policies, alert
+    rules, maintenance mode, incidents, REST endpoint alerts, and
+    Splunk-side companion app installs) lives in the dedicated
+    ``splunk-oncall-setup`` skill. This skill only emits a handoff
+    pointing operators there; it no longer performs On-Call API requests
+    or accepts On-Call credentials.
+    """
+    if not entries:
+        return
     for raw_entry in entries:
         entry = mapping_item(raw_entry, "on_call[]")
         name = str(entry.get("name", "on-call-workflow")).strip() or "on-call-workflow"
-        kind = str(entry.get("kind", "handoff")).strip().lower()
-        if kind == "api_request":
-            method = str(entry.get("method", "GET")).upper()
-            path = str(entry.get("path", "/")).strip()
-            if not path.startswith("/"):
-                raise SpecError(f"on_call {name!r} api_request path must start with '/'.")
-            payload_file = None
-            if "payload" in entry:
-                payload_file = ctx.write_payload(Path("payloads") / "on-call" / f"{slugify(name)}.json", entry["payload"])
-            writes = method not in {"GET", "HEAD", "OPTIONS"}
-            coverage = "api_apply" if writes else "api_validate"
-            ctx.add_action("on-call-api-request", "on_call", name, coverage, method, path, payload_file, writes=writes, service="on_call")
-            ctx.add_coverage(
-                "on_call",
-                name,
-                coverage,
-                "Optional Splunk On-Call API request rendered with separate API ID and key file handling.",
-                [payload_file] if payload_file else [],
-                DOC_SOURCES["on_call"],
-            )
-            continue
         rendered = {key: value for key, value in entry.items() if key != "api_request"}
         rel = ctx.write_payload(Path("payloads") / "on-call" / f"{slugify(name)}.handoff.json", rendered)
         ctx.add_handoff(
             "on_call",
             name,
-            "On-Call schedules, rotations, escalation policies, routing keys, and calendars require operator handoff unless an explicit On-Call API request is supplied.",
+            "Splunk On-Call configuration is managed by the splunk-oncall-setup skill.",
             [
                 f"Use rendered handoff object: {rel}",
-                "Confirm schedule ownership, rotations, shift boundaries, escalation policy targets, and calendar publishing in Splunk On-Call.",
-                "Use --oncall-api-id and --oncall-api-key-file only for explicit on_call kind: api_request entries.",
+                "Run the splunk-oncall-setup skill for teams, users, rotations, escalation policies, "
+                "routing keys, paging policies, alert rules, maintenance mode, incidents, REST endpoint "
+                "alerts, and Splunk-side companion app installs (Splunkbase 3546, 4886, 5863).",
+                "See: skills/splunk-oncall-setup/SKILL.md.",
             ],
             DOC_SOURCES["on_call"],
         )

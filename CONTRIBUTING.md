@@ -62,10 +62,10 @@ pre-commit run --all-files
 
 Hooks include trailing-whitespace, JSON/YAML validity, private-key detection,
 `bash -n` on every skill script, the SKILL frontmatter contract, the
-repo-readiness check (catalog parity / symlinks), `generate_deployment_docs.py
---check`, `ruff`, and `yamllint`. The full pytest / bats / shellcheck suite is
-intentionally not in pre-commit: keep those in CI and in the explicit commands
-below for fast local feedback.
+repo-readiness check (catalog parity / symlinks),
+`generate_deployment_docs.py --check`, `ruff`, and `yamllint`. The full
+pytest / bats / shellcheck suite is intentionally not in pre-commit: keep
+those in CI and in the explicit commands below for fast local feedback.
 
 ## Required Checks
 

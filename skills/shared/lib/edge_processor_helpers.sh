@@ -59,10 +59,23 @@ ep_api_call() {
     fi
     # Read TLS args into a bash array. mapfile is simpler but less portable;
     # use a here-string to keep behavior deterministic on macOS bash 3.x.
-    local tls_args=()
-    while IFS= read -r line; do
-        [[ -n "${line}" ]] && tls_args+=("${line}")
-    done < <(_ep_curl_tls_args || true)
+    # _ep_curl_tls_args returns 1 when EP_API_CA_CERT is misconfigured; we
+    # must propagate that error rather than silently falling back to default
+    # curl verification (which could mask MITM-relevant misconfiguration).
+    local tls_args=() tls_status=0
+    {
+        while IFS= read -r line; do
+            [[ -n "${line}" ]] && tls_args+=("${line}")
+        done
+    } < <(_ep_curl_tls_args; printf 'STATUS=%d\n' "$?")
+    if [[ "${#tls_args[@]}" -gt 0 ]] && [[ "${tls_args[-1]}" == STATUS=* ]]; then
+        tls_status="${tls_args[-1]#STATUS=}"
+        unset 'tls_args[-1]'
+    fi
+    if (( tls_status != 0 )); then
+        log "ERROR: Edge Processor TLS configuration invalid (EP_API_CA_CERT/EP_API_INSECURE)."
+        return 1
+    fi
     local token
     token="$(cat "${token_file}")"
     # printf is a bash builtin, so the token does not appear in any separate

@@ -1,0 +1,326 @@
+# Splunk On-Call full-coverage example. Mirrors the exact spec model
+# documented in references/coverage.md. Use this as the starting point for
+# `--render --validate` and trim it down to the sections you need.
+api_version: splunk-oncall-setup/v1
+
+org_slug: acme-corp
+api_base: https://api.victorops.com
+default_routing_key: catchall
+
+users:
+  - kind: create
+    username: alice
+    firstName: Alice
+    lastName: Anderson
+    email: alice@example.com
+    role: team_admin
+    contact_methods:
+      emails:
+        - rank: 1
+          email: alice@example.com
+      phones:
+        - rank: 1
+          phone: "+15555550101"
+          type: phone
+  - kind: create
+    username: bob
+    firstName: Bob
+    lastName: Brown
+    email: bob@example.com
+    role: user
+  - kind: create
+    username: stakeholder1
+    firstName: Stake
+    lastName: Holder
+    email: stake@example.com
+    role: stakeholder
+
+teams:
+  - kind: create
+    name: Checkout SRE
+    # The `slug` is the system-generated team slug returned by Splunk On-Call
+    # when the team is first created (format: `team-AbCd1234`). Apply the
+    # team-create action first, copy the slug from the response, paste it
+    # here, then re-render and apply the dependent member / rotation /
+    # escalation-policy actions. Without `slug:`, those dependents fall back
+    # to handoff coverage entries documenting the same two-pass workflow.
+    slug: team-AbCd1234EXAMPLE
+    members:
+      - alice
+      - bob
+    admins:
+      - alice
+
+rotations:
+  - kind: create
+    team: Checkout SRE
+    name: Checkout primary
+    timezone: America/New_York
+    shifts:
+      - name: Weekday primary
+        type: partial_day
+        start_time: "09:00"
+        end_time: "17:00"
+        days_of_week: [Mon, Tue, Wed, Thu, Fri]
+        members:
+          - alice
+          - bob
+
+escalation_policies:
+  - kind: create
+    team: Checkout SRE
+    name: Checkout escalation
+    steps:
+      - timeout_minutes: 0
+        targets:
+          - type: rotation_group
+            slug: checkout-primary
+      - timeout_minutes: 15
+        targets:
+          - type: user
+            slug: alice
+          - type: user
+            slug: bob
+
+routing_keys:
+  - kind: create
+    routingKey: checkout
+    targets:
+      - team: Checkout SRE
+        policy: Checkout escalation
+
+paging_policies:
+  personal:
+    - username: alice
+      steps:
+        - rules:
+            - type: PUSH
+              timeout_seconds: 60
+            - type: SMS
+              timeout_seconds: 120
+
+scheduled_overrides:
+  - kind: create
+    origOnCallUser: alice
+    overrideOnCallUser: bob
+    start: "2026-06-01T00:00:00Z"
+    end: "2026-06-08T00:00:00Z"
+    assignments:
+      - policySlug: pol-checkout-escalation
+
+alert_rules:
+  - kind: create
+    alertField: monitoring_tool
+    alertValueMatch: splunk
+    matchType: WILDCARD
+    rank: 1
+    stopFlag: false
+    routeKey: checkout
+    annotations:
+      - annotationType: url
+        fieldName: Runbook
+        fieldValue: https://runbooks.example.com/${{entity_id}}
+  - kind: create
+    alertField: state_message
+    alertValueMatch: "(?i)database\\s+down"
+    matchType: REGEX
+    rank: 2
+    stopFlag: true
+    annotations:
+      - annotationType: note
+        fieldName: Note
+        fieldValue: Auto-tagged by Rules Engine.
+
+maintenance_mode:
+  - kind: status
+  # Uncomment to actually start a window during apply:
+  # - kind: start
+  #   names:
+  #     - "Checkout deploy 2026-06-01"
+  #   routingKeys:
+  #     - checkout
+
+incidents:
+  - kind: create
+    summary: "Checkout HTTP 5xx burst"
+    details: "Burst of 5xx from edge proxy."
+    userName: alice
+    targets:
+      - type: EscalationPolicy
+        slug: pol-checkout-escalation
+    isMultiResponder: false
+    state_start_time: 1735689600
+  - kind: ack
+    incidentNumbers:
+      - "12345"
+    userName: alice
+  - kind: resolve
+    incidentNumbers:
+      - "12345"
+    userName: alice
+    message: Resolved after database failover.
+
+notes:
+  - incidentNumber: "12345"
+    kind: create
+    noteName: investigation-step-1
+    body: "Confirmed primary DB CPU steady-state."
+
+chat_messages:
+  - team: Checkout SRE
+    message: "Heads up: deploy window starts at 14:00 UTC."
+
+stakeholder_messages:
+  - title: "Checkout incident update"
+    message: "Engineers are investigating elevated checkout latency."
+    incidentId: 12345
+    recipients:
+      - stakeholder1
+    recipientTeams: []
+
+webhooks:
+  - kind: inventory
+  - kind: planned
+    name: Slack channel webhook
+    url: https://hooks.slack.com/services/EXAMPLE/EXAMPLE/EXAMPLE
+    method: POST
+    contentType: application/json
+    eventType: Incident-Triggered
+
+reporting:
+  - kind: shift_changes
+    team: Checkout SRE
+    days: 7
+  - kind: incident_history
+    days: 7
+
+schedules:
+  - kind: team
+    team: Checkout SRE
+    daysForward: 90
+  - kind: user
+    user: alice
+
+rest_alerts:
+  - alert_name: critical_disk_low
+    message_type: CRITICAL
+    entity_id: disk_space/db01
+    entity_display_name: Critically Low Disk Space on DB01
+    state_message: The disk is full. Free space is 1%.
+    monitoring_tool: splunk
+    routing_key: checkout
+    annotations:
+      - kind: url
+        title: Runbook
+        value: https://runbooks.example.com/disk-space
+      - kind: note
+        title: Note
+        value: Auto-resolves once free space recovers above 10%.
+
+email_alerts:
+  - kind: handoff
+    integration_name: Splunk On-Call generic email
+    routing_key: checkout
+
+integrations:
+  - kind: slack
+    name: Slack notifications for Checkout SRE
+  - kind: microsoft_teams
+    name: Teams notifications for Platform Ops
+  - kind: webex_teams
+    name: Webex bridge for SRE
+  - kind: servicenow
+    name: ServiceNow SecOps bidirectional
+    instance_url: https://example.service-now.com
+  - kind: statuspage
+    name: Customer status page
+    page_id: abc123
+  - kind: twilio_live_call_routing
+    name: Twilio LCR for paging
+  - kind: conference_bridge
+    name: Checkout war room bridge
+    team: Checkout SRE
+    url: https://meet.example.com/checkout-warroom
+
+sso:
+  kind: saml
+  company_id: ""
+  idp:
+    name: Okta
+    issuer: https://example.okta.com
+    entity_id: http://www.okta.com/exk1abc
+  contacts:
+    - email: oncall-admin@example.com
+
+reports:
+  - kind: post_incident_review
+    incident_number: 12345
+  - kind: on_call_review
+    team: Checkout SRE
+    days: 14
+  - kind: mtta_mttr
+    team: Checkout SRE
+    days: 30
+  - kind: team_dashboard
+    team: Checkout SRE
+  - kind: similar_incidents
+    incident_number: 12345
+
+calendars:
+  - kind: team
+    team: Checkout SRE
+  - kind: user
+    user: alice
+
+mobile:
+  - user: alice
+    platform: ios
+  - user: bob
+    platform: android
+
+recovery_polling:
+  enabled: true
+  alert_actions:
+    - alert_name: "Critically Low Disk Space"
+      enable_recovery: true
+      poll_interval: 300
+      inactive_polls: 2
+  scheduled_search:
+    cron_schedule: "*/5 * * * *"
+    schedule_window: 60
+    enabled: true
+
+splunk_side:
+  alert_action_app:
+    splunkbase_id: 3546
+    app_name: victorops_app
+    org_slug: acme-corp
+    install_target: search_head
+  add_on:
+    splunkbase_id: 4886
+    app_name: TA-splunk-add-on-for-victorops
+    install_target: heavy_forwarder
+    indexes:
+      - victorops_users
+      - victorops_teams
+      - victorops_oncall
+      - victorops_incidents
+    inputs:
+      - kind: victorops_user
+        interval: 3600
+      - kind: victorops_oncall
+        interval: 600
+      - kind: victorops_teams
+        interval: 3600
+      - kind: victorops_incidents
+        interval: 60
+  soar_connector:
+    splunkbase_id: 5863
+    app_name: splunkoncall
+  itsi:
+    enabled: false
+    ea_role: ""
+    ea_mgr_host: ""
+  enterprise_security:
+    adaptive_response: true
+  observability_handoff: true

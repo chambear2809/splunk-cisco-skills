@@ -105,20 +105,10 @@ logs:
     visualization: log_timeline
 
 on_call:
-  - kind: rotation
-    team: Checkout SRE
-    name: Checkout primary
-    timezone: America/New_York
-    shifts:
-      - name: Weekday primary
-        type: partial_day
-        members:
-          - alice
-          - bob
-  - kind: escalation_policy
-    team: Checkout SRE
-    name: Checkout escalation
-    steps:
-      - delay_minutes: 0
-        action: notify_rotation
-        rotation: Checkout primary
+  # The full Splunk On-Call lifecycle (teams, users, rotations, escalation
+  # policies, routing keys, paging policies, alert rules, maintenance mode,
+  # incidents, REST endpoint alerts, and Splunk-side companion app installs)
+  # lives in the dedicated splunk-oncall-setup skill. Entries here are
+  # rendered as deeplink-only handoffs that point operators there.
+  - name: Checkout SRE handoff
+    note: "Run the splunk-oncall-setup skill for full Splunk On-Call coverage."

@@ -10,8 +10,9 @@ description: >-
   forced), fast and enforce-counts peer offline, peer removal from manager
   list, maintenance mode, single-site to multisite migration, decommission a
   site, move a peer to a new site, migrate a non-clustered indexer into the
-  cluster, pass4SymmKey rotation, manager DR backup, and forwarder
-  indexer-discovery output snippets. Use when the user asks to bootstrap an
+  cluster, and forwarder indexer-discovery output snippets. Cluster
+  pass4SymmKey is templated as `$IDXC_SECRET` for operator-managed rotation
+  (see Operations & Out of Scope). Use when the user asks to bootstrap an
   indexer cluster, multisite cluster, configure site_replication_factor /
   site_search_factor, apply or rollback a cluster bundle, perform a rolling
   restart, take a peer offline, migrate single-site to multisite, or run
@@ -179,6 +180,19 @@ Under `splunk-indexer-cluster-rendered/cluster/`:
 - Emits a `LICENSE_PEERS[]` stub at `splunk-indexer-cluster-rendered/cluster/handoffs/license-peers.txt` so `splunk-license-manager-setup` can wire up the license peer config.
 - Warns when bundle apps include SmartStore-aware files and points to
   [`skills/splunk-index-lifecycle-smartstore-setup`](../../skills/splunk-index-lifecycle-smartstore-setup/SKILL.md) for `indexes.conf` rendering.
+
+## Out of Scope
+
+- **Cluster `pass4SymmKey` rotation**: rendered `server.conf` files contain
+  `pass4SymmKey = $IDXC_SECRET` so the operator can manage the secret out of
+  band (env var, secrets manager, `splunk hash-passwd`). Rotating the secret
+  cluster-wide remains a manual rolling restart with the new value; this
+  skill does not orchestrate that rolling rotation.
+- **Manager DR backup / restore**: backup/restore of `master-apps/` and
+  manager state is operator-owned. The redundancy templates render
+  active/standby manager pairs but do not snapshot or replay manager state.
+- **Splunk Cloud indexer clusters**: Splunk-managed; this skill targets
+  self-managed Splunk Enterprise only.
 
 ## References
 

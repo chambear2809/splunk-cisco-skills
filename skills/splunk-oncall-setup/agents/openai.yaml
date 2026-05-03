@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk On-Call Setup"
+  short_description: "Render and apply Splunk On-Call (formerly VictorOps) teams, rotations, escalation policies, alert rules, REST endpoint alerts, and Splunk-side companion apps"
+  default_prompt: >-
+    Use $splunk-oncall-setup to render and optionally apply Splunk On-Call
+    objects with explicit coverage status for API-backed, deeplink, handoff,
+    and Splunkbase-install workflows. File-based secrets only.

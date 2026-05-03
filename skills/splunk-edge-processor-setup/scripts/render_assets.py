@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import stat
 from pathlib import Path
@@ -52,6 +53,22 @@ def csv_list(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+# Instance hostnames are interpolated into rendered file PATHS like
+# `host/{host}/install-with-systemd.sh`. We restrict the value to a DNS-
+# label / IP character class so a bogus value like `../../etc/passwd`
+# cannot escape the operator's chosen output directory.
+_HOST_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+
+def validate_host_token(host: str) -> str:
+    if not host or not _HOST_RE.fullmatch(host):
+        die(
+            f"--ep-instances host {host!r} is not a valid hostname/IP token "
+            "(allowed: letters, digits, '.', '_', '-')."
+        )
+    return host
+
+
 def write_file(path: Path, content: str, executable: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -94,7 +111,7 @@ def parse_instances(value: str) -> list[dict]:
         if "=" not in entry:
             die(f"--ep-instances entry needs host=mode: {entry!r}")
         host, mode = entry.split("=", 1)
-        host = host.strip()
+        host = validate_host_token(host.strip())
         mode = mode.strip()
         if mode not in VALID_INSTANCE_MODES:
             die(f"--ep-instances mode must be {VALID_INSTANCE_MODES}: {entry!r}")
@@ -211,6 +228,18 @@ def render_pipeline_payload(spec: dict) -> str:
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
+def _spl2_string_literal(value: str) -> str:
+    """Encode an arbitrary Python string as a safe SPL2 double-quoted literal.
+
+    SPL2 string literals follow the same backslash escape conventions as
+    JSON. ``json.dumps`` produces a properly-escaped double-quoted string
+    for any input, so values containing ``"``, ``\\``, newlines, tabs, or
+    other control characters cannot break out of the literal and inject
+    additional pipeline syntax.
+    """
+    return json.dumps(value, ensure_ascii=False)
+
+
 def render_pipeline_spl2(spec: dict, destination: dict | None) -> str:
     field = next((k for k in spec.keys() if k not in ("name", "partition", "destination", "spl2_file")), "")
     if field:
@@ -219,12 +248,17 @@ def render_pipeline_spl2(spec: dict, destination: dict | None) -> str:
             op, val = raw.split(":", 1)
         else:
             op, val = "equals", raw
+        # Field names are operator-supplied; we keep the existing identifier
+        # contract (must match the SPL2 identifier shape). The VALUE is
+        # passed through json.dumps so quotes/backslashes/newlines cannot
+        # close the string literal and inject SPL2.
+        val_lit = _spl2_string_literal(val)
         if op in ("equals",):
-            cond = f'{field} == "{val}"'
+            cond = f'{field} == {val_lit}'
         elif op in ("matches",):
-            cond = f'match({field}, "{val}")'
+            cond = f'match({field}, {val_lit})'
         else:
-            cond = f'{field} == "{val}"'
+            cond = f'{field} == {val_lit}'
         if spec["partition"].lower() == "remove":
             cond = f'NOT ({cond})'
     else:

@@ -30,16 +30,16 @@ Modes:
   --json                Emit JSON output where supported
 
 Options:
-  --spec PATH                 YAML or JSON native operations spec
-  --output-dir DIR            Rendered output directory
-  --realm REALM               Observability realm, such as us0
-  --token-file PATH           File containing an Observability API token for live apply
-  --oncall-api-id ID          Splunk On-Call API ID for explicit on_call API actions
-  --oncall-api-key-file PATH  File containing a Splunk On-Call API key for live On-Call API actions
-  --help                      Show this help
+  --spec PATH         YAML or JSON native operations spec
+  --output-dir DIR    Rendered output directory
+  --realm REALM       Observability realm, such as us0
+  --token-file PATH   File containing an Observability API token for live apply
+  --help              Show this help
 
-Direct secret flags such as --token, --access-token, --api-token, --sf-token,
---oncall-api-key, and --x-vo-api-key are rejected. Use file paths instead.
+Direct secret flags such as --token, --access-token, --api-token, and
+--sf-token are rejected. Use --token-file instead.
+
+Splunk On-Call API actions live in the splunk-oncall-setup skill, not here.
 EOF
 }
 
@@ -53,8 +53,6 @@ SPEC=""
 OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
 REALM="${SPLUNK_O11Y_REALM:-}"
 TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE:-}"
-ONCALL_API_ID=""
-ONCALL_API_KEY_FILE=""
 
 if [[ $# -eq 0 ]]; then
     usage
@@ -72,8 +70,6 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --realm) require_arg "$1" "$#" || exit 1; REALM="$2"; shift 2 ;;
         --token-file) require_arg "$1" "$#" || exit 1; TOKEN_FILE="$2"; shift 2 ;;
-        --oncall-api-id) require_arg "$1" "$#" || exit 1; ONCALL_API_ID="$2"; shift 2 ;;
-        --oncall-api-key-file) require_arg "$1" "$#" || exit 1; ONCALL_API_KEY_FILE="$2"; shift 2 ;;
         --token|--access-token|--api-token|--o11y-token|--sf-token)
             reject_secret_arg "$1" "--token-file"
             exit 1
@@ -82,12 +78,24 @@ while [[ $# -gt 0 ]]; do
             reject_secret_arg "${1%%=*}" "--token-file"
             exit 1
             ;;
-        --oncall-api-key|--on-call-api-key|--x-vo-api-key)
-            reject_secret_arg "$1" "--oncall-api-key-file"
+        --oncall-api-id|--oncall-api-key|--on-call-api-key|--x-vo-api-key)
+            log "ERROR: Splunk On-Call API actions live in the splunk-oncall-setup skill."
+            log "Use: bash skills/splunk-oncall-setup/scripts/setup.sh --apply ..."
             exit 1
             ;;
-        --oncall-api-key=*|--on-call-api-key=*|--x-vo-api-key=*)
-            reject_secret_arg "${1%%=*}" "--oncall-api-key-file"
+        --oncall-api-id=*|--oncall-api-key=*|--on-call-api-key=*|--x-vo-api-key=*)
+            log "ERROR: Splunk On-Call API actions live in the splunk-oncall-setup skill."
+            log "Use: bash skills/splunk-oncall-setup/scripts/setup.sh --apply ..."
+            exit 1
+            ;;
+        --oncall-api-key-file)
+            log "ERROR: Splunk On-Call API actions live in the splunk-oncall-setup skill."
+            log "Use: bash skills/splunk-oncall-setup/scripts/setup.sh --apply --api-key-file ..."
+            exit 1
+            ;;
+        --oncall-api-key-file=*)
+            log "ERROR: Splunk On-Call API actions live in the splunk-oncall-setup skill."
+            log "Use: bash skills/splunk-oncall-setup/scripts/setup.sh --apply --api-key-file ..."
             exit 1
             ;;
         --help|-h) usage; exit 0 ;;
@@ -161,22 +169,12 @@ if [[ "${APPLY}" == "true" ]]; then
         log "ERROR: --token-file is required and must be readable for live --apply."
         exit 1
     fi
-    if [[ "${DRY_RUN}" != "true" && -n "${ONCALL_API_KEY_FILE}" && ! -r "${ONCALL_API_KEY_FILE}" ]]; then
-        log "ERROR: --oncall-api-key-file must be readable when supplied."
-        exit 1
-    fi
     apply_args=(apply --plan-dir "${OUTPUT_DIR}")
     if [[ -n "${REALM}" ]]; then
         apply_args+=(--realm "${REALM}")
     fi
     if [[ -n "${TOKEN_FILE}" ]]; then
         apply_args+=(--token-file "${TOKEN_FILE}")
-    fi
-    if [[ -n "${ONCALL_API_ID}" ]]; then
-        apply_args+=(--oncall-api-id "${ONCALL_API_ID}")
-    fi
-    if [[ -n "${ONCALL_API_KEY_FILE}" ]]; then
-        apply_args+=(--oncall-api-key-file "${ONCALL_API_KEY_FILE}")
     fi
     if [[ "${DRY_RUN}" == "true" ]]; then
         apply_args+=(--dry-run)

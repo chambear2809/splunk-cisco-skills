@@ -1,0 +1,57 @@
+# Splunk-side companion app installation. Pass to setup.sh
+# --install-splunk-app along with --api-id and --api-key-file.
+api_version: splunk-oncall-setup/v1
+
+splunk_side:
+  alert_action_app:
+    splunkbase_id: 3546
+    app_name: victorops_app
+    org_slug: acme-corp
+    install_target: search_head
+    # Optional ITSI hybrid-action overrides.
+    ea_role: ""
+    ea_mgr_host: ""
+  add_on:
+    splunkbase_id: 4886
+    app_name: TA-splunk-add-on-for-victorops
+    install_target: heavy_forwarder
+    indexes:
+      - victorops_users
+      - victorops_teams
+      - victorops_oncall
+      - victorops_incidents
+    inputs:
+      - kind: victorops_user
+        interval: 3600
+      - kind: victorops_oncall
+        interval: 600
+      - kind: victorops_teams
+        interval: 3600
+      - kind: victorops_incidents
+        interval: 60
+  soar_connector:
+    splunkbase_id: 5863
+    app_name: splunkoncall
+    # asset configuration is rendered as a JSON stub for the operator to
+    # paste into SOAR; integration_url is required only for create / update
+    # incident actions.
+    asset_label: splunk-on-call-prod
+  itsi:
+    enabled: false
+    ea_role: ""
+    ea_mgr_host: ""
+  enterprise_security:
+    adaptive_response: true
+  observability_handoff: true
+
+recovery_polling:
+  enabled: true
+  alert_actions:
+    - alert_name: "Critically Low Disk Space"
+      enable_recovery: true
+      poll_interval: 300
+      inactive_polls: 2
+  scheduled_search:
+    cron_schedule: "*/5 * * * *"
+    schedule_window: 60
+    enabled: true

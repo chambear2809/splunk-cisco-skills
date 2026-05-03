@@ -1,0 +1,14 @@
+{
+  "_comment": "Subject CN tokens that identify Splunk-shipped default certificates. The renderer's verify-certs.sh and preflight.sh refuse these. SHA-256 fingerprints are platform-specific and vary by Splunk build, so substring matching on subject is the canonical detection.",
+  "subject_cn_tokens": [
+    "SplunkServerDefaultCert",
+    "SplunkCommonCA",
+    "SplunkWebDefaultCert"
+  ],
+  "default_cert_paths": [
+    "$SPLUNK_HOME/etc/auth/server.pem",
+    "$SPLUNK_HOME/etc/auth/cacert.pem",
+    "$SPLUNK_HOME/etc/auth/splunkweb/cert.pem",
+    "$SPLUNK_HOME/etc/auth/splunkweb/privkey.pem"
+  ]
+}

@@ -56,10 +56,24 @@ soar_rest_call() {
         log "ERROR: SOAR API token missing or empty: ${token_file}"
         return 1
     fi
-    local tls_args=()
-    while IFS= read -r line; do
-        [[ -n "${line}" ]] && tls_args+=("${line}")
-    done < <(_soar_curl_tls_args || true)
+    local tls_args=() tls_status=0
+    # _soar_curl_tls_args may legitimately return 1 when SOAR_API_CA_CERT
+    # points at a missing/empty file. We must NOT swallow that with `|| true`
+    # because doing so would silently fall back to default curl verification
+    # against a broken operator config. Capture status separately and abort.
+    {
+        while IFS= read -r line; do
+            [[ -n "${line}" ]] && tls_args+=("${line}")
+        done
+    } < <(_soar_curl_tls_args; printf 'STATUS=%d\n' "$?")
+    if [[ "${#tls_args[@]}" -gt 0 ]] && [[ "${tls_args[-1]}" == STATUS=* ]]; then
+        tls_status="${tls_args[-1]#STATUS=}"
+        unset 'tls_args[-1]'
+    fi
+    if (( tls_status != 0 )); then
+        log "ERROR: SOAR TLS configuration invalid (SOAR_API_CA_CERT/SOAR_API_INSECURE)."
+        return 1
+    fi
     local token
     token="$(cat "${token_file}")"
     curl -sS \
@@ -122,10 +136,21 @@ _soar_admin_basic_auth_call() {
         log "ERROR: could not parse host from SOAR tenant URL: ${tenant_url}"
         return 1
     fi
-    local tls_args=()
-    while IFS= read -r line; do
-        [[ -n "${line}" ]] && tls_args+=("${line}")
-    done < <(_soar_curl_tls_args || true)
+    local tls_args=() tls_status=0
+    # See soar_rest_call: do not swallow _soar_curl_tls_args failures.
+    {
+        while IFS= read -r line; do
+            [[ -n "${line}" ]] && tls_args+=("${line}")
+        done
+    } < <(_soar_curl_tls_args; printf 'STATUS=%d\n' "$?")
+    if [[ "${#tls_args[@]}" -gt 0 ]] && [[ "${tls_args[-1]}" == STATUS=* ]]; then
+        tls_status="${tls_args[-1]#STATUS=}"
+        unset 'tls_args[-1]'
+    fi
+    if (( tls_status != 0 )); then
+        log "ERROR: SOAR TLS configuration invalid (SOAR_API_CA_CERT/SOAR_API_INSECURE)."
+        return 1
+    fi
     curl -sS \
         ${tls_args[@]+"${tls_args[@]}"} \
         -X "${method}" \
@@ -148,21 +173,34 @@ soar_create_automation_user() {
 
     # 1. Create the user (ignore 409 if already exists). Use mktemp for the
     #    response body so 4xx error bodies don't linger in /tmp/<predictable>.
-    local create_body
+    #    The username is built into JSON via python's json.dumps so any quote,
+    #    backslash, or control character in the value cannot break out of the
+    #    JSON string and modify the request structure.
+    local create_body create_json
     create_body="$(mktemp)"
     chmod 600 "${create_body}"
+    create_json="$(python3 -c '
+import json, sys
+print(json.dumps({"username": sys.argv[1], "type": "automation"}))
+' "${username}")"
     _soar_admin_basic_auth_call "${tenant_url}" "${admin_pw_file}" POST /rest/ph_user \
         -H 'Content-Type: application/json' \
-        --data "{\"username\": \"${username}\", \"type\": \"automation\"}" \
+        --data "${create_json}" \
         > "${create_body}" || true
     rm -f "${create_body}"
 
-    # 2. Look up the user id.
-    local lookup_body user_id
+    # 2. Look up the user id. The username is URL-encoded so that filter
+    #    metacharacters (`"`, `&`, `=`, spaces, etc.) cannot alter the OData
+    #    filter the SOAR `_filter_username` endpoint will parse.
+    local lookup_body user_id encoded_username
+    encoded_username="$(python3 -c '
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1], safe=""))
+' "${username}")"
     lookup_body="$(mktemp)"
     chmod 600 "${lookup_body}"
     _soar_admin_basic_auth_call "${tenant_url}" "${admin_pw_file}" GET \
-        "/rest/ph_user?_filter_username=\"${username}\"&include_automation=1" \
+        "/rest/ph_user?_filter_username=%22${encoded_username}%22&include_automation=1" \
         > "${lookup_body}"
     user_id=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d['data'][0]['id'])" "${lookup_body}")
     rm -f "${lookup_body}"
