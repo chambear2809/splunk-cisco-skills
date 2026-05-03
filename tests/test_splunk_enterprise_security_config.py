@@ -1191,7 +1191,7 @@ def test_package_conf_coverage_classifies_local_es_package() -> None:
     assert families["cloud_integrations"]["managed_by"] == "integrations"
 
 
-def test_package_conf_coverage_plan_and_live_inventory() -> None:
+def test_package_conf_coverage_plan_and_live_inventory(monkeypatch: pytest.MonkeyPatch) -> None:
     plan = engine.PlanBuilder(
         {
             "package_conf_coverage": {
@@ -1219,6 +1219,25 @@ def test_package_conf_coverage_plan_and_live_inventory() -> None:
                     {"name": "analytic_story://three"},
                 ]
             return []
+
+    fake_manifest = {
+        "package_present": True,
+        "package_path": "/tmp/splunk-enterprise-security.spl",
+        "family_count": 1,
+        "families": [
+            {
+                "name": "analyticstories",
+                "apps": ["SplunkEnterpriseSecuritySuite"],
+                "file_count": 1,
+                "stanza_count": 3,
+                "sample_stanzas": ["analytic_story://one"],
+                "managed_by": "package_conf_coverage",
+            }
+        ],
+        "unclassified": [],
+        "export_notes": "test manifest",
+    }
+    monkeypatch.setattr(engine, "package_conf_coverage_manifest", lambda _root: fake_manifest)
 
     inventory = FakePackageConfClient(
         REPO_ROOT,

@@ -559,7 +559,7 @@ prepare_render_package_path() {
     else
         validate_package_type_matches_path "${PACKAGE_PATH}" "${PACKAGE_TYPE}"
     fi
-    validate_target_package_type
+    validate_target_package_type "${PACKAGE_TYPE}"
 }
 
 dry_run_plan() {
@@ -589,7 +589,7 @@ validate_inputs() {
     validate_choice "${ENROLL_MODE}" none deployment-server enterprise-indexers splunk-cloud
     validate_choice "${USE_ACK}" true false
     validate_target_arch
-    validate_target_package_type
+    validate_target_package_type "${PACKAGE_TYPE}"
 
     validate_positive_int "${PHONE_HOME_INTERVAL}" "phone-home interval"
     validate_no_newline "${ADMIN_USER}" "admin user"
@@ -757,7 +757,7 @@ pick_package_path() {
         PACKAGE_TYPE="$(hbs_detect_package_type "${PACKAGE_PATH}")"
     fi
     validate_package_type_matches_path "${PACKAGE_PATH}" "${PACKAGE_TYPE}"
-    validate_target_package_type
+    validate_target_package_type "${PACKAGE_TYPE}"
     require_universal_forwarder_package "${PACKAGE_PATH}"
 
     if [[ -n "${LATEST_UF_METADATA}" ]]; then
