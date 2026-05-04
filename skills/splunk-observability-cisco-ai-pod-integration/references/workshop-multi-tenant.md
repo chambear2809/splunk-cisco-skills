@@ -23,10 +23,10 @@ TENANTS=("alice" "bob" "carol")
 
 for tenant in "${TENANTS[@]}"; do
     namespace="tenant-${tenant}"
-    
+
     kubectl create namespace "${namespace}" --dry-run=client -o yaml | kubectl apply -f -
     kubectl label namespace "${namespace}" tenant="${tenant}" --overwrite
-    
+
     cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: ServiceAccount

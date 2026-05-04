@@ -42,10 +42,11 @@ federation credentials. Use the new
    (e.g., `srchIndexesAllowed = main;summary` only; no admin caps).
 2. **`acceptFrom`**: add the consumer SH IPs/CIDR to
    `server.conf [httpServer] acceptFrom`. The skill's existing
-   acceptFrom rendering already includes a slot for this CIDR;
-   pass the consumer CIDR via `--bastion-cidr` or extend the
-   renderer to accept a `--federation-consumer-cidr` flag (TODO if
-   the operator needs more granularity).
+   acceptFrom rendering already includes a slot for this CIDR.
+   Pass the consumer CIDR via `--bastion-cidr`; if an operator needs
+   separate federation-only granularity, add a dedicated
+   `--federation-consumer-cidr` renderer flag in the same acceptFrom
+   allowlist path.
 3. **mTLS** (Splunk Enterprise 10.0+): set
    `[sslConfig] requireClientCert = true` on the provider and
    distribute a client cert to each consumer. This adds a layer of

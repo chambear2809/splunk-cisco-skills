@@ -2,6 +2,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    cat <<'EOF'
+Usage: bash skills/cisco-scan-setup/scripts/validate.sh [--help]
+
+Validates the deployed Splunk Cisco App Navigator using configured Splunk credentials.
+EOF
+    exit 0
+fi
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="splunk-cisco-app-navigator"

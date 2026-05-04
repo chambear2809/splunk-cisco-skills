@@ -117,7 +117,7 @@ agent:
 
 **Root cause**: An operator hand-edited the values file to put the token inline instead of using the `--set splunkObservability.accessToken=$(cat $TOKEN_FILE)` pattern.
 
-**Fix**: 
+**Fix**:
 
 1. Rotated the leaked token immediately.
 2. Removed the inline token from the values file.
