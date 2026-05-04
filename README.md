@@ -1025,7 +1025,33 @@ apply them only when explicitly requested.
 `splunk-observability-native-ops` follows the same no-runtime-placement model
 for native Observability operations: it renders supported API payloads, API
 validation requests, deeplinks, and deterministic operator handoffs for UI-only
-surfaces.
+surfaces. The Observability integration skills
+(`splunk-observability-cloud-integration-setup`,
+`splunk-observability-k8s-auto-instrumentation-setup`,
+`splunk-observability-k8s-frontend-rum-setup`,
+`splunk-observability-thousandeyes-integration`,
+`splunk-observability-isovalent-integration`,
+`splunk-observability-cisco-nexus-integration`,
+`splunk-observability-cisco-intersight-integration`,
+`splunk-observability-nvidia-gpu-integration`, and
+`splunk-observability-cisco-ai-pod-integration`) follow the same render-first
+pattern: they overlay the base Splunk OTel Collector chart from
+`splunk-observability-otel-collector-setup`, pair with existing Splunk Platform
+TA skills where relevant, and hand off dashboards and detectors to
+`splunk-observability-dashboard-builder` and `splunk-observability-native-ops`.
 `splunk-enterprise-kubernetes-setup` is for self-managed Splunk Enterprise on
 Kubernetes: either Splunk Operator for Kubernetes on an existing cluster, or
 Splunk POD on Cisco UCS with the Splunk Kubernetes Installer.
+`cisco-isovalent-platform-setup` installs the Isovalent platform itself
+(Cilium, Tetragon, optional Hubble Enterprise) on Kubernetes; it is explicitly
+not a Splunk TA installer and is the prerequisite for wiring Isovalent
+telemetry into Splunk Platform + Splunk Observability Cloud via
+`splunk-observability-isovalent-integration`.
+`cisco-thousandeyes-mcp-setup` renders Model Context Protocol client
+configurations for Cursor, Claude Code, Codex, VS Code, and AWS Kiro; the
+MCP server itself is operated by Cisco.
+`splunk-platform-pki-setup` is a self-managed Splunk Enterprise platform PKI
+workflow. It mints per-component certificates, renders FIPS wiring and TLS
+algorithm presets, and hands off rolling restart / cluster bundle apply to
+`splunk-indexer-cluster-setup`. Splunk Cloud platform certificates remain
+Splunk-managed.
