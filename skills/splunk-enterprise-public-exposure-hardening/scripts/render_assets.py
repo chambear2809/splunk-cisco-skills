@@ -908,8 +908,8 @@ def render_authentication_conf(args: argparse.Namespace) -> str:
         # on the right (do NOT use comma; spec L654).
         lines.extend([
             "",
-            f"# Splunk role on the LEFT, ';'-separated LDAP groups on the RIGHT.",
-            f"# Group names are case-sensitive (spec L657).",
+            "# Splunk role on the LEFT, ';'-separated LDAP groups on the RIGHT.",
+            "# Group names are case-sensitive (spec L657).",
             f"[roleMap_{strategy}]",
         ])
         if args.ldap_public_reader_group:

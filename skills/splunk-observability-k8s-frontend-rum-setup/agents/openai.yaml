@@ -1,0 +1,17 @@
+interface:
+  display_name: "Splunk Observability Kubernetes Frontend RUM"
+  short_description: "Inject Splunk Browser RUM and Session Replay into Kubernetes-served frontends"
+  default_prompt: >-
+    Use $splunk-observability-k8s-frontend-rum-setup to render and apply
+    Splunk Browser RUM (@splunk/otel-web 2.x) plus optional Session Replay
+    (Splunk recorder) into Kubernetes-served frontends across four injection
+    modes (nginx pod-side ConfigMap, ingress-nginx configuration-snippet,
+    initContainer HTML rewriter for distroless, runtime-config ConfigMap for
+    npm-bundled SDK), with full Frustration Signals 2.0 (rage / dead /
+    error / thrashed cursor), Session Replay sensitivityRules + features +
+    sampler, JavaScript source-map upload helpers wrapping the splunk-rum
+    CLI, RUM-to-APM Server-Timing trace-linking validation, multi-workload
+    spec, distroless detection, ingress-nginx CVE-2021-25742 preflight, and
+    handoffs to splunk-observability-dashboard-builder for RUM dashboards
+    and splunk-observability-native-ops for RUM detectors. This is Splunk
+    Browser RUM, NOT AppDynamics BRUM (handled by cisco-appdynamics-setup).

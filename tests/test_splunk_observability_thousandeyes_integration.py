@@ -192,6 +192,29 @@ def test_token_values_never_appear_in_rendered_output(tmp_path: Path) -> None:
     assert "O11Y_API_TOKEN_SHOULD_NOT_LEAK" not in text
 
 
+def test_rendered_apply_scripts_keep_tokens_off_argv(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+
+    scripts = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in sorted((output / "scripts").glob("*.sh"))
+    )
+    forbidden = (
+        'TE_TOKEN="$(cat "${TE_TOKEN_FILE}")"',
+        'O11Y_API_TOKEN="$(cat "${O11Y_API_TOKEN_FILE}")"',
+        '-H "Authorization: Bearer ${TE_TOKEN}"',
+        '-H "X-SF-Token: ${O11Y_API_TOKEN}"',
+        "os.environ['TE_TOKEN']",
+    )
+    for needle in forbidden:
+        assert needle not in scripts
+    assert '-K "${TE_CURL_CONFIG}"' in scripts
+    assert '-K "${O11Y_CURL_CONFIG}"' in scripts
+
+
 def test_idempotent_re_render(tmp_path: Path) -> None:
     output = tmp_path / "rendered"
     spec = write_spec(tmp_path / "spec.json")

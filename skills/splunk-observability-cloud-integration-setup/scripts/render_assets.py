@@ -764,27 +764,31 @@ def section_pairing(spec: dict[str, Any]) -> str:
             "## Unified Identity (UID) pair",
             "",
             "```bash",
-            "acs --format structured observability pair \\",
-            "  --o11y-access-token \"$(cat \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\")\" \\",
-            f"  --o11y-realm {realm}",
+            "bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh --apply pairing \\",
+            "  --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\" \\",
+            f"  --realm {realm}",
             "```",
             "",
             "Or via the ACS REST API:",
             "",
             "```bash",
+            "SPLUNK_CLOUD_PAIRING_CURL_CONFIG=\"$(mktemp)\"",
+            "chmod 600 \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\"",
+            "{ printf 'header = \"Authorization: Bearer '; tr -d '\\r\\n' < \"${SPLUNK_CLOUD_ADMIN_JWT_FILE}\"; printf '\"\\n';",
+            "  printf 'header = \"o11y-access-token: '; tr -d '\\r\\n' < \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\"; printf '\"\\n'; } > \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\"",
+            "trap 'rm -f \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\"' EXIT",
+            "",
             "curl -X POST 'https://admin.splunk.com/${SPLUNK_CLOUD_STACK}/adminconfig/v2/observability/sso-pairing' \\",
-            "  -H 'Content-Type: application/json' \\",
-            "  -H 'Authorization: Bearer ${SPLUNK_CLOUD_ADMIN_JWT}' \\",
-            "  -H 'o11y-access-token: ${SPLUNK_O11Y_ADMIN_TOKEN}'",
+            "  -K \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\" \\",
+            "  -H 'Content-Type: application/json'",
             "```",
             "",
             "Returns `{\"id\": \"<pairing-id>\"}`. Poll with:",
             "",
             "```bash",
             "curl -X GET 'https://admin.splunk.com/${SPLUNK_CLOUD_STACK}/adminconfig/v2/observability/sso-pairing/${PAIRING_ID}' \\",
-            "  -H 'Content-Type: application/json' \\",
-            "  -H 'Authorization: Bearer ${SPLUNK_CLOUD_ADMIN_JWT}' \\",
-            "  -H 'o11y-access-token: ${SPLUNK_O11Y_ADMIN_TOKEN}'",
+            "  -K \"${SPLUNK_CLOUD_PAIRING_CURL_CONFIG}\" \\",
+            "  -H 'Content-Type: application/json'",
             "```",
             "",
             "Statuses are `SUCCESS`, `FAILED`, or `IN_PROGRESS`.",
@@ -852,8 +856,9 @@ def section_rbac(spec: dict[str, Any]) -> str:
         "## Step 3 (DESTRUCTIVE): enable-centralized-rbac",
         "",
         "```bash",
-        "acs --format structured observability enable-centralized-rbac \\",
-        "  --o11y-access-token \"$(cat \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\")\"",
+        "bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh --apply rbac \\",
+        "  --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\" \\",
+        "  --i-accept-rbac-cutover",
         "```",
         "",
         "After this step Splunk Cloud Platform becomes the RBAC store for Splunk Observability Cloud. UID-mapped users WITHOUT an `o11y_*` role are LOCKED OUT.",
@@ -1254,13 +1259,37 @@ def section_handoff(spec: dict[str, Any]) -> str:
 SHEBANG = "#!/usr/bin/env bash\nset -euo pipefail\n\n"
 
 
+SPLUNK_CURL_AUTH_HELPER = """\
+_curl_config_escape() {
+  local value="${1:-}"
+  value="${value//\\\\/\\\\\\\\}"
+  value="${value//\\"/\\\\\\"}"
+  value="${value//$'\\n'/\\\\n}"
+  value="${value//$'\\r'/\\\\r}"
+  printf '%s' "${value}"
+}
+
+make_splunk_auth_config() {
+  local auth_config
+  auth_config="$(mktemp)"
+  chmod 600 "${auth_config}"
+  printf 'user = "%s:%s"\\n' "$(_curl_config_escape "${SPLUNK_USER}")" "$(_curl_config_escape "${SPLUNK_PASS}")" > "${auth_config}"
+  printf '%s\\n' "${auth_config}"
+}
+
+"""
+
+
 def apply_script_token_auth() -> str:
     return SHEBANG + (
         "# Step: enable token authentication on the Splunk platform.\n"
         ": \"${SPLUNK_SEARCH_API_URI:?SPLUNK_SEARCH_API_URI must be set (https://host:8089)}\"\n"
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n\n"
-        "curl -k -u \"${SPLUNK_USER}:${SPLUNK_PASS}\" \\\n"
+        + SPLUNK_CURL_AUTH_HELPER
+        + "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
+        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n\n"
+        "curl -k -K \"${SPLUNK_AUTH_CONFIG}\" \\\n"
         "  -X POST \"${SPLUNK_SEARCH_API_URI}/services/admin/token-auth/tokens_auth\" \\\n"
         "  -d disabled=false\n"
     )
@@ -1269,16 +1298,21 @@ def apply_script_token_auth() -> str:
 def apply_script_pairing(spec: dict[str, Any]) -> str:
     realm = spec["realm"]
     multi = spec["pairing"].get("multi_org") or [{"realm": realm}]
+    stack = spec.get("splunk_cloud_stack", "")
     body = SHEBANG + (
         "# Step: Unified Identity pair (one call per realm).\n"
         ": \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE:?SPLUNK_O11Y_ADMIN_TOKEN_FILE must point to a chmod-600 admin token file}\"\n\n"
+        "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
+        "PAIRING_API=\"${PAIRING_API:-skills/splunk-observability-cloud-integration-setup/scripts/o11y_pairing_api.py}\"\n"
+        f"SPLUNK_CLOUD_STACK=\"${{SPLUNK_CLOUD_STACK:-{stack}}}\"\n"
+        "PAIRING_ARGS=(--admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\")\n"
+        "[[ -n \"${SPLUNK_CLOUD_STACK:-}\" ]] && PAIRING_ARGS+=(--splunk-cloud-stack \"${SPLUNK_CLOUD_STACK}\")\n"
+        "[[ -n \"${SPLUNK_CLOUD_ADMIN_JWT_FILE:-}\" ]] && PAIRING_ARGS+=(--splunk-cloud-admin-jwt-file \"${SPLUNK_CLOUD_ADMIN_JWT_FILE}\")\n\n"
     )
     for entry in multi:
         body += (
             f"# Pair realm: {entry.get('realm')}\n"
-            "acs --format structured observability pair "
-            f"--o11y-realm {entry.get('realm')} "
-            "--o11y-access-token \"$(cat \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\")\"\n\n"
+            f"\"${{PYTHON_BIN}}\" \"${{PAIRING_API}}\" \"${{PAIRING_ARGS[@]}}\" pair --realm {entry.get('realm')}\n\n"
         )
     return body
 
@@ -1293,8 +1327,11 @@ def apply_script_rbac(spec: dict[str, Any]) -> str:
             ": \"${SPLUNK_SEARCH_API_URI:?SPLUNK_SEARCH_API_URI must be set}\"\n"
             ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
             ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n\n"
+            f"{SPLUNK_CURL_AUTH_HELPER}"
+            "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
+            "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n\n"
             "# Create the o11y_access gate role (no extra capabilities).\n"
-            "curl -k -u \"${SPLUNK_USER}:${SPLUNK_PASS}\" \\\n"
+            "curl -k -K \"${SPLUNK_AUTH_CONFIG}\" \\\n"
             "  -X POST \"${SPLUNK_SEARCH_API_URI}/services/authorization/roles\" \\\n"
             "  -d name=o11y_access -d srchIndexesAllowed=\"\" -d srchIndexesDefault=\"\"\n\n"
         )
@@ -1306,8 +1343,13 @@ def apply_script_rbac(spec: dict[str, Any]) -> str:
             "  echo 'enable-centralized-rbac refused: SOICS_RBAC_CUTOVER_ACK!=true. Re-run with --i-accept-rbac-cutover.' >&2\n"
             "  exit 2\n"
             "fi\n"
-            "acs --format structured observability enable-centralized-rbac \\\n"
-            "  --o11y-access-token \"$(cat \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\")\"\n"
+            "PYTHON_BIN=\"${PYTHON_BIN:-python3}\"\n"
+            "PAIRING_API=\"${PAIRING_API:-skills/splunk-observability-cloud-integration-setup/scripts/o11y_pairing_api.py}\"\n"
+            "\"${PYTHON_BIN}\" \"${PAIRING_API}\" \\\n"
+            "  --admin-token-file \"${SPLUNK_O11Y_ADMIN_TOKEN_FILE}\" \\\n"
+            f"  --realm {spec['realm']} \\\n"
+            "  --i-accept-rbac-cutover \\\n"
+            "  enable-centralized-rbac\n"
         )
     return body
 
@@ -1324,7 +1366,10 @@ def apply_script_discover_app(spec: dict[str, Any]) -> str:
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n"
         f": \"${{{discover['access_tokens_realm_token_file_ref']}:?{discover['access_tokens_realm_token_file_ref']} must point to a chmod-600 token file}}\"\n\n"
-        "AUTH=(\"-u\" \"${SPLUNK_USER}:${SPLUNK_PASS}\")\n"
+        f"{SPLUNK_CURL_AUTH_HELPER}"
+        "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
+        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n"
+        "AUTH=(\"-K\" \"${SPLUNK_AUTH_CONFIG}\")\n"
         "BASE_URL=\"${SPLUNK_SEARCH_API_URI}/servicesNS/nobody/discover_splunk_observability_cloud\"\n\n"
         "# Tab 1: Related Content discovery toggle.\n"
         f"curl -k \"${{AUTH[@]}}\" -X POST \"${{BASE_URL}}/related_content_discovery\" -d enabled={'1' if discover['related_content_discovery'] else '0'}\n\n"
@@ -1333,9 +1378,7 @@ def apply_script_discover_app(spec: dict[str, Any]) -> str:
         "# Tab 4: Automatic UI updates toggle.\n"
         f"curl -k \"${{AUTH[@]}}\" -X POST \"${{BASE_URL}}/automatic_ui_updates\" -d enabled={'1' if discover['automatic_ui_updates'] else '0'}\n\n"
         "# Tab 5: Access tokens (realm + token from chmod-600 file).\n"
-        f"O11Y_TOKEN=\"$(cat \"${{{discover['access_tokens_realm_token_file_ref']}}}\")\"\n"
-        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{BASE_URL}}/access_tokens\" -d realm={realm} --data-urlencode access_token=\"${{O11Y_TOKEN}}\"\n"
-        "unset O11Y_TOKEN\n\n"
+        f"curl -k \"${{AUTH[@]}}\" -X POST \"${{BASE_URL}}/access_tokens\" -d realm={realm} --data-urlencode \"access_token@${{{discover['access_tokens_realm_token_file_ref']}}}\"\n\n"
         "# Read permission grant on the Discover app.\n"
         f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/servicesNS/nobody/system/apps/local/discover_splunk_observability_cloud/permissions\" \\\n"
         f"  -d 'sharing=app' -d 'perms.read={','.join(discover['read_permission_roles'])}'\n"
@@ -1357,7 +1400,10 @@ def apply_script_loc(spec: dict[str, Any]) -> str:
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n"
         ": \"${LOC_SERVICE_ACCOUNT_PASSWORD_FILE:?--service-account-password-file must be set (chmod 600)}\"\n\n"
-        "AUTH=(\"-u\" \"${SPLUNK_USER}:${SPLUNK_PASS}\")\n\n"
+        f"{SPLUNK_CURL_AUTH_HELPER}"
+        "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
+        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n"
+        "AUTH=(\"-K\" \"${SPLUNK_AUTH_CONFIG}\")\n\n"
         "# Role.\n"
         f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/authorization/roles\" \\\n"
         f"  -d name={role['name']} \\\n"
@@ -1370,12 +1416,10 @@ def apply_script_loc(spec: dict[str, Any]) -> str:
         f"  -d rtSrchJobsQuota=0 \\\n"
         f"  {' '.join(f'-d srchIndexesAllowed={ix}' for ix in role['indexes'])}\n\n"
         "# User.\n"
-        f"LOC_PASSWORD=\"$(cat \"${{LOC_SERVICE_ACCOUNT_PASSWORD_FILE}}\")\"\n"
         f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/authentication/users\" \\\n"
         f"  -d name={sa['username']} \\\n"
         f"  -d roles={role['name']} \\\n"
-        f"  --data-urlencode password=\"${{LOC_PASSWORD}}\"\n"
-        f"unset LOC_PASSWORD\n\n"
+        f"  --data-urlencode \"password@${{LOC_SERVICE_ACCOUNT_PASSWORD_FILE}}\"\n\n"
         "# Workload rule.\n"
         f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/workloads/rules\" \\\n"
         f"  -d name=loc_runtime_abort \\\n"
@@ -1396,20 +1440,22 @@ def apply_script_sim_addon(spec: dict[str, Any]) -> str:
         ": \"${SPLUNK_USER:?SPLUNK_USER must be set}\"\n"
         ": \"${SPLUNK_PASS:?SPLUNK_PASS must be set}\"\n"
         f": \"${{{sim['org_token_file_ref']}:?--org-token-file must be set (chmod 600)}}\"\n\n"
-        "AUTH=(\"-u\" \"${SPLUNK_USER}:${SPLUNK_PASS}\")\n"
+        f"{SPLUNK_CURL_AUTH_HELPER}"
+        "SPLUNK_AUTH_CONFIG=\"$(make_splunk_auth_config)\"\n"
+        "trap 'rm -f \"${SPLUNK_AUTH_CONFIG}\"' EXIT\n"
+        "AUTH=(\"-K\" \"${SPLUNK_AUTH_CONFIG}\")\n"
         "TA_BASE=\"${SPLUNK_SEARCH_API_URI}/servicesNS/nobody/Splunk_TA_sim\"\n\n"
         "# Index.\n"
         f"curl -k \"${{AUTH[@]}}\" -X POST \"${{SPLUNK_SEARCH_API_URI}}/services/data/indexes\" \\\n"
         f"  -d name={sim['index_name']} -d datatype=metric || true\n\n"
         "# Account.\n"
-        f"ORG_TOKEN=\"$(cat \"${{{sim['org_token_file_ref']}}}\")\"\n"
         f"curl -k \"${{AUTH[@]}}\" -X POST \"${{TA_BASE}}/splunk_infrastructure_monitoring_account\" \\\n"
         f"  -d name={sim['account_name']} \\\n"
         f"  -d realm={realm} \\\n"
-        f"  --data-urlencode access_token=\"${{ORG_TOKEN}}\" \\\n"
+        f"  --data-urlencode \"access_token@${{{sim['org_token_file_ref']}}}\" \\\n"
         f"  -d job_start_rate=60 \\\n"
         f"  -d event_search_rate=30\n"
-        f"unset ORG_TOKEN\n\n"
+        "\n"
     )
     for name in sim["modular_inputs"]:
         catalog = SIGNALFLOW_CATALOG[name]

@@ -11,6 +11,7 @@
 - [ ] `ruff check skills/ tests/ agent/`
 - [ ] `yamllint -c .yamllint.yml .github/ skills/splunk-itsi-config/templates skills/splunk-itsi-config/agents`
 - [ ] `python3 skills/shared/scripts/generate_deployment_docs.py --check`
+- [ ] `python3 skills/shared/scripts/generate_skill_ux_catalog.py --check`
 - [ ] SCAN catalog check run or intentionally skipped because the local SCAN package is unavailable
 - [ ] `python3 tests/check_skill_frontmatter.py`
 - [ ] `python3 tests/check_repo_readiness.py`

@@ -4,7 +4,7 @@
 |--------|---------------|--------------|----------------|--------------|---------------|
 | Cursor | `mcp/cursor.mcp.json` | `~/.cursor/mcp.json` (user) or `<repo>/.cursor/mcp.json` (workspace) | `${env:TE_API_TOKEN}` from shell or Cursor secrets UI | yes | n/a (Cursor MCP HTTP supports headers, not OAuth2 flow directly) |
 | Claude Code | `mcp/claude.mcp.json` (instructions only; actual registration is via Settings > Connectors) | Claude Settings > Connectors > Add custom connector | DCR token share via OAuth at registration | n/a (browser-mediated) | yes (paid plans on web; Desktop on free) |
-| Codex | `mcp/codex-register-te-mcp.sh` | `codex mcp add ThousandEyes -- ...` | Token file read at registration time only; never echoed | yes | yes |
+| Codex | `mcp/codex-register-te-mcp.sh` | `codex mcp add ThousandEyes -- ...` | OAuth2 browser consent; Bearer helper refuses argv exposure | no auto-register | yes |
 | VS Code | `mcp/vscode.mcp.json` | VS Code MCP servers config (varies by extension) | `${input:te-key}` runtime prompt (password type) | yes | yes |
 | AWS Kiro | `mcp/kiro.mcp.json` | `~/.kiro/settings/mcp.json` | `${env:TE_API_TOKEN}` via `mcp-remote@latest --header` (Bearer) or browser flow (OAuth2) | yes | yes |
 
@@ -40,8 +40,8 @@ The rendered `mcp/codex-register-te-mcp.sh` script:
 1. Verifies `codex` is on PATH.
 2. Verifies `npx` is on PATH (the `mcp-remote@latest` bridge requires Node.js).
 3. Removes any existing Codex MCP registration with the same name (`replace_existing: true`).
-4. Reads the token file and exports `TE_API_TOKEN` only for the duration of the `codex mcp add` invocation.
-5. Calls `codex mcp add <name> -- npx -y mcp-remote@latest <url> --transport http-only --header "Authorization: Bearer ${TE_API_TOKEN}"`.
+4. Refuses Bearer auto-registration because `mcp-remote --header` would put the token on process argv.
+5. For Codex, prefer OAuth2 browser consent or a client-side secret store that can inject the header without argv exposure.
 
 Run with no arguments to use the default name from `template.example`, or pass a custom name as the first argument.
 

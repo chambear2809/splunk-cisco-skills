@@ -1,0 +1,301 @@
+# Splunk Observability Kubernetes Frontend RUM + Session Replay spec
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Tokens are loaded from chmod 600 files referenced by SPLUNK_O11Y_RUM_TOKEN_FILE
+# (RUM access token, embedded into the rendered JS) and SPLUNK_O11Y_TOKEN_FILE
+# (Org Access Token, used by the source-map upload helper). Never put token
+# values in this file, on the command line, or in shell environment prefixes.
+#
+# This is Splunk Browser RUM (@splunk/otel-web 2.x), NOT AppDynamics BRUM.
+
+api_version: splunk-observability-k8s-frontend-rum-setup/v1
+
+# ---- Identity --------------------------------------------------------------
+
+# Splunk Observability realm. Lands on the rendered SplunkRum.init({ realm }).
+realm: us0
+
+# RUM access token file (chmod 600). The token is embedded literally into the
+# rendered JS snippet (RUM tokens are inherently public once served). The file
+# path can also be supplied through SPLUNK_O11Y_RUM_TOKEN_FILE in the project
+# credentials file -- the renderer prefers the spec value when both are set.
+rum_token_file: ""
+
+# Application identity. Lands on every span as application.name +
+# deployment.environment + app.version.
+application_name: "acme-checkout"
+deployment_environment: "prod"
+version: "1.42.0"
+
+# Optional: cluster identity surfaced in the rendered runbook + handoff specs.
+cluster_name: "prod-cluster"
+
+# Optional: cookieDomain for cross-subdomain session sharing. Leave empty to
+# fall back to window.location.hostname.
+cookie_domain: ""
+
+# ---- Endpoints + agent versioning ------------------------------------------
+
+endpoints:
+  # cdn.observability.splunkcloud.com (default, post Mar 24 2026 cutover) or
+  # cdn.signalfx.com (legacy; emits a deprecation WARN at render time).
+  domain: "splunkcloud"
+  # Override for self-hosted CDNs or air-gapped clusters. When set, the
+  # rendered <script src=> uses this URL prefix verbatim.
+  cdn_base: ""
+  # Override the auto-derived rum-ingest beacon URL. Rare; only set this when
+  # the RUM agent must talk to a non-standard ingest endpoint.
+  beacon_endpoint_override: ""
+
+# Splunk Browser RUM agent version. Supports v1, v1.2, v1.2.3, latest.
+# Default is v1 (latest major-version-locked release; recommended for prod).
+# When agent_version is an exact vX.Y.Z pin, an SRI integrity attribute is
+# emitted on the <script> tag. `latest` is REJECTED unless the renderer is
+# invoked with --allow-latest-version.
+agent_version: "v1"
+
+# Subresource Integrity hash for the rendered exact-version <script>. Only
+# used when agent_version matches vX.Y.Z. Operator must supply (from the
+# GitHub Releases page) -- the renderer cannot fetch it.
+agent_sri: ""
+session_recorder_sri: ""
+
+# Optional IE11 fallback. Adds a second <script> tag for splunk-otel-web-legacy.js
+# loaded via <!--[if IE]>...<![endif]--> conditional comments (legacy only).
+legacy_ie11_build: false
+
+# ---- Workloads (multi-app per spec) ----------------------------------------
+
+# A list of frontend workloads to instrument. Each workload may pick its own
+# injection_mode (mixed-mode clusters supported). Per-workload overrides for
+# application_name / deployment_environment / version override the global
+# values above.
+workloads:
+  - kind: Deployment
+    namespace: prod
+    name: checkout-web
+    # One of: nginx-configmap | ingress-snippet | init-container | runtime-config
+    injection_mode: nginx-configmap
+    # Path inside the container that the served HTML lives at. Default for
+    # nginx-served apps is /usr/share/nginx/html. Mode C uses this as the
+    # initContainer mount point.
+    serve_path: "/usr/share/nginx/html"
+    # Filename inside serve_path. Mode C rewrites this file in place.
+    html_file: "index.html"
+    # Mode A.i only. Identifies which container in the Pod runs nginx.
+    nginx_container: "web"
+    # Mode A.ii only. The Ingress object name that fronts this workload.
+    ingress_name: ""
+    # Mode B only. Mount path inside serve_path for the runtime-config JS.
+    runtime_config_path: "/rum-config.js"
+    # Mode C only. Override the utility image used to rewrite HTML when the
+    # target image is distroless. Default busybox:1.36.
+    rewriter_image: ""
+    # Optional per-workload identity override.
+    application_name_override: ""
+    deployment_environment_override: ""
+    version_override: ""
+
+# Example mixed-mode cluster: one nginx-served SPA + one distroless static
+# server + one ingress-nginx-fronted MPA.
+# workloads:
+#   - kind: Deployment
+#     namespace: prod
+#     name: checkout-web
+#     injection_mode: nginx-configmap
+#   - kind: Deployment
+#     namespace: prod
+#     name: status-page
+#     injection_mode: init-container
+#     serve_path: "/var/www/html"
+#   - kind: Deployment
+#     namespace: prod
+#     name: marketing-site
+#     injection_mode: ingress-snippet
+#     ingress_name: marketing-site
+
+# ---- SplunkRum.init() instrumentation surface ------------------------------
+
+instrumentations:
+  # Core toggles
+  debug: false
+  disable_automation_frameworks: true
+  disable_bots: true
+  persistance: "cookie"           # cookie | localStorage
+  user_tracking_mode: "anonymousTracking"  # anonymousTracking | noTracking
+
+  # Global attributes added to every span. Common entries: enduser.id,
+  # enduser.role, team, feature.flag.<name>.
+  global_attributes:
+    team: "frontend"
+
+  # Regex or string URLs to drop from RUM beacons.
+  ignore_urls:
+    - "/health"
+    - "/metrics"
+
+  # Exporter. Default Zipkin; opt into OTLP for Splunk APM trace linking.
+  exporter:
+    otlp: false
+
+  # Tracer / sampler. always_on | always_off | session_based with ratio.
+  tracer:
+    sampler_type: "session_based"
+    sampler_ratio: 1.0
+
+  # SPA metrics tuning (route-change page-completion timing).
+  spa_metrics:
+    enabled: true
+    quiet_time_ms: 5000
+    max_resources_to_watch: 100
+    ignore_urls: []
+
+  # Per-instrumentation toggles (default-on entries marked).
+  modules:
+    errors: true            # default on
+    fetch: true             # default on
+    xhr: true               # default on
+    interactions: true      # default on
+    longtask: true          # default on
+    postload: true          # default on
+    document: true          # default on (route-change capture lives here)
+    webvitals: true         # default on (LCP, CLS, INP, FCP, TTFB)
+    websocket: false        # default off
+    socketio: false         # default off
+    visibility: false       # default off
+    connectivity: false     # default off
+
+  # Extra DOM events the interactions instrumentation should capture beyond
+  # the SplunkRum.DEFAULT_AUTO_INSTRUMENTED_EVENT_NAMES set.
+  interactions_extra_event_names: []
+
+  # socket.io target binding when modules.socketio: true. Default 'io' looks
+  # at window.io.
+  socketio_target: "io"
+
+  # ---- Frustration Signals 2.0 ---------------------------------------------
+  frustration_signals:
+    rage_click:
+      enabled: true            # default on
+      count: 4
+      timeframe_seconds: 1
+      ignore_selectors: []
+    dead_click:
+      enabled: false           # default off
+      time_window_ms: 1000
+      ignore_urls: []
+    error_click:
+      enabled: false           # default off
+      time_window_ms: 1000
+      ignore_urls: []
+    thrashed_cursor:
+      enabled: false           # default off; 14 tuning knobs
+      time_window_ms: 2000
+      throttle_ms: 16
+      min_direction_changes: 4
+      min_direction_change_degrees: 45
+      min_total_distance: 300
+      min_movement_distance: 5
+      min_average_velocity: 300
+      max_velocity: 5000
+      max_confined_area_size: 200
+      thrashing_score_threshold: 0.6
+      score_weight_direction_changes: 0.4
+      score_weight_velocity: 0.3
+      score_weight_confined_area: 0.3
+      ignore_urls: []
+
+# ---- Browser RUM privacy ---------------------------------------------------
+
+# Note: this is the BROWSER RUM privacy surface (controls click-text capture).
+# Session Replay has its own sensitivityRules block under session_replay below.
+privacy:
+  mask_all_text: true
+  sensitivity_rules:
+    - rule: unmask
+      selector: "h1, h2, h3"
+    - rule: exclude
+      selector: ".sensitive-data"
+
+# ---- Session Replay (enterprise tier) --------------------------------------
+
+session_replay:
+  # Default off. When enabled: true, the renderer also requires the
+  # --accept-session-replay-enterprise gate flag.
+  enabled: false
+  # New Splunk recorder is the default. rrweb is legacy (deprecated >=v1.0.0)
+  # and the renderer emits a WARN when chosen.
+  recorder: "splunk"
+  # Legacy rrweb-style aliases. When recorder=splunk, these are advisory only
+  # (the validator reports them as deprecated).
+  mask_all_inputs: true
+  mask_all_text: true
+  # Splunk recorder fine-grained control.
+  sensitivity_rules:
+    - rule: mask
+      selector: ".pii"
+    - rule: exclude
+      selector: "#payment-form"
+  max_export_interval_ms: 5000
+  sampler_ratio: 1.0
+  # Feature flags for media + asset packing.
+  features:
+    canvas: false
+    video: false
+    iframes: false
+    # pack_assets accepts bool OR a sub-object {styles, fonts, images}.
+    pack_assets:
+      styles: true
+      fonts: false
+      images: false
+    cache_assets: false
+    # When set, the recorder will host its background processing in this
+    # iframe (Web Worker). Leave empty to use the default in-page processor.
+    background_service_src: ""
+
+# ---- Content Security Policy (advisory) ------------------------------------
+
+# The renderer EMITS the exact CSP entries to add to your existing headers
+# but does not patch ingress headers automatically.
+csp:
+  emit_advisory: true
+  # When true the rendered preflight-report.md repeats the script-src,
+  # connect-src, and worker-src lines you must add for the chosen endpoint
+  # domain + Session Replay backgroundServiceSrc combination.
+
+# ---- RUM-to-APM linking ----------------------------------------------------
+
+apm_linking:
+  enabled: true
+  # Backend URL used by validate.sh --live --check-server-timing to verify the
+  # backend is emitting the Server-Timing: traceparent header. When the probe
+  # fails, handoff-auto-instrumentation.sh is rendered.
+  expected_server_timing_backend_url: ""
+
+# ---- JavaScript source-map upload ------------------------------------------
+
+source_maps:
+  enabled: true
+  # cli (default; uses splunk-rum sourcemaps inject + upload) or webpack
+  # (uses @splunk/rum-build-plugins SplunkRumWebpackPlugin).
+  bundler: "cli"
+  # Directory that contains the production .js + .js.map files. dist for
+  # Webpack defaults, .next for Next.js builds.
+  injection_target_dir: "dist"
+  # github_actions | gitlab_ci | none -- emits a sample CI snippet alongside
+  # the upload script.
+  ci_provider: "github_actions"
+
+# ---- Hand-offs --------------------------------------------------------------
+
+handoffs:
+  # Emit handoff-dashboards.sh that calls splunk-observability-dashboard-builder.
+  dashboard_builder: true
+  # Emit handoff-detectors.sh that calls splunk-observability-native-ops.
+  native_ops: true
+  # Emit handoff-cloud-integration.sh advisory for the SIM RUM modular input.
+  cloud_integration: true
+  # handoff-auto-instrumentation.sh is emitted automatically by validate.sh
+  # when --check-server-timing fails; this flag controls whether the renderer
+  # also emits it pre-emptively (without a live probe).
+  auto_instrumentation: false

@@ -25,10 +25,15 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
-import shutil
+import sys
 from pathlib import Path
 from typing import Any
+
+SHARED_LIB = Path(__file__).resolve().parents[3] / "skills" / "shared" / "lib"
+if str(SHARED_LIB) not in sys.path:
+    sys.path.insert(0, str(SHARED_LIB))
+
+from yaml_compat import YamlCompatError, dump_yaml, load_yaml_or_json  # noqa: E402
 
 
 SKILL_NAME = "splunk-observability-isovalent-integration"
@@ -84,18 +89,6 @@ DEFAULT_METRIC_ALLOWLIST = [
     "k8s.namespace.phase",
 ]
 
-
-def _load_yaml_module():
-    try:
-        import yaml  # type: ignore[import-not-found]
-    except ModuleNotFoundError as exc:
-        raise SpecError(
-            "PyYAML is required. Install with 'python3 -m pip install -r requirements-agent.txt' "
-            "or pass a JSON spec."
-        ) from exc
-    return yaml
-
-
 class SpecError(ValueError):
     pass
 
@@ -125,17 +118,9 @@ def bool_flag(value: str) -> bool:
 
 def load_spec(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
-    suffix = path.suffix.lower()
     try:
-        if suffix == ".json":
-            data = json.loads(text)
-        else:
-            yaml = _load_yaml_module()
-            try:
-                data = yaml.safe_load(text)
-            except yaml.YAMLError:
-                data = json.loads(text)
-    except json.JSONDecodeError as exc:
+        data = load_yaml_or_json(text, source=str(path))
+    except YamlCompatError as exc:
         raise SpecError(f"Failed to parse spec {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise SpecError(f"Spec {path} did not parse to a mapping.")
@@ -154,8 +139,7 @@ def write_text(path: Path, content: str, *, executable: bool = False) -> None:
 
 
 def write_yaml(path: Path, payload: Any) -> None:
-    yaml = _load_yaml_module()
-    write_text(path, yaml.safe_dump(payload, sort_keys=True, default_flow_style=False))
+    write_text(path, dump_yaml(payload, sort_keys=True))
 
 
 def write_json(path: Path, payload: Any) -> None:
@@ -531,12 +515,12 @@ echo "      ${{BASE_OUTPUT_DIR}}/k8s/values.yaml \\\\"
 echo "      ${{OVERLAY}} \\\\"
 echo "      > /tmp/merged-values.yaml"
 echo
-echo "Step 3: Apply the merged values via helm (token via --set --reuse-values)."
+echo "Step 3: Apply the merged values via helm (token via --set-file --reuse-values)."
 echo "  Run:"
 echo "    helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \\\\"
 echo "      -n splunk-otel --create-namespace --reuse-values \\\\"
 echo "      -f /tmp/merged-values.yaml \\\\"
-echo '      --set splunkObservability.accessToken="$(cat $O11Y_TOKEN_FILE)"'
+echo '      --set-file splunkObservability.accessToken="$O11Y_TOKEN_FILE"'
 """
         )
 

@@ -16,7 +16,7 @@ Produces:
   - metadata.json
 
 The renderer never reads token files. Apply scripts read tokens from chmod-600
-files at runtime (`$(cat $TOKEN_FILE)`) so secrets never enter argv or disk.
+files at runtime and keep secret values out of argv and rendered files.
 """
 
 from __future__ import annotations
@@ -594,7 +594,10 @@ def render_apply_script(
                 "    echo \"ERROR: TE_TOKEN_FILE must point at a readable token file.\" >&2",
                 "    exit 1",
                 "fi",
-                'TE_TOKEN="$(cat "${TE_TOKEN_FILE}")"',
+                'TE_CURL_CONFIG="$(mktemp)"',
+                'chmod 600 "${TE_CURL_CONFIG}"',
+                '{ printf \'header = "Authorization: Bearer \'; tr -d \'\\r\\n\' < "${TE_TOKEN_FILE}"; printf \'"\\n\'; } > "${TE_CURL_CONFIG}"',
+                'trap \'rm -f "${TE_CURL_CONFIG}"\' EXIT',
                 "",
             ]
         )
@@ -605,7 +608,6 @@ def render_apply_script(
                 "    echo \"ERROR: O11Y_INGEST_TOKEN_FILE must point at a readable token file.\" >&2",
                 "    exit 1",
                 "fi",
-                'O11Y_INGEST_TOKEN="$(cat "${O11Y_INGEST_TOKEN_FILE}")"',
                 "",
             ]
         )
@@ -616,7 +618,6 @@ def render_apply_script(
                 "    echo \"ERROR: O11Y_API_TOKEN_FILE must point at a readable token file.\" >&2",
                 "    exit 1",
                 "fi",
-                'O11Y_API_TOKEN="$(cat "${O11Y_API_TOKEN_FILE}")"',
                 "",
             ]
         )
@@ -640,7 +641,7 @@ else
     URL="https://api.thousandeyes.com/v7/streams"
 fi
 curl -sS -X "${METHOD}" "${URL}" \\
-    -H "Authorization: Bearer ${TE_TOKEN}" \\
+    -K "${TE_CURL_CONFIG}" \\
     -H "Content-Type: application/json" \\
     --data-binary "${SUBST_PAYLOAD}" \\
     -o /tmp/te-stream-response.json -w '%{http_code}\\n'
@@ -657,7 +658,7 @@ for h in data.get('headers', []):
         h['value']=open(sys.argv[2]).read().strip();
 print(json.dumps(data))" "${CONNECTOR_FILE}" "${O11Y_API_TOKEN_FILE}")"
 CONNECTOR_RESPONSE="$(curl -sS -X POST 'https://api.thousandeyes.com/v7/connectors/generic' \\
-    -H "Authorization: Bearer ${TE_TOKEN}" \\
+    -K "${TE_CURL_CONFIG}" \\
     -H "Content-Type: application/json" \\
     --data-binary "${SUBST_CONNECTOR}")"
 echo "${CONNECTOR_RESPONSE}" > /tmp/te-connector-response.json
@@ -671,7 +672,7 @@ data=json.load(open(sys.argv[1]));
 data['connectorId']=sys.argv[2];
 print(json.dumps(data))" "${OPERATION_FILE}" "${CONNECTOR_ID}")"
 curl -sS -X PUT "https://api.thousandeyes.com/v7/operations/splunk-observability-apm/${CONNECTOR_ID}" \\
-    -H "Authorization: Bearer ${TE_TOKEN}" \\
+    -K "${TE_CURL_CONFIG}" \\
     -H "Content-Type: application/json" \\
     --data-binary "${SUBST_OPERATION}" \\
     -o /tmp/te-apm-operation-response.json -w '%{http_code}\\n'
@@ -694,7 +695,7 @@ items=json.load(open(sys.argv[1]));
 for item in items:
     payload_file=os.path.join(os.path.dirname(sys.argv[1]), item['file']);
     url=f\"https://api.thousandeyes.com/v7/tests/{item['type']}\";
-    cmd=['curl','-sS','-X','POST',url,'-H',f\"Authorization: Bearer {os.environ['TE_TOKEN']}\",'-H','Content-Type: application/json','--data-binary',f'@{payload_file}','-o',f'/tmp/te-test-{item[\"slug\"]}.json','-w','%{http_code}\\n'];
+    cmd=['curl','-sS','-X','POST',url,'-K',os.environ['TE_CURL_CONFIG'],'-H','Content-Type: application/json','--data-binary',f'@{payload_file}','-o',f'/tmp/te-test-{item[\"slug\"]}.json','-w','%{http_code}\\n'];
     print(item['slug'], end=': ');
     sys.stdout.flush();
     subprocess.run(cmd, check=True)" "${INDEX_FILE}"
@@ -711,7 +712,7 @@ for payload in "${PAYLOADS_DIR}"/*.json; do
     [[ -f "${payload}" ]] || continue
     echo "$(basename "${payload}"): "
     curl -sS -X POST 'https://api.thousandeyes.com/v7/alerts/rules' \\
-        -H "Authorization: Bearer ${TE_TOKEN}" \\
+        -K "${TE_CURL_CONFIG}" \\
         -H "Content-Type: application/json" \\
         --data-binary @"${payload}" \\
         -o "/tmp/te-alert-rule-$(basename "${payload}")" -w '%{http_code}\\n'
@@ -727,7 +728,7 @@ for kind in labels tags; do
         [[ -f "${payload}" ]] || continue
         echo "${kind}/$(basename "${payload}"): "
         curl -sS -X POST "https://api.thousandeyes.com/v7/${kind}" \\
-            -H "Authorization: Bearer ${TE_TOKEN}" \\
+            -K "${TE_CURL_CONFIG}" \\
             -H "Content-Type: application/json" \\
             --data-binary @"${payload}" \\
             -o "/tmp/te-${kind}-$(basename "${payload}")" -w '%{http_code}\\n'
@@ -743,7 +744,7 @@ for payload in "${PAYLOADS_DIR}"/*.json; do
     [[ -f "${payload}" ]] || continue
     echo "$(basename "${payload}"): "
     curl -sS -X POST 'https://api.thousandeyes.com/v7/dashboards' \\
-        -H "Authorization: Bearer ${TE_TOKEN}" \\
+        -K "${TE_CURL_CONFIG}" \\
         -H "Content-Type: application/json" \\
         --data-binary @"${payload}" \\
         -o "/tmp/te-te-dashboard-$(basename "${payload}")" -w '%{http_code}\\n'
@@ -758,14 +759,14 @@ for payload in "${PAYLOADS_DIR}"/*.json; do
     [[ -f "${payload}" ]] || continue
     echo "create $(basename "${payload}"): "
     RESPONSE="$(curl -sS -X POST 'https://api.thousandeyes.com/v7/templates' \\
-        -H "Authorization: Bearer ${TE_TOKEN}" \\
+        -K "${TE_CURL_CONFIG}" \\
         -H "Content-Type: application/json" \\
         --data-binary @"${payload}")"
     TEMPLATE_ID="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('id',''))" "${RESPONSE}")"
     if [[ -n "${TEMPLATE_ID:-}" && "${DEPLOY_TEMPLATES:-false}" == "true" ]]; then
         echo "  deploy ${TEMPLATE_ID}: "
         curl -sS -X POST "https://api.thousandeyes.com/v7/templates/${TEMPLATE_ID}/deploy" \\
-            -H "Authorization: Bearer ${TE_TOKEN}" \\
+            -K "${TE_CURL_CONFIG}" \\
             -H "Content-Type: application/json" \\
             -d '{}' \\
             -o "/tmp/te-template-deploy-${TEMPLATE_ID}.json" -w '%{http_code}\\n'
@@ -783,9 +784,11 @@ def list_helper(name: str, description: str, url_path: str) -> str:
         '    echo "ERROR: TE_TOKEN_FILE must point at a readable token file." >&2\n'
         "    exit 1\n"
         "fi\n"
-        'TE_TOKEN="$(cat "${TE_TOKEN_FILE}")"\n\n'
-        f'curl -sS "https://api.thousandeyes.com/v7/{url_path}" \\\n'
-        '    -H "Authorization: Bearer ${TE_TOKEN}" \\\n'
+        'TE_CURL_CONFIG="$(mktemp)"\n'
+        'chmod 600 "${TE_CURL_CONFIG}"\n'
+        '{ printf \'header = "Authorization: Bearer \'; tr -d \'\\r\\n\' < "${TE_TOKEN_FILE}"; printf \'"\\n\'; } > "${TE_CURL_CONFIG}"\n'
+        'trap \'rm -f "${TE_CURL_CONFIG}"\' EXIT\n\n'
+        f'curl -sS -K "${{TE_CURL_CONFIG}}" "https://api.thousandeyes.com/v7/{url_path}" \\\n'
         '    -H "Accept: application/json"\n'
     )
 
@@ -805,13 +808,15 @@ if [[ -z "${O11Y_API_TOKEN_FILE:-}" || ! -r "${O11Y_API_TOKEN_FILE}" ]]; then
     echo "ERROR: O11Y_API_TOKEN_FILE must point at a readable token file." >&2
     exit 1
 fi
-O11Y_API_TOKEN="$(cat "${O11Y_API_TOKEN_FILE}")"
+O11Y_CURL_CONFIG="$(mktemp)"
+chmod 600 "${O11Y_CURL_CONFIG}"
+{ printf 'header = "X-SF-Token: '; tr -d '\\r\\n' < "${O11Y_API_TOKEN_FILE}"; printf '"\\n'; } > "${O11Y_CURL_CONFIG}"
+trap 'rm -f "${O11Y_CURL_CONFIG}"' EXIT
 SPECS_DIR="$(dirname "${BASH_SOURCE[0]}")/../dashboards"
 for spec in "${SPECS_DIR}"/*.signalflow.yaml; do
     [[ -f "${spec}" ]] || continue
     echo "Probing $(basename "${spec}") via api.${REALM}.signalfx.com ..."
-    curl -sS "https://api.${REALM}.signalfx.com/v2/metric?query=thousandeyes&limit=1" \\
-        -H "X-SF-Token: ${O11Y_API_TOKEN}" \\
+    curl -sS -K "${O11Y_CURL_CONFIG}" "https://api.${REALM}.signalfx.com/v2/metric?query=thousandeyes&limit=1" \\
         -o /tmp/sfx-probe.json -w 'http=%{http_code}\\n' || true
 done
 """
@@ -890,7 +895,7 @@ def main() -> int:
         "apm_connector": apm is not None,
         "tests": [t["slug"] for t in tests],
         "alert_rules": [r["slug"] for r in alerts],
-        "labels": [l["slug"] for l in labels],
+        "labels": [label["slug"] for label in labels],
         "tags": [t["slug"] for t in tags],
         "te_dashboards": [d["slug"] for d in te_dashboards],
         "templates": [t["slug"] for t in templates],

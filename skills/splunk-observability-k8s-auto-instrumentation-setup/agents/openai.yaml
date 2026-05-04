@@ -1,0 +1,12 @@
+interface:
+  display_name: "Splunk Observability Kubernetes Auto-Instrumentation"
+  short_description: "Zero-code auto-instrumentation for Kubernetes apps to Splunk Observability Cloud"
+  default_prompt: >-
+    Use $splunk-observability-k8s-auto-instrumentation-setup to render per-language
+    OpenTelemetry Operator Instrumentation CRs (Java, Node.js, Python, .NET, Go,
+    Apache HTTPD, Nginx, SDK), workload annotation strategic-merge patches with
+    backup/restore, optional OBI eBPF DaemonSet with OpenShift SCC, AlwaysOn
+    Profiling and runtime metrics wiring, propagator and sampler configuration,
+    and apply + verify + uninstall workflows. This is an overlay on top of
+    splunk-observability-otel-collector-setup, which must install the base
+    collector + operator + CRDs first.

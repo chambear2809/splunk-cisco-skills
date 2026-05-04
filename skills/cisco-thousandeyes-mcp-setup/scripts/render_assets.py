@@ -188,12 +188,13 @@ def codex_register_script(server_name: str, replace_existing: bool, auth: str, t
 
     Mirrors the structure of agent/register-codex-splunk-cisco-skills-mcp.sh
     so operators have a familiar shape. The script never echoes the token
-    value; for Bearer auth it `set -a; source <(grep -v '^#' "${TOKEN_FILE}" | sed 's/^/TE_API_TOKEN=/')` style is intentionally avoided to prevent shell history exposure. We instead document setting TE_API_TOKEN in the operator's shell rc file.
+    value. Bearer auto-registration is refused for Codex because mcp-remote
+    requires a header argument that would expose the token on process argv.
     """
     replace_block = (
-        f'if codex mcp get "${{SERVER_NAME}}" --json >/dev/null 2>&1; then\n'
-        f'    codex mcp remove "${{SERVER_NAME}}" >/dev/null\n'
-        f"fi\n"
+        'if codex mcp get "${SERVER_NAME}" --json >/dev/null 2>&1; then\n'
+        '    codex mcp remove "${SERVER_NAME}" >/dev/null\n'
+        "fi\n"
         if replace_existing
         else ""
     )
@@ -205,13 +206,9 @@ def codex_register_script(server_name: str, replace_existing: bool, auth: str, t
             f'    echo "ERROR: TE token file not readable: ${{TOKEN_FILE}}" >&2\n'
             f'    exit 1\n'
             f'fi\n'
-            f'export TE_API_TOKEN="$(cat "${{TOKEN_FILE}}")"\n'
-            f'unset TOKEN_FILE\n'
-            f'\n'
-            f'exec codex mcp add "${{SERVER_NAME}}" -- npx -y mcp-remote@latest \\\n'
-            f'    "{TE_MCP_URL}" \\\n'
-            f'    --transport http-only \\\n'
-            f'    --header "Authorization: Bearer ${{TE_API_TOKEN}}"\n'
+            f'echo "ERROR: Codex bearer auto-registration is disabled because mcp-remote --header would expose the token on process argv." >&2\n'
+            f'echo "Re-render with --auth oauth2 for browser consent, or use a client-side secret store that does not put bearer tokens on argv." >&2\n'
+            f'exit 2\n'
         )
     else:
         body = (
@@ -410,16 +407,27 @@ def render_readme(args: argparse.Namespace, clients: list[str], accept_write_too
             ]
         )
     if "codex" in clients:
-        lines.extend(
-            [
-                "### Codex",
-                "",
-                "- Run `bash mcp/codex-register-te-mcp.sh` to register with Codex.",
-                "- The script reads the token file at runtime; it never echoes the value.",
-                "- Requires Node.js (`npx`) on PATH.",
-                "",
-            ]
-        )
+        if args.auth == "bearer":
+            lines.extend(
+                [
+                    "### Codex",
+                    "",
+                    "- Bearer auto-registration is intentionally disabled because",
+                    "  `mcp-remote --header` would expose the token on process argv.",
+                    "- Re-render with `--auth oauth2` for browser consent.",
+                    "",
+                ]
+            )
+        else:
+            lines.extend(
+                [
+                    "### Codex",
+                    "",
+                    "- Run `bash mcp/codex-register-te-mcp.sh` to register with Codex.",
+                    "- Requires Node.js (`npx`) on PATH.",
+                    "",
+                ]
+            )
     if "vscode" in clients:
         lines.extend(
             [

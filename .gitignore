@@ -68,11 +68,14 @@ projects/tmp-*
 /splunk-observability-dashboard-rendered/
 /splunk-observability-native-rendered/
 /splunk-observability-cloud-integration-rendered/
+/splunk-observability-k8s-auto-instrumentation-rendered/
+/splunk-observability-k8s-frontend-rum-rendered/
 /splunk-edge-processor-rendered/
 /splunk-indexer-cluster-rendered/
 /splunk-license-manager-rendered/
 /splunk-cloud-acs-allowlist-rendered/
 /splunk-soar-rendered/
+/splunk-platform-pki-rendered/
 /ta-for-indexers-rendered/
 /splunk-mcp-rendered/*
 !/splunk-mcp-rendered/run-splunk-mcp.js

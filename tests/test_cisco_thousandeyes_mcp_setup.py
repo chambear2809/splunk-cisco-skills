@@ -162,8 +162,8 @@ def test_idempotent_re_render(tmp_path: Path) -> None:
     assert second_run_output.read_text(encoding="utf-8") == cursor_first
 
 
-def test_codex_script_uses_token_file_at_runtime(tmp_path: Path) -> None:
-    """Codex registration shell must read the token file at runtime, not embed it."""
+def test_codex_bearer_script_refuses_argv_token_exposure(tmp_path: Path) -> None:
+    """Codex bearer registration must fail closed instead of placing tokens on argv."""
     output = tmp_path / "rendered"
     token = make_token_file(tmp_path)
     result = run_setup(
@@ -179,9 +179,7 @@ def test_codex_script_uses_token_file_at_runtime(tmp_path: Path) -> None:
     )
     assert result.returncode == 0, combined_output(result)
     script = (output / "mcp" / "codex-register-te-mcp.sh").read_text(encoding="utf-8")
-    assert 'cat "${TOKEN_FILE}"' in script
     assert "TE_BEARER_TOKEN_SHOULD_NOT_LEAK" not in script
-    # The Codex script must invoke `codex mcp add ...` and reference the
-    # canonical TE MCP URL.
-    assert "codex mcp add" in script
-    assert "https://api.thousandeyes.com/mcp" in script
+    assert "mcp-remote --header would expose the token on process argv" in script
+    assert "exit 2" in script
+    assert "codex mcp add" not in script

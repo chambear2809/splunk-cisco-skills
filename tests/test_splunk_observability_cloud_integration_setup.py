@@ -229,9 +229,10 @@ def test_apply_pairing_script_includes_all_realms(tmp_path: Path) -> None:
     )
     renderer.render(spec, tmp_path)
     apply_pairing = (tmp_path / "scripts/apply-pairing.sh").read_text()
-    assert "--o11y-realm us0" in apply_pairing
-    assert "--o11y-realm us1" in apply_pairing
-    assert "--o11y-realm eu0" in apply_pairing
+    assert "pair --realm us0" in apply_pairing
+    assert "pair --realm us1" in apply_pairing
+    assert "pair --realm eu0" in apply_pairing
+    assert "--o11y-access-token" not in apply_pairing
 
 
 def test_apply_rbac_script_guards_destructive_step(tmp_path: Path) -> None:

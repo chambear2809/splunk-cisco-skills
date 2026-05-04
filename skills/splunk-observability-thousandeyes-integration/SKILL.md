@@ -51,7 +51,7 @@ This is a **generalized TE -> Splunk Observability Cloud skill**, NOT tied to an
 - Reject every direct token flag (`--te-token`, `--access-token`, `--token`, `--bearer-token`, `--api-token`, `--o11y-token`, `--sf-token`).
 - Token files must be `chmod 600`. `--apply` runs a permission preflight and aborts with a `chmod 600 <path>` hint when looser. `--allow-loose-token-perms` overrides with a `WARN`.
 - TE Templates render with **Handlebars placeholders only** — TE API rejects plain-text credentials with HTTP 400.
-- Apply scripts read token files at runtime (`$(cat $TOKEN_FILE)`) inside the rendered shell; the renderer never reads token files.
+- Apply scripts read token files at runtime through curl config or payload-substitution helpers inside the rendered shell; the renderer never reads token files.
 
 ## Primary Workflow
 

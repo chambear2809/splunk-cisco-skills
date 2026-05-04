@@ -36,7 +36,7 @@ By default, assets are written under `cisco-thousandeyes-mcp-rendered/`:
 
 `--auth` defaults to `bearer`. Use `--auth oauth2` to render the OAuth2 client flow (browser consent on first connection; no token file needed).
 
-For `--auth bearer`, `--te-token-file` should point at a chmod-600 file containing the TE API token. The renderer never reads this file — it surfaces the path in the rendered Codex script and in the README only.
+For `--auth bearer`, `--te-token-file` should point at a chmod-600 file containing the TE API token. The renderer never reads this file. The Codex helper refuses Bearer auto-registration because `mcp-remote --header` would expose the token on process argv; use OAuth2 for Codex.
 
 ## Secret handling
 
@@ -52,7 +52,7 @@ Rejected direct-secret flags (each maps to `--te-token-file`):
 - `--bearer-token`
 - `--api-token`
 
-Cursor configs use `${env:TE_API_TOKEN}` so the token is supplied via the operator's shell environment. VS Code uses `${input:te-key}` for a runtime password prompt. Codex uses the token file at registration time. Kiro uses either OAuth2 (browser flow) or `${env:TE_API_TOKEN}` plus `mcp-remote@latest` `--header`.
+Cursor configs use `${env:TE_API_TOKEN}` so the token is supplied via the operator's shell environment. VS Code uses `${input:te-key}` for a runtime password prompt. Codex should use OAuth2 browser consent unless a secret store can inject the Bearer header without argv exposure. Kiro uses either OAuth2 (browser flow) or `${env:TE_API_TOKEN}` plus `mcp-remote@latest` `--header`.
 
 ## Tool catalog
 

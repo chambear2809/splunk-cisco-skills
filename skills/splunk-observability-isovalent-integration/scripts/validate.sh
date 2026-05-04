@@ -9,6 +9,11 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 
 OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-isovalent-rendered"
 LIVE=false
+KUBE_CONTEXT=""
+CILIUM_NAMESPACE="kube-system"
+TETRAGON_NAMESPACE="tetragon"
+COLLECTOR_RELEASE="splunk-otel-collector"
+COLLECTOR_NAMESPACE=""
 
 usage() {
     cat <<'EOF'
@@ -19,6 +24,15 @@ Usage:
 
 Options:
   --output-dir DIR   Rendered output directory
+  --kube-context CTX Kubernetes context for live checks
+  --cilium-namespace NS
+                     Namespace for Cilium services (default: kube-system)
+  --tetragon-namespace NS
+                     Namespace for Tetragon services (default: tetragon)
+  --collector-release NAME
+                     Helm release for Splunk OTel Collector (default: splunk-otel-collector)
+  --collector-namespace NS
+                     Namespace for Splunk OTel Collector; auto-detected when omitted
   --live             Run helm + kubectl probes against the cluster
   --help             Show this help
 EOF
@@ -27,6 +41,11 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
+        --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; shift 2 ;;
+        --cilium-namespace) require_arg "$1" "$#" || exit 1; CILIUM_NAMESPACE="$2"; shift 2 ;;
+        --tetragon-namespace) require_arg "$1" "$#" || exit 1; TETRAGON_NAMESPACE="$2"; shift 2 ;;
+        --collector-release) require_arg "$1" "$#" || exit 1; COLLECTOR_RELEASE="$2"; shift 2 ;;
+        --collector-namespace) require_arg "$1" "$#" || exit 1; COLLECTOR_NAMESPACE="$2"; shift 2 ;;
         --live) LIVE=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *) log "ERROR: Unknown option: $1"; usage; exit 1 ;;
@@ -69,10 +88,11 @@ fi
 # AND aligned. A common mis-render is a hostPath mount at one path and an
 # extraFileLogs glob at a different path.
 if grep -q 'logsCollection' "${OUTPUT_DIR}/splunk-otel-overlay/values.overlay.yaml"; then
-    HOST_PATH="$(python3 -c "
-import sys, yaml
-with open(sys.argv[1]) as f:
-    data = yaml.safe_load(f)
+    HOST_PATH="$(PYTHONPATH="${PROJECT_ROOT}/skills/shared/lib${PYTHONPATH:+:${PYTHONPATH}}" python3 -c "
+import sys
+from pathlib import Path
+from yaml_compat import load_yaml_or_json
+data = load_yaml_or_json(Path(sys.argv[1]).read_text(encoding='utf-8'), source=sys.argv[1])
 hp = ''
 for vol in (data.get('agent', {}).get('extraVolumes') or []):
     if 'hostPath' in vol:
@@ -80,10 +100,11 @@ for vol in (data.get('agent', {}).get('extraVolumes') or []):
         break
 print(hp)
 " "${OUTPUT_DIR}/splunk-otel-overlay/values.overlay.yaml")"
-    LOG_INCLUDE="$(python3 -c "
-import sys, yaml
-with open(sys.argv[1]) as f:
-    data = yaml.safe_load(f)
+    LOG_INCLUDE="$(PYTHONPATH="${PROJECT_ROOT}/skills/shared/lib${PYTHONPATH:+:${PYTHONPATH}}" python3 -c "
+import sys
+from pathlib import Path
+from yaml_compat import load_yaml_or_json
+data = load_yaml_or_json(Path(sys.argv[1]).read_text(encoding='utf-8'), source=sys.argv[1])
 inc = data.get('logsCollection', {}).get('extraFileLogs', {}).get('filelog/tetragon', {}).get('include', [])
 print(inc[0] if inc else '')
 " "${OUTPUT_DIR}/splunk-otel-overlay/values.overlay.yaml")"
@@ -115,10 +136,53 @@ if [[ "${LIVE}" == "true" ]]; then
         log "  ERROR: kubectl not on PATH."
         exit 1
     fi
+    if ! command -v helm >/dev/null 2>&1; then
+        log "  ERROR: helm not on PATH."
+        exit 1
+    fi
+    KUBECTL=(kubectl)
+    HELM=(helm)
+    if [[ -n "${KUBE_CONTEXT}" ]]; then
+        KUBECTL=(kubectl --context "${KUBE_CONTEXT}")
+        HELM=(helm --kube-context "${KUBE_CONTEXT}")
+    fi
+    discover_release_namespace() {
+        local release="$1"
+        "${HELM[@]}" list --all-namespaces --filter "^${release}$" 2>/dev/null | awk -v release="${release}" 'NR > 1 && $1 == release {print $2; exit}'
+    }
+    if [[ -z "${COLLECTOR_NAMESPACE}" ]]; then
+        COLLECTOR_NAMESPACE="$(discover_release_namespace "${COLLECTOR_RELEASE}")"
+        if [[ -z "${COLLECTOR_NAMESPACE}" ]]; then
+            COLLECTOR_NAMESPACE="splunk-otel"
+        fi
+    fi
+    probe_metrics() {
+        local label="$1" path="$2" required="${3:-true}" output status
+        output="$("${KUBECTL[@]}" get --raw "${path}" 2>&1)" && status=0 || status=$?
+        if [[ "${status}" -ne 0 ]]; then
+            if [[ "${required}" == "false" && "${output}" == *"NotFound"* ]]; then
+                log "    ${label}: optional service not installed"
+                return 0
+            fi
+            log "    WARN: ${label} metrics not reachable: $(printf '%s\n' "${output}" | head -1)"
+            return 0
+        fi
+        log "    ${label}: reachable"
+        printf '%s\n' "${output}" | sed -n '1,3p'
+    }
+    log "  Helm status (${COLLECTOR_RELEASE} in ${COLLECTOR_NAMESPACE}):"
+    "${HELM[@]}" status "${COLLECTOR_RELEASE}" -n "${COLLECTOR_NAMESPACE}" 2>/dev/null | sed -n '1,3p' || \
+        log "    WARN: ${COLLECTOR_RELEASE} status unavailable in ${COLLECTOR_NAMESPACE}"
     log "  Cilium pods (Hubble metrics on 9965 served from cilium agent pods):"
-    kubectl -n kube-system get pods -l k8s-app=cilium 2>&1 | head -5 || true
-    log "  Tetragon metrics endpoint via API server proxy (no kubectl exec):"
-    kubectl get --raw /api/v1/namespaces/tetragon/services/tetragon:2112/proxy/metrics 2>&1 | head -3 || true
-    log "  Splunk OTel collector logs (search for cilium scrape errors):"
-    kubectl -n splunk-otel logs -l app=splunk-otel-collector --tail=50 2>&1 | grep -E 'cilium|tetragon|hubble|forbidden' | head -10 || true
+    "${KUBECTL[@]}" -n "${CILIUM_NAMESPACE}" get pods -l k8s-app=cilium 2>&1 | sed -n '1,5p' || true
+    log "  Metrics endpoints via API server proxy (no kubectl exec):"
+    probe_metrics "cilium-agent:9962" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/cilium-agent:9962/proxy/metrics"
+    probe_metrics "hubble-metrics:9965" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/hubble-metrics:9965/proxy/metrics"
+    probe_metrics "cilium-envoy:9964" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/cilium-envoy:9964/proxy/metrics"
+    probe_metrics "cilium-operator:9963" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/cilium-operator:9963/proxy/metrics"
+    probe_metrics "tetragon:2112" "/api/v1/namespaces/${TETRAGON_NAMESPACE}/services/tetragon:2112/proxy/metrics"
+    probe_metrics "tetragon-operator-metrics:2113" "/api/v1/namespaces/${TETRAGON_NAMESPACE}/services/tetragon-operator-metrics:2113/proxy/metrics"
+    probe_metrics "cilium-dnsproxy:9967" "/api/v1/namespaces/${CILIUM_NAMESPACE}/services/cilium-dnsproxy:9967/proxy/metrics" false
+    log "  Splunk OTel collector logs (search for Isovalent scrape errors):"
+    "${KUBECTL[@]}" -n "${COLLECTOR_NAMESPACE}" logs -l app=splunk-otel-collector --tail=50 2>&1 | grep -E 'cilium|tetragon|hubble|dnsproxy|forbidden' | sed -n '1,10p' || true
 fi

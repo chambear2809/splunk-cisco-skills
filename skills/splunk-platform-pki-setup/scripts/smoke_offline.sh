@@ -122,8 +122,6 @@ else
     fail "FIPS 140-3 render"
 fi
 
-# Confirm splunk-launch.conf carries the FIPS line
-fips_launch="$tmp/fips/platform-pki/pki/distribute/standalone/000_pki_trust/local/splunk-launch.conf"
 # Standalone bundle is only emitted when target includes a standalone role; for
 # pure indexer-cluster target the launch conf goes via the install helper.
 fips_install="$tmp/fips/platform-pki/pki/install/install-fips-launch-conf.sh"
@@ -498,10 +496,7 @@ fi
 # serverCert = .../__HOST__/__HOST__-splunkd.pem, every peer would look
 # for a literal file named __HOST__-splunkd.pem and fail to start.
 bundle_failed=0
-for bundle_conf in $(find "$tmp/full-private/platform-pki/pki/distribute" \
-                          "$tmp/repl-ssl/platform-pki/pki/distribute" \
-                          "$tmp/fips/platform-pki/pki/distribute" \
-                          -name '*.conf' 2>/dev/null); do
+while IFS= read -r bundle_conf; do
     # forwarder-fleet outputs may legitimately omit serverCert (it's a forwarder),
     # but bundles MUST NOT carry per-host serverCert / sslPassword / __HOST__ refs.
     if grep -E '^[[:space:]]*serverCert[[:space:]]*=' "$bundle_conf" >/dev/null 2>&1; then
@@ -516,7 +511,10 @@ for bundle_conf in $(find "$tmp/full-private/platform-pki/pki/distribute" \
         fail "bundle conf carries __HOST__ placeholder Splunk will treat as literal: $bundle_conf"
         bundle_failed=1
     fi
-done
+done < <(find "$tmp/full-private/platform-pki/pki/distribute" \
+              "$tmp/repl-ssl/platform-pki/pki/distribute" \
+              "$tmp/fips/platform-pki/pki/distribute" \
+              -name '*.conf' 2>/dev/null)
 if [[ "$bundle_failed" == "0" ]]; then
     ok "no per-host serverCert / sslPassword / __HOST__ leaks into ANY bundle conf"
 fi

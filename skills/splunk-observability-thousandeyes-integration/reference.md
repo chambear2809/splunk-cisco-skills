@@ -61,7 +61,7 @@ Three file-backed token flags:
 
 Rejected direct-secret flags: `--te-token`, `--access-token`, `--token`, `--bearer-token`, `--api-token`, `--o11y-token`, `--sf-token`. Each error message points at the matching `--*-token-file` flag.
 
-The renderer never reads token files. Apply scripts read tokens from chmod-600 files at runtime via `$(cat $TOKEN_FILE)` so secrets never enter argv or rendered files.
+The renderer never reads token files. Apply scripts read tokens from chmod-600 files at runtime through curl config or payload-substitution helpers, so secrets never enter argv or rendered files.
 
 TE Templates render with **Handlebars placeholders only** (`{{te_credentials.api_key}}` style). The TE API rejects plain-text credentials with HTTP 400; the renderer catches this at render time so the operator gets a clear error before the network call.
 

@@ -111,6 +111,11 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     ("splunk-observability-cisco-intersight-integration", "setup.sh"),
     ("splunk-observability-nvidia-gpu-integration", "setup.sh"),
     ("splunk-observability-cisco-ai-pod-integration", "setup.sh"),
+    # splunk-observability-k8s-auto-instrumentation-setup is render-first with
+    # --apply-instrumentation / --apply-annotations / --uninstall-instrumentation
+    # gates; --dry-run is a pure preview (no cluster writes, no file writes beyond
+    # the plan text).
+    ("splunk-observability-k8s-auto-instrumentation-setup", "setup.sh"),
 }
 READ_ONLY_LIST_SCRIPTS: set[tuple[str, str]] = {
     ("cisco-product-setup", "setup.sh"),
@@ -250,6 +255,14 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
     ("splunk-observability-cisco-intersight-integration", "setup.sh"): ("--apply",),
     ("splunk-observability-nvidia-gpu-integration", "setup.sh"): ("--apply",),
     ("splunk-observability-cisco-ai-pod-integration", "setup.sh"): ("--apply",),
+    # splunk-observability-k8s-auto-instrumentation-setup mutates via the three
+    # apply modes (--apply-instrumentation / --apply-annotations, both matched by
+    # the --apply- prefix) and the uninstall mode. The --discover-workloads,
+    # --render, --dry-run, --json, --explain, and --gitops-mode paths are read-only.
+    ("splunk-observability-k8s-auto-instrumentation-setup", "setup.sh"): (
+        "--apply-",
+        "--uninstall-instrumentation",
+    ),
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it. The smoke_*

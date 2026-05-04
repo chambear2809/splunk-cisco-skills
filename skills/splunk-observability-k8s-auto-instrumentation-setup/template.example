@@ -1,0 +1,255 @@
+# Splunk Observability Kubernetes Auto-Instrumentation spec
+#
+# Copy this file to template.local and fill in non-secret values only.
+# This skill does NOT take or store credentials directly; it relies on the
+# base splunk-observability-otel-collector-setup for the ingest token and
+# on the Kubernetes cluster's RBAC for any kubectl writes.
+
+api_version: splunk-observability-k8s-auto-instrumentation-setup/v1
+
+# ---- Identity ----------------------------------------------------------------
+
+# Splunk Observability realm. Lands on the base collector Helm release that this
+# skill overlays on top of; used in the rendered handoff to
+# splunk-observability-otel-collector-setup.
+realm: us0
+
+# Kubernetes cluster identity. Becomes the `k8s.cluster.name` resource attribute
+# for every auto-instrumented trace.
+cluster_name: "prod-cluster"
+
+# Required: lands on every trace as `deployment.environment`. Pick one of
+# prod, staging, dev, qa, or a free-form string that matches your team's
+# environment taxonomy.
+deployment_environment: "prod"
+
+# Kubernetes distribution. One of:
+#   eks | eks/auto-mode | eks/fargate | gke | gke/autopilot | openshift | aks | generic
+# Several distributions auto-detect cluster_name; fargate requires --gateway-endpoint.
+distribution: "generic"
+
+# Base Splunk OTel Collector binding. The Instrumentation CR must live in a
+# namespace that the annotated workloads can resolve the agent Service DNS in.
+# Default matches the base collector skill defaults.
+base:
+  release: "splunk-otel-collector"
+  namespace: "splunk-otel"
+
+# ---- Instrumentation CRs ----------------------------------------------------
+
+# A list of one or more Instrumentation resources. When the list has more than
+# one entry, --multi-instrumentation MUST be set (preflight enforces). Each
+# workload annotation binds to an entry via `cr=<namespace>/<name>` (falls back
+# to the first entry when unset).
+instrumentation_crs:
+  - name: "splunk-otel-auto-instrumentation"
+    namespace: "splunk-otel"
+
+    # Languages this CR covers. Each language emits its own block in the CR
+    # spec (images, env, resource limits) per the OpenTelemetry Operator CRD.
+    # `sdk` is a language-agnostic env-only inject for apps that bundle their
+    # own OTel SDK.
+    languages:
+      - java
+      - nodejs
+      - python
+      # - dotnet
+      # - go
+      # - apache-httpd
+      # - nginx
+      # - sdk
+
+    # Endpoint where the CR tells language SDKs to send OTLP. Default points
+    # at the base-collector node-local agent DaemonSet via the SPLUNK_OTEL_AGENT
+    # env-var the chart injects. Override with the gateway Service DNS when
+    # running gateway-only (required on EKS Fargate).
+    endpoint: "http://$(SPLUNK_OTEL_AGENT):4317"
+
+    # Per-language endpoint override for languages that prefer HTTP OTLP (4318)
+    # over gRPC (4317). Uncomment any row you want to override.
+    per_language_endpoint: {}
+    # per_language_endpoint:
+    #   python: "http://$(SPLUNK_OTEL_AGENT):4318"
+    #   dotnet: "http://$(SPLUNK_OTEL_AGENT):4318"
+
+    # Propagators used by every language SDK in this CR.
+    propagators:
+      - tracecontext
+      - baggage
+      - b3
+
+    # Sampler + argument. Common choices:
+    #   always_on, always_off, traceidratio, parentbased_always_on,
+    #   parentbased_always_off, parentbased_traceidratio, jaeger_remote, xray
+    sampler:
+      type: "parentbased_always_on"
+      argument: ""
+
+    # AlwaysOn Profiling and runtime metrics. profiling_memory requires
+    # profiling_enabled. runtime_metrics is Java + Node.js only.
+    profiling_enabled: true
+    profiling_memory_enabled: false
+    profiler_call_stack_interval_ms: 10000
+    runtime_metrics_enabled: true
+
+    # Use Kubernetes pod labels (app / app.kubernetes.io/name / version /
+    # instance) as resource attributes on traces.
+    use_labels_for_resource_attributes: true
+
+    # Extra resource attributes applied to every trace this CR emits.
+    extra_resource_attrs: {}
+    # extra_resource_attrs:
+    #   service.namespace: "payments"
+    #   team: "platform"
+
+    # Per-language image overrides. Leave blank to use the Splunk defaults
+    # (ghcr.io/signalfx/splunk-otel-*). Required when mirroring to a private
+    # registry in an air-gapped environment.
+    images: {}
+    # images:
+    #   java: "internal-registry.example.com/splunk-otel-java:v2.12.0"
+    #   nodejs: "internal-registry.example.com/splunk-otel-js:v2.13.0"
+
+    # Per-language extra env. Use for SPLUNK_TRACE_RESPONSE_HEADER_ENABLED,
+    # SPLUNK_CONTEXT_SERVER_TIMING_ENABLED, and any OTEL_* override not covered
+    # above.
+    extra_env: {}
+    # extra_env:
+    #   java:
+    #     SPLUNK_TRACE_RESPONSE_HEADER_ENABLED: "true"
+
+    # Per-language resource limits on the injected init container. Follow
+    # Kubernetes format: cpu in cores (500m = 0.5 core), memory in MiB or GiB.
+    resource_limits: {}
+    # resource_limits:
+    #   java:
+    #     cpu: "500m"
+    #     memory: "128Mi"
+
+# Example multi-CR spec for per-environment sampling. Uncomment and adapt.
+# instrumentation_crs:
+#   - name: splunk-otel-dev
+#     namespace: splunk-otel
+#     languages: [java, nodejs]
+#     sampler:
+#       type: parentbased_always_on
+#       argument: ""
+#   - name: splunk-otel-prod
+#     namespace: splunk-otel
+#     languages: [java, nodejs]
+#     sampler:
+#       type: parentbased_traceidratio
+#       argument: "0.1"
+
+# ---- Operator tuning --------------------------------------------------------
+
+operator:
+  # Namespaces the operator should watch. Empty = cluster-scoped.
+  watch_namespaces: []
+  # How the webhook certificate is provisioned. auto is the chart default.
+  webhook_cert_mode: "auto"      # auto | cert-manager | external
+  # Required on Helm v4 to avoid the webhook race. Default true.
+  installation_job_enabled: true
+  # Feature gate for multi-CR. Must be true when instrumentation_crs has >1 entry.
+  multi_instrumentation: false
+
+# ---- Image pull secret (optional) -------------------------------------------
+
+# Name of an existing Kubernetes Secret of type kubernetes.io/dockerconfigjson
+# in each namespace where the operator pulls images. The operator creates the
+# secret itself; this skill never touches credential material.
+image_pull_secret: ""
+
+# ---- Workload annotations ---------------------------------------------------
+
+# Namespace-level opt-in. Every pod in the namespace gets the annotations.
+# Format: namespace -> list of languages.
+namespace_annotations: {}
+# namespace_annotations:
+#   dev:
+#     - java
+#     - nodejs
+
+# Workload-level annotations. These are the most common entry point.
+# Format (list of objects):
+#   - kind: Deployment            # Deployment | StatefulSet | DaemonSet
+#     namespace: prod
+#     name: payments-api
+#     language: java              # one of: java, nodejs, python, dotnet, go, apache-httpd, nginx, sdk
+#     container_names: "app"      # optional; REQUIRED when Istio sidecar injection is on
+#     dotnet_runtime: ""          # optional; linux-x64 | linux-musl-x64
+#     go_target_exe: ""           # REQUIRED for language: go
+#     cr: ""                      # optional; <namespace>/<crname> for multi-CR binding
+#     disable: false              # explicit opt-out (emits inject-<lang>: "false")
+workload_annotations:
+  - kind: Deployment
+    namespace: prod
+    name: payments-api
+    language: java
+  - kind: Deployment
+    namespace: prod
+    name: checkout-web
+    language: nodejs
+  - kind: StatefulSet
+    namespace: prod
+    name: fraud-score
+    language: python
+
+# ---- OBI (eBPF) -------------------------------------------------------------
+
+obi:
+  enabled: false
+  # Include list. Empty = watch every namespace except exclude_namespaces.
+  namespaces: []
+  exclude_namespaces:
+    - "kube-system"
+    - "kube-public"
+  version: ""
+  # OpenShift-only. SCC binding is auto-on when distribution=openshift AND
+  # obi.enabled=true. Set false ONLY when you have installed a compatible SCC
+  # externally (most operators will not need this).
+  render_openshift_scc: true
+
+# ---- Vendor coexistence -----------------------------------------------------
+
+vendors:
+  # Scan the cluster for Datadog / New Relic / AppDynamics / Dynatrace mutating
+  # webhooks and warn if any target workload is also under vendor control.
+  detect: true
+  # Emit exclusion env snippets for the listed vendors. These are informational
+  # in --render; they do not modify the target workload specs.
+  exclude: []
+  # exclude:
+  #   - datadog
+  #   - newrelic
+
+# ---- Pod Security Standards overrides --------------------------------------
+
+# If a target namespace has pod-security.kubernetes.io/enforce set to
+# restricted or baseline, Go and OBI instrumentation will fail-render
+# because their init/daemon container needs elevated privileges. Declare
+# overrides here (advisory; the operator must raise PSS separately) to
+# acknowledge the risk and allow render to succeed.
+#
+# Required keys per entry:
+#   namespace    - the namespace whose PSS label is being acknowledged
+#   enforce      - the actual PSS enforcement level: restricted | baseline
+#   acknowledged - true to allow render despite the restricted/baseline label
+#   rationale    - free-form note for audit; does not affect rendering
+pss_overrides: []
+# pss_overrides:
+#   - namespace: prod
+#     enforce: restricted
+#     acknowledged: true
+#     rationale: "Dedicated observability node pool; documented exemption."
+
+# ---- Handoff spec files -----------------------------------------------------
+
+handoffs:
+  # Emit handoff-collector.sh with the exact command to run the base
+  # collector skill if CRDs are absent.
+  base_collector: true
+  # Emit handoff-native-ops.spec.yaml for starter APM detectors.
+  native_ops: true
+  # Emit handoff-dashboard-builder.spec.yaml for APM topology dashboards.
+  dashboard_builder: true

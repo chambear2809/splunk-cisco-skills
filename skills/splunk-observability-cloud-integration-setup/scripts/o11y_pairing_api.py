@@ -3,14 +3,15 @@
 
 Wraps two Splunk public APIs:
 
-- ``acs observability pair / pairing-status-by-id / enable-capabilities /
-  enable-centralized-rbac`` (ACS CLI 2.14.0+)
+- ``acs observability enable-capabilities`` (ACS CLI 2.14.0+; no secret token)
 - ``POST /adminconfig/v2/observability/sso-pairing`` and
   ``GET  /adminconfig/v2/observability/sso-pairing/{pairing-id}`` (ACS REST)
 
 Tokens are read from chmod-600 files only — never accepted as a CLI flag and
-never written into ``apply-state.json``. The destructive
-``enable-centralized-rbac`` action requires ``--i-accept-rbac-cutover``.
+never written into ``apply-state.json``. Secret-bearing ACS CLI operations are
+not invoked because current ACS syntax would put the O11y token on process argv.
+The destructive ``enable-centralized-rbac`` action requires
+``--i-accept-rbac-cutover`` and a future safe token-file capable transport.
 """
 
 from __future__ import annotations
@@ -77,32 +78,16 @@ def pair(
     if state_dir is not None and has_step(state_dir, idem):
         return {"result": "skipped", "reason": "already-paired", "idempotency_key": idem}
 
-    admin_token = read_secret_file(admin_token_file)
-
-    if _acs_available():
-        rc, out, err = _run_acs(
-            ["observability", "pair", "--o11y-realm", realm, "--o11y-access-token", admin_token]
-        )
-        # Wipe the in-memory token and refuse to log it.
-        admin_token = ""
-        if rc != 0:
-            if state_dir is not None:
-                append_step(state_dir, "pairing", "pair", idem, "failed", notes=err.strip())
-            return {"result": "failed", "stderr": err.strip(), "stdout": out.strip()}
-        try:
-            payload = json.loads(out) if out.strip() else {}
-        except json.JSONDecodeError:
-            payload = {"raw": out.strip()}
-        if state_dir is not None:
-            append_step(state_dir, "pairing", "pair", idem, "success", response=payload)
-        return {"result": "success", "response": payload, "idempotency_key": idem}
-
-    # ACS CLI not installed; fall back to REST.
     if not splunk_cloud_stack or not splunk_cloud_admin_jwt_file:
         return {
             "result": "failed",
-            "reason": "acs CLI not installed and --splunk-cloud-admin-jwt-file not supplied for REST fallback",
+            "reason": (
+                "safe pairing requires --splunk-cloud-stack and "
+                "--splunk-cloud-admin-jwt-file for ACS REST; ACS CLI pairing "
+                "would expose the O11y token on process argv"
+            ),
         }
+    admin_token = read_secret_file(admin_token_file)
     jwt = read_secret_file(splunk_cloud_admin_jwt_file)
     url = f"https://admin.splunk.com/{splunk_cloud_stack}/adminconfig/v2/observability/sso-pairing"
     headers = {
@@ -126,24 +111,16 @@ def status(
     splunk_cloud_admin_jwt_file: str | None = None,
     realm: str | None = None,
 ) -> dict[str, Any]:
-    admin_token = read_secret_file(admin_token_file)
-    if _acs_available():
-        args = ["observability", "pairing-status-by-id", "--pairing-id", pairing_id, "--o11y-access-token", admin_token]
-        if realm:
-            args.extend(["--o11y-realm", realm])
-        rc, out, err = _run_acs(args)
-        admin_token = ""
-        if rc != 0:
-            return {"result": "failed", "stderr": err.strip(), "stdout": out.strip()}
-        try:
-            return {"result": "success", "response": json.loads(out)}
-        except json.JSONDecodeError:
-            return {"result": "success", "response": {"raw": out.strip()}}
     if not splunk_cloud_stack or not splunk_cloud_admin_jwt_file:
         return {
             "result": "failed",
-            "reason": "acs CLI not installed and --splunk-cloud-admin-jwt-file not supplied for REST fallback",
+            "reason": (
+                "safe pairing status requires --splunk-cloud-stack and "
+                "--splunk-cloud-admin-jwt-file for ACS REST; ACS CLI status "
+                "would expose the O11y token on process argv"
+            ),
         }
+    admin_token = read_secret_file(admin_token_file)
     jwt = read_secret_file(splunk_cloud_admin_jwt_file)
     url = f"https://admin.splunk.com/{splunk_cloud_stack}/adminconfig/v2/observability/sso-pairing/{pairing_id}"
     headers = {
@@ -184,15 +161,13 @@ def enable_centralized_rbac(
     idem = f"centralized_rbac:enable_centralized_rbac:{realm or 'default'}"
     if state_dir is not None and has_step(state_dir, idem):
         return {"result": "skipped", "reason": "already-applied", "idempotency_key": idem}
-    if not _acs_available():
-        return {"result": "failed", "reason": "acs CLI not installed"}
-    admin_token = read_secret_file(admin_token_file)
-    args = ["observability", "enable-centralized-rbac", "--o11y-access-token", admin_token]
-    if realm:
-        args.extend(["--o11y-realm", realm])
-    rc, out, err = _run_acs(args)
-    admin_token = ""
-    result = "success" if rc == 0 else "failed"
+    result = "failed"
+    out = ""
+    err = (
+        "enable-centralized-rbac is not automated because ACS CLI requires "
+        "--o11y-access-token on process argv and no safe REST/token-file "
+        "transport is implemented in this skill yet"
+    )
     if state_dir is not None:
         append_step(state_dir, "centralized_rbac", "enable_centralized_rbac", idem, result, notes=(err or out).strip())
     return {"result": result, "stdout": out.strip(), "stderr": err.strip()}

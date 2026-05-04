@@ -134,8 +134,40 @@ def test_idempotent_re_render(tmp_path: Path) -> None:
 
 def test_dry_run_json(tmp_path: Path) -> None:
     spec = write_spec(tmp_path / "spec.json")
-    result = run_setup("--render", "--spec", str(spec), "--dry-run", "--json", "--output-dir", str(tmp_path / "rendered"))
+    result = run_setup(
+        "--render",
+        "--spec",
+        str(spec),
+        "--cluster-name",
+        "isovalent-demo",
+        "--dry-run",
+        "--json",
+        "--output-dir",
+        str(tmp_path / "rendered"),
+    )
     assert result.returncode == 0, combined_output(result)
     plan = json.loads(result.stdout)
     assert plan["skill"] == "cisco-isovalent-platform-setup"
     assert plan["edition"] == "oss"
+    assert plan["cluster_name"] == "isovalent-demo"
+
+
+def test_cluster_name_override_lands_in_values_and_metadata(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    result = run_setup(
+        "--render",
+        "--spec",
+        str(spec),
+        "--cluster-name",
+        "isovalent-demo",
+        "--output-dir",
+        str(output),
+    )
+    assert result.returncode == 0, combined_output(result)
+    cilium = (output / "helm/cilium-values.yaml").read_text(encoding="utf-8")
+    tetragon = (output / "helm/tetragon-values.yaml").read_text(encoding="utf-8")
+    metadata = json.loads((output / "metadata.json").read_text(encoding="utf-8"))
+    assert "name: isovalent-demo" in cilium
+    assert "clusterName: isovalent-demo" in tetragon
+    assert metadata["cluster_name"] == "isovalent-demo"

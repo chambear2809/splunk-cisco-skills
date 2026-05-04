@@ -7,8 +7,12 @@ This annex covers the most common failure modes for the ThousandEyes -> Splunk O
 ### Step 1: confirm the Stream object exists
 
 ```bash
-TE_TOKEN=$(cat $TE_TOKEN_FILE)
-curl -sH "Authorization: Bearer ${TE_TOKEN}" \
+TE_CURL_CONFIG="$(mktemp)"
+chmod 600 "$TE_CURL_CONFIG"
+{ printf 'header = "Authorization: Bearer '; tr -d '\r\n' < "$TE_TOKEN_FILE"; printf '"\n'; } > "$TE_CURL_CONFIG"
+trap 'rm -f "$TE_CURL_CONFIG"' EXIT
+
+curl -sS -K "$TE_CURL_CONFIG" \
   "https://api.thousandeyes.com/v7/streams?aid=${ACCOUNT_GROUP_ID}" | jq
 ```
 
@@ -17,7 +21,7 @@ You should see one (or more) Stream objects with `type: opentelemetry`, `signal:
 ### Step 2: confirm the Stream is enabled and healthy
 
 ```bash
-curl -sH "Authorization: Bearer ${TE_TOKEN}" \
+curl -sS -K "$TE_CURL_CONFIG" \
   "https://api.thousandeyes.com/v7/streams/${STREAM_ID}?aid=${ACCOUNT_GROUP_ID}" | jq '.enabled, .lastStatus'
 ```
 
@@ -26,7 +30,7 @@ curl -sH "Authorization: Bearer ${TE_TOKEN}" \
 ### Step 3: confirm matched tests are running
 
 ```bash
-curl -sH "Authorization: Bearer ${TE_TOKEN}" \
+curl -sS -K "$TE_CURL_CONFIG" \
   "https://api.thousandeyes.com/v7/tests?aid=${ACCOUNT_GROUP_ID}" | jq '.tests[] | select(.testId == TEST_ID)'
 ```
 
@@ -49,7 +53,7 @@ If the count is 0, the Stream is forwarding but O11y is not ingesting. Common ca
 ## Stream creation fails with 401/403
 
 ```bash
-curl -sH "Authorization: Bearer ${TE_TOKEN}" -X POST \
+curl -sS -K "$TE_CURL_CONFIG" -X POST \
   "https://api.thousandeyes.com/v7/streams?aid=${ACCOUNT_GROUP_ID}" \
   -H "Content-Type: application/json" \
   --data @te-payloads/stream.json
@@ -74,7 +78,12 @@ bash apply-apm-connector.sh
 The connector requires a **User API access token** (admin scope), NOT an Org access token (ingest scope). Confirm via:
 
 ```bash
-curl -sH "X-SF-Token: $(cat $O11Y_API_TOKEN_FILE)" \
+O11Y_CURL_CONFIG="$(mktemp)"
+chmod 600 "$O11Y_CURL_CONFIG"
+{ printf 'header = "X-SF-Token: '; tr -d '\r\n' < "$O11Y_API_TOKEN_FILE"; printf '"\n'; } > "$O11Y_CURL_CONFIG"
+trap 'rm -f "${TE_CURL_CONFIG:-}" "$O11Y_CURL_CONFIG"' EXIT
+
+curl -sS -K "$O11Y_CURL_CONFIG" \
   "https://api.us0.signalfx.com/v2/credential" | jq
 ```
 
@@ -126,7 +135,7 @@ voice, ftp-server
 If you specify a type that's not in this list, TE silently drops the filter and forwards ALL types. Verify your filter via:
 
 ```bash
-curl -sH "Authorization: Bearer ${TE_TOKEN}" \
+curl -sS -K "$TE_CURL_CONFIG" \
   "https://api.thousandeyes.com/v7/streams/${STREAM_ID}?aid=${ACCOUNT_GROUP_ID}" | jq '.filters'
 ```
 

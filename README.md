@@ -9,6 +9,11 @@ external-collector topologies.
 
 ## Start With The Intake Templates
 
+For a scannable operator view of every skill, use
+[`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md). It gives each skill a
+plain-language purpose, the best first file to open, a safe `--help` command,
+the validation entry point, and the deeper docs to read next.
+
 Before starting a setup, review the skill-local `template.example` files. They
 show the non-secret information you should collect from the product domain
 owners ahead of time, such as hostnames, account names, org IDs, regions,
@@ -188,6 +193,8 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-enterprise-host-setup` | Splunk Enterprise runtime | Bootstrap Linux Splunk Enterprise hosts as search-tier, indexer, heavy-forwarder, cluster-manager, indexer-peer, SHC deployer, or SHC member |
 | `splunk-enterprise-kubernetes-setup` | Splunk Enterprise on Kubernetes | Render, preflight, apply, and validate SOK S1/C3/M4 or Splunk POD on Cisco UCS |
 | `splunk-observability-otel-collector-setup` | Splunk Observability Cloud OTel Collector | Render, apply, and validate Splunk Distribution of OpenTelemetry Collector assets for Kubernetes clusters and Linux hosts, including Splunk Platform HEC token handoff helpers |
+| `splunk-observability-k8s-auto-instrumentation-setup` | Zero-code K8s app auto-instrumentation | Overlay on `splunk-observability-otel-collector-setup`: render, apply, verify, and uninstall per-language OpenTelemetry Operator Instrumentation CRs, workload annotation patches, OBI, AlwaysOn Profiling, runtime metrics, vendor-coexistence detection, workload discovery, selective target apply/uninstall, and `--gitops-mode` YAML-only rendering |
+| `splunk-observability-k8s-frontend-rum-setup` | Splunk Browser RUM + Session Replay for Kubernetes-served frontends | Render, apply, verify, and uninstall Browser RUM injection across nginx, ingress-nginx, initContainer rewrite, and runtime-config modes; includes Frustration Signals, gated Session Replay, source-map upload helpers, RUM-to-APM Server-Timing validation, GitOps rendering, and handoffs to dashboard, detector, SIM, and auto-instrumentation workflows |
 | `splunk-observability-cloud-integration-setup` | Splunk Platform <-> Splunk Observability Cloud | Pair Splunk Cloud Platform / Splunk Enterprise with Splunk Observability Cloud end-to-end: token-auth flip, Unified Identity or Service Account pairing, multi-org default-org, Centralized RBAC, Discover Splunk Observability Cloud app's five Configurations tabs, Log Observer Connect (SCP + SE TLS), Related Content + Real Time Metrics, Dashboard Studio O11y metrics, and the Splunk Infrastructure Monitoring Add-on (Splunk_TA_sim, 5247) install + account + curated SignalFlow modular inputs |
 | `splunk-observability-thousandeyes-integration` | ThousandEyes -> Splunk Observability Cloud | Render and apply the full TE -> O11y wiring: Integration 1.0 OpenTelemetry stream (`POST /v7/streams` to ingest.<realm>.signalfx.com/v2/datapoint/otlp), Integrations 2.0 Splunk Observability APM connector, full TE asset lifecycle (tests, alert rules, labels, tags, TE-side dashboards, Templates with Handlebars-only credential placeholders); per-test-type SignalFlow dashboards + detectors handed off to `splunk-observability-dashboard-builder` and `splunk-observability-native-ops` |
 | `splunk-observability-isovalent-integration` | Isovalent (Cilium / Hubble / Tetragon) -> Splunk Observability Cloud + Splunk Platform | Render the Splunk OTel collector overlay (seven `prometheus/isovalent_*` scrape jobs + `filter/includemetrics` + cilium-dnsproxy fix); Splunk Platform logs DEFAULT via OTel filelog receiver + hostPath mount + `extraFileLogs.filelog/tetragon` (production-validated); legacy fluentd splunk_hec behind `--legacy-fluentd-hec` (DEPRECATED); hands off Tetragon log ingestion to `cisco-security-cloud-setup` (`PRODUCT=isovalent`, sourcetype `cisco:isovalent`, index `cisco_isovalent`) |
@@ -207,6 +214,7 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-indexer-cluster-setup` | Splunk Enterprise indexer cluster (single-site, multisite, redundant managers) | Bootstrap manager(s) / peers / SHs, manage cluster bundle (validate / apply / rollback), rolling restart (default / searchable / forced), peer offline (fast / enforce-counts), maintenance mode, single-site to multisite migration, manager replacement |
 | `splunk-cloud-acs-allowlist-setup` | Splunk Cloud ACS IP allowlists (all 7 features, IPv4 + IPv6) | Render plan, preflight (subnet limits, lock-out protection, FedRAMP carve-out), apply, audit / diff, optional Terraform emission |
 | `splunk-enterprise-public-exposure-hardening` | On-prem Splunk Enterprise public-internet exposure | Render Splunk-side hardening (web/server/inputs/outputs/authentication/authorize/limits/commands.conf + metadata) plus reverse-proxy (nginx/HAProxy) + firewall + WAF/CDN handoff; preflight 20-step + validate live probes; SVD floor enforcement; refuses to apply without `--accept-public-exposure` |
+| `splunk-platform-pki-setup` | Splunk Enterprise platform PKI lifecycle | Render Private PKI or Public PKI assets, distribute per-component certificates across Splunk Web, splunkd, S2S, HEC, KV Store, indexer clusters, SHC, License Manager, Deployment Server, Monitoring Console, Federated Search, DMZ HF, UF fleet, Edge Processor, SAML, LDAPS, and CLI trust; enforce TLS presets, FIPS wiring, KV Store EKU rules, mTLS opt-in, and delegated rotation runbooks |
 
 ## Vendor Package Policy
 

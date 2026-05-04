@@ -57,8 +57,13 @@ You should see `logsEnabled: true` and the HEC endpoint.
 4. Confirm the HEC token is valid:
 
 ```bash
-curl -sS -k -H "Authorization: Splunk $(cat $HEC_TOKEN_FILE)" \
+HEC_CURL_CONFIG="$(mktemp)"
+chmod 600 "$HEC_CURL_CONFIG"
+{ printf 'header = "Authorization: Splunk '; tr -d '\r\n' < "$HEC_TOKEN_FILE"; printf '"\n'; } > "$HEC_CURL_CONFIG"
+
+curl -sS -k -K "$HEC_CURL_CONFIG" \
     "https://$HEC_HOST:8088/services/collector/health"
+rm -f "$HEC_CURL_CONFIG"
 ```
 
 Should return `{"text":"HEC is healthy","code":17}`.
@@ -104,7 +109,12 @@ helm get values splunk-otel-collector -n splunk-otel -a | grep clusterName
 2. Confirm the dashboard's metric exists in your O11y org:
 
 ```bash
-curl -sS -H "X-SF-Token: $(cat $O11Y_API_TOKEN_FILE)" \
+O11Y_CURL_CONFIG="$(mktemp)"
+chmod 600 "$O11Y_CURL_CONFIG"
+{ printf 'header = "X-SF-Token: '; tr -d '\r\n' < "$O11Y_API_TOKEN_FILE"; printf '"\n'; } > "$O11Y_CURL_CONFIG"
+trap 'rm -f "$O11Y_CURL_CONFIG"' EXIT
+
+curl -sS -K "$O11Y_CURL_CONFIG" \
     "https://api.us0.signalfx.com/v2/metric?query=cilium_endpoint_state&limit=1" | jq
 ```
 

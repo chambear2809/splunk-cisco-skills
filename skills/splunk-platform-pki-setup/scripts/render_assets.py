@@ -303,7 +303,7 @@ def _key_bits_or_curve(key_algorithm: str) -> dict:
 def _validate_args(args: argparse.Namespace, policy: dict) -> None:
     """Validate operator inputs against the algorithm policy and the docs."""
     targets = _expand_targets(args.target)
-    mtls = _expand_mtls(args.enable_mtls)
+    _expand_mtls(args.enable_mtls)
 
     # TLS version floor.
     # `--allow-deprecated-tls` does NOT raise the upper bound (Splunk docs
@@ -885,7 +885,7 @@ echo "    $OUT_DIR/$NAME.key"
 
 
 def _sign_client_cert_sh(args: argparse.Namespace) -> str:
-    return _sh(f"""# Sign a client leaf cert. Same as sign-server-cert.sh but with the
+    return _sh("""# Sign a client leaf cert. Same as sign-server-cert.sh but with the
 # client EKU profile. Used for forwarder mTLS and deployment-client mTLS.
 exec "$(dirname "$0")/sign-server-cert.sh" "$@"
 """)
@@ -1926,7 +1926,7 @@ sslAltNameToCheck    = {peer}
 def _standalone_authentication_conf(args: argparse.Namespace) -> str:
     if not _bool(args.saml_sp):
         return "# Rendered by splunk-platform-pki-setup.\n# No SAML SP signing cert requested via --saml-sp; this file is intentionally empty.\n"
-    return f"""# Rendered by splunk-platform-pki-setup.
+    return """# Rendered by splunk-platform-pki-setup.
 # SAML SP signing cert wiring. The IdP cert (idpCertPath) is operator-supplied
 # and lives under $SPLUNK_HOME/etc/auth/idpCerts/. See references/saml-signing-certs.md.
 
@@ -2020,7 +2020,7 @@ def _ep_placeholder() -> str:
 def _ep_upload_sh_example(args: argparse.Namespace) -> str:
     # NOT chmod +x by intent — this is a template for the operator to copy
     # and adapt to their EP control-plane endpoint.
-    return f"""#!/usr/bin/env bash
+    return """#!/usr/bin/env bash
 # Example REST upload of EP certs to a Splunk Enterprise EP control plane.
 # This is NOT executed by the skill; copy + adapt for your environment.
 #
@@ -2028,9 +2028,9 @@ def _ep_upload_sh_example(args: argparse.Namespace) -> str:
 # no self-service ACS endpoint for EP cert upload.
 
 set -euo pipefail
-EP_CONTROL_PLANE="${{EP_CONTROL_PLANE:-https://ep-control.example.com:8089}}"
-EP_ID="${{EP_ID:-}}"
-ADMIN_PASSWORD_FILE="${{ADMIN_PASSWORD_FILE:-}}"
+EP_CONTROL_PLANE="${EP_CONTROL_PLANE:-https://ep-control.example.com:8089}"
+EP_ID="${EP_ID:-}"
+ADMIN_PASSWORD_FILE="${ADMIN_PASSWORD_FILE:-}"
 
 if [[ -z "$EP_ID" ]] || [[ -z "$ADMIN_PASSWORD_FILE" ]]; then
     echo "ERROR: EP_ID and ADMIN_PASSWORD_FILE must be set" >&2
@@ -2095,7 +2095,7 @@ bash skills/splunk-edge-processor-setup/scripts/setup.sh \\
 
 
 def _saml_sp_placeholder(args: argparse.Namespace) -> str:
-    return f"""# SAML SP signing cert placeholder.
+    return """# SAML SP signing cert placeholder.
 # Replace with the real cert from sign-saml-sp.sh.
 # After installing, regenerate SP metadata in Splunk Web (Settings ->
 # Authentication -> SAML -> Generate metadata) and re-upload to the IdP.
@@ -2263,7 +2263,7 @@ See `../../references/rotation-runbook.md` for the full narrative.
 
 
 def _rotate_leaf_host_sh(args: argparse.Namespace) -> str:
-    return _sh(f"""# Rotate a single host's leaf cert in place. Backs up the existing PEMs,
+    return _sh("""# Rotate a single host's leaf cert in place. Backs up the existing PEMs,
 # installs the new ones, runs verify + KV-Store EKU check, and prints a
 # 'restart this host' nudge. Does NOT exec the restart.
 
@@ -2285,8 +2285,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 for var in HOST NEW_CERT NEW_KEY NEW_CA; do
-    if [[ -z "${{!var}}" ]]; then
-        echo "ERROR: --${{var,,}} required" >&2
+    if [[ -z "${!var}" ]]; then
+        echo "ERROR: --${var,,} required" >&2
         exit 1
     fi
 done
@@ -2342,7 +2342,7 @@ echo "    After all leaves are rotated, re-run with the new CA only to drop the 
 
 
 def _swap_replication_port_to_ssl_sh(args: argparse.Namespace) -> str:
-    return _sh(f"""# Atomic migration of [replication_port://9887] -> [replication_port-ssl://9887]
+    return _sh("""# Atomic migration of [replication_port://9887] -> [replication_port-ssl://9887]
 # on the cluster bundle. Removes the cleartext stanza in the same edit so
 # the bundle never contains both stanzas active.
 #
@@ -2359,14 +2359,14 @@ if [[ -z "$BUNDLE_SERVER_CONF" ]] || [[ ! -f "$BUNDLE_SERVER_CONF" ]]; then
     exit 1
 fi
 
-cp -p "$BUNDLE_SERVER_CONF" "${{BUNDLE_SERVER_CONF}}.pre-ssl-$(date -u +%Y%m%dT%H%M%SZ)"
+cp -p "$BUNDLE_SERVER_CONF" "${BUNDLE_SERVER_CONF}.pre-ssl-$(date -u +%Y%m%dT%H%M%SZ)"
 
 # Drop the cleartext stanza if present.
 awk '
-    BEGIN {{ skip = 0 }}
-    /^\\[replication_port:\\/\\/9887\\]/ {{ skip = 1; next }}
-    /^\\[/ && skip {{ skip = 0 }}
-    !skip {{ print }}
+    BEGIN { skip = 0 }
+    /^\\[replication_port:\\/\\/9887\\]/ { skip = 1; next }
+    /^\\[/ && skip { skip = 0 }
+    !skip { print }
 ' "$BUNDLE_SERVER_CONF" > "$BUNDLE_SERVER_CONF.tmp"
 
 # Confirm the SSL stanza is present (the renderer should have written it
@@ -2921,7 +2921,7 @@ def render(args: argparse.Namespace) -> tuple[Path, set[str]]:
     # CSR templates
     emit("pki/csr-templates/generate-csr.sh", _generate_csr_sh(args), executable=True)
     emit("pki/csr-templates/README.md", _csr_template_readme(args, args.mode))
-    csr_emitted = _emit_csr_templates(args, targets, emit)
+    _emit_csr_templates(args, targets, emit)
 
     # Install / verify
     emit("pki/install/install-leaf.sh", _install_leaf_sh(args), executable=True)

@@ -1416,7 +1416,6 @@ def test_apply_search_head_does_not_unconditionally_assign_unused_pass4_var() ->
     pass4SymmKey value into a shell variable (pass4="$(cat ...)") that was then
     immediately unset and never used. The renderer should rely on
     -auth-passphrase-file alone."""
-    skill_root = SKILL_ROOT
     render_module_local = render_module
     # Inspect the source of the cluster-manager renderer.
     import inspect

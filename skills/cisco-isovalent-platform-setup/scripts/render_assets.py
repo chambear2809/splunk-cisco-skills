@@ -25,8 +25,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
+
+SHARED_LIB = Path(__file__).resolve().parents[3] / "skills" / "shared" / "lib"
+if str(SHARED_LIB) not in sys.path:
+    sys.path.insert(0, str(SHARED_LIB))
+
+from yaml_compat import YamlCompatError, dump_yaml, load_yaml_or_json  # noqa: E402
 
 
 SKILL_NAME = "cisco-isovalent-platform-setup"
@@ -50,17 +57,6 @@ VALID_EDITIONS = {"oss", "enterprise"}
 VALID_EXPORT_MODES = {"file", "stdout", "fluentd"}
 
 
-def _load_yaml_module():
-    try:
-        import yaml  # type: ignore[import-not-found]
-    except ModuleNotFoundError as exc:
-        raise SpecError(
-            "PyYAML is required. Install with 'python3 -m pip install -r requirements-agent.txt' "
-            "or pass a JSON spec."
-        ) from exc
-    return yaml
-
-
 class SpecError(ValueError):
     """Raised when the input spec violates skill constraints."""
 
@@ -70,6 +66,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--spec", required=True)
     parser.add_argument("--edition", default="", help="oss | enterprise (or empty = inherit from spec.edition)")
+    parser.add_argument("--cluster-name", default="", help="Override spec.cluster_name")
     parser.add_argument("--eks-mirror", default="")
     parser.add_argument("--enable-dnsproxy", default="false")
     parser.add_argument("--enable-hubble-enterprise", default="false")
@@ -89,17 +86,9 @@ def bool_flag(value: str) -> bool:
 
 def load_spec(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
-    suffix = path.suffix.lower()
     try:
-        if suffix == ".json":
-            data = json.loads(text)
-        else:
-            yaml = _load_yaml_module()
-            try:
-                data = yaml.safe_load(text)
-            except yaml.YAMLError:
-                data = json.loads(text)
-    except json.JSONDecodeError as exc:
+        data = load_yaml_or_json(text, source=str(path))
+    except YamlCompatError as exc:
         raise SpecError(f"Failed to parse spec {path}: {exc}") from exc
     if not isinstance(data, dict):
         raise SpecError(f"Spec {path} did not parse to a mapping.")
@@ -118,8 +107,7 @@ def write_text(path: Path, content: str, *, executable: bool = False) -> None:
 
 
 def write_yaml(path: Path, payload: Any) -> None:
-    yaml = _load_yaml_module()
-    write_text(path, yaml.safe_dump(payload, sort_keys=True, default_flow_style=False))
+    write_text(path, dump_yaml(payload, sort_keys=True))
 
 
 def cilium_values(spec: dict[str, Any], edition: str) -> dict[str, Any]:
@@ -443,14 +431,16 @@ def eksctl_byocni_example() -> str:
 
 
 def render_metadata(args: argparse.Namespace, spec: dict[str, Any], edition: str) -> dict[str, Any]:
+    export_mode = args.export_mode or (spec.get("tetragon") or {}).get("export", {}).get("mode", "file")
     return {
         "skill": SKILL_NAME,
         "edition": edition,
+        "cluster_name": spec.get("cluster_name", "lab-cluster"),
         "eks_mirror": bool_flag(args.eks_mirror),
         "enable_dnsproxy": bool_flag(args.enable_dnsproxy),
         "enable_hubble_enterprise": bool_flag(args.enable_hubble_enterprise),
         "enable_timescape": bool_flag(args.enable_timescape),
-        "tetragon_export_mode": (spec.get("tetragon") or {}).get("export", {}).get("mode", "file"),
+        "tetragon_export_mode": export_mode,
         "warnings": warnings(args, spec, edition),
     }
 
@@ -490,6 +480,9 @@ def main() -> int:
     except SpecError as exc:
         print(f"ERROR: {exc}", file=__import__("sys").stderr)
         return 1
+    if args.cluster_name:
+        spec = dict(spec)
+        spec["cluster_name"] = args.cluster_name
 
     edition = (args.edition or spec.get("edition") or "oss").lower()
     if edition not in VALID_EDITIONS:
@@ -511,6 +504,7 @@ def main() -> int:
         "skill": SKILL_NAME,
         "output_dir": str(Path(args.output_dir).resolve()),
         "edition": edition,
+        "cluster_name": spec.get("cluster_name", "lab-cluster"),
         "eks_mirror": eks_mirror,
         "enable_dnsproxy": enable_dnsproxy,
         "enable_hubble_enterprise": enable_hubble_enterprise,

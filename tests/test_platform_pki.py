@@ -54,9 +54,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = REPO_ROOT / "skills/splunk-platform-pki-setup"
 RENDER_SCRIPT = SKILL_ROOT / "scripts/render_assets.py"
@@ -190,8 +187,6 @@ def test_allow_deprecated_tls_relaxes_lower_bound(tmp_path: Path) -> None:
         "--allow-deprecated-tls flag must be acted on; the renderer used to "
         "accept the flag silently and never apply it."
     )
-    # Unit-test the argparse path directly via the loaded module.
-    parser_args = render_module.parse_args.__defaults__
     # The flag is registered; just confirm the policy-aware branch exists.
     assert "tls_version_forbidden" in src
 

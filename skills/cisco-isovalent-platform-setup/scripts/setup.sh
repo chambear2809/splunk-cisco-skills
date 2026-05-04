@@ -31,6 +31,7 @@ Modes:
 Options:
   --spec PATH            YAML or JSON spec (default: template.example)
   --output-dir DIR       Rendered output directory
+  --cluster-name NAME    Override spec.cluster_name
   --edition oss|enterprise
                          Override spec.edition. OSS = cilium/* from helm.cilium.io.
                          Enterprise = isovalent/* from helm.isovalent.com (license required).
@@ -74,6 +75,7 @@ EXPLAIN=false
 OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
 SPEC="${DEFAULT_SPEC}"
 EDITION=""
+CLUSTER_NAME=""
 EKS_MIRROR="false"
 ENABLE_DNSPROXY="false"
 ENABLE_HUBBLE_ENT="false"
@@ -107,6 +109,7 @@ while [[ $# -gt 0 ]]; do
         --explain) EXPLAIN=true; shift ;;
         --spec) require_arg "$1" "$#" || exit 1; SPEC="$2"; shift 2 ;;
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
+        --cluster-name) require_arg "$1" "$#" || exit 1; CLUSTER_NAME="$2"; shift 2 ;;
         --edition) require_arg "$1" "$#" || exit 1; EDITION="$2"; shift 2 ;;
         --eks-mirror) EKS_MIRROR="true"; shift ;;
         --enable-dnsproxy) ENABLE_DNSPROXY="true"; shift ;;
@@ -169,12 +172,10 @@ _check_token_perms() {
 # Enterprise apply requires the license file. We check at --apply time so
 # --render is friction-free.
 if [[ "${MODE_APPLY}" == "true" ]]; then
-    EFFECTIVE_EDITION="${EDITION:-$(python3 -c "import json,sys;
-try:
-    import yaml
-    with open(sys.argv[1]) as f: spec = yaml.safe_load(f.read())
-except (ModuleNotFoundError, ImportError):
-    with open(sys.argv[1]) as f: spec = json.load(f)
+    EFFECTIVE_EDITION="${EDITION:-$(PYTHONPATH="${PROJECT_ROOT}/skills/shared/lib${PYTHONPATH:+:${PYTHONPATH}}" python3 -c "import sys;
+from pathlib import Path
+from yaml_compat import load_yaml_or_json
+spec = load_yaml_or_json(Path(sys.argv[1]).read_text(encoding='utf-8'), source=sys.argv[1])
 print((spec or {}).get('edition', 'oss'))" "${SPEC}" 2>/dev/null || echo "oss")}"
     if [[ "${EFFECTIVE_EDITION}" == "enterprise" && -z "${ISOVALENT_LICENSE_FILE}" ]]; then
         log "ERROR: --apply with --edition enterprise requires --isovalent-license-file."
@@ -188,6 +189,7 @@ Cisco Isovalent Platform Setup -- execution plan
 ================================================
   Spec:                     ${SPEC}
   Output directory:         ${OUTPUT_DIR}
+  Cluster:                  ${CLUSTER_NAME:-<from spec, default lab-cluster>}
   Edition:                  ${EDITION:-<from spec, default oss>}
   EKS-AWS mirror:           ${EKS_MIRROR}
   Enable DNS proxy:         ${ENABLE_DNSPROXY}
@@ -206,6 +208,7 @@ RENDER_ARGS=(
     --output-dir "${OUTPUT_DIR}"
     --spec "${SPEC}"
     --edition "${EDITION}"
+    --cluster-name "${CLUSTER_NAME}"
     --eks-mirror "${EKS_MIRROR}"
     --enable-dnsproxy "${ENABLE_DNSPROXY}"
     --enable-hubble-enterprise "${ENABLE_HUBBLE_ENT}"

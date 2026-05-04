@@ -29,7 +29,7 @@ Render-first by default. `--apply` only writes to user config files when explici
 - Use `--te-token-file` for the Bearer header path; the renderer never reads the token file.
 - Reject direct token flags (`--te-token`, `--access-token`, `--token`, `--bearer-token`, `--api-token`).
 - Token files must be `chmod 600`. `--apply` runs a permission preflight and aborts with a `chmod 600 <path>` hint when looser. `--allow-loose-token-perms` overrides with a `WARN`.
-- Cursor and VS Code configs use `${input:te-key}` prompt-string patterns or environment variables, never inline tokens. Codex configs reference a token file path; Claude Code uses an OAuth-pair browser flow.
+- Cursor and VS Code configs use `${input:te-key}` prompt-string patterns or environment variables, never inline tokens. Codex should use OAuth2 browser consent unless a client-side secret store can inject Bearer headers without argv exposure. Claude Code uses an OAuth-pair browser flow.
 - The write/Instant-Test tool group (`Create/Update/Delete Synthetic Test`, `Run Instant Test`, `Deploy Template`) is **never** enabled by default. Pass `--accept-te-mcp-write-tools` to allow it in clients that support per-tool gating; the rendered README always surfaces the unit-consumption warning.
 
 ## Primary Workflow

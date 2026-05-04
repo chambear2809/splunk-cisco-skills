@@ -22,7 +22,16 @@ codex mcp list
 
 ## Authentication errors against `https://api.thousandeyes.com/mcp`
 
-- Verify the API token: `curl -H "Authorization: Bearer $(cat /tmp/te_api_token)" https://api.thousandeyes.com/v7/account-groups` returns a JSON body.
+- Verify the API token with a temporary `curl` config so the token stays out of argv:
+
+  ```bash
+  TE_CURL_CONFIG="$(mktemp)"
+  chmod 600 "$TE_CURL_CONFIG"
+  { printf 'header = "Authorization: Bearer '; tr -d '\r\n' < /tmp/te_api_token; printf '"\n'; } > "$TE_CURL_CONFIG"
+  curl -sS -K "$TE_CURL_CONFIG" https://api.thousandeyes.com/v7/account-groups
+  rm -f "$TE_CURL_CONFIG"
+  ```
+
 - Verify the token is associated with a user that holds the `API Access` permission (per `docs.thousandeyes.com/.../user-management/authorization/rb-access-control`).
 - Confirm the org has not opted out of TE AI features (per the MCP doc prerequisites section).
 
@@ -67,8 +76,13 @@ codex mcp list
 curl -s -o /dev/null -w '%{http_code}\n' --max-time 10 https://api.thousandeyes.com/mcp
 # 401 expected without Authorization (the endpoint is reachable; auth is required for tool calls)
 
-curl -H "Authorization: Bearer $(cat /tmp/te_api_token)" \
+TE_CURL_CONFIG="$(mktemp)"
+chmod 600 "$TE_CURL_CONFIG"
+{ printf 'header = "Authorization: Bearer '; tr -d '\r\n' < /tmp/te_api_token; printf '"\n'; } > "$TE_CURL_CONFIG"
+
+curl -K "$TE_CURL_CONFIG" \
   -s -o /dev/null -w '%{http_code}\n' --max-time 10 \
   https://api.thousandeyes.com/v7/account-groups
+rm -f "$TE_CURL_CONFIG"
 # 200 confirms the token is valid for the v7 REST API; MCP uses the same auth scope.
 ```
