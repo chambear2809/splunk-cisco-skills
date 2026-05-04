@@ -993,6 +993,23 @@ echo "    After installing, regenerate SP metadata in Splunk Web and re-upload t
 
 
 def _private_ca_readme(args: argparse.Namespace) -> str:
+    intermediate_secret_step = (
+        "bash skills/shared/scripts/write_secret_file.sh /tmp/pki_intermediate_ca_key_password"
+        if _bool(args.include_intermediate_ca)
+        else ""
+    )
+    intermediate_heading = (
+        "# 3. Build the Intermediate CA, signed by the Root."
+        if _bool(args.include_intermediate_ca)
+        else "# 3. (Intermediate CA not requested via --include-intermediate-ca; skip.)"
+    )
+    intermediate_create_step = (
+        "PKI_ROOT_CA_KEY_PASSWORD_FILE=/tmp/pki_root_ca_key_password \\\n"
+        "    PKI_INTERMEDIATE_CA_KEY_PASSWORD_FILE=/tmp/pki_intermediate_ca_key_password \\\n"
+        "    bash create-intermediate-ca.sh"
+        if _bool(args.include_intermediate_ca)
+        else ""
+    )
     return f"""# Private CA Operator Walkthrough
 
 The renderer emits these scripts so you (the operator) become the
@@ -1004,15 +1021,15 @@ so the same OpenSSL build that Splunk uses signs and verifies.
 ```bash
 # 1. Capture the CA passphrases in chmod-600 files. NEVER paste secrets.
 bash skills/shared/scripts/write_secret_file.sh /tmp/pki_root_ca_key_password
-{"bash skills/shared/scripts/write_secret_file.sh /tmp/pki_intermediate_ca_key_password" if _bool(args.include_intermediate_ca) else ""}
+{intermediate_secret_step}
 bash skills/shared/scripts/write_secret_file.sh /tmp/pki_leaf_key_password
 
 # 2. Build the Root CA (run on an OFFLINE host when possible).
 PKI_ROOT_CA_KEY_PASSWORD_FILE=/tmp/pki_root_ca_key_password \\
     bash create-root-ca.sh
 
-{"# 3. Build the Intermediate CA, signed by the Root." if _bool(args.include_intermediate_ca) else "# 3. (Intermediate CA not requested via --include-intermediate-ca; skip.)"}
-{"PKI_ROOT_CA_KEY_PASSWORD_FILE=/tmp/pki_root_ca_key_password \\\\\n    PKI_INTERMEDIATE_CA_KEY_PASSWORD_FILE=/tmp/pki_intermediate_ca_key_password \\\\\n    bash create-intermediate-ca.sh" if _bool(args.include_intermediate_ca) else ""}
+{intermediate_heading}
+{intermediate_create_step}
 
 # 4. Sign per-host server leaves. Repeat for each Splunk host.
 PKI_LEAF_KEY_PASSWORD_FILE=/tmp/pki_leaf_key_password \\

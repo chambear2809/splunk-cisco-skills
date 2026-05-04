@@ -57,6 +57,23 @@ Common starting points:
   Linux host, start with `skills/splunk-observability-otel-collector-setup/`.
   The workflow renders Helm and Linux installer assets first, then applies only
   when requested.
+- If you need to pair the Splunk Platform with Splunk Observability Cloud
+  (Unified Identity, the Discover Splunk Observability Cloud app, Log Observer
+  Connect, Related Content, the Splunk Infrastructure Monitoring Add-on), start
+  with `skills/splunk-observability-cloud-integration-setup/`.
+- If you need zero-code Kubernetes application auto-instrumentation (APM
+  traces, AlwaysOn Profiling, runtime metrics), start with
+  `skills/splunk-observability-k8s-auto-instrumentation-setup/`. For browser
+  RUM and Session Replay injection into a Kubernetes-served frontend, start
+  with `skills/splunk-observability-k8s-frontend-rum-setup/`.
+- If you need a Cisco product wired into Splunk Observability Cloud, start with
+  the matching integration skill:
+  `skills/splunk-observability-cisco-nexus-integration/`,
+  `skills/splunk-observability-cisco-intersight-integration/`,
+  `skills/splunk-observability-nvidia-gpu-integration/`,
+  `skills/splunk-observability-cisco-ai-pod-integration/`,
+  `skills/splunk-observability-isovalent-integration/`, or
+  `skills/splunk-observability-thousandeyes-integration/`.
 - If you need Splunk Observability Cloud dashboards, use
   `skills/splunk-observability-dashboard-builder/` to turn an operational goal
   into validated classic Observability dashboard API payloads, with modern
@@ -64,7 +81,16 @@ Common starting points:
 - If you need native Splunk Observability Cloud operations, use
   `skills/splunk-observability-native-ops/` for detectors, alert routing,
   Synthetics tests and artifacts, APM topology/traces, RUM sessions, modern
-  logs chart handoffs, and On-Call workflows.
+  logs chart handoffs, and On-Call deeplinks. For the full Splunk On-Call
+  lifecycle (teams, rotations, escalation policies, routing keys, Rules
+  Engine, and the Splunk-side companion apps), use
+  `skills/splunk-oncall-setup/`.
+- If you need to install the Isovalent platform itself (Cilium, Tetragon,
+  optional Hubble Enterprise) on Kubernetes before wiring it to Splunk, start
+  with `skills/cisco-isovalent-platform-setup/`.
+- If you need to register the official ThousandEyes MCP Server with Cursor,
+  Claude Code, Codex, VS Code, or AWS Kiro, start with
+  `skills/cisco-thousandeyes-mcp-setup/`.
 - If you need Splunk platform administration services, start with
   `skills/splunk-agent-management-setup/`,
   `skills/splunk-workload-management-setup/`,
@@ -72,12 +98,21 @@ Common starting points:
   `skills/splunk-federated-search-setup/`,
   `skills/splunk-index-lifecycle-smartstore-setup/`, or
   `skills/splunk-monitoring-console-setup/`.
+- If you need to build or rotate a Splunk Enterprise PKI (Private PKI, CSRs
+  for a public CA, per-component certificates across Splunk Web / splunkd /
+  S2S / HEC / KV Store / indexer cluster / SHC / License Manager / Deployment
+  Server / Monitoring Console / Federated Search / DMZ HF / UF fleet / Edge
+  Processor / SAML / LDAPS / CLI trust, FIPS wiring, or delegated rotation),
+  start with `skills/splunk-platform-pki-setup/`.
 - If you need self-managed license, indexer-cluster, Edge Processor, or Splunk
   Cloud ACS allowlist operations, start with
   `skills/splunk-license-manager-setup/`,
   `skills/splunk-indexer-cluster-setup/`,
   `skills/splunk-edge-processor-setup/`, or
   `skills/splunk-cloud-acs-allowlist-setup/`.
+- If you need to install Splunk SOAR On-prem (single or cluster), onboard
+  SOAR Cloud, stand up a Splunk SOAR Automation Broker, or install the
+  Splunk-side SOAR companion apps, start with `skills/splunk-soar-setup/`.
 - If you need external syslog or SNMP collection, start with
   `skills/splunk-connect-for-syslog-setup/` or
   `skills/splunk-connect-for-snmp-setup/`.
@@ -126,14 +161,24 @@ At a high level, the repo gives you seven layers of automation:
 5. **Platform administration workflows**: render and optionally apply
    self-managed Splunk Enterprise service configuration for Agent Management,
    Workload Management, Federated Search, SmartStore/index lifecycle, Monitoring
-   Console, HEC service patterns, license management, and indexer clusters. The
-   HEC service workflow can also render ACS-backed Splunk Cloud token payloads,
-   and the ACS allowlist workflow manages Cloud control-plane allowlists.
+   Console, HEC service patterns, license management, indexer clusters, and the
+   full Splunk Enterprise platform PKI (Private or Public PKI distributed across
+   Splunk Web, splunkd, S2S, HEC, KV Store, indexer cluster replication, SHC,
+   License Manager, Deployment Server, Monitoring Console, Federated Search,
+   DMZ HF, UF fleet, Edge Processor, SAML, LDAPS, and CLI trust). The HEC
+   service workflow can also render ACS-backed Splunk Cloud token payloads, and
+   the ACS allowlist workflow manages Cloud control-plane allowlists.
 6. **External collectors and observability**: render and optionally apply
    customer-managed SC4S, SC4SNMP, Splunk Edge Processor, and Splunk OTel
    Collector runtimes that send data to Splunk Cloud, Splunk Enterprise HEC, or
-   Splunk Observability Cloud, and build reviewed Observability dashboard plans
-   or API payload handoffs.
+   Splunk Observability Cloud; wire the Splunk Platform to Splunk Observability
+   Cloud (Unified Identity, Discover Splunk Observability Cloud app, Log
+   Observer Connect, Splunk Infrastructure Monitoring Add-on); overlay
+   zero-code Kubernetes application auto-instrumentation and Browser RUM +
+   Session Replay injection; wire Cisco Nexus, Intersight, Isovalent, NVIDIA
+   GPU, Cisco AI Pod, and ThousandEyes sources into Splunk Observability
+   Cloud; and build reviewed Observability dashboard, detector, alert routing,
+   and Splunk On-Call artifacts.
 7. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
@@ -760,12 +805,17 @@ splunk-cisco-skills/
 │   │   │   ├── edge_processor_helpers.sh # Edge Processor render helpers
 │   │   │   ├── deployment_helpers.sh    # rendered deployment helpers
 │   │   │   ├── registry_helpers.sh      # app registry and role lookups
-│   │   │   └── soar_helpers.sh          # SOAR install and handoff helpers
+│   │   │   ├── soar_helpers.sh          # SOAR install and handoff helpers
+│   │   │   └── yaml_compat.py           # stdlib YAML parser for PyYAML-free hosts
 │   │   └── scripts/
 │   │       ├── setup_credentials.sh
 │   │       ├── write_secret_file.sh
 │   │       ├── cloud_batch_install.sh
-│   │       └── cloud_batch_uninstall.sh
+│   │       ├── cloud_batch_uninstall.sh
+│   │       ├── generate_deployment_docs.py   # refresh DEPLOYMENT_ROLE_MATRIX.md + CLOUD_DEPLOYMENT_MATRIX.md
+│   │       ├── generate_skill_ux_catalog.py  # refresh SKILL_UX_CATALOG.md
+│   │       ├── smoke_sc4x_live.sh            # SC4S/SC4SNMP live smoke test
+│   │       └── test_splunkbase_connection.sh # Splunkbase credential check
 │   ├── splunk-app-install/
 │   ├── splunk-ai-assistant-setup/
 │   ├── splunk-agent-management-setup/
@@ -786,6 +836,15 @@ splunk-cisco-skills/
 │   ├── splunk-uba-setup/
 │   ├── splunk-soar-setup/
 │   ├── splunk-observability-otel-collector-setup/
+│   ├── splunk-observability-k8s-auto-instrumentation-setup/
+│   ├── splunk-observability-k8s-frontend-rum-setup/
+│   ├── splunk-observability-cloud-integration-setup/
+│   ├── splunk-observability-thousandeyes-integration/
+│   ├── splunk-observability-isovalent-integration/
+│   ├── splunk-observability-cisco-nexus-integration/
+│   ├── splunk-observability-cisco-intersight-integration/
+│   ├── splunk-observability-nvidia-gpu-integration/
+│   ├── splunk-observability-cisco-ai-pod-integration/
 │   ├── splunk-observability-dashboard-builder/
 │   ├── splunk-observability-native-ops/
 │   ├── splunk-oncall-setup/
@@ -796,6 +855,7 @@ splunk-cisco-skills/
 │   ├── splunk-edge-processor-setup/
 │   ├── splunk-cloud-acs-allowlist-setup/
 │   ├── splunk-enterprise-public-exposure-hardening/
+│   ├── splunk-platform-pki-setup/
 │   ├── splunk-itsi-config/
 │   ├── splunk-itsi-setup/
 │   ├── splunk-mcp-server-setup/
@@ -806,12 +866,14 @@ splunk-cisco-skills/
 │   ├── cisco-dc-networking-setup/
 │   ├── cisco-enterprise-networking-setup/
 │   ├── cisco-intersight-setup/
+│   ├── cisco-isovalent-platform-setup/
 │   ├── cisco-meraki-ta-setup/
 │   ├── cisco-product-setup/
 │   ├── cisco-scan-setup/
 │   ├── cisco-secure-access-setup/
 │   ├── cisco-security-cloud-setup/
 │   ├── cisco-spaces-setup/
+│   ├── cisco-thousandeyes-mcp-setup/
 │   └── cisco-thousandeyes-setup/
 ├── tests/                       # bats and Python test suites
 └── rules/
