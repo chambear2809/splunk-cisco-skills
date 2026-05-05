@@ -43,6 +43,7 @@ The user can also invoke skills directly as slash commands (e.g. `/cisco-catalys
 | `splunk-uba-setup` | Splunk UBA / UEBA readiness | Validate legacy UBA integrations, optional Kafka app placement, and ES Premier UEBA migration handoff |
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant (formerly Splunk AI Assistant for SPL); drive Enterprise cloud-connected onboarding |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
+| `splunk-admin-doctor` | Splunk Cloud and Enterprise admin health | Diagnose full admin-domain coverage, render doctor/fix-plan reports, create safe fix packets or handoffs, and run checkpointed live validation sweeps |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-universal-forwarder-setup` | Splunk Universal Forwarder runtime | Bootstrap Linux, macOS, and rendered Windows Universal Forwarders; enroll clients with deployment server, static indexers, or Splunk Cloud credentials package |
 | `splunk-agent-management-setup` | Splunk Agent Management | Render, apply, and validate server classes, deployment apps, and deployment client assets |

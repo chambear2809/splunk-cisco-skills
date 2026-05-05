@@ -346,6 +346,15 @@
       },
       {
         "kind": "workflow",
+        "skill": "splunk-admin-doctor",
+        "label": "`splunk-admin-doctor`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; diagnoses Splunk Cloud and Enterprise admin posture from evidence and safe local probes",
+        "cloud_config_path": "Rendered doctor, fix-plan, coverage, handoff, and support-ticket packets; Cloud mutations remain delegated to ACS-capable skills",
+        "notes": "Full-coverage admin doctor for Cloud and self-managed Enterprise. Classifies every major admin domain as direct local guidance, delegated fix, manual/support path, diagnose-only, or not applicable."
+      },
+      {
+        "kind": "workflow",
         "skill": "splunk-federated-search-setup",
         "label": "`splunk-federated-search-setup`",
         "splunkbase_id": "N/A",
@@ -905,6 +914,23 @@
         "heavy-forwarder"
       ],
       "notes": "Reusable HEC token and service configuration workflow for Enterprise HEC tiers or Splunk Cloud ACS-managed HEC."
+    },
+    {
+      "skill": "splunk-admin-doctor",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder",
+        "external-collector"
+      ],
+      "notes": "Admin diagnosis and routing workflow for Splunk Cloud and self-managed Enterprise. Renders local doctor/fix/coverage packets and delegates specialized remediation to existing skills; it is not a Splunk runtime package."
     },
     {
       "skill": "splunk-federated-search-setup",

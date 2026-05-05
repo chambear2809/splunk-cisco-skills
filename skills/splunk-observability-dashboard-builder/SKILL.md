@@ -74,6 +74,18 @@ The default path is **classic-api**: create custom dashboard groups, charts, and
    > automatically with exponential backoff (cap: 4 attempts; honors
    > `Retry-After` when present).
 
+7. Clean up validation smoke dashboards when needed:
+
+   ```bash
+   bash skills/splunk-observability-dashboard-builder/scripts/setup.sh \
+     --cleanup \
+     --apply-result splunk-observability-dashboard-rendered/apply-result.json
+   ```
+
+   Cleanup is intentionally guarded to rendered plans whose dashboard group and
+   dashboard names start with `codex_live_validation`. Use the Observability UI
+   or API directly for non-validation dashboards.
+
 ## Coverage Rules
 
 - **Fully renderable through classic-api**: custom dashboard groups, custom dashboards, TimeSeriesChart, SingleValue, List, TableChart, Heatmap, Text charts, event overlays, dashboard filters/variables, chart time ranges, units, legends, thresholds, and detector links represented by chart properties.
@@ -112,7 +124,7 @@ Do not create partial PUT payloads. The Observability chart API can null or remo
 
 ## Scripts
 
-- `scripts/setup.sh` - shell entrypoint for render, validate, discover, and apply.
+- `scripts/setup.sh` - shell entrypoint for render, validate, discover, apply, and guarded cleanup.
 - `scripts/render_dashboard.py` - validates specs and renders classic API payloads.
 - `scripts/validate_dashboard.py` - static validation for specs or rendered payloads.
 - `scripts/o11y_dashboard_api.py` - live API client using token files only.

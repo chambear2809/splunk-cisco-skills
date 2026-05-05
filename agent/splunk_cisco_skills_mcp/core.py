@@ -97,6 +97,8 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     ("splunk-security-essentials-setup", "setup.sh"),
     ("splunk-security-portfolio-setup", "setup.sh"),
     ("splunk-soar-setup", "setup.sh"),
+    ("splunk-admin-doctor", "doctor.py"),
+    ("splunk-admin-doctor", "setup.sh"),
     ("splunk-uba-setup", "setup.sh"),
     ("splunk-universal-forwarder-setup", "setup.sh"),
     ("splunk-workload-management-setup", "setup.sh"),
@@ -123,6 +125,8 @@ READ_ONLY_LIST_SCRIPTS: set[tuple[str, str]] = {
 }
 READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
     ("splunk-agent-management-setup", "setup.sh"): {"render", "preflight", "status"},
+    ("splunk-admin-doctor", "doctor.py"): {"doctor", "fix-plan", "validate", "status"},
+    ("splunk-admin-doctor", "setup.sh"): {"doctor", "fix-plan", "validate", "status"},
     ("splunk-workload-management-setup", "setup.sh"): {"render", "preflight", "status"},
     ("splunk-hec-service-setup", "setup.sh"): {"render", "preflight", "status"},
     ("splunk-index-lifecycle-smartstore-setup", "setup.sh"): {"render", "preflight", "status"},
@@ -192,6 +196,9 @@ READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
 # READ_ONLY_DRY_RUN_SCRIPTS; do not "deduplicate" without first updating
 # plan_skill_script().
 READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
+    # The live validator is a read-only baseline/help/status sweep unless the
+    # operator explicitly enables its bounded apply catalog.
+    ("splunk-admin-doctor", "live_validate_all.py"): ("--allow-apply",),
     ("splunk-observability-native-ops", "setup.sh"): ("--apply",),
     ("splunk-observability-dashboard-builder", "setup.sh"): ("--apply",),
     # splunk-oncall-setup mutates Splunk On-Call (or the Splunk-side companion

@@ -1,0 +1,114 @@
+{
+  "platform": "enterprise",
+  "rest": {
+    "reachable": true,
+    "tls_verified": false
+  },
+  "splunkd": {
+    "health": {
+      "status": "red",
+      "failures": [
+        "disk_space",
+        "search_scheduler"
+      ]
+    }
+  },
+  "btool": {
+    "errors": [
+      "Invalid key in indexes.conf"
+    ]
+  },
+  "monitoring_console": {
+    "configured": false,
+    "platform_alerts_enabled": false
+  },
+  "indexes": {
+    "missing": [
+      "summary"
+    ],
+    "retention_risks": [
+      "main frozenTimePeriodInSecs unset"
+    ]
+  },
+  "hec": {
+    "issues": [
+      "global HEC disabled"
+    ]
+  },
+  "forwarders": {
+    "stale_count": 4
+  },
+  "distributed_search": {
+    "peers_down": [
+      "idx02"
+    ]
+  },
+  "shc": {
+    "status": "degraded",
+    "replication_healthy": false
+  },
+  "indexer_cluster": {
+    "status": "red",
+    "rf_met": false,
+    "sf_met": false
+  },
+  "license": {
+    "violation_count": 1,
+    "messages": [
+      "daily quota exceeded"
+    ]
+  },
+  "scheduler": {
+    "skipped_count": 8,
+    "expensive_searches": [
+      "long_running_report"
+    ]
+  },
+  "workload_management": {
+    "guardrails_missing": true
+  },
+  "apps": {
+    "update_gaps": [
+      "Splunk_TA_example"
+    ]
+  },
+  "auth": {
+    "rbac_gaps": [
+      "power inherits risky capability"
+    ],
+    "weak_tokens": [
+      "stale automation token"
+    ]
+  },
+  "security": {
+    "default_certs": true,
+    "public_exposure": true,
+    "weak_tls": true
+  },
+  "kvstore": {
+    "status": "failed",
+    "errors": [
+      "mongod not running"
+    ]
+  },
+  "knowledge_objects": {
+    "acceleration_issues": [
+      "dm_acceleration_lag"
+    ]
+  },
+  "backup": {
+    "last_config_backup_age_days": 45
+  },
+  "support": {
+    "diag_ready": false,
+    "diag_blockers": [
+      "large dispatch directory"
+    ]
+  },
+  "premium_products": {
+    "detected": [
+      "ITSI",
+      "SOAR"
+    ]
+  }
+}

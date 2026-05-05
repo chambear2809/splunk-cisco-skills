@@ -230,6 +230,7 @@ def apply_plan(
     return {
         "ok": True,
         "realm": effective_realm,
+        "created_dashboard_group": not bool(group_info.get("id", "")),
         "dashboard_group_id": group_id,
         "chart_ids": chart_ids,
         "dashboard_id": dashboard_id,
@@ -350,9 +351,103 @@ def reconcile_plan(
         "ok": True,
         "mode": "update-existing",
         "realm": effective_realm,
+        "created_dashboard_group": False,
         "dashboard_group_id": group_id,
         "chart_ids": chart_ids,
         "dashboard_id": dashboard_id,
+    }
+
+
+def require_live_validation_cleanup_plan(plan: dict[str, Any]) -> None:
+    group_name = str(plan.get("dashboard_group", {}).get("name", "") or "")
+    dashboard_name = str(plan.get("dashboard", {}).get("name", "") or "")
+    names = [name for name in (group_name, dashboard_name) if name]
+    if not names or any(not name.startswith("codex_live_validation") for name in names):
+        raise ApiError(
+            "cleanup is limited to codex_live_validation* dashboard plans. "
+            "Use the Observability UI/API directly for non-validation dashboard cleanup."
+        )
+
+
+def delete_object(base: str, token: str, object_type: str, object_id: str) -> dict[str, Any]:
+    endpoint_type = {
+        "dashboard-group": "dashboardgroup",
+    }.get(object_type, object_type)
+    url = f"{base}/{endpoint_type}/{object_id}"
+    try:
+        request_json("DELETE", url, token)
+        return {"status": "deleted"}
+    except ApiError as exc:
+        if "HTTP 404" in str(exc):
+            return {"status": "already_absent"}
+        raise
+
+
+def cleanup_apply_result(
+    apply_result: Path,
+    realm: str,
+    token_file: Path | None,
+    dry_run: bool,
+) -> dict[str, Any]:
+    result = load_json(apply_result)
+    plan_dir = apply_result.resolve().parent
+    plan = load_json(plan_dir / "apply-plan.json")
+    require_live_validation_cleanup_plan(plan)
+
+    effective_realm = realm or result.get("realm") or plan.get("realm", "")
+    base = api_base(str(effective_realm))
+    plan_group = plan.get("dashboard_group", {})
+    created_group = bool(result.get("created_dashboard_group"))
+    if "created_dashboard_group" not in result:
+        created_group = not bool(plan_group.get("id", "")) and bool(plan_group.get("name", ""))
+
+    dashboard_id = str(result.get("dashboard_id", "") or "")
+    group_id = str(result.get("dashboard_group_id", "") or "")
+    raw_chart_ids = result.get("chart_ids", {})
+    chart_ids: dict[str, str] = {}
+    if isinstance(raw_chart_ids, dict):
+        chart_ids = {str(key): str(value) for key, value in raw_chart_ids.items() if value}
+
+    sequence: list[dict[str, str]] = []
+    if dashboard_id:
+        sequence.append({"action": "delete-dashboard", "id": dashboard_id})
+    for key, chart_id in chart_ids.items():
+        sequence.append({"action": "delete-chart", "key": key, "id": chart_id})
+    if group_id and created_group:
+        sequence.append({"action": "delete-dashboard-group", "id": group_id})
+    elif group_id:
+        sequence.append({"action": "keep-dashboard-group", "id": group_id})
+
+    delete_steps = [item for item in sequence if item["action"].startswith("delete-")]
+    if not delete_steps:
+        raise ApiError(f"No cleanup object IDs found in apply result: {apply_result}")
+
+    if dry_run:
+        return {
+            "ok": True,
+            "dry_run": True,
+            "mode": "cleanup",
+            "realm": effective_realm,
+            "sequence": sequence,
+        }
+
+    if token_file is None:
+        raise ApiError("--token-file is required for live cleanup (only --dry-run can omit it).")
+    token = read_token(token_file)
+    deleted: list[dict[str, str]] = []
+    for item in delete_steps:
+        action = item["action"]
+        object_type = action.removeprefix("delete-")
+        object_id = item["id"]
+        status = delete_object(base, token, object_type, object_id)
+        deleted.append({**item, **status})
+
+    return {
+        "ok": True,
+        "mode": "cleanup",
+        "realm": effective_realm,
+        "deleted": deleted,
+        "kept": [item for item in sequence if item["action"].startswith("keep-")],
     }
 
 
@@ -390,6 +485,12 @@ def main() -> int:
     apply_parser.add_argument("--dry-run", action="store_true")
     apply_parser.add_argument("--update-existing", action="store_true")
 
+    cleanup_parser = subparsers.add_parser("cleanup")
+    cleanup_parser.add_argument("--apply-result", required=True, type=Path)
+    cleanup_parser.add_argument("--realm", default="")
+    cleanup_parser.add_argument("--token-file", type=Path, default=None)
+    cleanup_parser.add_argument("--dry-run", action="store_true")
+
     discover_parser = subparsers.add_parser("discover-metrics")
     discover_parser.add_argument("--realm", required=True)
     discover_parser.add_argument("--token-file", required=True, type=Path)
@@ -407,6 +508,15 @@ def main() -> int:
                 args.token_file,
                 args.dry_run,
                 update_existing=args.update_existing,
+            )
+        elif args.command == "cleanup":
+            if not args.dry_run and args.token_file is None:
+                parser.error("cleanup requires --token-file unless --dry-run is set.")
+            result = cleanup_apply_result(
+                args.apply_result,
+                args.realm,
+                args.token_file,
+                args.dry_run,
             )
         elif args.command == "discover-metrics":
             result = discover_metrics(args.realm, args.token_file, args.query, args.limit)

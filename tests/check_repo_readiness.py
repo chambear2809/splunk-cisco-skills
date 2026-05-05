@@ -55,6 +55,7 @@ TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"^sc4s-rendered/"),
     re.compile(r"^sc4snmp-rendered/"),
     re.compile(r"^splunk-agent-management-rendered/"),
+    re.compile(r"^splunk-admin-doctor-rendered/"),
     re.compile(r"^splunk-workload-management-rendered/"),
     re.compile(r"^splunk-hec-service-rendered/"),
     re.compile(r"^splunk-federated-search-rendered/"),

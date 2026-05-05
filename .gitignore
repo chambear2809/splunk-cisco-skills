@@ -57,6 +57,8 @@ projects/tmp-*
 /sc4s-rendered/
 /sc4snmp-rendered/
 /splunk-agent-management-rendered/
+/splunk-admin-doctor-rendered/
+/splunk-live-validation-runs/
 /splunk-workload-management-rendered/
 /splunk-hec-service-rendered/
 /splunk-federated-search-rendered/

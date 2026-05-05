@@ -1,0 +1,4 @@
+interface:
+  display_name: "Splunk Admin Doctor"
+  short_description: "Diagnose Splunk admin health and render safe fix packets"
+  default_prompt: "Use $splunk-admin-doctor to diagnose Splunk Cloud or Splunk Enterprise admin health, produce a coverage report, and render explicit safe fix handoffs."

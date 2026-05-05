@@ -1,0 +1,21 @@
+# Splunk Admin Doctor Worksheet
+#
+# Copy this file locally and fill in non-secret values only.
+
+phase: doctor
+platform: auto
+
+target_search_head:
+splunk_uri:
+splunk_home: /opt/splunk
+output_dir: splunk-admin-doctor-rendered
+
+# Optional evidence file for offline or fixture-driven diagnosis.
+evidence_file:
+
+# Apply renders local packets only and requires explicit rule IDs.
+fixes:
+
+json: false
+strict: false
+dry_run: false

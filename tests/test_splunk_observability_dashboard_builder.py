@@ -48,6 +48,39 @@ def rendered_text(root: Path) -> str:
     return "\n".join(chunks)
 
 
+def write_live_validation_spec(path: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "api_version": "splunk-observability-dashboard-builder/v1",
+                "mode": "classic-api",
+                "realm": "us0",
+                "dashboard_group": {
+                    "name": "codex_live_validation_skill_checks",
+                    "description": "Created by live validation.",
+                },
+                "dashboard": {
+                    "name": "codex_live_validation_dashboard",
+                    "description": "Temporary smoke dashboard.",
+                },
+                "charts": [
+                    {
+                        "id": "validation-note",
+                        "name": "Validation note",
+                        "type": "Text",
+                        "row": 0,
+                        "column": 0,
+                        "width": 12,
+                        "height": 1,
+                        "markdown": "temporary smoke object",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def test_metric_discovery_normalizes_simple_bare_terms() -> None:
     assert normalize_metric_query("latency") == "sf_metric:*latency*"
     assert normalize_metric_query("kubeproxy_sync_proxy_rules_duration_seconds") == (
@@ -279,6 +312,74 @@ def test_dry_run_apply_uses_rendered_sequence_without_network(tmp_path: Path) ->
         "create-chart",
         "create-dashboard",
     ]
+    assert (output_dir / "apply-result.json").is_file()
+    saved = json.loads((output_dir / "apply-result.json").read_text(encoding="utf-8"))
+    assert saved["dry_run"] is True
+    assert saved["sequence"][0]["action"] == "create-dashboard-group"
+
+
+def test_cleanup_dry_run_uses_apply_result_delete_sequence(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    spec_path = tmp_path / "live-validation-dashboard.json"
+    write_live_validation_spec(spec_path)
+    result = run_setup("--render", "--spec", str(spec_path), "--output-dir", str(output_dir))
+    assert result.returncode == 0, result.stdout
+
+    apply_result = {
+        "ok": True,
+        "realm": "us0",
+        "created_dashboard_group": True,
+        "dashboard_group_id": "group-1",
+        "dashboard_id": "dashboard-1",
+        "chart_ids": {"validation-note": "chart-1"},
+    }
+    (output_dir / "apply-result.json").write_text(json.dumps(apply_result), encoding="utf-8")
+
+    cleanup = run_setup(
+        "--cleanup",
+        "--dry-run",
+        "--apply-result",
+        str(output_dir / "apply-result.json"),
+        "--realm",
+        "us0",
+    )
+
+    assert cleanup.returncode == 0, cleanup.stdout
+    payload = json.loads(cleanup.stdout[cleanup.stdout.index("{") :])
+    assert payload["mode"] == "cleanup"
+    assert payload["dry_run"] is True
+    assert [item["action"] for item in payload["sequence"]] == [
+        "delete-dashboard",
+        "delete-chart",
+        "delete-dashboard-group",
+    ]
+
+
+def test_cleanup_refuses_non_live_validation_dashboard_plans(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    result = run_setup("--render", "--spec", str(EXAMPLE_SPEC), "--output-dir", str(output_dir))
+    assert result.returncode == 0, result.stdout
+    apply_result = {
+        "ok": True,
+        "realm": "us0",
+        "created_dashboard_group": True,
+        "dashboard_group_id": "group-1",
+        "dashboard_id": "dashboard-1",
+        "chart_ids": {"latency-p95": "chart-1"},
+    }
+    (output_dir / "apply-result.json").write_text(json.dumps(apply_result), encoding="utf-8")
+
+    cleanup = run_setup(
+        "--cleanup",
+        "--dry-run",
+        "--apply-result",
+        str(output_dir / "apply-result.json"),
+        "--realm",
+        "us0",
+    )
+
+    assert cleanup.returncode == 1
+    assert "cleanup is limited to codex_live_validation" in cleanup.stdout
 
 
 def test_dry_run_update_existing_uses_fetch_then_put_sequence(tmp_path: Path) -> None:

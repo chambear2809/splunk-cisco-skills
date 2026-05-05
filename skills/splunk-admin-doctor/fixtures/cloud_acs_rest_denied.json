@@ -1,0 +1,50 @@
+{
+  "platform": "cloud",
+  "rest": {
+    "denied": true,
+    "reachable": false,
+    "status_code": 403,
+    "tls_verified": true
+  },
+  "acs": {
+    "reachable": true,
+    "status": "degraded",
+    "allowlist": {
+      "search_api_allowed": false,
+      "gaps": [
+        "current-admin-ip"
+      ]
+    }
+  },
+  "cmc": {
+    "findings": [
+      "HEC ingest lag",
+      "search concurrency pressure"
+    ],
+    "ingest": {
+      "status": "degraded"
+    },
+    "workload": {
+      "status": "yellow"
+    }
+  },
+  "hec": {
+    "enabled": false
+  },
+  "apps": {
+    "update_gaps": [
+      "TA-example"
+    ],
+    "restart_required": [
+      "TA-example"
+    ]
+  },
+  "subscription": {
+    "usage_risk": true
+  },
+  "premium_products": {
+    "detected": [
+      "Enterprise Security Cloud"
+    ]
+  }
+}

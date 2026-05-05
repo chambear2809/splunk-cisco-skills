@@ -27,6 +27,7 @@ Modes:
   --validate            Validate a spec and/or rendered payloads
   --apply               Render, then create dashboard group/charts/dashboard through the API
   --update-existing     With --apply, fetch existing objects and PUT full updates by ID
+  --cleanup             Delete a codex_live_validation* dashboard apply result
   --discover-metrics    Query Observability metric metadata
   --dry-run             For apply, show API creation sequence without live writes
   --json                Emit JSON output where supported
@@ -34,6 +35,7 @@ Modes:
 Options:
   --spec PATH           YAML or JSON dashboard spec
   --output-dir DIR      Rendered output directory
+  --apply-result PATH   Apply result JSON for --cleanup (default: OUTPUT_DIR/apply-result.json)
   --realm REALM         Observability realm, such as us0
   --token-file PATH     File containing Observability API token for live API operations
   --query TEXT          Metric discovery query
@@ -48,12 +50,14 @@ RENDER=false
 VALIDATE=false
 APPLY=false
 UPDATE_EXISTING=false
+CLEANUP=false
 DISCOVER_METRICS=false
 DRY_RUN=false
 JSON_OUTPUT=false
 
 SPEC=""
 OUTPUT_DIR="${DEFAULT_OUTPUT_DIR}"
+APPLY_RESULT=""
 REALM="${SPLUNK_O11Y_REALM:-}"
 TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE:-}"
 QUERY=""
@@ -70,11 +74,13 @@ while [[ $# -gt 0 ]]; do
         --validate) VALIDATE=true; shift ;;
         --apply) APPLY=true; RENDER=true; shift ;;
         --update-existing) UPDATE_EXISTING=true; shift ;;
+        --cleanup) CLEANUP=true; shift ;;
         --discover-metrics) DISCOVER_METRICS=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --spec) require_arg "$1" "$#" || exit 1; SPEC="$2"; shift 2 ;;
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
+        --apply-result) require_arg "$1" "$#" || exit 1; APPLY_RESULT="$2"; shift 2 ;;
         --realm) require_arg "$1" "$#" || exit 1; REALM="$2"; shift 2 ;;
         --token-file) require_arg "$1" "$#" || exit 1; TOKEN_FILE="$2"; shift 2 ;;
         --query) require_arg "$1" "$#" || exit 1; QUERY="$2"; shift 2 ;;
@@ -92,7 +98,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [[ "${RENDER}" != "true" && "${VALIDATE}" != "true" && "${APPLY}" != "true" && "${DISCOVER_METRICS}" != "true" ]]; then
+if [[ "${RENDER}" != "true" && "${VALIDATE}" != "true" && "${APPLY}" != "true" && "${CLEANUP}" != "true" && "${DISCOVER_METRICS}" != "true" ]]; then
     RENDER=true
 fi
 
@@ -115,6 +121,33 @@ if [[ "${DISCOVER_METRICS}" == "true" ]]; then
         --token-file "${TOKEN_FILE}" \
         --query "${QUERY}" \
         --limit "${LIMIT}"
+    exit $?
+fi
+
+if [[ "${CLEANUP}" == "true" ]]; then
+    if [[ -z "${APPLY_RESULT}" ]]; then
+        APPLY_RESULT="${OUTPUT_DIR}/apply-result.json"
+    fi
+    if [[ ! -r "${APPLY_RESULT}" ]]; then
+        log "ERROR: --apply-result must be readable for --cleanup: ${APPLY_RESULT}"
+        exit 1
+    fi
+    if [[ -z "${REALM}" ]]; then
+        log "ERROR: --realm is required for --cleanup."
+        exit 1
+    fi
+    if [[ "${DRY_RUN}" != "true" && (-z "${TOKEN_FILE}" || ! -r "${TOKEN_FILE}") ]]; then
+        log "ERROR: --token-file is required and must be readable for --cleanup."
+        exit 1
+    fi
+    cleanup_args=(cleanup --apply-result "${APPLY_RESULT}" --realm "${REALM}")
+    if [[ -n "${TOKEN_FILE}" ]]; then
+        cleanup_args+=(--token-file "${TOKEN_FILE}")
+    fi
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        cleanup_args+=(--dry-run)
+    fi
+    "${PYTHON_BIN}" "${SCRIPT_DIR}/o11y_dashboard_api.py" "${cleanup_args[@]}"
     exit $?
 fi
 
@@ -177,5 +210,6 @@ if [[ "${APPLY}" == "true" ]]; then
     if [[ "${DRY_RUN}" == "true" ]]; then
         apply_args+=(--dry-run)
     fi
-    "${PYTHON_BIN}" "${SCRIPT_DIR}/o11y_dashboard_api.py" "${apply_args[@]}"
+    mkdir -p "${OUTPUT_DIR}"
+    "${PYTHON_BIN}" "${SCRIPT_DIR}/o11y_dashboard_api.py" "${apply_args[@]}" | tee "${OUTPUT_DIR}/apply-result.json"
 fi
