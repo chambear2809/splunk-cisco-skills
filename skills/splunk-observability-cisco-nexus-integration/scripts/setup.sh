@@ -10,6 +10,12 @@ load_observability_cloud_settings
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-cisco-nexus-rendered"
 DEFAULT_SPEC="${SKILL_DIR}/template.example"
+PYTHON_BIN="python3"
+if [[ -x "${PROJECT_ROOT}/.venv/bin/python3" ]]; then
+    PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python3"
+elif [[ -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then
+    PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python"
+fi
 
 usage() {
     cat <<'EOF'
@@ -45,7 +51,7 @@ EOF
 bool_text() { if [[ "$1" == "true" ]]; then printf 'true'; else printf 'false'; fi; }
 
 resolve_abs_path() {
-    python3 - "$1" <<'PY'
+    "${PYTHON_BIN}" - "$1" <<'PY'
 from pathlib import Path
 import sys
 print(Path(sys.argv[1]).expanduser().resolve(), end="")
@@ -150,7 +156,7 @@ if [[ "${DRY_RUN}" == "true" ]]; then RENDER_ARGS+=(--dry-run); fi
 if [[ "${JSON_OUTPUT}" == "true" ]]; then RENDER_ARGS+=(--json); fi
 
 if [[ "${MODE_RENDER}" == "true" ]]; then
-    python3 "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
+    "${PYTHON_BIN}" "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
 fi
 
 if [[ "${DRY_RUN}" == "true" ]]; then exit 0; fi

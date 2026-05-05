@@ -930,9 +930,11 @@ in the user config, so register the repo-local server once with:
 bash agent/register-codex-splunk-cisco-skills-mcp.sh
 ```
 
-Read-only plans (validate scripts, `--help`, and `cisco-product-setup` with
-`--dry-run` or `--list-products`) can run with an explicit client confirmation.
-Plans are single-use: each plan hash is consumed when it executes. To allow
+Read-only plans include help output, validation/list scripts, Cisco product
+dry-runs/lists, and allowlisted render/preflight/status/validate/dry-run
+previews. They can run with explicit client confirmation. Plans are single-use:
+each plan hash is consumed when it executes, and plan hashes expire after one
+hour by default (`MCP_PLAN_TTL_SECONDS`; set `0` to disable expiry). To allow
 mutating setup, install, or configure scripts, start the MCP server process with:
 
 ```bash
@@ -940,12 +942,13 @@ SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1
 ```
 
 Execution always requires a previously generated plan hash and explicit
-confirmation from the client. Each `plan_*` and `execute_*` call accepts a
-`timeout_seconds` argument (default 30 minutes, capped at 2 hours by default
-or by `MCP_MAX_TIMEOUT_SECONDS`); if a child process exceeds it, the server
-sends SIGTERM, then SIGKILL after a short grace, and the response includes
-`timed_out: true`. Subprocess stdout and stderr are bounded per stream
-(256 KiB each) to keep the server stable when scripts are noisy.
+confirmation from the client. Each `plan_*` call accepts a `timeout_seconds`
+argument (default 30 minutes, capped at 2 hours by default or by
+`MCP_MAX_TIMEOUT_SECONDS`); `execute_*` uses the timeout stored in the matching
+plan. If a child process exceeds that timeout, the server sends SIGTERM, then
+SIGKILL after a short grace, and the response includes `timed_out: true`.
+Subprocess stdout and stderr are bounded per stream (256 KiB each) to keep the
+server stable when scripts are noisy.
 
 ## Requirements
 

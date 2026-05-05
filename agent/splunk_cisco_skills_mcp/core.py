@@ -270,6 +270,26 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
         "--apply-",
         "--uninstall-instrumentation",
     ),
+    # AWS integration renders/validates/discovers by default. --apply mutates
+    # the Splunk-side integration and/or AWS-side metric stream helpers, while
+    # --quickstart chains those apply sections and remains mutating even if an
+    # operator also passes --dry-run (some sections still invoke rendered apply
+    # helpers). Keep this out of READ_ONLY_DRY_RUN_SCRIPTS.
+    ("splunk-observability-aws-integration", "setup.sh"): (
+        "--apply",
+        "--quickstart",
+    ),
+    # DBMon only renders or performs read-only validation/API probes through
+    # setup.sh today. The sentinel keeps the pair explicitly allowlisted and
+    # will flip to mutating if a future --apply mode appears.
+    ("splunk-observability-database-monitoring-setup", "setup.sh"): ("--apply",),
+    # Frontend RUM render/discover/validate/guided modes are non-cluster
+    # changing. The injection and uninstall modes execute rendered kubectl
+    # helpers and require the mutation gate.
+    ("splunk-observability-k8s-frontend-rum-setup", "setup.sh"): (
+        "--apply-injection",
+        "--uninstall-injection",
+    ),
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it. The smoke_*
@@ -291,8 +311,15 @@ DIRECT_SECRET_FLAGS = {
     "--api-key",
     "--api-secret",
     "--api-token",
+    "--aws-access-key-id",
+    "--aws-secret-access-key",
+    "--aws-secret-key",
     "--bearer-token",
     "--client-secret",
+    "--connection-string",
+    "--datasource",
+    "--db-password",
+    "--external-id",
     "--hec-token",
     "--integration-key",
     # Intersight API key flags rejected by splunk-observability-cisco-intersight-integration
@@ -315,6 +342,7 @@ DIRECT_SECRET_FLAGS = {
     "--pull-secret",
     "--refresh-token",
     "--rest-key",
+    "--rum-token",
     "--secret",
     "--service-account-password",
     "--skey",
@@ -356,6 +384,8 @@ SECRET_FILE_FLAGS = {
     "--api-secret-file",
     "--api-token-file",
     "--automation-token-file",
+    "--aws-access-key-id-file",
+    "--aws-secret-access-key-file",
     "--bearer-token-file",
     "--client-secret-file",
     "--cloudlock-token-file",
@@ -382,6 +412,7 @@ SECRET_FILE_FLAGS = {
     "--platform-hec-token-file",
     "--pkcs-certificate-file",
     "--proxy-password-file",
+    "--rum-token-file",
     "--secret-file",
     "--service-account-password-file",
     "--shc-secret-file",

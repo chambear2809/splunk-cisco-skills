@@ -62,7 +62,7 @@ def skill_reference(skill: str) -> str:
     annotations=READ_LOCAL,
 )
 def skill_template(skill: str) -> str:
-    """Return a skill's template.example file."""
+    """Return a skill's template.example file or aggregated templates/* files."""
     return core.read_skill_file(skill, "template")
 
 

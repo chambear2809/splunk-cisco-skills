@@ -9,6 +9,12 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 load_observability_cloud_settings
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-thousandeyes-rendered"
+PYTHON_BIN="python3"
+if [[ -x "${PROJECT_ROOT}/.venv/bin/python3" ]]; then
+    PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python3"
+elif [[ -x "${PROJECT_ROOT}/.venv/bin/python" ]]; then
+    PYTHON_BIN="${PROJECT_ROOT}/.venv/bin/python"
+fi
 
 usage() {
     cat <<'EOF'
@@ -53,7 +59,7 @@ bool_text() {
 }
 
 resolve_abs_path() {
-    python3 - "$1" <<'PY'
+    "${PYTHON_BIN}" - "$1" <<'PY'
 from pathlib import Path
 import sys
 
@@ -225,7 +231,7 @@ if [[ "${JSON_OUTPUT}" == "true" ]]; then
 fi
 
 if [[ "${MODE_RENDER}" == "true" ]]; then
-    python3 "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
+    "${PYTHON_BIN}" "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
 fi
 
 if [[ "${DRY_RUN}" == "true" ]]; then

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,13 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertIn("cisco-product-setup", skills)
         self.assertIn("setup.sh", skills["cisco-product-setup"]["scripts"])
         self.assertFalse(skills["cisco-product-setup"]["has_template"])
+
+    def test_readme_supported_skills_table_matches_skill_catalog(self) -> None:
+        readme = (core.REPO_ROOT / "README.md").read_text(encoding="utf-8")
+        readme_skills = set(re.findall(r"\| `([^`]+)` \|", readme))
+        catalog_skills = {item["name"] for item in core.list_skills()["skills"]}
+
+        self.assertEqual(readme_skills, catalog_skills)
 
     def test_list_skills_exposes_references_directory(self) -> None:
         payload = core.list_skills()
@@ -142,6 +150,22 @@ class AgentMCPCoreTests(unittest.TestCase):
                         "setup.sh",
                         args,
                     )
+
+    def test_generic_script_plan_rejects_newer_direct_secret_flags(self) -> None:
+        cases = [
+            ("splunk-observability-aws-integration", ["--aws-access-key-id", "AKIA..."]),
+            ("splunk-observability-aws-integration", ["--aws-secret-access-key=secret-value"]),
+            ("splunk-observability-aws-integration", ["--aws-secret-key", "secret-value"]),
+            ("splunk-observability-aws-integration", ["--external-id", "sensitive-external-id"]),
+            ("splunk-observability-database-monitoring-setup", ["--db-password", "secret-value"]),
+            ("splunk-observability-database-monitoring-setup", ["--connection-string=postgres://user:pass@db"]),
+            ("splunk-observability-database-monitoring-setup", ["--datasource", "postgres://user:pass@db"]),
+            ("splunk-observability-k8s-frontend-rum-setup", ["--rum-token", "secret-value"]),
+        ]
+        for skill, args in cases:
+            with self.subTest(skill=skill, args=args):
+                with self.assertRaisesRegex(core.SkillMCPError, "Direct secret flag"):
+                    core.plan_skill_script(skill, "setup.sh", args)
 
     def test_oncall_setup_render_only_invocations_are_read_only(self) -> None:
         # No mutation flag → read-only.
@@ -804,6 +828,62 @@ class AgentMCPCoreTests(unittest.TestCase):
                 with self.subTest(skill=skill, args=args):
                     plan = core.plan_skill_script(skill, "setup.sh", args)
                     self.assertTrue(plan["read_only"])
+
+    def test_newer_render_first_observability_setups_classify_correctly(self) -> None:
+        aws_read_only = (
+            [],
+            ["--render"],
+            ["--validate"],
+            ["--doctor"],
+            ["--discover"],
+            ["--quickstart-from-live"],
+            ["--explain"],
+            ["--rollback", "integration"],
+            ["--list-namespaces"],
+            ["--list-recommended-stats"],
+        )
+        for args in aws_read_only:
+            with self.subTest(skill="aws", args=args):
+                plan = core.plan_skill_script(
+                    "splunk-observability-aws-integration", "setup.sh", list(args)
+                )
+                self.assertTrue(plan["read_only"])
+        for args in (["--apply"], ["--quickstart"], ["--quickstart", "--dry-run"]):
+            with self.subTest(skill="aws", args=args):
+                plan = core.plan_skill_script(
+                    "splunk-observability-aws-integration", "setup.sh", args
+                )
+                self.assertFalse(plan["read_only"])
+
+        for args in ([], ["--render"], ["--validate"], ["--validate", "--api"], ["--explain"], ["--dry-run"]):
+            with self.subTest(skill="dbmon", args=args):
+                plan = core.plan_skill_script(
+                    "splunk-observability-database-monitoring-setup", "setup.sh", args
+                )
+                self.assertTrue(plan["read_only"])
+
+        rum_read_only = (
+            [],
+            ["--render"],
+            ["--discover-frontend-workloads"],
+            ["--validate"],
+            ["--guided"],
+            ["--explain"],
+            ["--gitops-mode"],
+            ["--dry-run"],
+        )
+        for args in rum_read_only:
+            with self.subTest(skill="rum", args=args):
+                plan = core.plan_skill_script(
+                    "splunk-observability-k8s-frontend-rum-setup", "setup.sh", list(args)
+                )
+                self.assertTrue(plan["read_only"])
+        for args in (["--apply-injection"], ["--uninstall-injection"], ["--apply-injection", "--dry-run"]):
+            with self.subTest(skill="rum", args=args):
+                plan = core.plan_skill_script(
+                    "splunk-observability-k8s-frontend-rum-setup", "setup.sh", args
+                )
+                self.assertFalse(plan["read_only"])
 
     def test_matches_mutation_flag_handles_prefix_and_equals_form(self) -> None:
         patterns = ("--apply-", "--splunk-prep")
