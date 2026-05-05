@@ -167,6 +167,17 @@ if [[ -z "${TOKEN_FILE}" && -n "${SPLUNK_O11Y_TOKEN_FILE:-}" ]]; then
     TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE}"
 fi
 
+file_mode_octal() {
+    local path="$1"
+    "${PYTHON_BIN}" - "${path}" <<'PY'
+import os
+import stat
+import sys
+
+print(format(stat.S_IMODE(os.stat(sys.argv[1]).st_mode), "03o"))
+PY
+}
+
 assert_secret_file_perms() {
     local path="$1"
     local label="$2"
@@ -180,7 +191,7 @@ assert_secret_file_perms() {
         exit 2
     fi
     local mode
-    mode=$(stat -f '%A' "${path}" 2>/dev/null || stat -c '%a' "${path}")
+    mode="$(file_mode_octal "${path}")"
     if [[ "${mode}" != "600" ]]; then
         if [[ "${ALLOW_LOOSE_TOKEN_PERMS}" == "true" ]]; then
             echo "WARN: ${label} (${path}) has loose permissions (${mode}); proceeding under --allow-loose-token-perms." >&2
