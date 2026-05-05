@@ -16,7 +16,11 @@ This skill is a router over the existing Cisco setup skills in this repo.
 | `thousandeyes` | `cisco-thousandeyes-setup` | ThousandEyes |
 | `appdynamics` | `cisco-appdynamics-setup` | AppDynamics |
 | `spaces` | `cisco-spaces-setup` | Cisco Spaces (meta stream / firehose) |
-| `app_install_only` | `splunk-app-install` | Cisco Webex, UCS, ESA, WSA, Talos, EVM/SCA app validation |
+| `webex` | `cisco-webex-setup` | Webex, Webex Control Hub, Webex Contact Center |
+| `ucs_ta` | `cisco-ucs-ta-setup` | Cisco UCS Manager |
+| `secure_email_web_gateway` | `cisco-secure-email-web-gateway-setup` | Cisco ESA, Cisco WSA |
+| `talos_intelligence` | `cisco-talos-intelligence-setup` | Cisco Talos Intelligence for Enterprise Security Cloud |
+| `app_install_only` | `splunk-app-install` | EVM/SCA app validation and remaining app-only routes |
 
 ## Partial Handoff Routes
 

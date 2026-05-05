@@ -233,7 +233,7 @@ version = {version}
         self.assertEqual(payload["install_apps"][0]["app_name"], "CiscoSecurityCloud")
         self.assertIn("SCA/XDR pipeline", payload["resolved_product"]["notes"])
 
-    def test_dry_run_webex_routes_to_public_addon_install_only(self) -> None:
+    def test_dry_run_webex_routes_to_first_class_skill(self) -> None:
         result = self.run_command(
             "bash",
             str(SETUP_SCRIPT),
@@ -246,21 +246,124 @@ version = {version}
         )
         self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
         payload = json.loads(result.stdout)
-        self.assertEqual(payload["route"]["type"], "app_install_only")
-        self.assertEqual(payload["resolved_product"]["primary_skill"], "splunk-app-install")
+        self.assertEqual(payload["route"]["type"], "webex")
+        self.assertEqual(payload["resolved_product"]["primary_skill"], "cisco-webex-setup")
         self.assertEqual(payload["install_apps"][0]["app_name"], "ta_cisco_webex_add_on_for_splunk")
         self.assertEqual(payload["install_apps"][0]["splunkbase_id"], "8365")
-        self.assertIn("Splunk REST app status validation", payload["workflow_scripts"])
+        self.assertEqual(payload["install_apps"][1]["app_name"], "cisco_webex_meetings_app_for_splunk")
+        self.assertEqual(payload["install_apps"][1]["splunkbase_id"], "4992")
+        self.assertIn("skills/cisco-webex-setup/scripts/configure_account.sh", payload["workflow_scripts"])
+        self.assertIn("client_secret (secret-file)", payload["missing_values_for_configure"])
 
-    def test_public_cisco_addons_route_to_install_only_handoffs(self) -> None:
+    def test_webex_router_exposes_full_input_and_proxy_surface(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_webex",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        for expected in (
+            "webex_endpoint",
+            "method",
+            "query_params",
+            "request_body",
+            "org_id",
+            "webex_contact_center_region",
+            "query_template",
+            "site_url",
+            "end_time",
+            "interval",
+            "proxy_enabled",
+            "proxy_type",
+            "proxy_url",
+            "proxy_port",
+            "proxy_username",
+            "proxy_rdns",
+            "webex_base_url",
+        ):
+            with self.subTest(expected=expected):
+                self.assertIn(expected, payload["optional_non_secret_keys"])
+        self.assertIn("proxy_password", payload["secret_file_keys"])
+
+    def test_webex_router_reports_type_specific_input_requirements(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_webex",
+            "--set",
+            "auto_inputs",
+            "true",
+            "--set",
+            "input_type",
+            "contact_center_search",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("org_id", payload["missing_values_for_configure"])
+        self.assertIn("webex_contact_center_region", payload["missing_values_for_configure"])
+        self.assertIn("start_time", payload["missing_values_for_configure"])
+
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_webex",
+            "--set",
+            "auto_inputs",
+            "true",
+            "--set",
+            "input_type",
+            "generic_endpoint",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("webex_endpoint", payload["missing_values_for_configure"])
+
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "cisco_webex",
+            "--set",
+            "auto_inputs",
+            "true",
+            "--set",
+            "input_type",
+            "meetings_summary_report",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertIn("start_time", payload["missing_values_for_configure"])
+        self.assertIn("site_url", payload["missing_values_for_configure"])
+
+    def test_public_cisco_addons_route_to_first_class_skills(self) -> None:
         expected = {
-            "cisco_esa": ("Splunk_TA_cisco-esa", "1761"),
-            "cisco_talos": ("Splunk_TA_Talos_Intelligence", "7557"),
-            "cisco_ucs": ("Splunk_TA_cisco-ucs", "2731"),
-            "cisco_wsa": ("Splunk_TA_cisco-wsa", "1747"),
+            "cisco_esa": ("secure_email_web_gateway", "cisco-secure-email-web-gateway-setup", "Splunk_TA_cisco-esa", "1761"),
+            "cisco_talos": ("talos_intelligence", "cisco-talos-intelligence-setup", "Splunk_TA_Talos_Intelligence", "7557"),
+            "cisco_ucs": ("ucs_ta", "cisco-ucs-ta-setup", "Splunk_TA_cisco-ucs", "2731"),
+            "cisco_wsa": ("secure_email_web_gateway", "cisco-secure-email-web-gateway-setup", "Splunk_TA_cisco-wsa", "1747"),
         }
 
-        for product_id, (app_name, app_id) in expected.items():
+        for product_id, (route_type, primary_skill, app_name, app_id) in expected.items():
             with self.subTest(product_id=product_id):
                 result = self.run_command(
                     "bash",
@@ -274,10 +377,43 @@ version = {version}
                 )
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 payload = json.loads(result.stdout)
-                self.assertEqual(payload["route"]["type"], "app_install_only")
-                self.assertEqual(payload["resolved_product"]["primary_skill"], "splunk-app-install")
+                self.assertEqual(payload["route"]["type"], route_type)
+                self.assertEqual(payload["resolved_product"]["primary_skill"], primary_skill)
                 self.assertEqual(payload["install_apps"][0]["app_name"], app_name)
                 self.assertEqual(payload["install_apps"][0]["splunkbase_id"], app_id)
+
+    def test_public_cisco_addons_resolve_by_app_names_and_labels(self) -> None:
+        expected = {
+            "Splunk_TA_cisco-esa": "cisco_esa",
+            "Splunk_TA_cisco-ucs": "cisco_ucs",
+            "Splunk_TA_Talos_Intelligence": "cisco_talos",
+            "ta_cisco_webex_add_on_for_splunk": "cisco_webex",
+            "Talos Intelligence": "cisco_talos",
+        }
+        for query, product_id in expected.items():
+            with self.subTest(query=query):
+                result, payload = self.run_resolver_json(query)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertEqual(payload["status"], "resolved")
+                self.assertEqual(payload["matches"][0]["id"], product_id)
+
+    def test_webex_contact_center_and_control_hub_route_to_webex_skill(self) -> None:
+        for product_id in ("cisco_webex_contact_center", "cisco_webex_control_hub"):
+            with self.subTest(product_id=product_id):
+                result = self.run_command(
+                    "bash",
+                    str(SETUP_SCRIPT),
+                    "--catalog",
+                    str(self.catalog_path),
+                    "--product",
+                    product_id,
+                    "--dry-run",
+                    "--json",
+                )
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["route"]["type"], "webex")
+                self.assertEqual(payload["resolved_product"]["primary_skill"], "cisco-webex-setup")
 
     def test_active_collector_products_route_to_partial_handoffs(self) -> None:
         expected = {

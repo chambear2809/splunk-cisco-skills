@@ -55,7 +55,12 @@
         "wifi 6",
         "wifi 6e",
         "capwap",
-        "wireless ap"
+        "wireless ap",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform",
+        "cisco ios"
       ],
       "notes": "Access Points dashboards depend on Catalyst Center telemetry rather than a separate AP-only collector.",
       "optional_non_secret_keys": [
@@ -90,7 +95,15 @@
         "wifi 6",
         "wifi 6e",
         "capwap",
-        "wireless ap"
+        "wireless ap",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform",
+        "cisco_ios",
+        "cisco ios"
       ],
       "secret_keys": [
         "password"
@@ -175,7 +188,9 @@
         "contract",
         "bridge domain",
         "tenant",
-        "multi site orchestrator"
+        "multi site orchestrator",
+        "cisco dc networking app for splunk",
+        "cisco dc networking"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -216,7 +231,10 @@
         "contract",
         "bridge domain",
         "tenant",
-        "multi-site orchestrator"
+        "multi-site orchestrator",
+        "cisco_dc_networking_app_for_splunk",
+        "cisco dc networking app for splunk",
+        "Cisco DC Networking"
       ],
       "secret_keys": [
         "password"
@@ -279,7 +297,9 @@
         "tacacs",
         "radius",
         "aaa",
-        "authentication authorization accounting"
+        "authentication authorization accounting",
+        "ta cisco acs",
+        "technology add on for cisco secure access control server acs"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -300,7 +320,10 @@
         "tacacs",
         "radius",
         "aaa",
-        "authentication authorization accounting"
+        "authentication authorization accounting",
+        "TA-cisco_acs",
+        "TA cisco acs",
+        "Technology Add-on for Cisco Secure Access Control Server (ACS)"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -365,7 +388,12 @@
         "asr 9000",
         "asr 900",
         "mpls",
-        "segment routing"
+        "segment routing",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform",
+        "cisco ios"
       ],
       "notes": "ASR dashboards depend on Catalyst Center telemetry in the current repo automation.",
       "optional_non_secret_keys": [
@@ -400,7 +428,15 @@
         "asr 9000",
         "asr 900",
         "mpls",
-        "segment routing"
+        "segment routing",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform",
+        "cisco_ios",
+        "cisco ios"
       ],
       "secret_keys": [
         "password"
@@ -464,7 +500,9 @@
         "ai defense",
         "ai network defense",
         "automated threat detection",
-        "ml security"
+        "ml security",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -496,7 +534,9 @@
         "ai defense",
         "ai network defense",
         "automated threat detection",
-        "ml security"
+        "ml security",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -577,7 +617,9 @@
         "dash",
         "brum",
         "dbmon",
-        "infrastructure monitoring"
+        "infrastructure monitoring",
+        "splunk ta appdynamics",
+        "cisco splunk add on for appdynamics"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -618,7 +660,10 @@
         "dash",
         "brum",
         "dbmon",
-        "infrastructure monitoring"
+        "infrastructure monitoring",
+        "Splunk_TA_AppDynamics",
+        "Splunk TA AppDynamics",
+        "Cisco Splunk Add-on for AppDynamics"
       ],
       "secret_keys": [
         "client_secret"
@@ -987,7 +1032,8 @@
         "field notice",
         "eox",
         "end of life",
-        "caveat"
+        "caveat",
+        "cisco bug search and analytics"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -1009,7 +1055,9 @@
         "field notice",
         "eox",
         "end of life",
-        "caveat"
+        "caveat",
+        "Cisco_Bug_Search_and_Analytics",
+        "Cisco Bug Search and Analytics"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -1073,7 +1121,12 @@
         "ios xr",
         "core router",
         "service provider routing",
-        "multi terabit"
+        "multi terabit",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform",
+        "cisco ios"
       ],
       "notes": "CRS dashboards depend on Catalyst Center telemetry in the current repo automation.",
       "optional_non_secret_keys": [
@@ -1107,7 +1160,15 @@
         "ios xr",
         "core router",
         "service provider routing",
-        "multi-terabit"
+        "multi-terabit",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform",
+        "cisco_ios",
+        "cisco ios"
       ],
       "secret_keys": [
         "password"
@@ -1197,7 +1258,11 @@
         "wired wireless convergence",
         "cisco networking cloud",
         "encrypted traffic analytics",
-        "eta"
+        "eta",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -1239,7 +1304,13 @@
         "wired wireless convergence",
         "cisco networking cloud",
         "encrypted traffic analytics",
-        "eta"
+        "eta",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform"
       ],
       "secret_keys": [
         "password"
@@ -1337,7 +1408,11 @@
         "omp",
         "tloc",
         "bfd",
-        "cflowd"
+        "cflowd",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -1380,7 +1455,13 @@
         "omp",
         "tloc",
         "bfd",
-        "cflowd"
+        "cflowd",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform"
       ],
       "secret_keys": [
         "password"
@@ -1501,7 +1582,12 @@
         "stackwise",
         "poe",
         "voice vlan",
-        "smartnet"
+        "smartnet",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform",
+        "cisco ios"
       ],
       "notes": "Catalyst Switch dashboards depend on Catalyst Center telemetry rather than a switch-only collector.",
       "optional_non_secret_keys": [
@@ -1547,7 +1633,15 @@
         "stackwise",
         "poe",
         "voice vlan",
-        "smartnet"
+        "smartnet",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform",
+        "cisco_ios",
+        "cisco ios"
       ],
       "secret_keys": [
         "password"
@@ -1604,7 +1698,9 @@
         "cloud web security",
         "web proxy",
         "url filtering",
-        "web gateway"
+        "web gateway",
+        "cisco cws ta",
+        "cisco cloud web security cws add on for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -1625,7 +1721,10 @@
         "cloud web security",
         "web proxy",
         "url filtering",
-        "web gateway"
+        "web gateway",
+        "Cisco_CWS_TA",
+        "Cisco CWS TA",
+        "Cisco Cloud Web Security (CWS) Add-on for Splunk"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -1701,7 +1800,11 @@
         "cloud access security broker",
         "saas security",
         "shadow it",
-        "cloud dlp"
+        "cloud dlp",
+        "ta cisco cloud security addon",
+        "cisco secure access add on for splunk",
+        "cisco cloud security",
+        "cisco secure access app for splunk"
       ],
       "notes": "Cloudlock dashboards need the Cloudlock-specific settings in addition to the base Secure Access org account.",
       "optional_non_secret_keys": [
@@ -1749,7 +1852,13 @@
         "cloud access security broker",
         "saas security",
         "shadow it",
-        "cloud dlp"
+        "cloud dlp",
+        "TA-cisco-cloud-security-addon",
+        "TA cisco cloud security addon",
+        "Cisco Secure Access Add-on for Splunk",
+        "cisco-cloud-security",
+        "cisco cloud security",
+        "Cisco Secure Access App for Splunk"
       ],
       "secret_keys": [
         "api_key",
@@ -1825,7 +1934,9 @@
         "location analytics",
         "wifi analytics",
         "venue analytics",
-        "proximity"
+        "proximity",
+        "ta cmx",
+        "cisco cmx add on for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -1845,7 +1956,10 @@
         "location analytics",
         "wifi analytics",
         "venue analytics",
-        "proximity"
+        "proximity",
+        "TA-CMX",
+        "TA CMX",
+        "Cisco CMX Add-on for Splunk"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -2174,7 +2288,11 @@
         "purdue model",
         "modbus",
         "profinet",
-        "industrial protocol"
+        "industrial protocol",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -2213,7 +2331,13 @@
         "purdue model",
         "modbus",
         "profinet",
-        "industrial protocol"
+        "industrial protocol",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform"
       ],
       "secret_keys": [
         "api_token"
@@ -2277,7 +2401,11 @@
         "spf",
         "email fraud",
         "brand protection",
-        "dmp"
+        "dmp",
+        "ta cisco dp pd",
+        "cisco dmp app add on for splunk",
+        "cisco dp pd",
+        "cisco dmp app app for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -2298,7 +2426,13 @@
         "spf",
         "email fraud",
         "brand protection",
-        "dmp"
+        "dmp",
+        "TA-cisco_DP_PD",
+        "TA cisco DP PD",
+        "Cisco DMP/APP Add-On for Splunk",
+        "Cisco_DP_PD",
+        "Cisco DP PD",
+        "Cisco DMP/APP App for Splunk"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -2384,7 +2518,8 @@
         "user protection suite",
         "passwordless",
         "fido2",
-        "phishing resistant mfa"
+        "phishing resistant mfa",
+        "ciscosecuritycloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -2432,7 +2567,9 @@
         "user protection suite",
         "passwordless",
         "fido2",
-        "phishing resistant mfa"
+        "phishing resistant mfa",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "ikey",
@@ -2506,7 +2643,9 @@
         "phishing",
         "bec",
         "business email compromise",
-        "email protection"
+        "email protection",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -2549,7 +2688,9 @@
         "phishing",
         "bec",
         "business email compromise",
-        "email protection"
+        "email protection",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "client_secret",
@@ -2611,7 +2752,9 @@
         "endpoint visibility module",
         "process mapping",
         "flow to process",
-        "endpoint telemetry"
+        "endpoint telemetry",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "Cisco Security Cloud ships EVM knowledge objects and dashboards, but EVM telemetry is not configured through a CiscoSecurityCloud modular input in this repo. Install/validate Cisco Security Cloud here, then feed EVM sourcetypes through the supported upstream EVM pipeline.",
       "optional_non_secret_keys": [],
@@ -2636,7 +2779,9 @@
         "endpoint visibility module",
         "process mapping",
         "flow to process",
-        "endpoint telemetry"
+        "endpoint telemetry",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -2832,7 +2977,8 @@
         "securex",
         "ai assistant",
         "attack path analysis",
-        "automated investigation"
+        "automated investigation",
+        "ciscosecuritycloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -2875,7 +3021,9 @@
         "securex",
         "ai assistant",
         "attack path analysis",
-        "automated investigation"
+        "automated investigation",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "access_token",
@@ -3089,7 +3237,9 @@
         "identity posture",
         "compromised accounts",
         "itdr",
-        "lateral movement"
+        "lateral movement",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "Choose the Cisco Identity Intelligence ingestion mode with --set variant webhook or --set variant aws_s3.",
       "optional_non_secret_keys": [],
@@ -3179,7 +3329,9 @@
         "identity posture",
         "compromised accounts",
         "itdr",
-        "lateral movement"
+        "lateral movement",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "aws_access_secret",
@@ -3274,7 +3426,11 @@
         "posture",
         "profiling",
         "byod",
-        "guest portal"
+        "guest portal",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -3318,7 +3474,13 @@
         "posture",
         "profiling",
         "byod",
-        "guest portal"
+        "guest portal",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform"
       ],
       "secret_keys": [
         "password"
@@ -3583,7 +3745,12 @@
         "isr 1000",
         "isr 4000",
         "isr 4451",
-        "branch router"
+        "branch router",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform",
+        "cisco ios"
       ],
       "notes": "ISR dashboards depend on Catalyst Center telemetry in the current repo automation.",
       "optional_non_secret_keys": [
@@ -3617,7 +3784,15 @@
         "isr 1000",
         "isr 4000",
         "isr 4451",
-        "branch router"
+        "branch router",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform",
+        "cisco_ios",
+        "cisco ios"
       ],
       "secret_keys": [
         "password"
@@ -3683,7 +3858,9 @@
         "ucs management",
         "cloud operations",
         "workload optimization",
-        "hyperflex"
+        "hyperflex",
+        "splunk ta cisco intersight",
+        "cisco intersight add on for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -3712,7 +3889,10 @@
         "ucs management",
         "cloud operations",
         "workload optimization",
-        "hyperflex"
+        "hyperflex",
+        "Splunk_TA_Cisco_Intersight",
+        "Splunk TA Cisco Intersight",
+        "Cisco Intersight Add-on for Splunk"
       ],
       "secret_keys": [
         "client_secret"
@@ -3901,7 +4081,9 @@
         "kubernetes security",
         "k8s",
         "cloud native security",
-        "runtime enforcement"
+        "runtime enforcement",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -3935,7 +4117,9 @@
         "kubernetes security",
         "k8s",
         "cloud native security",
-        "runtime enforcement"
+        "runtime enforcement",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -4002,7 +4186,9 @@
         "isovalent edge processor",
         "data reduction",
         "observability pipeline",
-        "telemetry processing"
+        "telemetry processing",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -4035,7 +4221,9 @@
         "iep",
         "data reduction",
         "observability pipeline",
-        "telemetry processing"
+        "telemetry processing",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -4355,7 +4543,9 @@
         "meraki ms",
         "meraki mt",
         "meraki mv",
-        "wireless lan"
+        "wireless lan",
+        "splunk ta cisco meraki",
+        "cisco meraki add on for splunk"
       ],
       "notes": "This repo prefers the dedicated Meraki TA and can also apply the Enterprise Networking companion dashboards used by the SCAN catalog.",
       "optional_non_secret_keys": [
@@ -4395,7 +4585,10 @@
         "meraki ms",
         "meraki mt",
         "meraki mv",
-        "wireless lan"
+        "wireless lan",
+        "Splunk_TA_cisco_meraki",
+        "Splunk TA cisco meraki",
+        "Cisco Meraki Add-on for Splunk"
       ],
       "secret_keys": [
         "api_key"
@@ -4502,7 +4695,9 @@
         "multicloud defense",
         "cloud firewall",
         "multi cloud",
-        "aws azure gcp oci"
+        "aws azure gcp oci",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -4537,7 +4732,9 @@
         "mcd",
         "cloud firewall",
         "multi-cloud",
-        "aws azure gcp oci"
+        "aws azure gcp oci",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -4609,7 +4806,11 @@
         "candid",
         "intent verification",
         "aci assurance",
-        "nexus one"
+        "nexus one",
+        "ta cisco candid",
+        "cisco network assurance engine add on for splunk enterprise cisco nae",
+        "cisco app candid",
+        "cisco network assurance engine app for splunk enterprise cisco nae"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -4629,7 +4830,13 @@
         "candid",
         "intent verification",
         "aci assurance",
-        "nexus one"
+        "nexus one",
+        "TA_cisco-candid",
+        "TA cisco candid",
+        "Cisco Network Assurance Engine Add-on for Splunk Enterprise (Cisco NAE)",
+        "cisco-app-candid",
+        "cisco app candid",
+        "Cisco Network Assurance Engine App for Splunk Enterprise (Cisco NAE)"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -4692,7 +4899,8 @@
         "secure client nvm",
         "endpoint flow",
         "user protection suite",
-        "cisco security cloud"
+        "cisco security cloud",
+        "ciscosecuritycloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -4728,7 +4936,9 @@
         "secure client nvm",
         "endpoint flow",
         "user protection suite",
-        "cisco security cloud"
+        "cisco security cloud",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -4805,7 +5015,9 @@
         "ndi",
         "ndo",
         "fabric controller",
-        "nexus one"
+        "nexus one",
+        "cisco dc networking app for splunk",
+        "cisco dc networking"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -4843,7 +5055,10 @@
         "ndi",
         "ndo",
         "fabric controller",
-        "nexus one"
+        "nexus one",
+        "cisco_dc_networking_app_for_splunk",
+        "cisco dc networking app for splunk",
+        "Cisco DC Networking"
       ],
       "secret_keys": [
         "password"
@@ -5001,7 +5216,9 @@
         "vpc",
         "fabric extender",
         "fex",
-        "fabricpath"
+        "fabricpath",
+        "cisco dc networking app for splunk",
+        "cisco dc networking"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -5042,7 +5259,10 @@
         "vpc",
         "fabric extender",
         "fex",
-        "fabricpath"
+        "fabricpath",
+        "cisco_dc_networking_app_for_splunk",
+        "cisco dc networking app for splunk",
+        "Cisco DC Networking"
       ],
       "secret_keys": [
         "password"
@@ -5270,7 +5490,9 @@
         "prime infrastructure",
         "nms",
         "device lifecycle",
-        "campus management"
+        "campus management",
+        "ta add on for cisco prime infrastructure",
+        "add on for cisco prime infrastructure"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -5291,7 +5513,10 @@
         "cisco prime",
         "nms",
         "device lifecycle",
-        "campus management"
+        "campus management",
+        "TA-add-on-for-cisco-prime-infrastructure",
+        "TA add on for cisco prime infrastructure",
+        "Add-on for Cisco Prime Infrastructure"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -5347,7 +5572,9 @@
         "skylight",
         "service assurance",
         "sla monitoring",
-        "synthetic testing"
+        "synthetic testing",
+        "ta skylight for splunk",
+        "ta accedian skylight powered security"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -5368,7 +5595,10 @@
         "skylight",
         "service assurance",
         "sla monitoring",
-        "synthetic testing"
+        "synthetic testing",
+        "TA-skylight-for-splunk",
+        "TA skylight for splunk",
+        "TA Accedian Skylight powered Security"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -5420,7 +5650,9 @@
         "vulnerability disclosure",
         "openvuln api",
         "critical advisory",
-        "high advisory"
+        "high advisory",
+        "ti cisco vuln",
+        "cisco psirt openvuln api add on for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -5443,7 +5675,10 @@
         "vulnerability disclosure",
         "openVuln api",
         "critical advisory",
-        "high advisory"
+        "high advisory",
+        "ti-cisco-vuln",
+        "ti cisco vuln",
+        "Cisco PSIRT openVuln API Add-on for Splunk"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -5601,7 +5836,11 @@
         "sase",
         "secure access service edge",
         "cisco security cloud",
-        "user protection suite"
+        "user protection suite",
+        "ta cisco cloud security addon",
+        "cisco secure access add on for splunk",
+        "cisco cloud security",
+        "cisco secure access app for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -5650,7 +5889,13 @@
         "sase",
         "secure access service edge",
         "cisco security cloud",
-        "user protection suite"
+        "user protection suite",
+        "TA-cisco-cloud-security-addon",
+        "TA cisco cloud security addon",
+        "Cisco Secure Access Add-on for Splunk",
+        "cisco-cloud-security",
+        "cisco cloud security",
+        "Cisco Secure Access App for Splunk"
       ],
       "secret_keys": [
         "api_key",
@@ -5754,7 +5999,9 @@
         "entity modeling",
         "behavioral analytics",
         "cloud visibility",
-        "xdr"
+        "xdr",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "Cisco Security Cloud includes the Security Cloud Analytics knowledge surface, but this repo does not configure a standalone SCA modular input. Install/validate Cisco Security Cloud here, then feed SCA telemetry through the supported upstream SCA/XDR pipeline.",
       "optional_non_secret_keys": [],
@@ -5785,7 +6032,9 @@
         "entity modeling",
         "behavioral analytics",
         "cloud visibility",
-        "xdr"
+        "xdr",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [],
@@ -5796,7 +6045,11 @@
       "value_proposition": "Extend network threat detection from on-prem (SNA) to public cloud and SaaS \u2014 surfacing cloud-native alerts, entity risk scores, and behavioral anomalies in Splunk for unified SOC visibility across hybrid environments."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "esa_index",
+        "render_handoff",
+        "wsa_index"
+      ],
       "addon": "Splunk_TA_cisco-esa",
       "addon_label": "Splunk Add-on for Cisco ESA",
       "addon_uid": "1761",
@@ -5810,7 +6063,9 @@
       "app_viz_uid": "",
       "automation_state": "automated",
       "category": "security",
-      "companion_skills": [],
+      "companion_skills": [
+        "splunk-connect-for-syslog-setup"
+      ],
       "conditional_required_secret_rules": [],
       "dashboards": [
         "application"
@@ -5848,21 +6103,28 @@
         "dlp",
         "message tracking",
         "cisco security cloud",
-        "secure email gateway"
+        "secure email gateway",
+        "splunk ta cisco esa",
+        "splunk add on for cisco esa"
       ],
-      "notes": "Installs the Splunk-supported Cisco ESA add-on. Configure ESA log forwarding or SC4S collection outside this product router, then validate the app and sourcetypes.",
-      "optional_non_secret_keys": [],
+      "notes": "First-class Cisco ESA setup: installs the Splunk-supported ESA add-on, creates the email index, aligns Cisco_ESA_Index, and hands off SC4S/file-monitor collection without inventing device API inputs.",
+      "optional_non_secret_keys": [
+        "esa_index",
+        "wsa_index",
+        "render_handoff"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-app-install",
+      "primary_skill": "cisco-secure-email-web-gateway-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
       "route": {
-        "configuration": "manual",
-        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
-        "validation": "installed_apps"
+        "default_esa_index": "email",
+        "default_wsa_index": "netproxy",
+        "handoff": "Use splunk-connect-for-syslog-setup for SC4S runtime deployment; this route prepares Splunk-side indexes, macros, parser packages, and optional handoff snippets.",
+        "product": "esa"
       },
-      "route_type": "app_install_only",
+      "route_type": "secure_email_web_gateway",
       "search_terms": [
         "cisco_esa",
         "cisco esa",
@@ -5879,7 +6141,10 @@
         "dlp",
         "message tracking",
         "cisco security cloud",
-        "secure email gateway"
+        "secure email gateway",
+        "Splunk_TA_cisco-esa",
+        "Splunk TA cisco esa",
+        "Splunk Add-on for Cisco ESA"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -5898,8 +6163,14 @@
       ],
       "status": "active",
       "subcategory": "email_security",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "products"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-secure-email-web-gateway-setup/template.example"
+      ],
       "value_proposition": "Centralize ESA mail logs, message tracking, and threat verdicts in Splunk for rapid email incident response."
     },
     {
@@ -5966,7 +6237,8 @@
         "cisco security cloud",
         "xdr endpoint",
         "orbital",
-        "malware defense"
+        "malware defense",
+        "ciscosecuritycloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -6015,7 +6287,9 @@
         "cisco security cloud",
         "xdr endpoint",
         "orbital",
-        "malware defense"
+        "malware defense",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "api_key"
@@ -6203,7 +6477,9 @@
         "eve",
         "snort",
         "secure firewall cloud native",
-        "sfcn"
+        "sfcn",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "Choose the Secure Firewall collection mode with --set variant api, estreamer, syslog, or asa_syslog.",
       "optional_non_secret_keys": [],
@@ -6352,7 +6628,9 @@
         "eve",
         "snort",
         "secure firewall cloud native",
-        "sfcn"
+        "sfcn",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "password",
@@ -6418,7 +6696,9 @@
         "ids",
         "intrusion detection",
         "sdee",
-        "signature based"
+        "signature based",
+        "splunk ta cisco ips",
+        "splunk add on for cisco ips"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -6439,7 +6719,10 @@
         "ids",
         "intrusion detection",
         "sdee",
-        "signature-based"
+        "signature-based",
+        "Splunk_TA_cisco-ips",
+        "Splunk TA cisco ips",
+        "Splunk Add-on for Cisco IPS"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -6506,7 +6789,9 @@
         "sandbox",
         "file detonation",
         "behavioral analysis",
-        "sample submission"
+        "sample submission",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -6548,7 +6833,9 @@
         "sandbox",
         "file detonation",
         "behavioral analysis",
-        "sample submission"
+        "sample submission",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "api_key",
@@ -6633,7 +6920,8 @@
         "network detection and response",
         "flow analytics",
         "flow collector",
-        "anomaly detection"
+        "anomaly detection",
+        "ciscosecuritycloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -6683,7 +6971,9 @@
         "network detection and response",
         "flow analytics",
         "flow collector",
-        "anomaly detection"
+        "anomaly detection",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "password"
@@ -6759,7 +7049,9 @@
         "workload protection",
         "zero trust segmentation",
         "ebpf",
-        "distributed firewall"
+        "distributed firewall",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -6798,7 +7090,9 @@
         "workload protection",
         "zero trust segmentation",
         "ebpf",
-        "distributed firewall"
+        "distributed firewall",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -6850,7 +7144,11 @@
         "ctr",
         "cisco threat response",
         "ribbon",
-        "security orchestration"
+        "security orchestration",
+        "ta cisco threat response",
+        "cisco securex threat response custom search command",
+        "relay module",
+        "cisco securex threat response relay module"
       ],
       "notes": "",
       "optional_non_secret_keys": [],
@@ -6869,7 +7167,13 @@
         "ctr",
         "cisco threat response",
         "ribbon",
-        "security orchestration"
+        "security orchestration",
+        "TA-cisco-threat-response",
+        "TA cisco threat response",
+        "Cisco SecureX threat response - Custom Search Command",
+        "relay-module",
+        "relay module",
+        "Cisco SecureX threat response - Relay module"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -7088,7 +7392,9 @@
         "smart building",
         "location analytics",
         "cisco networking cloud",
-        "tjene"
+        "tjene",
+        "ta cisco spaces",
+        "spaces add on for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -7124,7 +7430,10 @@
         "smart building",
         "location analytics",
         "cisco networking cloud",
-        "tjene"
+        "tjene",
+        "ta_cisco_spaces",
+        "ta cisco spaces",
+        "Spaces Add-On for Splunk"
       ],
       "secret_keys": [
         "activation_token"
@@ -7145,7 +7454,10 @@
       "value_proposition": "Ingest Cisco Spaces location analytics, occupancy trends, and IoT sensor events into Splunk \u2014 enabling facilities and security teams to correlate physical-space intelligence with network and security data."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "enable_ip_blacklist",
+        "index"
+      ],
       "addon": "Splunk_TA_Talos_Intelligence",
       "addon_label": "Cisco Talos Intelligence for Enterprise Security Cloud",
       "addon_uid": "7557",
@@ -7156,7 +7468,9 @@
       "app_viz_uid": "",
       "automation_state": "automated",
       "category": "security",
-      "companion_skills": [],
+      "companion_skills": [
+        "splunk-enterprise-security-config"
+      ],
       "conditional_required_secret_rules": [],
       "dashboards": [
         "talos_logs"
@@ -7186,21 +7500,26 @@
         "ip reputation",
         "domain reputation",
         "file reputation",
-        "snort"
+        "snort",
+        "splunk ta talos intelligence",
+        "cisco talos intelligence for enterprise security cloud"
       ],
-      "notes": "Installs Cisco Talos Intelligence for Enterprise Security Cloud. This integration requires a supported Splunk Enterprise Security Cloud deployment; finish Talos setup in the ES/SOAR workflow.",
-      "optional_non_secret_keys": [],
+      "notes": "First-class Cisco Talos Intelligence setup for supported Splunk Enterprise Security Cloud deployments; validates service-account readiness, alert actions, capability mapping, and default-disabled threatlist state.",
+      "optional_non_secret_keys": [
+        "enable_ip_blacklist",
+        "index"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-app-install",
+      "primary_skill": "cisco-talos-intelligence-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
       "route": {
-        "configuration": "manual",
-        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
-        "validation": "installed_apps"
+        "default_enable_ip_blacklist": "false",
+        "default_index": "talos_intelligence",
+        "support_posture": "Enterprise Security Cloud 7.3.2+; non-FedRAMP; service account material is normally Splunk Cloud-provisioned."
       },
-      "route_type": "app_install_only",
+      "route_type": "talos_intelligence",
       "search_terms": [
         "cisco_talos",
         "cisco talos",
@@ -7211,16 +7530,27 @@
         "ip reputation",
         "domain reputation",
         "file reputation",
-        "snort"
+        "snort",
+        "Splunk_TA_Talos_Intelligence",
+        "Splunk TA Talos Intelligence",
+        "Cisco Talos Intelligence for Enterprise Security Cloud"
       ],
-      "secret_keys": [],
+      "secret_keys": [
+        "service_account"
+      ],
       "sourcetypes": [
         "cisco:talos"
       ],
       "status": "active",
       "subcategory": "threat_response",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "deployment"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-talos-intelligence-setup/template.example"
+      ],
       "value_proposition": "Enrich Splunk events with Talos threat intelligence for faster triage and higher-fidelity detections."
     },
     {
@@ -7371,7 +7701,11 @@
         "cloud agent",
         "enterprise agent",
         "network path",
-        "outage detection"
+        "outage detection",
+        "ta cisco thousandeyes",
+        "cisco thousandeyes app for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -7417,7 +7751,13 @@
         "cloud agent",
         "enterprise agent",
         "network path",
-        "outage detection"
+        "outage detection",
+        "ta_cisco_thousandeyes",
+        "ta cisco thousandeyes",
+        "Cisco ThousandEyes App for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -7581,7 +7921,11 @@
         "user protection suite",
         "investigate",
         "roaming security",
-        "roaming client"
+        "roaming client",
+        "ta cisco cloud security addon",
+        "cisco secure access add on for splunk",
+        "cisco cloud security",
+        "cisco secure access app for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -7629,7 +7973,13 @@
         "user protection suite",
         "investigate",
         "roaming security",
-        "roaming client"
+        "roaming client",
+        "TA-cisco-cloud-security-addon",
+        "TA cisco cloud security addon",
+        "Cisco Secure Access Add-on for Splunk",
+        "cisco-cloud-security",
+        "cisco cloud security",
+        "Cisco Secure Access App for Splunk"
       ],
       "secret_keys": [
         "api_key",
@@ -7726,7 +8076,11 @@
         "passive dns",
         "whois",
         "co occurrence",
-        "domain investigation"
+        "domain investigation",
+        "ta cisco cloud security addon",
+        "cisco secure access add on for splunk",
+        "cisco cloud security",
+        "cisco secure access app for splunk"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -7767,7 +8121,13 @@
         "passive dns",
         "whois",
         "co-occurrence",
-        "domain investigation"
+        "domain investigation",
+        "TA-cisco-cloud-security-addon",
+        "TA cisco cloud security addon",
+        "Cisco Secure Access Add-on for Splunk",
+        "cisco-cloud-security",
+        "cisco cloud security",
+        "Cisco Secure Access App for Splunk"
       ],
       "secret_keys": [
         "api_key",
@@ -7911,7 +8271,19 @@
       "value_proposition": "Correlate CUCM CDR/CMR records and syslog events in Splunk for voice quality monitoring and capacity management."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "account_name",
+        "create_default_task",
+        "description",
+        "disable_ssl_verification",
+        "index",
+        "interval",
+        "name",
+        "server_url",
+        "sourcetype",
+        "task_name",
+        "templates"
+      ],
       "addon": "Splunk_TA_cisco-ucs",
       "addon_label": "Splunk Add-on for Cisco UCS",
       "addon_uid": "2731",
@@ -7964,21 +8336,40 @@
         "x series",
         "x fabric",
         "hyperflex",
-        "intersight managed"
+        "intersight managed",
+        "splunk ta cisco ucs",
+        "splunk add on for cisco ucs"
       ],
-      "notes": "Installs the Splunk-supported Cisco UCS add-on. Configure UCS Manager inputs in the add-on UI or supported Splunk docs.",
-      "optional_non_secret_keys": [],
+      "notes": "First-class Cisco UCS TA setup: installs the Splunk-supported UCS add-on, creates the cisco_ucs index, configures UCS Manager server records, default templates, and cisco_ucs_task inputs.",
+      "optional_non_secret_keys": [
+        "create_default_task",
+        "description",
+        "disable_ssl_verification",
+        "index",
+        "interval",
+        "sourcetype",
+        "task_name",
+        "templates"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-app-install",
-      "required_non_secret_keys": [],
-      "required_secret_keys": [],
+      "primary_skill": "cisco-ucs-ta-setup",
+      "required_non_secret_keys": [
+        "name",
+        "server_url",
+        "account_name"
+      ],
+      "required_secret_keys": [
+        "account_password"
+      ],
       "route": {
-        "configuration": "manual",
-        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
-        "validation": "installed_apps"
+        "default_index": "cisco_ucs",
+        "default_interval": "300",
+        "default_name": "UCS_PROD",
+        "default_sourcetype": "cisco:ucs",
+        "default_templates": "UCS_Fault,UCS_Inventory,UCS_Performance"
       },
-      "route_type": "app_install_only",
+      "route_type": "ucs_ta",
       "search_terms": [
         "cisco_ucs",
         "cisco ucs",
@@ -7996,16 +8387,27 @@
         "x-series",
         "x-fabric",
         "hyperflex",
-        "intersight managed"
+        "intersight managed",
+        "Splunk_TA_cisco-ucs",
+        "Splunk TA cisco ucs",
+        "Splunk Add-on for Cisco UCS"
       ],
-      "secret_keys": [],
+      "secret_keys": [
+        "account_password"
+      ],
       "sourcetypes": [
         "cisco:ucs"
       ],
       "status": "active",
       "subcategory": "compute_infra",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "server"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-ucs-ta-setup/template.example"
+      ],
       "value_proposition": "Correlate UCS hardware faults, firmware events, and blade telemetry with Splunk for proactive data center operations."
     },
     {
@@ -8055,7 +8457,9 @@
         "cve",
         "cvss",
         "exploit",
-        "risk score"
+        "risk score",
+        "ciscosecuritycloud",
+        "cisco security cloud"
       ],
       "notes": "",
       "optional_non_secret_keys": [
@@ -8093,7 +8497,9 @@
         "cve",
         "cvss",
         "exploit",
-        "risk score"
+        "risk score",
+        "CiscoSecurityCloud",
+        "Cisco Security Cloud"
       ],
       "secret_keys": [
         "api_key"
@@ -8114,7 +8520,11 @@
       "value_proposition": "Enrich Splunk investigations with CVE context, exploit data, and Cisco Security Risk Scores."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "esa_index",
+        "render_handoff",
+        "wsa_index"
+      ],
       "addon": "Splunk_TA_cisco-wsa",
       "addon_label": "Splunk Add-on for Cisco WSA",
       "addon_uid": "1747",
@@ -8128,7 +8538,9 @@
       "app_viz_uid": "",
       "automation_state": "automated",
       "category": "security",
-      "companion_skills": [],
+      "companion_skills": [
+        "splunk-connect-for-syslog-setup"
+      ],
       "conditional_required_secret_rules": [],
       "dashboards": [
         "application"
@@ -8163,21 +8575,28 @@
         "content filtering",
         "ironport web",
         "cisco security cloud",
-        "secure web gateway"
+        "secure web gateway",
+        "splunk ta cisco wsa",
+        "splunk add on for cisco wsa"
       ],
-      "notes": "Installs the Splunk-supported Cisco WSA add-on. Configure WSA log forwarding or SC4S collection outside this product router, then validate the app and sourcetypes.",
-      "optional_non_secret_keys": [],
+      "notes": "First-class Cisco WSA setup: installs the Splunk-supported WSA add-on, creates the netproxy index, aligns Cisco_WSA_Index, and hands off SC4S/file-monitor collection without inventing device API inputs.",
+      "optional_non_secret_keys": [
+        "esa_index",
+        "wsa_index",
+        "render_handoff"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-app-install",
+      "primary_skill": "cisco-secure-email-web-gateway-setup",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
       "route": {
-        "configuration": "manual",
-        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
-        "validation": "installed_apps"
+        "default_esa_index": "email",
+        "default_wsa_index": "netproxy",
+        "handoff": "Use splunk-connect-for-syslog-setup for SC4S runtime deployment; this route prepares Splunk-side indexes, macros, parser packages, and optional handoff snippets.",
+        "product": "wsa"
       },
-      "route_type": "app_install_only",
+      "route_type": "secure_email_web_gateway",
       "search_terms": [
         "cisco_wsa",
         "cisco wsa",
@@ -8192,7 +8611,10 @@
         "content filtering",
         "ironport web",
         "cisco security cloud",
-        "secure web gateway"
+        "secure web gateway",
+        "Splunk_TA_cisco-wsa",
+        "Splunk TA cisco wsa",
+        "Splunk Add-on for Cisco WSA"
       ],
       "secret_keys": [],
       "sourcetypes": [
@@ -8205,12 +8627,53 @@
       ],
       "status": "active",
       "subcategory": "cloud_security",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "products"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-secure-email-web-gateway-setup/template.example"
+      ],
       "value_proposition": "Stream WSA access logs and threat verdicts into Splunk for web traffic analytics and policy compliance."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "account_region",
+        "auto_inputs",
+        "calling_index",
+        "client_id",
+        "contact_center_index",
+        "endpoint",
+        "end_time",
+        "gov_api_reference_link",
+        "input_type",
+        "instance_url",
+        "interval",
+        "is_gov_account",
+        "locations",
+        "loglevel",
+        "meetings_index",
+        "method",
+        "name",
+        "org_id",
+        "proxy_enabled",
+        "proxy_port",
+        "proxy_rdns",
+        "proxy_type",
+        "proxy_url",
+        "proxy_username",
+        "query_params",
+        "query_template",
+        "request_body",
+        "redirect_url",
+        "scope",
+        "site_url",
+        "start_time",
+        "webex_base_url",
+        "webex_contact_center_region",
+        "webex_endpoint"
+      ],
       "addon": "ta_cisco_webex_add_on_for_splunk",
       "addon_label": "Webex Add-on for Splunk",
       "addon_uid": "8365",
@@ -8230,7 +8693,8 @@
       "display_name": "Cisco Webex",
       "id": "cisco_webex",
       "install_apps": [
-        "ta_cisco_webex_add_on_for_splunk"
+        "ta_cisco_webex_add_on_for_splunk",
+        "cisco_webex_meetings_app_for_splunk"
       ],
       "keywords": [
         "webex",
@@ -8258,21 +8722,64 @@
         "webex connect",
         "messaging",
         "webex devices",
-        "collaboration"
+        "collaboration",
+        "ta cisco webex add on for splunk",
+        "webex add on for splunk"
       ],
-      "notes": "Installs the Webex Add-on for Splunk. Configure Webex REST API inputs in the add-on UI or vendor documentation.",
-      "optional_non_secret_keys": [],
+      "notes": "First-class Webex setup: installs the Webex Add-on plus Webex App dashboards, configures OAuth accounts, default indexes/macros, and all packaged Webex REST input families.",
+      "optional_non_secret_keys": [
+        "account_region",
+        "auto_inputs",
+        "calling_index",
+        "contact_center_index",
+        "endpoint",
+        "end_time",
+        "gov_api_reference_link",
+        "input_type",
+        "instance_url",
+        "interval",
+        "is_gov_account",
+        "locations",
+        "loglevel",
+        "meetings_index",
+        "method",
+        "org_id",
+        "proxy_enabled",
+        "proxy_port",
+        "proxy_rdns",
+        "proxy_type",
+        "proxy_url",
+        "proxy_username",
+        "query_params",
+        "query_template",
+        "request_body",
+        "redirect_url",
+        "site_url",
+        "start_time",
+        "webex_base_url",
+        "webex_contact_center_region",
+        "webex_endpoint"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "splunk-app-install",
-      "required_non_secret_keys": [],
-      "required_secret_keys": [],
+      "primary_skill": "cisco-webex-setup",
+      "required_non_secret_keys": [
+        "name",
+        "client_id",
+        "scope"
+      ],
+      "required_secret_keys": [
+        "client_secret"
+      ],
       "route": {
-        "configuration": "manual",
-        "handoff": "Install and validate the listed app(s), then complete product-specific input setup in the app UI or vendor-supported workflow.",
-        "validation": "installed_apps"
+        "default_calling_index": "wxc",
+        "default_contact_center_index": "wxcc",
+        "default_endpoint": "webexapis.com",
+        "default_input_type": "core",
+        "default_meetings_index": "wx",
+        "default_name": "WEBEX_PROD"
       },
-      "route_type": "app_install_only",
+      "route_type": "webex",
       "search_terms": [
         "cisco_webex",
         "cisco webex",
@@ -8287,9 +8794,17 @@
         "webex connect",
         "messaging",
         "webex devices",
-        "collaboration"
+        "collaboration",
+        "ta_cisco_webex_add_on_for_splunk",
+        "ta cisco webex add on for splunk",
+        "Webex Add-on for Splunk"
       ],
-      "secret_keys": [],
+      "secret_keys": [
+        "client_secret",
+        "access_token",
+        "refresh_token",
+        "proxy_password"
+      ],
       "sourcetypes": [
         "cisco:webex:admin:audit:events",
         "cisco:webex:call:detailed_history",
@@ -8301,12 +8816,53 @@
       ],
       "status": "active",
       "subcategory": "meetings_calling",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "account"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-webex-setup/template.example"
+      ],
       "value_proposition": "Stream Webex meeting telemetry, call detail records, and admin audit events into Splunk for collaboration analytics."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "account_region",
+        "auto_inputs",
+        "calling_index",
+        "client_id",
+        "contact_center_index",
+        "endpoint",
+        "end_time",
+        "gov_api_reference_link",
+        "input_type",
+        "instance_url",
+        "interval",
+        "is_gov_account",
+        "locations",
+        "loglevel",
+        "meetings_index",
+        "method",
+        "name",
+        "org_id",
+        "proxy_enabled",
+        "proxy_port",
+        "proxy_rdns",
+        "proxy_type",
+        "proxy_url",
+        "proxy_username",
+        "query_params",
+        "query_template",
+        "request_body",
+        "redirect_url",
+        "scope",
+        "site_url",
+        "start_time",
+        "webex_base_url",
+        "webex_contact_center_region",
+        "webex_endpoint"
+      ],
       "addon": "",
       "addon_label": "",
       "addon_uid": "",
@@ -8318,7 +8874,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "unsupported_roadmap",
+      "automation_state": "automated",
       "category": "collaboration",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -8326,7 +8882,10 @@
       "description": "Cisco's next-generation contact center platform providing omnichannel customer engagement (voice, chat, email, social), AI-powered agent assistance, workforce optimization, interaction analytics, and real-time supervisor dashboards. Available as both a cloud-native SaaS (CCaaS) offering and an on-premises deployment for organizations that cannot send data to the cloud. WxCC is the strategic successor to Cisco UCCE/UCCX.",
       "display_name": "Cisco Webex Contact Center (WxCC)",
       "id": "cisco_webex_contact_center",
-      "install_apps": [],
+      "install_apps": [
+        "ta_cisco_webex_add_on_for_splunk",
+        "cisco_webex_meetings_app_for_splunk"
+      ],
       "keywords": [
         "webex contact center",
         "wxcc",
@@ -8345,7 +8904,7 @@
         "recording"
       ],
       "learn_more_url": "https://www.webex.com/contact-center.html",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco webex contact center",
         "cisco webex contact center wxcc",
@@ -8365,15 +8924,60 @@
         "quality management",
         "recording"
       ],
-      "notes": "",
-      "optional_non_secret_keys": [],
+      "notes": "Routed to the Webex setup skill because the current Webex Add-on package includes Webex Contact Center Search inputs and the Webex App includes Contact Center dashboards.",
+      "optional_non_secret_keys": [
+        "account_region",
+        "auto_inputs",
+        "calling_index",
+        "contact_center_index",
+        "endpoint",
+        "end_time",
+        "gov_api_reference_link",
+        "input_type",
+        "instance_url",
+        "interval",
+        "is_gov_account",
+        "locations",
+        "loglevel",
+        "meetings_index",
+        "method",
+        "org_id",
+        "proxy_enabled",
+        "proxy_port",
+        "proxy_rdns",
+        "proxy_type",
+        "proxy_url",
+        "proxy_username",
+        "query_params",
+        "query_template",
+        "request_body",
+        "redirect_url",
+        "site_url",
+        "start_time",
+        "webex_base_url",
+        "webex_contact_center_region",
+        "webex_endpoint"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
-      "required_non_secret_keys": [],
-      "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "primary_skill": "cisco-webex-setup",
+      "required_non_secret_keys": [
+        "name",
+        "client_id",
+        "scope"
+      ],
+      "required_secret_keys": [
+        "client_secret"
+      ],
+      "route": {
+        "default_calling_index": "wxc",
+        "default_contact_center_index": "wxcc",
+        "default_endpoint": "webexapis.com",
+        "default_input_type": "core",
+        "default_meetings_index": "wx",
+        "default_name": "WEBEX_PROD"
+      },
+      "route_type": "webex",
       "search_terms": [
         "cisco_webex_contact_center",
         "cisco webex contact center",
@@ -8396,16 +9000,62 @@
         "quality management",
         "recording"
       ],
-      "secret_keys": [],
+      "secret_keys": [
+        "client_secret",
+        "access_token",
+        "refresh_token",
+        "proxy_password"
+      ],
       "sourcetypes": [],
       "status": "roadmap",
       "subcategory": "contact_center",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "account"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-webex-setup/template.example"
+      ],
       "value_proposition": "Ingest Webex Contact Center CDRs, agent performance metrics, queue analytics, and interaction events into Splunk for contact center operations intelligence, SLA monitoring, and workforce planning."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "account_region",
+        "auto_inputs",
+        "calling_index",
+        "client_id",
+        "contact_center_index",
+        "endpoint",
+        "end_time",
+        "gov_api_reference_link",
+        "input_type",
+        "instance_url",
+        "interval",
+        "is_gov_account",
+        "locations",
+        "loglevel",
+        "meetings_index",
+        "method",
+        "name",
+        "org_id",
+        "proxy_enabled",
+        "proxy_port",
+        "proxy_rdns",
+        "proxy_type",
+        "proxy_url",
+        "proxy_username",
+        "query_params",
+        "query_template",
+        "request_body",
+        "redirect_url",
+        "scope",
+        "site_url",
+        "start_time",
+        "webex_base_url",
+        "webex_contact_center_region",
+        "webex_endpoint"
+      ],
       "addon": "",
       "addon_label": "",
       "addon_uid": "",
@@ -8416,7 +9066,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "unsupported_roadmap",
+      "automation_state": "automated",
       "category": "collaboration",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -8424,7 +9074,10 @@
       "description": "Centralized cloud management portal for all Webex services \u2014 users, devices, calling, meetings, messaging, and contact center. Provides analytics dashboards, troubleshooting tools, security/compliance settings, and audit logging across the Webex platform.",
       "display_name": "Cisco Webex Control Hub",
       "id": "cisco_webex_control_hub",
-      "install_apps": [],
+      "install_apps": [
+        "ta_cisco_webex_add_on_for_splunk",
+        "cisco_webex_meetings_app_for_splunk"
+      ],
       "keywords": [
         "control hub",
         "webex admin",
@@ -8438,7 +9091,7 @@
         "webex provisioning"
       ],
       "learn_more_url": "https://admin.webex.com",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco webex control hub",
         "control hub",
@@ -8452,15 +9105,60 @@
         "audit",
         "webex provisioning"
       ],
-      "notes": "",
-      "optional_non_secret_keys": [],
+      "notes": "Routed to the Webex setup skill because Control Hub audit, meeting, quality, calling, and generic Webex API coverage lives in the Webex Add-on/App package pair.",
+      "optional_non_secret_keys": [
+        "account_region",
+        "auto_inputs",
+        "calling_index",
+        "contact_center_index",
+        "endpoint",
+        "end_time",
+        "gov_api_reference_link",
+        "input_type",
+        "instance_url",
+        "interval",
+        "is_gov_account",
+        "locations",
+        "loglevel",
+        "meetings_index",
+        "method",
+        "org_id",
+        "proxy_enabled",
+        "proxy_port",
+        "proxy_rdns",
+        "proxy_type",
+        "proxy_url",
+        "proxy_username",
+        "query_params",
+        "query_template",
+        "request_body",
+        "redirect_url",
+        "site_url",
+        "start_time",
+        "webex_base_url",
+        "webex_contact_center_region",
+        "webex_endpoint"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
-      "required_non_secret_keys": [],
-      "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "primary_skill": "cisco-webex-setup",
+      "required_non_secret_keys": [
+        "name",
+        "client_id",
+        "scope"
+      ],
+      "required_secret_keys": [
+        "client_secret"
+      ],
+      "route": {
+        "default_calling_index": "wxc",
+        "default_contact_center_index": "wxcc",
+        "default_endpoint": "webexapis.com",
+        "default_input_type": "core",
+        "default_meetings_index": "wx",
+        "default_name": "WEBEX_PROD"
+      },
+      "route_type": "webex",
       "search_terms": [
         "cisco_webex_control_hub",
         "cisco webex control hub",
@@ -8477,12 +9175,23 @@
         "audit",
         "webex provisioning"
       ],
-      "secret_keys": [],
+      "secret_keys": [
+        "client_secret",
+        "access_token",
+        "refresh_token",
+        "proxy_password"
+      ],
       "sourcetypes": [],
       "status": "roadmap",
       "subcategory": "meetings_calling",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "account"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-webex-setup/template.example"
+      ],
       "value_proposition": "Ingest Control Hub audit logs, device telemetry, and admin events into Splunk for unified Webex governance, compliance monitoring, and operational analytics."
     },
     {
@@ -8542,7 +9251,12 @@
         "flexconnect",
         "aireos",
         "cisco wireless",
-        "campus network"
+        "campus network",
+        "ta cisco catalyst",
+        "cisco catalyst add on for splunk",
+        "cisco catalyst app",
+        "cisco enterprise networking for splunk platform",
+        "cisco ios"
       ],
       "notes": "WLC dashboards depend on Catalyst Center telemetry rather than a standalone WLC collector.",
       "optional_non_secret_keys": [
@@ -8579,7 +9293,15 @@
         "flexconnect",
         "aireos",
         "cisco wireless",
-        "campus network"
+        "campus network",
+        "TA_cisco_catalyst",
+        "TA cisco catalyst",
+        "Cisco Catalyst Add-on for Splunk",
+        "cisco-catalyst-app",
+        "cisco catalyst app",
+        "Cisco Enterprise Networking for Splunk Platform",
+        "cisco_ios",
+        "cisco ios"
       ],
       "secret_keys": [
         "password"

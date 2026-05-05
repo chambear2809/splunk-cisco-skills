@@ -67,42 +67,50 @@
       {
         "kind": "app",
         "app_name": "ta_cisco_webex_add_on_for_splunk",
-        "label": "`splunk-app-install` Webex add-on",
+        "label": "`cisco-webex-setup` Webex add-on",
         "cloud_install_path": "ACS Splunkbase",
-        "cloud_config_path": "Configure Webex REST API inputs in the add-on UI or vendor docs",
-        "notes": "Install-only route from `cisco-product-setup`; product-specific input automation is not implemented in this repo."
+        "cloud_config_path": "REST via Webex add-on account/input handlers for OAuth accounts and Webex REST API inputs",
+        "notes": "Installs with the companion Webex App dashboards. Covers meetings, admin/security audit, meeting quality, detailed call history, generic endpoint, and Contact Center Search inputs."
+      },
+      {
+        "kind": "app",
+        "app_name": "cisco_webex_meetings_app_for_splunk",
+        "label": "`cisco-webex-setup` Webex app",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Search-tier macro alignment for wx, wxc, and wxcc dashboard indexes",
+        "notes": "Companion dashboard app for the Webex Add-on. Provides Webex Meetings, Calling, Contact Center, Security, and data-quality dashboards."
       },
       {
         "kind": "app",
         "app_name": "Splunk_TA_cisco-ucs",
-        "label": "`splunk-app-install` Cisco UCS add-on",
+        "label": "`cisco-ucs-ta-setup`",
         "cloud_install_path": "ACS Splunkbase",
-        "cloud_config_path": "Configure UCS Manager inputs in the add-on UI or supported Splunk docs",
-        "notes": "Install-only route from `cisco-product-setup`; product-specific input automation is not implemented in this repo."
+        "cloud_config_path": "REST via UCS server, template, and cisco_ucs_task handlers",
+        "notes": "Creates the cisco_ucs index, configures UCS Manager server records with encrypted passwords, default/custom class-ID templates, and cisco:ucs inputs."
       },
       {
         "kind": "app",
         "app_name": "Splunk_TA_cisco-esa",
-        "label": "`splunk-app-install` Cisco ESA add-on",
+        "label": "`cisco-secure-email-web-gateway-setup` ESA",
         "cloud_install_path": "ACS Splunkbase",
-        "cloud_config_path": "Configure ESA log forwarding or SC4S collection outside this repo",
-        "notes": "Install-only route from `cisco-product-setup`; product-specific input automation is not implemented in this repo."
+        "cloud_config_path": "Search-tier/indexer parser package plus email index and Cisco_ESA_Index macro alignment",
+        "notes": "Parser/search-time add-on. Collection is SC4S or file monitor; this repo prepares Splunk-side package placement, indexes, macros, and handoff snippets."
       },
       {
         "kind": "app",
         "app_name": "Splunk_TA_cisco-wsa",
-        "label": "`splunk-app-install` Cisco WSA add-on",
+        "label": "`cisco-secure-email-web-gateway-setup` WSA",
         "cloud_install_path": "ACS Splunkbase",
-        "cloud_config_path": "Configure WSA log forwarding or SC4S collection outside this repo",
-        "notes": "Install-only route from `cisco-product-setup`; product-specific input automation is not implemented in this repo."
+        "cloud_config_path": "Search-tier/indexer parser package plus netproxy index and Cisco_WSA_Index macro alignment",
+        "notes": "Parser/search-time add-on. Collection is SC4S or file monitor; this repo prepares Splunk-side package placement, indexes, macros, and handoff snippets."
       },
       {
         "kind": "app",
         "app_name": "Splunk_TA_Talos_Intelligence",
-        "label": "`splunk-app-install` Cisco Talos intelligence",
+        "label": "`cisco-talos-intelligence-setup`",
         "cloud_install_path": "ACS Splunkbase for supported ES Cloud stacks",
-        "cloud_config_path": "Finish setup in the supported Enterprise Security / SOAR workflow",
-        "notes": "Install-only route from `cisco-product-setup`; Splunk documents this app for Splunk Enterprise Security Cloud."
+        "cloud_config_path": "Validate ES Cloud support posture, service-account fingerprint, get_talos_enrichment capability, alert actions, and threatlist state",
+        "notes": "Enterprise Security Cloud-first integration. Service account certificate/private key is normally Splunk Cloud-provisioned and remains file-based for diagnostics only."
       },
       {
         "kind": "app",
@@ -355,6 +363,15 @@
       },
       {
         "kind": "workflow",
+        "skill": "splunk-cloud-data-manager-setup",
+        "label": "`splunk-cloud-data-manager-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; Data Manager is a native Splunk Cloud Platform onboarding experience for cloud-service data",
+        "cloud_config_path": "Render-first readiness, doctor, validation, and supported artifact apply workflow for Data Manager AWS CloudFormation/StackSets, Azure ARM, GCP Terraform templates, CrowdStrike FDR handoffs, HEC/index checks, health searches, and provider prerequisite guardrails",
+        "notes": "Covers AWS, Azure, GCP, and CrowdStrike Data Manager onboarding without claiming private Data Manager APIs or Terraform CRUD for Data Manager inputs. Input creation remains a Data Manager UI handoff; splunk/scp Terraform is adjacent only for supported prerequisites such as indexes, HEC tokens, roles, and allowlists."
+      },
+      {
+        "kind": "workflow",
         "skill": "splunk-federated-search-setup",
         "label": "`splunk-federated-search-setup`",
         "splunkbase_id": "N/A",
@@ -430,6 +447,15 @@
         "cloud_install_path": "No Splunk Cloud app install; OTel Collector runtime is rendered for customer-managed Kubernetes clusters or Linux hosts",
         "cloud_config_path": "Rendered Helm values, Kubernetes secret helpers, Linux installer wrappers, and optional HEC token handoff scripts using file-based tokens",
         "notes": "External OpenTelemetry Collector workflow for Observability metrics, traces, profiling, Kubernetes events, discovery, auto-instrumentation, and optional Splunk Platform HEC logs with splunk-hec-service-setup handoff helpers."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-observability-ai-agent-monitoring-setup",
+        "label": "`splunk-observability-ai-agent-monitoring-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; AI Agent Monitoring uses customer-managed Python instrumentation, the Splunk OTel Collector, Splunk Platform HEC, and Log Observer Connect prerequisites",
+        "cloud_config_path": "Rendered GenAI package/runtime env plans, histogram collector overlays, HEC and Log Observer Connect handoffs, dashboard/detector specs, and an explicit coverage report for every AI Agent Monitoring and AI Infrastructure Monitoring surface",
+        "notes": "Render-first orchestration skill for Splunk AI Agent Monitoring. Delegates collector apply to splunk-observability-otel-collector-setup, HEC apply to splunk-hec-service-setup, LOC apply to splunk-observability-cloud-integration-setup, dashboards to splunk-observability-dashboard-builder, detectors to splunk-observability-native-ops, and AI infrastructure products to dedicated skills where available. UI-only AI Agent Monitoring connection/index selection remains deeplink/handoff."
       },
       {
         "kind": "workflow",
@@ -688,6 +714,58 @@
       "notes": "Meraki collector app with dashboard alignment; place on the search tier or a heavy forwarder."
     },
     {
+      "skill": "cisco-webex-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-head Webex REST API collection and dashboard setup for the Webex Add-on plus Webex App."
+    },
+    {
+      "skill": "cisco-ucs-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Cisco UCS Manager API collection through Splunk_TA_cisco-ucs server/template/task handlers."
+    },
+    {
+      "skill": "cisco-secure-email-web-gateway-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Cisco ESA/WSA parser and ingestion-handoff workflow. Use SC4S or file monitors for collection; install TAs on search and parsing tiers."
+    },
+    {
+      "skill": "cisco-talos-intelligence-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "indexer"
+      ],
+      "notes": "Enterprise Security Cloud-first Talos reputation integration with custom REST handler, adaptive response actions, and service-account readiness validation."
+    },
+    {
       "skill": "cisco-product-setup",
       "role_support": {
         "search-tier": "supported",
@@ -764,6 +842,22 @@
         "external-collector"
       ],
       "notes": "External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup."
+    },
+    {
+      "skill": "splunk-observability-ai-agent-monitoring-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "Render-first orchestration for Splunk AI Agent Monitoring and AI Infrastructure Monitoring. Requires external collector runtime for traces/metrics/logs, Splunk Platform HEC and Log Observer Connect prerequisites for evaluation/content event correlation, and delegates dashboards/detectors to native Observability skills. UI-only AI Agent Monitoring connection/index selection remains a deeplink handoff."
     },
     {
       "skill": "splunk-observability-database-monitoring-setup",
@@ -931,6 +1025,21 @@
         "external-collector"
       ],
       "notes": "Admin diagnosis and routing workflow for Splunk Cloud and self-managed Enterprise. Renders local doctor/fix/coverage packets and delegates specialized remediation to existing skills; it is not a Splunk runtime package."
+    },
+    {
+      "skill": "splunk-cloud-data-manager-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "external-collector"
+      ],
+      "notes": "Splunk Cloud Platform Data Manager readiness and provider-artifact workflow. Requires the Splunk Cloud primary search head for Data Manager UI/readiness and supports customer-managed cloud-provider artifacts for AWS CloudFormation/StackSets, Azure ARM, GCP Terraform, and CrowdStrike FDR S3/SQS handoffs."
     },
     {
       "skill": "splunk-federated-search-setup",
@@ -1690,7 +1799,7 @@
       "latest_verified_date": "March 18, 2026"
     },
     {
-      "skill": "splunk-app-install",
+      "skill": "cisco-webex-setup",
       "app_name": "ta_cisco_webex_add_on_for_splunk",
       "splunkbase_id": "8365",
       "label": "Webex Add-on for Splunk",
@@ -1699,9 +1808,9 @@
         "webex-add-on-for-splunk_*"
       ],
       "role_support": {
-        "search-tier": "supported",
+        "search-tier": "required",
         "indexer": "none",
-        "heavy-forwarder": "supported",
+        "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
@@ -1717,7 +1826,34 @@
       "latest_verified_date": "April 8, 2026"
     },
     {
-      "skill": "splunk-app-install",
+      "skill": "cisco-webex-setup",
+      "app_name": "cisco_webex_meetings_app_for_splunk",
+      "splunkbase_id": "4992",
+      "label": "Webex App for Splunk",
+      "license_ack_url": "https://www.apache.org/licenses/LICENSE-2.0",
+      "package_patterns": [
+        "webex-app-for-splunk_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "2.0.0",
+      "latest_verified_date": "April 30, 2026"
+    },
+    {
+      "skill": "cisco-ucs-ta-setup",
       "app_name": "Splunk_TA_cisco-ucs",
       "splunkbase_id": "2731",
       "label": "Splunk Add-on for Cisco UCS",
@@ -1744,7 +1880,7 @@
       "latest_verified_date": "April 25, 2025"
     },
     {
-      "skill": "splunk-app-install",
+      "skill": "cisco-secure-email-web-gateway-setup",
       "app_name": "Splunk_TA_cisco-esa",
       "splunkbase_id": "1761",
       "label": "Splunk Add-on for Cisco ESA",
@@ -1771,7 +1907,7 @@
       "latest_verified_date": "July 30, 2024"
     },
     {
-      "skill": "splunk-app-install",
+      "skill": "cisco-secure-email-web-gateway-setup",
       "app_name": "Splunk_TA_cisco-wsa",
       "splunkbase_id": "1747",
       "label": "Splunk Add-on for Cisco WSA",
@@ -1798,7 +1934,7 @@
       "latest_verified_date": "December 13, 2024"
     },
     {
-      "skill": "splunk-app-install",
+      "skill": "cisco-talos-intelligence-setup",
       "app_name": "Splunk_TA_Talos_Intelligence",
       "splunkbase_id": "7557",
       "label": "Cisco Talos Intelligence for Enterprise Security Cloud",
@@ -1808,16 +1944,16 @@
       ],
       "role_support": {
         "search-tier": "required",
-        "indexer": "none",
+        "indexer": "supported",
         "heavy-forwarder": "none",
         "universal-forwarder": "none",
         "external-collector": "none"
       },
       "capabilities": {
-        "needs_custom_rest": false,
+        "needs_custom_rest": true,
         "needs_search_time_objects": true,
         "needs_kvstore": false,
-        "needs_python_runtime": false,
+        "needs_python_runtime": true,
         "needs_packet_capture": false,
         "uf_safe": false
       },

@@ -23,6 +23,7 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "3449",
     "3471",
     "4147",
+    "4992",
     "5234",
     "5238",
     "5247",
@@ -310,7 +311,7 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             secure_access_addon_entry.get("package_patterns", []),
         )
 
-    def test_public_cisco_install_only_registry_entries_are_present(self):
+    def test_public_cisco_first_class_registry_entries_are_present(self):
         registry = json.loads(
             (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
         )
@@ -320,22 +321,29 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         }
 
         expected = {
-            "8365": ("ta_cisco_webex_add_on_for_splunk", "webex-add-on-for-splunk_*"),
-            "2731": ("Splunk_TA_cisco-ucs", "splunk-add-on-for-cisco-ucs_*"),
-            "1761": ("Splunk_TA_cisco-esa", "splunk-add-on-for-cisco-esa_*"),
-            "1747": ("Splunk_TA_cisco-wsa", "splunk-add-on-for-cisco-wsa_*"),
+            "8365": ("cisco-webex-setup", "ta_cisco_webex_add_on_for_splunk", "webex-add-on-for-splunk_*"),
+            "4992": ("cisco-webex-setup", "cisco_webex_meetings_app_for_splunk", "webex-app-for-splunk_*"),
+            "2731": ("cisco-ucs-ta-setup", "Splunk_TA_cisco-ucs", "splunk-add-on-for-cisco-ucs_*"),
+            "1761": ("cisco-secure-email-web-gateway-setup", "Splunk_TA_cisco-esa", "splunk-add-on-for-cisco-esa_*"),
+            "1747": ("cisco-secure-email-web-gateway-setup", "Splunk_TA_cisco-wsa", "splunk-add-on-for-cisco-wsa_*"),
             "7557": (
+                "cisco-talos-intelligence-setup",
                 "Splunk_TA_Talos_Intelligence",
                 "cisco-talos-intelligence-for-enterprise-security-cloud_*",
             ),
         }
 
-        for app_id, (app_name, package_pattern) in expected.items():
+        for app_id, (skill, app_name, package_pattern) in expected.items():
             with self.subTest(app_id=app_id):
                 entry = apps_by_id[app_id]
-                self.assertEqual(entry["skill"], "splunk-app-install")
+                self.assertEqual(entry["skill"], skill)
                 self.assertEqual(entry["app_name"], app_name)
                 self.assertIn(package_pattern, entry.get("package_patterns", []))
+
+        talos_entry = apps_by_id["7557"]
+        self.assertEqual(talos_entry["role_support"]["indexer"], "supported")
+        self.assertTrue(talos_entry["capabilities"]["needs_custom_rest"])
+        self.assertTrue(talos_entry["capabilities"]["needs_python_runtime"])
 
     def test_scan_registry_entry_is_present(self):
         registry = json.loads(

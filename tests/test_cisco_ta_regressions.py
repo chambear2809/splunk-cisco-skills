@@ -24,6 +24,48 @@ from tests.regression_helpers import (
 
 
 class CiscoTARegressionTests(ShellScriptRegressionBase):
+    def test_new_cisco_helpers_reject_secret_equals_without_echoing_value(self):
+        secret = "SECRET_SHOULD_NOT_LEAK"
+        cases = [
+            (
+                "skills/cisco-webex-setup/scripts/configure_account.sh",
+                "--client-secret",
+                "--client-secret-file",
+            ),
+            (
+                "skills/cisco-webex-setup/scripts/configure_account.sh",
+                "--access-token",
+                "--access-token-file",
+            ),
+            (
+                "skills/cisco-webex-setup/scripts/configure_account.sh",
+                "--refresh-token",
+                "--refresh-token-file",
+            ),
+            (
+                "skills/cisco-webex-setup/scripts/configure_account.sh",
+                "--proxy-password",
+                "--proxy-password-file",
+            ),
+            (
+                "skills/cisco-ucs-ta-setup/scripts/configure_server.sh",
+                "--password",
+                "--password-file",
+            ),
+            (
+                "skills/cisco-talos-intelligence-setup/scripts/configure_service_account.sh",
+                "--service-account",
+                "--service-account-file",
+            ),
+        ]
+        for script, flag, file_flag in cases:
+            with self.subTest(script=script, flag=flag):
+                result = self.run_script_no_env(script, f"{flag}={secret}")
+                output = result.stdout + result.stderr
+                self.assertNotEqual(result.returncode, 0)
+                self.assertNotIn(secret, output)
+                self.assertIn(file_flag, output)
+
     def test_security_cloud_smoke_flow(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

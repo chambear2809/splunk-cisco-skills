@@ -1,0 +1,151 @@
+# Splunk Cloud Data Manager setup worksheet.
+# Keep this file non-secret. Use *_file fields for secret material.
+
+api_version: splunk-cloud-data-manager-setup/v1
+name: example-data-manager-onboarding
+
+splunk_cloud:
+  stack: example-stack
+  experience: victoria
+  region: us-east-1
+  primary_search_head: true
+  roles:
+    - sc_admin
+  custom_indexes:
+    - cloud
+    - cloud_security
+  service_account_user: svc_splunk_data_manager
+
+data_manager:
+  manual_version: "1.16"
+  input_limit: 5000
+  planned_input_count: 12
+  create_inputs_via_ui: true
+  ui_base_url: https://example-stack.splunkcloud.com/en-US/app/splunk_data_manager
+  existing_input_inventory_file: ""
+
+hec:
+  enabled: true
+  validate_tokens: true
+  ack_required_sources:
+    - CloudTrail
+    - GuardDuty
+    - SecurityHub
+    - IAM Access Analyzer
+    - CloudWatch Logs
+
+indexes:
+  required:
+    - cloud
+    - cloud_security
+  validate_access: true
+
+aws:
+  enabled: true
+  account_mode: single
+  control_account_id: "111111111111"
+  data_account_ids:
+    - "111111111111"
+  regions:
+    - us-east-1
+  source_families:
+    - cloudtrail
+    - cloudwatch_logs
+    - security_hub
+    - guardduty
+    - s3
+    - s3_promote
+  cloudformation_template_path: ""
+  stackset_template_path: ""
+  iam_roles_region: us-east-1
+  organizations:
+    enabled: false
+    organizational_unit_ids: []
+    checked_for_overlap: false
+  custom_logs:
+    enabled: true
+    custom_sourcetype_suffix: app_json
+    log_group_names: []
+  custom_s3_source_types:
+    enabled: true
+    props_conf_path: ""
+    transforms_conf_path: ""
+  s3_promote:
+    enabled: true
+    historical_index: cloud_history
+    ingest_actions_reviewed: false
+    ingest_processor_reviewed: false
+
+azure:
+  enabled: true
+  tenant_id: "00000000-0000-0000-0000-000000000000"
+  client_id: "00000000-0000-0000-0000-000000000000"
+  client_secret_file: /tmp/azure_client_secret
+  subscription_ids:
+    - "00000000-0000-0000-0000-000000000000"
+  event_hub_subscription_id: "00000000-0000-0000-0000-000000000000"
+  event_hub_region: eastus
+  arm_template_path: ""
+  function_runtime_minimum: "4.x"
+  mscs_migration:
+    enabled: true
+    export_json_path: ""
+    mscs_min_version: "5.4.0"
+    inputs_inactive: false
+    health_ready: false
+    duplicate_migration_checked: false
+
+gcp:
+  enabled: true
+  project_id: example-project
+  dataflow_region: us-central1
+  gcs_bucket: example-data-manager-tf-state
+  json_key_file: /tmp/gcp_data_manager_key.json
+  terraform_template_dir: ""
+  scopes:
+    projects:
+      - example-project
+    folders: []
+    organization: ""
+  overlap_checked: false
+  edit_delete_requires_terraform: true
+
+crowdstrike:
+  enabled: true
+  region: US-1
+  aws_access_key_id_file: /tmp/crowdstrike_fdr_access_key_id
+  aws_secret_access_key_file: /tmp/crowdstrike_fdr_secret_access_key
+  sqs_queue_url: https://sqs.us-west-1.amazonaws.com/123456789012/example-fdr
+  visibility_timeout_seconds: 300
+  notification_cutoff_time_utc: ""
+  default_index: cloud_security
+  event_types:
+    - sensor
+    - external
+    - ztha
+    - aidmaster
+    - managedassets
+  single_account_confirmed: true
+
+iac:
+  apply_enabled: false
+  aws_cloudformation_apply_enabled: false
+  azure_arm_apply_enabled: false
+  gcp_terraform_apply_enabled: false
+  gcp_terraform_destroy_enabled: false
+  splunk_scp_provider_adjacent_only: true
+
+validation:
+  run_splunk_readiness: true
+  run_cloud_artifact_validation: true
+  run_health_searches: true
+
+migration:
+  azure_event_hubs_from_mscs: true
+  duplicate_event_hub_migration_checked: false
+
+handoffs:
+  splunk_hec_service_setup: true
+  splunk_app_install_for_addons: true
+  splunk_cloud_acs_allowlist_setup: true
+  splunk_admin_doctor: true

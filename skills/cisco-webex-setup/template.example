@@ -1,0 +1,50 @@
+# Cisco Webex setup intake template.
+# Copy to template.local and fill non-secret values only.
+
+[account]
+name = WEBEX_PROD
+endpoint = webexapis.com
+client_id =
+redirect_url =
+scope = meeting:admin_schedule_read spark-admin:people_read
+is_gov_account = false
+gov_api_reference_link =
+instance_url =
+loglevel =
+
+[proxy]
+proxy_enabled =
+proxy_type =
+proxy_url =
+proxy_port =
+proxy_username =
+proxy_rdns =
+
+[secret_files]
+client_secret = /tmp/webex_client_secret
+access_token =
+refresh_token =
+proxy_password =
+
+[indexes]
+meetings_index = wx
+calling_index = wxc
+contact_center_index = wxcc
+
+[inputs]
+auto_inputs = false
+input_type = core
+start_time =
+end_time =
+interval = 3600
+site_url =
+account_region =
+locations =
+webex_endpoint =
+webex_base_url = webexapis.com
+method = GET
+query_params =
+request_body =
+org_id =
+webex_contact_center_region =
+query_template = AAR

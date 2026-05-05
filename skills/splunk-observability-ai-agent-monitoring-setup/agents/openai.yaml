@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk O11y AI Agent Monitoring Setup"
+  short_description: "Plan Splunk AI agent monitoring safely."
+  default_prompt: "Use $splunk-observability-ai-agent-monitoring-setup to render and validate a Splunk AI Agent Monitoring setup plan."
+
+policy:
+  allow_implicit_invocation: true

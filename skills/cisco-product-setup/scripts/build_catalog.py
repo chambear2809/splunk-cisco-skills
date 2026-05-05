@@ -32,6 +32,10 @@ TEMPLATE_PATHS = {
     "thousandeyes": "skills/cisco-thousandeyes-setup/template.example",
     "appdynamics": "skills/cisco-appdynamics-setup/template.example",
     "spaces": "skills/cisco-spaces-setup/template.example",
+    "webex": "skills/cisco-webex-setup/template.example",
+    "ucs_ta": "skills/cisco-ucs-ta-setup/template.example",
+    "secure_email_web_gateway": "skills/cisco-secure-email-web-gateway-setup/template.example",
+    "talos_intelligence": "skills/cisco-talos-intelligence-setup/template.example",
 }
 
 DC_ACCOUNT_TEMPLATE_SECTION = {
@@ -217,6 +221,11 @@ def load_scan_products(scan_package: Path) -> list[dict]:
         display_name = parser.get(section, "display_name", fallback=section).strip()
         aliases = split_csv(parser.get(section, "aliases", fallback=""))
         keywords = split_csv(parser.get(section, "keywords", fallback=""))
+        addon = parser.get(section, "addon", fallback="").strip()
+        addon_label = parser.get(section, "addon_label", fallback="").strip()
+        app_viz = parser.get(section, "app_viz", fallback="").strip()
+        app_viz_label = parser.get(section, "app_viz_label", fallback="").strip()
+        app_viz_2 = parser.get(section, "app_viz_2", fallback="").strip()
         search_terms = unique_ordered(
             [
                 section,
@@ -224,6 +233,14 @@ def load_scan_products(scan_package: Path) -> list[dict]:
                 *extract_display_aliases(display_name),
                 *aliases,
                 *keywords,
+                addon,
+                addon.replace("_", " ").replace("-", " "),
+                addon_label,
+                app_viz,
+                app_viz.replace("_", " ").replace("-", " "),
+                app_viz_label,
+                app_viz_2,
+                app_viz_2.replace("_", " ").replace("-", " "),
             ]
         )
 
@@ -236,13 +253,13 @@ def load_scan_products(scan_package: Path) -> list[dict]:
                 "subcategory": parser.get(section, "subcategory", fallback="").strip(),
                 "description": parser.get(section, "description", fallback="").strip(),
                 "value_proposition": parser.get(section, "value_proposition", fallback="").strip(),
-                "addon": parser.get(section, "addon", fallback="").strip(),
+                "addon": addon,
                 "addon_uid": parser.get(section, "addon_uid", fallback="").strip(),
-                "addon_label": parser.get(section, "addon_label", fallback="").strip(),
-                "app_viz": parser.get(section, "app_viz", fallback="").strip(),
+                "addon_label": addon_label,
+                "app_viz": app_viz,
                 "app_viz_uid": parser.get(section, "app_viz_uid", fallback="").strip(),
-                "app_viz_label": parser.get(section, "app_viz_label", fallback="").strip(),
-                "app_viz_2": parser.get(section, "app_viz_2", fallback="").strip(),
+                "app_viz_label": app_viz_label,
+                "app_viz_2": app_viz_2,
                 "prereq_apps": split_csv(parser.get(section, "prereq_apps", fallback="")),
                 "prereq_labels": split_csv(parser.get(section, "prereq_labels", fallback="")),
                 "dashboards": split_csv(parser.get(section, "dashboards", fallback="")),
@@ -731,6 +748,206 @@ def build_spaces_route(override: dict) -> dict:
     }
 
 
+def build_webex_route(override: dict) -> dict:
+    return {
+        "route_type": "webex",
+        "primary_skill": "cisco-webex-setup",
+        "companion_skills": [],
+        "install_apps": ["ta_cisco_webex_add_on_for_splunk", "cisco_webex_meetings_app_for_splunk"],
+        "template_paths": [TEMPLATE_PATHS["webex"]],
+        "template_checks": merge_template_checks(
+            ini_section_check("account"),
+            override.get("template_checks"),
+        ),
+        "required_non_secret_keys": ["name", "client_id", "scope"],
+        "optional_non_secret_keys": [
+            "account_region",
+            "auto_inputs",
+            "calling_index",
+            "contact_center_index",
+            "endpoint",
+            "end_time",
+            "gov_api_reference_link",
+            "input_type",
+            "instance_url",
+            "interval",
+            "is_gov_account",
+            "locations",
+            "loglevel",
+            "meetings_index",
+            "method",
+            "org_id",
+            "proxy_enabled",
+            "proxy_port",
+            "proxy_rdns",
+            "proxy_type",
+            "proxy_url",
+            "proxy_username",
+            "query_params",
+            "query_template",
+            "request_body",
+            "redirect_url",
+            "site_url",
+            "start_time",
+            "webex_base_url",
+            "webex_contact_center_region",
+            "webex_endpoint",
+        ],
+        "accepted_non_secret_keys": [
+            "account_region",
+            "auto_inputs",
+            "calling_index",
+            "client_id",
+            "contact_center_index",
+            "endpoint",
+            "end_time",
+            "gov_api_reference_link",
+            "input_type",
+            "instance_url",
+            "interval",
+            "is_gov_account",
+            "locations",
+            "loglevel",
+            "meetings_index",
+            "method",
+            "name",
+            "org_id",
+            "proxy_enabled",
+            "proxy_port",
+            "proxy_rdns",
+            "proxy_type",
+            "proxy_url",
+            "proxy_username",
+            "query_params",
+            "query_template",
+            "request_body",
+            "redirect_url",
+            "scope",
+            "site_url",
+            "start_time",
+            "webex_base_url",
+            "webex_contact_center_region",
+            "webex_endpoint",
+        ],
+        "secret_keys": ["client_secret", "access_token", "refresh_token", "proxy_password"],
+        "required_secret_keys": ["client_secret"],
+        "route": {
+            "default_name": "WEBEX_PROD",
+            "default_meetings_index": "wx",
+            "default_calling_index": "wxc",
+            "default_contact_center_index": "wxcc",
+            "default_input_type": "core",
+            "default_endpoint": "webexapis.com",
+        },
+    }
+
+
+def build_ucs_ta_route(override: dict) -> dict:
+    return {
+        "route_type": "ucs_ta",
+        "primary_skill": "cisco-ucs-ta-setup",
+        "companion_skills": [],
+        "install_apps": ["Splunk_TA_cisco-ucs"],
+        "template_paths": [TEMPLATE_PATHS["ucs_ta"]],
+        "template_checks": merge_template_checks(
+            ini_section_check("server"),
+            override.get("template_checks"),
+        ),
+        "required_non_secret_keys": ["name", "server_url", "account_name"],
+        "optional_non_secret_keys": [
+            "create_default_task",
+            "description",
+            "disable_ssl_verification",
+            "index",
+            "interval",
+            "sourcetype",
+            "task_name",
+            "templates",
+        ],
+        "accepted_non_secret_keys": [
+            "account_name",
+            "create_default_task",
+            "description",
+            "disable_ssl_verification",
+            "index",
+            "interval",
+            "name",
+            "server_url",
+            "sourcetype",
+            "task_name",
+            "templates",
+        ],
+        "secret_keys": ["account_password"],
+        "required_secret_keys": ["account_password"],
+        "route": {
+            "default_name": "UCS_PROD",
+            "default_index": "cisco_ucs",
+            "default_interval": "300",
+            "default_sourcetype": "cisco:ucs",
+            "default_templates": "UCS_Fault,UCS_Inventory,UCS_Performance",
+        },
+    }
+
+
+def build_secure_email_web_gateway_route(product: dict, override: dict) -> dict:
+    product_id = product.get("id", "")
+    if product_id == "cisco_esa":
+        product_key = "esa"
+        install_apps = ["Splunk_TA_cisco-esa"]
+    elif product_id == "cisco_wsa":
+        product_key = "wsa"
+        install_apps = ["Splunk_TA_cisco-wsa"]
+    else:
+        product_key = override.get("product", "both")
+        install_apps = list(override.get("install_apps", ["Splunk_TA_cisco-esa", "Splunk_TA_cisco-wsa"]))
+    return {
+        "route_type": "secure_email_web_gateway",
+        "primary_skill": "cisco-secure-email-web-gateway-setup",
+        "companion_skills": ["splunk-connect-for-syslog-setup"],
+        "install_apps": install_apps,
+        "template_paths": [TEMPLATE_PATHS["secure_email_web_gateway"]],
+        "template_checks": merge_template_checks(
+            ini_section_check("products"),
+            override.get("template_checks"),
+        ),
+        "required_non_secret_keys": [],
+        "optional_non_secret_keys": ["esa_index", "wsa_index", "render_handoff"],
+        "accepted_non_secret_keys": ["esa_index", "render_handoff", "wsa_index"],
+        "secret_keys": [],
+        "required_secret_keys": [],
+        "route": {
+            "product": product_key,
+            "default_esa_index": "email",
+            "default_wsa_index": "netproxy",
+            "handoff": "Use splunk-connect-for-syslog-setup for SC4S runtime deployment; this route prepares Splunk-side indexes, macros, parser packages, and optional handoff snippets.",
+        },
+    }
+
+
+def build_talos_intelligence_route(override: dict) -> dict:
+    return {
+        "route_type": "talos_intelligence",
+        "primary_skill": "cisco-talos-intelligence-setup",
+        "companion_skills": ["splunk-enterprise-security-config"],
+        "install_apps": ["Splunk_TA_Talos_Intelligence"],
+        "template_paths": [TEMPLATE_PATHS["talos_intelligence"]],
+        "template_checks": merge_template_checks(
+            ini_section_check("deployment"),
+            override.get("template_checks"),
+        ),
+        "required_non_secret_keys": [],
+        "optional_non_secret_keys": ["enable_ip_blacklist", "index"],
+        "accepted_non_secret_keys": ["enable_ip_blacklist", "index"],
+        "secret_keys": ["service_account"],
+        "required_secret_keys": [],
+        "route": {
+            "default_index": "talos_intelligence",
+            "default_enable_ip_blacklist": "false",
+            "support_posture": "Enterprise Security Cloud 7.3.2+; non-FedRAMP; service account material is normally Splunk Cloud-provisioned.",
+        },
+    }
+
+
 def build_route(product: dict, override: dict, security_products: dict) -> dict:
     route_type = override["route_type"]
     if route_type == "security_cloud_product":
@@ -757,6 +974,14 @@ def build_route(product: dict, override: dict, security_products: dict) -> dict:
         return build_appdynamics_route(override)
     if route_type == "spaces":
         return build_spaces_route(override)
+    if route_type == "webex":
+        return build_webex_route(override)
+    if route_type == "ucs_ta":
+        return build_ucs_ta_route(override)
+    if route_type == "secure_email_web_gateway":
+        return build_secure_email_web_gateway_route(product, override)
+    if route_type == "talos_intelligence":
+        return build_talos_intelligence_route(override)
     raise ValueError(f"Unknown route_type for {product['id']}: {route_type}")
 
 

@@ -740,6 +740,21 @@ prepare_effective_route() {
             EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
             append_unique_required_secret "activation_token"
             ;;
+        webex)
+            EFFECTIVE_DEFAULT_NAME="$(product_field route.default_name)"
+            append_unique_required_secret "client_secret"
+            ;;
+        ucs_ta)
+            EFFECTIVE_DEFAULT_NAME="$(product_field route.default_name)"
+            EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
+            append_unique_required_secret "account_password"
+            ;;
+        secure_email_web_gateway)
+            EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_esa_index)"
+            ;;
+        talos_intelligence)
+            EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
+            ;;
         appdynamics)
             EFFECTIVE_DEFAULT_NAME="$(product_field route.default_name)"
             EFFECTIVE_DEFAULT_INDEX="$(product_field route.default_index)"
@@ -805,6 +820,86 @@ effective_spaces_index() {
     fi
 }
 
+effective_webex_meetings_index() {
+    local value
+    value="$(lookup_user_value "meetings_index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_meetings_index)"
+    fi
+}
+
+effective_webex_calling_index() {
+    local value
+    value="$(lookup_user_value "calling_index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_calling_index)"
+    fi
+}
+
+effective_webex_contact_center_index() {
+    local value
+    value="$(lookup_user_value "contact_center_index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_contact_center_index)"
+    fi
+}
+
+effective_webex_input_type() {
+    local value
+    value="$(lookup_user_value "input_type" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_input_type)"
+    fi
+}
+
+effective_ucs_index() {
+    local value
+    value="$(lookup_user_value "index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "${EFFECTIVE_DEFAULT_INDEX:-cisco_ucs}"
+    fi
+}
+
+effective_esa_index() {
+    local value
+    value="$(lookup_user_value "esa_index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_esa_index)"
+    fi
+}
+
+effective_wsa_index() {
+    local value
+    value="$(lookup_user_value "wsa_index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "$(product_field route.default_wsa_index)"
+    fi
+}
+
+effective_talos_index() {
+    local value
+    value="$(lookup_user_value "index" || true)"
+    if [[ -n "${value}" ]]; then
+        printf '%s' "${value}"
+    else
+        printf '%s' "${EFFECTIVE_DEFAULT_INDEX:-talos_intelligence}"
+    fi
+}
+
 effective_spaces_auto_inputs() {
     local value
     value="$(lookup_user_value "auto_inputs" || true)"
@@ -843,7 +938,7 @@ effective_auto_inputs() {
 }
 
 check_missing_configuration_inputs() {
-    local key secret_key secret_status missing=()
+    local key secret_key secret_status input_type missing=()
 
     prepare_effective_route
 
@@ -874,6 +969,27 @@ check_missing_configuration_inputs() {
                 *) missing+=("${secret_key} (secret-file ${secret_status})") ;;
             esac
         done
+    fi
+
+    if [[ "${ROUTE_TYPE}" == "webex" ]] && effective_auto_inputs; then
+        input_type="$(effective_webex_input_type)"
+        case "${input_type}" in
+            core|meetings_summary_report|admin_audit_events|security_audit_events|meeting_qualities|detailed_call_history|contact_center_search)
+                has_user_value "start_time" || missing+=("start_time")
+                ;;
+        esac
+        case "${input_type}" in
+            core|meetings_summary_report)
+                has_user_value "site_url" || missing+=("site_url")
+                ;;
+        esac
+        if [[ "${input_type}" == "generic_endpoint" ]] && ! has_user_value "webex_endpoint"; then
+            missing+=("webex_endpoint")
+        fi
+        if [[ "${input_type}" == "contact_center_search" ]]; then
+            has_user_value "org_id" || missing+=("org_id")
+            has_user_value "webex_contact_center_region" || missing+=("webex_contact_center_region")
+        fi
     fi
 
     if [[ -n "${missing[0]+set}" ]]; then
@@ -1023,6 +1139,31 @@ print_command_plan() {
             echo "  - skills/cisco-spaces-setup/scripts/setup.sh"
             echo "  - skills/cisco-spaces-setup/scripts/configure_stream.sh"
             echo "  - skills/cisco-spaces-setup/scripts/validate.sh"
+            ;;
+        webex)
+            echo "Workflow scripts:"
+            echo "  - skills/cisco-webex-setup/scripts/setup.sh"
+            echo "  - skills/cisco-webex-setup/scripts/configure_account.sh"
+            echo "  - skills/cisco-webex-setup/scripts/configure_inputs.sh"
+            echo "  - skills/cisco-webex-setup/scripts/validate.sh"
+            ;;
+        ucs_ta)
+            echo "Workflow scripts:"
+            echo "  - skills/cisco-ucs-ta-setup/scripts/setup.sh"
+            echo "  - skills/cisco-ucs-ta-setup/scripts/configure_server.sh"
+            echo "  - skills/cisco-ucs-ta-setup/scripts/configure_task.sh"
+            echo "  - skills/cisco-ucs-ta-setup/scripts/validate.sh"
+            ;;
+        secure_email_web_gateway)
+            echo "Workflow scripts:"
+            echo "  - skills/cisco-secure-email-web-gateway-setup/scripts/setup.sh"
+            echo "  - skills/cisco-secure-email-web-gateway-setup/scripts/render_ingestion_assets.sh"
+            echo "  - skills/cisco-secure-email-web-gateway-setup/scripts/validate.sh"
+            ;;
+        talos_intelligence)
+            echo "Workflow scripts:"
+            echo "  - skills/cisco-talos-intelligence-setup/scripts/setup.sh"
+            echo "  - skills/cisco-talos-intelligence-setup/scripts/validate.sh"
             ;;
     esac
 }
@@ -1236,6 +1377,27 @@ workflow_scripts_by_route = {
         "skills/cisco-spaces-setup/scripts/configure_stream.sh",
         "skills/cisco-spaces-setup/scripts/validate.sh",
     ],
+    "webex": [
+        "skills/cisco-webex-setup/scripts/setup.sh",
+        "skills/cisco-webex-setup/scripts/configure_account.sh",
+        "skills/cisco-webex-setup/scripts/configure_inputs.sh",
+        "skills/cisco-webex-setup/scripts/validate.sh",
+    ],
+    "ucs_ta": [
+        "skills/cisco-ucs-ta-setup/scripts/setup.sh",
+        "skills/cisco-ucs-ta-setup/scripts/configure_server.sh",
+        "skills/cisco-ucs-ta-setup/scripts/configure_task.sh",
+        "skills/cisco-ucs-ta-setup/scripts/validate.sh",
+    ],
+    "secure_email_web_gateway": [
+        "skills/cisco-secure-email-web-gateway-setup/scripts/setup.sh",
+        "skills/cisco-secure-email-web-gateway-setup/scripts/render_ingestion_assets.sh",
+        "skills/cisco-secure-email-web-gateway-setup/scripts/validate.sh",
+    ],
+    "talos_intelligence": [
+        "skills/cisco-talos-intelligence-setup/scripts/setup.sh",
+        "skills/cisco-talos-intelligence-setup/scripts/validate.sh",
+    ],
 }
 workflow_scripts = workflow_scripts_by_route.get(route_type, [])
 if route_type == "workflow_handoff":
@@ -1336,6 +1498,9 @@ install_app_by_name() {
 
 run_install_phase() {
     local app_name
+    if [[ "${ROUTE_TYPE}" == "talos_intelligence" ]]; then
+        bash "${SCRIPT_DIR}/../../cisco-talos-intelligence-setup/scripts/setup.sh" --support-preflight-only
+    fi
     while IFS= read -r app_name || [[ -n "${app_name}" ]]; do
         [[ -n "${app_name}" ]] || continue
         install_app_by_name "${app_name}"
@@ -1660,6 +1825,167 @@ run_spaces_configure() {
     "${cmd[@]}"
 }
 
+webex_index_for_input_type() {
+    local input_type="$1" meetings_index="$2" calling_index="$3" contact_center_index="$4"
+    case "${input_type}" in
+        detailed_call_history) printf '%s' "${calling_index}" ;;
+        contact_center_search) printf '%s' "${contact_center_index}" ;;
+        *) printf '%s' "${meetings_index}" ;;
+    esac
+}
+
+append_webex_input_options() {
+    has_user_value "interval" && cmd+=(--interval "$(lookup_user_value "interval")")
+    has_user_value "start_time" && cmd+=(--start-time "$(lookup_user_value "start_time")")
+    has_user_value "end_time" && cmd+=(--end-time "$(lookup_user_value "end_time")")
+    has_user_value "site_url" && cmd+=(--site-url "$(lookup_user_value "site_url")")
+    has_user_value "account_region" && cmd+=(--account-region "$(lookup_user_value "account_region")")
+    has_user_value "locations" && cmd+=(--locations "$(lookup_user_value "locations")")
+    has_user_value "webex_endpoint" && cmd+=(--webex-endpoint "$(lookup_user_value "webex_endpoint")")
+    has_user_value "webex_base_url" && cmd+=(--webex-base-url "$(lookup_user_value "webex_base_url")")
+    has_user_value "method" && cmd+=(--method "$(lookup_user_value "method")")
+    has_user_value "query_params" && cmd+=(--query-params "$(lookup_user_value "query_params")")
+    has_user_value "request_body" && cmd+=(--request-body "$(lookup_user_value "request_body")")
+    has_user_value "org_id" && cmd+=(--org-id "$(lookup_user_value "org_id")")
+    has_user_value "webex_contact_center_region" && cmd+=(--webex-contact-center-region "$(lookup_user_value "webex_contact_center_region")")
+    has_user_value "query_template" && cmd+=(--query-template "$(lookup_user_value "query_template")")
+}
+
+run_webex_configure() {
+    local name endpoint scope meetings_index calling_index contact_center_index cmd input_type input_index
+    name="$(effective_name)"
+    endpoint="$(lookup_user_value "endpoint" || true)"
+    [[ -z "${endpoint}" ]] && endpoint="$(product_field route.default_endpoint)"
+    scope="$(lookup_user_value "scope")"
+    meetings_index="$(effective_webex_meetings_index)"
+    calling_index="$(effective_webex_calling_index)"
+    contact_center_index="$(effective_webex_contact_center_index)"
+    input_type="$(effective_webex_input_type)"
+
+    bash "${SCRIPT_DIR}/../../cisco-webex-setup/scripts/setup.sh" \
+        --meetings-index "${meetings_index}" \
+        --calling-index "${calling_index}" \
+        --contact-center-index "${contact_center_index}"
+
+    cmd=(bash "${SCRIPT_DIR}/../../cisco-webex-setup/scripts/configure_account.sh"
+        --name "${name}"
+        --endpoint "${endpoint}"
+        --client-id "$(lookup_user_value "client_id")"
+        --client-secret-file "$(lookup_secret_file "client_secret")"
+        --scope "${scope}")
+
+    has_user_value "redirect_url" && cmd+=(--redirect-url "$(lookup_user_value "redirect_url")")
+    has_user_value "is_gov_account" && cmd+=(--is-gov-account "$(lookup_user_value "is_gov_account")")
+    has_user_value "gov_api_reference_link" && cmd+=(--gov-api-reference-link "$(lookup_user_value "gov_api_reference_link")")
+    has_user_value "instance_url" && cmd+=(--instance-url "$(lookup_user_value "instance_url")")
+    has_user_value "loglevel" && cmd+=(--loglevel "$(lookup_user_value "loglevel")")
+    has_user_value "proxy_enabled" && cmd+=(--proxy-enabled "$(lookup_user_value "proxy_enabled")")
+    has_user_value "proxy_type" && cmd+=(--proxy-type "$(lookup_user_value "proxy_type")")
+    has_user_value "proxy_url" && cmd+=(--proxy-url "$(lookup_user_value "proxy_url")")
+    has_user_value "proxy_port" && cmd+=(--proxy-port "$(lookup_user_value "proxy_port")")
+    has_user_value "proxy_username" && cmd+=(--proxy-username "$(lookup_user_value "proxy_username")")
+    has_user_value "proxy_rdns" && cmd+=(--proxy-rdns "$(lookup_user_value "proxy_rdns")")
+    has_secret_file "access_token" && cmd+=(--access-token-file "$(lookup_secret_file "access_token")")
+    has_secret_file "refresh_token" && cmd+=(--refresh-token-file "$(lookup_secret_file "refresh_token")")
+    has_secret_file "proxy_password" && cmd+=(--proxy-password-file "$(lookup_secret_file "proxy_password")")
+
+    "${cmd[@]}"
+
+    if effective_auto_inputs; then
+        if [[ "${input_type}" == "core" ]]; then
+            for input_type in meetings admin_audit_events security_audit_events meeting_qualities meetings_summary_report detailed_call_history; do
+                input_index="$(webex_index_for_input_type "${input_type}" "${meetings_index}" "${calling_index}" "${contact_center_index}")"
+                cmd=(bash "${SCRIPT_DIR}/../../cisco-webex-setup/scripts/configure_inputs.sh"
+                    --account "${name}"
+                    --input-type "${input_type}"
+                    --index "${input_index}")
+                append_webex_input_options
+                "${cmd[@]}"
+            done
+        else
+            input_index="$(webex_index_for_input_type "${input_type}" "${meetings_index}" "${calling_index}" "${contact_center_index}")"
+            cmd=(bash "${SCRIPT_DIR}/../../cisco-webex-setup/scripts/configure_inputs.sh"
+                --account "${name}"
+                --input-type "${input_type}"
+                --index "${input_index}")
+            append_webex_input_options
+            "${cmd[@]}"
+        fi
+    fi
+}
+
+run_ucs_ta_configure() {
+    local name index cmd templates task_name interval sourcetype
+    name="$(effective_name)"
+    index="$(effective_ucs_index)"
+    templates="$(lookup_user_value "templates" || true)"
+    [[ -z "${templates}" ]] && templates="$(product_field route.default_templates)"
+    interval="$(lookup_user_value "interval" || true)"
+    [[ -z "${interval}" ]] && interval="$(product_field route.default_interval)"
+    sourcetype="$(lookup_user_value "sourcetype" || true)"
+    [[ -z "${sourcetype}" ]] && sourcetype="$(product_field route.default_sourcetype)"
+
+    bash "${SCRIPT_DIR}/../../cisco-ucs-ta-setup/scripts/setup.sh" --index "${index}"
+
+    cmd=(bash "${SCRIPT_DIR}/../../cisco-ucs-ta-setup/scripts/configure_server.sh"
+        --name "${name}"
+        --server-url "$(lookup_user_value "server_url")"
+        --account-name "$(lookup_user_value "account_name")"
+        --password-file "$(lookup_secret_file "account_password")"
+        --index "${index}")
+    has_user_value "description" && cmd+=(--description "$(lookup_user_value "description")")
+    if has_user_value "disable_ssl_verification" && is_truthy "$(lookup_user_value "disable_ssl_verification")"; then
+        cmd+=(--disable-ssl-verification)
+    fi
+    if has_user_value "create_default_task" && is_truthy "$(lookup_user_value "create_default_task")"; then
+        cmd+=(--create-default-task)
+    fi
+    "${cmd[@]}"
+
+    if has_user_value "task_name"; then
+        task_name="$(lookup_user_value "task_name")"
+        bash "${SCRIPT_DIR}/../../cisco-ucs-ta-setup/scripts/configure_task.sh" \
+            --name "${task_name}" \
+            --servers "${name}" \
+            --templates "${templates}" \
+            --interval "${interval}" \
+            --sourcetype "${sourcetype}" \
+            --index "${index}"
+    fi
+}
+
+run_secure_email_web_gateway_configure() {
+    local product esa_index wsa_index cmd
+    product="$(product_field route.product)"
+    esa_index="$(effective_esa_index)"
+    wsa_index="$(effective_wsa_index)"
+    cmd=(bash "${SCRIPT_DIR}/../../cisco-secure-email-web-gateway-setup/scripts/setup.sh"
+        --product "${product}"
+        --esa-index "${esa_index}"
+        --wsa-index "${wsa_index}")
+    "${cmd[@]}"
+    if has_user_value "render_handoff" && is_truthy "$(lookup_user_value "render_handoff")"; then
+        bash "${SCRIPT_DIR}/../../cisco-secure-email-web-gateway-setup/scripts/render_ingestion_assets.sh" \
+            --product "${product}" \
+            --esa-index "${esa_index}" \
+            --wsa-index "${wsa_index}"
+    fi
+}
+
+run_talos_intelligence_configure() {
+    local index cmd
+    index="$(effective_talos_index)"
+    cmd=(bash "${SCRIPT_DIR}/../../cisco-talos-intelligence-setup/scripts/setup.sh" --index "${index}")
+    if has_user_value "enable_ip_blacklist" && is_truthy "$(lookup_user_value "enable_ip_blacklist")"; then
+        cmd+=(--enable-ip-blacklist)
+    fi
+    "${cmd[@]}"
+    if has_secret_file "service_account"; then
+        bash "${SCRIPT_DIR}/../../cisco-talos-intelligence-setup/scripts/configure_service_account.sh" \
+            --service-account-file "$(lookup_secret_file "service_account")"
+    fi
+}
+
 run_app_install_only_configure() {
     log "No product-specific configure phase is automated for $(product_field display_name)."
     log "Install validation is covered here; follow the product notes or vendor docs for post-install input setup."
@@ -1677,6 +2003,10 @@ run_configure_phase() {
         thousandeyes) run_thousandeyes_configure ;;
         appdynamics) run_appdynamics_configure ;;
         spaces) run_spaces_configure ;;
+        webex) run_webex_configure ;;
+        ucs_ta) run_ucs_ta_configure ;;
+        secure_email_web_gateway) run_secure_email_web_gateway_configure ;;
+        talos_intelligence) run_talos_intelligence_configure ;;
         *)
             log "ERROR: Unsupported route type '${ROUTE_TYPE}'."
             exit 1
@@ -1746,6 +2076,21 @@ run_validation_phase() {
             ;;
         spaces)
             bash "${SCRIPT_DIR}/../../cisco-spaces-setup/scripts/validate.sh"
+            ;;
+        webex)
+            bash "${SCRIPT_DIR}/../../cisco-webex-setup/scripts/validate.sh"
+            ;;
+        ucs_ta)
+            bash "${SCRIPT_DIR}/../../cisco-ucs-ta-setup/scripts/validate.sh"
+            ;;
+        secure_email_web_gateway)
+            bash "${SCRIPT_DIR}/../../cisco-secure-email-web-gateway-setup/scripts/validate.sh" \
+                --product "$(product_field route.product)" \
+                --esa-index "$(effective_esa_index)" \
+                --wsa-index "$(effective_wsa_index)"
+            ;;
+        talos_intelligence)
+            bash "${SCRIPT_DIR}/../../cisco-talos-intelligence-setup/scripts/validate.sh"
             ;;
         *)
             log "ERROR: Unsupported route type '${ROUTE_TYPE}' for validation." >&2

@@ -26,6 +26,7 @@ DEFAULT_OUTPUT_DIR = "splunk-observability-k8s-auto-instrumentation-rendered"
 DEFAULT_ENDPOINT = "http://$(SPLUNK_OTEL_AGENT):4317"
 DEFAULT_METRICS_ENDPOINT = "http://$(SPLUNK_OTEL_AGENT):9943/v2/datapoint"
 DEFAULT_BACKUP_CONFIGMAP = "splunk-otel-auto-instrumentation-annotations-backup"
+DISCOVERY_COMMAND_TIMEOUT_SECONDS = 5
 SUPPORTED_LANGUAGES = {
     "java",
     "nodejs",
@@ -1609,59 +1610,66 @@ def discover_workloads(config: dict[str, Any], output_dir: Path, *, dry_run: boo
     if config.get("kube_context"):
         kubectl.extend(["--context", config["kube_context"]])
         helm.extend(["--kube-context", config["kube_context"]])
-    if kubectl_path:
+
+    def run_discovery_probe(command: list[str], label: str) -> subprocess.CompletedProcess[str] | None:
         try:
-            result = subprocess.run(
-                kubectl + ["get", "deploy,sts,ds", "-A", "-o", "json"],
+            return subprocess.run(
+                command,
                 check=False,
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                timeout=DISCOVERY_COMMAND_TIMEOUT_SECONDS,
             )
+        except subprocess.TimeoutExpired:
+            probe["warnings"].append(
+                f"{label} timed out after {DISCOVERY_COMMAND_TIMEOUT_SECONDS}s; continuing with empty discovery data."
+            )
+        except Exception as exc:  # noqa: BLE001
+            probe["warnings"].append(f"{label} failed: {exc}")
+        return None
+
+    if kubectl_path:
+        result = run_discovery_probe(
+            kubectl + ["get", "deploy,sts,ds", "-A", "-o", "json"],
+            "kubectl workload discovery",
+        )
+        if result is not None:
             if result.returncode == 0:
-                data = json.loads(result.stdout or "{}")
-                for item in data.get("items", []):
-                    workloads.append(
-                        {
-                            "kind": item.get("kind", ""),
-                            "namespace": item.get("metadata", {}).get("namespace", "default"),
-                            "name": item.get("metadata", {}).get("name", ""),
-                            "language": "",
-                            "container_names": "",
-                            "go_target_exe": "",
-                            "dotnet_runtime": "",
-                            "cr": "",
-                        }
-                    )
+                try:
+                    data = json.loads(result.stdout or "{}")
+                    for item in data.get("items", []):
+                        workloads.append(
+                            {
+                                "kind": item.get("kind", ""),
+                                "namespace": item.get("metadata", {}).get("namespace", "default"),
+                                "name": item.get("metadata", {}).get("name", ""),
+                                "language": "",
+                                "container_names": "",
+                                "go_target_exe": "",
+                                "dotnet_runtime": "",
+                                "cr": "",
+                            }
+                        )
+                except Exception as exc:  # noqa: BLE001
+                    probe["warnings"].append(f"kubectl workload discovery failed: {exc}")
             else:
                 probe["warnings"].append(result.stderr.strip() or "kubectl workload discovery failed.")
-        except Exception as exc:  # noqa: BLE001
-            probe["warnings"].append(f"kubectl workload discovery failed: {exc}")
-        try:
-            crd = subprocess.run(
-                kubectl + ["get", "crd", "instrumentations.opentelemetry.io"],
-                check=False,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+        crd = run_discovery_probe(
+            kubectl + ["get", "crd", "instrumentations.opentelemetry.io"],
+            "kubectl CRD probe",
+        )
+        if crd is not None:
             probe["instrumentation_crd_present"] = crd.returncode == 0
-        except Exception as exc:  # noqa: BLE001
-            probe["warnings"].append(f"CRD probe failed: {exc}")
     else:
         probe["warnings"].append("kubectl not found on PATH; wrote an empty starter inventory.")
     if helm_path:
-        try:
-            helm_result = subprocess.run(
-                helm + ["list", "-n", config["base"]["namespace"], "-q"],
-                check=False,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
+        helm_result = run_discovery_probe(
+            helm + ["list", "-n", config["base"]["namespace"], "-q"],
+            "helm release probe",
+        )
+        if helm_result is not None:
             probe["helm_release_present"] = config["base"]["release"] in (helm_result.stdout or "").splitlines()
-        except Exception as exc:  # noqa: BLE001
-            probe["warnings"].append(f"helm probe failed: {exc}")
 
     payload = {"api_version": API_VERSION, "workloads": workloads}
     result = {"discovery": payload, "base_collector_probe": probe}

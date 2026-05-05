@@ -1,0 +1,56 @@
+{
+  "api_version": "splunk-observability-ai-agent-monitoring-setup/v1",
+  "realm": "us0",
+  "deployment": {
+    "collector_mode": "kubernetes",
+    "cluster_name": "ai-prod-cluster",
+    "namespace": "splunk-otel",
+    "environment": "prod",
+    "send_otlp_histograms": true,
+    "workload_kind": "deployment",
+    "workload_namespace": "default",
+    "workload_name": "ai-agent-service",
+    "container_name": "app"
+  },
+  "ai_agent_monitoring": {
+    "service_name": "ai-agent-service",
+    "instrumentation_mode": "zero-code",
+    "python_version": "3.10",
+    "frameworks": ["langchain", "openai"],
+    "translators": [],
+    "additional_packages": [],
+    "enable_content_capture": false,
+    "accept_content_capture": false,
+    "enable_evaluations": false,
+    "accept_evaluation_cost": false,
+    "evaluation_provider": "openai",
+    "evals_separate_process": true,
+    "evals_sample_rate": 0.25,
+    "evals_rate_limit_rps": 1,
+    "hec": {
+      "enabled": true,
+      "platform": "enterprise",
+      "index": "ai_events",
+      "token_name": "ai_agent_monitoring_hec",
+      "source": "otel",
+      "sourcetype": "otel"
+    },
+    "log_observer_connect": {
+      "enabled": true,
+      "target": "enterprise",
+      "connection_name": "splunk-platform-loc",
+      "index": "ai_events"
+    }
+  },
+  "ai_infrastructure": {
+    "include_all_supported": true,
+    "products": []
+  },
+  "dashboards": {
+    "enabled": true,
+    "group_name": "AI Agent Monitoring"
+  },
+  "detectors": {
+    "enabled": true
+  }
+}

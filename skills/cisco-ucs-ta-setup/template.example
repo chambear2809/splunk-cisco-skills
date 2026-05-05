@@ -1,0 +1,20 @@
+# Cisco UCS setup intake template.
+# Copy to template.local and fill non-secret values only.
+
+[server]
+name = UCS_PROD
+server_url = ucs-manager.example.com
+account_name = splunk
+description = Production UCS Manager
+disable_ssl_verification = false
+
+[secret_files]
+account_password = /tmp/ucs_password
+
+[task]
+task_name = UCS_PROD_all
+index = cisco_ucs
+interval = 300
+sourcetype = cisco:ucs
+servers = UCS_PROD
+templates = UCS_Fault,UCS_Inventory,UCS_Performance

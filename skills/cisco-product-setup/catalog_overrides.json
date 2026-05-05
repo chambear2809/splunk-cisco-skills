@@ -191,39 +191,32 @@
       "route_type": "thousandeyes"
     },
     "cisco_esa": {
-      "route_type": "app_install_only",
-      "install_apps": [
-        "Splunk_TA_cisco-esa"
-      ],
-      "notes": "Installs the Splunk-supported Cisco ESA add-on. Configure ESA log forwarding or SC4S collection outside this product router, then validate the app and sourcetypes."
+      "route_type": "secure_email_web_gateway",
+      "notes": "First-class Cisco ESA setup: installs the Splunk-supported ESA add-on, creates the email index, aligns Cisco_ESA_Index, and hands off SC4S/file-monitor collection without inventing device API inputs."
     },
     "cisco_talos": {
-      "route_type": "app_install_only",
-      "install_apps": [
-        "Splunk_TA_Talos_Intelligence"
-      ],
-      "notes": "Installs Cisco Talos Intelligence for Enterprise Security Cloud. This integration requires a supported Splunk Enterprise Security Cloud deployment; finish Talos setup in the ES/SOAR workflow."
+      "route_type": "talos_intelligence",
+      "notes": "First-class Cisco Talos Intelligence setup for supported Splunk Enterprise Security Cloud deployments; validates service-account readiness, alert actions, capability mapping, and default-disabled threatlist state."
     },
     "cisco_ucs": {
-      "route_type": "app_install_only",
-      "install_apps": [
-        "Splunk_TA_cisco-ucs"
-      ],
-      "notes": "Installs the Splunk-supported Cisco UCS add-on. Configure UCS Manager inputs in the add-on UI or supported Splunk docs."
+      "route_type": "ucs_ta",
+      "notes": "First-class Cisco UCS TA setup: installs the Splunk-supported UCS add-on, creates the cisco_ucs index, configures UCS Manager server records, default templates, and cisco_ucs_task inputs."
     },
     "cisco_wsa": {
-      "route_type": "app_install_only",
-      "install_apps": [
-        "Splunk_TA_cisco-wsa"
-      ],
-      "notes": "Installs the Splunk-supported Cisco WSA add-on. Configure WSA log forwarding or SC4S collection outside this product router, then validate the app and sourcetypes."
+      "route_type": "secure_email_web_gateway",
+      "notes": "First-class Cisco WSA setup: installs the Splunk-supported WSA add-on, creates the netproxy index, aligns Cisco_WSA_Index, and hands off SC4S/file-monitor collection without inventing device API inputs."
     },
     "cisco_webex": {
-      "route_type": "app_install_only",
-      "install_apps": [
-        "ta_cisco_webex_add_on_for_splunk"
-      ],
-      "notes": "Installs the Webex Add-on for Splunk. Configure Webex REST API inputs in the add-on UI or vendor documentation."
+      "route_type": "webex",
+      "notes": "First-class Webex setup: installs the Webex Add-on plus Webex App dashboards, configures OAuth accounts, default indexes/macros, and all packaged Webex REST input families."
+    },
+    "cisco_webex_contact_center": {
+      "route_type": "webex",
+      "notes": "Routed to the Webex setup skill because the current Webex Add-on package includes Webex Contact Center Search inputs and the Webex App includes Contact Center dashboards."
+    },
+    "cisco_webex_control_hub": {
+      "route_type": "webex",
+      "notes": "Routed to the Webex setup skill because Control Hub audit, meeting, quality, calling, and generic Webex API coverage lives in the Webex Add-on/App package pair."
     },
     "cisco_spaces": {
       "route_type": "spaces"

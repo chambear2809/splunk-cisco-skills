@@ -69,6 +69,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cloud-provider", default="")
     parser.add_argument("--chart-version", default="")
     parser.add_argument("--kube-context", default="")
+    parser.add_argument("--extra-values-file", action="append", default=[])
     parser.add_argument("--o11y-ingest-url", default="")
     parser.add_argument("--o11y-api-url", default="")
     parser.add_argument("--platform-hec-url", default="")
@@ -124,7 +125,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--service-group", default="")
     bool_arg(parser, "skip-collector-repo", False)
     parser.add_argument("--repo-channel", choices=("primary", "beta", "test"), default="primary")
-    parser.add_argument("--deployment-environment", default="")
+    parser.add_argument("--deployment-environment", default="default")
     parser.add_argument("--service-name", default="")
     parser.add_argument(
         "--instrumentation-mode",
@@ -301,20 +302,6 @@ def k8s_values(args: argparse.Namespace) -> str:
         f"  profilingEnabled: {yaml_scalar(str_bool(args.enable_profiling))}",
         f"  secureAppEnabled: {yaml_scalar(str_bool(args.enable_secure_app))}",
         "",
-        "splunkPlatform:",
-        f"  endpoint: {yaml_scalar(args.platform_hec_url if logs_enabled else '')}",
-        '  token: ""',
-        f"  index: {yaml_scalar(args.platform_hec_index if logs_enabled else '')}",
-        f"  logsEnabled: {yaml_scalar(logs_enabled)}",
-        "  metricsEnabled: false",
-        "  tracesEnabled: false",
-        "  insecureSkipVerify: false",
-        "  sendingQueue:",
-        "    persistentQueue:",
-        f"      enabled: {yaml_scalar(str_bool(args.platform_persistent_queue_enabled))}",
-        f"      storagePath: {yaml_scalar(args.platform_persistent_queue_path)}",
-        f"  fsyncEnabled: {yaml_scalar(str_bool(args.platform_fsync_enabled))}",
-        "",
         "clusterReceiver:",
         f"  enabled: {yaml_scalar(str_bool(args.cluster_receiver_enabled))}",
         f"  eventsEnabled: {yaml_scalar(str_bool(args.enable_events))}",
@@ -359,6 +346,24 @@ def k8s_values(args: argparse.Namespace) -> str:
         f"  priorityClassName: {yaml_scalar(args.priority_class_name)}",
         "",
     ]
+    if logs_enabled:
+        insert_at = lines.index("clusterReceiver:")
+        lines[insert_at:insert_at] = [
+            "splunkPlatform:",
+            f"  endpoint: {yaml_scalar(args.platform_hec_url)}",
+            '  token: ""',
+            f"  index: {yaml_scalar(args.platform_hec_index)}",
+            "  logsEnabled: true",
+            "  metricsEnabled: false",
+            "  tracesEnabled: false",
+            "  insecureSkipVerify: false",
+            "  sendingQueue:",
+            "    persistentQueue:",
+            f"      enabled: {yaml_scalar(str_bool(args.platform_persistent_queue_enabled))}",
+            f"      storagePath: {yaml_scalar(args.platform_persistent_queue_path)}",
+            f"  fsyncEnabled: {yaml_scalar(str_bool(args.platform_fsync_enabled))}",
+            "",
+        ]
     if str_bool(args.windows_nodes):
         lines.extend(
             [
@@ -383,6 +388,14 @@ def render_k8s(args: argparse.Namespace, output_dir: Path) -> None:
 
     values_path = k8s_dir / "values.yaml"
     write_text(values_path, k8s_values(args))
+    extra_values_names = []
+    for index, extra_values in enumerate(args.extra_values_file, start=1):
+        source = Path(extra_values).expanduser()
+        if not source.is_file():
+            raise SystemExit(f"--extra-values-file does not exist or is not a file: {source}")
+        target_name = f"extra-values-{index}.yaml"
+        shutil.copyfile(source, k8s_dir / target_name)
+        extra_values_names.append(target_name)
 
     logs_enabled = platform_logs_enabled(args)
     kube_prefix = ""
@@ -459,6 +472,9 @@ kubectl {kube_prefix}"${{secret_args[@]}}" --dry-run=client -o yaml | kubectl {k
     helm_context_line = ""
     if args.kube_context:
         helm_context_line = f"    --kube-context {shell_quote(args.kube_context)} \\\n"
+    values_args = ['    -f "${script_dir}/values.yaml"']
+    values_args.extend(f'    -f "${{script_dir}}/{name}"' for name in extra_values_names)
+    values_args_block = " \\\n".join(values_args)
 
     write_text(
         k8s_dir / "helm-install.sh",
@@ -474,7 +490,7 @@ helm repo update splunk-otel-collector-chart
 helm upgrade --install "${{release_name}}" splunk-otel-collector-chart/splunk-otel-collector \\
     --namespace "${{namespace}}" \\
     --create-namespace \\
-{helm_context_line}{chart_version_line}    -f "${{script_dir}}/values.yaml"
+{helm_context_line}{chart_version_line}{values_args_block}
 """,
         executable=True,
     )

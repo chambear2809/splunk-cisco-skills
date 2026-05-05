@@ -1,0 +1,11 @@
+# Cisco Talos Intelligence setup intake template.
+# Copy to template.local and fill non-secret values only.
+
+[deployment]
+index = talos_intelligence
+enable_ip_blacklist = false
+confirm_es_cloud = true
+
+[advanced_secret_files]
+# Normally provisioned by Splunk Cloud; only use for explicit diagnostics.
+service_account = /tmp/talos_service_account.pem

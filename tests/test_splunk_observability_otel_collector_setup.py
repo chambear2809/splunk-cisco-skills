@@ -141,6 +141,41 @@ def test_kubernetes_values_enable_expected_all_signal_options(tmp_path: Path) ->
     assert metadata["signals"]["autoinstrumentation"] is True
 
 
+def test_kubernetes_extra_values_file_is_copied_and_used_by_helm(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    extra_values = tmp_path / "ai-agent-values.yaml"
+    extra_values.write_text(
+        "agent:\n"
+        "  config:\n"
+        "    exporters:\n"
+        "      signalfx:\n"
+        "        send_otlp_histograms: true\n",
+        encoding="utf-8",
+    )
+
+    result = run_setup(
+        "--render-k8s",
+        "--realm",
+        "us0",
+        "--cluster-name",
+        "demo-cluster",
+        "--extra-values-file",
+        str(extra_values),
+        "--output-dir",
+        str(output_dir),
+    )
+
+    assert result.returncode == 0, result.stdout
+    values = (output_dir / "k8s/values.yaml").read_text(encoding="utf-8")
+    assert 'environment: "default"' in values
+    copied = output_dir / "k8s/extra-values-1.yaml"
+    helm_install = (output_dir / "k8s/helm-install.sh").read_text(encoding="utf-8")
+    assert "splunkPlatform:" not in values
+    assert copied.read_text(encoding="utf-8") == extra_values.read_text(encoding="utf-8")
+    assert '-f "${script_dir}/values.yaml" \\' in helm_install
+    assert '-f "${script_dir}/extra-values-1.yaml"' in helm_install
+
+
 def test_platform_hec_helper_renders_handoff_and_default_token_path(tmp_path: Path) -> None:
     output_dir = tmp_path / "rendered"
 

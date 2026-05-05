@@ -1,0 +1,15 @@
+# Cisco ESA/WSA setup intake template.
+# Copy to template.local and fill non-secret values only.
+
+[products]
+product = both
+
+[indexes]
+esa_index = email
+wsa_index = netproxy
+
+[collector_handoff]
+collector = sc4s
+output_dir = ./cisco-secure-email-web-gateway-rendered
+esa_host_filter = ^esa-
+wsa_host_filter = ^wsa-

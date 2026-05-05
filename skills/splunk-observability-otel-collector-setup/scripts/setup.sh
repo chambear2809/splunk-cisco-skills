@@ -61,6 +61,7 @@ Kubernetes options:
   --cloud-provider NAME         Chart cloud provider, such as aws, gcp, azure
   --chart-version VERSION       Pin the Helm chart version
   --kube-context NAME           kubectl/Helm context
+  --extra-values-file PATH      Additional Helm values overlay; may be repeated
   --o11y-ingest-url URL         Override Observability ingest URL
   --o11y-api-url URL            Override Observability API URL
   --platform-hec-url URL        Splunk Platform HEC URL for Kubernetes logs
@@ -173,6 +174,7 @@ REALM="${SPLUNK_O11Y_REALM:-}"
 O11Y_TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE:-}"
 PLATFORM_HEC_TOKEN_FILE=""
 ALLOW_LOOSE_TOKEN_PERMS=false
+EXTRA_VALUES_FILES=()
 
 NAMESPACE="splunk-otel"
 RELEASE_NAME="splunk-otel-collector"
@@ -229,7 +231,7 @@ SERVICE_USER=""
 SERVICE_GROUP=""
 SKIP_COLLECTOR_REPO=false
 REPO_CHANNEL="primary"
-DEPLOYMENT_ENVIRONMENT=""
+DEPLOYMENT_ENVIRONMENT="default"
 SERVICE_NAME=""
 INSTRUMENTATION_MODE="systemd"
 INSTRUMENTATION_SDKS=""
@@ -298,6 +300,7 @@ while [[ $# -gt 0 ]]; do
         --cloud-provider) require_arg "$1" "$#" || exit 1; CLOUD_PROVIDER="$2"; shift 2 ;;
         --chart-version) require_arg "$1" "$#" || exit 1; CHART_VERSION="$2"; shift 2 ;;
         --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; shift 2 ;;
+        --extra-values-file) require_arg "$1" "$#" || exit 1; EXTRA_VALUES_FILES+=("$2"); shift 2 ;;
         --o11y-ingest-url) require_arg "$1" "$#" || exit 1; O11Y_INGEST_URL="$2"; shift 2 ;;
         --o11y-api-url) require_arg "$1" "$#" || exit 1; O11Y_API_URL="$2"; shift 2 ;;
         --platform-hec-url) require_arg "$1" "$#" || exit 1; PLATFORM_HEC_URL="$2"; shift 2 ;;
@@ -658,6 +661,9 @@ RENDER_ARGS=(
     --enable-certmanager "$(bool_text "${ENABLE_CERTMANAGER}")"
     --enable-secure-app "$(bool_text "${ENABLE_SECURE_APP}")"
 )
+for extra_values_file in "${EXTRA_VALUES_FILES[@]}"; do
+    RENDER_ARGS+=(--extra-values-file "${extra_values_file}")
+done
 
 if [[ "${RENDER_K8S}" == "true" ]]; then
     RENDER_ARGS+=(--render-k8s)

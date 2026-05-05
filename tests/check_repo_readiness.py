@@ -68,6 +68,8 @@ TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"^splunk-observability-cloud-integration-rendered/"),
     re.compile(r"^splunk-observability-database-monitoring-rendered/"),
     re.compile(r"^splunk-observability-aws-integration-rendered/"),
+    re.compile(r"^splunk-cloud-data-manager-rendered/"),
+    re.compile(r"^cisco-secure-email-web-gateway-rendered/"),
     re.compile(r"^ta-for-indexers-rendered/"),
     re.compile(r"^splunk-mcp-rendered/(?!run-splunk-mcp\.js$)"),
     re.compile(r"^splunk-ta/_unpacked/"),

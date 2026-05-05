@@ -78,8 +78,10 @@ projects/tmp-*
 /splunk-indexer-cluster-rendered/
 /splunk-license-manager-rendered/
 /splunk-cloud-acs-allowlist-rendered/
+/splunk-cloud-data-manager-rendered/
 /splunk-soar-rendered/
 /splunk-platform-pki-rendered/
+/cisco-secure-email-web-gateway-rendered/
 /ta-for-indexers-rendered/
 /splunk-mcp-rendered/*
 !/splunk-mcp-rendered/run-splunk-mcp.js
