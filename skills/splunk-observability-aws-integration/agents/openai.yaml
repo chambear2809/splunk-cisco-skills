@@ -1,0 +1,22 @@
+interface:
+  display_name: "Splunk Observability Cloud <-> AWS Integration"
+  short_description: "Render, apply, validate, discover, and diagnose the Splunk Observability Cloud AWSCloudWatch integration end-to-end"
+  default_prompt: >-
+    Use $splunk-observability-aws-integration to render, validate, apply,
+    discover, or diagnose the Splunk Observability Cloud AWSCloudWatch
+    integration: polling vs Splunk-managed Metric Streams vs AWS-managed
+    Metric Streams vs Terraform; External-ID or SecurityToken IAM auth;
+    per-use-case IAM policy emission (foundation, polling, streams, tag
+    sync, Cassandra-Keyspaces special case); regional or StackSets
+    CloudFormation stubs from signalfx/aws-cloudformation-templates;
+    Splunk-side Terraform pinned to signalfx provider ~> 9.0; conflict
+    enforcement between services / namespaceSyncRules /
+    customCloudwatchNamespaces / customNamespaceSyncRules /
+    metricStreamsManagedExternally + useMetricStreamsSync; AWS-recommended
+    stats catalog via collectOnlyRecommendedStats; AWS PrivateLink ingest
+    stubs (default legacy signalfx.com domain); multi-account / AWS
+    Organizations StackSets; drift detection with --quickstart-from-live;
+    and the documented troubleshooting catalog. Hand-offs cover the
+    Splunk_TA_AWS logs path (Splunkbase 1876), the future Lambda APM skill,
+    O11y dashboards, AutoDetect detectors, and the Splunk OTel collector
+    for EC2/EKS host telemetry.

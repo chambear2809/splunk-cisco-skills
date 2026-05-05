@@ -194,6 +194,10 @@ def _format_scalar(value: Any) -> str:
         return "null"
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, list):
+        return "[]"
+    if isinstance(value, dict):
+        return "{}"
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return str(value)
     text = str(value)

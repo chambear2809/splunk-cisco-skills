@@ -1,0 +1,9 @@
+interface:
+  display_name: "Splunk Observability Database Monitoring"
+  short_description: "Render DBMon OTel collector config for SQL Server, Oracle, and PostgreSQL"
+  default_prompt: >-
+    Use $splunk-observability-database-monitoring-setup to render and validate
+    Splunk Observability Cloud Database Monitoring collector configuration for
+    PostgreSQL, Microsoft SQL Server, or Oracle Database. Keep secrets in
+    Kubernetes Secrets or local env files, place Kubernetes receivers under
+    clusterReceiver, and verify the logs/dbmon event pipeline.

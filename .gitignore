@@ -68,6 +68,8 @@ projects/tmp-*
 /splunk-observability-dashboard-rendered/
 /splunk-observability-native-rendered/
 /splunk-observability-cloud-integration-rendered/
+/splunk-observability-database-monitoring-rendered/
+/splunk-observability-aws-integration-rendered/
 /splunk-observability-k8s-auto-instrumentation-rendered/
 /splunk-observability-k8s-frontend-rum-rendered/
 /splunk-edge-processor-rendered/

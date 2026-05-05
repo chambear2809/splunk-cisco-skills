@@ -1,0 +1,117 @@
+# Splunk Observability Cloud <-> AWS integration spec.
+#
+# Copy this file locally (e.g. template.local) and fill in the non-secret
+# values. The skill reads tokens and AWS access keys from chmod-600 files
+# passed through --token-file, --aws-access-key-id-file, and
+# --aws-secret-access-key-file. NEVER put tokens, keys, or any other secret in
+# this file.
+
+api_version: splunk-observability-aws-integration/v1
+
+# Realm of the Splunk Observability Cloud org that owns the integration.
+# AWS-hosted realms only -- the GCP-hosted `us2-gcp` realm cannot run the
+# AWS integration (no STS region mapping). Per the auth doc table:
+#   us0 -> us-east-1   us1 -> us-west-2   us2 -> us-east-1   us3 -> us-west-2
+#   eu0 -> eu-west-1   eu1 -> eu-central-1   eu2 -> eu-west-2
+#   au0 -> ap-southeast-2   jp0 -> ap-northeast-1   sg0 -> ap-southeast-1
+realm: us1                              # us0|us1|us2|us3|au0|eu0|eu1|eu2|jp0|sg0
+
+integration_name: production-aws-account-1
+
+authentication:
+  mode: external_id                     # external_id | security_token
+  # External-ID flow: commercial AWS regions; recommended.
+  aws_account_id: "123456789012"        # operator-supplied; emits trust JSON
+  iam_role_name: SplunkObservabilityRole
+  external_id: ""                       # populated from POST /v2/integration response
+  # Security-token flow: required for GovCloud (us-gov-east-1, us-gov-west-1)
+  # and China (cn-north-1, cn-northwest-1). Renderer refuses external_id mode
+  # when any GovCloud/China region is selected. Pass keys through
+  # --aws-access-key-id-file and --aws-secret-access-key-file.
+
+connection:
+  mode: streaming_splunk_managed        # polling | streaming_splunk_managed | streaming_aws_managed | terraform_only
+  poll_rate_seconds: 300                # canonical pollRate range 60-600 s, default 300
+  metadata_poll_rate_seconds: 900       # metadata refresh
+  adaptive_polling:                     # default ON since Feb 2026
+    enabled: true
+    inactive_seconds: 1200              # canonical inactiveMetricsPollRate range 60-3600 s, default 1200
+
+regions:
+  - us-east-1
+  - us-east-2
+  - us-west-2
+# `regions` cannot be empty. The canonical Pulumi/Terraform schema enforces
+# this, and Splunk highly discourages an empty list anyway because new AWS
+# regions auto-onboard and inflate cost. The renderer FAILs on `regions: []`
+# with no override flag. To monitor "everything", enumerate explicitly.
+
+services:
+  # Use EITHER `explicit` services OR `namespace_sync_rules` -- they conflict
+  # at the API level. The renderer rejects specs that set both.
+  mode: explicit                        # all_built_in | explicit | namespace_filtered | custom_only
+  explicit:                             # serializes to API field `services`
+    - AWS/EC2
+    - AWS/RDS
+    - AWS/Lambda
+    - AWS/ApplicationELB
+  collect_only_recommended_stats: true  # canonical `collectOnlyRecommendedStats` (Terraform v9.7.0+)
+  metric_stats_to_syncs:                # canonical flat array shape; per-namespace per-metric stat allow-list
+    - namespace: AWS/Lambda
+      metric: Duration
+      stats: [mean, upper]
+    - namespace: AWS/Lambda
+      metric: Invocations
+      stats: [sum]
+  namespace_sync_rules: []              # ONLY when mode=namespace_filtered; serializes to API field `namespaceSyncRules`
+
+custom_namespaces:
+  # Use EITHER `simple_list` OR `sync_rules` -- they conflict at the API level
+  # (customCloudwatchNamespaces vs customNamespaceSyncRules).
+  simple_list:                          # serializes to `customCloudwatchNamespaces`
+    - CWAgent                           # CloudWatch Agent default namespace; only useful when the agent is installed AWS-side
+    - System/Linux
+  sync_rules: []                        # alternative; serializes to `customNamespaceSyncRules`
+sync_custom_namespaces_only: false      # canonical `syncCustomNamespacesOnly` -- skip built-ins when true
+
+guards:
+  enable_check_large_volume: true       # 100k-metric auto-disable
+  ignore_all_status_metrics: false      # set false to bring in EC2 status check metrics
+  sync_load_balancer_target_group_tags: false
+  enable_aws_usage: false               # cost+usage metrics; requires organizations:DescribeOrganization
+
+metric_streams:
+  use_metric_streams_sync: true         # canonical `useMetricStreamsSync` -- the boolean intent
+  managed_externally: false             # canonical `metricStreamsManagedExternally`; true = AWS-console-driven; requires use_metric_streams_sync=true
+  named_token: ""                       # canonical `namedToken`; INGEST org token name; empty = default
+  cloudformation: true                  # render regional CFN stub per region
+  cloudformation_template_url: ""       # default https://o11y-public.s3.amazonaws.com/aws-cloudformation-templates/release/template_metric_streams_regional.yaml
+  use_stack_sets: false                 # when true, render multi-region StackSets template (template_metric_streams.yaml)
+  terraform: false                      # alternate path: signalfx/aws-terraform-templates
+
+private_link:
+  enable: false
+  endpoint_types: [ingest, api, stream] # ingest | api | stream | backfill
+  service_name_overrides: {}            # operator override per-realm vpce service name
+  domain: legacy                        # legacy=signalfx.com (matches Sep-2024 Splunk doc) | new=observability.splunkcloud.com
+
+terraform_provider:
+  source: splunk-terraform/signalfx
+  version: "~> 9.0"                     # latest stable 9.7.2 (April 2026); 6.22.0 from older docs is stale
+
+multi_account:
+  enabled: false                        # set true to render N integrations + StackSets
+  control_account_id: ""                # AWS Organizations management or delegated admin
+  member_accounts: []                   # list of {aws_account_id, label, regions: [...]}
+  cfn_stacksets:
+    template_url: ""                    # default https://o11y-public.s3.amazonaws.com/aws-cloudformation-templates/release/template_metric_streams.yaml
+    use_org_service_managed: true       # service-linked roles auto-created via AWS Organizations
+    fallback_admin_role: AWSCloudFormationStackSetAdministrationRole   # used when use_org_service_managed=false
+    fallback_execution_role: AWSCloudFormationStackSetExecutionRole
+
+handoffs:
+  lambda_apm: false                     # future companion skill splunk-observability-aws-lambda-apm-setup
+  logs_via_splunk_ta_aws: false         # hand off to splunk-app-install (Splunkbase 1876, min v8.1.1)
+  dashboards: false                     # hand off to splunk-observability-dashboard-builder
+  detectors: false                      # hand off to splunk-observability-native-ops
+  otel_collector_for_ec2_eks: false     # hand off to splunk-observability-otel-collector-setup

@@ -424,6 +424,24 @@
       },
       {
         "kind": "workflow",
+        "skill": "splunk-observability-database-monitoring-setup",
+        "label": "`splunk-observability-database-monitoring-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; DBMon uses the customer-managed Splunk OTel Collector runtime rendered by splunk-observability-otel-collector-setup",
+        "cloud_config_path": "Rendered Kubernetes clusterReceiver overlay, Linux collector fragment, placeholder-only DB credential Secret stubs, and gateway-routing reference for Splunk Database Monitoring events",
+        "notes": "Render/validate-first Splunk Database Monitoring workflow for PostgreSQL, Microsoft SQL Server, and Oracle Database. Enforces DBMon realm availability, collector version floors, official support matrix, clusterReceiver placement, logs/dbmon event exporter, and file/env/Secret-only credential handling."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-observability-aws-integration",
+        "label": "`splunk-observability-aws-integration`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; AWSCloudWatch integration is configured through Splunk Observability Cloud APIs, CloudFormation, Terraform, and AWS-side IAM/Metric Streams resources",
+        "cloud_config_path": "Rendered REST payloads, IAM policy JSON, CloudFormation and StackSets stubs, Terraform configuration, drift reports, PrivateLink notes, and handoff runbooks for adjacent AWS telemetry paths",
+        "notes": "Standalone reusable Splunk Observability Cloud AWS integration workflow for polling, Splunk-managed Metric Streams, AWS-managed Metric Streams, and Terraform. Enforces canonical AWSCloudWatch field conflicts, file-based token handling, region and realm guardrails, recommended-stats selection, multi-account StackSets emission, and Splunk_TA_AWS handoff for AWS logs."
+      },
+      {
+        "kind": "workflow",
         "skill": "splunk-observability-k8s-auto-instrumentation-setup",
         "label": "`splunk-observability-k8s-auto-instrumentation-setup`",
         "splunkbase_id": "N/A",
@@ -737,6 +755,20 @@
         "external-collector"
       ],
       "notes": "External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup."
+    },
+    {
+      "skill": "splunk-observability-database-monitoring-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Render/validate-first Splunk Database Monitoring workflow for PostgreSQL, Microsoft SQL Server, and Oracle Database. Renders Splunk OTel Collector Kubernetes clusterReceiver overlays and Linux collector fragments, validates official DBMon realm/platform/version support, and keeps all credentials in Kubernetes Secrets or local environment variables."
     },
     {
       "skill": "splunk-observability-k8s-auto-instrumentation-setup",
@@ -1314,6 +1346,20 @@
         "external-collector"
       ],
       "notes": "Umbrella skill composing splunk-observability-cisco-nexus-integration, splunk-observability-cisco-intersight-integration, and splunk-observability-nvidia-gpu-integration via subprocess + Python deep-merge, then adding AI-Pod-specific blocks: NIM / vLLM / Milvus / Trident / Portworx / Redfish scrapes, dual-pipeline filtering, k8s_attributes/nim, OpenShift defaults, rbac.customRules (when --nim-scrape-mode endpoints), --workshop-mode multi-tenant pattern, and the OpenShift SCC helper."
+    },
+    {
+      "skill": "splunk-observability-aws-integration",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Splunk Observability Cloud <-> AWS integration end-to-end across all four documented connection paths: polling, Splunk-managed Metric Streams, AWS-managed Metric Streams, and Terraform. Renders the full canonical AWSCloudWatch field set (POST/PUT /v2/integration with X-SF-Token), per-use-case IAM JSON (foundation, polling, streams, tag sync, Cassandra special-case ARN list), regional or StackSets CloudFormation stubs from signalfx/aws-cloudformation-templates, Splunk-side Terraform pinned to signalfx provider ~> 9.0, conflict-matrix enforcement (services vs namespaceSyncRules, customCloudWatchNamespaces vs customNamespaceSyncRules, metricStreamsManagedExternally requires useMetricStreamsSync), AWS-recommended-stats catalog via collectOnlyRecommendedStats, AWS PrivateLink ingest stubs (default legacy signalfx.com domain), multi-account / AWS Organizations StackSets, drift detection with --quickstart-from-live, and the documented troubleshooting catalog. Live-validated against the operator's existing us1 integration. Hand-offs to splunk-app-install for Splunk_TA_AWS (Splunkbase 1876, min v8.1.1) for AWS log ingestion, splunk-observability-cloud-integration-setup for Log Observer Connect, splunk-observability-dashboard-builder, splunk-observability-native-ops, splunk-observability-otel-collector-setup for EC2/EKS host telemetry, and a future splunk-observability-aws-lambda-apm-setup."
     }
   ],
   "apps": [

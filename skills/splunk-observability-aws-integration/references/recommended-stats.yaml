@@ -1,0 +1,176 @@
+# AWS recommended stats catalog (subset).
+#
+# When `services.collect_only_recommended_stats: true` is set in the spec,
+# the integration imports only these stats per (namespace, metric) pair.
+# Source of truth (full catalog): https://docs.splunk.com/en/splunk-observability-cloud/manage-data/connect-to-your-cloud-service-provider/connect-to-aws/aws-recommended-stats-api-only
+#
+# Stat name mapping (Splunk Observability Cloud naming):
+#   AWS Average    -> mean
+#   AWS Maximum    -> upper
+#   AWS Minimum    -> lower
+#   AWS Sum        -> sum
+#   AWS SampleCount -> count
+#
+# Use `bash setup.sh --list-recommended-stats` to print the live catalog as JSON.
+
+AWS/ApplicationELB:
+  ActiveConnectionCount: [sum]
+  RequestCount: [sum]
+  TargetResponseTime: [mean, upper]
+  HTTPCode_Target_5XX_Count: [sum]
+  UnHealthyHostCount: [upper]
+  HealthyHostCount: [upper]
+
+AWS/EC2:
+  CPUUtilization: [mean, upper]
+  NetworkIn: [sum]
+  NetworkOut: [sum]
+  NetworkPacketsIn: [sum]
+  NetworkPacketsOut: [sum]
+  DiskReadBytes: [sum]
+  DiskWriteBytes: [sum]
+  DiskReadOps: [sum]
+  DiskWriteOps: [sum]
+  StatusCheckFailed: [sum]
+
+AWS/ECS:
+  CPUUtilization: [mean, count]
+  MemoryUtilization: [mean, count]
+  CPUReservation: [mean]
+  MemoryReservation: [mean]
+
+AWS/EKS:
+  cluster_failed_node_count: [upper]
+  cluster_node_count: [upper]
+
+AWS/Lambda:
+  ConcurrentExecutions: [upper]
+  Duration: [mean, upper]
+  Errors: [sum]
+  Invocations: [sum]
+  Throttles: [sum]
+  IteratorAge: [upper]
+
+AWS/RDS:
+  CPUUtilization: [mean, upper]
+  FreeStorageSpace: [lower]
+  FreeableMemory: [lower]
+  DatabaseConnections: [mean, upper]
+  ReadLatency: [mean, upper]
+  WriteLatency: [mean, upper]
+  ReadIOPS: [sum]
+  WriteIOPS: [sum]
+
+AWS/S3:
+  AllRequests: [sum]
+  GetRequests: [sum]
+  PutRequests: [sum]
+  BucketSizeBytes: [mean]
+  NumberOfObjects: [mean]
+
+AWS/SQS:
+  ApproximateNumberOfMessagesVisible: [upper]
+  NumberOfMessagesSent: [sum]
+  NumberOfMessagesReceived: [sum]
+  NumberOfMessagesDeleted: [sum]
+
+AWS/SNS:
+  NumberOfMessagesPublished: [sum]
+  NumberOfNotificationsDelivered: [sum]
+  NumberOfNotificationsFailed: [sum]
+
+AWS/Kinesis:
+  GetRecords.IteratorAgeMilliseconds: [upper]
+  IncomingBytes: [sum]
+  IncomingRecords: [sum]
+  PutRecords.Bytes: [sum]
+  PutRecords.Records: [sum]
+
+AWS/Firehose:
+  IncomingBytes: [sum]
+  IncomingRecords: [sum]
+  DeliveryToS3.Records: [sum]
+  DeliveryToS3.DataFreshness: [upper]
+
+AWS/DynamoDB:
+  ConsumedReadCapacityUnits: [sum]
+  ConsumedWriteCapacityUnits: [sum]
+  ProvisionedReadCapacityUnits: [mean]
+  ProvisionedWriteCapacityUnits: [mean]
+  ThrottledRequests: [sum]
+  SuccessfulRequestLatency: [mean, upper]
+
+AWS/ApiGateway:
+  Count: [sum]
+  Latency: [mean, upper]
+  IntegrationLatency: [mean, upper]
+  4XXError: [sum]
+  5XXError: [sum]
+
+AWS/CloudFront:
+  Requests: [sum]
+  BytesDownloaded: [sum]
+  BytesUploaded: [sum]
+  4xxErrorRate: [mean]
+  5xxErrorRate: [mean]
+
+AWS/ELB:
+  RequestCount: [sum]
+  Latency: [mean, upper]
+  HTTPCode_Backend_5XX: [sum]
+  UnHealthyHostCount: [upper]
+
+AWS/NetworkELB:
+  ActiveFlowCount: [sum]
+  NewFlowCount: [sum]
+  ProcessedBytes: [sum]
+  TCP_Client_Reset_Count: [sum]
+
+AWS/NATGateway:
+  ActiveConnectionCount: [upper]
+  BytesInFromDestination: [sum]
+  BytesInFromSource: [sum]
+  BytesOutToDestination: [sum]
+  BytesOutToSource: [sum]
+  ErrorPortAllocation: [sum]
+
+AWS/AutoScaling:
+  GroupDesiredCapacity: [mean]
+  GroupInServiceInstances: [mean]
+  GroupMinSize: [mean]
+  GroupMaxSize: [mean]
+
+AWS/ElastiCache:
+  CPUUtilization: [mean, upper]
+  EngineCPUUtilization: [mean, upper]
+  CurrConnections: [mean, upper]
+  NetworkBytesIn: [sum]
+  NetworkBytesOut: [sum]
+
+AWS/Redshift:
+  CPUUtilization: [mean, upper]
+  PercentageDiskSpaceUsed: [upper]
+  DatabaseConnections: [upper]
+
+AWS/Route53:
+  HealthCheckStatus: [lower]
+  HealthCheckPercentageHealthy: [mean]
+  ConnectionTime: [mean, upper]
+
+AWS/States:
+  ExecutionsStarted: [sum]
+  ExecutionsSucceeded: [sum]
+  ExecutionsFailed: [sum]
+  ExecutionTime: [mean, upper]
+
+AWS/Bedrock:
+  InputTokenCount: [sum]
+  OutputTokenCount: [sum]
+  Invocations: [sum]
+  InvocationLatency: [mean, upper]
+
+AWS/SageMaker:
+  CPUUtilization: [mean, upper]
+  MemoryUtilization: [mean, upper]
+  GPUUtilization: [mean, upper]
+  GPUMemoryUtilization: [mean, upper]

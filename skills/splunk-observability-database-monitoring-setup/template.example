@@ -1,0 +1,84 @@
+# Splunk Observability Database Monitoring spec
+#
+# Copy this file to template.local and fill in non-secret values only.
+# Never place passwords, datasource strings, access tokens, or API keys here.
+
+api_version: splunk-observability-database-monitoring-setup/v1
+
+realm: us1
+cluster_name: "lab-cluster"
+distribution: kubernetes  # kubernetes | openshift | eks | gke | linux
+
+collector:
+  version: v0.150.0
+  namespace: splunk-otel
+  release_name: splunk-otel-collector
+  secret_name: splunk-otel-collector-splunk
+  token_key: splunk_observability_access_token
+
+outputs:
+  kubernetes: true
+  linux: true
+
+# Keep false for production. Set true only for lab/demo targets that are
+# receiver-compatible but outside Splunk's published DBMon support matrix.
+allow_unsupported_targets: false
+
+targets:
+  - name: orders_postgres
+    type: postgresql
+    platform: aws-rds
+    version: "17.5"
+    endpoint: orders-postgres.example.internal:5432
+    databases:
+      - orders
+    credentials:
+      kubernetes_secret:
+        name: dbmon-orders-postgres
+        namespace: splunk-otel
+        username_key: username
+        password_key: password
+      linux_env:
+        username_var: DBMON_ORDERS_POSTGRES_USERNAME
+        password_var: DBMON_ORDERS_POSTGRES_PASSWORD
+    events:
+      query_sample: true
+      top_query: true
+
+  - name: billing_sqlserver
+    type: sqlserver
+    platform: self-hosted
+    version: "2022"
+    server: billing-sql.example.internal
+    port: 1433
+    credentials:
+      kubernetes_secret:
+        name: dbmon-billing-sqlserver
+        namespace: splunk-otel
+        username_key: username
+        password_key: password
+      linux_env:
+        username_var: DBMON_BILLING_SQLSERVER_USERNAME
+        password_var: DBMON_BILLING_SQLSERVER_PASSWORD
+    events:
+      query_sample: true
+      top_query: true
+
+  - name: erp_oracle_node1
+    type: oracledb
+    platform: oracle-rac
+    version: "19c"
+    endpoint: erp-oracle-node1.example.internal:1521
+    service: ERPPROD
+    credentials:
+      kubernetes_secret:
+        name: dbmon-erp-oracle-node1
+        namespace: splunk-otel
+        username_key: username
+        password_key: password
+      linux_env:
+        username_var: DBMON_ERP_ORACLE_NODE1_USERNAME
+        password_var: DBMON_ERP_ORACLE_NODE1_PASSWORD
+    events:
+      query_sample: true
+      top_query: true
