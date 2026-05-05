@@ -1,9 +1,22 @@
-# Splunk TA Skills — Codex Context
+# Splunk Platform and Cisco Skills — Codex Context
 
-This repository is a working library of Cursor, Codex, and Claude Code agent skills plus
-shell scripts for installing, configuring, and validating Splunk apps and Technology
-Add-ons on Splunk Cloud and self-managed Splunk Enterprise deployments, and for
-bootstrapping Linux Splunk Enterprise hosts.
+This repository is a working library of Cursor, Codex, and Claude Code agent
+skills, MCP tooling, intake templates, reference docs, and shell automation for
+planning, rendering, installing, configuring, validating, and handing off Splunk
+Platform, Splunk Cloud, Splunk Observability Cloud, Cisco, and adjacent
+operational integrations.
+
+It goes well beyond Technology Add-on setup. The catalog covers Cisco product
+onboarding, Splunk apps and TAs, Enterprise Security and the broader Splunk
+security portfolio, ITSI, SOAR, On-Call, Observability Cloud integrations,
+dashboards, detectors, OpenTelemetry collectors, Kubernetes APM
+auto-instrumentation, Browser RUM and Session Replay, AWS and ThousandEyes
+integrations, HEC, ACS allowlists, PKI, SmartStore, federated search, workload
+management, Monitoring Console, license management, indexer clusters, Edge
+Processor, Stream, SC4S, SC4SNMP, Universal Forwarders, Linux Splunk Enterprise
+hosts, self-managed Kubernetes runtimes, and external-collector topologies.
+Most workflows are render-first and validation-heavy, with explicit apply
+phases and secret-file guardrails for production changes.
 
 ## How To Use This Repo With Codex
 

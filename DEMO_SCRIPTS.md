@@ -111,7 +111,7 @@ The question becomes, "How quickly can I turn this data into value?" [emphasize]
 
 That is the real sales story here.
 
-Splunk TA Skills turns onboarding into a repeatable operating motion for the Splunk admin. [pause]
+The Splunk Platform and Cisco Skills repo turns onboarding into a repeatable operating motion for the Splunk admin. [pause]
 Less manual effort. [beat]
 Faster onboarding. [beat]
 More consistency. [beat]
