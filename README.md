@@ -6,10 +6,9 @@ planning, rendering, installing, configuring, validating, and handing off Splunk
 Platform, Splunk Cloud, Splunk Observability Cloud, Cisco, and adjacent
 operational integrations.
 
-It goes well beyond Technology Add-on setup. The catalog covers Cisco product
-onboarding, Splunk apps and TAs, Enterprise Security and the broader Splunk
-security portfolio, ITSI, SOAR, On-Call, Observability Cloud integrations,
-dashboards, detectors, OpenTelemetry collectors, Kubernetes APM
+The catalog covers Cisco product onboarding, Splunk apps and TAs, Enterprise Security 
+and the broader Splunk security portfolio, ITSI, SOAR, On-Call, Observability Cloud 
+integrations, dashboards, detectors, OpenTelemetry collectors, Kubernetes APM
 auto-instrumentation, Browser RUM and Session Replay, AWS and ThousandEyes
 integrations, HEC, ACS allowlists, PKI, SmartStore, federated search, workload
 management, Monitoring Console, license management, indexer clusters, Edge
