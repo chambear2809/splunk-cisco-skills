@@ -353,6 +353,14 @@
         "notes": "Reusable HEC platform service workflow for allowed indexes, default source/sourcetype, TLS, and ACK-aware token handling."
       },
       {
+        "kind": "app",
+        "app_name": "splunk-connect-for-otlp",
+        "label": "`splunk-connect-for-otlp-setup`",
+        "cloud_install_path": "ACS Splunkbase for supported Cloud topologies; customer-managed heavy forwarder fallback when inbound OTLP reachability is not proven",
+        "cloud_config_path": "REST modular input configuration plus HEC token handoff through splunk-hec-service-setup",
+        "notes": "Hybrid-gated OTLP modular input. Victoria direct execution requires topology and inbound reachability validation; Classic routes input execution to IDM or customer-managed heavy forwarder. External collectors and SDKs are senders/clients only."
+      },
+      {
         "kind": "workflow",
         "skill": "splunk-admin-doctor",
         "label": "`splunk-admin-doctor`",
@@ -800,6 +808,22 @@
       },
       "cloud_pairing": [],
       "notes": "Generic package delivery skill; actual package compatibility comes from the package or app metadata."
+    },
+    {
+      "skill": "splunk-connect-for-otlp-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "Splunkbase app 8704 modular input runs on search-tier or heavy-forwarder only after topology checks; external collectors and SDKs are OTLP senders/clients, not app install targets. Classic Cloud routes to IDM or customer-managed heavy forwarder."
     },
     {
       "skill": "splunk-connect-for-syslog-setup",
@@ -2553,6 +2577,35 @@
       },
       "latest_verified_version": "1.0.7",
       "latest_verified_date": "February 18, 2026"
+    },
+    {
+      "skill": "splunk-connect-for-otlp-setup",
+      "app_name": "splunk-connect-for-otlp",
+      "splunkbase_id": "8704",
+      "label": "Splunk Connect for OTLP",
+      "package_patterns": [
+        "splunk-connect-for-otlp*.tgz",
+        "splunk-connect-for-otlp_*.tgz"
+      ],
+      "min_splunk_version": "9.4",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only.",
+      "latest_verified_version": "0.4.1",
+      "latest_verified_date": "May 6, 2026"
     },
     {
       "skill": "splunk-observability-cloud-integration-setup",

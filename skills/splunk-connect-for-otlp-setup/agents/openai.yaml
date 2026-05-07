@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Connect for OTLP"
+  short_description: "Install and repair the OTLP Splunk modular input"
+  default_prompt: >-
+    Use $splunk-connect-for-otlp-setup to install Splunkbase app 8704,
+    configure the OTLP modular input, render sender examples, and validate HEC
+    token/index routing without exposing token values.

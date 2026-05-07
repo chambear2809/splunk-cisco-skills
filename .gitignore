@@ -61,6 +61,7 @@ projects/tmp-*
 /splunk-live-validation-runs/
 /splunk-workload-management-rendered/
 /splunk-hec-service-rendered/
+/splunk-connect-for-otlp-rendered/
 /splunk-federated-search-rendered/
 /splunk-smartstore-rendered/
 /splunk-monitoring-console-rendered/

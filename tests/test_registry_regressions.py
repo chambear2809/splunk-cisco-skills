@@ -50,6 +50,7 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "8365",
     "8485",
     "8566",
+    "8704",
 }
 
 
@@ -241,6 +242,10 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(workload_management["role_support"]["heavy-forwarder"], "none")
         hec_service = skill_topologies["splunk-hec-service-setup"]
         self.assertEqual(hec_service["role_support"]["heavy-forwarder"], "supported")
+        otlp = skill_topologies["splunk-connect-for-otlp-setup"]
+        self.assertEqual(otlp["role_support"]["search-tier"], "supported")
+        self.assertEqual(otlp["role_support"]["heavy-forwarder"], "supported")
+        self.assertEqual(otlp["role_support"]["external-collector"], "supported")
         federated_search = skill_topologies["splunk-federated-search-setup"]
         self.assertEqual(federated_search["role_support"]["search-tier"], "required")
         smartstore = skill_topologies["splunk-index-lifecycle-smartstore-setup"]

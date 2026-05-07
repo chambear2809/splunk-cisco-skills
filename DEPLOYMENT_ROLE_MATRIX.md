@@ -49,6 +49,7 @@ For Cloud-specific install and API behavior, see
 | `cisco-product-setup` | Supported | None | Supported | None | None | None | Product-name router that resolves a Cisco product from the SCAN catalog and delegates to the matching setup skill or explicit gap classification. |
 | `cisco-thousandeyes-setup` | Supported | None | Supported | None | None | None | Hybrid-capable app that combines HEC push with polling and dashboard setup. |
 | `splunk-app-install` | Supported | Supported | Supported | Supported | None | None | Generic package delivery skill; actual package compatibility comes from the package or app metadata. |
+| `splunk-connect-for-otlp-setup` | Supported | None | Supported | None | Supported | Search tier, HF, or External collector | Splunkbase app 8704 modular input runs on search-tier or heavy-forwarder only after topology checks; external collectors and SDKs are OTLP senders/clients, not app install targets. Classic Cloud routes to IDM or customer-managed heavy forwarder. |
 | `splunk-connect-for-syslog-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4S runtime assets. |
 | `splunk-connect-for-snmp-setup` | Supported | None | None | None | Required | External collector | External collector workflow that prepares Splunk-side objects and renders SC4SNMP runtime assets. |
 | `splunk-observability-otel-collector-setup` | Supported | None | None | None | Required | External collector | External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup. |
@@ -144,6 +145,7 @@ For Cloud-specific install and API behavior, see
 | `Splunk_AI_Assistant_Cloud` | `splunk-ai-assistant-setup` | Required | None | None | None | None |
 | `Splunk_MCP_Server` | `splunk-mcp-server-setup` | Required | None | None | None | None |
 | `ta_cisco_spaces` | `cisco-spaces-setup` | Supported | None | Supported | None | None |
+| `splunk-connect-for-otlp` | `splunk-connect-for-otlp-setup` | Supported | None | Supported | None | Supported |
 | `Splunk_TA_sim` | `splunk-observability-cloud-integration-setup` | Required | None | Supported | None | None |
 
 ## Notes On Split Deployments

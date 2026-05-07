@@ -1,0 +1,30 @@
+# Splunk Connect for OTLP Setup Worksheet
+
+# Non-secret Splunk target context.
+platform: enterprise
+cloud_topology: victoria
+execution_tier: heavy-forwarder
+
+# Modular input.
+input_name: otlp-main
+grpc_port: 4317
+http_port: 4318
+listen_address: 0.0.0.0
+enable_ssl: false
+server_cert: ""
+server_key: ""
+index: otlp_events
+source: otlp
+sourcetype: splunk-connect-for-otlp
+
+# HEC token handoff. Store token values only in a local chmod-600 file.
+hec_token_name: splunk_otlp
+hec_default_index: otlp_events
+hec_allowed_indexes: otlp_events
+hec_token_file: /tmp/splunk_otlp_hec_token
+
+# Sender assets.
+receiver_host: otlp-hf.example.com
+sender_protocol: both
+sender_tls: false
+service_name: example-service
