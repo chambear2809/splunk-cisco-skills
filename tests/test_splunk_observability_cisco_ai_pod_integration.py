@@ -12,6 +12,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SETUP = REPO_ROOT / "skills/splunk-observability-cisco-ai-pod-integration/scripts/setup.sh"
+VALIDATE = REPO_ROOT / "skills/splunk-observability-cisco-ai-pod-integration/scripts/validate.sh"
 
 
 def run_setup(*args: str) -> subprocess.CompletedProcess[str]:
@@ -185,23 +186,42 @@ def test_intersight_pipeline_merged_into_composite_overlay(tmp_path: Path) -> No
     # The child's overlay adds 'otlp' to the metrics pipeline receivers list.
     # If the umbrella's load_child_overlay() drops the file, this is the line
     # that disappears from the composed overlay.
-    import yaml as _yaml  # local import; PyYAML is required for the AI Pod skill
-
-    composed = _yaml.safe_load(overlay)
-    metrics_receivers = (
-        composed.get("agent", {})
-        .get("config", {})
-        .get("service", {})
-        .get("pipelines", {})
-        .get("metrics", {})
-        .get("receivers", [])
-    )
-    assert "otlp" in metrics_receivers, (
+    assert "        metrics:\n          receivers:\n          - otlp\n" in overlay, (
         "Composed overlay's agent.config.service.pipelines.metrics.receivers is "
         "missing 'otlp'. The Intersight child's pipeline overlay was silently "
         "dropped during composition; load_child_overlay() likely failed to walk "
         f"all *.yaml files. Intersight child files: {[p.name for p in yaml_files]}"
     )
+
+
+def test_live_validate_propagates_to_children_and_catches_intersight_export_errors() -> None:
+    script = VALIDATE.read_text(encoding="utf-8")
+    assert "command -v oc" in script
+    assert "child_args+=(--live)" in script
+    assert "unknown service opentelemetry.proto.collector.metrics.v1.MetricsService" in script
+    assert "receiver_creator/nvidia" in script
+
+
+def test_setup_exposes_existing_collector_apply_path() -> None:
+    script = SETUP.read_text(encoding="utf-8")
+    assert "--apply-existing-collector" in script
+    assert "apply_existing_collector.py" in script
+    assert "--set splunkObservability.accessToken" not in script
+
+
+def test_existing_collector_apply_removes_stale_nvidia_and_forces_otlp_metrics() -> None:
+    script = (
+        REPO_ROOT
+        / "skills/splunk-observability-cisco-ai-pod-integration/scripts/apply_existing_collector.py"
+    ).read_text(encoding="utf-8")
+    assert "receiver_creator/nvidia" in script
+    assert "receiver_creator/dcgm-cisco" in script
+    assert "prune_nexus_without_secret" in script
+    assert "cisco-nexus-ssh" in script
+    assert "metrics_receivers.insert(0, \"otlp\")" in script
+    assert "--set-file" in script
+    assert "--force-conflicts" in script
+    assert "accessToken" in script
 
 
 def test_all_rendered_shell_scripts_have_valid_bash_syntax(tmp_path: Path) -> None:

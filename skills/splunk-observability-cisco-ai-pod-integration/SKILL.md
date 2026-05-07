@@ -17,7 +17,8 @@ description: >-
   processor with model_name extraction, NIM scrape via TWO modes
   (--nim-scrape-mode receiver_creator|endpoints), OpenShift defaults
   (kubeletstats.insecure_skip_verify, certmanager off, cloudProvider
-  empty), helm --reuse-values --set token pattern. Hands off composed
+  empty), file-backed Helm token pattern, existing-collector apply with stale
+  receiver_creator/nvidia cleanup. Hands off composed
   render to splunk-observability-otel-collector-setup with --distribution,
   HEC for K8s container logs to splunk-hec-service-setup, dashboards to
   splunk-observability-dashboard-builder, detectors to
@@ -56,7 +57,8 @@ These are the **silent failure traps** the umbrella prevents:
 3. **DCGM dual-label discovery**: matches both `app` and `app.kubernetes.io/name`. Inherited from the GPU child skill.
 4. **Dual-pipeline filtering**: filtered standard pipeline + unfiltered specialized pipelines for AI Pod dashboards. Smarter than the canonical single-pipeline pattern.
 5. **OpenShift defaults**: `kubeletstats.insecure_skip_verify: true` (REQUIRED), `certmanager.enabled: false`, `cloudProvider: ""`.
-6. **Helm token pattern**: apply scripts use `helm upgrade --install --reuse-values --set splunkObservability.accessToken="$(cat $TOKEN_FILE)"` so the token is never written to a tracked values file.
+6. **Existing collector apply**: use `--apply-existing-collector` when a Splunk OTel Collector is already running. This path renders the overlay, reads current Helm values without persisting the token, removes stale `receiver_creator/nvidia`, wires `otlp` into the metrics pipeline for Intersight, applies via Helm, restarts the existing collector agent, restarts Intersight, and runs live validation.
+7. **Helm token pattern**: apply scripts use a file-backed token (`--set-file splunkObservability.accessToken=...`) so the token is never written to a tracked values file or temporary values file.
 
 ## Composition model
 
@@ -67,7 +69,7 @@ When you run `--render`, the umbrella:
 3. Adds AI-Pod-specific blocks on top of the merged overlay.
 4. Renders unified handoff scripts.
 
-When you run `--apply [SECTION]`, the umbrella forwards to the appropriate child skill's apply or runs its own AI-Pod-specific apply.
+When you run `--apply-existing-collector`, the umbrella applies its rendered overlay to the already running Splunk OTel Collector Helm release instead of standing up a second collector.
 
 ## What it renders (composed + AI-Pod-specific)
 
@@ -116,7 +118,21 @@ When you run `--apply [SECTION]`, the umbrella forwards to the appropriate child
      --output-dir splunk-observability-cisco-ai-pod-rendered
    ```
 
-3. Apply child manifests (Intersight, optional DCGM patch) + merge overlay + apply via base collector:
+3. If a Splunk OTel Collector is already running, apply the overlay in place and run live validation:
+
+   ```bash
+   bash skills/splunk-observability-cisco-ai-pod-integration/scripts/setup.sh \
+     --render --apply-existing-collector --validate --live \
+     --realm us0 \
+     --cluster-name atl-ai-pod \
+     --distribution openshift \
+     --collector-release splunk-otel-collector \
+     --collector-namespace splunk-otel \
+     --o11y-token-file /path/to/o11y-token \
+     --output-dir splunk-observability-cisco-ai-pod-rendered
+   ```
+
+4. For greenfield installs, apply child manifests (Intersight, optional DCGM patch) + merge overlay + apply via base collector:
 
    ```bash
    bash splunk-observability-cisco-ai-pod-rendered/scripts/handoff-base-collector.sh
@@ -143,5 +159,7 @@ bash skills/splunk-observability-cisco-ai-pod-integration/scripts/validate.sh
 ```
 
 Runs each child skill's `validate.sh` recursively, then adds AI-Pod-specific checks: `oc get deployment -n intersight-otel`, log tail for `<release>-splunk-otel-collector-k8s-cluster-receiver`, RBAC patch presence when endpoint-SD is used, optional SignalFlow probes for `num_requests_running`, `milvus_proxy_req_count`, `vllm:e2e_request_latency_seconds`.
+
+With `--live`, validation prefers `oc`, falls back to `kubectl`, passes `--live` through to child validators, and fails on Intersight OTLP export errors such as `unknown service opentelemetry.proto.collector.metrics.v1.MetricsService`.
 
 See `reference.md` and `references/composition-and-overlay-merge.md`, `nim-vllm-scrape-catalog.md`, `milvus-storage-redfish.md`, `openshift-scc.md`, `workshop-multi-tenant.md`, `ai-pod-dashboards-catalog.md`, `endpoints-rbac-patch.md`, `dual-pipeline-filtering.md`, `nim-scrape-modes.md`, `production-troubleshooting-atl-ocp2.md`, `troubleshooting.md` for the full annexes.

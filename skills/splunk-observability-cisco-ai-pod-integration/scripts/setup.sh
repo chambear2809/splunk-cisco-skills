@@ -26,7 +26,9 @@ Usage:
 
 Modes:
   --render                       Render composed overlay + AI-Pod additions + handoffs (default)
+  --apply-existing-collector     Apply the rendered overlay to an existing Splunk OTel Helm release
   --validate                     Run static validation (recursively + AI-Pod-specific)
+  --live                         With --validate, run oc/kubectl live validation
   --dry-run                      Show plan without writing
   --json                         Emit JSON dry-run output
   --explain                      Print plan in plain English
@@ -42,6 +44,7 @@ Options:
   --workshop-mode                Render the workshop multi-tenant deploy script
   --collector-release NAME       Override Intersight child's collector.release
   --collector-namespace NS       Override Intersight child's collector.namespace
+  --collector-chart-ref REF      Helm chart ref for --apply-existing-collector
   --o11y-token-file PATH         Splunk O11y Org access token (passed through)
   --intersight-key-id-file PATH  Intersight key ID (passed through to Intersight child)
   --intersight-key-file PATH     Intersight private key (passed through to Intersight child)
@@ -66,7 +69,9 @@ PY
 }
 
 MODE_RENDER=true
+MODE_APPLY_EXISTING_COLLECTOR=false
 MODE_VALIDATE=false
+VALIDATE_LIVE=false
 DRY_RUN=false
 JSON_OUTPUT=false
 EXPLAIN=false
@@ -81,6 +86,7 @@ ENABLE_DCGM_POD_LABELS="false"
 WORKSHOP_MODE="false"
 COLLECTOR_RELEASE=""
 COLLECTOR_NAMESPACE=""
+COLLECTOR_CHART_REF="splunk-otel-collector-chart/splunk-otel-collector"
 O11Y_TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE:-}"
 INTERSIGHT_KEY_ID_FILE=""
 INTERSIGHT_KEY_FILE=""
@@ -92,7 +98,9 @@ if [[ $# -eq 0 ]]; then usage; exit 0; fi
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --render) MODE_RENDER=true; shift ;;
+        --apply-existing-collector) MODE_APPLY_EXISTING_COLLECTOR=true; shift ;;
         --validate) MODE_VALIDATE=true; shift ;;
+        --live) VALIDATE_LIVE=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --explain) EXPLAIN=true; shift ;;
@@ -106,6 +114,7 @@ while [[ $# -gt 0 ]]; do
         --workshop-mode) WORKSHOP_MODE="true"; shift ;;
         --collector-release) require_arg "$1" "$#" || exit 1; COLLECTOR_RELEASE="$2"; shift 2 ;;
         --collector-namespace) require_arg "$1" "$#" || exit 1; COLLECTOR_NAMESPACE="$2"; shift 2 ;;
+        --collector-chart-ref) require_arg "$1" "$#" || exit 1; COLLECTOR_CHART_REF="$2"; shift 2 ;;
         --o11y-token-file) require_arg "$1" "$#" || exit 1; O11Y_TOKEN_FILE="$2"; shift 2 ;;
         --intersight-key-id-file) require_arg "$1" "$#" || exit 1; INTERSIGHT_KEY_ID_FILE="$2"; shift 2 ;;
         --intersight-key-file) require_arg "$1" "$#" || exit 1; INTERSIGHT_KEY_FILE="$2"; shift 2 ;;
@@ -176,7 +185,7 @@ Splunk Observability Cisco AI Pod Integration (umbrella) -- execution plan
                           OpenShift defaults (when distribution=openshift),
                           rbac.customRules (when nim_scrape_mode=endpoints),
                           --workshop-mode multi-tenant.sh, OpenShift SCC helper.
-  Mode: render=$(bool_text "${MODE_RENDER}") validate=$(bool_text "${MODE_VALIDATE}")
+  Mode: render=$(bool_text "${MODE_RENDER}") apply_existing_collector=$(bool_text "${MODE_APPLY_EXISTING_COLLECTOR}") validate=$(bool_text "${MODE_VALIDATE}") live=$(bool_text "${VALIDATE_LIVE}")
 EXPLAIN
     exit 0
 fi
@@ -202,6 +211,29 @@ fi
 
 if [[ "${DRY_RUN}" == "true" ]]; then exit 0; fi
 
+if [[ "${MODE_APPLY_EXISTING_COLLECTOR}" == "true" ]]; then
+    if [[ -z "${O11Y_TOKEN_FILE}" ]]; then
+        log "ERROR: --apply-existing-collector requires --o11y-token-file (or SPLUNK_O11Y_TOKEN_FILE)."
+        exit 1
+    fi
+    if [[ ! -r "${O11Y_TOKEN_FILE}" ]]; then
+        log "ERROR: --o11y-token-file is not readable: ${O11Y_TOKEN_FILE}"
+        exit 1
+    fi
+    "${PYTHON_BIN}" "${SCRIPT_DIR}/apply_existing_collector.py" \
+        --output-dir "${OUTPUT_DIR}" \
+        --release "${COLLECTOR_RELEASE:-splunk-otel-collector}" \
+        --namespace "${COLLECTOR_NAMESPACE:-splunk-otel}" \
+        --chart-ref "${COLLECTOR_CHART_REF}" \
+        --o11y-token-file "${O11Y_TOKEN_FILE}"
+    MODE_VALIDATE=true
+    VALIDATE_LIVE=true
+fi
+
 if [[ "${MODE_VALIDATE}" == "true" ]]; then
-    bash "${SCRIPT_DIR}/validate.sh" --output-dir "${OUTPUT_DIR}"
+    VALIDATE_ARGS=(--output-dir "${OUTPUT_DIR}")
+    if [[ "${VALIDATE_LIVE}" == "true" ]]; then
+        VALIDATE_ARGS+=(--live)
+    fi
+    bash "${SCRIPT_DIR}/validate.sh" "${VALIDATE_ARGS[@]}"
 fi

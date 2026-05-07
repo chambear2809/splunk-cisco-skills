@@ -94,6 +94,6 @@ The Splunk Platform TA path (`Splunk_TA_Cisco_Intersight`) lives in [cisco-inter
 bash skills/splunk-observability-cisco-intersight-integration/scripts/validate.sh
 ```
 
-Static checks: manifest validity, no inline credentials, OTLP endpoint shape. With `--live`: `kubectl get deployment -n intersight-otel`, log tail for the intersight-otel pod.
+Static checks: manifest validity, no inline credentials, OTLP endpoint shape. With `--live`: prefers `oc` and falls back to `kubectl`, probes the `intersight-otel` namespace, checks the live OTLP target service/config, and fails if the pod logs show OTLP metrics export errors such as `unknown service opentelemetry.proto.collector.metrics.v1.MetricsService`.
 
 See `reference.md` and `references/intersight-deployment.md`, `intersight-secrets.md`, `dashboards-catalog.md`, `troubleshooting.md` for details.

@@ -5,20 +5,20 @@
 1. Confirm the `intersight-otel-collector` pod is running:
 
 ```bash
-kubectl -n intersight-otel get pods
+oc -n intersight-otel get pods
 ```
 
 2. Confirm the Secret exists and has the right keys:
 
 ```bash
-kubectl -n intersight-otel get secret intersight-secret -o jsonpath='{.data}' | jq 'keys'
-# expect: ["key", "keyId"]
+oc -n intersight-otel get secret intersight-api-credentials -o jsonpath='{.data}' | jq 'keys'
+# expect: ["intersight-key", "intersight-key-id"]
 ```
 
 3. Tail the collector logs:
 
 ```bash
-kubectl -n intersight-otel logs deployment/intersight-otel-collector --tail=200
+oc -n intersight-otel logs deployment/intersight-otel --tail=200
 ```
 
 Common errors:
@@ -26,12 +26,13 @@ Common errors:
 - `unauthenticated: Failed to verify user identity`: wrong API key ID or expired private key. Regenerate via Intersight UI -> Settings -> API Keys.
 - `auth: failed to sign JWT`: the private key isn't valid PEM. Verify with `openssl rsa -in /tmp/key.pem -check`.
 - `dial tcp <agent>: i/o timeout`: the Intersight collector cannot reach the Splunk OTel agent over OTLP. Check the endpoint URL (`<release>-splunk-otel-collector-agent.splunk-otel.svc.cluster.local:4317`) and confirm port 4317 is exposed on the agent.
+- `unknown service opentelemetry.proto.collector.metrics.v1.MetricsService`: the Intersight collector reached a gRPC endpoint, but that endpoint is not accepting OTLP metrics. Confirm `otel_collector_endpoint` points to the Splunk OTel collector agent service on port `4317`, not a Splunk Cloud ingest/HEC endpoint, then confirm the Service target and the running collector actually serve OTLP metrics on `4317`.
 
 ## Verify OTLP hand-off to the main collector
 
 ```bash
-# Run a quick TCP check from inside the intersight-otel collector pod:
-kubectl -n intersight-otel exec deployment/intersight-otel-collector -- \
+# Run a quick TCP check from inside the intersight-otel pod:
+oc -n intersight-otel exec deployment/intersight-otel -- \
   nc -zv <release>-splunk-otel-collector-agent.splunk-otel.svc.cluster.local 4317
 ```
 

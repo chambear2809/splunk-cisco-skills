@@ -12,6 +12,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SETUP = REPO_ROOT / "skills/splunk-observability-cisco-intersight-integration/scripts/setup.sh"
+VALIDATE = REPO_ROOT / "skills/splunk-observability-cisco-intersight-integration/scripts/validate.sh"
 
 
 def run_setup(*args: str) -> subprocess.CompletedProcess[str]:
@@ -138,3 +139,10 @@ def test_idempotent_re_render(tmp_path: Path) -> None:
     assert second.returncode == 0, combined_output(second)
     first_deploy = (output / "intersight-integration/intersight-otel-deployment.yaml").read_text(encoding="utf-8")
     assert (output / "intersight-integration/intersight-otel-deployment.yaml").read_text(encoding="utf-8") == first_deploy
+
+
+def test_live_validate_prefers_oc_and_catches_otlp_metrics_service_error() -> None:
+    script = VALIDATE.read_text(encoding="utf-8")
+    assert "command -v oc" in script
+    assert "unknown service opentelemetry.proto.collector.metrics.v1.MetricsService" in script
+    assert "service.pipelines.metrics.receivers" in script

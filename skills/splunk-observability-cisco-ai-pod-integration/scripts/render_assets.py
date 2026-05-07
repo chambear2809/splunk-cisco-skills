@@ -696,6 +696,14 @@ echo '      --set splunkObservability.accessToken="$(cat $O11Y_TOKEN_FILE)"'
 echo
 echo "Step 5: OpenShift SCC (if applicable)."
 echo "    bash $(dirname \\${{BASH_SOURCE[0]}})/../openshift/scc.sh"
+echo
+echo "For an existing Splunk OTel release, prefer the skill-owned apply path:"
+echo "    bash skills/splunk-observability-cisco-ai-pod-integration/scripts/setup.sh \\\\"
+echo "      --render --apply-existing-collector --validate --live \\\\"
+echo "      --realm {realm} --cluster-name {cluster_name} --distribution {distribution} \\\\"
+echo "      --collector-release splunk-otel-collector --collector-namespace splunk-otel \\\\"
+echo '      --o11y-token-file "$O11Y_TOKEN_FILE"'
+echo "This removes stale receiver_creator/nvidia values and wires OTLP metrics before Helm upgrade."
 """
         )
     if handoffs.get("hec_service", True) and hec_enabled:
