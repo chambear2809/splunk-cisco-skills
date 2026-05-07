@@ -124,5 +124,6 @@ Environment-specific notes:
 | `splunk-license-manager-setup` | `curl`; optional SSH/file-copy tooling for license file placement. | Splunk Enterprise license manager and peer admin access; license file(s) available locally. |
 | `splunk-mcp-server-setup` | `node`, `npm`/`npx`, `mcp-remote`; `codex` for Codex registration. | Splunk MCP Server app package/install access; Splunk bearer token file or token-minting permissions; target MCP clients. |
 | `splunk-monitoring-console-setup` | Shared baseline. | Splunk Enterprise Monitoring Console and peer REST access; distributed mode peer/group details. |
+| `splunk-platform-restart-orchestrator` | Shared baseline; optional `acs`, `ssh`, `sshpass`, `systemctl`, and noninteractive `sudo` depending on target topology. | Splunk Cloud ACS or Splunk Enterprise management access; host-local restart/reload authority or an operator handoff path; target role/topology details. |
 | `splunk-platform-pki-setup` | `openssl`, `jq`; optional `ssh`, `scp`, and `sudo` for distribution/rotation handoffs. | Private CA or public CSR workflow inputs; per-component hostname/SAN inventory; Vault/AD CS/EJBCA/ACME handoffs when used. |
 | `splunk-workload-management-setup` | `systemctl` for local Linux readiness checks. | Splunk Enterprise workload-management capable hosts; Linux cgroup/systemd prerequisites; pool/rule/admission plan. |
