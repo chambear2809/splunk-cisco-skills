@@ -218,6 +218,82 @@ except Exception:
 PY
 }
 
+port_listens_in_text() {
+    local payload="$1" port="$2"
+    grep -Eq "(^|[[:space:]])[^[:space:]]*:${port}([[:space:]]|$)" <<<"${payload}"
+}
+
+tcp_port_reachable() {
+    local host="$1" port="$2"
+    python3 - "${host}" "${port}" >/dev/null 2>&1 <<'PY'
+import socket
+import sys
+
+host, port = sys.argv[1], int(sys.argv[2])
+with socket.create_connection((host, port), timeout=3):
+    pass
+PY
+}
+
+check_bound_ports() {
+    local input_summary="$1"
+    local found disabled
+    local ssh_host ssh_user ssh_port listeners="" host
+    local listener_source="none"
+
+    found="$(printf '%s' "${input_summary}" | rest_json_field found)"
+    disabled="$(printf '%s' "${input_summary}" | rest_json_field disabled)"
+    if [[ "${found}" != "True" && "${found}" != "true" ]]; then
+        return 0
+    fi
+    if [[ "${disabled}" == "1" || "${disabled}" == "true" || "${disabled}" == "True" ]]; then
+        return 0
+    fi
+
+    ssh_host="${SPLUNK_SSH_HOST:-${SPLUNK_HOST:-$(splunk_host_from_uri "${SPLUNK_URI}")}}"
+    ssh_user="${SPLUNK_SSH_USER:-splunk}"
+    ssh_port="${SPLUNK_SSH_PORT:-22}"
+    if [[ -n "${ssh_host}" && -n "${ssh_user}" ]] && command -v ssh >/dev/null 2>&1; then
+        listeners="$(ssh -o BatchMode=yes -o ConnectTimeout=5 -p "${ssh_port}" "${ssh_user}@${ssh_host}" \
+            'if command -v ss >/dev/null 2>&1; then ss -ltn; elif command -v netstat >/dev/null 2>&1; then netstat -ltn; else exit 3; fi' \
+            2>/dev/null || true)"
+        if [[ -n "${listeners}" ]]; then
+            listener_source="ssh"
+        fi
+    fi
+
+    if [[ "${listener_source}" == "ssh" ]]; then
+        if port_listens_in_text "${listeners}" "${GRPC_PORT}"; then
+            add_check "grpc-listener" "ok" "gRPC receiver port ${GRPC_PORT} is listening on ${ssh_host}."
+        else
+            add_check "grpc-listener" "fail" "Input is enabled, but gRPC receiver port ${GRPC_PORT} is not listening on ${ssh_host}."
+        fi
+        if port_listens_in_text "${listeners}" "${HTTP_PORT}"; then
+            add_check "http-listener" "ok" "HTTP receiver port ${HTTP_PORT} is listening on ${ssh_host}."
+        else
+            add_check "http-listener" "fail" "Input is enabled, but HTTP receiver port ${HTTP_PORT} is not listening on ${ssh_host}."
+        fi
+        return 0
+    fi
+
+    host="${SPLUNK_HOST:-$(splunk_host_from_uri "${SPLUNK_URI}")}"
+    if [[ -z "${host}" ]]; then
+        add_check "grpc-listener" "warn" "Unable to determine a target host for gRPC receiver port ${GRPC_PORT} reachability."
+        add_check "http-listener" "warn" "Unable to determine a target host for HTTP receiver port ${HTTP_PORT} reachability."
+        return 0
+    fi
+    if tcp_port_reachable "${host}" "${GRPC_PORT}"; then
+        add_check "grpc-listener" "ok" "gRPC receiver port ${GRPC_PORT} is reachable from the validator host."
+    else
+        add_check "grpc-listener" "warn" "Could not confirm gRPC receiver port ${GRPC_PORT}; SSH listener check unavailable and TCP probe to ${host} failed."
+    fi
+    if tcp_port_reachable "${host}" "${HTTP_PORT}"; then
+        add_check "http-listener" "ok" "HTTP receiver port ${HTTP_PORT} is reachable from the validator host."
+    else
+        add_check "http-listener" "warn" "Could not confirm HTTP receiver port ${HTTP_PORT}; SSH listener check unavailable and TCP probe to ${host} failed."
+    fi
+}
+
 validate_live() {
     local app_version input_json input_summary hec_json hec_summary errors_count smoke_count
     local input_json_file hec_json_file
@@ -234,7 +310,7 @@ validate_live() {
     add_check "session" "ok" "Splunk REST session established."
 
     app_version="$(rest_get_app_version "${SK}" "${SPLUNK_URI}" "${APP_NAME}" 2>/dev/null || true)"
-    if [[ -z "${app_version}" ]]; then
+    if [[ -z "${app_version}" || "${app_version}" == "unknown" ]]; then
         add_check "app-installed" "fail" "App ${APP_NAME} is not visible through /services/apps/local."
     else
         add_check "app-installed" "ok" "Installed version ${app_version}."
@@ -299,6 +375,7 @@ PY
     else
         add_check "input-stanza" "fail" "Input ${INPUT_TYPE}://${INPUT_NAME} was not found."
     fi
+    check_bound_ports "${input_summary}"
 
     hec_json="$(splunk_curl "${SK}" "${SPLUNK_URI}/servicesNS/-/-/data/inputs/http?output_mode=json&count=0" 2>/dev/null || true)"
     hec_json_file="$(mktemp)"

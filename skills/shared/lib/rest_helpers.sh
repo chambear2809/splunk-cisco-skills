@@ -295,17 +295,29 @@ get_session_key_from_password_file() {
 # treat the session key as compromised; otherwise, this remains the most
 # practical way to feed the auth header without writing it to disk.
 splunk_curl() {
-    local sk="$1"; shift
+    local sk="$1"
+    local connect_timeout="${SPLUNK_REST_CONNECT_TIMEOUT:-10}"
+    local max_time="${SPLUNK_REST_MAX_TIME:-120}"
+    shift
     _set_splunk_curl_tls_args || return 1
-    curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") "$@"
+    curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+        --connect-timeout "${connect_timeout}" --max-time "${max_time}" \
+        -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") "$@"
 }
 
 splunk_curl_post() {
-    local sk="$1"; shift
-    local post_data="$1"; shift
+    local sk="$1"
+    local connect_timeout="${SPLUNK_REST_CONNECT_TIMEOUT:-10}"
+    local max_time="${SPLUNK_REST_MAX_TIME:-120}"
+    local post_data
+    shift
+    post_data="$1"
+    shift
     _set_splunk_curl_tls_args || return 1
     printf '%s' "${post_data}" \
-        | curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") -d @- "$@"
+        | curl -s ${_tls_verify_args[@]+"${_tls_verify_args[@]}"} \
+            --connect-timeout "${connect_timeout}" --max-time "${max_time}" \
+            -K <(printf 'header = "Authorization: Splunk %s"\n' "${sk}") -d @- "$@"
 }
 
 read_secret_file() {

@@ -13,6 +13,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_DIR = REPO_ROOT / "skills/splunk-connect-for-otlp-setup"
 SETUP = SKILL_DIR / "scripts/setup.sh"
+VALIDATE = SKILL_DIR / "scripts/validate.sh"
 RENDER = SKILL_DIR / "scripts/render_sender_assets.py"
 DOCTOR = SKILL_DIR / "scripts/doctor.py"
 
@@ -79,6 +80,17 @@ def test_setup_dry_run_json_includes_safe_full_lifecycle_plan() -> None:
     assert "SECRET" not in result.stdout
 
 
+def test_validate_guards_missing_app_and_unbound_ports() -> None:
+    validate_text = VALIDATE.read_text(encoding="utf-8")
+    rest_text = (REPO_ROOT / "skills/shared/lib/rest_helpers.sh").read_text(encoding="utf-8")
+
+    assert '${app_version}" == "unknown"' in validate_text
+    assert "grpc-listener" in validate_text
+    assert "http-listener" in validate_text
+    assert "ssh -o BatchMode=yes" in validate_text
+    assert "SPLUNK_REST_MAX_TIME" in rest_text
+
+
 def test_rendered_sender_assets_cover_http_grpc_metadata_and_no_token_values(tmp_path: Path) -> None:
     secret = "SUPER_SECRET_HEC_TOKEN_SHOULD_NOT_RENDER"
     token_file = tmp_path / "hec.token"
@@ -110,6 +122,8 @@ def test_rendered_sender_assets_cover_http_grpc_metadata_and_no_token_values(tmp
     assert secret not in combined
     assert "Authorization=Splunk ${SPLUNK_HEC_TOKEN}" in combined
     assert "Authorization: \"Splunk ${env:SPLUNK_HEC_TOKEN}\"" in combined
+    assert f'SPLUNK_HEC_TOKEN_FILE="{token_file}"' in combined
+    assert "SPLUNK_HEC_TOKEN_FILE=\"$/" not in combined
     assert "com.splunk.index" in combined
     assert "otlp_events" in combined
     assert "otlp.example.com:4317" in combined

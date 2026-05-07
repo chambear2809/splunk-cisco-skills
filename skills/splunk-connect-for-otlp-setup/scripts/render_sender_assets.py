@@ -200,7 +200,7 @@ set -euo pipefail
 
 # Source this file locally after creating a chmod-600 HEC token file.
 # Token values are loaded from disk at runtime and are never rendered here.
-export SPLUNK_HEC_TOKEN_FILE="${args.hec_token_file}"
+export SPLUNK_HEC_TOKEN_FILE="{args.hec_token_file}"
 export {token_env}="$(cat "${{SPLUNK_HEC_TOKEN_FILE}}")"
 export OTEL_EXPORTER_OTLP_ENDPOINT="{endpoint}"
 export OTEL_EXPORTER_OTLP_PROTOCOL="{protocol_value}"
