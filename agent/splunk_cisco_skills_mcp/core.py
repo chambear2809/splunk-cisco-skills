@@ -17,6 +17,7 @@ import subprocess
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Lock
@@ -35,8 +36,32 @@ PLAN_HASH_CHARS = 64
 PLAN_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 DEFAULT_TIMEOUT_SECONDS = 1800
 MIN_TIMEOUT_SECONDS = 1
-MAX_TIMEOUT_SECONDS = int(os.environ.get("MCP_MAX_TIMEOUT_SECONDS", "7200"))
-RESOLVE_TIMEOUT_SECONDS = int(os.environ.get("MCP_RESOLVE_TIMEOUT_SECONDS", "60"))
+
+
+def _env_int(name: str, default: int, *, min_value: int | None = None) -> int:
+    """Read an integer env var without letting bad config crash import."""
+    raw_value = os.environ.get(name)
+    if raw_value in (None, ""):
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError:
+        return default
+    if min_value is not None and value < min_value:
+        return default
+    return value
+
+
+MAX_TIMEOUT_SECONDS = _env_int(
+    "MCP_MAX_TIMEOUT_SECONDS",
+    7200,
+    min_value=MIN_TIMEOUT_SECONDS,
+)
+RESOLVE_TIMEOUT_SECONDS = _env_int(
+    "MCP_RESOLVE_TIMEOUT_SECONDS",
+    60,
+    min_value=MIN_TIMEOUT_SECONDS,
+)
 # Max characters of stdout/stderr returned per stream. The bounded subprocess
 # wrapper enforces this at the byte level during execution to prevent unbounded
 # memory growth from chatty scripts.
@@ -52,7 +77,7 @@ MAX_STORED_PLANS = 256
 # cannot be quietly applied later — the operator must regenerate the plan
 # from the current state. Override at deployment time with
 # MCP_PLAN_TTL_SECONDS=<int>; values <= 0 disable the TTL guard entirely.
-PLAN_TTL_SECONDS = int(os.environ.get("MCP_PLAN_TTL_SECONDS", "3600"))
+PLAN_TTL_SECONDS = _env_int("MCP_PLAN_TTL_SECONDS", 3600)
 
 # Scripts whose --dry-run / --list-products invocation is genuinely read-only.
 # Any (skill, script) pair NOT in this set is treated as mutating regardless of
@@ -536,6 +561,22 @@ def _safe_text(value: Any, *, label: str) -> str:
     return value
 
 
+def _safe_string_mapping(
+    value: Mapping[Any, Any] | None,
+    *,
+    label: str,
+) -> dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        raise SkillMCPError(f"{label} must be an object of string keys and values")
+    safe: dict[str, str] = {}
+    for raw_key, raw_value in value.items():
+        key = _safe_text(raw_key, label=f"{label} key")
+        safe[key] = _safe_text(raw_value, label=f"{label}[{key}]")
+    return safe
+
+
 def _looks_secret_key(key: str) -> bool:
     if normalize_key := re.sub(r"[^A-Za-z0-9]+", "_", key).strip("_").lower():
         if normalize_key in NON_SECRET_VALUE_KEYS:
@@ -544,7 +585,7 @@ def _looks_secret_key(key: str) -> bool:
 
 
 def _validate_timeout(timeout_seconds: int) -> int:
-    if not isinstance(timeout_seconds, int):
+    if isinstance(timeout_seconds, bool) or not isinstance(timeout_seconds, int):
         raise SkillMCPError("timeout_seconds must be an integer")
     if timeout_seconds < MIN_TIMEOUT_SECONDS or timeout_seconds > MAX_TIMEOUT_SECONDS:
         raise SkillMCPError(
@@ -578,6 +619,8 @@ def _script_command(path: Path, args: list[str]) -> list[str]:
 
 
 def _validate_args(args: list[str]) -> list[str]:
+    if not isinstance(args, list):
+        raise SkillMCPError("args must be a list of strings")
     safe_args: list[str] = []
     index = 0
     while index < len(args):
@@ -589,6 +632,12 @@ def _validate_args(args: list[str]) -> list[str]:
             )
         if arg.startswith("--") and "=" in arg and flag in SECRET_FILE_FLAGS:
             path_value = arg.split("=", 1)[1]
+            if not path_value:
+                raise SkillMCPError(f"{flag} requires a file path")
+        elif flag in SECRET_FILE_FLAGS and flag != "--secret-file":
+            if index + 1 >= len(args):
+                raise SkillMCPError(f"{flag} requires a file path")
+            path_value = _safe_text(args[index + 1], label=f"{flag} path")
             if not path_value:
                 raise SkillMCPError(f"{flag} requires a file path")
         if arg == "--set":
@@ -770,13 +819,22 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
     while waiting for the timeout.
     """
     timeout_seconds = _validate_timeout(timeout_seconds)
-    proc = subprocess.Popen(
-        command,
-        cwd=REPO_ROOT,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=False,
-    )
+    try:
+        proc = subprocess.Popen(
+            command,
+            cwd=REPO_ROOT,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=False,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        return _BoundedResult(
+            returncode=127,
+            stdout="",
+            stderr=f"Failed to start command: {exc}",
+        )
     stdout_buf: list[bytes] = []
     stderr_buf: list[bytes] = []
     stdout_dropped = [0]
@@ -798,14 +856,31 @@ def _run_command(command: list[str], *, timeout_seconds: int) -> _BoundedResult:
         returncode = proc.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
         timed_out = True
-        # Send SIGTERM, then SIGKILL after a grace period if needed.
+        # Send SIGTERM, then SIGKILL after a grace period if needed. The
+        # child is started in a new session so this reaches subprocesses that
+        # inherited the script's process group as well as the shell itself.
         try:
-            proc.terminate()
+            os.killpg(proc.pid, signal.SIGTERM)
+        except (OSError, ProcessLookupError):
+            try:
+                proc.terminate()
+            except (OSError, ProcessLookupError):
+                pass
+        try:
             try:
                 returncode = proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
-                proc.kill()
-                returncode = proc.wait(timeout=5)
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except (OSError, ProcessLookupError):
+                    try:
+                        proc.kill()
+                    except (OSError, ProcessLookupError):
+                        pass
+                try:
+                    returncode = proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    returncode = -signal.SIGKILL
         except (OSError, ProcessLookupError):
             returncode = -signal.SIGKILL
     finally:
@@ -1215,8 +1290,8 @@ def plan_cisco_product_setup(
 ) -> dict[str, Any]:
     product = _safe_text(product, label="product")
     timeout_seconds = _validate_timeout(timeout_seconds)
-    set_values = set_values or {}
-    secret_files = secret_files or {}
+    set_values = _safe_string_mapping(set_values, label="set_values")
+    secret_files = _safe_string_mapping(secret_files, label="secret_files")
 
     phase_flags = {
         "full": [],
@@ -1317,7 +1392,7 @@ def plan_skill_script(
 ) -> dict[str, Any]:
     path = _script_path(skill, script)
     timeout_seconds = _validate_timeout(timeout_seconds)
-    safe_args = _validate_args(args or [])
+    safe_args = _validate_args([] if args is None else args)
     command = _script_command(path, safe_args)
     script_name = path.name
     pair = (skill, script_name)

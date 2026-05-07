@@ -6,14 +6,16 @@ planning, rendering, installing, configuring, validating, and handing off Splunk
 Platform, Splunk Cloud, Splunk Observability Cloud, Cisco, and adjacent
 operational integrations.
 
-The catalog covers Cisco product onboarding, Splunk apps and TAs, Enterprise Security 
-and the broader Splunk security portfolio, ITSI, SOAR, On-Call, Observability Cloud 
-integrations, dashboards, detectors, OpenTelemetry collectors, Kubernetes APM
-auto-instrumentation, Browser RUM and Session Replay, AWS and ThousandEyes
-integrations, HEC, ACS allowlists, PKI, SmartStore, federated search, workload
-management, Monitoring Console, license management, indexer clusters, Edge
-Processor, Stream, SC4S, SC4SNMP, Universal Forwarders, Linux Splunk Enterprise
-hosts, self-managed Kubernetes runtimes, and external-collector topologies.
+The catalog covers Cisco product onboarding, Splunk apps and TAs, Enterprise
+Security and the broader Splunk security portfolio, ITSI, SOAR, On-Call,
+Observability Cloud integrations, AI Agent Monitoring, Database Monitoring,
+dashboards, detectors, OpenTelemetry collectors, Kubernetes APM
+auto-instrumentation, Browser RUM and Session Replay, AWS, ThousandEyes, and
+OTLP integrations, HEC, ACS allowlists, PKI, SmartStore, federated search,
+workload management, Monitoring Console, license management, indexer clusters,
+Edge Processor, Stream, Splunk Connect for OTLP, SC4S, SC4SNMP, Universal
+Forwarders, Linux Splunk Enterprise hosts, self-managed Kubernetes runtimes, and
+external-collector topologies.
 Most workflows are render-first and validation-heavy, with explicit apply
 phases and secret-file guardrails for production changes.
 
@@ -63,10 +65,28 @@ Common starting points:
   `skills/splunk-security-portfolio-setup/`; it routes Enterprise Security,
   SOAR, Security Essentials, UBA, Attack Analyzer, ARI, and related offerings
   to the supported setup, install-only, or handoff path.
+- If you need a broad Splunk Cloud or Enterprise administration health review,
+  start with `skills/splunk-admin-doctor/`; it diagnoses admin-domain coverage
+  and renders doctor reports, fix plans, and safe handoffs.
+- If you need Splunk Cloud Data Manager onboarding for AWS, Azure, GCP, or
+  CrowdStrike, start with `skills/splunk-cloud-data-manager-setup/`. It works
+  from Data Manager-generated artifacts and keeps private Data Manager APIs out
+  of scope.
 - If you need Splunk Observability Cloud OTel collection on Kubernetes or a
   Linux host, start with `skills/splunk-observability-otel-collector-setup/`.
   The workflow renders Helm and Linux installer assets first, then applies only
   when requested.
+- If you need OTLP senders to land in Splunk Platform through the Splunk Connect
+  for OTLP modular input, start with
+  `skills/splunk-connect-for-otlp-setup/`; use `skills/splunk-hec-service-setup/`
+  for the HEC token prerequisite.
+- If you need Splunk Observability Cloud Database Monitoring for PostgreSQL,
+  Microsoft SQL Server, or Oracle Database, start with
+  `skills/splunk-observability-database-monitoring-setup/`.
+- If you need Splunk AI Agent Monitoring or AI Infrastructure Monitoring, start
+  with `skills/splunk-observability-ai-agent-monitoring-setup/`.
+- If you need AWS metrics and CloudWatch integration assets for Splunk
+  Observability Cloud, start with `skills/splunk-observability-aws-integration/`.
 - If you need to pair the Splunk Platform with Splunk Observability Cloud
   (Unified Identity, the Discover Splunk Observability Cloud app, Log Observer
   Connect, Related Content, the Splunk Infrastructure Monitoring Add-on), start
@@ -166,8 +186,9 @@ At a high level, the repo gives you seven layers of automation:
    or install them from local `.tgz` or `.spl` files. In Splunk Cloud, installs
    are executed through ACS instead of direct `/services/apps/local` calls.
 4. **App-specific setup**: create indexes, configure accounts, enable inputs,
-   update macros, and apply dashboard settings. In Splunk Cloud, index creation
-   uses ACS and the app-specific REST configuration uses the search tier.
+   update macros, configure modular inputs, and apply dashboard settings. In
+   Splunk Cloud, index creation uses ACS and the app-specific REST configuration
+   uses the search tier.
 5. **Platform administration workflows**: render and optionally apply
    self-managed Splunk Enterprise service configuration for Agent Management,
    Workload Management, Federated Search, SmartStore/index lifecycle, Monitoring
@@ -180,15 +201,15 @@ At a high level, the repo gives you seven layers of automation:
    the ACS allowlist workflow manages Cloud control-plane allowlists.
 6. **External collectors and observability**: render and optionally apply
    customer-managed SC4S, SC4SNMP, Splunk Edge Processor, and Splunk OTel
-   Collector runtimes that send data to Splunk Cloud, Splunk Enterprise HEC, or
-   Splunk Observability Cloud; wire the Splunk Platform to Splunk Observability
-   Cloud (Unified Identity, Discover Splunk Observability Cloud app, Log
-   Observer Connect, Splunk Infrastructure Monitoring Add-on); overlay
-   zero-code Kubernetes application auto-instrumentation and Browser RUM +
-   Session Replay injection; wire Cisco Nexus, Intersight, Isovalent, NVIDIA
-   GPU, Cisco AI Pod, and ThousandEyes sources into Splunk Observability
-   Cloud; and build reviewed Observability dashboard, detector, alert routing,
-   and Splunk On-Call artifacts.
+   Collector runtimes; configure Splunk Connect for OTLP listener placement and
+   sender handoffs; wire the Splunk Platform to Splunk Observability Cloud
+   (Unified Identity, Discover Splunk Observability Cloud app, Log Observer
+   Connect, Splunk Infrastructure Monitoring Add-on); overlay zero-code
+   Kubernetes application auto-instrumentation, Browser RUM + Session Replay
+   injection, Database Monitoring, and AI Agent Monitoring; wire AWS, Cisco
+   Nexus, Intersight, Isovalent, NVIDIA GPU, Cisco AI Pod, and ThousandEyes
+   sources into Splunk Observability Cloud; and build reviewed Observability
+   dashboard, detector, alert routing, and Splunk On-Call artifacts.
 7. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
@@ -836,53 +857,9 @@ splunk-cisco-skills/
 │   │       ├── generate_skill_ux_catalog.py  # refresh SKILL_UX_CATALOG.md
 │   │       ├── smoke_sc4x_live.sh            # SC4S/SC4SNMP live smoke test
 │   │       └── test_splunkbase_connection.sh # Splunkbase credential check
-│   ├── splunk-app-install/
-│   ├── splunk-ai-assistant-setup/
-│   ├── splunk-agent-management-setup/
-│   ├── splunk-universal-forwarder-setup/
-│   ├── splunk-workload-management-setup/
-│   ├── splunk-hec-service-setup/
-│   ├── splunk-federated-search-setup/
-│   ├── splunk-index-lifecycle-smartstore-setup/
-│   ├── splunk-monitoring-console-setup/
-│   ├── splunk-enterprise-host-setup/
-│   ├── splunk-enterprise-kubernetes-setup/
-│   ├── splunk-enterprise-security-install/
-│   ├── splunk-enterprise-security-config/
-│   ├── splunk-security-portfolio-setup/
-│   ├── splunk-security-essentials-setup/
-│   ├── splunk-asset-risk-intelligence-setup/
-│   ├── splunk-attack-analyzer-setup/
-│   ├── splunk-uba-setup/
-│   ├── splunk-soar-setup/
-│   ├── splunk-observability-otel-collector-setup/
-│   ├── splunk-observability-k8s-auto-instrumentation-setup/
-│   ├── splunk-observability-k8s-frontend-rum-setup/
-│   ├── splunk-observability-cloud-integration-setup/
-│   ├── splunk-observability-thousandeyes-integration/
-│   ├── splunk-observability-isovalent-integration/
-│   ├── splunk-observability-cisco-nexus-integration/
-│   ├── splunk-observability-cisco-intersight-integration/
-│   ├── splunk-observability-nvidia-gpu-integration/
-│   ├── splunk-observability-cisco-ai-pod-integration/
-│   ├── splunk-observability-dashboard-builder/
-│   ├── splunk-observability-native-ops/
-│   ├── splunk-oncall-setup/
-│   ├── splunk-connect-for-syslog-setup/
-│   ├── splunk-connect-for-snmp-setup/
-│   ├── splunk-license-manager-setup/
-│   ├── splunk-indexer-cluster-setup/
-│   ├── splunk-edge-processor-setup/
-│   ├── splunk-cloud-acs-allowlist-setup/
-│   ├── splunk-enterprise-public-exposure-hardening/
-│   ├── splunk-platform-pki-setup/
-│   ├── splunk-itsi-config/
-│   ├── splunk-itsi-setup/
-│   ├── splunk-mcp-server-setup/
-│   ├── splunk-stream-setup/
 │   ├── cisco-appdynamics-setup/
-│   ├── cisco-catalyst-ta-setup/
 │   ├── cisco-catalyst-enhanced-netflow-setup/
+│   ├── cisco-catalyst-ta-setup/
 │   ├── cisco-dc-networking-setup/
 │   ├── cisco-enterprise-networking-setup/
 │   ├── cisco-intersight-setup/
@@ -891,10 +868,64 @@ splunk-cisco-skills/
 │   ├── cisco-product-setup/
 │   ├── cisco-scan-setup/
 │   ├── cisco-secure-access-setup/
+│   ├── cisco-secure-email-web-gateway-setup/
 │   ├── cisco-security-cloud-setup/
 │   ├── cisco-spaces-setup/
+│   ├── cisco-talos-intelligence-setup/
 │   ├── cisco-thousandeyes-mcp-setup/
-│   └── cisco-thousandeyes-setup/
+│   ├── cisco-thousandeyes-setup/
+│   ├── cisco-ucs-ta-setup/
+│   ├── cisco-webex-setup/
+│   ├── splunk-admin-doctor/
+│   ├── splunk-agent-management-setup/
+│   ├── splunk-ai-assistant-setup/
+│   ├── splunk-app-install/
+│   ├── splunk-asset-risk-intelligence-setup/
+│   ├── splunk-attack-analyzer-setup/
+│   ├── splunk-cloud-acs-allowlist-setup/
+│   ├── splunk-cloud-data-manager-setup/
+│   ├── splunk-connect-for-otlp-setup/
+│   ├── splunk-connect-for-snmp-setup/
+│   ├── splunk-connect-for-syslog-setup/
+│   ├── splunk-edge-processor-setup/
+│   ├── splunk-enterprise-host-setup/
+│   ├── splunk-enterprise-kubernetes-setup/
+│   ├── splunk-enterprise-public-exposure-hardening/
+│   ├── splunk-enterprise-security-config/
+│   ├── splunk-enterprise-security-install/
+│   ├── splunk-federated-search-setup/
+│   ├── splunk-hec-service-setup/
+│   ├── splunk-index-lifecycle-smartstore-setup/
+│   ├── splunk-indexer-cluster-setup/
+│   ├── splunk-itsi-config/
+│   ├── splunk-itsi-setup/
+│   ├── splunk-license-manager-setup/
+│   ├── splunk-mcp-server-setup/
+│   ├── splunk-monitoring-console-setup/
+│   ├── splunk-observability-ai-agent-monitoring-setup/
+│   ├── splunk-observability-aws-integration/
+│   ├── splunk-observability-cisco-ai-pod-integration/
+│   ├── splunk-observability-cisco-intersight-integration/
+│   ├── splunk-observability-cisco-nexus-integration/
+│   ├── splunk-observability-cloud-integration-setup/
+│   ├── splunk-observability-dashboard-builder/
+│   ├── splunk-observability-database-monitoring-setup/
+│   ├── splunk-observability-isovalent-integration/
+│   ├── splunk-observability-k8s-auto-instrumentation-setup/
+│   ├── splunk-observability-k8s-frontend-rum-setup/
+│   ├── splunk-observability-native-ops/
+│   ├── splunk-observability-nvidia-gpu-integration/
+│   ├── splunk-observability-otel-collector-setup/
+│   ├── splunk-observability-thousandeyes-integration/
+│   ├── splunk-oncall-setup/
+│   ├── splunk-platform-pki-setup/
+│   ├── splunk-security-essentials-setup/
+│   ├── splunk-security-portfolio-setup/
+│   ├── splunk-soar-setup/
+│   ├── splunk-stream-setup/
+│   ├── splunk-uba-setup/
+│   ├── splunk-universal-forwarder-setup/
+│   └── splunk-workload-management-setup/
 ├── tests/                       # bats and Python test suites
 └── rules/
     └── credential-handling.mdc
@@ -981,6 +1012,11 @@ Minimum expected environment:
   workflows
 - a `splunk.com` account for Splunkbase downloads when installing public apps
 
+For the per-skill software and live-access matrix, see
+[`SKILL_REQUIREMENTS.md`](SKILL_REQUIREMENTS.md). It calls out workflow-specific
+tools such as `kubectl`, `helm`, `yq`, `node`, `mcp-remote`, Docker/Podman,
+Terraform, cloud CLIs, and `splunk-rum` only where those skills need them.
+
 For Splunk Cloud workflows, you should also install the ACS CLI:
 
 ```bash
@@ -1003,9 +1039,11 @@ that will run the generated assets.
 
 ## Current Scope
 
-This repo focuses on vendor TAs/apps that can be configured through REST and
-shell automation on **self-managed Splunk Enterprise** and on **Splunk Cloud
-search tiers with ACS plus allowlisted REST API access**.
+This repo focuses on vendor TAs/apps, Splunk administration workflows, and
+customer-managed collection or integration runtimes that can be configured
+through REST, shell automation, rendered assets, or explicit handoffs on
+**self-managed Splunk Enterprise** and on **Splunk Cloud search tiers with ACS
+plus allowlisted REST API access**.
 
 The platform administration skills deliberately separate self-managed
 Enterprise file-render workflows from Splunk Cloud managed features:
@@ -1024,6 +1062,13 @@ self-managed Enterprise control planes; Splunk Cloud licensing and indexer
 clusters remain Splunk-managed. `splunk-cloud-acs-allowlist-setup` is the
 Cloud-side control-plane workflow for ACS feature allowlists and does not map
 to an Enterprise runtime role.
+`splunk-admin-doctor` spans both Splunk Cloud and Splunk Enterprise as a
+diagnostic router: it renders reports, fix plans, and handoffs, but only applies
+the narrow safe fix packets exposed by its workflow.
+`splunk-cloud-data-manager-setup` stays Cloud-side and artifact-driven: it
+renders artifacts, runs doctor checks, validates, and safely applies supported
+Data Manager-generated AWS, Azure, GCP, and CrowdStrike onboarding artifacts
+without claiming private Data Manager API coverage.
 
 The biggest Cloud-specific limitation is hybrid collection architectures. For
 example, Splunk Stream on Splunk Cloud uses a cloud-hosted `splunk_app_stream`
@@ -1033,15 +1078,27 @@ follows a similar principle for SC4S: the repo prepares Splunk and renders the
 collector runtime assets, but the SC4S syslog-ng container itself runs on
 customer-managed infrastructure rather than on the Cloud search tier.
 `splunk-connect-for-snmp-setup` follows the same external-collector model for
-SC4SNMP polling and traps. `splunk-edge-processor-setup` also follows a
-customer-managed runtime model: it renders Edge Processor instance and pipeline
-assets that join to a Splunk Cloud tenant or Splunk Enterprise data management
-node, and emits ACS allowlist handoffs when Cloud destinations need them.
+SC4SNMP polling and traps. `splunk-connect-for-otlp-setup` follows the hybrid
+OTLP modular-input model: it can configure the Splunk Platform app where the
+listener can actually be reached, but Splunk Cloud Classic needs IDM or a
+customer-managed heavy forwarder, and Splunk Cloud Victoria still requires
+topology and inbound reachability validation before direct listener placement.
+`splunk-edge-processor-setup` also follows a customer-managed runtime model: it
+renders Edge Processor instance and pipeline assets that join to a Splunk Cloud
+tenant or Splunk Enterprise data management node, and emits ACS allowlist
+handoffs when Cloud destinations need them.
 `splunk-observability-otel-collector-setup` extends that pattern to
 customer-managed Kubernetes or Linux OpenTelemetry Collector runtimes that send
 data to Splunk Observability Cloud and optional Splunk Platform HEC. In these
 workflows, the rendered apply paths are rerunnable install-or-upgrade
 entrypoints for customer-managed runtimes.
+`splunk-observability-database-monitoring-setup` layers database receiver
+configuration for PostgreSQL, Microsoft SQL Server, and Oracle Database onto
+that collector model. `splunk-observability-ai-agent-monitoring-setup` renders
+GenAI instrumentation, evaluation telemetry, histogram collector readiness, and
+AI Infrastructure Monitoring handoffs. `splunk-observability-aws-integration`
+is an Observability Cloud API and IaC workflow for AWSCloudWatch polling and
+Metric Streams, not an AWS log-ingestion path.
 `splunk-observability-dashboard-builder` is separate from runtime placement: it
 renders and validates native Observability Cloud dashboard API payloads and can
 apply them only when explicitly requested.
@@ -1050,18 +1107,23 @@ for native Observability operations: it renders supported API payloads, API
 validation requests, deeplinks, and deterministic operator handoffs for UI-only
 surfaces. The Observability integration skills
 (`splunk-observability-cloud-integration-setup`,
+`splunk-observability-ai-agent-monitoring-setup`,
+`splunk-observability-database-monitoring-setup`,
 `splunk-observability-k8s-auto-instrumentation-setup`,
 `splunk-observability-k8s-frontend-rum-setup`,
+`splunk-observability-aws-integration`,
 `splunk-observability-thousandeyes-integration`,
 `splunk-observability-isovalent-integration`,
 `splunk-observability-cisco-nexus-integration`,
 `splunk-observability-cisco-intersight-integration`,
 `splunk-observability-nvidia-gpu-integration`, and
 `splunk-observability-cisco-ai-pod-integration`) follow the same render-first
-pattern: they overlay the base Splunk OTel Collector chart from
-`splunk-observability-otel-collector-setup`, pair with existing Splunk Platform
-TA skills where relevant, and hand off dashboards and detectors to
-`splunk-observability-dashboard-builder` and `splunk-observability-native-ops`.
+pattern: collector-dependent skills overlay the base Splunk OTel Collector
+chart from `splunk-observability-otel-collector-setup`; platform-pairing and
+cloud-service skills render API, IaC, or operator handoff payloads; and the
+skills hand off dashboards and detectors to
+`splunk-observability-dashboard-builder` and `splunk-observability-native-ops`
+where relevant.
 `splunk-enterprise-kubernetes-setup` is for self-managed Splunk Enterprise on
 Kubernetes: either Splunk Operator for Kubernetes on an existing cluster, or
 Splunk POD on Cisco UCS with the Splunk Kubernetes Installer.

@@ -17,6 +17,7 @@ REQUIRED_TOP_LEVEL = [
     "SECURITY.md",
     "LICENSE",
     "CHANGELOG.md",
+    "SKILL_REQUIREMENTS.md",
     ".gitattributes",
     ".github/CODEOWNERS",
     ".github/pull_request_template.md",
@@ -131,6 +132,26 @@ def check_catalog_sync(errors: list[str]) -> None:
             errors.append(f"{rel}: missing skill catalog entries: {', '.join(missing)}")
         if extra:
             errors.append(f"{rel}: unknown skill catalog entries: {', '.join(extra)}")
+
+
+def check_skill_requirements_catalog(errors: list[str]) -> None:
+    doc_path = REPO_ROOT / "SKILL_REQUIREMENTS.md"
+    if not doc_path.exists():
+        return
+    expected = set(skill_names())
+    actual = catalog_skills(doc_path)
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing:
+        errors.append(
+            "SKILL_REQUIREMENTS.md: missing skill requirement entries: "
+            + ", ".join(missing)
+        )
+    if extra:
+        errors.append(
+            "SKILL_REQUIREMENTS.md: unknown skill requirement entries: "
+            + ", ".join(extra)
+        )
 
 
 def check_cursor_and_claude_commands(errors: list[str]) -> None:
@@ -281,6 +302,7 @@ def main() -> int:
     errors: list[str] = []
     check_required_files(errors)
     check_catalog_sync(errors)
+    check_skill_requirements_catalog(errors)
     check_cursor_and_claude_commands(errors)
     check_no_tracked_local_artifacts(errors)
     check_secret_examples(errors)

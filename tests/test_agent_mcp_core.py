@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import re
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 from agent.splunk_cisco_skills_mcp import core
 
@@ -132,6 +134,26 @@ class AgentMCPCoreTests(unittest.TestCase):
                 ["--password", "secret-value"],
             )
 
+    def test_generic_script_plan_requires_args_list(self) -> None:
+        with self.assertRaisesRegex(core.SkillMCPError, "args must be a list"):
+            core.plan_skill_script(
+                "cisco-product-setup",
+                "resolve_product.sh",
+                "--help",  # type: ignore[arg-type]
+            )
+
+    def test_product_plan_requires_mapping_inputs(self) -> None:
+        with self.assertRaisesRegex(core.SkillMCPError, "set_values must be an object"):
+            core.plan_cisco_product_setup(
+                "Cisco ACI",
+                set_values=["hostname", "apic1.example.local"],  # type: ignore[arg-type]
+            )
+        with self.assertRaisesRegex(core.SkillMCPError, "secret_files must be an object"):
+            core.plan_cisco_product_setup(
+                "Cisco ACI",
+                secret_files=["password", "/tmp/p"],  # type: ignore[arg-type]
+            )
+
     def test_generic_script_plan_rejects_oncall_direct_secret_flags(self) -> None:
         cases = [
             ["--oncall-api-key", "secret-value"],
@@ -166,6 +188,21 @@ class AgentMCPCoreTests(unittest.TestCase):
             with self.subTest(skill=skill, args=args):
                 with self.assertRaisesRegex(core.SkillMCPError, "Direct secret flag"):
                     core.plan_skill_script(skill, "setup.sh", args)
+
+    def test_generic_script_plan_requires_file_secret_paths(self) -> None:
+        cases = [
+            ["--password-file"],
+            ["--password-file", ""],
+            ["--token-file="],
+        ]
+        for args in cases:
+            with self.subTest(args=args):
+                with self.assertRaisesRegex(core.SkillMCPError, "requires a file path"):
+                    core.plan_skill_script(
+                        "cisco-catalyst-ta-setup",
+                        "configure_account.sh",
+                        args,
+                    )
 
     def test_oncall_setup_render_only_invocations_are_read_only(self) -> None:
         # No mutation flag → read-only.
@@ -435,6 +472,40 @@ class AgentMCPCoreTests(unittest.TestCase):
             core.execute_plan("not-a-hash", confirm=True)
         with self.assertRaisesRegex(core.SkillMCPError, "64-character lowercase hex"):
             core.execute_plan("A" * 64, confirm=True)
+
+    def test_timeout_rejects_bool(self) -> None:
+        with self.assertRaisesRegex(core.SkillMCPError, "timeout_seconds must be an integer"):
+            core.plan_skill_script(
+                "cisco-product-setup",
+                "resolve_product.sh",
+                ["--help"],
+                timeout_seconds=True,  # type: ignore[arg-type]
+            )
+
+    def test_invalid_integer_env_values_do_not_break_import(self) -> None:
+        env = os.environ.copy()
+        env["MCP_MAX_TIMEOUT_SECONDS"] = "not-an-int"
+        env["MCP_RESOLVE_TIMEOUT_SECONDS"] = "also-bad"
+        env["MCP_PLAN_TTL_SECONDS"] = "bad"
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "from agent.splunk_cisco_skills_mcp import core; "
+                    "print(core.MAX_TIMEOUT_SECONDS, core.RESOLVE_TIMEOUT_SECONDS, core.PLAN_TTL_SECONDS)"
+                ),
+            ],
+            cwd=core.REPO_ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertEqual(result.stdout.strip(), "7200 60 3600")
 
     def test_dry_run_flag_does_not_make_arbitrary_scripts_read_only(self) -> None:
         # A script that does not actually implement --dry-run must NOT be
@@ -965,6 +1036,38 @@ class AgentMCPCoreTests(unittest.TestCase):
         finally:
             if previous is not None:
                 os.environ["SPLUNK_SKILLS_MCP_ALLOW_MUTATION"] = previous
+
+    def test_run_command_isolates_stdin_and_process_group(self) -> None:
+        class FakeProc:
+            pid = 12345
+
+            def __init__(self) -> None:
+                self.stdout = io.BytesIO(b"ok\n")
+                self.stderr = io.BytesIO(b"")
+
+            def wait(self, timeout: int | None = None) -> int:
+                return 0
+
+        fake_proc = FakeProc()
+        with mock.patch.object(core.subprocess, "Popen", return_value=fake_proc) as popen:
+            result = core._run_command(["fake"], timeout_seconds=1)
+
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, "ok\n")
+        kwargs = popen.call_args.kwargs
+        self.assertEqual(kwargs["stdin"], core.subprocess.DEVNULL)
+        self.assertTrue(kwargs["start_new_session"])
+
+    def test_run_command_returns_structured_error_when_spawn_fails(self) -> None:
+        with mock.patch.object(
+            core.subprocess,
+            "Popen",
+            side_effect=FileNotFoundError("missing-binary"),
+        ):
+            result = core._run_command(["missing-binary"], timeout_seconds=1)
+
+        self.assertEqual(result.returncode, 127)
+        self.assertIn("Failed to start command", result.stderr)
 
     def test_catalog_non_secret_keys_do_not_match_secret_regex(self) -> None:
         """Defense against future catalog edits.
