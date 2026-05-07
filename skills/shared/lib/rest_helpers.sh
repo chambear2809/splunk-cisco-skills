@@ -989,6 +989,11 @@ app_restart_splunk_or_exit() {
         return 0
     fi
 
+    if type platform_restart_or_exit >/dev/null 2>&1; then
+        platform_restart_or_exit "${sk}" "${uri}" "${operation}" "${skip_msg}"
+        return $?
+    fi
+
     log ""
     log "Restarting Splunk to complete ${operation}..."
     log "Waiting for the management API to cycle..."

@@ -567,6 +567,10 @@ cloud_app_restart_or_exit() {
 
 log_platform_restart_guidance() {
     local prefix="${1:-changes}"
+    if type platform_reload_or_restart_guidance >/dev/null 2>&1; then
+        platform_reload_or_restart_guidance "${prefix}"
+        return 0
+    fi
     if is_splunk_cloud; then
         echo "Splunk Cloud: check 'acs status current-stack' after ${prefix} and run 'acs restart current-stack' only if restartRequired=true."
     else

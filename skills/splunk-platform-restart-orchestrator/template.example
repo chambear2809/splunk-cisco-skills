@@ -1,0 +1,16 @@
+# Splunk Platform Restart Orchestrator intake
+
+OPERATION=app installation
+TARGET_ROLE=search-tier
+RESTART_MODE=auto
+SPLUNK_HOME=/opt/splunk
+
+# Optional comma-separated ports to probe after restart, for example:
+# EXPECTED_PORTS=8089,4317,4318
+EXPECTED_PORTS=
+
+# Explicit REST fallback is disabled by default.
+ALLOW_REST_FALLBACK=false
+
+# Actual restart requires --restart --accept-restart.
+ACCEPT_RESTART=false

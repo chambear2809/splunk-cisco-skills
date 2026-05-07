@@ -28,12 +28,16 @@ if [[ -z "${_CRED_HELPERS_LOADED:-}" ]]; then
     source "${_CLUSTER_LIB_DIR}/credential_helpers.sh"
 fi
 
-# cluster_bundle_validate <manager_uri> <sk>
-# POST /services/cluster/manager/control/default/validate
+# cluster_bundle_validate <manager_uri> <sk> [check_restart]
+# POST /services/cluster/manager/control/default/validate_bundle
 cluster_bundle_validate() {
     local manager_uri="$1" sk="$2"
-    splunk_curl_post "${sk}" "" \
-        "${manager_uri}/services/cluster/manager/control/default/validate?output_mode=json"
+    local check_restart="${3:-false}" body=""
+    if _bool_is_true "${check_restart}"; then
+        body="check-restart=true"
+    fi
+    splunk_curl_post "${sk}" "${body}" \
+        "${manager_uri}/services/cluster/manager/control/default/validate_bundle?output_mode=json"
 }
 
 # cluster_bundle_status <manager_uri> <sk>

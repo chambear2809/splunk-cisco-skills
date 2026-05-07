@@ -99,7 +99,8 @@ bash skills/splunk-license-manager-setup/scripts/validate.sh \
 
 Under `splunk-license-manager-rendered/license/`:
 
-- `manager/install-licenses.sh` — `splunk add licenses` + restart.
+- `manager/install-licenses.sh` — installs license files and uses the shared
+  restart orchestrator for the manager restart.
 - `manager/activate-group.sh` — `POST /services/licenser/groups/<group>`.
 - `manager/pools/<name>.json` — desired-state pool definition.
 - `manager/apply-pools.sh` — POST/PUT/DELETE to converge pool list.
@@ -108,10 +109,10 @@ Under `splunk-license-manager-rendered/license/`:
   and POSTs `manager_uri` to the peer's own
   `https://<host>:8089/services/licenser/localpeer` REST endpoint using a
   password file (`get_session_key_from_password_file`); no SSH and no
-  `splunk -auth admin:<pw>` argv on either host. Optionally requests a
-  splunkd restart over REST when `--restart-splunk=true`. Override the peer
-  URL with `PEER_MANAGEMENT_URL` (or just the port via
-  `PEER_MANAGEMENT_PORT`) for non-default deployments.
+  `splunk -auth admin:<pw>` argv on either host. When
+  `--restart-splunk=true`, emits a topology-aware restart handoff instead of a
+  default REST restart. Override the peer URL with `PEER_MANAGEMENT_URL` (or
+  just the port via `PEER_MANAGEMENT_PORT`) for non-default deployments.
 - `validate.sh` — peers, usage, messages, version-compat checks.
 - `audit/<timestamp>/{groups,stacks,pools,licenses,messages,localpeer,usage,peers}.json`
   snapshots.

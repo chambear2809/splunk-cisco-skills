@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Restart Orchestrator"
+  short_description: "Plan safe Splunk restarts and audit restart handling"
+  default_prompt: >-
+    Use $splunk-platform-restart-orchestrator to plan or execute topology-aware
+    Splunk restarts, prefer reload paths where supported, and audit repo-wide
+    restart handling without exposing secrets.

@@ -410,7 +410,7 @@ def render_bundle_scripts(cluster_manager_uri: str) -> dict[str, str]:
         + _CLUSTER_MGR_SK_BLOCK
     )
     return {
-        "validate.sh": make_script(common_header + 'cluster_bundle_validate "${MANAGER_URI}" "${SK}"\n'),
+        "validate.sh": make_script(common_header + 'cluster_bundle_validate "${MANAGER_URI}" "${SK}" true\n'),
         "status.sh": make_script(common_header + 'cluster_bundle_status "${MANAGER_URI}" "${SK}"\n'),
         "apply.sh": make_script(common_header + 'cluster_bundle_apply "${MANAGER_URI}" "${SK}"\n'),
         "apply-skip-validation.sh": make_script(common_header + 'cluster_bundle_apply "${MANAGER_URI}" "${SK}" --skip-validation\n'),
@@ -609,8 +609,8 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + '  --data-urlencode "site_search_factor=${SITE_SF}" \\\n'
             + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
-            + 'splunk_curl "${SK}" -X POST "${MANAGER_URI}/services/server/control/restart?output_mode=json" >/dev/null\n'
-            + 'log "Manager configured for multisite. Now run move-peer-to-site.sh per peer to assign sites."\n'
+            + 'platform_restart_handoff "cluster manager multisite conversion" "Restart the manager through its supported service path before assigning peer sites."\n'
+            + 'log "Manager configured for multisite. After the manager restart, run move-peer-to-site.sh per peer to assign sites."\n'
         ),
         "replace-manager.sh": make_script(
             _CLUSTER_LIB_DIR_BLOCK
@@ -625,8 +625,8 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + '  --data-urlencode "mode=manager" \\\n'
             + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
-            + 'splunk_curl "${SK}" -X POST "${MANAGER_URI}/services/server/control/restart?output_mode=json" >/dev/null\n'
-            + 'log "OK: New manager configured at ${MANAGER_URI}. Update peer/SH manager_uri to point here next."\n'
+            + 'platform_restart_handoff "new cluster manager configuration" "Restart the new manager through its supported service path before updating peer/search-head manager_uri."\n'
+            + 'log "OK: New manager configured at ${MANAGER_URI}. After the manager restart, update peer/SH manager_uri to point here next."\n'
         ),
         "decommission-site.sh": make_script(
             mgr_sk_block
@@ -653,8 +653,8 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + 'splunk_curl "${SK}" -X POST \\\n'
             + '  --data-urlencode "available_sites=${remaining}" \\\n'
             + '  "${MANAGER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
-            + 'splunk_curl "${SK}" -X POST "${MANAGER_URI}/services/server/control/restart?output_mode=json" >/dev/null\n'
-            + 'log "OK: Decommissioned ${SITE}; available_sites is now ${remaining}."\n'
+            + 'platform_restart_handoff "cluster manager site decommission" "Restart the manager through its supported service path so available_sites=${remaining} takes effect."\n'
+            + 'log "OK: Decommissioned ${SITE}; available_sites is now ${remaining}. Restart handoff rendered."\n'
         ),
         "move-peer-to-site.sh": make_script(
             _CLUSTER_LIB_DIR_BLOCK
@@ -667,8 +667,8 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + 'splunk_curl "${SK}" -X POST \\\n'
             + '  --data-urlencode "site=${NEW_SITE}" \\\n'
             + '  "${PEER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
-            + 'splunk_curl "${SK}" -X POST "${PEER_URI}/services/server/control/restart?output_mode=json" >/dev/null\n'
-            + 'log "OK: Peer ${PEER_HOST} now reports site=${NEW_SITE}."\n'
+            + 'platform_restart_handoff "indexer peer site assignment" "For a single peer, use Splunk Web or splunk offline followed by a privileged start; do not use raw splunk restart."\n'
+            + 'log "OK: Peer ${PEER_HOST} now has site=${NEW_SITE} configured. Restart handoff rendered."\n'
         ),
         "migrate-non-clustered.sh": make_script(
             _CLUSTER_LIB_DIR_BLOCK
@@ -695,8 +695,8 @@ def render_migration(args: argparse.Namespace) -> dict[str, str]:
             + '  --data-urlencode "replication_port=${REPLICATION_PORT}" \\\n'
             + '  --data-urlencode "secret@${SECRET_FILE}" \\\n'
             + '  "${PEER_URI}/services/cluster/config?output_mode=json" >/dev/null\n'
-            + 'splunk_curl "${SK}" -X POST "${PEER_URI}/services/server/control/restart?output_mode=json" >/dev/null\n'
-            + 'log "OK: ${INDEXER_HOST} joined the cluster as a peer."\n'
+            + 'platform_restart_handoff "non-clustered indexer migration" "Restart the peer through documented peer semantics so it can join the cluster safely."\n'
+            + 'log "OK: ${INDEXER_HOST} is configured to join the cluster as a peer. Restart handoff rendered."\n'
         ),
     }
 

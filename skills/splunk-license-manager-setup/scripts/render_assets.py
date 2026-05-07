@@ -213,7 +213,8 @@ Co-located with: `{args.colocated_with}`
 
 License install and group activation usually require a Splunk restart on the
 manager. Configuring a peer's localpeer requires a peer restart so the change
-takes effect. Both restarts are emitted by the rendered scripts.
+takes effect. Manager restarts use the shared restart orchestrator; peer
+localpeer scripts emit a handoff instead of defaulting to remote REST restart.
 
 ## Next steps
 
@@ -276,15 +277,10 @@ def render_install_licenses(args: argparse.Namespace, parsed: dict) -> str:
     license_files = " ".join(shell_quote(p) for p in parsed["license_files"]) or ""
     manager_uri = shell_quote(args.license_manager_uri)
     restart_block = (
-        # Restart goes through the local splunk CLI with no -auth (the
-        # operator must already own the host); the password never lands in
-        # the splunk argv that other users on this host could see.
-        'if [[ -x "/opt/splunk/bin/splunk" ]]; then\n'
-        '  /opt/splunk/bin/splunk stop || true\n'
-        '  /opt/splunk/bin/splunk start\n'
-        'else\n'
-        '  echo "WARNING: /opt/splunk/bin/splunk not found; skipping local restart. Restart Splunk manually before continuing." >&2\n'
-        'fi\n'
+        'SPLUNK_URI="${MANAGER_URI}"\n'
+        'export SPLUNK_URI\n'
+        'platform_restart_or_exit "${SK}" "${MANAGER_URI}" "license manager changes" \\\n'
+        '  "License changes typically require a restart on the manager."\n'
         if args.restart_splunk == "true"
         else 'echo "Splunk restart skipped. License changes typically require a restart on the manager."\n'
     )
@@ -428,10 +424,12 @@ def render_configure_peer(args: argparse.Namespace, host: str, ssh_user: str) ->
         )
         + (
             "# Localpeer changes only take effect after a Splunk restart on\n"
-            "# the peer. Trigger it via REST so we never put credentials on\n"
-            "# the splunk CLI argv on the remote host.\n"
-            'splunk_curl "${SK}" -X POST "${PEER_URI}/services/server/control/restart?output_mode=json" >/dev/null\n'
-            'echo "OK: requested splunkd restart on ${HOST} via REST"\n'
+            "# the peer. Render a topology-aware handoff instead of defaulting\n"
+            "# to REST restart against a remote systemd-managed host.\n"
+            'SPLUNK_URI="${PEER_URI}"\n'
+            'export SPLUNK_URI\n'
+            'platform_restart_handoff "license localpeer update on ${HOST}" \\\n'
+            '  "Peer restart requires host-local service ownership or an explicit orchestrator restart plan."\n'
             if args.restart_splunk == "true"
             else 'echo "Restart skipped (--restart-splunk=false). Localpeer changes require a Splunk restart on ${HOST} to take effect."\n'
         )

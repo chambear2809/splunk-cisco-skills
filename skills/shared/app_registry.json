@@ -353,6 +353,15 @@
         "notes": "Reusable HEC platform service workflow for allowed indexes, default source/sourcetype, TLS, and ACK-aware token handling."
       },
       {
+        "kind": "workflow",
+        "skill": "splunk-platform-restart-orchestrator",
+        "label": "`splunk-platform-restart-orchestrator`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; plans and executes ACS restarts only when restartRequired=true",
+        "cloud_config_path": "Topology-aware restart/reload planning for Splunk Cloud ACS, Enterprise systemd/CLI paths, deployment-server reloads, SHC rolling restart, and indexer-cluster handoffs",
+        "notes": "Repo-wide restart guardrail workflow. Audits restart call sites, avoids default REST restarts on systemd hosts, and renders handoffs when no safe noninteractive restart path exists."
+      },
+      {
         "kind": "app",
         "app_name": "splunk-connect-for-otlp",
         "label": "`splunk-connect-for-otlp-setup`",
@@ -1032,6 +1041,20 @@
         "heavy-forwarder"
       ],
       "notes": "Reusable HEC token and service configuration workflow for Enterprise HEC tiers or Splunk Cloud ACS-managed HEC."
+    },
+    {
+      "skill": "splunk-platform-restart-orchestrator",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Splunk Platform restart and reload orchestration workflow. Covers Cloud ACS restart checks, Enterprise systemd/CLI/REST fallback decisions, deployment-server reloads, SHC/IDXC handoffs, and repo-wide restart audit reports."
     },
     {
       "skill": "splunk-admin-doctor",
