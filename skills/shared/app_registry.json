@@ -1448,6 +1448,20 @@
       "notes": "Splunk Observability Cloud <-> ThousandEyes integration via Streams API v7 (OTLP metrics) + Integrations 2.0 APM connector + full TE asset lifecycle (tests, alert rules, labels, tags, dashboards, templates). No Splunk Platform runtime placement."
     },
     {
+      "skill": "splunk-galileo-integration",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Galileo Observe to Splunk workflow orchestration: REST export to Splunk HEC, OpenTelemetry/OpenInference runtime snippets, Splunk Connect for OTLP handoff, Splunk OTel Collector handoff, and dashboard/detector handoffs. Splunk-side HEC, OTLP, OTel Collector, dashboard, and detector logic is delegated to existing skills. Use --o11y-only for Splunk Observability Cloud-only mode with no Splunk Platform HEC dependency."
+    },
+    {
       "skill": "cisco-isovalent-platform-setup",
       "role_support": {
         "search-tier": "none",

@@ -28,7 +28,9 @@ Development and CI additionally require:
 
 Environment-specific notes:
 
-- Run `duo-sso` before AWS live work in this environment.
+- AWS live workflows require an authenticated AWS CLI profile or session with
+  the right target account, organization, and regional permissions. Use your
+  local organization's SSO or credential broker outside this repository.
 - Kubernetes apply/validate paths require the right `kubectl` or `oc` context.
 - Cloud and Observability tokens must be referenced by file path, never pasted
   into shell arguments or chat.
@@ -86,7 +88,7 @@ Environment-specific notes:
 | Skill | Additional local tooling | Live access and product requirements |
 | --- | --- | --- |
 | `splunk-observability-ai-agent-monitoring-setup` | `PyYAML`; `kubectl` for Kubernetes runtime apply paths. | Splunk Observability realm and token files; GenAI application/runtime details; optional HEC/Log Observer Connect handoffs. |
-| `splunk-observability-aws-integration` | `aws`; optional `terraform`; `curl`. | Run `duo-sso` before AWS access here; Splunk Observability admin/user token files; AWS account/organization permissions for CloudWatch and Metric Streams. |
+| `splunk-observability-aws-integration` | `aws`; optional `terraform`; `curl`. | Authenticated AWS CLI profile/session; Splunk Observability admin/user token files; AWS account/organization permissions for CloudWatch and Metric Streams. |
 | `splunk-observability-cisco-ai-pod-integration` | `kubectl` or `oc`, `helm`, `yq`; child-skill tools for Nexus, Intersight, NVIDIA, and OTel collector handoffs. | Splunk Observability token files; Cisco AI Pod cluster access; UCS/Nexus/NVIDIA/NIM/vLLM/storage endpoint details. |
 | `splunk-observability-cisco-intersight-integration` | `kubectl` or `oc`; optional `helm`, `jq`, `yq`, `openssl`, `nc` for live checks and troubleshooting. | Splunk Observability token files; Kubernetes namespace access; Intersight API credentials in a Kubernetes Secret. |
 | `splunk-observability-cisco-nexus-integration` | `kubectl`, `helm`, `yq`; optional `ssh` and `nc` for device checks. | Splunk Observability token files; Nexus/NX-OS device SSH credentials via Kubernetes Secret; collector cluster access. |

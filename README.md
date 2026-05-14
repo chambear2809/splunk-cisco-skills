@@ -10,8 +10,9 @@ The catalog covers Cisco product onboarding, Splunk apps and TAs, Enterprise
 Security and the broader Splunk security portfolio, ITSI, SOAR, On-Call,
 Observability Cloud integrations, AI Agent Monitoring, Database Monitoring,
 dashboards, detectors, OpenTelemetry collectors, Kubernetes APM
-auto-instrumentation, Browser RUM and Session Replay, AWS, ThousandEyes, and
-OTLP integrations, HEC, ACS allowlists, PKI, SmartStore, federated search,
+auto-instrumentation, Browser RUM and Session Replay, AWS, ThousandEyes,
+Galileo, and OTLP integrations, HEC, ACS allowlists, PKI, SmartStore,
+federated search,
 workload management, Monitoring Console, license management, indexer clusters,
 Edge Processor, Stream, Splunk Connect for OTLP, SC4S, SC4SNMP, Universal
 Forwarders, Linux Splunk Enterprise hosts, self-managed Kubernetes runtimes, and
@@ -104,6 +105,12 @@ Common starting points:
   `skills/splunk-observability-cisco-ai-pod-integration/`,
   `skills/splunk-observability-isovalent-integration/`, or
   `skills/splunk-observability-thousandeyes-integration/`.
+- If you need Galileo Observe data in Splunk Platform or Splunk Observability
+  Cloud, start with `skills/splunk-galileo-integration/`. It renders the
+  Galileo REST to HEC bridge, OpenTelemetry/OpenInference runtime snippets, and
+  handoffs to the existing HEC, OTLP, OTel Collector, dashboard, and detector
+  skills. Use `--o11y-only` for Splunk Observability Cloud-only workflows with
+  no Splunk Platform HEC dependency.
 - If you need Splunk Observability Cloud dashboards, use
   `skills/splunk-observability-dashboard-builder/` to turn an operational goal
   into validated classic Observability dashboard API payloads, with modern
@@ -208,9 +215,10 @@ At a high level, the repo gives you seven layers of automation:
    Connect, Splunk Infrastructure Monitoring Add-on); overlay zero-code
    Kubernetes application auto-instrumentation, Browser RUM + Session Replay
    injection, Database Monitoring, and AI Agent Monitoring; wire AWS, Cisco
-   Nexus, Intersight, Isovalent, NVIDIA GPU, Cisco AI Pod, and ThousandEyes
-   sources into Splunk Observability Cloud; and build reviewed Observability
-   dashboard, detector, alert routing, and Splunk On-Call artifacts.
+   Nexus, Intersight, Isovalent, NVIDIA GPU, Cisco AI Pod, ThousandEyes, and
+   Galileo sources into Splunk Observability Cloud; and build reviewed
+   Observability dashboard, detector, alert routing, and Splunk On-Call
+   artifacts.
 7. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
@@ -284,6 +292,7 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-observability-k8s-frontend-rum-setup` | Splunk Browser RUM + Session Replay for Kubernetes-served frontends | Render, apply, verify, and uninstall Browser RUM injection across nginx, ingress-nginx, initContainer rewrite, and runtime-config modes; includes Frustration Signals, gated Session Replay, source-map upload helpers, RUM-to-APM Server-Timing validation, GitOps rendering, and handoffs to dashboard, detector, SIM, and auto-instrumentation workflows |
 | `splunk-observability-cloud-integration-setup` | Splunk Platform <-> Splunk Observability Cloud | Pair Splunk Cloud Platform / Splunk Enterprise with Splunk Observability Cloud end-to-end: token-auth flip, Unified Identity or Service Account pairing, multi-org default-org, Centralized RBAC, Discover Splunk Observability Cloud app's five Configurations tabs, Log Observer Connect (SCP + SE TLS), Related Content + Real Time Metrics, Dashboard Studio O11y metrics, and the Splunk Infrastructure Monitoring Add-on (Splunk_TA_sim, 5247) install + account + curated SignalFlow modular inputs |
 | `splunk-observability-thousandeyes-integration` | ThousandEyes -> Splunk Observability Cloud | Render and apply the full TE -> O11y wiring: Integration 1.0 OpenTelemetry stream (`POST /v7/streams` to ingest.<realm>.signalfx.com/v2/datapoint/otlp), Integrations 2.0 Splunk Observability APM connector, full TE asset lifecycle (tests, alert rules, labels, tags, TE-side dashboards, Templates with Handlebars-only credential placeholders); per-test-type SignalFlow dashboards + detectors handed off to `splunk-observability-dashboard-builder` and `splunk-observability-native-ops` |
+| `splunk-galileo-integration` | Galileo Observe -> Splunk Platform and Splunk Observability Cloud | Render, validate, and optionally apply Galileo REST export to Splunk HEC, Galileo OpenTelemetry/OpenInference runtime snippets, Splunk Platform OTLP input handoffs, Splunk OTel Collector handoffs, and Observability dashboard/detector handoffs while delegating HEC, OTLP, OTel Collector, dashboard, and detector internals to existing skills; supports `--o11y-only` to omit Splunk Platform HEC dependencies |
 | `splunk-observability-isovalent-integration` | Isovalent (Cilium / Hubble / Tetragon) -> Splunk Observability Cloud + Splunk Platform | Render the Splunk OTel collector overlay (seven `prometheus/isovalent_*` scrape jobs + `filter/includemetrics` + cilium-dnsproxy fix); Splunk Platform logs DEFAULT via OTel filelog receiver + hostPath mount + `extraFileLogs.filelog/tetragon` (production-validated); legacy fluentd splunk_hec behind `--legacy-fluentd-hec` (DEPRECATED); hands off Tetragon log ingestion to `cisco-security-cloud-setup` (`PRODUCT=isovalent`, sourcetype `cisco:isovalent`, index `cisco_isovalent`) |
 | `splunk-observability-cisco-nexus-integration` | Cisco Nexus 9000 fabric -> Splunk Observability Cloud | Standalone reusable: clusterReceiver `cisco_os` overlay (PR #45562 multi-device + global-scrapers format, contrib v0.149.0+) with K8s Secret manifest stub for SSH credentials, dashboards (port utilization, errors, drops, CPU/memory) and detectors (interface down, packet drop rate, CPU/memory pressure). Companion to `cisco-dc-networking-setup` (Splunk Platform TA path). |
 | `splunk-observability-cisco-intersight-integration` | Cisco Intersight (UCS) -> Splunk Observability Cloud | Standalone reusable: separate `intersight-otel` namespace + Secret manifest stub + Deployment + ConfigMap pointing at the Splunk OTel agent's OTLP gRPC endpoint; dashboards (UCS power/thermal/fan/network/alarms/advisories/VM count) and detectors (alarm spike, security advisory delta, host temp/power, fan failure). Companion to `cisco-intersight-setup` (Splunk Platform TA path). |

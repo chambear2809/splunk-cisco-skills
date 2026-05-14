@@ -116,6 +116,7 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     # when --dry-run is set, so --apply --dry-run is a true preview path.
     ("splunk-observability-native-ops", "setup.sh"),
     ("splunk-observability-otel-collector-setup", "setup.sh"),
+    ("splunk-galileo-integration", "setup.sh"),
     # splunk-oncall-setup --dry-run skips API/HEC writes even when the
     # caller also passes --apply, --send-alert, or --install-splunk-app.
     ("splunk-oncall-setup", "setup.sh"),
@@ -315,6 +316,9 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
         "--apply-injection",
         "--uninstall-injection",
     ),
+    # Galileo integration is render-first; live work happens only through
+    # --apply sections, while --dry-run is a plan-only preview.
+    ("splunk-galileo-integration", "setup.sh"): ("--apply",),
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it. The smoke_*
@@ -345,6 +349,8 @@ DIRECT_SECRET_FLAGS = {
     "--datasource",
     "--db-password",
     "--external-id",
+    "--galileo-api-key",
+    "--galileo-bearer-token",
     "--hec-token",
     "--integration-key",
     # Intersight API key flags rejected by splunk-observability-cisco-intersight-integration
@@ -372,6 +378,7 @@ DIRECT_SECRET_FLAGS = {
     "--service-account-password",
     "--skey",
     "--sf-token",
+    "--splunk-hec-token",
     # ThousandEyes bearer token rejected by cisco-thousandeyes-mcp-setup and
     # splunk-observability-thousandeyes-integration.
     "--te-token",
@@ -415,6 +422,7 @@ SECRET_FILE_FLAGS = {
     "--client-secret-file",
     "--cloudlock-token-file",
     "--discovery-secret-file",
+    "--galileo-api-key-file",
     "--hec-token-file",
     "--idxc-secret-file",
     "--integration-key-file",
@@ -444,6 +452,7 @@ SECRET_FILE_FLAGS = {
     "--snmpv3-secrets-file",
     "--soar-automation-token-file",
     "--splunk-cloud-admin-jwt-file",
+    "--splunk-hec-token-file",
     # ThousandEyes bearer token file ref (cisco-thousandeyes-mcp-setup +
     # splunk-observability-thousandeyes-integration).
     "--te-token-file",

@@ -1,0 +1,9 @@
+interface:
+  display_name: "Splunk Galileo Integration"
+  short_description: "Wire Galileo Observe to Splunk Platform and Splunk Observability with REST/HEC, OTel/OpenInference, delegated handoffs, and Observability-only mode."
+  default_prompt: >-
+    Use $splunk-galileo-integration to render, validate, and optionally apply
+    Galileo Observe to Splunk workflows: REST export to Splunk HEC, Galileo
+    OpenTelemetry/OpenInference runtime snippets, Splunk Platform OTLP input
+    handoff, Splunk OTel Collector handoff, dashboard/detector handoffs, and
+    --o11y-only Observability Cloud mode without Splunk Platform HEC.
