@@ -898,6 +898,8 @@ splunk-cisco-skills/
 │   ├── cisco-thousandeyes-setup/
 │   ├── cisco-ucs-ta-setup/
 │   ├── cisco-webex-setup/
+│   ├── galileo-agent-control-setup/
+│   ├── galileo-platform-setup/
 │   ├── splunk-admin-doctor/
 │   ├── splunk-agent-management-setup/
 │   ├── splunk-ai-assistant-setup/
@@ -909,6 +911,7 @@ splunk-cisco-skills/
 │   ├── splunk-connect-for-otlp-setup/
 │   ├── splunk-connect-for-snmp-setup/
 │   ├── splunk-connect-for-syslog-setup/
+│   ├── splunk-deployment-server-setup/
 │   ├── splunk-edge-processor-setup/
 │   ├── splunk-enterprise-host-setup/
 │   ├── splunk-enterprise-kubernetes-setup/
@@ -917,7 +920,6 @@ splunk-cisco-skills/
 │   ├── splunk-enterprise-security-install/
 │   ├── splunk-federated-search-setup/
 │   ├── splunk-hec-service-setup/
-│   ├── splunk-platform-restart-orchestrator/
 │   ├── splunk-index-lifecycle-smartstore-setup/
 │   ├── splunk-indexer-cluster-setup/
 │   ├── splunk-itsi-config/
@@ -928,12 +930,14 @@ splunk-cisco-skills/
 │   ├── splunk-observability-ai-agent-monitoring-setup/
 │   ├── splunk-observability-aws-integration/
 │   ├── splunk-observability-aws-lambda-apm-setup/
+│   ├── splunk-observability-azure-integration/
 │   ├── splunk-observability-cisco-ai-pod-integration/
 │   ├── splunk-observability-cisco-intersight-integration/
 │   ├── splunk-observability-cisco-nexus-integration/
 │   ├── splunk-observability-cloud-integration-setup/
 │   ├── splunk-observability-dashboard-builder/
 │   ├── splunk-observability-database-monitoring-setup/
+│   ├── splunk-observability-gcp-integration/
 │   ├── splunk-observability-isovalent-integration/
 │   ├── splunk-observability-k8s-auto-instrumentation-setup/
 │   ├── splunk-observability-k8s-frontend-rum-setup/
@@ -943,6 +947,8 @@ splunk-cisco-skills/
 │   ├── splunk-observability-thousandeyes-integration/
 │   ├── splunk-oncall-setup/
 │   ├── splunk-platform-pki-setup/
+│   ├── splunk-platform-restart-orchestrator/
+│   ├── splunk-search-head-cluster-setup/
 │   ├── splunk-security-essentials-setup/
 │   ├── splunk-security-portfolio-setup/
 │   ├── splunk-soar-setup/
@@ -1010,7 +1016,7 @@ hour by default (`MCP_PLAN_TTL_SECONDS`; set `0` to disable expiry). To allow
 mutating setup, install, or configure scripts, start the MCP server process with:
 
 ```bash
-SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1
+SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1 python3 agent/run-splunk-cisco-skills-mcp.py
 ```
 
 Execution always requires a previously generated plan hash and explicit
