@@ -17,6 +17,7 @@ SETUP = SKILL_DIR / "scripts/setup.sh"
 VALIDATE = SKILL_DIR / "scripts/validate.sh"
 RENDER = SKILL_DIR / "scripts/render_assets.py"
 BRIDGE = SKILL_DIR / "scripts/galileo_to_splunk_hec.py"
+LIFECYCLE = SKILL_DIR / "scripts/galileo_object_lifecycle.py"
 
 
 def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -56,6 +57,7 @@ def test_setup_help_lists_apply_sections() -> None:
     assert "--o11y-only" in combined
     for section in [
         "readiness",
+        "object-lifecycle",
         "observe-export",
         "observe-runtime",
         "protect-runtime",
@@ -86,14 +88,53 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     assert (output_dir / "coverage-report.json").is_file()
     assert (output_dir / "handoff.md").is_file()
     assert (output_dir / "readiness/readiness-report.json").is_file()
+    assert (output_dir / "lifecycle/object-lifecycle-manifest.example.json").is_file()
+    assert (output_dir / "lifecycle/product-coverage-matrix.json").is_file()
+    assert (output_dir / "lifecycle/product-coverage-matrix.md").is_file()
     assert (output_dir / "runtime/python-opentelemetry-env.sh").is_file()
     assert (output_dir / "runtime/python-galileo-protect.py").is_file()
     assert (output_dir / "evaluate/evaluate-assets.yaml").is_file()
     assert (output_dir / "splunk-platform/hec-event-sample.json").is_file()
     assert (output_dir / "splunk-platform/export-records-request.json").is_file()
     assert (output_dir / "otel/collector-galileo-fanout.yaml").is_file()
+    matrix = json.loads((output_dir / "lifecycle/product-coverage-matrix.json").read_text(encoding="utf-8"))
+    surfaces = {item["surface"] for item in matrix}
+    for surface in [
+        "API keys, auth, users, groups, and RBAC",
+        "REST API base URL, custom deployments, and healthcheck",
+        "SSO, OIDC, SAML, and enterprise identity",
+        "Evaluate workflow runs",
+        "Python and TypeScript SDK parity",
+        "Metric taxonomy, autotune, and use-case categories",
+        "Custom scorers and scorer validation",
+        "Luna and model/provider integrations",
+        "Luna-2 fine-tuning and metric evaluation workflows",
+        "Provider integrations, model aliases, costs, and pricing",
+        "Tags, metadata, run labels, and filter hygiene",
+        "Enterprise data retention, TTL, redaction, and privacy controls",
+        "Trace query, columns, recompute, update, and delete maintenance",
+        "Agent Graph, Logs UI, Messages UI, and console debugging views",
+        "Distributed tracing and multi-service propagation",
+        "Third-party framework integrations and wrappers",
+        "MCP tool-call logging and tool spans",
+        "Galileo alerts and notifications",
+        "Annotation templates, ratings, and queues",
+        "Feedback templates and ratings",
+        "Trends dashboards, widgets, sections, Signals, and insights",
+        "Run insights, health scores, and token usage",
+        "Jobs, async tasks, validation status, and progress polling",
+        "Enterprise deployment, system users, and organization jobs",
+        "Galileo MCP Server and IDE developer tooling",
+        "Playgrounds, sample projects, unit tests, and CI experiments",
+        "Cookbooks, use-case guides, and starter examples",
+        "Error catalog, troubleshooting, and support diagnostics",
+        "Release notes and version compatibility",
+        "Splunk destinations",
+    ]:
+        assert surface in surfaces
     for script in [
         "apply-readiness.sh",
+        "apply-object-lifecycle.sh",
         "apply-observe-export.sh",
         "apply-observe-runtime.sh",
         "apply-protect-runtime.sh",
@@ -195,6 +236,7 @@ def test_o11y_only_otel_collector_handoff_omits_platform_hec(tmp_path: Path) -> 
     }
     assert plan["selected_sections"] == [
         "readiness",
+        "object-lifecycle",
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
@@ -221,6 +263,7 @@ def test_o11y_only_default_apply_dry_run_selects_cloud_sections(tmp_path: Path) 
     assert payload["modes"]["splunk_platform_hec_enabled"] is False
     assert payload["selected_sections"] == [
         "readiness",
+        "object-lifecycle",
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
@@ -249,7 +292,7 @@ def test_o11y_only_apply_all_uses_cloud_sections_before_apply(tmp_path: Path) ->
 
     assert result.returncode != 0
     assert "Unknown apply section: all" not in combined
-    assert "--o11y-token-file is required" in combined
+    assert "--galileo-api-key-file is required" in combined
 
 
 def test_o11y_only_rejects_explicit_platform_sections(tmp_path: Path) -> None:
@@ -370,6 +413,49 @@ def test_export_records_request_shape_defaults_to_jsonl_and_redaction() -> None:
     }
 
 
+def test_object_lifecycle_dry_run_covers_core_galileo_objects(tmp_path: Path) -> None:
+    manifest = tmp_path / "lifecycle.json"
+    output = tmp_path / "result.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "project": {"name": "enterprise-ops"},
+                "log_stream": {"name": "production", "metrics": ["correctness"]},
+                "datasets": [{"name": "eval-cases", "content": [{"input": "hi"}]}],
+                "prompts": [{"name": "triage", "template": [{"role": "user", "content": "{{input}}"}]}],
+                "experiments": [{"name": "baseline"}],
+                "protect_stages": [{"name": "production", "create": True}],
+                "agent_control_targets": [{"target_type": "log_stream"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_cmd(
+        sys.executable,
+        str(LIFECYCLE),
+        "--dry-run",
+        "--galileo-api-key-file",
+        str(tmp_path / "galileo.token"),
+        "--manifest",
+        str(manifest),
+        "--output",
+        str(output),
+    )
+    payload = json.loads(result.stdout)
+
+    assert payload["status"] == "ok"
+    assert payload["project"]["status"] == "planned"
+    assert payload["log_stream"]["status"] == "planned"
+    assert payload["metrics"]["status"] == "planned"
+    assert payload["datasets"][0]["status"] == "planned"
+    assert payload["prompts"][0]["status"] == "planned"
+    assert payload["experiments"][0]["status"] == "planned"
+    assert payload["protect_stages"][0]["status"] == "planned"
+    assert payload["agent_control_targets"][0]["status"] == "planned"
+    assert output.is_file()
+
+
 def test_repo_has_no_legacy_galileo_skill_references() -> None:
     legacy = "splunk-" + "galileo-integration"
     result = run_cmd("git", "grep", "-n", legacy, "--", ".", check=False)
@@ -377,4 +463,4 @@ def test_repo_has_no_legacy_galileo_skill_references() -> None:
 
 
 def test_python_scripts_compile() -> None:
-    run_cmd(sys.executable, "-m", "py_compile", str(RENDER), str(BRIDGE))
+    run_cmd(sys.executable, "-m", "py_compile", str(RENDER), str(BRIDGE), str(LIFECYCLE))

@@ -1468,7 +1468,7 @@
       "cloud_pairing": [
         "external-collector"
       ],
-      "notes": "Galileo SaaS/Enterprise readiness and Splunk workflow orchestration: export_records to Splunk HEC, Observe OpenTelemetry/OpenInference snippets, Protect invoke snippets, Evaluate/experiment/dataset/metric/annotation handoffs, Splunk Connect for OTLP handoff, Splunk OTel Collector handoff, and dashboard/detector handoffs. Use --o11y-only for Splunk Observability Cloud-only mode with no Splunk Platform HEC dependency."
+      "notes": "Galileo SaaS/Enterprise readiness, object lifecycle provisioning for projects/log streams/datasets/prompts/experiments/metrics/Protect stages/Agent Control targets, full Galileo feature coverage handoffs for REST API/custom deployments, SSO/RBAC, Luna-2, scorers, workflows, tags/metadata, enterprise retention/TTL/privacy, Agent Graph and console debugging, MCP tool calls, cookbooks, async jobs, and release compatibility, plus Splunk workflow orchestration: export_records to Splunk HEC, Observe OpenTelemetry/OpenInference snippets, Protect invoke snippets, Evaluate annotation/feedback handoffs, Splunk Connect for OTLP handoff, Splunk OTel Collector handoff, and dashboard/detector handoffs. Use --o11y-only for Splunk Observability Cloud-only mode with no Splunk Platform HEC dependency."
     },
     {
       "skill": "galileo-agent-control-setup",

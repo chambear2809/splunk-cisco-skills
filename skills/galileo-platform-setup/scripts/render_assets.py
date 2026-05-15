@@ -20,6 +20,7 @@ from typing import Any
 SKILL_NAME = "galileo-platform-setup"
 APPLY_SECTIONS = [
     "readiness",
+    "object-lifecycle",
     "observe-export",
     "observe-runtime",
     "protect-runtime",
@@ -32,6 +33,7 @@ APPLY_SECTIONS = [
 ]
 O11Y_ONLY_SECTIONS = [
     "readiness",
+    "object-lifecycle",
     "observe-runtime",
     "protect-runtime",
     "evaluate-assets",
@@ -81,6 +83,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--project-name", default="")
     parser.add_argument("--log-stream-id", default="")
     parser.add_argument("--log-stream", default="")
+    parser.add_argument("--lifecycle-manifest", default="")
+    parser.add_argument("--dataset-dir", default="")
+    parser.add_argument("--prompt-manifest", default="")
+    parser.add_argument("--experiment-manifest", default="")
+    parser.add_argument("--protect-stage-manifest", default="")
+    parser.add_argument("--metrics", default="")
     parser.add_argument("--galileo-api-base", default="")
     parser.add_argument("--galileo-console-url", default="")
     parser.add_argument("--galileo-otel-endpoint", default="")
@@ -241,19 +249,36 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
     console_url = arg_or_spec("galileo_console_url", "galileo.console_url", "")
     if not api_base:
         api_base = derive_api_base(console_url) if console_url else "https://api.galileo.ai"
+    otel_endpoint = arg_or_spec("galileo_otel_endpoint", "galileo.otel_endpoint", "")
+    if not otel_endpoint:
+        otel_endpoint = api_base.rstrip("/") + "/otel/v1/traces"
 
     return {
         "project_id": arg_or_spec("project_id", "galileo.project_id", ""),
         "project_name": arg_or_spec("project_name", "galileo.project_name", "galileo-project"),
         "log_stream_id": arg_or_spec("log_stream_id", "galileo.log_stream_id", ""),
         "log_stream": arg_or_spec("log_stream", "galileo.log_stream", "production"),
+        "lifecycle_manifest": arg_or_spec(
+            "lifecycle_manifest",
+            "galileo.lifecycle_manifest",
+            "",
+        ),
+        "dataset_dir": arg_or_spec("dataset_dir", "galileo.dataset_dir", ""),
+        "prompt_manifest": arg_or_spec("prompt_manifest", "galileo.prompt_manifest", ""),
+        "experiment_manifest": arg_or_spec(
+            "experiment_manifest",
+            "galileo.experiment_manifest",
+            "",
+        ),
+        "protect_stage_manifest": arg_or_spec(
+            "protect_stage_manifest",
+            "galileo.protect_stage_manifest",
+            "",
+        ),
+        "metrics": arg_or_spec("metrics", "galileo.metrics", ""),
         "galileo_api_base": api_base,
         "galileo_console_url": console_url,
-        "galileo_otel_endpoint": arg_or_spec(
-            "galileo_otel_endpoint",
-            "galileo.otel_endpoint",
-            "https://api.galileo.ai/otel/traces",
-        ),
+        "galileo_otel_endpoint": otel_endpoint,
         "experiment_id": arg_or_spec("experiment_id", "galileo.experiment_id", ""),
         "metrics_testing_id": arg_or_spec("metrics_testing_id", "galileo.metrics_testing_id", ""),
         "export_format": arg_or_spec("export_format", "hec_export.export_format", "jsonl"),
@@ -408,6 +433,39 @@ fi
 """
     write_text(scripts_dir / "apply-readiness.sh", readiness, executable=True)
     scripts["readiness"] = "scripts/apply-readiness.sh"
+
+    object_lifecycle = f"""{script_header()}
+{require_file_var("GALILEO_API_KEY_FILE", config["galileo_api_key_file"], "--galileo-api-key-file")}
+cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_object_lifecycle.py"
+  --galileo-api-key-file "${{GALILEO_API_KEY_FILE}}"
+  --project-name {shell_quote(config["project_name"])}
+  --log-stream-name {shell_quote(config["log_stream"])}
+  --api-base {shell_quote(config["galileo_api_base"])}
+  --output "${{OUTPUT_DIR}}/lifecycle/object-lifecycle-result.json")
+"""
+    if config["project_id"]:
+        object_lifecycle += f'cmd+=(--project-id {shell_quote(config["project_id"])})\n'
+    if config["log_stream_id"]:
+        object_lifecycle += f'cmd+=(--log-stream-id {shell_quote(config["log_stream_id"])})\n'
+    if config["galileo_console_url"]:
+        object_lifecycle += f'cmd+=(--console-url {shell_quote(config["galileo_console_url"])})\n'
+    if config["lifecycle_manifest"]:
+        object_lifecycle += f'cmd+=(--manifest {shell_quote(config["lifecycle_manifest"])})\n'
+    else:
+        object_lifecycle += 'cmd+=(--manifest "${OUTPUT_DIR}/lifecycle/object-lifecycle-manifest.example.json")\n'
+    if config["dataset_dir"]:
+        object_lifecycle += f'cmd+=(--dataset-dir {shell_quote(config["dataset_dir"])})\n'
+    if config["prompt_manifest"]:
+        object_lifecycle += f'cmd+=(--prompt-manifest {shell_quote(config["prompt_manifest"])})\n'
+    if config["experiment_manifest"]:
+        object_lifecycle += f'cmd+=(--experiment-manifest {shell_quote(config["experiment_manifest"])})\n'
+    if config["protect_stage_manifest"]:
+        object_lifecycle += f'cmd+=(--protect-stage-manifest {shell_quote(config["protect_stage_manifest"])})\n'
+    if config["metrics"]:
+        object_lifecycle += f'cmd+=(--metrics {shell_quote(config["metrics"])})\n'
+    object_lifecycle += 'exec "${cmd[@]}"\n'
+    write_text(scripts_dir / "apply-object-lifecycle.sh", object_lifecycle, executable=True)
+    scripts["object-lifecycle"] = "scripts/apply-object-lifecycle.sh"
 
     splunk_hec = f"""{script_header()}
 {require_file_var("SPLUNK_HEC_TOKEN_FILE", config["splunk_hec_token_file"], "--splunk-hec-token-file")}
@@ -603,6 +661,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-native-ops/scripts/setu
         """for section in "${sections[@]}"; do
   case "${section}" in
     readiness) "${SCRIPT_DIR}/apply-readiness.sh" ;;
+    object-lifecycle) "${SCRIPT_DIR}/apply-object-lifecycle.sh" ;;
     observe-export) "${SCRIPT_DIR}/apply-observe-export.sh" ;;
     observe-runtime) "${SCRIPT_DIR}/apply-observe-runtime.sh" ;;
     protect-runtime) "${SCRIPT_DIR}/apply-protect-runtime.sh" ;;
@@ -631,6 +690,9 @@ export OTEL_SERVICE_NAME={shell_quote(config["service_name"])}
 export OTEL_RESOURCE_ATTRIBUTES={shell_quote("deployment.environment=" + config["deployment_environment"])}
 export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT={shell_quote(config["galileo_otel_endpoint"])}
 export GALILEO_API_KEY_FILE={shell_quote(config["galileo_api_key_file"])}
+export GALILEO_API_BASE={shell_quote(config["galileo_api_base"])}
+export GALILEO_API_URL={shell_quote(config["galileo_api_base"])}
+export GALILEO_CONSOLE_URL={shell_quote(config["galileo_console_url"])}
 """,
     )
     write_text(
@@ -657,6 +719,10 @@ def _read_secret_file(env_name: str) -> str:
 def configure_galileo_tracing() -> None:
     os.environ.setdefault("GALILEO_PROJECT", {config["project_name"]!r})
     os.environ.setdefault("GALILEO_LOG_STREAM", {config["log_stream"]!r})
+    os.environ.setdefault("GALILEO_API_BASE", {config["galileo_api_base"]!r})
+    os.environ.setdefault("GALILEO_API_URL", {config["galileo_api_base"]!r})
+    if {config["galileo_console_url"]!r}:
+        os.environ.setdefault("GALILEO_CONSOLE_URL", {config["galileo_console_url"]!r})
     os.environ.setdefault("OTEL_SERVICE_NAME", {config["service_name"]!r})
     os.environ.setdefault("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", {config["galileo_otel_endpoint"]!r})
     if "GALILEO_API_KEY" not in os.environ:
@@ -692,6 +758,9 @@ data:
   OTEL_SERVICE_NAME: {json.dumps(config["service_name"])}
   OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: {json.dumps(config["galileo_otel_endpoint"])}
   OTEL_RESOURCE_ATTRIBUTES: {json.dumps("deployment.environment=" + config["deployment_environment"])}
+  GALILEO_API_BASE: {json.dumps(config["galileo_api_base"])}
+  GALILEO_API_URL: {json.dumps(config["galileo_api_base"])}
+  GALILEO_CONSOLE_URL: {json.dumps(config["galileo_console_url"])}
 """,
     )
     write_text(
@@ -800,6 +869,12 @@ def render_readiness(output_dir: Path, config: dict[str, Any]) -> None:
             "runtime_snippet": "runtime/python-galileo-protect.py",
             "status": "rendered_handoff",
         },
+        "object_lifecycle_readiness": {
+            "script": "scripts/apply-object-lifecycle.sh",
+            "manifest": "lifecycle/object-lifecycle-manifest.example.json",
+            "coverage_matrix": "lifecycle/product-coverage-matrix.json",
+            "status": "rendered_apply_ready",
+        },
         "signals_trends_annotations": {
             "signals": "covered_by_readiness_report",
             "trends": "covered_by_dashboard_detector_handoffs",
@@ -818,6 +893,645 @@ echo
     )
 
 
+def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
+    api_base = config["galileo_api_base"].rstrip("/")
+    return [
+        {
+            "surface": "Projects",
+            "lifecycle": ["create", "get", "list", "share_rbac_review"],
+            "coverage": "automated_create_or_get_plus_readiness_handoff",
+            "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/reference/projects",
+        },
+        {
+            "surface": "API keys, auth, users, groups, and RBAC",
+            "lifecycle": [
+                "api_key_file_auth",
+                "jwt_basic_auth_handoff",
+                "user_group_role_review",
+                "project_dataset_integration_collaborators",
+            ],
+            "coverage": "secret_file_auth_automated_rbac_and_collaborators_handoff",
+            "rendered_assets": ["readiness/readiness-report.json", "lifecycle/object-lifecycle-manifest.example.json"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/concepts/access-control",
+        },
+        {
+            "surface": "REST API base URL, custom deployments, and healthcheck",
+            "lifecycle": [
+                "hosted_api_base_handoff",
+                "custom_console_to_api_derivation",
+                "healthcheck_validation",
+                "api_version_readiness_review",
+            ],
+            "coverage": "rendered_endpoint_derivation_and_healthcheck_validation",
+            "rendered_assets": ["readiness/readiness-report.json", "readiness/healthcheck.sh"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/api/getting-started",
+        },
+        {
+            "surface": "SSO, OIDC, SAML, and enterprise identity",
+            "lifecycle": [
+                "oidc_provider_handoff",
+                "saml_endpoint_handoff",
+                "issuer_redirect_uri_review",
+                "enterprise_identity_readiness",
+            ],
+            "coverage": "readiness_handoff_for_sso_and_enterprise_identity",
+            "rendered_assets": ["readiness/readiness-report.json", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/security/sso",
+        },
+        {
+            "surface": "Log streams",
+            "lifecycle": ["create", "get", "list", "enable_metrics"],
+            "coverage": "automated_create_or_get_and_optional_metric_enablement",
+            "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/reference/log_streams",
+        },
+        {
+            "surface": "Datasets",
+            "lifecycle": ["create", "get", "version_review", "delete_handoff"],
+            "coverage": "automated_create_from_manifest_or_dataset_dir",
+            "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "evaluate/evaluate-assets.yaml"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/experiments/datasets",
+        },
+        {
+            "surface": "Dataset versions, sharing, prompt datasets, and synthetic extension",
+            "lifecycle": [
+                "version_history_handoff",
+                "dataset_collaborator_handoff",
+                "prompt_evaluation_dataset_handoff",
+                "synthetic_extend_handoff",
+            ],
+            "coverage": "rendered_handoff_with_dataset_creation_automation",
+            "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "evaluate/evaluate-assets.yaml"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/experiments/datasets",
+        },
+        {
+            "surface": "Prompts",
+            "lifecycle": ["create", "get", "list", "version_review", "delete_handoff"],
+            "coverage": "automated_create_from_manifest",
+            "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "evaluate/evaluate-assets.yaml"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/experiments/prompts",
+        },
+        {
+            "surface": "Experiments",
+            "lifecycle": ["create", "get", "run_handoff", "export"],
+            "coverage": "automated_create_or_prompt_dataset_run_when_manifest_opts_in",
+            "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "evaluate/experiment-handoff.md"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/reference/experiments",
+        },
+        {
+            "surface": "Experiment groups, tags, comparison, search, and metric settings",
+            "lifecycle": [
+                "experiment_group_review",
+                "experiment_tags_handoff",
+                "comparison_handoff",
+                "search_and_metrics_handoff",
+            ],
+            "coverage": "rendered_handoff_with_experiment_create_or_run_automation",
+            "rendered_assets": ["evaluate/experiment-handoff.md", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/reference/experiments",
+        },
+        {
+            "surface": "Evaluate workflow runs",
+            "lifecycle": [
+                "workflow_step_handoff",
+                "run_create_api_handoff",
+                "registered_generated_finetuned_scorer_handoff",
+            ],
+            "coverage": "rendered_handoff_for_evaluate_api_runs",
+            "rendered_assets": ["evaluate/evaluate-assets.yaml", "evaluate/experiment-handoff.md"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/api-reference/evaluate/create-workflows-run",
+        },
+        {
+            "surface": "Python and TypeScript SDK parity",
+            "lifecycle": [
+                "python_sdk_reference_handoff",
+                "typescript_sdk_reference_handoff",
+                "observe_workflow_class_handoff",
+                "evaluate_workflow_class_handoff",
+                "package_version_handoff",
+                "telemetry_toggle_handoff",
+            ],
+            "coverage": "rendered_sdk_surface_tracking_for_python_and_typescript",
+            "rendered_assets": ["runtime/", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/typescript/sdk-reference",
+        },
+        {
+            "surface": "Evaluate metrics and scorers",
+            "lifecycle": ["enable_log_stream_metrics", "run_experiment_metrics", "custom_scorer_handoff"],
+            "coverage": "automated_built_in_metric_enablement_and_manifest_handoff",
+            "rendered_assets": ["evaluate/evaluate-assets.yaml", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/reference/log_streams",
+        },
+        {
+            "surface": "Metric taxonomy, autotune, and use-case categories",
+            "lifecycle": [
+                "agentic_metrics_handoff",
+                "rag_metrics_handoff",
+                "response_quality_handoff",
+                "safety_compliance_handoff",
+                "expression_readability_handoff",
+                "model_confidence_handoff",
+                "multimodal_quality_handoff",
+                "text_to_sql_handoff",
+                "autotune_handoff",
+            ],
+            "coverage": "rendered_handoff_for_metric_selection_and_improvement",
+            "rendered_assets": ["evaluate/evaluate-assets.yaml", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/concepts/metrics/metric-comparison",
+        },
+        {
+            "surface": "Custom scorers and scorer validation",
+            "lifecycle": [
+                "list_scorers_handoff",
+                "scorer_settings_handoff",
+                "code_llm_luna_scorer_version_handoff",
+                "validate_scorer_handoff",
+            ],
+            "coverage": "rendered_handoff_for_scorer_authoring_validation_and_settings",
+            "rendered_assets": ["evaluate/evaluate-assets.yaml", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/reference/scorers",
+        },
+        {
+            "surface": "Luna and model/provider integrations",
+            "lifecycle": ["tenant_feature_check", "model_alias_review", "provider_integration_handoff"],
+            "coverage": "readiness_handoff_for_enterprise_features_and_model_alias_prereqs",
+            "rendered_assets": ["readiness/readiness-report.json", "evaluate/experiment-handoff.md"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/sdk-reference",
+        },
+        {
+            "surface": "Luna-2 fine-tuning and metric evaluation workflows",
+            "lifecycle": [
+                "luna_model_availability_review",
+                "luna_metric_evaluation_handoff",
+                "luna_experiment_handoff",
+                "fine_tuning_readiness_review",
+            ],
+            "coverage": "rendered_handoff_for_luna_fine_tuning_and_evaluation_paths",
+            "rendered_assets": ["readiness/readiness-report.json", "evaluate/experiment-handoff.md"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/concepts/luna/fine-tuning",
+        },
+        {
+            "surface": "Provider integrations, model aliases, costs, and pricing",
+            "lifecycle": [
+                "available_integrations_review",
+                "openai_anthropic_bedrock_sagemaker_azure_databricks_vertex_nvidia_writer_custom_handoff",
+                "integration_collaborator_handoff",
+                "model_pricing_handoff",
+            ],
+            "coverage": "rendered_secret_safe_provider_and_cost_handoff",
+            "rendered_assets": ["readiness/readiness-report.json", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/concepts/metrics",
+        },
+        {
+            "surface": "Observe traces, sessions, spans",
+            "lifecycle": ["runtime_instrument", "export_records", "splunk_hec_ingest"],
+            "coverage": "automated_export_bridge_and_runtime_snippets",
+            "rendered_assets": ["runtime/", "splunk-platform/export-records-request.json"],
+            "apply_script": "scripts/apply-observe-export.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/logging/logging-basics",
+        },
+        {
+            "surface": "Tags, metadata, run labels, and filter hygiene",
+            "lifecycle": [
+                "trace_tags_handoff",
+                "trace_metadata_handoff",
+                "span_metadata_handoff",
+                "session_metadata_handoff",
+                "prompt_run_tags_handoff",
+                "sensitive_metadata_review",
+            ],
+            "coverage": "rendered_runtime_and_redaction_handoff_for_tags_and_metadata",
+            "rendered_assets": ["runtime/", "readiness/readiness-report.json"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/logging/tags-and-metadata",
+        },
+        {
+            "surface": "Enterprise data retention, TTL, redaction, and privacy controls",
+            "lifecycle": [
+                "enterprise_ttl_handoff",
+                "redacted_input_output_runtime_handoff",
+                "pii_metric_and_policy_review",
+                "data_retention_policy_review",
+                "privacy_compliance_handoff",
+            ],
+            "coverage": "rendered_handoff_for_enterprise_retention_redaction_and_privacy_controls",
+            "rendered_assets": ["readiness/readiness-report.json", "runtime/", "splunk-platform/export-records-request.json"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/release-notes",
+        },
+        {
+            "surface": "Trace query, columns, recompute, update, and delete maintenance",
+            "lifecycle": [
+                "query_sessions_traces_spans_handoff",
+                "available_columns_handoff",
+                "recompute_metrics_handoff",
+                "delete_records_guardrail",
+                "organization_job_status_handoff",
+            ],
+            "coverage": "export_automated_destructive_and_recompute_paths_handoff_only",
+            "rendered_assets": ["splunk-platform/export-records-request.json", "readiness/readiness-report.json"],
+            "apply_script": "scripts/apply-observe-export.sh",
+            "docs": "https://docs.galileo.ai/api-reference/trace/export-records",
+        },
+        {
+            "surface": "Agent Graph, Logs UI, Messages UI, and console debugging views",
+            "lifecycle": [
+                "aggregate_agent_graph_handoff",
+                "agent_graph_node_search_handoff",
+                "traffic_analytics_review",
+                "large_logstream_filtering_and_pagination_review",
+                "messages_ui_review",
+                "logstream_insights_ui_review",
+            ],
+            "coverage": "rendered_operator_handoff_for_console_debugging_surfaces",
+            "rendered_assets": ["readiness/readiness-report.json", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/release-notes",
+        },
+        {
+            "surface": "Distributed tracing and multi-service propagation",
+            "lifecycle": [
+                "distributed_trace_context_handoff",
+                "otel_trace_stitching_handoff",
+                "multi_service_session_trace_span_export",
+            ],
+            "coverage": "rendered_runtime_and_export_handoff_for_distributed_tracing",
+            "rendered_assets": ["runtime/", "otel/collector-galileo-fanout.yaml"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/logging/distributed-tracing",
+        },
+        {
+            "surface": "Multimodal observability",
+            "lifecycle": ["image_audio_document_logging_handoff", "multimodal_metric_handoff", "redaction_review"],
+            "coverage": "rendered_runtime_and_redaction_handoff",
+            "rendered_assets": ["runtime/", "readiness/readiness-report.json"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/concepts/logging/multimodal-observability",
+        },
+        {
+            "surface": "OpenTelemetry and OpenInference",
+            "lifecycle": ["runtime_env", "collector_fanout", "kubernetes_handoff"],
+            "coverage": "rendered_runtime_and_collector_handoff",
+            "rendered_assets": ["runtime/python-opentelemetry-galileo.py", "otel/collector-galileo-fanout.yaml"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/third-party-integrations/opentelemetry-and-openinference",
+        },
+        {
+            "surface": "Third-party framework integrations and wrappers",
+            "lifecycle": [
+                "a2a_protocol_handoff",
+                "crewai_handoff",
+                "google_adk_handoff",
+                "langchain_langgraph_handoff",
+                "mastra_handoff",
+                "microsoft_agent_framework_handoff",
+                "openai_wrapper_handoff",
+                "openai_agents_trace_processor_handoff",
+                "pydantic_ai_handoff",
+                "strands_agents_handoff",
+                "vercel_ai_sdk_handoff",
+                "custom_span_handoff",
+                "openinference_handoff",
+            ],
+            "coverage": "rendered_runtime_handoff_for_supported_frameworks",
+            "rendered_assets": ["runtime/", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/typescript/wrappers/wrappers-overview",
+        },
+        {
+            "surface": "MCP tool-call logging and tool spans",
+            "lifecycle": [
+                "mcp_client_tool_call_handoff",
+                "tool_span_logging_handoff",
+                "anthropic_mcp_example_handoff",
+                "tool_input_output_redaction_review",
+            ],
+            "coverage": "rendered_runtime_handoff_for_mcp_tool_spans",
+            "rendered_assets": ["runtime/", "readiness/readiness-report.json"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/how-to-guides/basics/log-mcp-server-calls/log-mcp-server-calls",
+        },
+        {
+            "surface": "Galileo alerts and notifications",
+            "lifecycle": ["email_alert_handoff", "slack_webhook_handoff", "metric_threshold_handoff"],
+            "coverage": "rendered_handoff_and_splunk_detector_mapping",
+            "rendered_assets": ["detectors/galileo-detectors.yaml", "readiness/readiness-report.json"],
+            "apply_script": "scripts/apply-detectors.sh",
+            "docs": "https://docs.galileo.ai/how-to-guides/basics/set-up-alerts-on-logs",
+        },
+        {
+            "surface": "Protect stages and invocation",
+            "lifecycle": ["stage_create", "ruleset_handoff", "invoke_runtime", "notification_handoff"],
+            "coverage": "automated_stage_create_when_galileo_protect_is_installed_plus_runtime_helper",
+            "rendered_assets": ["runtime/python-galileo-protect.py", "lifecycle/object-lifecycle-manifest.example.json"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/api-reference/protect/invoke",
+        },
+        {
+            "surface": "Protect rules, rulesets, actions, notifications, and LangChain/LangGraph runtime",
+            "lifecycle": [
+                "ruleset_manifest_handoff",
+                "central_stage_version_handoff",
+                "notification_webhook_handoff",
+                "langchain_langgraph_runtime_handoff",
+            ],
+            "coverage": "stage_create_automation_plus_ruleset_and_runtime_handoff",
+            "rendered_assets": ["runtime/python-galileo-protect.py", "lifecycle/object-lifecycle-manifest.example.json"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/protect/rulesets",
+        },
+        {
+            "surface": "Agent Control targets",
+            "lifecycle": ["resolve_log_stream_target", "control_server_handoff", "splunk_sink_handoff"],
+            "coverage": "automated_target_resolution_plus_delegate_to_galileo_agent_control_setup",
+            "rendered_assets": ["lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/reference/agent_control",
+        },
+        {
+            "surface": "Annotation templates, ratings, and queues",
+            "lifecycle": [
+                "annotation_template_handoff",
+                "annotation_rating_handoff",
+                "bulk_annotation_handoff",
+                "queue_enterprise_beta_handoff",
+                "export_field_mapping",
+            ],
+            "coverage": "rendered_handoff_and_splunk_field_coverage",
+            "rendered_assets": ["evaluate/annotation-feedback-handoff.md", "coverage-report.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/concepts/annotations/overview",
+        },
+        {
+            "surface": "Feedback templates and ratings",
+            "lifecycle": ["feedback_template_handoff", "feedback_rating_handoff", "bulk_feedback_handoff"],
+            "coverage": "rendered_handoff_and_splunk_field_coverage",
+            "rendered_assets": ["evaluate/annotation-feedback-handoff.md", "coverage-report.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/api-reference/feedback/create-feedback-template-v2",
+        },
+        {
+            "surface": "Trends dashboards, widgets, sections, Signals, and insights",
+            "lifecycle": [
+                "get_update_trends_handoff",
+                "widget_section_handoff",
+                "dashboard_favorite_duplicate_delete_handoff",
+                "splunk_dashboard_detector_mapping",
+            ],
+            "coverage": "rendered_handoff_and_splunk_dashboard_detector_mapping",
+            "rendered_assets": ["dashboards/galileo-dashboard.yaml", "detectors/galileo-detectors.yaml"],
+            "apply_script": "scripts/apply-dashboards.sh",
+            "docs": "https://docs.galileo.ai/api-reference/trends_dashboard/get-trends",
+        },
+        {
+            "surface": "Run insights, health scores, and token usage",
+            "lifecycle": ["run_insights_settings_handoff", "health_score_handoff", "token_usage_handoff"],
+            "coverage": "rendered_handoff_for_insight_settings_and_health_score_apis",
+            "rendered_assets": ["readiness/readiness-report.json", "dashboards/galileo-dashboard.yaml"],
+            "apply_script": "scripts/apply-dashboards.sh",
+            "docs": api_base + "/v2/healthcheck",
+        },
+        {
+            "surface": "Jobs, async tasks, validation status, and progress polling",
+            "lifecycle": [
+                "dataset_generation_status_handoff",
+                "scorer_validation_task_handoff",
+                "job_progress_handoff",
+                "organization_job_status_handoff",
+            ],
+            "coverage": "rendered_handoff_for_async_task_and_job_status_tracking",
+            "rendered_assets": ["readiness/readiness-report.json", "evaluate/evaluate-assets.yaml"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/python/reference/job_progress",
+        },
+        {
+            "surface": "Search, runs, traces SDK utilities, decorators, handlers, and wrappers",
+            "lifecycle": [
+                "sdk_runtime_handoff",
+                "decorator_and_logger_handoff",
+                "openai_langchain_langgraph_wrapper_handoff",
+                "search_runs_traces_handoff",
+            ],
+            "coverage": "rendered_runtime_handoff_and_sdk_surface_tracking",
+            "rendered_assets": ["runtime/", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/logging/logging-basics",
+        },
+        {
+            "surface": "Enterprise deployment, system users, and organization jobs",
+            "lifecycle": ["security_readiness", "system_user_handoff", "organization_job_status_handoff"],
+            "coverage": "readiness_handoff_for_enterprise_admin_surfaces",
+            "rendered_assets": ["readiness/readiness-report.json"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/deployments/security-and-access-control",
+        },
+        {
+            "surface": "Galileo MCP Server and IDE developer tooling",
+            "lifecycle": ["mcp_server_url_handoff", "cursor_vscode_handoff", "mcp_dataset_prompt_experiment_tools"],
+            "coverage": "rendered_handoff_for_mcp_tooling_with_secret_file_guardrails",
+            "rendered_assets": ["readiness/readiness-report.json", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/getting-started/mcp/setup-galileo-mcp",
+        },
+        {
+            "surface": "Playgrounds, sample projects, unit tests, and CI experiments",
+            "lifecycle": [
+                "console_playground_handoff",
+                "sample_project_handoff",
+                "unit_test_experiment_handoff",
+                "ci_cd_experiment_gate_handoff",
+            ],
+            "coverage": "rendered_handoff_for_non_production_eval_workflows",
+            "rendered_assets": ["evaluate/experiment-handoff.md", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/experiments/running-experiments-in-unit-tests",
+        },
+        {
+            "surface": "Cookbooks, use-case guides, and starter examples",
+            "lifecycle": [
+                "agentic_ai_example_handoff",
+                "rag_example_handoff",
+                "conversational_quality_playbook_handoff",
+                "multi_agent_cookbook_handoff",
+                "starter_project_review",
+            ],
+            "coverage": "rendered_handoff_for_official_galileo_use_case_accelerators",
+            "rendered_assets": ["evaluate/experiment-handoff.md", "runtime/", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/cookbooks/use-cases/agent-langchain",
+        },
+        {
+            "surface": "Error catalog, troubleshooting, and support diagnostics",
+            "lifecycle": ["error_catalog_handoff", "common_errors_handoff", "project_key_lookup_handoff"],
+            "coverage": "rendered_operator_diagnostics_handoff",
+            "rendered_assets": ["readiness/readiness-report.json", "handoff.md"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/references/faqs/errors-catalog",
+        },
+        {
+            "surface": "Release notes and version compatibility",
+            "lifecycle": [
+                "release_notes_review",
+                "sdk_version_pin_handoff",
+                "api_behavior_change_review",
+                "tenant_feature_flag_review",
+            ],
+            "coverage": "rendered_operator_handoff_for_version_compatibility",
+            "rendered_assets": ["readiness/readiness-report.json", "handoff.md"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/release-notes",
+        },
+        {
+            "surface": "Splunk destinations",
+            "lifecycle": ["hec_token_handoff", "otlp_handoff", "otel_collector_handoff", "dashboards", "detectors"],
+            "coverage": "delegated_to_existing_splunk_skills",
+            "rendered_assets": ["splunk-platform/", "otel/", "dashboards/", "detectors/"],
+            "apply_script": "scripts/apply-selected.sh",
+            "docs": "https://help.splunk.com/en/data-management/collect-http-event-data/use-hec-in-splunk-enterprise/format-events-for-http-event-collector",
+        },
+    ]
+
+
+def render_object_lifecycle(output_dir: Path, config: dict[str, Any]) -> None:
+    metrics = [item.strip() for item in str(config["metrics"]).split(",") if item.strip()]
+    manifest = {
+        "api_version": f"{SKILL_NAME}/object-lifecycle/v1",
+        "project": {
+            "name": config["project_name"],
+            "id": config["project_id"],
+            "create": True,
+        },
+        "log_stream": {
+            "name": config["log_stream"],
+            "id": config["log_stream_id"],
+            "create": True,
+            "metrics": metrics,
+        },
+        "datasets": [],
+        "prompts": [],
+        "experiments": [
+            {
+                "name": f"{config['project_name']}-baseline",
+                "mode": "create_only",
+                "dataset_name": "",
+                "prompt_name": "",
+                "metrics": metrics,
+                "tags": {"source": SKILL_NAME},
+            }
+        ],
+        "protect_stages": [
+            {
+                "name": "production",
+                "project_id": config["project_id"],
+                "create": False,
+                "note": "Set create=true when Galileo Protect stages should be provisioned.",
+            }
+        ],
+        "agent_control_targets": [
+            {
+                "target_type": "log_stream",
+                "project_id": config["project_id"],
+                "log_stream_id": config["log_stream_id"],
+                "note": "Resolved locally; delegate control server and sink setup to galileo-agent-control-setup.",
+            }
+        ],
+        "collaborators": {
+            "projects": [],
+            "datasets": [],
+            "integrations": [],
+            "note": "Use as an operator handoff for users, groups, and RBAC roles.",
+        },
+        "integrations": {
+            "providers": [
+                "OpenAI",
+                "Anthropic",
+                "AWS Bedrock",
+                "AWS SageMaker",
+                "Azure OpenAI",
+                "Databricks",
+                "Google Vertex AI",
+                "Mistral",
+                "NVIDIA",
+                "Writer",
+                "custom",
+            ],
+            "note": "Secrets for model/provider integrations stay outside rendered artifacts.",
+        },
+        "scorers": {
+            "custom_code": [],
+            "custom_llm": [],
+            "luna": [],
+            "preset": [],
+            "note": "Validate and register scorers with a deliberate operator step before enabling on production log streams.",
+        },
+        "annotation_templates": [],
+        "feedback_templates": [],
+        "trends_dashboards": [],
+        "trace_maintenance": {
+            "query": True,
+            "recompute_metrics": False,
+            "delete_records": False,
+            "note": "Destructive trace/session/span operations are intentionally handoff-only.",
+        },
+        "run_insights": {
+            "health_score": "handoff",
+            "token_usage": "handoff",
+            "settings": "handoff",
+        },
+        "multimodal_observability": {
+            "images": "handoff",
+            "audio": "handoff",
+            "documents": "handoff",
+            "redaction_review_required": True,
+        },
+    }
+    write_json(output_dir / "lifecycle/object-lifecycle-manifest.example.json", manifest)
+    write_json(output_dir / "lifecycle/product-coverage-matrix.json", product_coverage_matrix(config))
+    write_text(
+        output_dir / "lifecycle/product-coverage-matrix.md",
+        "\n".join(
+            [
+                "# Galileo Product Coverage Matrix",
+                "",
+                "| Surface | Lifecycle Coverage | Apply Surface |",
+                "| --- | --- | --- |",
+                *[
+                    "| {surface} | {coverage} | `{script}` |".format(
+                        surface=item["surface"],
+                        coverage=item["coverage"],
+                        script=item["apply_script"],
+                    )
+                    for item in product_coverage_matrix(config)
+                ],
+                "",
+                "Use `scripts/apply-object-lifecycle.sh` when the tenant needs project, "
+                "log stream, dataset, prompt, experiment, metric, Protect stage, or Agent "
+                "Control target creation/validation before exporting telemetry to Splunk.",
+                "",
+            ]
+        ),
+    )
+
+
 def render_evaluate_assets(output_dir: Path, config: dict[str, Any]) -> None:
     write_text(
         output_dir / "evaluate/evaluate-assets.yaml",
@@ -833,6 +1547,7 @@ experiments:
   metrics_testing_id: {json.dumps(config["metrics_testing_id"])}
 coverage:
   evaluate: rendered_handoff
+  object_lifecycle: lifecycle/object-lifecycle-manifest.example.json
   metrics:
     agentic: operator_review
     sampling: operator_review
@@ -840,6 +1555,7 @@ coverage:
   datasets: operator_review
   annotations_feedback: rendered_handoff
   signals_trends: rendered_handoff
+  product_coverage_matrix: lifecycle/product-coverage-matrix.json
 """,
     )
     write_text(
@@ -1080,6 +1796,7 @@ def build_apply_plan(
 ) -> dict[str, Any]:
     targets = {
         "readiness": "galileo-platform-setup",
+        "object-lifecycle": "galileo-platform-setup",
         "observe-export": "galileo-platform-setup",
         "observe-runtime": "galileo-platform-setup",
         "protect-runtime": "galileo-platform-setup",
@@ -1118,6 +1835,7 @@ def build_apply_plan(
             "handoff": "handoff.md",
             "runtime": "runtime/",
             "readiness": "readiness/",
+            "lifecycle": "lifecycle/",
             "evaluate": "evaluate/",
             "splunk_platform": "splunk-platform/",
             "otel": "otel/",
@@ -1135,6 +1853,31 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
             "galileo_saas_enterprise_readiness": {
                 "status": "rendered_handoff",
                 "assets": ["readiness/readiness-report.json", "readiness/healthcheck.sh"],
+            },
+            "galileo_object_lifecycle": {
+                "status": "automated_create_or_get",
+                "assets": [
+                    "lifecycle/object-lifecycle-manifest.example.json",
+                    "lifecycle/product-coverage-matrix.json",
+                ],
+                "script": "scripts/galileo_object_lifecycle.py",
+                "covers": [
+                    "projects",
+                    "log_streams",
+                    "datasets",
+                    "prompts",
+                    "experiments",
+                    "metrics",
+                    "protect_stages",
+                    "agent_control_targets",
+                    "luna_readiness",
+                    "provider_integrations",
+                ],
+            },
+            "galileo_full_feature_coverage_matrix": {
+                "status": "rendered",
+                "domain_count": len(product_coverage_matrix(config)),
+                "asset": "lifecycle/product-coverage-matrix.json",
             },
             "galileo_export_records_to_splunk_hec": {
                 "status": "automated",
@@ -1154,8 +1897,8 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
                 "assets": ["runtime/python-galileo-protect.py"],
             },
             "galileo_evaluate_experiments_datasets_annotations": {
-                "status": "rendered_handoff",
-                "assets": ["evaluate/"],
+                "status": "automated_lifecycle_plus_rendered_handoff",
+                "assets": ["evaluate/", "lifecycle/"],
             },
             "splunk_observability_operations": {
                 "status": "delegated",
@@ -1195,6 +1938,7 @@ def render_handoff(output_dir: Path, config: dict[str, Any], scripts: dict[str, 
         [
             "",
             "## Delegation Targets",
+            "- `object-lifecycle` -> `galileo-platform-setup`",
             "- `splunk-hec` -> `splunk-hec-service-setup`",
             "- `splunk-otlp` -> `splunk-connect-for-otlp-setup`",
             "- `otel-collector` -> `splunk-observability-otel-collector-setup`",
@@ -1212,10 +1956,12 @@ def render_handoff(output_dir: Path, config: dict[str, Any], scripts: dict[str, 
     write_text(output_dir / "handoff.md", "\n".join(lines))
 
 
-def maybe_copy_bridge(output_dir: Path) -> None:
-    source = Path(__file__).with_name("galileo_to_splunk_hec.py")
-    if source.is_file():
-        target = output_dir / "scripts/galileo_to_splunk_hec.py"
+def maybe_copy_runtime_scripts(output_dir: Path) -> None:
+    for name in ("galileo_to_splunk_hec.py", "galileo_object_lifecycle.py"):
+        source = Path(__file__).with_name(name)
+        if not source.is_file():
+            continue
+        target = output_dir / "scripts" / name
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
         target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
@@ -1234,13 +1980,14 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
     output_dir.mkdir(parents=True, exist_ok=True)
     render_readiness(output_dir, config)
+    render_object_lifecycle(output_dir, config)
     render_runtime(output_dir, config)
     render_evaluate_assets(output_dir, config)
     render_splunk_platform(output_dir, config)
     render_otel(output_dir, config)
     render_o11y_specs(output_dir, config)
     scripts = render_scripts(output_dir, config, sections)
-    maybe_copy_bridge(output_dir)
+    maybe_copy_runtime_scripts(output_dir)
     apply_plan = build_apply_plan(config, scripts, sections, output_dir)
     coverage = build_coverage_report(config)
     write_json(output_dir / "apply-plan.json", apply_plan)

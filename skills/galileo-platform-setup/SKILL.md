@@ -1,15 +1,18 @@
 ---
 name: galileo-platform-setup
 description: >-
-  Render, validate, and optionally apply Galileo platform readiness and Splunk
-  wiring for Galileo SaaS or Enterprise deployments. Covers Observe exports
-  through export_records, OpenTelemetry/OpenInference runtime snippets, Protect
-  invoke snippets, Evaluate/experiments/datasets/metrics/annotation handoffs,
-  Luna Enterprise readiness, RBAC/project-sharing checks, Splunk HEC/OTLP/OTel
-  Collector handoffs, and Splunk Observability dashboards/detectors. Use when
-  the user asks to connect Galileo Observe, Evaluate, Protect, Luna, metrics,
-  experiments, datasets, annotations, feedback, or GenAI observability records
-  to Splunk Platform or Splunk Observability Cloud.
+  Render, validate, and optionally apply Galileo platform readiness, object
+  lifecycle, and Splunk wiring for Galileo SaaS or Enterprise deployments.
+  Covers Observe exports through export_records, project/log stream, dataset,
+  prompt, and experiment object lifecycle provisioning, OpenTelemetry/OpenInference
+  runtime snippets, Protect stages/invoke snippets, Evaluate metrics/annotation
+  handoffs, Luna Enterprise readiness, RBAC/project-sharing checks, Agent
+  Control target resolution, Splunk HEC/OTLP/OTel Collector handoffs, and
+  Splunk Observability dashboards/detectors. Use when the user asks to create
+  Galileo projects/log streams/datasets/prompts/experiments or connect Observe,
+  Evaluate, Protect, Luna, metrics, Agent Control targets, annotations,
+  feedback, or GenAI observability records to Splunk Platform or Splunk
+  Observability Cloud.
 ---
 
 # Galileo Platform Setup
@@ -24,16 +27,29 @@ logic.
    auth mode inventory, RBAC/group/project-sharing checklist, Luna Enterprise
    readiness, metric sampling/filtering coverage, Protect invoke readiness, and
    Signals/Trends/annotation coverage.
-2. **Observe export to Splunk HEC**: render and run
+2. **Galileo object lifecycle**: create or validate projects, log streams,
+   datasets, prompts, experiments, log stream metrics, Protect stages, and
+   Agent Control targets using `scripts/galileo_object_lifecycle.py`. The
+   rendered coverage matrix also tracks auth/RBAC, integrations, costs,
+   custom scorers, Evaluate workflow runs, trace maintenance, annotation and
+   feedback templates, Trends dashboards, run insights, multimodal logging,
+   distributed tracing, tags/metadata, enterprise retention/TTL/privacy,
+   Agent Graph and console debugging views, alerts, framework wrappers, Python
+   and TypeScript SDK parity, REST API/custom deployment healthchecks,
+   SSO/OIDC/SAML, Luna-2 fine-tuning/evaluation handoffs, Galileo MCP tooling,
+   MCP tool-call logging, async job progress, playground/sample/CI workflows,
+   official cookbook/use-case starter examples, troubleshooting,
+   release/version checks, search/SDK utilities, and enterprise admin handoffs.
+3. **Observe export to Splunk HEC**: render and run
    `scripts/galileo_to_splunk_hec.py` against
    `/v2/projects/{project_id}/export_records` using JSONL by default.
-3. **Observe runtime**: render Python and Kubernetes Galileo
+4. **Observe runtime**: render Python and Kubernetes Galileo
    OpenTelemetry/OpenInference snippets.
-4. **Protect runtime**: render a file-secret-backed Python helper for
+5. **Protect runtime**: render a file-secret-backed Python helper for
    `/v2/protect/invoke`.
-5. **Evaluate assets**: render handoffs for experiments, datasets, metrics
+6. **Evaluate assets**: render handoffs for experiments, datasets, metrics
    testing, annotations, feedback, Signals, and Trends.
-6. **Splunk handoffs**:
+7. **Splunk handoffs**:
    - HEC token/service: `splunk-hec-service-setup`
    - Splunk Platform OTLP input: `splunk-connect-for-otlp-setup`
    - Splunk OTel Collector: `splunk-observability-otel-collector-setup`
@@ -70,6 +86,18 @@ Apply only explicit sections:
 
 ```bash
 bash skills/galileo-platform-setup/scripts/setup.sh \
+  --apply object-lifecycle \
+  --project-name "$GALILEO_PROJECT" \
+  --log-stream "$GALILEO_LOG_STREAM" \
+  --galileo-console-url "$GALILEO_CONSOLE_URL" \
+  --lifecycle-manifest ./galileo-lifecycle.json \
+  --galileo-api-key-file /tmp/galileo_api_key
+```
+
+Export records after object provisioning:
+
+```bash
+bash skills/galileo-platform-setup/scripts/setup.sh \
   --apply splunk-hec,observe-export \
   --project-id "$GALILEO_PROJECT_ID" \
   --log-stream-id "$GALILEO_LOG_STREAM_ID" \
@@ -96,6 +124,7 @@ bash skills/galileo-platform-setup/scripts/setup.sh \
 Apply sections:
 
 - `readiness`
+- `object-lifecycle`
 - `observe-export`
 - `observe-runtime`
 - `protect-runtime`
@@ -107,9 +136,13 @@ Apply sections:
 - `detectors`
 
 With `--o11y-only`, the default selected sections are `readiness`,
-`observe-runtime`, `protect-runtime`, `evaluate-assets`, `otel-collector`,
-`dashboards`, and `detectors`. Explicit Splunk Platform sections
+`object-lifecycle`, `observe-runtime`, `protect-runtime`, `evaluate-assets`,
+`otel-collector`, `dashboards`, and `detectors`. Explicit Splunk Platform sections
 (`observe-export`, `splunk-hec`, `splunk-otlp`) are rejected in that mode.
+
+Use `--lifecycle-manifest`, `--dataset-dir`, `--prompt-manifest`,
+`--experiment-manifest`, `--protect-stage-manifest`, and `--metrics` when the
+tenant needs Galileo objects provisioned before export or runtime handoff.
 
 ## Secret Handling
 
@@ -138,7 +171,8 @@ For code validation:
 ```bash
 python3 -m py_compile \
   skills/galileo-platform-setup/scripts/render_assets.py \
-  skills/galileo-platform-setup/scripts/galileo_to_splunk_hec.py
+  skills/galileo-platform-setup/scripts/galileo_to_splunk_hec.py \
+  skills/galileo-platform-setup/scripts/galileo_object_lifecycle.py
 ```
 
 See `reference.md` for endpoint notes, field mapping, apply sections, and
