@@ -121,7 +121,7 @@ release section when cutting a release.
 
 ### Removed
 
-- Removed `splunk-galileo-integration` skill (deprecated). Its functionality
+- Removed the deprecated Galileo Splunk integration skill. Its functionality
   has been split into two dedicated skills: `galileo-platform-setup` (Galileo
   Observe, Protect, Evaluate, and Splunk HEC/OTLP/OTel Collector integration)
   and `galileo-agent-control-setup` (Agent Control server, auth, controls,

@@ -372,7 +372,7 @@ def test_export_records_request_shape_defaults_to_jsonl_and_redaction() -> None:
 
 def test_repo_has_no_legacy_galileo_skill_references() -> None:
     legacy = "splunk-" + "galileo-integration"
-    result = run_cmd("rg", legacy, ".", check=False)
+    result = run_cmd("git", "grep", "-n", legacy, "--", ".", check=False)
     assert result.returncode == 1, result.stdout + result.stderr
 
 
