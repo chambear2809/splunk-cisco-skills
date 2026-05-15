@@ -183,8 +183,10 @@ class AgentMCPCoreTests(unittest.TestCase):
             ("splunk-observability-database-monitoring-setup", ["--connection-string=postgres://user:pass@db"]),
             ("splunk-observability-database-monitoring-setup", ["--datasource", "postgres://user:pass@db"]),
             ("splunk-observability-k8s-frontend-rum-setup", ["--rum-token", "secret-value"]),
-            ("splunk-galileo-integration", ["--galileo-api-key", "secret-value"]),
-            ("splunk-galileo-integration", ["--splunk-hec-token=secret-value"]),
+            ("galileo-platform-setup", ["--galileo-api-key", "secret-value"]),
+            ("galileo-platform-setup", ["--splunk-hec-token=secret-value"]),
+            ("galileo-agent-control-setup", ["--agent-control-api-key", "secret-value"]),
+            ("galileo-agent-control-setup", ["--agent-control-admin-key=secret-value"]),
         ]
         for skill, args in cases:
             with self.subTest(skill=skill, args=args):
@@ -603,24 +605,43 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertTrue(dashboard_render["read_only"])
 
         galileo_render = core.plan_skill_script(
-            "splunk-galileo-integration",
+            "galileo-platform-setup",
             "setup.sh",
-            ["--render", "--output-dir", "splunk-galileo-rendered"],
+            ["--render", "--output-dir", "galileo-platform-rendered"],
         )
         galileo_apply = core.plan_skill_script(
-            "splunk-galileo-integration",
+            "galileo-platform-setup",
             "setup.sh",
             [
                 "--apply",
-                "hec-export",
+                "observe-export",
                 "--galileo-api-key-file",
                 "/tmp/galileo",
                 "--splunk-hec-token-file",
                 "/tmp/hec",
             ],
         )
+        agent_control_render = core.plan_skill_script(
+            "galileo-agent-control-setup",
+            "setup.sh",
+            ["--render", "--output-dir", "galileo-agent-control-rendered"],
+        )
+        agent_control_apply = core.plan_skill_script(
+            "galileo-agent-control-setup",
+            "setup.sh",
+            [
+                "--apply",
+                "splunk-sink",
+                "--agent-control-api-key-file",
+                "/tmp/agent-control",
+                "--splunk-hec-token-file",
+                "/tmp/hec",
+            ],
+        )
         self.assertTrue(galileo_render["read_only"])
         self.assertFalse(galileo_apply["read_only"])
+        self.assertTrue(agent_control_render["read_only"])
+        self.assertFalse(agent_control_apply["read_only"])
 
     def test_universal_forwarder_latest_smoke_is_read_only(self) -> None:
         plan = core.plan_skill_script(

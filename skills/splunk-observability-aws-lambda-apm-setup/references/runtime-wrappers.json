@@ -1,0 +1,9 @@
+{
+  "_comment": "AWS Lambda exec-wrapper paths per runtime family. Set AWS_LAMBDA_EXEC_WRAPPER to the path for the target runtime. Source: signalfx/splunk-otel-lambda",
+  "nodejs": "/opt/nodejs-otel-handler",
+  "python": "/opt/otel-instrument",
+  "java": "/opt/otel-handler",
+  "java_stream": "/opt/otel-stream-handler",
+  "java_apigw_proxy": "/opt/otel-proxy-handler",
+  "java_sqs": "/opt/otel-sqs-handler"
+}

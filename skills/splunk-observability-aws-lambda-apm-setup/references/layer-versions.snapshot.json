@@ -1,0 +1,53 @@
+{
+  "_meta": {
+    "source": "signalfx/lambda-layer-versions",
+    "publisher_aws_account": "254067382080",
+    "snapshot_date": "2026-05-15",
+    "note": "Use --refresh-layer-manifest or set SPLUNK_LAMBDA_LAYER_MANIFEST_URL to fetch the latest versions. Regions not listed for arm64 are unpublished for that arch.",
+    "layer_names": {
+      "x86_64": "splunk-apm",
+      "arm64": "splunk-apm-arm"
+    }
+  },
+  "x86_64": {
+    "us-east-1":      {"version": 119, "arn": "arn:aws:lambda:us-east-1:254067382080:layer:splunk-apm:119"},
+    "us-east-2":      {"version": 119, "arn": "arn:aws:lambda:us-east-2:254067382080:layer:splunk-apm:119"},
+    "us-west-1":      {"version": 119, "arn": "arn:aws:lambda:us-west-1:254067382080:layer:splunk-apm:119"},
+    "us-west-2":      {"version": 119, "arn": "arn:aws:lambda:us-west-2:254067382080:layer:splunk-apm:119"},
+    "ap-northeast-1": {"version": 119, "arn": "arn:aws:lambda:ap-northeast-1:254067382080:layer:splunk-apm:119"},
+    "ap-northeast-2": {"version": 119, "arn": "arn:aws:lambda:ap-northeast-2:254067382080:layer:splunk-apm:119"},
+    "ap-south-1":     {"version": 119, "arn": "arn:aws:lambda:ap-south-1:254067382080:layer:splunk-apm:119"},
+    "ap-southeast-1": {"version": 119, "arn": "arn:aws:lambda:ap-southeast-1:254067382080:layer:splunk-apm:119"},
+    "ap-southeast-2": {"version": 119, "arn": "arn:aws:lambda:ap-southeast-2:254067382080:layer:splunk-apm:119"},
+    "ca-central-1":   {"version": 119, "arn": "arn:aws:lambda:ca-central-1:254067382080:layer:splunk-apm:119"},
+    "eu-central-1":   {"version": 119, "arn": "arn:aws:lambda:eu-central-1:254067382080:layer:splunk-apm:119"},
+    "eu-north-1":     {"version": 119, "arn": "arn:aws:lambda:eu-north-1:254067382080:layer:splunk-apm:119"},
+    "eu-west-1":      {"version": 119, "arn": "arn:aws:lambda:eu-west-1:254067382080:layer:splunk-apm:119"},
+    "eu-west-2":      {"version": 119, "arn": "arn:aws:lambda:eu-west-2:254067382080:layer:splunk-apm:119"},
+    "eu-west-3":      {"version": 119, "arn": "arn:aws:lambda:eu-west-3:254067382080:layer:splunk-apm:119"},
+    "sa-east-1":      {"version": 119, "arn": "arn:aws:lambda:sa-east-1:254067382080:layer:splunk-apm:119"},
+    "ap-northeast-3": {"version": 119, "arn": "arn:aws:lambda:ap-northeast-3:254067382080:layer:splunk-apm:119"},
+    "eu-south-1":     {"version": 119, "arn": "arn:aws:lambda:eu-south-1:254067382080:layer:splunk-apm:119"},
+    "af-south-1":     {"version": 119, "arn": "arn:aws:lambda:af-south-1:254067382080:layer:splunk-apm:119"},
+    "me-south-1":     {"version": 119, "arn": "arn:aws:lambda:me-south-1:254067382080:layer:splunk-apm:119"}
+  },
+  "arm64": {
+    "us-east-1":      {"version": 119, "arn": "arn:aws:lambda:us-east-1:254067382080:layer:splunk-apm-arm:119"},
+    "us-east-2":      {"version": 119, "arn": "arn:aws:lambda:us-east-2:254067382080:layer:splunk-apm-arm:119"},
+    "us-west-2":      {"version": 119, "arn": "arn:aws:lambda:us-west-2:254067382080:layer:splunk-apm-arm:119"},
+    "ap-northeast-1": {"version": 119, "arn": "arn:aws:lambda:ap-northeast-1:254067382080:layer:splunk-apm-arm:119"},
+    "ap-south-1":     {"version": 119, "arn": "arn:aws:lambda:ap-south-1:254067382080:layer:splunk-apm-arm:119"},
+    "ap-southeast-1": {"version": 119, "arn": "arn:aws:lambda:ap-southeast-1:254067382080:layer:splunk-apm-arm:119"},
+    "ap-southeast-2": {"version": 119, "arn": "arn:aws:lambda:ap-southeast-2:254067382080:layer:splunk-apm-arm:119"},
+    "eu-central-1":   {"version": 119, "arn": "arn:aws:lambda:eu-central-1:254067382080:layer:splunk-apm-arm:119"},
+    "eu-west-1":      {"version": 119, "arn": "arn:aws:lambda:eu-west-1:254067382080:layer:splunk-apm-arm:119"},
+    "eu-west-2":      {"version": 119, "arn": "arn:aws:lambda:eu-west-2:254067382080:layer:splunk-apm-arm:119"}
+  },
+  "supported_runtimes": {
+    "nodejs": ["nodejs18.x", "nodejs20.x", "nodejs22.x"],
+    "python": ["python3.8", "python3.9", "python3.10", "python3.11", "python3.12", "python3.13"],
+    "java": ["java8", "java8.al2", "java11", "java17", "java21"],
+    "unsupported": ["go1.x", "ruby3.2", "ruby3.3", "dotnet6", "dotnet8", "provided.al2", "provided.al2023"],
+    "deprecated_but_supported": ["python3.8"]
+  }
+}

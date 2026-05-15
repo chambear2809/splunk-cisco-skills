@@ -494,6 +494,15 @@
       },
       {
         "kind": "workflow",
+        "skill": "splunk-observability-aws-lambda-apm-setup",
+        "label": "`splunk-observability-aws-lambda-apm-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; the Splunk OTel Lambda layer (signalfx/splunk-otel-lambda, beta, publisher 254067382080) is attached directly to AWS Lambda functions via AWS CLI, CloudFormation, or Terraform",
+        "cloud_config_path": "Rendered per-function layer ARN attachments, AWS_LAMBDA_EXEC_WRAPPER wiring, SPLUNK_REALM / SPLUNK_ACCESS_TOKEN (resolve references only — Secrets Manager or SSM SecureString), optional OTLP env vars, IAM egress stub (local collector disabled path), Terraform and CloudFormation snippets, and handoff scripts to splunk-observability-dashboard-builder and splunk-observability-native-ops",
+        "notes": "Render-first APM instrumentation skill for AWS Lambda via the Splunk OpenTelemetry Lambda layer. Covers Node.js 18/20/22, Python 3.9-3.13, Java 8/11/17/21 on x86_64 and arm64. Per-runtime AWS_LAMBDA_EXEC_WRAPPER wiring; secret-safe SPLUNK_ACCESS_TOKEN delivery via AWS Secrets Manager or SSM SecureString resolve references; layer ARN baked snapshot with opt-in live refresh; vendor/ADOT conflict detection; X-Ray coexistence; GovCloud/China refusal; beta gate. Fulfills the handoffs.lambda_apm stub in splunk-observability-aws-integration."
+      },
+      {
+        "kind": "workflow",
         "skill": "splunk-observability-k8s-auto-instrumentation-setup",
         "label": "`splunk-observability-k8s-auto-instrumentation-setup`",
         "splunkbase_id": "N/A",
@@ -1448,7 +1457,7 @@
       "notes": "Splunk Observability Cloud <-> ThousandEyes integration via Streams API v7 (OTLP metrics) + Integrations 2.0 APM connector + full TE asset lifecycle (tests, alert rules, labels, tags, dashboards, templates). No Splunk Platform runtime placement."
     },
     {
-      "skill": "splunk-galileo-integration",
+      "skill": "galileo-platform-setup",
       "role_support": {
         "search-tier": "none",
         "indexer": "none",
@@ -1459,7 +1468,21 @@
       "cloud_pairing": [
         "external-collector"
       ],
-      "notes": "Galileo Observe to Splunk workflow orchestration: REST export to Splunk HEC, OpenTelemetry/OpenInference runtime snippets, Splunk Connect for OTLP handoff, Splunk OTel Collector handoff, and dashboard/detector handoffs. Splunk-side HEC, OTLP, OTel Collector, dashboard, and detector logic is delegated to existing skills. Use --o11y-only for Splunk Observability Cloud-only mode with no Splunk Platform HEC dependency."
+      "notes": "Galileo SaaS/Enterprise readiness and Splunk workflow orchestration: export_records to Splunk HEC, Observe OpenTelemetry/OpenInference snippets, Protect invoke snippets, Evaluate/experiment/dataset/metric/annotation handoffs, Splunk Connect for OTLP handoff, Splunk OTel Collector handoff, and dashboard/detector handoffs. Use --o11y-only for Splunk Observability Cloud-only mode with no Splunk Platform HEC dependency."
+    },
+    {
+      "skill": "galileo-agent-control-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Agent Control runtime governance workflow: server/auth/control templates, Python/TypeScript runtime snippets, OTel sink config, custom Splunk HEC event sink, Splunk HEC service handoff, Splunk OTel Collector handoff, and dashboard/detector handoffs."
     },
     {
       "skill": "cisco-isovalent-platform-setup",
@@ -1555,7 +1578,21 @@
       "cloud_pairing": [
         "external-collector"
       ],
-      "notes": "Splunk Observability Cloud <-> AWS integration end-to-end across all four documented connection paths: polling, Splunk-managed Metric Streams, AWS-managed Metric Streams, and Terraform. Renders the full canonical AWSCloudWatch field set (POST/PUT /v2/integration with X-SF-Token), per-use-case IAM JSON (foundation, polling, streams, tag sync, Cassandra special-case ARN list), regional or StackSets CloudFormation stubs from signalfx/aws-cloudformation-templates, Splunk-side Terraform pinned to signalfx provider ~> 9.0, conflict-matrix enforcement (services vs namespaceSyncRules, customCloudWatchNamespaces vs customNamespaceSyncRules, metricStreamsManagedExternally requires useMetricStreamsSync), AWS-recommended-stats catalog via collectOnlyRecommendedStats, AWS PrivateLink ingest stubs (default legacy signalfx.com domain), multi-account / AWS Organizations StackSets, drift detection with --quickstart-from-live, and the documented troubleshooting catalog. Live-validated against the operator's existing us1 integration. Hand-offs to splunk-app-install for Splunk_TA_AWS (Splunkbase 1876, min v8.1.1) for AWS log ingestion, splunk-observability-cloud-integration-setup for Log Observer Connect, splunk-observability-dashboard-builder, splunk-observability-native-ops, splunk-observability-otel-collector-setup for EC2/EKS host telemetry, and a future splunk-observability-aws-lambda-apm-setup."
+      "notes": "Splunk Observability Cloud <-> AWS integration end-to-end across all four documented connection paths: polling, Splunk-managed Metric Streams, AWS-managed Metric Streams, and Terraform. Renders the full canonical AWSCloudWatch field set (POST/PUT /v2/integration with X-SF-Token), per-use-case IAM JSON (foundation, polling, streams, tag sync, Cassandra special-case ARN list), regional or StackSets CloudFormation stubs from signalfx/aws-cloudformation-templates, Splunk-side Terraform pinned to signalfx provider ~> 9.0, conflict-matrix enforcement (services vs namespaceSyncRules, customCloudWatchNamespaces vs customNamespaceSyncRules, metricStreamsManagedExternally requires useMetricStreamsSync), AWS-recommended-stats catalog via collectOnlyRecommendedStats, AWS PrivateLink ingest stubs (default legacy signalfx.com domain), multi-account / AWS Organizations StackSets, drift detection with --quickstart-from-live, and the documented troubleshooting catalog. Live-validated against the operator's existing us1 integration. Hand-offs to splunk-app-install for Splunk_TA_AWS (Splunkbase 1876, min v8.1.1) for AWS log ingestion, splunk-observability-cloud-integration-setup for Log Observer Connect, splunk-observability-dashboard-builder, splunk-observability-native-ops, splunk-observability-otel-collector-setup for EC2/EKS host telemetry, and splunk-observability-aws-lambda-apm-setup for Lambda APM."
+    },
+    {
+      "skill": "splunk-observability-aws-lambda-apm-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Render-first APM instrumentation for AWS Lambda via the Splunk OpenTelemetry Lambda layer (signalfx/splunk-otel-lambda, beta, publisher 254067382080). Covers Node.js 18/20/22, Python 3.9-3.13, Java 8/11/17/21 on x86_64 and arm64. Per-runtime AWS_LAMBDA_EXEC_WRAPPER wiring; secret-safe SPLUNK_ACCESS_TOKEN delivery via AWS Secrets Manager or SSM SecureString resolve references (token value never in files or argv); baked layer ARN snapshot with opt-in live refresh; vendor/ADOT conflict detection; X-Ray coexistence flag; GovCloud/China refusal; IAM egress stub for local-collector-disabled path; AWS CLI / Terraform / CloudFormation variants; rollback, discover-functions, doctor, and cross-skill handoffs. Fulfills the handoffs.lambda_apm stub in splunk-observability-aws-integration."
     }
   ],
   "apps": [
@@ -2670,6 +2707,87 @@
       "notes": "Provides the sim SPL command + splunk_infrastructure_monitoring_data_streams modular input. Splunk Synthetic Monitoring Add-on (Splunkbase 5608) is archived and replaced by SIM streams; treat that legacy app as deprecated and do not install it.",
       "latest_verified_version": "1.3.0",
       "latest_verified_date": "February 6, 2026"
+    },
+    {
+      "skill": "splunk-observability-azure-integration",
+      "app_name": "Splunk_TA_microsoft_cloud_services",
+      "splunkbase_id": "3110",
+      "label": "Splunk Add-on for Microsoft Cloud Services",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-cloud-services_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "required",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "Azure log ingestion TA (Activity Logs, Audit Logs, Azure AD Sign-in Logs, Azure Monitor Logs). Azure Monitor metrics go through the Splunk Observability Azure integration; logs go through this TA. Hand-off from splunk-observability-azure-integration.",
+      "latest_verified_version": "4.4.0",
+      "latest_verified_date": "May 2026"
+    },
+    {
+      "skill": "splunk-observability-azure-integration",
+      "app_name": "microsoft_azure_app",
+      "splunkbase_id": "4882",
+      "label": "Microsoft Azure App for Splunk",
+      "package_patterns": [
+        "microsoft-azure-app-for-splunk_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "Azure dashboards for Splunk Platform. Hand-off from splunk-observability-azure-integration (handoffs.microsoft_azure_app=true).",
+      "latest_verified_version": "3.0.0",
+      "latest_verified_date": "May 2026"
+    },
+    {
+      "skill": "splunk-observability-gcp-integration",
+      "app_name": "Splunk_TA_google_cloud_platform",
+      "splunkbase_id": "3088",
+      "label": "Splunk Add-on for Google Cloud Platform",
+      "package_patterns": [
+        "splunk-add-on-for-google-cloud-platform_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "required",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "GCP log ingestion TA (Pub/Sub, Cloud Storage, Cloud Audit Logs). GCP metrics go through the Splunk Observability GCP integration; logs go through this TA. Hand-off from splunk-observability-gcp-integration.",
+      "latest_verified_version": "4.3.0",
+      "latest_verified_date": "May 2026"
     }
   ]
 }

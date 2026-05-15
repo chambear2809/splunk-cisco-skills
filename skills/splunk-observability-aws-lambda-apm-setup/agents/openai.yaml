@@ -1,0 +1,18 @@
+interface:
+  display_name: "Splunk Observability Cloud — AWS Lambda APM Setup"
+  short_description: "Render, validate, and apply Splunk OTel Lambda layer APM instrumentation for AWS Lambda functions"
+  default_prompt: >-
+    Use $splunk-observability-aws-lambda-apm-setup to instrument AWS Lambda
+    functions with Splunk Observability Cloud APM via the Splunk OpenTelemetry
+    Lambda layer (signalfx/splunk-otel-lambda, beta, publisher 254067382080):
+    resolve layer ARNs for Node.js 18/20/22, Python 3.9-3.13, and Java
+    8/11/17/21 on x86_64/arm64; wire AWS_LAMBDA_EXEC_WRAPPER; deliver
+    SPLUNK_ACCESS_TOKEN via Secrets Manager or SSM SecureString resolve
+    references (token never in files or argv); emit AWS CLI
+    update-function-configuration plan, Terraform main.tf, and CloudFormation
+    snippets; detect Datadog/New Relic/AppDynamics/Dynatrace/ADOT conflicts;
+    handle X-Ray coexistence; refuse GovCloud/China regions; render rollback
+    commands; and hand off to splunk-observability-aws-integration (CloudWatch
+    metrics), splunk-observability-dashboard-builder (dashboards),
+    splunk-observability-native-ops (detectors), and splunk-connect-for-otlp-
+    setup (log ingestion).

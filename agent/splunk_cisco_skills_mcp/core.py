@@ -116,7 +116,8 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     # when --dry-run is set, so --apply --dry-run is a true preview path.
     ("splunk-observability-native-ops", "setup.sh"),
     ("splunk-observability-otel-collector-setup", "setup.sh"),
-    ("splunk-galileo-integration", "setup.sh"),
+    ("galileo-platform-setup", "setup.sh"),
+    ("galileo-agent-control-setup", "setup.sh"),
     # splunk-oncall-setup --dry-run skips API/HEC writes even when the
     # caller also passes --apply, --send-alert, or --install-splunk-app.
     ("splunk-oncall-setup", "setup.sh"),
@@ -144,6 +145,13 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     # gates; --dry-run is a pure preview (no cluster writes, no file writes beyond
     # the plan text).
     ("splunk-observability-k8s-auto-instrumentation-setup", "setup.sh"),
+    # splunk-observability-aws-lambda-apm-setup renders the Lambda layer + env
+    # plan by default; no AWS API calls happen without --apply or --quickstart.
+    ("splunk-observability-aws-lambda-apm-setup", "setup.sh"),
+    # Azure and GCP Observability Cloud integration skills are render-first.
+    # --apply mutates the Splunk-side integration only; no cloud-side changes.
+    ("splunk-observability-azure-integration", "setup.sh"),
+    ("splunk-observability-gcp-integration", "setup.sh"),
 }
 READ_ONLY_LIST_SCRIPTS: set[tuple[str, str]] = {
     ("cisco-product-setup", "setup.sh"),
@@ -316,9 +324,30 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
         "--apply-injection",
         "--uninstall-injection",
     ),
-    # Galileo integration is render-first; live work happens only through
-    # --apply sections, while --dry-run is a plan-only preview.
-    ("splunk-galileo-integration", "setup.sh"): ("--apply",),
+    # Galileo platform / Agent Control skills are render-first; live work
+    # happens only through --apply sections, while --dry-run is a plan-only
+    # preview.
+    ("galileo-platform-setup", "setup.sh"): ("--apply",),
+    ("galileo-agent-control-setup", "setup.sh"): ("--apply",),
+    # Lambda APM renders/validates/discovers by default. --apply mutates
+    # AWS Lambda function configurations via the rendered aws-cli plan, while
+    # --quickstart chains render + print-apply-command (still mutating path).
+    # Keep out of READ_ONLY_DRY_RUN_SCRIPTS because --quickstart may invoke
+    # AWS helpers.
+    ("splunk-observability-aws-lambda-apm-setup", "setup.sh"): (
+        "--apply",
+        "--quickstart",
+    ),
+    # Azure and GCP integration skills are render-first. --apply mutates the
+    # Splunk O11y integration only. --quickstart chains render + apply command.
+    ("splunk-observability-azure-integration", "setup.sh"): (
+        "--apply",
+        "--quickstart",
+    ),
+    ("splunk-observability-gcp-integration", "setup.sh"): (
+        "--apply",
+        "--quickstart",
+    ),
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it. The smoke_*
@@ -348,6 +377,8 @@ DIRECT_SECRET_FLAGS = {
     "--connection-string",
     "--datasource",
     "--db-password",
+    "--agent-control-admin-key",
+    "--agent-control-api-key",
     "--external-id",
     "--galileo-api-key",
     "--galileo-bearer-token",
@@ -411,6 +442,8 @@ SECRET_FILE_FLAGS = {
     "--access-token-file",
     "--activation-code-file",
     "--admin-token-file",
+    "--agent-control-admin-key-file",
+    "--agent-control-api-key-file",
     "--analytics-secret-file",
     "--api-key-file",
     "--api-secret-file",

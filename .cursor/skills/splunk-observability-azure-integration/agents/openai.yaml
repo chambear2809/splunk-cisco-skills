@@ -1,0 +1,23 @@
+interface:
+  display_name: "Splunk Observability Cloud <-> Azure Integration"
+  short_description: "Render, apply, validate, discover, and diagnose the Splunk Observability Cloud Azure integration end-to-end."
+  default_prompt: |
+    Use $splunk-observability-azure-integration to render, validate, apply,
+    discover, or diagnose the Splunk Observability Cloud Azure integration:
+    polling via Azure Monitor API; Service Principal (tenantId + appId +
+    secretKey) via file-only delivery; azureEnvironment AZURE or
+    AZURE_US_GOVERNMENT; per-subscription subscription list; services ~80-entry
+    enum with additionalServices escape hatch; customNamespacesPerService for
+    non-standard namespaces; resourceFilterRules tag-based filtering;
+    syncGuestOsNamespaces; useBatchApi; importAzureMonitor; pollRate 60–600 s;
+    namedToken ForceNew warning; Terraform signalfx_azure_integration pinned to
+    splunk-terraform/signalfx ~> 9.0; Azure CLI SP creation + Monitoring Reader
+    + Reader role assignment scripts; Bicep role-assignment template; multi-
+    subscription and management-group-scoped role assignment; drift detection
+    with credential-hash sidecar (appId/secretKey redacted on GET); conflict
+    matrix (services non-empty, poll-rate bounds, namedToken ForceNew);
+    GovCloud realm guard for AZURE_US_GOVERNMENT; and cross-skill handoffs to
+    splunk-app-install (Splunk_TA_microsoft_cloud_services Splunkbase 3110 logs),
+    splunk-observability-otel-collector-setup (AKS host telemetry),
+    splunk-observability-dashboard-builder (Azure dashboards), and
+    splunk-observability-native-ops (Azure detectors).

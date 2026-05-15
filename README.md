@@ -105,12 +105,17 @@ Common starting points:
   `skills/splunk-observability-cisco-ai-pod-integration/`,
   `skills/splunk-observability-isovalent-integration/`, or
   `skills/splunk-observability-thousandeyes-integration/`.
-- If you need Galileo Observe data in Splunk Platform or Splunk Observability
-  Cloud, start with `skills/splunk-galileo-integration/`. It renders the
-  Galileo REST to HEC bridge, OpenTelemetry/OpenInference runtime snippets, and
-  handoffs to the existing HEC, OTLP, OTel Collector, dashboard, and detector
-  skills. Use `--o11y-only` for Splunk Observability Cloud-only workflows with
-  no Splunk Platform HEC dependency.
+- If you need Galileo platform readiness or Galileo Observe/Evaluate/Protect
+  data wired to Splunk Platform or Splunk Observability Cloud, start with
+  `skills/galileo-platform-setup/`. It renders `export_records` to HEC,
+  OpenTelemetry/OpenInference runtime snippets, Protect invoke snippets,
+  Evaluate handoffs, and delegated HEC, OTLP, OTel Collector, dashboard, and
+  detector setup. Use `--o11y-only` for workflows with no Splunk Platform HEC
+  dependency.
+- If you need Agent Control runtime governance wired to Splunk, start with
+  `skills/galileo-agent-control-setup/`. It renders server/auth/control
+  templates, Python and TypeScript runtime snippets, OTel and custom Splunk HEC
+  sinks, and delegated Splunk HEC/O11y handoffs.
 - If you need Splunk Observability Cloud dashboards, use
   `skills/splunk-observability-dashboard-builder/` to turn an operational goal
   into validated classic Observability dashboard API payloads, with modern
@@ -292,13 +297,17 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-observability-k8s-frontend-rum-setup` | Splunk Browser RUM + Session Replay for Kubernetes-served frontends | Render, apply, verify, and uninstall Browser RUM injection across nginx, ingress-nginx, initContainer rewrite, and runtime-config modes; includes Frustration Signals, gated Session Replay, source-map upload helpers, RUM-to-APM Server-Timing validation, GitOps rendering, and handoffs to dashboard, detector, SIM, and auto-instrumentation workflows |
 | `splunk-observability-cloud-integration-setup` | Splunk Platform <-> Splunk Observability Cloud | Pair Splunk Cloud Platform / Splunk Enterprise with Splunk Observability Cloud end-to-end: token-auth flip, Unified Identity or Service Account pairing, multi-org default-org, Centralized RBAC, Discover Splunk Observability Cloud app's five Configurations tabs, Log Observer Connect (SCP + SE TLS), Related Content + Real Time Metrics, Dashboard Studio O11y metrics, and the Splunk Infrastructure Monitoring Add-on (Splunk_TA_sim, 5247) install + account + curated SignalFlow modular inputs |
 | `splunk-observability-thousandeyes-integration` | ThousandEyes -> Splunk Observability Cloud | Render and apply the full TE -> O11y wiring: Integration 1.0 OpenTelemetry stream (`POST /v7/streams` to ingest.<realm>.signalfx.com/v2/datapoint/otlp), Integrations 2.0 Splunk Observability APM connector, full TE asset lifecycle (tests, alert rules, labels, tags, TE-side dashboards, Templates with Handlebars-only credential placeholders); per-test-type SignalFlow dashboards + detectors handed off to `splunk-observability-dashboard-builder` and `splunk-observability-native-ops` |
-| `splunk-galileo-integration` | Galileo Observe -> Splunk Platform and Splunk Observability Cloud | Render, validate, and optionally apply Galileo REST export to Splunk HEC, Galileo OpenTelemetry/OpenInference runtime snippets, Splunk Platform OTLP input handoffs, Splunk OTel Collector handoffs, and Observability dashboard/detector handoffs while delegating HEC, OTLP, OTel Collector, dashboard, and detector internals to existing skills; supports `--o11y-only` to omit Splunk Platform HEC dependencies |
+| `galileo-platform-setup` | Galileo SaaS/Enterprise platform -> Splunk Platform and Splunk Observability Cloud | Render, validate, and optionally apply Galileo readiness, `export_records` to Splunk HEC, Observe OpenTelemetry/OpenInference snippets, Protect invoke snippets, Evaluate/experiment/dataset/metric/annotation handoffs, Splunk HEC/OTLP/OTel Collector handoffs, and Observability dashboard/detector handoffs; supports `--o11y-only` to omit Splunk Platform HEC dependencies |
+| `galileo-agent-control-setup` | Agent Control -> Splunk Platform and Splunk Observability Cloud | Render, validate, and optionally apply Agent Control server readiness, file-backed auth templates, controls, Python/TypeScript runtime snippets, OTel sink config, custom Splunk HEC event sink, Splunk HEC/OTel Collector handoffs, and Observability dashboard/detector handoffs |
 | `splunk-observability-isovalent-integration` | Isovalent (Cilium / Hubble / Tetragon) -> Splunk Observability Cloud + Splunk Platform | Render the Splunk OTel collector overlay (seven `prometheus/isovalent_*` scrape jobs + `filter/includemetrics` + cilium-dnsproxy fix); Splunk Platform logs DEFAULT via OTel filelog receiver + hostPath mount + `extraFileLogs.filelog/tetragon` (production-validated); legacy fluentd splunk_hec behind `--legacy-fluentd-hec` (DEPRECATED); hands off Tetragon log ingestion to `cisco-security-cloud-setup` (`PRODUCT=isovalent`, sourcetype `cisco:isovalent`, index `cisco_isovalent`) |
 | `splunk-observability-cisco-nexus-integration` | Cisco Nexus 9000 fabric -> Splunk Observability Cloud | Standalone reusable: clusterReceiver `cisco_os` overlay (PR #45562 multi-device + global-scrapers format, contrib v0.149.0+) with K8s Secret manifest stub for SSH credentials, dashboards (port utilization, errors, drops, CPU/memory) and detectors (interface down, packet drop rate, CPU/memory pressure). Companion to `cisco-dc-networking-setup` (Splunk Platform TA path). |
 | `splunk-observability-cisco-intersight-integration` | Cisco Intersight (UCS) -> Splunk Observability Cloud | Standalone reusable: separate `intersight-otel` namespace + Secret manifest stub + Deployment + ConfigMap pointing at the Splunk OTel agent's OTLP gRPC endpoint; dashboards (UCS power/thermal/fan/network/alarms/advisories/VM count) and detectors (alarm spike, security advisory delta, host temp/power, fan failure). Companion to `cisco-intersight-setup` (Splunk Platform TA path). |
 | `splunk-observability-nvidia-gpu-integration` | NVIDIA GPUs (DCGM Exporter) -> Splunk Observability Cloud | Standalone reusable: `receiver_creator/dcgm-cisco` (parameterized; explicitly NOT `receiver_creator/nvidia` to avoid collision with chart autodetect); dual-label DCGM discovery (`app` + `app.kubernetes.io/name`); default unfiltered `metrics/nvidia-metrics` pipeline; `--enable-dcgm-pod-labels` patch (env-var + RBAC + SA-token + kubelet mount) for the well-known GPU Operator pod-label gap. Works for any GPU cluster (NVIDIA DGX, AI Pod, generic K8s + GPUs). |
 | `splunk-observability-cisco-ai-pod-integration` | Cisco AI Pod (UCS + Nexus + NVIDIA GPUs + NIM/vLLM + storage) -> Splunk Observability Cloud | Umbrella that composes Nexus + Intersight + NVIDIA GPU components via subprocess + Python deep-merge AND adds NIM scrape (TWO modes: `receiver_creator` simple vs `endpoints` precise + `rbac.customRules` patch), vLLM, Milvus, NetApp Trident (port 8001), Pure Portworx (17001+17018), Redfish exporter (user-supplied), `k8s_attributes/nim` for `model_name` extraction, dual-pipeline filtering pattern, OpenShift defaults (kubeletstats `insecure_skip_verify`, certmanager off, cloudProvider empty), `--workshop-mode` multi-tenant.sh, OpenShift SCC helper. Mirrors `signalfx/splunk-opentelemetry-examples/collector/cisco-ai-ready-pods` + production-validated atl-ocp2 OpenShift cluster. |
 | `splunk-observability-aws-integration` | AWS -> Splunk Observability Cloud | Standalone reusable: render, apply, validate, discover, and diagnose the `AWSCloudWatch` integration end-to-end across polling, Splunk-managed Metric Streams, AWS-managed Metric Streams, and Terraform. Emits IAM policy JSON, regional or StackSets CloudFormation stubs, Splunk-side Terraform, API payloads, drift reports, and handoffs for AWS logs, Lambda APM, dashboards, detectors, and EC2/EKS host telemetry. |
+| `splunk-observability-azure-integration` | Azure -> Splunk Observability Cloud | Render, apply, validate, discover, and diagnose the Azure Monitor integration. REST type=Azure; SP tenantId+appId+secretKey via chmod-600 files (appId/secretKey redacted on GET); azureEnvironment AZURE or AZURE_US_GOVERNMENT; per-subscription list; ~80-service enum + additionalServices; pollRate 60–600s; Terraform signalfx_azure_integration; Azure CLI SP creation + role scripts; Bicep role-assignment; handoffs for Splunkbase 3110 (logs), 4882 (dashboards), AKS OTel collector. |
+| `splunk-observability-gcp-integration` | GCP -> Splunk Observability Cloud | Render, apply, validate, discover, and diagnose the GCP Cloud Monitoring integration. REST type=GCP; SERVICE_ACCOUNT_KEY or WORKLOAD_IDENTITY_FEDERATION authMethod; projectKey redacted on GET; 32-service enum; pollRate 60–600s; Terraform signalfx_gcp_integration; gcloud SA creation + IAM binding scripts; WIF realm-to-principal map; handoffs for Splunkbase 3088 (GCP logs), GKE OTel collector. |
+| `splunk-observability-aws-lambda-apm-setup` | AWS Lambda -> Splunk Observability Cloud APM | Render, validate, and optionally apply Splunk OTel Lambda layer (`signalfx/splunk-otel-lambda`, beta, publisher `254067382080`) APM instrumentation. Node.js/Python/Java runtimes, x86_64/arm64, exec-wrapper wiring, Secrets Manager/SSM token delivery, vendor/ADOT conflict detection, Terraform/CloudFormation/AWS CLI variants, rollback, doctor. |
 | `splunk-observability-dashboard-builder` | Splunk Observability Cloud dashboards | Render, validate, and optionally apply classic Observability dashboard groups, charts, and dashboards from natural-language, JSON, or YAML specs |
 | `splunk-observability-native-ops` | Splunk Observability Cloud native operations | Render, validate, and optionally apply supported native Observability operations for detectors, alert routing, Synthetics, APM, RUM, logs, and On-Call handoffs |
 | `splunk-oncall-setup` | Splunk On-Call (formerly VictorOps) | Render, validate, and apply On-Call teams, users, rotations, escalation policies, routing keys, incidents, REST/email alert payloads, and Splunk-side companion app handoffs |
@@ -309,6 +318,8 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-soar-setup` | `splunk_soar-unpriv` (single + cluster) + `splunk_app_soar` (6361) + Splunk App for SOAR Export (3411) + Splunk SOAR Automation Broker | Install SOAR On-prem (single + cluster with external PG/GlusterFS/Elasticsearch), help with SOAR Cloud onboarding, install Automation Broker on Docker/Podman, install Splunk-side SOAR apps, ready ES integration, backup/restore |
 | `splunk-edge-processor-setup` | Splunk Edge Processor instances + cloud / Enterprise control plane | Add EP control-plane object, install instances on Linux (systemd or not), scale to multi-instance, manage source types / destinations / SPL2 pipelines, apply pipelines, validate health |
 | `splunk-indexer-cluster-setup` | Splunk Enterprise indexer cluster (single-site, multisite, redundant managers) | Bootstrap manager(s) / peers / SHs, manage cluster bundle (validate / apply / rollback), rolling restart (default / searchable / forced), peer offline (fast / enforce-counts), maintenance mode, single-site to multisite migration, manager replacement |
+| `splunk-search-head-cluster-setup` | Splunk Enterprise Search Head Cluster | Plan, render, bootstrap, and operate an SHC: deployer config push, member `server.conf` generation, sequenced bootstrap, rolling restarts, captain transfer, KV Store replication, member add / decommission / remove, migration, and failure mode runbooks |
+| `splunk-deployment-server-setup` | Splunk Enterprise Deployment Server runtime | Bootstrap DS, tune `phoneHomeIntervalInSecs` for large UF fleets, REST fleet inspection, HA pair, cascading DS guard, mass re-targeting, staged rollout, and explicit `filterType` rendering |
 | `splunk-cloud-acs-allowlist-setup` | Splunk Cloud ACS IP allowlists (all 7 features, IPv4 + IPv6) | Render plan, preflight (subnet limits, lock-out protection, FedRAMP carve-out), apply, audit / diff, optional Terraform emission |
 | `splunk-enterprise-public-exposure-hardening` | On-prem Splunk Enterprise public-internet exposure | Render Splunk-side hardening (web/server/inputs/outputs/authentication/authorize/limits/commands.conf + metadata) plus reverse-proxy (nginx/HAProxy) + firewall + WAF/CDN handoff; preflight 20-step + validate live probes; SVD floor enforcement; refuses to apply without `--accept-public-exposure` |
 | `splunk-platform-pki-setup` | Splunk Enterprise platform PKI lifecycle | Render Private PKI or Public PKI assets, distribute per-component certificates across Splunk Web, splunkd, S2S, HEC, KV Store, indexer clusters, SHC, License Manager, Deployment Server, Monitoring Console, Federated Search, DMZ HF, UF fleet, Edge Processor, SAML, LDAPS, and CLI trust; enforce TLS presets, FIPS wiring, KV Store EKU rules, mTLS opt-in, and delegated rotation runbooks |
@@ -916,6 +927,7 @@ splunk-cisco-skills/
 │   ├── splunk-monitoring-console-setup/
 │   ├── splunk-observability-ai-agent-monitoring-setup/
 │   ├── splunk-observability-aws-integration/
+│   ├── splunk-observability-aws-lambda-apm-setup/
 │   ├── splunk-observability-cisco-ai-pod-integration/
 │   ├── splunk-observability-cisco-intersight-integration/
 │   ├── splunk-observability-cisco-nexus-integration/
@@ -1111,6 +1123,9 @@ GenAI instrumentation, evaluation telemetry, histogram collector readiness, and
 AI Infrastructure Monitoring handoffs. `splunk-observability-aws-integration`
 is an Observability Cloud API and IaC workflow for AWSCloudWatch polling and
 Metric Streams, not an AWS log-ingestion path.
+`splunk-observability-aws-lambda-apm-setup` owns the Splunk OTel Lambda layer
+lifecycle for APM/tracing of AWS Lambda functions and is the fulfillment of
+the `handoffs.lambda_apm` stub from the AWS integration skill.
 `splunk-observability-dashboard-builder` is separate from runtime placement: it
 renders and validates native Observability Cloud dashboard API payloads and can
 apply them only when explicitly requested.
@@ -1124,6 +1139,7 @@ surfaces. The Observability integration skills
 `splunk-observability-k8s-auto-instrumentation-setup`,
 `splunk-observability-k8s-frontend-rum-setup`,
 `splunk-observability-aws-integration`,
+`splunk-observability-aws-lambda-apm-setup`,
 `splunk-observability-thousandeyes-integration`,
 `splunk-observability-isovalent-integration`,
 `splunk-observability-cisco-nexus-integration`,

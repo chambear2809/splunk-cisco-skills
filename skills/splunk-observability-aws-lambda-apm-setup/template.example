@@ -1,0 +1,81 @@
+# Splunk Observability Cloud — AWS Lambda APM spec.
+#
+# Copy this file locally (e.g. template.local.yaml) and fill in the non-secret
+# values. The skill reads the Splunk O11y access token from a chmod-600 file via
+# --token-file. NEVER put the token value or any other secret in this file.
+#
+# IMPORTANT: signalfx/splunk-otel-lambda is BETA. Set accept_beta: true to
+# acknowledge this. Test in a non-production environment first.
+
+api_version: splunk-observability-aws-lambda-apm-setup/v1
+
+# Splunk Observability Cloud realm.
+# Supported: us0 us1 us2 us3 eu0 eu1 eu2 au0 jp0 sg0
+# NOT supported: us2-gcp (GCP-hosted), us-gov-* (GovCloud), cn-* (China).
+realm: us1
+
+# Beta acknowledgement. Required to render or apply.
+accept_beta: true
+
+# Where to deliver SPLUNK_ACCESS_TOKEN to Lambda functions.
+# secretsmanager: uses {{resolve:secretsmanager:splunk-lambda-access-token:SecretString:::}}
+# ssm: uses {{resolve:ssm-secure:/splunk/lambda/access-token}}
+# Default: secretsmanager
+secret_backend: secretsmanager
+
+# Enable the Lambda Extension wrapper (embedded local OTel collector).
+# true (default): runtime SDK sends to localhost:4318; the extension
+#                 forwards OTLP to Splunk. Lower latency, batched export.
+# false:          runtime SDK sends OTLP directly to the Splunk ingest endpoint.
+#                 Requires VPC egress to ingest.<realm>.observability.splunkcloud.com
+local_collector_enabled: true
+
+# Set true when X-Ray active tracing is enabled on the function.
+# Adds OTEL_LAMBDA_DISABLE_AWS_CONTEXT_PROPAGATION=true to prevent
+# trace ID collisions between X-Ray and OpenTelemetry.
+xray_coexistence: false
+
+# List of Lambda functions to instrument.
+# Each entry maps to one aws lambda update-function-configuration call.
+targets:
+  - function_name: my-python-function
+    region: us-east-1
+    runtime: python3.11            # python3.8(deprecated) / python3.9 / python3.10 / python3.11 / python3.12 / python3.13
+    arch: x86_64                   # x86_64 (default) | arm64
+    package_type: zip              # zip (default) | image (container-image path; see container-image/ output)
+    # handler_type is only relevant for Java runtimes:
+    # default | stream | apigw_proxy | sqs
+    handler_type: default
+    # Optional per-function execution mode overrides:
+    # execution_modes:
+    #   snapstart: false           # Java only; warns if combined with profiler
+    #   provisioned_concurrency: 0 # set >0 to emit ProvisionedConcurrencyConfig in SAM/CFN
+    #   lambda_at_edge: false      # REFUSED; skill cannot instrument Lambda@Edge
+
+  - function_name: my-nodejs-function
+    region: us-east-1
+    runtime: nodejs20.x            # nodejs18.x / nodejs20.x / nodejs22.x
+    arch: x86_64
+    package_type: zip
+
+  - function_name: my-java-function
+    region: us-east-2
+    runtime: java17                # java8 / java8.al2 / java11 / java17 / java21
+    arch: x86_64
+    handler_type: default          # default=RequestHandler; stream=StreamRequestHandler;
+                                   # apigw_proxy=API Gateway Proxy; sqs=SQS trigger
+
+# Enable the separate Splunk Lambda Metrics Extension layer (BETA).
+# Subscribes to AWS Lambda Telemetry API and ships execution metrics to Splunk O11y.
+# Adds a second layer ARN (splunk-lambda-metrics / splunk-lambda-metrics-arm).
+# Layer count limit is 5 per function; the renderer validates combined count.
+metrics_extension: false
+
+# Cross-skill handoffs. Set true to emit handoff driver scripts.
+handoffs:
+  cloudwatch_metrics: false        # hand off to splunk-observability-aws-integration
+  dashboards: false                # hand off to splunk-observability-dashboard-builder
+  detectors: false                 # hand off to splunk-observability-native-ops
+  logs: false                      # hand off to splunk-connect-for-otlp-setup
+  gateway_otel_collector: false    # hand off to splunk-observability-otel-collector-setup
+                                   # (use when routing Lambda OTLP through a gateway collector)

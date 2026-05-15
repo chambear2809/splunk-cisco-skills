@@ -1,0 +1,15 @@
+{
+  "note": "Splunk Observability Cloud WIF service account principals per realm. Used when authMethod=WORKLOAD_IDENTITY_FEDERATION. These values are approximate — contact Splunk Support for confirmation of the exact principal for your realm.",
+  "principals": {
+    "us0": "serviceAccount:o11y-ingest@prod-us-0.iam.gserviceaccount.com",
+    "us1": "serviceAccount:o11y-ingest@prod-us-west-2.iam.gserviceaccount.com",
+    "us2": "serviceAccount:o11y-ingest@prod-us-east-1.iam.gserviceaccount.com",
+    "us3": "${SPLUNK_WIF_PRINCIPAL_CONTACT_SPLUNK_SUPPORT}",
+    "eu0": "serviceAccount:o11y-ingest@prod-eu-0.iam.gserviceaccount.com",
+    "eu1": "serviceAccount:o11y-ingest@prod-eu-1.iam.gserviceaccount.com",
+    "eu2": "${SPLUNK_WIF_PRINCIPAL_CONTACT_SPLUNK_SUPPORT}",
+    "au0": "serviceAccount:o11y-ingest@prod-au-0.iam.gserviceaccount.com",
+    "jp0": "serviceAccount:o11y-ingest@prod-jp-0.iam.gserviceaccount.com",
+    "sg0": "${SPLUNK_WIF_PRINCIPAL_CONTACT_SPLUNK_SUPPORT}"
+  }
+}
