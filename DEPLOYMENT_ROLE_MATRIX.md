@@ -90,6 +90,7 @@ For Cloud-specific install and API behavior, see
 | `splunk-attack-analyzer-setup` | Required | Supported | Supported | None | None | Indexer or HF | Installs the Splunk Attack Analyzer add-on and dashboard app, creates/validates the saa index, and aligns the saa_indexes macro; API credentials remain file-based handoff material. |
 | `splunk-asset-risk-intelligence-setup` | Required | Supported | None | None | None | Indexer | Restricted ARI app with search-tier UI/KV Store requirements, index-tier readiness for ari_staging, ari_asset, ari_internal, and ari_ta, read-only validation, and lifecycle-complete handoffs for post-install, data sources, metrics, responses/audit, investigations, ES integration, Exposure Analytics, Add-ons, Echo, upgrade, and teardown prerequisites. |
 | `splunk-ai-assistant-setup` | Required | None | None | None | None | None | Search-tier Splunk AI Assistant app with cloud-backed inference, Context and Model Runtime app UI settings, Agent Mode Cloud-region gating, and KV Store-backed local chat state. |
+| `splunk-ai-ml-toolkit-setup` | Required | None | None | None | Supported | External collector | Search-tier AI Toolkit/MLTK, PSC, and optional DSDL app workflow with external runtime handoffs for Docker, Kubernetes, OpenShift, HPC, GPU, air-gapped images, LLM providers, Connections, Container Management, DSDL API/health/telemetry, and legacy anomaly migration. |
 | `splunk-mcp-server-setup` | Required | None | None | None | None | None | Search-tier MCP service app with custom REST handlers, KV Store-backed tool metadata, encrypted token issuance, and optional local policy overlays. |
 | `splunk-stream-setup` | Required | Supported | Required | Supported | None | HF or UF | Split-package Stream deployment: search-tier UI, forwarder-side capture, and optional indexer knowledge objects. |
 | `cisco-spaces-setup` | Supported | None | Supported | None | None | None | Cisco Spaces firehose collector app with UCC REST handlers for stream configuration and activation token encryption. |
@@ -151,6 +152,12 @@ For Cloud-specific install and API behavior, see
 | `Splunk-UBA-SA-Kafka` | `splunk-uba-setup` | Required | None | None | None | None |
 | `DA-ESS-ContentUpdate` | `splunk-enterprise-security-config` | Required | None | None | None | None |
 | `Splunk_AI_Assistant_Cloud` | `splunk-ai-assistant-setup` | Required | None | None | None | None |
+| `Splunk_SA_Scientific_Python_linux_x86_64` | `splunk-ai-ml-toolkit-setup` | Required | None | None | None | None |
+| `Splunk_SA_Scientific_Python_windows_x86_64` | `splunk-ai-ml-toolkit-setup` | Required | None | None | None | None |
+| `Splunk_SA_Scientific_Python_darwin_x86_64` | `splunk-ai-ml-toolkit-setup` | Required | None | None | None | None |
+| `Splunk_SA_Scientific_Python_darwin_arm64` | `splunk-ai-ml-toolkit-setup` | Required | None | None | None | None |
+| `Splunk_ML_Toolkit` | `splunk-ai-ml-toolkit-setup` | Required | None | None | None | None |
+| `mltk-container` | `splunk-ai-ml-toolkit-setup` | Required | None | None | None | Supported |
 | `Splunk_MCP_Server` | `splunk-mcp-server-setup` | Required | None | None | None | None |
 | `ta_cisco_spaces` | `cisco-spaces-setup` | Supported | None | Supported | None | None |
 | `splunk-connect-for-otlp` | `splunk-connect-for-otlp-setup` | Supported | None | Supported | None | Supported |

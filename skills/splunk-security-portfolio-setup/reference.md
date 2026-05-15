@@ -33,7 +33,9 @@ Attack Analyzer, and Asset and Risk Intelligence.
 | InfoSec App for Splunk | `install_only` | `splunk-app-install` | Splunkbase `4240`, starter security dashboards. |
 | Splunk Common Information Model | `install_only` | `splunk-app-install` | Splunkbase `1621`; bundled with ES/PCI in many deployments. |
 | Splunk App for Lookup File Editing | `install_only` | `splunk-app-install` | Splunkbase `1724`; prerequisite for selected apps. |
-| Splunk AI Toolkit / MLTK | `install_only` | `splunk-app-install` | Splunkbase `2890`; not a security portfolio product. |
+| Splunk AI Toolkit / MLTK | `first_class` | `splunk-ai-ml-toolkit-setup` | Splunkbase `2890` plus PSC variants; not a security portfolio product, but ES detections and security analytics can depend on ML workflows. |
+| Splunk App for Data Science and Deep Learning | `first_class` | `splunk-ai-ml-toolkit-setup --include-dsdl` | Splunkbase `4607`; external model/runtime handoffs. |
+| Splunk App for Anomaly Detection / Smart Alerts Assistant beta | `partial` | `splunk-ai-ml-toolkit-setup --legacy-anomaly-audit` | Splunkbase `6843` and `6415`; migration-only, not a new install path. |
 | Splunk App for Fraud Analytics | `manual_gap` | Manual package/install-only handoff | Official docs reference `Splunk_Fraud_Analytics.tar.gz`; keep as explicit non-product gap. |
 | Splunk Automation Broker | `partial` | `splunk-soar-setup` | Container readiness and handoff only. |
 

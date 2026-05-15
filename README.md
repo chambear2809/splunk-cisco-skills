@@ -86,6 +86,9 @@ Common starting points:
   `skills/splunk-observability-database-monitoring-setup/`.
 - If you need Splunk AI Agent Monitoring or AI Infrastructure Monitoring, start
   with `skills/splunk-observability-ai-agent-monitoring-setup/`.
+- If you need Splunk AI Toolkit / MLTK, Python for Scientific Computing, DSDL,
+  anomaly workflows, LLM `ai` command readiness, or legacy anomaly migration,
+  start with `skills/splunk-ai-ml-toolkit-setup/`.
 - If you need AWS metrics and CloudWatch integration assets for Splunk
   Observability Cloud, start with `skills/splunk-observability-aws-integration/`.
 - If you need to pair the Splunk Platform with Splunk Observability Cloud
@@ -283,6 +286,7 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-attack-analyzer-setup` | `Splunk_TA_SAA` + `Splunk_App_SAA` | Install and validate Attack Analyzer platform integration, the `saa` index, `saa_indexes` macro, and API key handoff |
 | `splunk-uba-setup` | Splunk UBA / UEBA readiness | Validate legacy UBA integrations, optional Kafka app placement, and ES Premier UEBA migration handoff |
 | `splunk-ai-assistant-setup` | `Splunk_AI_Assistant_Cloud` | Install and configure Splunk AI Assistant (formerly Splunk AI Assistant for SPL); drive Enterprise cloud-connected onboarding |
+| `splunk-ai-ml-toolkit-setup` | Splunk AI Toolkit / MLTK + PSC + DSDL | Install, render, validate, and audit Splunk-owned AI/ML workflows beyond AI Assistant, including AI Toolkit, Python for Scientific Computing, DSDL runtime handoffs, anomaly workflows, LLM `ai` command readiness, and legacy anomaly migration |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-admin-doctor` | Splunk Cloud and Enterprise admin health | Diagnose full admin-domain coverage, render doctor/fix-plan reports, create safe fix packets or handoffs, and run checkpointed live validation sweeps |
 | `splunk-cloud-data-manager-setup` | Splunk Cloud Platform Data Manager | Render, doctor, validate, and safely apply supported Data Manager-generated AWS CloudFormation/StackSet, Azure ARM, and GCP Terraform artifacts; covers AWS, Azure, GCP, and CrowdStrike onboarding, HEC/index readiness, source catalogs, migration guardrails, and UI handoffs without private Data Manager API or Terraform CRUD claims |

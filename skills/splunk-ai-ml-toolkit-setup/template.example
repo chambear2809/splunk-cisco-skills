@@ -1,0 +1,23 @@
+api_version: splunk-ai-ml-toolkit-setup/v1
+platform: enterprise
+splunk_version: "9.4"
+psc_target: linux64
+include_ai_toolkit: true
+include_dsdl: true
+dsdl_runtime: kubernetes
+legacy_anomaly_audit: true
+features:
+  ml_spl: true
+  smart_assistants: true
+  anomaly_workflows: true
+  llm_ai_command: true
+  connections_tab: true
+  container_management: true
+  onnx: true
+  alerts: true
+dsdl:
+  runtime_endpoint: ""
+  runtime_namespace: ""
+  require_gpu: false
+  airgap: false
+  notebook_governance: true

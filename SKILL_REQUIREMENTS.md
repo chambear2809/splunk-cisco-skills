@@ -115,6 +115,7 @@ Environment-specific notes:
 | `splunk-admin-doctor` | `acs` for Cloud checks; optional `ssh`; `curl`. | Splunk Cloud ACS or Enterprise REST access; admin-domain permissions for the areas being diagnosed. |
 | `splunk-agent-management-setup` | Shared baseline. | Splunk Enterprise deployment server or deployment-app file target access; server class/app ownership details. |
 | `splunk-ai-assistant-setup` | Shared baseline. | Splunk app workflow access; Splunk AI Assistant entitlement and activation/onboarding details. |
+| `splunk-ai-ml-toolkit-setup` | Shared baseline; `PyYAML` for YAML specs. | Splunk app workflow access; Splunkbase access for AI Toolkit, PSC, and DSDL packages; external DSDL runtime ownership for Docker, Kubernetes, OpenShift, HPC, GPU, or air-gapped handoffs. |
 | `splunk-app-install` | `acs`; optional `ssh`, `scp`, and `sshpass` for Enterprise remote staging. | Splunk Enterprise REST or Splunk Cloud ACS access; Splunkbase credentials or local package path. |
 | `splunk-cloud-acs-allowlist-setup` | `acs`; optional `terraform`; `curl` for source-IP discovery. | Splunk Cloud ACS stack permissions; exact allowlist feature/subnet plan; lock-out protection review. |
 | `splunk-cloud-data-manager-setup` | `aws`, `az`, `gcloud`, and `terraform` only for the cloud artifact families being validated/applied. | Data Manager-generated CloudFormation/ARM/Terraform artifacts; cloud-provider permissions; HEC/index prerequisites. |

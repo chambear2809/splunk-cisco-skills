@@ -191,12 +191,32 @@
     },
     {
       "key": "mltk",
-      "name": "Splunk Machine Learning Toolkit",
-      "aliases": ["mltk", "ml toolkit", "machine learning toolkit", "splunk ai toolkit", "splunk_ml_toolkit"],
-      "status": "install_only",
-      "route": ["splunk-app-install"],
-      "splunkbase_ids": ["2890"],
-      "notes": "Not a security portfolio product, but referenced by ES detections that use ML and by selected security analytics workflows. Listed here so the router can resolve it instead of falling through to 'No matching entry'."
+      "name": "Splunk AI Toolkit / MLTK",
+      "aliases": ["mltk", "ml toolkit", "machine learning toolkit", "splunk ai toolkit", "splunk_ml_toolkit", "ai toolkit"],
+      "status": "first_class",
+      "route": ["splunk-ai-ml-toolkit-setup"],
+      "splunkbase_ids": ["2890", "2882", "2883", "2881", "6785"],
+      "notes": "Not a security portfolio product, but referenced by ES detections that use ML and by selected security analytics workflows. Routes to the AI/ML skill for PSC dependency selection, AI Toolkit validation, anomaly workflows, and model inventory."
+    },
+    {
+      "key": "dsdl",
+      "name": "Splunk App for Data Science and Deep Learning",
+      "aliases": ["dsdl", "deep learning toolkit", "dltk", "data science and deep learning", "mltk container"],
+      "status": "first_class",
+      "route": ["splunk-ai-ml-toolkit-setup"],
+      "route_args": ["--include-dsdl"],
+      "splunkbase_ids": ["4607"],
+      "notes": "AI Toolkit extension for external custom model runtimes, JupyterLab notebooks, Docker/Kubernetes/OpenShift/HPC/GPU handoffs, and model governance."
+    },
+    {
+      "key": "legacy-anomaly-detection",
+      "name": "Splunk App for Anomaly Detection",
+      "aliases": ["anomaly detection", "anomaly detection assistant", "anomaly detection assistant for splunk", "splunk anomaly detection assistant", "splunk app for anomaly detection", "anomaly detection app", "smart alerts assistant"],
+      "status": "partial",
+      "route": ["splunk-ai-ml-toolkit-setup"],
+      "route_args": ["--legacy-anomaly-audit"],
+      "splunkbase_ids": ["6843", "6415"],
+      "notes": "Legacy anomaly apps are audit and migration-only. New anomaly workflows should route to current Splunk AI Toolkit assistants and Cisco Deep Time Series anomaly detection readiness."
     },
     {
       "key": "automation-broker",

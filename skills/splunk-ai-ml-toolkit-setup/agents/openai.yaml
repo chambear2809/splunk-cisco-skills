@@ -1,0 +1,4 @@
+interface:
+  display_name: "Splunk AI/ML Toolkit Setup"
+  short_description: "Plan and validate Splunk AI Toolkit, PSC, and DSDL"
+  default_prompt: "Use $splunk-ai-ml-toolkit-setup to render a full Splunk AI Toolkit, PSC, DSDL, and anomaly-workflow coverage plan."

@@ -308,6 +308,54 @@
         "notes": "Search-tier app only. Splunk Cloud installs stay on the public Splunkbase path; Enterprise uses cloud-connected activation after install. Latest verified Splunkbase release is 2.0.0; Agent Mode is Cloud-region gated and FedRAMP IL2 support is limited."
       },
       {
+        "kind": "app",
+        "app_name": "Splunk_ML_Toolkit",
+        "label": "`splunk-ai-ml-toolkit-setup` AI Toolkit",
+        "cloud_install_path": "ACS Splunkbase after installing the matching Python for Scientific Computing add-on",
+        "cloud_config_path": "Search-tier validation plus UI handoffs for ML-SPL, Smart Assistants, anomaly workflows, LLM `ai` command providers, Connections, Container Management, ONNX, alerts, safeguards, and model inventory",
+        "notes": "Splunk AI Toolkit / MLTK (Splunkbase 2890). Latest audited release is 5.7.3 with Cisco Deep Time Series anomaly detection; live installs intentionally pull the latest compatible Splunkbase release and do not pin --app-version."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_SA_Scientific_Python_linux_x86_64",
+        "label": "`splunk-ai-ml-toolkit-setup` PSC Linux 64-bit",
+        "cloud_install_path": "ACS Splunkbase for Linux search heads; default PSC target for Splunk Cloud",
+        "cloud_config_path": "No app-local config; validates AI Toolkit Python runtime dependency",
+        "notes": "Python for Scientific Computing add-on for Linux 64-bit search heads, Splunkbase 2882, latest audited 4.3.1."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_SA_Scientific_Python_windows_x86_64",
+        "label": "`splunk-ai-ml-toolkit-setup` PSC Windows 64-bit",
+        "cloud_install_path": "Splunkbase install on Windows search heads you control",
+        "cloud_config_path": "No app-local config; validates AI Toolkit Python runtime dependency",
+        "notes": "Python for Scientific Computing add-on for Windows 64-bit search heads, Splunkbase 2883, latest audited 4.3.1."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_SA_Scientific_Python_darwin_x86_64",
+        "label": "`splunk-ai-ml-toolkit-setup` PSC Mac Intel",
+        "cloud_install_path": "Splunkbase install on Mac Intel search heads you control",
+        "cloud_config_path": "No app-local config; validates AI Toolkit Python runtime dependency",
+        "notes": "Python for Scientific Computing add-on for Mac Intel search heads, Splunkbase 2881, latest audited 4.3.1."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_SA_Scientific_Python_darwin_arm64",
+        "label": "`splunk-ai-ml-toolkit-setup` PSC Mac Apple Silicon",
+        "cloud_install_path": "Splunkbase install on Mac Apple Silicon search heads you control",
+        "cloud_config_path": "No app-local config; validates AI Toolkit Python runtime dependency",
+        "notes": "Python for Scientific Computing add-on for Mac Apple Silicon search heads, Splunkbase 6785, latest audited 4.3.1."
+      },
+      {
+        "kind": "app",
+        "app_name": "mltk-container",
+        "label": "`splunk-ai-ml-toolkit-setup` DSDL",
+        "cloud_install_path": "ACS Splunkbase after AI Toolkit and PSC prerequisites",
+        "cloud_config_path": "Search-tier setup plus rendered handoffs for Docker, Kubernetes, OpenShift, HPC, GPU, air-gapped images, setup-page/runtime health, API endpoint, HEC/Observability telemetry, Jupyter notebooks, RAG/LLM, and model governance",
+        "notes": "Splunk App for Data Science and Deep Learning / DSDL (Splunkbase 4607). External runtimes remain operator-owned handoffs unless a downstream runtime skill applies them."
+      },
+      {
         "kind": "workflow",
         "skill": "splunk-mcp-server-setup",
         "label": "`splunk-mcp-server-setup`",
@@ -498,7 +546,7 @@
         "label": "`splunk-observability-aws-lambda-apm-setup`",
         "splunkbase_id": "N/A",
         "cloud_install_path": "No Splunk Cloud app install; the Splunk OTel Lambda layer (signalfx/splunk-otel-lambda, beta, publisher 254067382080) is attached directly to AWS Lambda functions via AWS CLI, CloudFormation, or Terraform",
-        "cloud_config_path": "Rendered per-function layer ARN attachments, AWS_LAMBDA_EXEC_WRAPPER wiring, SPLUNK_REALM / SPLUNK_ACCESS_TOKEN (resolve references only — Secrets Manager or SSM SecureString), optional OTLP env vars, IAM egress stub (local collector disabled path), Terraform and CloudFormation snippets, and handoff scripts to splunk-observability-dashboard-builder and splunk-observability-native-ops",
+        "cloud_config_path": "Rendered per-function layer ARN attachments, AWS_LAMBDA_EXEC_WRAPPER wiring, SPLUNK_REALM / SPLUNK_ACCESS_TOKEN (resolve references only \u2014 Secrets Manager or SSM SecureString), optional OTLP env vars, IAM egress stub (local collector disabled path), Terraform and CloudFormation snippets, and handoff scripts to splunk-observability-dashboard-builder and splunk-observability-native-ops",
         "notes": "Render-first APM instrumentation skill for AWS Lambda via the Splunk OpenTelemetry Lambda layer. Covers Node.js 18/20/22, Python 3.9-3.13, Java 8/11/17/21 on x86_64 and arm64. Per-runtime AWS_LAMBDA_EXEC_WRAPPER wiring; secret-safe SPLUNK_ACCESS_TOKEN delivery via AWS Secrets Manager or SSM SecureString resolve references; layer ARN baked snapshot with opt-in live refresh; vendor/ADOT conflict detection; X-Ray coexistence; GovCloud/China refusal; beta gate. Fulfills the handoffs.lambda_apm stub in splunk-observability-aws-integration."
       },
       {
@@ -1380,6 +1428,20 @@
       },
       "cloud_pairing": [],
       "notes": "Search-tier Splunk AI Assistant app with cloud-backed inference, Context and Model Runtime app UI settings, Agent Mode Cloud-region gating, and KV Store-backed local chat state."
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Search-tier AI Toolkit/MLTK, PSC, and optional DSDL app workflow with external runtime handoffs for Docker, Kubernetes, OpenShift, HPC, GPU, air-gapped images, LLM providers, Connections, Container Management, DSDL API/health/telemetry, and legacy anomaly migration."
     },
     {
       "skill": "splunk-mcp-server-setup",
@@ -2651,6 +2713,183 @@
         "uf_safe": false
       },
       "latest_verified_date": "April 9, 2026"
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "Splunk_SA_Scientific_Python_linux_x86_64",
+      "splunkbase_id": "2882",
+      "label": "Python for Scientific Computing (for Linux 64-bit)",
+      "license_ack_url": "https://github.com/splunk/Splunk-python-for-scientific-computing/blob/master/LICENSE",
+      "package_patterns": [
+        "python-for-scientific-computing-for-linux-64-bit_*"
+      ],
+      "min_splunk_version": "9.3",
+      "latest_verified_version": "4.3.1",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "PSC target for Linux 64-bit search heads and the default Splunk Cloud AI Toolkit runtime dependency.",
+      "latest_verified_date": "February 27, 2026"
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "Splunk_SA_Scientific_Python_windows_x86_64",
+      "splunkbase_id": "2883",
+      "label": "Python for Scientific Computing (for Windows 64-bit)",
+      "license_ack_url": "https://github.com/splunk/Splunk-python-for-scientific-computing/blob/master/LICENSE",
+      "package_patterns": [
+        "python-for-scientific-computing-for-windows-64-bit_*"
+      ],
+      "min_splunk_version": "9.3",
+      "latest_verified_version": "4.3.1",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "PSC target for Windows 64-bit search heads.",
+      "latest_verified_date": "February 27, 2026"
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "Splunk_SA_Scientific_Python_darwin_x86_64",
+      "splunkbase_id": "2881",
+      "label": "Python for Scientific Computing (for Mac Intel)",
+      "license_ack_url": "https://github.com/splunk/Splunk-python-for-scientific-computing/blob/master/LICENSE",
+      "package_patterns": [
+        "python-for-scientific-computing-for-mac-intel_*"
+      ],
+      "min_splunk_version": "9.3",
+      "latest_verified_version": "4.3.1",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "PSC target for Mac Intel search heads.",
+      "latest_verified_date": "February 27, 2026"
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "Splunk_SA_Scientific_Python_darwin_arm64",
+      "splunkbase_id": "6785",
+      "label": "Python for Scientific Computing (for Mac Apple Silicon)",
+      "license_ack_url": "https://github.com/splunk/Splunk-python-for-scientific-computing/blob/master/LICENSE",
+      "package_patterns": [
+        "python-for-scientific-computing-for-mac-apple-silicon_*"
+      ],
+      "min_splunk_version": "9.3",
+      "latest_verified_version": "4.3.1",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "PSC target for Mac Apple Silicon search heads.",
+      "latest_verified_date": "February 27, 2026"
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "Splunk_ML_Toolkit",
+      "splunkbase_id": "2890",
+      "label": "Splunk AI Toolkit",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-software-license-agreement.html",
+      "package_patterns": [
+        "splunk-ai-toolkit_*"
+      ],
+      "min_splunk_version": "9.3",
+      "latest_verified_version": "5.7.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "Splunk AI Toolkit / MLTK app. Requires the PSC add-on matching the search-head OS; supports ML-SPL, Smart Assistants, anomaly workflows, LLM ai command provider handoffs, ONNX, alerts, and model inventory.",
+      "latest_verified_date": "April 19, 2026"
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "mltk-container",
+      "splunkbase_id": "4607",
+      "label": "Splunk App for Data Science and Deep Learning",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-software-license-agreement.html",
+      "package_patterns": [
+        "splunk-app-for-data-science-and-deep-learning_*"
+      ],
+      "install_requires": [
+        "2890"
+      ],
+      "min_splunk_version": "8.0",
+      "latest_verified_version": "5.2.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "DSDL extends AI Toolkit with external Docker, Kubernetes, OpenShift, HPC, GPU, air-gapped image, Jupyter notebook, RAG/LLM, and model governance workflows. Runtime setup is rendered as a handoff by default.",
+      "latest_verified_date": "February 5, 2026"
     },
     {
       "skill": "splunk-mcp-server-setup",
