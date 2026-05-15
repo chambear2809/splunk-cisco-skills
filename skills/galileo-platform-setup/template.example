@@ -1,0 +1,62 @@
+# Galileo Platform Setup intake template.
+# Copy to template.local and fill in non-secret values only.
+api_version: galileo-platform-setup/v1
+
+galileo:
+  project_id: "galileo-project-id"
+  project_name: "customer-facing-ai"
+  log_stream_id: "galileo-log-stream-id"
+  log_stream: "production"
+  console_url: "https://app.galileo.ai"
+  api_base: "https://api.galileo.ai"
+  otel_endpoint: "https://api.galileo.ai/otel/traces"
+  experiment_id: ""
+  metrics_testing_id: ""
+
+hec_export:
+  root_type: "trace"
+  export_format: "jsonl"
+  redact: true
+  since: ""
+  until: ""
+  cursor_file: "./galileo-platform-rendered/state/cursor.json"
+
+splunk:
+  platform: "enterprise"
+  hec_url: "https://splunk.example.com:8088/services/collector/event"
+  hec_token_name: "galileo_observe"
+  hec_allowed_indexes: "galileo"
+  index: "galileo"
+  source: "galileo"
+  sourcetype: "galileo:observe:json"
+  host: ""
+
+splunk_observability:
+  realm: "us0"
+  # Set true for Splunk Observability Cloud-only mode. This skips default
+  # Splunk Platform HEC/OTLP sections and omits Platform HEC helper wiring from
+  # the OTel Collector handoff.
+  o11y_only: false
+
+runtime:
+  service_name: "galileo-instrumented-app"
+  deployment_environment: "production"
+  target_dir: ""
+
+otlp:
+  receiver_host: "otlp.example.com"
+  grpc_port: "4317"
+  http_port: "4318"
+
+collector:
+  cluster_name: "galileo-apps"
+
+kubernetes:
+  namespace: "default"
+  workload: ""
+
+secrets:
+  # File paths only. Do not put token values in this file.
+  galileo_api_key_file: "/tmp/galileo_api_key"
+  splunk_hec_token_file: "/tmp/splunk_hec_token"
+  o11y_token_file: "/tmp/splunk_o11y_token"

@@ -38,7 +38,6 @@ AWS_REGION=""
 ACCEPT_BETA=false
 ALLOW_LOOSE_TOKEN_PERMS=false
 ALLOW_VENDOR_COEXISTENCE=false
-REFRESH_LAYER_MANIFEST=false
 GITOPS_MODE=false
 TARGET=""
 JSON_OUTPUT=false
@@ -142,7 +141,7 @@ while [[ $# -gt 0 ]]; do
         --allow-loose-token-perms) ALLOW_LOOSE_TOKEN_PERMS=true ;;
         --accept-beta) ACCEPT_BETA=true ;;
         --allow-vendor-coexistence) ALLOW_VENDOR_COEXISTENCE=true ;;
-        --refresh-layer-manifest) REFRESH_LAYER_MANIFEST=true ;;
+        --refresh-layer-manifest) echo "WARN: live layer-manifest refresh is not implemented; using bundled snapshot." >&2 ;;
         --gitops-mode) GITOPS_MODE=true ;;
         --aws-region) AWS_REGION="$2"; shift ;;
         --dry-run) DRY_RUN=true ;;

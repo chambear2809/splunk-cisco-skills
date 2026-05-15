@@ -9,6 +9,42 @@ release section when cutting a release.
 
 ### Added
 
+- New `galileo-platform-setup` skill: render-first Galileo SaaS/Enterprise
+  integration with Splunk Platform (HEC/OTLP) and Splunk Observability Cloud.
+  Covers `export_records` to Splunk HEC, Observe OpenTelemetry/OpenInference
+  snippets, Protect invoke snippets, Evaluate/experiment/dataset/metric/
+  annotation handoffs, and OTel Collector, dashboard, and detector handoffs;
+  supports `--o11y-only` to omit Splunk Platform HEC dependencies. 14 unit
+  tests.
+- New `galileo-agent-control-setup` skill: render-first Agent Control server
+  readiness, file-backed auth templates, controls, Python/TypeScript runtime
+  snippets, OTel sink config, custom Splunk HEC event sink, and Observability
+  dashboard/detector handoffs. 6 unit tests.
+- New `splunk-deployment-server-setup` skill: bootstrap and operate a Splunk
+  Enterprise Deployment Server. Covers DS enablement, `phoneHomeIntervalInSecs`
+  scaling for fleets up to 10,000+ UFs, REST fleet inspection, HA pair with
+  HAProxy, rsync app sync, cascading DS anti-pattern guard, mass client
+  re-targeting, staged rollout, and explicit `filterType` rendering for Splunk
+  9.4.3+. 10 unit tests.
+- New `splunk-search-head-cluster-setup` skill: plan, render, bootstrap, and
+  operate an SHC — deployer config push, member `server.conf` generation,
+  sequenced bootstrap, rolling restarts (searchable / default / forced),
+  captain transfer, KV Store replication monitoring and reset, member add /
+  decommission / remove, standalone-to-SHC migration, deployer replacement,
+  ES placement on SHC, and failure mode runbooks. 10 unit tests.
+- New `splunk-observability-aws-lambda-apm-setup` skill: render-first, full-coverage
+  Splunk OpenTelemetry Lambda layer (`signalfx/splunk-otel-lambda`, beta, publisher
+  `254067382080`) APM instrumentation for AWS Lambda functions. Covers Node.js
+  18/20/22, Python 3.9–3.13, Java 8/11/17/21 on x86_64 and arm64; per-runtime
+  `AWS_LAMBDA_EXEC_WRAPPER` wiring; secret-safe `SPLUNK_ACCESS_TOKEN` delivery via
+  AWS Secrets Manager or SSM SecureString (resolve references; token value never in
+  files or argv); layer ARN baked snapshot with opt-in live refresh; vendor/ADOT
+  conflict detection; X-Ray coexistence flag; GovCloud/China refusal; IAM egress
+  stub; AWS CLI / Terraform / CloudFormation variants; rollback; discover-functions;
+  doctor; and cross-skill handoffs. Fulfills the `handoffs.lambda_apm` stub in
+  `splunk-observability-aws-integration`. MCP-registered with render-only default
+  classification and `--apply`/`--quickstart` mutation gate. 34 unit tests.
+
 - New Splunk security portfolio and readiness skills:
   - `splunk-security-portfolio-setup` (router that resolves ES, SOAR,
     Security Essentials, UBA, Attack Analyzer, ARI, and related offerings to
@@ -82,6 +118,16 @@ release section when cutting a release.
   read-only catalog/skill/template tools, dry-run planning for Cisco product
   setup, and a two-stage commit (plan + confirm) execution flow gated by
   `SPLUNK_SKILLS_MCP_ALLOW_MUTATION=1`.
+
+### Removed
+
+- Removed `splunk-galileo-integration` skill (deprecated). Its functionality
+  has been split into two dedicated skills: `galileo-platform-setup` (Galileo
+  Observe, Protect, Evaluate, and Splunk HEC/OTLP/OTel Collector integration)
+  and `galileo-agent-control-setup` (Agent Control server, auth, controls,
+  Python/TypeScript runtime snippets, and OTel/HEC sink wiring). The old skill
+  had a narrower scope and no test coverage; the replacements are render-first,
+  fully validated, and MCP-registered.
 
 ### Changed
 

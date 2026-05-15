@@ -24,7 +24,6 @@ from __future__ import annotations
 import importlib.util
 import json
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -119,7 +118,7 @@ class TestGCPRenderer:
         assert (tmp_path / "rest" / "create.json").exists()
 
     def test_wif_spec_renders(self, tmp_path):
-        result = self._render(_valid_wif_spec(), tmp_path)
+        self._render(_valid_wif_spec(), tmp_path)
         assert (tmp_path / "rest" / "create.json").exists()
 
     def test_rest_payload_type_gcp(self, tmp_path):

@@ -225,7 +225,7 @@ case "${MODE}" in
                     if [[ "${DRY_RUN}" == "true" ]]; then
                         echo "(dry-run) would POST/PUT ${OUTPUT_DIR}/rest/create.json to /v2/integration"
                     else
-                        local key_file_args=()
+                        key_file_args=()
                         [[ -n "${KEY_FILE}" ]] && key_file_args+=(--key-file "${KEY_FILE}")
                         "${PYTHON_BIN}" "${SCRIPT_DIR}/gcp_integration_api.py" \
                             --realm "${REALM:-us1}" \

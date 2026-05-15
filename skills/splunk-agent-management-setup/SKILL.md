@@ -86,3 +86,8 @@ bash skills/splunk-agent-management-setup/scripts/validate.sh --live
 ```
 
 Read `reference.md` for researched behavior and official documentation links.
+
+## Hand-off Contracts
+
+- **DS runtime** (bootstrap, `phoneHome` tuning, REST fleet inspection, HA pair, client migration): handled by [`splunk-deployment-server-setup`](../splunk-deployment-server-setup/SKILL.md). This skill owns `serverclass.conf` authoring; `splunk-deployment-server-setup` owns DS runtime operations.
+- **UF enrollment**: handled by [`splunk-universal-forwarder-setup`](../splunk-universal-forwarder-setup/SKILL.md) for the client side of DS enrollment.

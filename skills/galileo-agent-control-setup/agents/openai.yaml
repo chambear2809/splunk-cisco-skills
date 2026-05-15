@@ -1,0 +1,9 @@
+interface:
+  display_name: "Galileo Agent Control Setup"
+  short_description: "Render Agent Control server/auth/control/runtime/sink assets and Splunk handoffs."
+  default_prompt: >-
+    Use $galileo-agent-control-setup to render, validate, and optionally apply
+    Agent Control workflows: server readiness, auth templates, control policy
+    templates, Python @control() snippets, TypeScript snippets, OTel sink env,
+    custom Splunk HEC event sink, HEC service handoff, OTel Collector handoff,
+    and dashboard/detector handoffs.

@@ -1,0 +1,78 @@
+# Splunk Search Head Cluster Setup — intake template
+# Copy to a working file and edit. No secrets here — credentials use file-based paths.
+# Pass this file path to setup.sh via env vars or flags.
+#
+# Usage:
+#   bash skills/splunk-search-head-cluster-setup/scripts/setup.sh \
+#     --phase render \
+#     --shc-label prod_shc \
+#     --deployer-host deployer01.corp.example.com \
+#     --member-hosts sh01.corp.example.com,sh02.corp.example.com,sh03.corp.example.com \
+#     --replication-factor 3
+
+# --------------------------------------------------------------------------
+# SHC identity
+# --------------------------------------------------------------------------
+
+# Label identifying this SHC — must match across all members and the deployer.
+# Allowed: letters, digits, hyphens, underscores (no spaces).
+shc_label: prod_shc
+
+# Deployer FQDN and REST URI
+deployer_host: deployer01.corp.example.com
+deployer_uri: https://deployer01.corp.example.com:8089
+
+# Comma-separated SHC member FQDNs
+member_hosts: sh01.corp.example.com,sh02.corp.example.com,sh03.corp.example.com
+
+# --------------------------------------------------------------------------
+# Replication and KV Store
+# --------------------------------------------------------------------------
+
+# SHC data replication factor (minimum 3 for production)
+replication_factor: 3
+
+# KV Store replication factor (independent of SHC RF)
+# Typically matches replication_factor
+kvstore_replication_factor: 3
+
+# KV Store port (default 8191)
+kvstore_port: 8191
+
+# --------------------------------------------------------------------------
+# Heartbeat and restart tuning
+# --------------------------------------------------------------------------
+
+# Time (seconds) without a heartbeat before a member is considered down
+heartbeat_timeout: 60
+
+# Interval (seconds) between heartbeat broadcasts
+heartbeat_period: 5
+
+# Inactivity timeout for rolling restart (seconds)
+# The captain waits this long for a restarting member to become searchable
+restart_inactivity_timeout: 600
+
+# Rolling restart mode: searchable | default | forced
+# searchable: maintains search coverage throughout (recommended)
+# default: fastest, may briefly interrupt searches
+# forced: skips inactivity check (requires --accept-force-restart)
+rolling_restart_mode: searchable
+
+# --------------------------------------------------------------------------
+# Secret file paths (values never stored here)
+# --------------------------------------------------------------------------
+
+# File containing the Splunk admin password (chmod 600)
+# Create: bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_admin_password
+admin_password_file: /tmp/splunk_admin_password
+
+# File containing the SHC shared secret / pass4SymmKey (chmod 600)
+# Create: bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_shc_secret
+shc_secret_file: /tmp/splunk_shc_secret
+
+# --------------------------------------------------------------------------
+# Output directory (where rendered assets land)
+# --------------------------------------------------------------------------
+
+output_dir: splunk-search-head-cluster-rendered

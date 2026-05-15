@@ -130,6 +130,11 @@ bash skills/splunk-universal-forwarder-setup/scripts/validate.sh \
   --enroll deployment-server
 ```
 
+## Hand-off Contracts
+
+- **DS runtime** (bootstrap, `phoneHome` tuning, HA pair, client migration): see [`splunk-deployment-server-setup`](../splunk-deployment-server-setup/SKILL.md). This skill handles UF enrollment; `splunk-deployment-server-setup` owns the DS runtime side.
+- **Server class authoring**: see [`splunk-agent-management-setup`](../splunk-agent-management-setup/SKILL.md) for `serverclass.conf` and `deploymentclient.conf` rendering.
+
 ## References
 
 - [reference.md](reference.md) for package matrix, phases, and operational notes

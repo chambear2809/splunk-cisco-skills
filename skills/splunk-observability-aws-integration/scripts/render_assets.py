@@ -1431,13 +1431,13 @@ def _section_handoff(spec: dict[str, Any]) -> str:
 """)
     if h["lambda_apm"]:
         rows.append(f"""
-## Lambda APM (future companion skill)
+## Lambda APM
 
-- Future skill: `splunk-observability-aws-lambda-apm-setup`
+- Skill: `splunk-observability-aws-lambda-apm-setup`
 - Splunk OpenTelemetry Lambda layer publisher: `{LAMBDA_LAYER_PUBLISHER_AWS_ACCOUNT}`
-- Companion: `signalfx/splunk-extension-wrapper` (Lambda Extension for Metrics)
-- Until that skill ships, see:
-  https://help.splunk.com/en/splunk-observability-cloud/manage-data/instrument-serverless-functions/instrument-serverless-functions/instrument-aws-lambda-functions
+- Run: `bash skills/splunk-observability-aws-lambda-apm-setup/scripts/setup.sh --quickstart --accept-beta`
+- Covers Node.js/Python/Java on x86_64 and arm64, exec-wrapper wiring, Secrets Manager/SSM token delivery, vendor/ADOT conflict detection, and Terraform/CloudFormation/AWS CLI variants.
+- See: https://help.splunk.com/en/splunk-observability-cloud/manage-data/instrument-serverless-functions/instrument-serverless-functions/instrument-aws-lambda-functions
 """)
     if h["dashboards"]:
         rows.append("""
@@ -1629,19 +1629,17 @@ def render_handoff_lambda_sh(spec: dict[str, Any]) -> str:
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
-# Hand-off (FUTURE COMPANION SKILL): AWS Lambda APM via the Splunk
-# OpenTelemetry Lambda layer.
+# Hand-off: AWS Lambda APM via the Splunk OpenTelemetry Lambda layer.
+# Use the splunk-observability-aws-lambda-apm-setup skill.
 
-cat <<EOF
-==> AWS Lambda APM is OUT OF SCOPE for this AWSCloudWatch integration skill.
-==> A future companion skill, splunk-observability-aws-lambda-apm-setup, will
-    own the Lambda APM lifecycle.
-==> Until then, instrument by hand:
-    - Splunk OTel Lambda layer publisher AWS account: {LAMBDA_LAYER_PUBLISHER_AWS_ACCOUNT}
-    - Required env vars: SPLUNK_REALM, SPLUNK_ACCESS_TOKEN, AWS_LAMBDA_EXEC_WRAPPER, OTEL_SERVICE_NAME
-    - Optional Lambda Extension for Metrics: signalfx/splunk-extension-wrapper
-    - Splunk doc: https://help.splunk.com/en/splunk-observability-cloud/manage-data/instrument-serverless-functions/instrument-serverless-functions/instrument-aws-lambda-functions
-EOF
+echo "==> AWS Lambda APM is handled by splunk-observability-aws-lambda-apm-setup."
+echo "    Splunk OTel Lambda layer publisher AWS account: {LAMBDA_LAYER_PUBLISHER_AWS_ACCOUNT}"
+echo ""
+echo "==> Quickstart:"
+echo "    bash skills/splunk-observability-aws-lambda-apm-setup/scripts/setup.sh --quickstart --accept-beta"
+echo ""
+echo "==> Splunk doc:"
+echo "    https://help.splunk.com/en/splunk-observability-cloud/manage-data/instrument-serverless-functions/instrument-serverless-functions/instrument-aws-lambda-functions"
 """
 
 

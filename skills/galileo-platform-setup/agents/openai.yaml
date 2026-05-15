@@ -1,0 +1,10 @@
+interface:
+  display_name: "Galileo Platform Setup"
+  short_description: "Render Galileo SaaS/Enterprise readiness, Observe export, Protect/Evaluate assets, Splunk handoffs, and O11y-only mode."
+  default_prompt: >-
+    Use $galileo-platform-setup to render, validate, and optionally apply
+    Galileo platform workflows: readiness, export_records to Splunk HEC,
+    OpenTelemetry/OpenInference runtime snippets, Protect invoke snippets,
+    Evaluate/experiment/dataset/metric/annotation handoffs, Splunk HEC and
+    OTLP handoffs, Splunk OTel Collector handoff, dashboard/detector handoffs,
+    and --o11y-only Observability Cloud mode without Splunk Platform HEC.

@@ -1,0 +1,65 @@
+# Splunk Deployment Server Setup — intake template
+# Copy to a working file and edit. No secrets here — credentials use file-based paths.
+#
+# Usage:
+#   bash skills/splunk-deployment-server-setup/scripts/setup.sh \
+#     --phase render \
+#     --ds-host ds01.corp.example.com \
+#     --fleet-size 2000
+
+# --------------------------------------------------------------------------
+# Deployment Server identity
+# --------------------------------------------------------------------------
+
+# DS FQDN and REST URI
+ds_host: ds01.corp.example.com
+ds_uri: https://ds01.corp.example.com:8089
+
+# --------------------------------------------------------------------------
+# Fleet sizing — determines phoneHome recommendation
+# --------------------------------------------------------------------------
+
+# Estimated number of Universal Forwarder clients
+# Used to recommend phoneHomeIntervalInSecs:
+#   < 500:    60s  (default)
+#   500-2000: 120s
+#   2000-5000: 300s
+#   5000-10000: 600s
+#   > 10000:  900s + HA pair recommended
+fleet_size: 500
+
+# Override the computed phoneHome interval (leave blank to use computed value)
+# phone_home_interval_override: 300
+
+# Handshake retry interval (seconds, default 60)
+handshake_retry_interval: 60
+
+# Max number of apps a single client can receive (default 100)
+max_client_apps: 100
+
+# --------------------------------------------------------------------------
+# HA pair (optional, recommended for fleets > 5000 UFs)
+# --------------------------------------------------------------------------
+
+# Set ha_enabled: true to render HA pair assets (haproxy.cfg, sync script)
+ha_enabled: false
+
+# Second DS host (required if ha_enabled: true)
+ds_host2: ds02.corp.example.com
+
+# Virtual IP or DNS name used by UF deploymentclient.conf targetUri
+ds_vip: ds-vip.corp.example.com
+
+# --------------------------------------------------------------------------
+# Secret file paths (values never stored here)
+# --------------------------------------------------------------------------
+
+# File containing the Splunk admin password (chmod 600)
+# Create: bash skills/shared/scripts/write_secret_file.sh /tmp/splunk_admin_password
+admin_password_file: /tmp/splunk_admin_password
+
+# --------------------------------------------------------------------------
+# Output directory (where rendered assets land)
+# --------------------------------------------------------------------------
+
+output_dir: splunk-deployment-server-rendered

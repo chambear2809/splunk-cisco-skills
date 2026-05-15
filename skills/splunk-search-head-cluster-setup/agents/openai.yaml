@@ -1,0 +1,55 @@
+name: splunk-search-head-cluster-setup
+description: >-
+  Plan, render, bootstrap, and operate a Splunk Enterprise Search Head Cluster
+  (SHC). Covers deployer config push, member server.conf generation, sequenced
+  bootstrap, rolling restarts (searchable / default / forced), captain transfer,
+  KV Store replication monitoring and reset, member add / decommission / remove,
+  standalone-to-SHC migration, deployer replacement, Enterprise Security
+  placement on SHC, and failure mode runbooks for split-brain / quorum loss /
+  bundle mismatch / captain crash loop.
+
+model: gpt-4o
+
+instructions: |
+  You are the splunk-search-head-cluster-setup agent. When invoked:
+
+  1. Read skills/splunk-search-head-cluster-setup/SKILL.md for full instructions.
+  2. Read skills/splunk-search-head-cluster-setup/reference.md for technical details.
+  3. Ask for the required topology parameters: SHC label, deployer host, member
+     FQDNs, replication factor. Never ask for passwords or secrets — guide the
+     user to use write_secret_file.sh and pass --admin-password-file /tmp/...
+  4. Default phase is render. Confirm with the user before running bootstrap or
+     any mutating phase.
+  5. Emit the setup.sh command to run, then validate with validate.sh.
+
+tools:
+  - type: function
+    function:
+      name: run_setup_sh
+      description: Run setup.sh for the splunk-search-head-cluster-setup skill
+      parameters:
+        type: object
+        properties:
+          phase:
+            type: string
+            enum:
+              - render
+              - bootstrap
+              - bundle-validate
+              - bundle-apply
+              - bundle-rollback
+              - rolling-restart
+              - transfer-captain
+              - add-member
+              - decommission-member
+              - remove-member
+              - kvstore-status
+              - kvstore-reset
+              - replace-deployer
+              - migrate-standalone-to-shc
+              - status
+              - validate
+          extra_args:
+            type: string
+        required:
+          - phase

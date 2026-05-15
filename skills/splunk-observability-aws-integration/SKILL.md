@@ -27,8 +27,8 @@ description: >-
   catalog. Live validation against the operator's existing integration via the
   Splunk Observability Cloud REST API at
   `https://api.<realm>.observability.splunkcloud.com/v2/integration` with
-  `X-SF-Token` admin user API access tokens. Hand-offs to a future
-  `splunk-observability-aws-lambda-apm-setup` skill (Lambda APM via the Splunk
+  `X-SF-Token` admin user API access tokens. Hand-offs to
+  `splunk-observability-aws-lambda-apm-setup` (Lambda APM via the Splunk
   OpenTelemetry Lambda layer publisher 254067382080), to `splunk-app-install`
   for the Splunk Add-on for AWS (Splunkbase 1876, min v8.1.1; uninstall
   `Splunk_TA_amazon_security_lake` first if present) and on to
@@ -241,17 +241,17 @@ include the following top-level blocks (full reference in
 - OTel collector on EC2 / EKS for richer host telemetry than `CWAgent` ->
   [`splunk-observability-otel-collector-setup`](../splunk-observability-otel-collector-setup/SKILL.md).
 - Lambda APM via the Splunk OpenTelemetry Lambda layer (publisher
-  `254067382080`) -> deferred to a future companion skill
-  `splunk-observability-aws-lambda-apm-setup`. Renderer emits a hand-off stub
-  in `09-handoff.md` only.
+  `254067382080`) ->
+  [`splunk-observability-aws-lambda-apm-setup`](../splunk-observability-aws-lambda-apm-setup/SKILL.md).
+  Renderer emits a hand-off stub in `09-handoff.md`.
 
 ## Out of Scope
 
 - AWS log collection via the Splunk AWS log collector Lambda (handed off to
   `Splunk_TA_AWS`; the `enableLogsSync` API field is deprecated and rejected
   by the renderer).
-- Lambda APM instrumentation via the OpenTelemetry Lambda layer (deferred to
-  the future `splunk-observability-aws-lambda-apm-setup` companion skill).
+- Lambda APM instrumentation via the OpenTelemetry Lambda layer (handed off to
+  [`splunk-observability-aws-lambda-apm-setup`](../splunk-observability-aws-lambda-apm-setup/SKILL.md)).
 - Native O11y AWS dashboard / detector CRUD (handed off to
   `splunk-observability-dashboard-builder` and
   `splunk-observability-native-ops`).

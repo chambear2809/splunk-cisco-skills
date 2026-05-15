@@ -1593,6 +1593,58 @@
         "external-collector"
       ],
       "notes": "Render-first APM instrumentation for AWS Lambda via the Splunk OpenTelemetry Lambda layer (signalfx/splunk-otel-lambda, beta, publisher 254067382080). Covers Node.js 18/20/22, Python 3.9-3.13, Java 8/11/17/21 on x86_64 and arm64. Per-runtime AWS_LAMBDA_EXEC_WRAPPER wiring; secret-safe SPLUNK_ACCESS_TOKEN delivery via AWS Secrets Manager or SSM SecureString resolve references (token value never in files or argv); baked layer ARN snapshot with opt-in live refresh; vendor/ADOT conflict detection; X-Ray coexistence flag; GovCloud/China refusal; IAM egress stub for local-collector-disabled path; AWS CLI / Terraform / CloudFormation variants; rollback, discover-functions, doctor, and cross-skill handoffs. Fulfills the handoffs.lambda_apm stub in splunk-observability-aws-integration."
+    },
+    {
+      "skill": "splunk-observability-azure-integration",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Splunk Observability Cloud Azure Monitor integration workflow. Renders and optionally applies cloud-side Azure integration payloads, Terraform, Azure CLI and Bicep handoffs, plus dashboard/detector and Splunk Platform log-ingestion add-on handoffs. No Splunk Platform runtime placement for the Observability integration itself."
+    },
+    {
+      "skill": "splunk-observability-gcp-integration",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Splunk Observability Cloud GCP Cloud Monitoring integration workflow. Renders and optionally applies cloud-side GCP integration payloads, Terraform, gcloud Service Account or WIF handoffs, plus dashboard/detector and Splunk Platform log-ingestion add-on handoffs. No Splunk Platform runtime placement for the Observability integration itself."
+    },
+    {
+      "skill": "splunk-deployment-server-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "universal-forwarder"
+      ],
+      "notes": "Self-managed Splunk Enterprise Deployment Server runtime workflow. Bootstraps and operates deployment-server state, phoneHome tuning, REST fleet inspection, HA pairing, reloads, and client migration; composes with splunk-agent-management-setup for serverclass/deployment-app authoring and splunk-universal-forwarder-setup for client enrollment."
+    },
+    {
+      "skill": "splunk-search-head-cluster-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Self-managed Splunk Enterprise Search Head Cluster orchestration workflow covering deployer bootstrap, member initialization, bundle validation/apply/rollback, captain transfer, rolling restarts, KV Store health, member add/remove, migrations, and failure-mode runbooks."
     }
   ],
   "apps": [
@@ -2732,8 +2784,8 @@
         "uf_safe": false
       },
       "notes": "Azure log ingestion TA (Activity Logs, Audit Logs, Azure AD Sign-in Logs, Azure Monitor Logs). Azure Monitor metrics go through the Splunk Observability Azure integration; logs go through this TA. Hand-off from splunk-observability-azure-integration.",
-      "latest_verified_version": "4.4.0",
-      "latest_verified_date": "May 2026"
+      "latest_verified_version": "6.1.1",
+      "latest_verified_date": "April 8, 2026"
     },
     {
       "skill": "splunk-observability-azure-integration",
@@ -2759,8 +2811,8 @@
         "uf_safe": false
       },
       "notes": "Azure dashboards for Splunk Platform. Hand-off from splunk-observability-azure-integration (handoffs.microsoft_azure_app=true).",
-      "latest_verified_version": "3.0.0",
-      "latest_verified_date": "May 2026"
+      "latest_verified_version": "2.1.1",
+      "latest_verified_date": "December 11, 2024"
     },
     {
       "skill": "splunk-observability-gcp-integration",
@@ -2786,8 +2838,8 @@
         "uf_safe": false
       },
       "notes": "GCP log ingestion TA (Pub/Sub, Cloud Storage, Cloud Audit Logs). GCP metrics go through the Splunk Observability GCP integration; logs go through this TA. Hand-off from splunk-observability-gcp-integration.",
-      "latest_verified_version": "4.3.0",
-      "latest_verified_date": "May 2026"
+      "latest_verified_version": "5.0.2",
+      "latest_verified_date": "April 22, 2026"
     }
   ]
 }

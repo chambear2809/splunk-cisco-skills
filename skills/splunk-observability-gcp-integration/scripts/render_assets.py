@@ -527,35 +527,30 @@ def render_terraform_variables(spec: dict[str, Any]) -> str:
 
 
 def render_gcloud_cli_create_sa(spec: dict[str, Any]) -> str:
-    auth = spec["authentication"]
-    psk = auth.get("project_service_keys") or []
-    project_ids = [e["project_id"] for e in psk if isinstance(e, dict) and e.get("project_id")]
-    project_example = project_ids[0] if project_ids else "${GCP_PROJECT_ID}"
-
-    return f"""#!/usr/bin/env bash
+    return """#!/usr/bin/env bash
 # Create GCP Service Account for Splunk Observability GCP integration.
 # Outputs the SA key to /tmp/splunk-gcp-sa-key.json (chmod 600).
 # NEVER paste the key value into this script — the output file is the secret file.
 set -euo pipefail
 
-: "${{GCP_PROJECT_ID:?Set GCP_PROJECT_ID to your GCP project ID}}"
+: "${GCP_PROJECT_ID:?Set GCP_PROJECT_ID to your GCP project ID}"
 
 SA_NAME="splunk-observability-o11y"
-SA_EMAIL="${{SA_NAME}}@${{GCP_PROJECT_ID}}.iam.gserviceaccount.com"
+SA_EMAIL="${SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
 
-echo "==> Creating Service Account: ${{SA_EMAIL}}"
-gcloud iam service-accounts create "${{SA_NAME}}" \\
+echo "==> Creating Service Account: ${SA_EMAIL}"
+gcloud iam service-accounts create "${SA_NAME}" \\
   --display-name "Splunk Observability O11y" \\
-  --project "${{GCP_PROJECT_ID}}"
+  --project "${GCP_PROJECT_ID}"
 
 echo "==> Downloading SA key to /tmp/splunk-gcp-sa-key.json"
 gcloud iam service-accounts keys create /tmp/splunk-gcp-sa-key.json \\
-  --iam-account "${{SA_EMAIL}}" \\
-  --project "${{GCP_PROJECT_ID}}"
+  --iam-account "${SA_EMAIL}" \\
+  --project "${GCP_PROJECT_ID}"
 chmod 600 /tmp/splunk-gcp-sa-key.json
 
 echo "==> SA key written to /tmp/splunk-gcp-sa-key.json (chmod 600)"
-echo "==> Service Account email: ${{SA_EMAIL}}"
+echo "==> Service Account email: ${SA_EMAIL}"
 echo ""
 echo "==> Next: bash bind-roles.sh"
 """
@@ -634,16 +629,16 @@ echo "    Cloud Pub/Sub subscriptions, GCS log bucket inputs, Cloud Audit Logs"
 
 
 def render_handoff_gke_otel(spec: dict[str, Any]) -> str:
-    return f"""#!/usr/bin/env bash
+    return """#!/usr/bin/env bash
 # Hand-off: GKE host telemetry via splunk-observability-otel-collector-setup.
 # Splunk Observability GCP integration collects Cloud Monitoring metrics.
 # The OTel collector adds richer Kubernetes/host telemetry from GKE nodes.
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 echo "==> Render Splunk OTel collector for GKE:"
-echo "    bash ${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render"
+echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render"
 echo ""
 echo "==> The OTel collector complements (does not replace) the GCP Cloud Monitoring integration."
 echo "    GKE cluster metrics via Cloud Monitoring (container service)"

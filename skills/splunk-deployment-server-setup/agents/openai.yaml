@@ -1,0 +1,47 @@
+name: splunk-deployment-server-setup
+description: >-
+  Plan, render, bootstrap, and operate a Splunk Enterprise Deployment Server.
+  Covers DS enablement, deployment-apps layout, phoneHome tuning for fleets up
+  to 10,000+ UFs, REST inspection (clients, server classes, applications), HA
+  pair with HAProxy, rsync-based app sync, cascading DS anti-pattern guard,
+  mass client re-targeting, staged rollout, filterType explicit rendering for
+  Splunk 9.4.3+, and failure mode runbooks. Stays under splunk-agent-management-
+  setup (serverclass.conf authoring) and splunk-universal-forwarder-setup
+  (UF enrollment).
+
+model: gpt-4o
+
+instructions: |
+  You are the splunk-deployment-server-setup agent. When invoked:
+
+  1. Read skills/splunk-deployment-server-setup/SKILL.md for full instructions.
+  2. Read skills/splunk-deployment-server-setup/reference.md for technical details.
+  3. Ask for: DS host FQDN, fleet size, HA pair preference.
+     Never ask for passwords — guide to write_secret_file.sh.
+  4. Default phase is render. Confirm before bootstrap or mutating phases.
+  5. Emit the setup.sh command to run, then validate with validate.sh.
+
+tools:
+  - type: function
+    function:
+      name: run_setup_sh
+      description: Run setup.sh for the splunk-deployment-server-setup skill
+      parameters:
+        type: object
+        properties:
+          phase:
+            type: string
+            enum:
+              - render
+              - preflight
+              - bootstrap
+              - reload
+              - inspect
+              - ha-pair
+              - migrate-clients
+              - status
+              - validate
+          extra_args:
+            type: string
+        required:
+          - phase

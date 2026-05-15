@@ -87,14 +87,19 @@ Environment-specific notes:
 
 | Skill | Additional local tooling | Live access and product requirements |
 | --- | --- | --- |
+| `galileo-agent-control-setup` | Shared baseline; optional Python and TypeScript package managers for applying rendered runtime snippets. | Agent Control server URL and API/admin key files; optional Splunk HEC token file, Splunk Observability token file, and target realm for sinks, dashboards, and detectors. |
+| `galileo-platform-setup` | Shared baseline; `curl` for healthcheck/readiness probes. | Galileo API key file, project/log-stream/experiment details; optional Splunk HEC token file, Splunk Observability token file, and target realm for HEC export, OTel Collector, dashboards, and detectors. |
 | `splunk-observability-ai-agent-monitoring-setup` | `PyYAML`; `kubectl` for Kubernetes runtime apply paths. | Splunk Observability realm and token files; GenAI application/runtime details; optional HEC/Log Observer Connect handoffs. |
 | `splunk-observability-aws-integration` | `aws`; optional `terraform`; `curl`. | Authenticated AWS CLI profile/session; Splunk Observability admin/user token files; AWS account/organization permissions for CloudWatch and Metric Streams. |
+| `splunk-observability-aws-lambda-apm-setup` | `aws`; optional `terraform`; `curl`. | Authenticated AWS CLI profile/session; Splunk Observability ingest token file; AWS Lambda function names, regions, runtimes; AWS Secrets Manager or SSM write permission for token storage. |
+| `splunk-observability-azure-integration` | `az`; optional `terraform`; `curl`. | Authenticated Azure CLI session; Splunk Observability admin/user token files; Azure Service Principal (appId/secretKey via file) or Workload Identity; Azure subscription IDs and tenant ID. |
 | `splunk-observability-cisco-ai-pod-integration` | `kubectl` or `oc`, `helm`, `yq`; child-skill tools for Nexus, Intersight, NVIDIA, and OTel collector handoffs. | Splunk Observability token files; Cisco AI Pod cluster access; UCS/Nexus/NVIDIA/NIM/vLLM/storage endpoint details. |
 | `splunk-observability-cisco-intersight-integration` | `kubectl` or `oc`; optional `helm`, `jq`, `yq`, `openssl`, `nc` for live checks and troubleshooting. | Splunk Observability token files; Kubernetes namespace access; Intersight API credentials in a Kubernetes Secret. |
 | `splunk-observability-cisco-nexus-integration` | `kubectl`, `helm`, `yq`; optional `ssh` and `nc` for device checks. | Splunk Observability token files; Nexus/NX-OS device SSH credentials via Kubernetes Secret; collector cluster access. |
 | `splunk-observability-cloud-integration-setup` | `acs`, `curl`, `openssl`; optional `docker` for companion local checks. | Splunk Cloud/Enterprise REST access; Splunk Observability admin/org/user token files; Log Observer Connect and SIM add-on prerequisites. |
 | `splunk-observability-dashboard-builder` | `PyYAML` for YAML specs. | Splunk Observability API token file with dashboard permissions; target realm/org. |
 | `splunk-observability-database-monitoring-setup` | `kubectl`, `helm`; `PyYAML`. | Splunk Observability token files; database endpoint details; DB credentials in Kubernetes Secrets or local secret files. |
+| `splunk-observability-gcp-integration` | `gcloud`; optional `terraform`; `curl`. | Authenticated gcloud CLI session; Splunk Observability admin/user token files; GCP Service Account key file (chmod 600) or Workload Identity Federation pool/provider; GCP project IDs. |
 | `splunk-observability-isovalent-integration` | `kubectl` or `oc`, `helm`, `yq`; optional `jq` and `aws`. | Splunk Observability token files; installed Cilium/Tetragon/Hubble stack; optional Splunk HEC token/index for Tetragon logs. |
 | `splunk-observability-k8s-auto-instrumentation-setup` | `kubectl`, `helm`; optional `npm` for app/runtime helper snippets. | Splunk Observability token files; OpenTelemetry Operator or Splunk OBI readiness; target workload namespaces. |
 | `splunk-observability-k8s-frontend-rum-setup` | `kubectl`; `npm` and `splunk-rum` for source-map helpers. | Splunk RUM token file; Splunk Observability token file for source maps; target frontend workload/ingress access. |
@@ -121,6 +126,8 @@ Environment-specific notes:
 | `splunk-hec-service-setup` | Shared baseline. | Splunk Enterprise REST or Splunk Cloud ACS access; HEC index/token naming plan; HEC receiver URL decisions. |
 | `splunk-index-lifecycle-smartstore-setup` | Shared baseline. | Splunk Enterprise indexer or cluster-manager access; object store bucket/remote volume details and credentials handoff. |
 | `splunk-indexer-cluster-setup` | `ssh`, `scp`, `sudo`; `curl`. | Cluster manager/peer/search head admin access; bundle apply and rolling-restart authority. |
+| `splunk-search-head-cluster-setup` | `ssh`, `scp`, `sudo`; `curl`; `python3`. | Deployer and all SHC member admin access; SHC shared secret file; rolling-restart authority; KV Store reset acceptance if needed. |
+| `splunk-deployment-server-setup` | `ssh`, `rsync`, `curl`; `python3`. | Splunk Enterprise admin access on DS host; `phoneHome` tuning authority; HA pair networking if applicable. |
 | `splunk-itsi-config` | `PyYAML`; optional `ssh`, `scp`, and `sshpass` for content/file staging. | ITSI REST access; `SA-ITOA` and content-pack readiness; native object specs and ownership lookups. |
 | `splunk-itsi-setup` | Shared baseline. | Splunk app workflow access; ITSI package/Splunkbase entitlement and license readiness. |
 | `splunk-license-manager-setup` | `curl`; optional SSH/file-copy tooling for license file placement. | Splunk Enterprise license manager and peer admin access; license file(s) available locally. |

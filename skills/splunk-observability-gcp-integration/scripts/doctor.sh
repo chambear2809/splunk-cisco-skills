@@ -45,7 +45,6 @@ print(json.loads(open('${OUTPUT_DIR}/coverage-report.json').read()).get('realm',
 " 2>/dev/null || echo "unknown")"
 fi
 
-checks=()
 fails=()
 warns=()
 infos=()

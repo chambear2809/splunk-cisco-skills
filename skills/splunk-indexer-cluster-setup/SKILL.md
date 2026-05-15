@@ -180,6 +180,7 @@ Under `splunk-indexer-cluster-rendered/cluster/`:
 - Emits a `LICENSE_PEERS[]` stub at `splunk-indexer-cluster-rendered/cluster/handoffs/license-peers.txt` so `splunk-license-manager-setup` can wire up the license peer config.
 - Warns when bundle apps include SmartStore-aware files and points to
   [`skills/splunk-index-lifecycle-smartstore-setup`](../../skills/splunk-index-lifecycle-smartstore-setup/SKILL.md) for `indexes.conf` rendering.
+- For Search Head Cluster setup (deployer, SHC members, rolling restarts, captain transfer, KV Store), see [`splunk-search-head-cluster-setup`](../splunk-search-head-cluster-setup/SKILL.md).
 
 ## Out of Scope
 

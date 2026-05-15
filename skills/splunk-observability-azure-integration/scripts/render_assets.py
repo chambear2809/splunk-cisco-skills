@@ -470,22 +470,22 @@ resource "signalfx_azure_integration" "this" {{
 
 
 def render_terraform_variables(spec: dict[str, Any]) -> str:
-    return f"""variable "tenant_id" {{
+    return """variable "tenant_id" {
   description = "Azure AD Directory (tenant) ID"
   type        = string
-}}
+}
 
-variable "app_id" {{
+variable "app_id" {
   description = "Azure AD application (client) ID"
   type        = string
   sensitive   = true
-}}
+}
 
-variable "secret_key" {{
+variable "secret_key" {
   description = "Azure AD client secret"
   type        = string
   sensitive   = true
-}}
+}
 """
 
 
@@ -495,9 +495,6 @@ variable "secret_key" {{
 
 
 def render_azure_cli_create_sp(spec: dict[str, Any]) -> str:
-    sub_list = " ".join(
-        f"--scopes \"/subscriptions/${{AZ_SUB_ID}}\"" for _ in spec["subscriptions"][:1]
-    )
     multi = spec["multi_subscription"]
     scope_comment = ""
     if multi["enabled"] and multi["management_group_id"]:
@@ -673,16 +670,16 @@ echo "    bash ${PROJECT_ROOT}/skills/splunk-app-install/scripts/install_app.sh 
 
 
 def render_handoff_aks_otel(spec: dict[str, Any]) -> str:
-    return f"""#!/usr/bin/env bash
+    return """#!/usr/bin/env bash
 # Hand-off: AKS host telemetry via splunk-observability-otel-collector-setup.
 # Splunk Observability Azure integration collects Azure Monitor metrics.
 # The OTel collector adds richer Kubernetes/host telemetry from AKS nodes.
 set -euo pipefail
 
-PROJECT_ROOT="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/../../.." && pwd)"
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 echo "==> Render Splunk OTel collector for AKS:"
-echo "    bash ${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render"
+echo "    bash ${PROJECT_ROOT}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh --render"
 echo ""
 echo "==> The OTel collector complements (does not replace) the Azure Monitor integration."
 echo "    AKS cluster: microsoft.containerservice/managedclusters metrics via Azure Monitor"

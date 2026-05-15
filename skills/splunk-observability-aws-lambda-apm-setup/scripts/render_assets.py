@@ -21,9 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
-import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -394,17 +392,17 @@ def _render_layers(spec: dict[str, Any], manifest: dict[str, Any]) -> str:
             lines.append(f"## {fn}: ERROR\n{e}\n")
             continue
         lines.append(f"## {fn}")
-        lines.append(f"```bash")
-        lines.append(f"aws lambda get-function-configuration \\")
+        lines.append("```bash")
+        lines.append("aws lambda get-function-configuration \\")
         lines.append(f"  --function-name {fn} \\")
         lines.append(f"  --region {region} \\")
-        lines.append(f"  --query 'Layers[].Arn'")
-        lines.append(f"```")
+        lines.append("  --query 'Layers[].Arn'")
+        lines.append("```")
         lines.append("")
         lines.append("Layer ARN to attach:")
-        lines.append(f"```")
+        lines.append("```")
         lines.append(layer_arn)
-        lines.append(f"```")
+        lines.append("```")
         lines.append("")
     return "\n".join(lines)
 
@@ -466,7 +464,7 @@ def _render_validation(spec: dict[str, Any]) -> str:
     lines.append("## Static checks")
     lines.append("```bash")
     lines.append(f"bash skills/{SKILL_NAME}/scripts/validate.sh \\")
-    lines.append(f"  --output-dir splunk-observability-aws-lambda-apm-rendered")
+    lines.append("  --output-dir splunk-observability-aws-lambda-apm-rendered")
     lines.append("```\n")
 
     lines.append("## Expected span attributes")
@@ -616,7 +614,7 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
 
         lines.append(f"# --- {fn} ---")
         lines.append(f'echo "==> Updating {fn} in {region}..."')
-        lines.append(f"aws lambda update-function-configuration \\")
+        lines.append("aws lambda update-function-configuration \\")
         lines.append(f"  --function-name {fn} \\")
         lines.append(f"  --region {region} \\")
         lines.append(f"  --layers '{layer_arn}' \\")
@@ -699,15 +697,15 @@ def _render_terraform(spec: dict[str, Any], manifest: dict[str, Any], wrappers: 
         lines += [
             f"# Function: {fn}",
             f'resource "aws_lambda_function" "{safe_name}" {{',
-            f'  # Reference your existing function or import it.',
+            '  # Reference your existing function or import it.',
             f'  function_name = "{fn}"',
             f'  layers        = ["{layer_arn}"]',
-            f'  environment {{',
-            f'    variables = {{',
+            '  environment {',
+            '    variables = {',
         ] + env_block_lines + [
-            f'    }}',
-            f'  }}',
-            f'}}',
+            '    }',
+            '  }',
+            '}',
             "",
         ]
 
@@ -770,15 +768,15 @@ def _render_cloudformation(spec: dict[str, Any], manifest: dict[str, Any], wrapp
 
         lines += [
             f"# Function: {fn}",
-            f"  # Add to your Resources section:",
+            "  # Add to your Resources section:",
             f"  {fn}:",
-            f"    Type: AWS::Lambda::Function",
-            f"    Properties:",
-            f"      # ... other properties ...",
-            f"      Layers:",
+            "    Type: AWS::Lambda::Function",
+            "    Properties:",
+            "      # ... other properties ...",
+            "      Layers:",
             f"        - {layer_arn}",
-            f"      Environment:",
-            f"        Variables:",
+            "      Environment:",
+            "        Variables:",
         ] + env_yaml_lines + ["", ""]
 
     return "\n".join(lines)
@@ -910,7 +908,7 @@ def _render_sam(spec: dict[str, Any], manifest: dict[str, Any], metrics_manifest
 
         if pkg_type == "image":
             lines.append(f"  # {fn}: container-image function — see container-image/Dockerfile.{runtime.split('.')[0].replace('nodejs', 'node')} for instrumentation snippet.")
-            lines.append(f"  # AWS_LAMBDA_EXEC_WRAPPER is NOT honored for container Lambdas; instrument programmatically.")
+            lines.append("  # AWS_LAMBDA_EXEC_WRAPPER is NOT honored for container Lambdas; instrument programmatically.")
             lines.append("")
             continue
 
@@ -950,34 +948,34 @@ def _render_sam(spec: dict[str, Any], manifest: dict[str, Any], metrics_manifest
 
         resource_lines = [
             f"  {safe_name}:",
-            f"    Type: AWS::Serverless::Function",
-            f"    Properties:",
+            "    Type: AWS::Serverless::Function",
+            "    Properties:",
             f"      FunctionName: {fn}",
             f"      Runtime: {runtime}",
-            f"      Architectures:",
+            "      Architectures:",
             f"        - {arch_sam}",
-            f"      Layers:",
+            "      Layers:",
         ]
         for la in layer_arns:
             resource_lines.append(f"        - {la}")
         resource_lines += [
-            f"      Environment:",
-            f"        Variables:",
+            "      Environment:",
+            "        Variables:",
         ] + env_lines
 
         if snapstart and _runtime_family(runtime) == "java":
             resource_lines += [
-                f"      SnapStart:",
-                f"        ApplyOn: PublishedVersions",
-                f"      # WARNING: Do NOT combine SnapStart with OTEL_JAVA_AGENT_FAST_STARTUP_ENABLED=true",
+                "      SnapStart:",
+                "        ApplyOn: PublishedVersions",
+                "      # WARNING: Do NOT combine SnapStart with OTEL_JAVA_AGENT_FAST_STARTUP_ENABLED=true",
             ]
         elif snapstart:
             resource_lines.append(f"      # SnapStart is only available for Java runtimes; ignored for {runtime}.")
 
         if prov_concurrency and int(prov_concurrency) > 0:
             resource_lines += [
-                f"      AutoPublishAlias: live",
-                f"      ProvisionedConcurrencyConfig:",
+                "      AutoPublishAlias: live",
+                "      ProvisionedConcurrencyConfig:",
                 f"        ProvisionedConcurrentExecutions: {int(prov_concurrency)}",
             ]
 
@@ -1068,7 +1066,6 @@ def _render_cdk(spec: dict[str, Any], manifest: dict[str, Any], metrics_manifest
         if metrics_arn:
             ts_lines.append(f"    const splunkMetricsLayer_{safe_ts} = lambda.LayerVersion.fromLayerVersionArn(this, 'SplunkMetricsLayer{safe_ts}', '{metrics_arn}');")
         ts_layers = f"splunkLayer_{safe_ts}" + (f", splunkMetricsLayer_{safe_ts}" if metrics_arn else "")
-        ts_env = ", ".join(f'"{k}": "{v}"' for k, v in env_dict_ts.items())
         ts_lines += [
             f"    // NOTE: Deliver SPLUNK_ACCESS_TOKEN from {sm_source}, not hardcoded:",
             f"    // fn_{safe_ts}.addEnvironment('SPLUNK_ACCESS_TOKEN', secret.secretValue.unsafeUnwrap());",
@@ -1079,7 +1076,6 @@ def _render_cdk(spec: dict[str, Any], manifest: dict[str, Any], metrics_manifest
             ts_lines.append(f"    // fn_{safe_ts}.addEnvironment('{k}', '{v}');")
         ts_lines.append("")
 
-        py_env = ",\n            ".join(f'"{k}": "{v}"' for k, v in env_dict_ts.items())
         py_lines += [
             f"        # Function: {fn}",
             f"        splunk_layer_{safe_py} = _lambda.LayerVersion.from_layer_version_arn(",
@@ -1169,10 +1165,10 @@ def _render_container_image(spec: dict[str, Any]) -> dict[str, str]:
             f'{env_note}',
         ]
         if not local:
-            env_block_lines.append(f'ENV SPLUNK_LAMBDA_LOCAL_COLLECTOR_ENABLED="false"')
+            env_block_lines.append('ENV SPLUNK_LAMBDA_LOCAL_COLLECTOR_ENABLED="false"')
             env_block_lines.append(f'ENV OTEL_EXPORTER_OTLP_ENDPOINT="{otlp_ep}"')
         if xray:
-            env_block_lines.append(f'ENV OTEL_LAMBDA_DISABLE_AWS_CONTEXT_PROPAGATION="true"')
+            env_block_lines.append('ENV OTEL_LAMBDA_DISABLE_AWS_CONTEXT_PROPAGATION="true"')
 
         env_block = "\n".join(env_block_lines)
 

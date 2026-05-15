@@ -50,6 +50,7 @@ SNAPSHOT="${SCRIPT_DIR}/../references/layer-versions.snapshot.json"
 failures=()
 warns=()
 infos=()
+[[ -n "${REALM}" ]] && infos+=("Realm: ${REALM}")
 
 # --- Snapshot freshness ---
 if [[ -f "${SNAPSHOT}" ]]; then

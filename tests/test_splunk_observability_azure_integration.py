@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import importlib.util
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -319,7 +318,6 @@ class TestAzureTemplateExample:
     def test_template_example_fails_on_placeholder_tenant(self):
         mod = _load_renderer()
         spec_text = TEMPLATE.read_text(encoding="utf-8")
-        import sys
         sys.path.insert(0, str(SKILL_DIR.parent.parent / "shared" / "lib"))
         from yaml_compat import load_yaml_or_json
         spec = load_yaml_or_json(spec_text, source=str(TEMPLATE))

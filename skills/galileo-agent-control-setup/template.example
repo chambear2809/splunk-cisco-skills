@@ -1,0 +1,42 @@
+# Galileo Agent Control Setup intake template.
+# Copy to template.local and fill in non-secret values only.
+api_version: galileo-agent-control-setup/v1
+
+agent_control:
+  server_url: "http://localhost:8000"
+  server_host: "0.0.0.0"
+  server_port: "8000"
+
+agent:
+  name: "splunk-governed-agent"
+  description: "Agent protected by Galileo Agent Control."
+
+runtime:
+  service_name: "agent-control-runtime"
+  deployment_environment: "production"
+  target_dir: ""
+
+otel:
+  endpoint: "http://localhost:4318/v1/traces"
+
+splunk:
+  platform: "enterprise"
+  hec_url: "https://splunk.example.com:8088/services/collector/event"
+  hec_token_name: "agent_control_events"
+  hec_allowed_indexes: "agent_control"
+  index: "agent_control"
+  source: "agent-control"
+  sourcetype: "agent_control:events:json"
+
+splunk_observability:
+  realm: "us0"
+
+collector:
+  cluster_name: "agent-control"
+
+secrets:
+  # File paths only. Do not put token values in this file.
+  agent_control_api_key_file: "/tmp/agent_control_api_key"
+  agent_control_admin_key_file: "/tmp/agent_control_admin_key"
+  splunk_hec_token_file: "/tmp/splunk_hec_token"
+  o11y_token_file: "/tmp/splunk_o11y_token"
