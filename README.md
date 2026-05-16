@@ -1,4 +1,4 @@
-# Splunk Platform and Cisco Skills
+# Splunk and Cisco Skills
 
 This repository is a working library of Cursor, Codex, and Claude Code agent
 skills, MCP tooling, intake templates, reference docs, and shell automation for
