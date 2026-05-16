@@ -48,6 +48,20 @@ Current component sources without 26.4 pathing:
 - Virtual Appliance Standard services: https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/install-splunk-appdynamics-services/standard-deployment
 - Virtual Appliance Hybrid services: https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/install-splunk-appdynamics-services/hybrid-deployment
 
+Virtual Appliance VMware operator coverage:
+
+- vSphere and ESXi OVA pages are currently published under 25.10 paths, while
+  the On-Premises platform, Enterprise Console, and Controller command-line
+  pages expose 26.4 paths. Do not relabel the VMware OVA docs as 26.4.
+- vSphere deployment requires three VM deployments from the OVA/OVF flow and
+  host configuration values for host name, host IP/subnet, default gateway,
+  DNS IP, and domain name.
+- ESXi deployment requires deploying the OVA-backed VMs and then bootstrapping
+  the node with `sudo appdctl host init` so the host details can be supplied.
+- The rendered VMware scripts are dry-run first. OVF Tool omits passwords from
+  the target locator and prompts interactively; govc reads a password file only
+  when `VMWARE_APPLY=1`.
+
 Owned surfaces:
 
 - On-Premises Controller lifecycle

@@ -1,0 +1,306 @@
+# Splunk Observability deep native workflows example.
+api_version: splunk-observability-deep-native-workflows/v1
+realm: us0
+
+context:
+  environment: prod
+  service: checkoutservice
+  application: checkout-web
+  database: checkout-postgres
+  synthetic_test_id: synthetic-checkout-browser
+
+workflows:
+  - surface: modern_dashboard
+    name: Checkout command center
+    audience: sre
+    dashboard: Checkout command center
+    sections:
+      - Reliability
+      - User experience
+      - Database queries
+      - Synthetic coverage
+    metrics:
+      - service.request.duration
+      - service.request.count
+      - service.error.count
+    logs:
+      query_language: SPL2
+      indexes:
+        - main
+      query: "from main where service.name='checkoutservice' and severity='error'"
+    service_map:
+      service: checkoutservice
+      environment: prod
+
+  - surface: apm_service_map
+    name: Checkout dependency map
+    service: checkoutservice
+    environment: prod
+    time_range: "-1h"
+    breakdowns:
+      - endpoint
+      - business_transaction
+
+  - surface: apm_service_view
+    name: Checkout service view review
+    service: checkoutservice
+    environment: prod
+    checks:
+      - success_rate_sli
+      - red_metrics
+      - dependency_latency
+      - runtime_metrics
+      - infrastructure_metrics
+      - endpoints
+      - embedded_logs
+
+  - surface: apm_business_transaction
+    name: Checkout business transaction rule
+    rule: checkout-flow
+    edition: enterprise
+    span_tags:
+      - checkout.flow
+      - customer_tier
+    checks:
+      - admin_role
+      - troubleshooting_metricset
+      - cardinality_analysis
+      - rule_enabled
+
+  - surface: apm_trace_waterfall
+    name: Slow checkout trace review
+    trace_id: abcdef0123456789
+    service: checkoutservice
+    include_segments: true
+    checks:
+      - span_filters
+      - rum_session_tab
+      - related_logs
+      - trace_download
+
+  - surface: apm_tag_spotlight
+    name: Checkout latency contributors
+    service: checkoutservice
+    environment: prod
+    indexed_tags:
+      - customer_tier
+      - payment_provider
+
+  - surface: apm_profiling_flamegraph
+    name: Checkout code profiling workflow
+    service: checkoutservice
+    environment: prod
+    checks:
+      - cpu_flame_graph
+      - memory_allocation
+      - trace_context
+      - runtime_support
+
+  - surface: rum_session_replay
+    name: Checkout rage-click replay
+    application: checkout-web
+    environment: prod
+    query: "app:checkout-web replay:present error:true"
+    metrics:
+      - rum.page_view.count
+      - rum.long_task.count
+    privacy:
+      consent_required: true
+      mask_all_text: true
+      review_sensitive_selectors: true
+
+  - surface: rum_error_analysis
+    name: Checkout browser error triage
+    application: checkout-web
+    error_id: js-error-placeholder
+    checks:
+      - javascript_error_id
+      - source_maps
+      - backend_errors
+      - related_sessions
+      - replay_pivot
+
+  - surface: rum_url_grouping
+    name: Checkout URL grouping migration
+    application: checkout-web
+    version: v2
+    rules:
+      - name: checkout-order
+        pattern: "https://shop.example.com/checkout/order/<w*>"
+      - name: checkout-hash-fragment
+        pattern: "https://shop.example.com/checkout#step=<*>&tenant=<w*>"
+    checks:
+      - impacted_dashboards
+      - impacted_detectors
+      - high_cardinality_patterns
+
+  - surface: rum_mobile
+    name: Checkout mobile crash workflow
+    application: checkout-mobile
+    platform: ios
+    checks:
+      - app_summary
+      - crashes
+      - session_timeline
+      - dsym_uploaded
+      - network_performance
+
+  - surface: db_query_explain_plan
+    name: Checkout DB query details
+    database: checkout-postgres
+    query_hash: normalized-query-placeholder
+    checks:
+      - queries_tab
+      - explain_plans
+      - query_samples
+      - traces
+      - infrastructure_correlation
+
+  - surface: synthetic_waterfall
+    name: Checkout synthetic run waterfall
+    test_id: synthetic-checkout-browser
+    test_type: browser
+    run_id: latest
+    artifacts:
+      - network.har
+      - video.mp4
+    checks:
+      - waterfall_resource_filters
+      - web_vitals
+      - apm_links
+
+  - surface: infrastructure_navigator
+    name: Checkout host navigator review
+    navigator: hosts
+    entity: checkout-host-placeholder
+    checks:
+      - active_streams
+      - built_in_dashboards
+      - active_alerts
+      - related_services
+
+  - surface: kubernetes_navigator
+    name: Checkout Kubernetes entity review
+    cluster: prod-cluster
+    namespace: checkout
+    workload: deployment/checkout-web
+    pod: checkout-web-placeholder
+    checks:
+      - collector_version
+      - k8s_analyzer
+      - events
+      - dependencies
+      - embedded_logs
+      - apm_service_pivot
+
+  - surface: network_explorer
+    name: Checkout network dependency review
+    cluster: prod-cluster
+    namespace: checkout
+    service: checkoutservice
+    checks:
+      - ebpf_gateway
+      - network_map
+      - tcp_retransmits
+      - dns_errors
+      - dropped_packets
+
+  - surface: related_content
+    name: Checkout related content validation
+    service: checkoutservice
+    environment: prod
+    metadata:
+      - service.name
+      - deployment.environment
+      - trace_id
+      - host.name
+      - k8s.cluster.name
+      - k8s.pod.name
+      - container.id
+    checks:
+      - apm_to_logs
+      - apm_to_kubernetes
+      - host_to_services
+      - trace_to_logs
+      - entity_index_mapping
+
+  - surface: ai_assistant_investigation
+    name: Checkout AI Assistant prompts
+    realm: us1
+    prompts:
+      - "What changed for checkoutservice latency in prod during the past hour?"
+      - "Find error traces for checkoutservice in prod."
+      - "Summarize Kubernetes pod restart signals for namespace checkout."
+    checks:
+      - realm_available
+      - org_policy
+      - svc_quota
+      - chat_id_capture
+
+  - surface: slo_creation
+    name: Checkout request success SLO
+    mode: api_apply
+    payload:
+      name: Checkout request success SLO
+      description: Request-based SLO for checkout successful spans.
+      type: RequestBased
+      inputs:
+        programText: |
+          G = data('spans.count', filter=filter('sf_service', 'checkoutservice') and filter('sf_error', 'false'))
+          T = data('spans.count', filter=filter('sf_service', 'checkoutservice'))
+        goodEventsLabel: G
+        totalEventsLabel: T
+      targets:
+        - type: RollingWindow
+          compliancePeriod: 30d
+          slo: 99.9
+          sloAlertRules:
+            - type: BREACH
+              rules:
+                - detectLabel: breach
+                  severity: Major
+                  description: Checkout SLO target breached.
+                  disabled: false
+                  notifications: []
+            - type: ERROR_BUDGET_LEFT
+              rules:
+                - detectLabel: budget_low
+                  severity: Critical
+                  description: Checkout error budget is nearly exhausted.
+                  disabled: false
+                  parameters:
+                    percentageErrorBudgetConsumed: 0.8
+                  notifications: []
+            - type: BURN_RATE
+              rules:
+                - detectLabel: burn_rate
+                  severity: Critical
+                  description: Checkout burn rate is too high.
+                  disabled: false
+                  parameters:
+                    burnRateThreshold_1: 14.4
+                    burnRateThreshold_2: 6
+                  notifications: []
+
+  - surface: observability_mobile_app
+    name: Mobile incident review
+    dashboards:
+      - Checkout command center
+      - APM Services
+    alert_severities:
+      - Critical
+      - Major
+    checks:
+      - dashboard_filters
+      - alert_details
+      - share_dashboard
+      - push_notification_handoff
+
+  - surface: log_observer_chart
+    name: Checkout error logs chart
+    dashboard: Checkout command center
+    query_language: SPL2
+    indexes:
+      - main
+    query: "from main where service.name='checkoutservice' and severity='error'"
+    visualization: log_timeline

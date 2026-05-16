@@ -59,6 +59,28 @@ Environment-specific notes:
 | `cisco-ucs-ta-setup` | Shared baseline. | Splunk app workflow access; UCS Manager host/account details and password file. |
 | `cisco-webex-setup` | Shared baseline. | Splunk app workflow access; Webex OAuth app, scopes, organization IDs, and secret files. |
 
+## Splunk AppDynamics
+
+| Skill | Additional local tooling | Live access and product requirements |
+| --- | --- | --- |
+| `splunk-appdynamics-setup` | Shared baseline; `PyYAML`. | AppDynamics Controller URL/account details for routing; no secrets in specs; child requirements inherit from selected owner skill. |
+| `splunk-appdynamics-platform-setup` | Shared baseline; optional `ssh` and platform CLIs for reviewed runbooks. | AppDynamics On-Premises or Virtual Appliance admin access; Enterprise Console mutation acceptance for platform changes. |
+| `splunk-appdynamics-controller-admin-setup` | Shared baseline; `curl`. | AppDynamics Controller admin/API access; OAuth client secrets and passwords in chmod-600 files. |
+| `splunk-appdynamics-agent-management-setup` | Shared baseline; optional `ssh` for reviewed host execution. | Smart Agent and Agent Management access; target host inventory; remote execution requires explicit acceptance. |
+| `splunk-appdynamics-apm-setup` | Shared baseline. | AppDynamics Controller API access; application/tier/runtime details; runtime source edits handled by downstream owners. |
+| `splunk-appdynamics-k8s-cluster-agent-setup` | `kubectl` or `oc`; optional `helm`. | Kubernetes cluster access; AppDynamics Controller account secret in Kubernetes; rollout requires explicit acceptance. |
+| `splunk-appdynamics-infrastructure-visibility-setup` | Shared baseline; optional host access for Machine Agent runbooks. | Controller access; host/container/network visibility details; host secrets in files. |
+| `splunk-appdynamics-database-visibility-setup` | Shared baseline; `curl`. | Database Visibility API access; database credentials in chmod-600 files referenced by collector specs. |
+| `splunk-appdynamics-analytics-setup` | Shared baseline; `curl`. | Analytics endpoint/global account; Events API key file; custom event publishing requires explicit acceptance. |
+| `splunk-appdynamics-eum-setup` | Shared baseline; optional app build tooling for source-map upload runbooks. | EUM app keys; source edits require explicit acceptance; source-map upload tokens in files. |
+| `splunk-appdynamics-synthetic-monitoring-setup` | `kubectl` or container runtime for Private Synthetic Agent paths. | Synthetic Monitoring access; PSA secrets in files or Kubernetes Secrets; private agent rollout reviewed before apply. |
+| `splunk-appdynamics-log-observer-connect-setup` | Shared baseline; Splunk Platform tools inherit from delegated skills. | AppDynamics LOC access; Splunk Cloud/Enterprise service-account and allow-list readiness. |
+| `splunk-appdynamics-alerting-content-setup` | Shared baseline. | Controller API access for health rules, policies, actions, and export snapshots. |
+| `splunk-appdynamics-dashboards-reports-setup` | Shared baseline. | Controller API/UI access for dashboards, reports, schedules, and War Rooms. |
+| `splunk-appdynamics-tags-extensions-setup` | Shared baseline; optional host access for Machine Agent extensions. | Controller tag API access; extension and third-party connector details; secrets in files. |
+| `splunk-appdynamics-security-ai-setup` | Shared baseline; downstream Observability/Cisco AI tools as needed. | Secure Application or Observability for AI entitlement/readiness; GPU and Cisco AI Pod handoff context. |
+| `splunk-appdynamics-sap-agent-setup` | Shared baseline; SAP Basis tools handled by operator runbooks. | SAP system details, transport/authorization readiness, and AppDynamics Controller access; SAP credentials in files. |
+
 ## Collectors And Forwarders
 
 | Skill | Additional local tooling | Live access and product requirements |
@@ -98,6 +120,7 @@ Environment-specific notes:
 | `splunk-observability-cisco-nexus-integration` | `kubectl`, `helm`, `yq`; optional `ssh` and `nc` for device checks. | Splunk Observability token files; Nexus/NX-OS device SSH credentials via Kubernetes Secret; collector cluster access. |
 | `splunk-observability-cloud-integration-setup` | `acs`, `curl`, `openssl`; optional `docker` for companion local checks. | Splunk Cloud/Enterprise REST access; Splunk Observability admin/org/user token files; Log Observer Connect and SIM add-on prerequisites. |
 | `splunk-observability-dashboard-builder` | `PyYAML` for YAML specs. | Splunk Observability API token file with dashboard permissions; target realm/org. |
+| `splunk-observability-deep-native-workflows` | `PyYAML` for YAML specs. | Splunk Observability realm; optional token files only for downstream owning skills if API apply is later executed. |
 | `splunk-observability-database-monitoring-setup` | `kubectl`, `helm`; `PyYAML`. | Splunk Observability token files; database endpoint details; DB credentials in Kubernetes Secrets or local secret files. |
 | `splunk-observability-gcp-integration` | `gcloud`; optional `terraform`; `curl`. | Authenticated gcloud CLI session; Splunk Observability admin/user token files; GCP Service Account key file (chmod 600) or Workload Identity Federation pool/provider; GCP project IDs. |
 | `splunk-observability-isovalent-integration` | `kubectl` or `oc`, `helm`, `yq`; optional `jq` and `aws`. | Splunk Observability token files; installed Cilium/Tetragon/Hubble stack; optional Splunk HEC token/index for Tetragon logs. |

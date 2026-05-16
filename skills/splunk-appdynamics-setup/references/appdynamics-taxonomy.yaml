@@ -168,6 +168,22 @@ features:
     status: api_apply
     validation_method: User, group, role, and permission readback plus SAML/LDAP configuration checklist
     apply_boundary: API-backed objects apply through Controller APIs; IdP-side SAML/LDAP changes are runbooks.
+  - id: appd_controller_local_credential_reauth
+    family: Controller Admin
+    feature: Local-credential user-management password re-entry for Controller administrators
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: render_runbook
+    validation_method: Admin runbook confirms local-credential administrators re-enter the current password before modifying users and that automation does not bypass the UI control
+    apply_boundary: User modification remains API/UI-controlled; local credential reauthentication is an operator validation step.
+  - id: appd_edit_application_name_permission
+    family: Controller Admin
+    feature: Edit Applications Name permission for APM application renaming
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: api_apply
+    validation_method: Role export/readback confirms Admin and Administrator defaults and custom roles explicitly grant or omit Edit Applications Name
+    apply_boundary: Role changes use documented RBAC APIs or runbook review; no blind privilege broadening.
   - id: appd_licensing_rules
     family: Licensing
     feature: Licensing, subscriptions, license rules, and consumption validation
@@ -176,6 +192,14 @@ features:
     status: api_apply
     validation_method: License usage, rule, and entitlement readbacks
     apply_boundary: Documented license-rule APIs may apply; procurement and entitlement changes are not automated.
+  - id: appd_licensing_storage_usage_metrics
+    family: Licensing
+    feature: Application-level storage usage metrics for Agent-based Licensing accounts
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: validate_only
+    validation_method: Metric Browser readback for Usage(Bytes) and Usage(Count) across Transaction Analytics, Browser RUM, and Mobile RUM with Events Service 26.1.0+ readiness
+    apply_boundary: Support-gated Controller property enablement is not automated; the skill renders validation and handoff only.
   - id: appd_sensitive_data_collection_security
     family: Controller Admin
     feature: Sensitive data collection controls, privacy settings, SQL/log masking, and data collection dashboard validation
@@ -184,6 +208,14 @@ features:
     status: render_runbook
     validation_method: Raw SQL suppression, query literal hiding, error-log exclusion, Log Analytics masking, environment-variable filters, RBAC, and Data Collection Dashboard review
     apply_boundary: Privacy and data-collection controls are rendered as reviewed runbooks; agent, analytics, and database changes delegate to their child owners.
+  - id: appd_machine_agent_tag_rbac
+    family: Controller Admin
+    feature: Machine Agent tag-based RBAC for View Agent and Edit Agent permissions
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: api_apply
+    validation_method: Role, permission, and host-tag readbacks confirm Machine Agent access is constrained by approved tags
+    apply_boundary: Tag and RBAC changes are applied only through documented APIs or reviewed UI runbooks; host tag sources delegate to infrastructure owners.
   - id: appd_smart_agent_readiness
     family: Agent Management
     feature: Smart Agent prerequisites, supported platforms, supported agents, permissions, memory, disk, and license readiness
@@ -264,6 +296,22 @@ features:
     status: cli_apply
     validation_method: Lifecycle plan validates agent type aliases, local or remote command shape, download source, service/process mode, upgrade source, uninstall path, rollback eligibility, and post-action Controller state
     apply_boundary: Commands are generated for review; remote execution requires --accept-remote-execution and rollback is limited to supported prior-version state.
+  - id: appd_agent_upgrade_api
+    family: Agent Management
+    feature: Agent Upgrade API planning for Smart Agent managed agent upgrades
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: api_apply
+    validation_method: Upgrade API plan validates Smart Agent inventory, target agent versions, file-backed OAuth token use, post-upgrade version readback, and rollback package readiness
+    apply_boundary: Upgrade API mutations require reviewed targets and remote-execution acceptance where host changes are involved; the rendered plan is dry-run by default.
+  - id: appd_agent_license_release_reacquire
+    family: Agent Management
+    feature: Supported agent license release on disable and reacquire on enable
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: validate_only
+    validation_method: Disable/enable runbook records support-gated feature flag, license pool before and after counts, managed-agent state, and reacquisition behavior
+    apply_boundary: License release/reacquire is support-gated and never used as an automated balancing action without operator approval.
   - id: appd_smartagentctl_remote_yaml_security
     family: Agent Management
     feature: smartagentctl remote.yaml, max concurrency, Linux SSH, Windows WinRM, SSH password environment variables, known hosts, and HTTP or SOCKS5 SSH proxy support
@@ -440,6 +488,14 @@ features:
     status: k8s_apply
     validation_method: File-backed O11y token secret, realm and environment values, collector logs, OTLP service reachability, and O11y API or UI readback
     apply_boundary: O11y token and collector rollout require --accept-k8s-rollout; token values are never rendered and deep collector tuning delegates to splunk-observability-otel-collector-setup.
+  - id: appd_cluster_agent_k8s_event_visibility
+    family: Kubernetes
+    feature: Cluster Agent enhanced Kubernetes event visibility when Kubernetes alerting is enabled
+    owner: splunk-appdynamics-k8s-cluster-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes
+    status: k8s_apply
+    validation_method: Cluster Agent release runbook validates Kubernetes alerting enablement, event visibility in Controller, namespace scoping, and Cluster Agent/Operator compatibility
+    apply_boundary: Cluster Agent rollout requires --accept-k8s-rollout; Controller-side alerting enablement remains a reviewed admin runbook.
   - id: appd_machine_agent_server_visibility
     family: Infrastructure Visibility
     feature: Machine Agent and Server Visibility host metrics
@@ -520,6 +576,38 @@ features:
     status: validate_only
     validation_method: DB server/node/event API readback and metric query
     apply_boundary: Server/node lifecycle is observed through agents; this row validates only.
+  - id: appd_dbmon_vault_access_keys
+    family: Database Visibility
+    feature: HashiCorp Vault access-key readiness for Database Visibility collector credentials
+    owner: splunk-appdynamics-database-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes
+    status: render_runbook
+    validation_method: Readiness YAML records Vault secret path ownership, access-key file handling, Database Agent log confirmation, and collector password resolution
+    apply_boundary: Vault policy, token, and secret writes remain external secret-store handoffs; token values are never rendered.
+  - id: appd_dbmon_postgres_blocking_sessions
+    family: Database Visibility
+    feature: PostgreSQL Blocking Session visibility in Database Monitoring
+    owner: splunk-appdynamics-database-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes
+    status: validate_only
+    validation_method: DBMon readiness validates supported PostgreSQL collectors, blocking-session tab/data, query/session metadata, and alerting handoff
+    apply_boundary: Collector setup can apply through redacted payloads; database workload/blocking behavior is observed only.
+  - id: appd_dbmon_mongodb_query_executor_metrics
+    family: Database Visibility
+    feature: MongoDB QueryExecutor metrics
+    owner: splunk-appdynamics-database-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes
+    status: validate_only
+    validation_method: DBMon readiness validates QueryExecutor metric path visibility, index/cardinality sanity, and dashboard or health-rule handoff
+    apply_boundary: Metrics are readback validation; MongoDB configuration changes remain database-owner handoffs.
+  - id: appd_dbmon_sqlserver_db2_support
+    family: Database Visibility
+    feature: Microsoft SQL Server 2025 support and DB2 driver selection by Database Agent JRE
+    owner: splunk-appdynamics-database-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes
+    status: render_runbook
+    validation_method: Readiness YAML records SQL Server 2025 collector validation and DB2 db2jcc.jar versus db2jcc4.jar selection by JRE level
+    apply_boundary: Driver placement and database collector changes are reviewed operator actions with redacted credential payloads.
   - id: appd_transaction_analytics
     family: Analytics
     feature: Transaction Analytics schemas, ADQL, and query validation
@@ -568,6 +656,14 @@ features:
     status: render_runbook
     validation_method: App key inventory, page beacon probe, and browser analytics readback
     apply_boundary: Source edits require --accept-eum-source-edit; default is snippet rendering only.
+  - id: appd_core_web_vitals_inp
+    family: End User Monitoring
+    feature: Core Web Vitals Interaction to Next Paint replacement for First Input Delay in Browser RUM
+    owner: splunk-appdynamics-eum-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: render_runbook
+    validation_method: Core Web Vitals runbook validates INP, LCP, CLS, percentile widgets, Metric Browser paths, Browser RUM dashboards, and alerting handoff
+    apply_boundary: Browser source instrumentation remains snippet/runbook-first; alert content delegates to alerting setup.
   - id: appd_mobile_rum
     family: End User Monitoring
     feature: Mobile RUM for iOS, Android, React Native, Flutter, and .NET MAUI
@@ -624,6 +720,14 @@ features:
     status: k8s_apply
     validation_method: PSA pod/container status, Shepherd connectivity, and agent registration checks
     apply_boundary: Kubernetes/container rollout is rendered; operator applies reviewed manifests.
+  - id: appd_private_synthetic_agent_26_4_runtime
+    family: Synthetic Monitoring
+    feature: Private Synthetic Agent 26.4 Podman, Chrome Headful mode, Kubernetes StorageClass flag, and Chrome 147 validation
+    owner: splunk-appdynamics-synthetic-monitoring-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes
+    status: render_runbook
+    validation_method: PSA 26.4 runbook validates runtime choice, headful/headless behavior, StorageClass policy, Chrome version, screenshots, and waterfall artifacts
+    apply_boundary: Container or Kubernetes runtime changes remain reviewed operator actions; no unapproved PSA rollout.
   - id: appd_log_observer_connect
     family: Log Observer Connect
     feature: Splunk Log Observer Connect for Splunk AppDynamics configuration
@@ -656,6 +760,22 @@ features:
     status: api_apply
     validation_method: Policy/action/suppression readback and sample notification checklist
     apply_boundary: Documented APIs apply; external notification targets are handoffs.
+  - id: appd_alert_template_db_hostname
+    family: Alerting
+    feature: Database health-rule notification hostname variable latestEvent.eventProperties.hostname
+    owner: splunk-appdynamics-alerting-content-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: api_apply
+    validation_method: Template-variable runbook validates sample violation payloads, database hostname rendering, downstream action content, and rollback export
+    apply_boundary: Alert template changes require exported rollback snapshots and responder approval before apply.
+  - id: appd_core_web_vitals_alerting
+    family: Alerting
+    feature: Core Web Vitals INP/LCP/CLS health-rule and custom alert coverage
+    owner: splunk-appdynamics-alerting-content-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: render_runbook
+    validation_method: Alerting runbook validates INP, LCP, CLS metric paths, percentile thresholds, policy binding, and FID legacy carve-out
+    apply_boundary: Browser RUM instrumentation delegates to EUM; health-rule apply uses exported rollback snapshots and approved thresholds.
   - id: appd_alerting_import_export
     family: Alerting
     feature: Alerting content import, export, versioning, and rollback
@@ -688,6 +808,14 @@ features:
     status: api_apply
     validation_method: Dashboard inventory/readback and widget count checks
     apply_boundary: API-backed dashboards apply; Dash Studio assets delegate where appropriate.
+  - id: appd_dash_studio_26_4_widgets
+    family: Dashboards Reports
+    feature: Dash Studio 26.4 time-series standard-deviation bands and ADQL autocomplete
+    owner: splunk-appdynamics-dashboards-reports-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: render_runbook
+    validation_method: Dash Studio runbook validates standard-deviation band rendering, ADQL autocomplete query construction, widget readback, and ThousandEyes widget regression checks
+    apply_boundary: Dash Studio UI-only enhancements render review steps; API-backed dashboards apply only where documented.
   - id: appd_reports_scheduled_reports
     family: Dashboards Reports
     feature: Reports, scheduled reports, and report delivery validation
@@ -696,6 +824,14 @@ features:
     status: render_runbook
     validation_method: Report inventory, schedule checklist, and delivery validation
     apply_boundary: UI-only report operations render runbooks.
+  - id: appd_reports_tls_direct_download
+    family: Dashboards Reports
+    feature: Reports direct PDF download and HTTPS image TLS certificate validation
+    owner: splunk-appdynamics-dashboards-reports-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: render_runbook
+    validation_method: Reports runbook validates direct download, schedule delivery, image URL TLS certificate behavior, and recipient permissions
+    apply_boundary: Report operations remain UI/runbook-first; external image certificate remediation delegates to asset owners.
   - id: appd_war_rooms
     family: Dashboards Reports
     feature: War Rooms and collaborative troubleshooting views
@@ -712,6 +848,14 @@ features:
     status: delegated_apply
     validation_method: ThousandEyes integration toggle readiness, token handoff checklist, Dash Studio query/widget validation, test/account-group selection, and ThousandEyes deeplink checks
     apply_boundary: AppDynamics dashboard binding renders runbooks; ThousandEyes-side tests, tokens, streams, and dashboards delegate to ThousandEyes skills and secret-file handoffs.
+  - id: appd_log_tail_widget_deprecation
+    family: Dashboards Reports
+    feature: Deprecated Log Tail widgets and replacement planning
+    owner: splunk-appdynamics-dashboards-reports-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes
+    status: render_runbook
+    validation_method: Log Tail deprecation runbook inventories deprecated widgets and validates Log Observer Connect, Analytics/ADQL, or Splunk Platform replacements
+    apply_boundary: Deprecated widget replacement is rendered as a dashboard migration runbook and log-source handoff.
   - id: appd_custom_tag_api
     family: Tags Extensions
     feature: Custom Tag APIs, tag enablement, and tag propagation validation
@@ -768,6 +912,14 @@ features:
     status: delegated_apply
     validation_method: GenAI framework, GPU telemetry, and Cisco AI Pod readiness checks
     apply_boundary: AI/GPU platform wiring delegates to Observability AI and Cisco AI Pod skills.
+  - id: appd_cisco_ai_pod_monitoring
+    family: Security AI
+    feature: Cisco AI POD monitoring handoff for AppDynamics Observability for AI and Splunk Observability telemetry
+    owner: splunk-appdynamics-security-ai-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/observability-for-ai/26.4.0/splunk-appdynamics-observability-for-ai/supported-ai-components
+    status: delegated_apply
+    validation_method: Cisco AI POD runbook validates UCS/Intersight, Nexus, NVIDIA GPU, NIM/vLLM, storage, vector store, APM tier, OTel service, and O11y dimension correlation
+    apply_boundary: AI POD infrastructure telemetry delegates to Cisco AI Pod, NVIDIA GPU, Nexus, and Intersight observability skills; AppDynamics side renders correlation validation.
   - id: appd_sap_agent
     family: SAP Agent
     feature: SAP Agent install, Controller registration, and metrics validation

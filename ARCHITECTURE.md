@@ -105,7 +105,12 @@ The current skills fall into eight architectural roles:
   `cisco-enterprise-networking-setup`, `splunk-itsi-config`, and
   `splunk-enterprise-security-config`. Splunk Observability dashboard planning
   is covered by `splunk-observability-dashboard-builder`, which does not target
-  a Splunk Platform runtime role. Native Observability operations are covered by
+  a Splunk Platform runtime role. Deep native Observability product journeys are
+  covered by `splunk-observability-deep-native-workflows`, which renders
+  UI-aware workflow packets, coverage reports, deeplinks, and API action plans
+  for modern dashboards, APM, RUM, DBMon, Synthetics, SLOs, Infrastructure and
+  Kubernetes navigators, Network Explorer, Related Content, AI Assistant, logs
+  charts, and mobile app flows. Native Observability operations are covered by
   `splunk-observability-native-ops`, which renders supported API payloads,
   validation requests, deeplinks, and handoffs for UI-only surfaces.
 - **External collector skills** — prepare Splunk-side objects and render
@@ -581,6 +586,16 @@ kept in local secret files.
 Observability Cloud dashboards. It renders and validates classic dashboard API
 payloads and can apply them only when explicitly requested, but it does not
 install collectors or belong on a Splunk Enterprise role.
+
+`splunk-observability-deep-native-workflows` is the UI-aware product workflow
+companion. It renders coverage-first packets for modern dashboard composition,
+APM service maps/service views/business transactions/trace waterfalls/profiling,
+RUM session replay/error analysis/URL grouping/mobile RUM, DBMon query and
+explain-plan triage, Synthetic waterfall artifacts, SLO creation,
+Infrastructure and Kubernetes navigators, Network Explorer, Related Content, AI
+Assistant, modern logs charts, and Observability Cloud Mobile app workflows. It
+owns deeplinks, public API validation action plans, and downstream handoffs, not
+runtime placement.
 
 `splunk-observability-native-ops` is the native operations companion. It covers
 detectors, alert routing, Synthetics, APM topology and trace workflows, RUM

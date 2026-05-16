@@ -12,6 +12,8 @@ Taxonomy rows owned by this skill:
 - `appd_agent_management_auto_attach`
 - `appd_agent_management_auto_discovery`
 - `appd_smartagentctl_lifecycle`
+- `appd_agent_upgrade_api`
+- `appd_agent_license_release_reacquire`
 - `appd_smartagentctl_remote_yaml_security`
 - `appd_smart_agent_cli_deprecated`
 - `appd_agent_downloads_package_validation`

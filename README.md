@@ -131,6 +131,13 @@ Common starting points:
   `skills/splunk-observability-dashboard-builder/` to turn an operational goal
   into validated classic Observability dashboard API payloads, with modern
   dashboard features called out as advisory work.
+- If you need deep native Splunk Observability Cloud product workflows, use
+  `skills/splunk-observability-deep-native-workflows/` for UI-aware packets
+  covering modern dashboards, APM service maps/service views/business
+  transactions/trace waterfalls/profiling, RUM replay/errors/URL grouping/mobile
+  RUM, DBMon explain-plan triage, Synthetic waterfalls, SLO API payloads,
+  Infrastructure/Kubernetes/Network Explorer, Related Content, AI Assistant,
+  modern logs charts, and Observability Cloud Mobile app handoffs.
 - If you need native Splunk Observability Cloud operations, use
   `skills/splunk-observability-native-ops/` for detectors, alert routing,
   Synthetics tests and artifacts, APM topology/traces, RUM sessions, modern
@@ -262,23 +269,23 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision inputs |
 | `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards |
 | `cisco-appdynamics-setup` | `Splunk_TA_AppDynamics` | Configure AppDynamics controller and analytics connections, inputs, and dashboards |
-| `splunk-appdynamics-setup` | AppDynamics suite router | Route AppDynamics requests, enforce taxonomy coverage, orchestrate child skills, and emit doctor reports |
-| `splunk-appdynamics-platform-setup` | AppDynamics On-Premises / Virtual Appliance | Render Enterprise Console, Controller, Events Service, EUM Server, Synthetic Server, HA, upgrade, and secure platform runbooks |
-| `splunk-appdynamics-controller-admin-setup` | AppDynamics Controller administration | Configure and validate API clients, OAuth, users, groups, roles, SAML, LDAP, permissions, licensing, and license rules |
-| `splunk-appdynamics-agent-management-setup` | Smart Agent / Agent Management | Render Smart Agent remote install, upgrade, rollback, and managed .NET, Database, Java, Machine, and Node.js agent plans |
-| `splunk-appdynamics-apm-setup` | AppDynamics APM | Configure and validate business applications, tiers, nodes, business transactions, endpoints, remote services, information points, snapshots, metrics, and app-server snippets |
+| `splunk-appdynamics-setup` | AppDynamics suite router | Route AppDynamics requests, enforce taxonomy coverage, orchestrate child skills, and emit doctor reports for SaaS, On-Premises, release/reference, product-announcement, API, security, AI, SAP, and Splunk Platform paths |
+| `splunk-appdynamics-platform-setup` | AppDynamics On-Premises / Virtual Appliance | Render On-Premises overview, release/reference, deployment planning, platform quickstart, Enterprise Console, Controller, Events Service, EUM Server, Synthetic Server, HA, upgrade, and secure platform runbooks |
+| `splunk-appdynamics-controller-admin-setup` | AppDynamics Controller administration | Configure and validate API clients, OAuth, users, groups, roles, SAML, LDAP, permissions, licensing, license rules, sensitive data controls, and tenant admin plans |
+| `splunk-appdynamics-agent-management-setup` | Smart Agent / Agent Management | Render Smart Agent remote install, upgrade, rollback, software download/package validation, and managed .NET, Database, Java, Machine, and Node.js agent plans |
+| `splunk-appdynamics-apm-setup` | AppDynamics APM | Configure and validate business applications, tiers, nodes, business transactions, endpoints, remote services, information points, snapshots, metrics, app-server snippets, serverless monitoring, and Splunk AppDynamics for OpenTelemetry |
 | `splunk-appdynamics-k8s-cluster-agent-setup` | AppDynamics Cluster Agent | Render Cluster Agent, Kubernetes auto-instrumentation, Splunk OTel Collector, and workload rollout validation assets |
-| `splunk-appdynamics-infrastructure-visibility-setup` | AppDynamics Infrastructure Visibility | Render Machine Agent, Server Visibility, Network Visibility, Docker/container visibility, service availability, tags, and infrastructure health rules |
+| `splunk-appdynamics-infrastructure-visibility-setup` | AppDynamics Infrastructure Visibility | Render Machine Agent, Server Visibility, Network Visibility, Docker/container visibility, service availability, tags, GPU monitoring, Prometheus extension, and infrastructure health rules |
 | `splunk-appdynamics-database-visibility-setup` | AppDynamics Database Visibility | Render Database Agent readiness, redacted Database Visibility API collector payloads, and DB server/node/event validation |
 | `splunk-appdynamics-analytics-setup` | AppDynamics Analytics | Render Transaction, Log, Browser, Mobile, Synthetic, IoT/Connected Devices Analytics, ADQL, Events API schemas, publish, and query validation |
 | `splunk-appdynamics-eum-setup` | AppDynamics EUM / RUM | Render Browser RUM, Mobile RUM, IoT RUM, app keys, JS injection, mobile snippets, Browser and Mobile Session Replay, source maps, and beacon validation |
 | `splunk-appdynamics-synthetic-monitoring-setup` | AppDynamics Synthetic Monitoring | Render Browser Synthetic, Synthetic API Monitoring, hosted and private agents, PSA Docker/Kubernetes/Minikube assets, Shepherd URLs, and run validation |
 | `splunk-appdynamics-log-observer-connect-setup` | AppDynamics Log Observer Connect | Render LOC setup, legacy Splunk integration detection/disablement, Splunk service-account handoffs, and deep-link validation |
-| `splunk-appdynamics-alerting-content-setup` | AppDynamics alerting content | Render health rules, schedules, policies, actions, email digests, suppression, import/export, rollback, and validation |
-| `splunk-appdynamics-dashboards-reports-setup` | AppDynamics dashboards and reports | Render custom dashboards, Dash Studio handoffs, reports, scheduled reports, War Rooms, and dashboard/report validation |
+| `splunk-appdynamics-alerting-content-setup` | AppDynamics alerting content | Render health rules, schedules, policies, actions, email digests, suppression, import/export, rollback, anomaly detection, AIML baselines, automated diagnostics, and validation |
+| `splunk-appdynamics-dashboards-reports-setup` | AppDynamics dashboards and reports | Render custom dashboards, Dash Studio handoffs, ThousandEyes dashboard integration, reports, scheduled reports, War Rooms, and dashboard/report validation |
 | `splunk-appdynamics-tags-extensions-setup` | AppDynamics tags and extensions | Render Custom Tag APIs, tag enablement, Integration Modules, extensions, Machine Agent custom metrics, and external integration runbooks |
-| `splunk-appdynamics-security-ai-setup` | AppDynamics security and AI | Render Cisco Secure Application, Secure Application for OTel Java, Observability for AI, GenAI, GPU, and Cisco AI Pod handoffs |
-| `splunk-appdynamics-sap-agent-setup` | AppDynamics SAP Agent | Render SAP Agent, ABAP Agent, local and gateway HTTP SDK, SNP CrystalBridge, BiQ Collector, NetWeaver transports, authorization, and validation runbooks |
+| `splunk-appdynamics-security-ai-setup` | AppDynamics security and AI | Render Application Security Monitoring, Secure Application policies/APIs, Secure Application for OTel Java, Observability for AI, GenAI, GPU, and Cisco AI Pod handoffs |
+| `splunk-appdynamics-sap-agent-setup` | AppDynamics SAP Agent | Render SAP Agent, ABAP Agent, local and gateway HTTP SDK, SNP CrystalBridge, BiQ Collector, NetWeaver transports, authorization, release-note, compatibility, and validation runbooks |
 | `cisco-security-cloud-setup` | `CiscoSecurityCloud` | Install and configure product-specific Cisco Security Cloud inputs with dashboard-ready defaults |
 | `cisco-secure-access-setup` | `cisco-cloud-security` + `TA-cisco-cloud-security-addon` | Install and configure Secure Access org accounts, event add-on prerequisites, app settings, and dashboard prerequisites |
 | `cisco-webex-setup` | `ta_cisco_webex_add_on_for_splunk` + `cisco_webex_meetings_app_for_splunk` | Configure Webex OAuth accounts, dashboard indexes/macros, and REST inputs for meetings, audit, qualities, calling, generic endpoints, and Contact Center |
@@ -338,6 +345,7 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-observability-gcp-integration` | GCP -> Splunk Observability Cloud | Render, apply, validate, discover, and diagnose the GCP Cloud Monitoring integration. REST type=GCP; SERVICE_ACCOUNT_KEY or WORKLOAD_IDENTITY_FEDERATION authMethod; projectKey redacted on GET; 32-service enum; pollRate 60–600s; Terraform signalfx_gcp_integration; gcloud SA creation + IAM binding scripts; WIF realm-to-principal map; handoffs for Splunkbase 3088 (GCP logs), GKE OTel collector. |
 | `splunk-observability-aws-lambda-apm-setup` | AWS Lambda -> Splunk Observability Cloud APM | Render, validate, and optionally apply Splunk OTel Lambda layer (`signalfx/splunk-otel-lambda`, beta, publisher `254067382080`) APM instrumentation. Node.js/Python/Java runtimes, x86_64/arm64, exec-wrapper wiring, Secrets Manager/SSM token delivery, vendor/ADOT conflict detection, Terraform/CloudFormation/AWS CLI variants, rollback, doctor. |
 | `splunk-observability-dashboard-builder` | Splunk Observability Cloud dashboards | Render, validate, and optionally apply classic Observability dashboard groups, charts, and dashboards from natural-language, JSON, or YAML specs |
+| `splunk-observability-deep-native-workflows` | Splunk Observability Cloud deep native workflows | Render and validate full native product workflow packets for modern dashboards, APM service maps/service views/business transactions/trace waterfalls/profiling, RUM replay/errors/URL grouping/mobile RUM, DBMon query/explain-plan triage, Synthetic waterfall artifacts, SLO API payloads, Infrastructure/Kubernetes/Network Explorer, Related Content, AI Assistant, modern logs charts, and Observability Cloud Mobile app handoffs; emits API-vs-UI coverage reports, deeplinks, apply plans, and downstream skill handoffs |
 | `splunk-observability-native-ops` | Splunk Observability Cloud native operations | Render, validate, and optionally apply supported native Observability operations for detectors, alert routing, Synthetics, APM, RUM, logs, and On-Call handoffs |
 | `splunk-oncall-setup` | Splunk On-Call (formerly VictorOps) | Render, validate, and apply On-Call teams, users, rotations, escalation policies, routing keys, incidents, REST/email alert payloads, and Splunk-side companion app handoffs |
 | `splunk-stream-setup` | Splunk Stream stack | Install and configure Splunk Stream components |
@@ -966,6 +974,7 @@ splunk-cisco-skills/
 │   ├── splunk-observability-cloud-integration-setup/
 │   ├── splunk-observability-dashboard-builder/
 │   ├── splunk-observability-database-monitoring-setup/
+│   ├── splunk-observability-deep-native-workflows/
 │   ├── splunk-observability-gcp-integration/
 │   ├── splunk-observability-isovalent-integration/
 │   ├── splunk-observability-k8s-auto-instrumentation-setup/
@@ -1038,8 +1047,9 @@ bash agent/register-codex-splunk-cisco-skills-mcp.sh
 ```
 
 Read-only plans include help output, validation/list scripts, Cisco product
-dry-runs/lists, and allowlisted render/preflight/status/validate/dry-run
-previews. They can run with explicit client confirmation. Plans are single-use:
+dry-runs/lists, AppDynamics render/doctor/rollback coverage plans, and
+allowlisted render/preflight/status/validate/dry-run previews. They can run
+with explicit client confirmation. Plans are single-use:
 each plan hash is consumed when it executes, and plan hashes expire after one
 hour by default (`MCP_PLAN_TTL_SECONDS`; set `0` to disable expiry). To allow
 mutating setup, install, or configure scripts, start the MCP server process with:
@@ -1164,6 +1174,15 @@ the `handoffs.lambda_apm` stub from the AWS integration skill.
 `splunk-observability-dashboard-builder` is separate from runtime placement: it
 renders and validates native Observability Cloud dashboard API payloads and can
 apply them only when explicitly requested.
+`splunk-observability-deep-native-workflows` covers UI-aware native product
+journeys that are deeper than detector/dashboard object lifecycle: modern
+dashboard composition, APM service maps/service views/business
+transactions/trace waterfalls/profiling, RUM replay/errors/URL grouping/mobile
+RUM, DBMon explain-plan triage, Synthetic waterfalls, SLO payloads,
+Infrastructure/Kubernetes/Network Explorer, Related Content, AI Assistant, logs
+charts, and the Observability Cloud Mobile app. It emits coverage reports,
+deeplinks, API action plans, and downstream handoffs instead of claiming runtime
+placement.
 `splunk-observability-native-ops` follows the same no-runtime-placement model
 for native Observability operations: it renders supported API payloads, API
 validation requests, deeplinks, and deterministic operator handoffs for UI-only

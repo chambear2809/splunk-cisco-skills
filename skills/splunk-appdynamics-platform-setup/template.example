@@ -31,6 +31,7 @@ virtual_appliance:
   node_count: 3
   image_file: /secure/appdynamics/appd-va.ova
   dns_domain: va.example.com
+  subnet_prefix: "24"
   node_ips:
     - 10.0.10.11
     - 10.0.10.12
@@ -38,6 +39,32 @@ virtual_appliance:
   gateway_ip: 10.0.10.1
   dns_server_ip: 10.0.10.53
   license_file: /secure/appdynamics/license.lic
+  vmware:
+    # Use vmware_vsphere for vCenter or vmware_esxi for a standalone ESXi host.
+    vcenter_url: https://vcenter.example.com/sdk
+    vcenter_host: vcenter.example.com
+    vcenter_username_file: /secure/vmware/vcenter-username
+    vcenter_password_file: /secure/vmware/vcenter-password
+    datacenter: DC1
+    cluster: AppD-Cluster
+    resource_pool: Resources
+    vm_folder: AppDynamics
+    datastore: datastore1
+    network: "VM Network"
+    disk_provisioning: thin
+    power_on: true
+    allow_insecure_tls: false
+    # Optional: set after `ovftool --probe appd-va.ova` or govc import.spec.
+    ovf_source_network: ""
+    ovf_property_hostname_key: ""
+    ovf_property_host_ip_cidr_key: ""
+    ovf_property_gateway_key: ""
+    ovf_property_dns_key: ""
+    ovf_property_domain_key: ""
+    esxi:
+      esxi_host: esxi.example.com
+      esxi_username_file: /secure/vmware/esxi-username
+      esxi_password_file: /secure/vmware/esxi-password
 
 enterprise_console:
   host: ec.example.com

@@ -565,7 +565,7 @@
         "splunkbase_id": "N/A",
         "cloud_install_path": "No Splunk Cloud app install; standalone reusable skill (RUM beacons direct to rum-ingest.<realm>.observability.splunkcloud.com) that renders Splunk Browser RUM (@splunk/otel-web 2.x) + Session Replay (Splunk recorder) injection assets for customer-managed Kubernetes clusters",
         "cloud_config_path": "Rendered K8s manifests for one of four injection modes (nginx pod-side ConfigMap with sub_filter, ingress-nginx configuration-snippet annotation, busybox+emptyDir initContainer rewriter for distroless, runtime-config ConfigMap for npm-bundled SDK), injection-backup ConfigMap, full SplunkRum.init + Frustration Signals 2.0 + Session Replay surfaces, JavaScript source-map upload helper wrapping the splunk-rum CLI + @splunk/rum-build-plugins Webpack plugin, RUM-to-APM Server-Timing trace-linking validation",
-        "notes": "Splunk Browser RUM + Session Replay injection. NOT AppDynamics BRUM (handled by cisco-appdynamics-setup). Two distinct credential files: SPLUNK_O11Y_RUM_TOKEN_FILE for the browser-embedded RUM token, SPLUNK_O11Y_TOKEN_FILE reused for the server-to-server source-map upload. Hands off RUM dashboards to splunk-observability-dashboard-builder, RUM detectors to splunk-observability-native-ops, the SIM rum modular input to splunk-observability-cloud-integration-setup, and RUM-to-APM trace linking to splunk-observability-k8s-auto-instrumentation-setup."
+        "notes": "Splunk Browser RUM + Session Replay injection. NOT AppDynamics BRUM (handled by splunk-appdynamics-eum-setup). Two distinct credential files: SPLUNK_O11Y_RUM_TOKEN_FILE for the browser-embedded RUM token, SPLUNK_O11Y_TOKEN_FILE reused for the server-to-server source-map upload. Hands off RUM dashboards to splunk-observability-dashboard-builder, RUM detectors to splunk-observability-native-ops, the SIM rum modular input to splunk-observability-cloud-integration-setup, and RUM-to-APM trace linking to splunk-observability-k8s-auto-instrumentation-setup."
       },
       {
         "kind": "workflow",
@@ -575,6 +575,15 @@
         "cloud_install_path": "No Splunk Cloud app install; renders Splunk Observability Cloud dashboard groups, charts, dashboards, and apply plans",
         "cloud_config_path": "Validate and optionally apply classic Observability dashboard API payloads; access tokens stay file-based and are never placed in chat or command arguments",
         "notes": "Dashboard composition workflow for Observability dashboard groups, charts, variables, detector links, runbooks, rendered API payloads, and optional applies."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-observability-deep-native-workflows",
+        "label": "`splunk-observability-deep-native-workflows`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; renders UI-aware native Observability Cloud workflow packets and API-vs-UI coverage reports",
+        "cloud_config_path": "Render modern dashboard, APM service map/service view/business transaction/trace/profiling, RUM replay/error/URL grouping/mobile, DBMon, Synthetics, SLO, Infrastructure/Kubernetes/Network Explorer, Related Content, AI Assistant, logs chart, and Observability Cloud Mobile app plans with API-vs-UI status, deeplinks, API action plans, and downstream skill handoffs",
+        "notes": "Deep native Observability workflow planner for product surfaces that need UI-aware runbooks or public API action plans. Complements dashboard-builder, native-ops, cloud-integration, RUM, DBMon, and OTel collector skills without owning collector runtime placement."
       },
       {
         "kind": "workflow",
@@ -1002,6 +1011,18 @@
       },
       "cloud_pairing": [],
       "notes": "Splunk Observability Cloud dashboard render/apply workflow; no Splunk Platform runtime placement."
+    },
+    {
+      "skill": "splunk-observability-deep-native-workflows",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Deep native Observability Cloud workflow planner for modern dashboards, APM service maps/service views/business transactions/trace waterfalls/profiling, RUM session replay/error analysis/URL grouping/mobile RUM, DBMon explain-plan triage, Synthetic waterfalls, SLOs, Infrastructure/Kubernetes/Network Explorer, Related Content, AI Assistant, logs charts, and Observability Cloud Mobile app handoffs. No Splunk Platform runtime placement."
     },
     {
       "skill": "splunk-observability-native-ops",
@@ -1707,6 +1728,210 @@
         "search-tier"
       ],
       "notes": "Self-managed Splunk Enterprise Search Head Cluster orchestration workflow covering deployer bootstrap, member initialization, bundle validation/apply/rollback, captain transfer, rolling restarts, KV Store health, member add/remove, migrations, and failure-mode runbooks."
+    },
+    {
+      "skill": "splunk-appdynamics-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "AppDynamics suite router and coverage doctor; enforces the checked-in taxonomy for SaaS, On-Premises, release/reference, product-announcement, API, security, AI, SAP, and Splunk Platform paths, and delegates product or Splunk Platform mutations to child skills."
+    },
+    {
+      "skill": "splunk-appdynamics-platform-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics platform workflow covering On-Premises overview, release/reference review, deployment planning, platform quickstart, Controller, Events Service, EUM Server, Synthetic Server, Enterprise Console, Virtual Appliance, HA, upgrade, and secure platform runbooks; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-controller-admin-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics Controller admin workflow covering API clients, OAuth, RBAC, SAML/LDAP, permissions, licensing, license rules, sensitive data controls, and tenant admin validation; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-agent-management-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics Smart Agent workflow covering remote install/upgrade/rollback, software download/package validation, and managed agent lifecycle; host execution is gated and no Splunk app placement is required."
+    },
+    {
+      "skill": "splunk-appdynamics-apm-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics APM workflow covering application model, business transactions, service endpoints, snapshots, metrics, serverless monitoring, and Splunk AppDynamics for OpenTelemetry; runtime installs delegate to AppDynamics agent owner skills."
+    },
+    {
+      "skill": "splunk-appdynamics-k8s-cluster-agent-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External Kubernetes/AppDynamics workflow; Kubernetes rollout is gated and no Splunk app placement is required."
+    },
+    {
+      "skill": "splunk-appdynamics-infrastructure-visibility-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics Infrastructure Visibility workflow covering Machine Agent, Server Visibility, Network Visibility, Docker/container visibility, service availability, tags, GPU monitoring, Prometheus extension, and infrastructure health rules; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-database-visibility-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics Database Visibility workflow; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-analytics-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics Analytics workflow; Events API publishing is gated and no Splunk app placement is required."
+    },
+    {
+      "skill": "splunk-appdynamics-eum-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics EUM workflow; source edits are gated and no Splunk app placement is required."
+    },
+    {
+      "skill": "splunk-appdynamics-synthetic-monitoring-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics Synthetic Monitoring workflow; private agent rollout is rendered and no Splunk app placement is required."
+    },
+    {
+      "skill": "splunk-appdynamics-log-observer-connect-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "AppDynamics LOC workflow; delegates Splunk service-account and platform operations to Splunk Platform skills."
+    },
+    {
+      "skill": "splunk-appdynamics-alerting-content-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics alerting content workflow covering health rules, policies, actions, schedules, email digests, suppression, import/export, rollback, anomaly detection, AIML baselines, and automated diagnostics; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-dashboards-reports-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics dashboard/report workflow covering custom dashboards, Dash Studio handoffs, ThousandEyes dashboard integration, reports, scheduled reports, War Rooms, and validation; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-tags-extensions-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics tag and extension workflow; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-security-ai-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics security and AI workflow covering Application Security Monitoring, Secure Application policies/APIs, Secure Application for OTel Java, Observability for AI, GenAI, GPU, and Cisco AI Pod handoffs."
+    },
+    {
+      "skill": "splunk-appdynamics-sap-agent-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics SAP Agent workflow covering SAP Agent, ABAP Agent, HTTP SDK, SNP CrystalBridge, BiQ Collector, NetWeaver transports, authorization, release-note, compatibility, and validation runbooks; SAP changes are rendered as runbooks."
     }
   ],
   "apps": [

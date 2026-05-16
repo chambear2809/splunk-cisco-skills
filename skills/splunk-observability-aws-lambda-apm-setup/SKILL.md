@@ -247,7 +247,7 @@ never mutates AWS without operator review.
 
 - Lambda log ingestion (handed off to `splunk-connect-for-otlp-setup`)
 - CloudWatch metrics for AWS/Lambda namespace (handed off to `splunk-observability-aws-integration`)
-- AppDynamics serverless instrumentation (handled by `cisco-appdynamics-setup`)
+- AppDynamics serverless instrumentation (handled by `splunk-appdynamics-apm-setup`)
 - AlwaysOn Profiling for Lambda (not officially supported in `signalfx/splunk-otel-lambda`)
 - Go, Ruby, .NET Lambda runtimes (no published layers from publisher 254067382080)
 - GovCloud / China regions (no published layers; renderer refuses with `not_applicable`)

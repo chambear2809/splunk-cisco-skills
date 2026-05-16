@@ -185,7 +185,7 @@ Disables the integration in Splunk O11y (sets `enabled: false`). Use
 - Azure detectors → [`splunk-observability-native-ops`](../splunk-observability-native-ops/SKILL.md)
 - Log Observer Connect → [`splunk-observability-cloud-integration-setup`](../splunk-observability-cloud-integration-setup/SKILL.md)
 - HEC tokens → [`splunk-hec-service-setup`](../splunk-hec-service-setup/SKILL.md)
-- AppDynamics on Azure → [`cisco-appdynamics-setup`](../cisco-appdynamics-setup/SKILL.md)
+- AppDynamics on Azure → [`splunk-appdynamics-setup`](../splunk-appdynamics-setup/SKILL.md)
 
 ## Out of Scope
 

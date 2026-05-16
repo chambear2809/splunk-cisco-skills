@@ -1,0 +1,4 @@
+interface:
+  display_name: "Splunk Observability Deep Native Workflows"
+  short_description: "Deep native Observability workflow packets"
+  default_prompt: "Use $splunk-observability-deep-native-workflows to render a full native Observability Cloud workflow packet for APM, RUM, SLOs, Synthetics, DBMon, Infrastructure/Kubernetes, Related Content, AI Assistant, mobile, and modern dashboards."

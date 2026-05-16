@@ -37,6 +37,9 @@ Deployment-method coverage is broader than the taxonomy row count:
   Microsoft Azure VHD, AWS AMI, KVM QCOW2, and ROSA/OpenShift Virtualization
   QCOW2.
 - Virtual Appliance services: Standard and Hybrid `appdcli` deployment paths.
+- VMware OVA handoff: redacted vSphere/ESXi inventory, OVF Tool dry-run import
+  commands, govc import-option workflow, password-file handling, pod CIDR
+  overlap warnings, and live govc/SSH validation hooks.
 
 The renderer emits `deployment-method-selector.yaml` and
 `deployment-method-matrix.md` so users can start with a small set of decisions

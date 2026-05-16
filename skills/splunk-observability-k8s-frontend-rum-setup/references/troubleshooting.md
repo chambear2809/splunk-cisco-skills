@@ -225,4 +225,4 @@ proxy allowlist for direct passthrough.
 If you find yourself looking for AppDynamics-specific configuration (like
 `adrum.js`, EUM cookies, or AppDynamics Browser RUM rate-limit settings),
 you have the wrong skill. This skill is **Splunk Browser RUM** only. For
-AppDynamics Browser RUM, see [cisco-appdynamics-setup](../../cisco-appdynamics-setup/SKILL.md).
+AppDynamics Browser RUM, see [splunk-appdynamics-eum-setup](../../splunk-appdynamics-eum-setup/SKILL.md).

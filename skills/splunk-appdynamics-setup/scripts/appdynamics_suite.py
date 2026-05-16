@@ -78,6 +78,8 @@ SKILL_META: dict[str, dict[str, Any]] = {
             "https://help.splunk.com/en/appdynamics-on-premises/eum-server-deployment",
             "https://help.splunk.com/en/appdynamics-on-premises/synthetic-server-deployment/synthetic-server-deployment/installation-overview",
             "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/get-started-with-on-premises-virtual-appliance",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-vsphere",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-esxi",
             "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/amazon-web-services-aws",
             "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/red-hat-openshift-service-in-aws-rosa",
             "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/install-splunk-appdynamics-services/standard-deployment",
@@ -97,6 +99,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
             "https://help.splunk.com/en/appdynamics-saas/appdynamics-saas-administration",
             "https://help.splunk.com/appdynamics-saas/licensing",
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/sensitive-data-collection-and-security",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
         ],
         "gate": None,
     },
@@ -124,6 +127,8 @@ SKILL_META: dict[str, dict[str, Any]] = {
             "https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/smart-agent-command-line-utility",
             "https://help.splunk.com/en/appdynamics-on-premises/accounts/download-splunk-appdynamics-software",
             "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/agent-installer-platform-service-api",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes",
         ],
         "gate": "remote_execution",
     },
@@ -156,6 +161,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
             "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-.net-agent/enable-the-combined-mode-for-.net-agent",
             "https://help.splunk.com/en/appdynamics-on-premises/application-performance-monitoring/26.3.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-node.js-agent/dual-signal-mode-for-node.js-combined-agent",
             "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/machine-agent/combined-agent-for-infrastructure-visibility",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes",
         ],
         "gate": "k8s_rollout",
     },
@@ -179,7 +185,10 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "purpose": "Render collector CRUD payloads with file-backed secrets, DB server/node validation, and event checks.",
         "apply": "Database Visibility API apply uses password-file references and redacted rendered payloads.",
         "validation": "Collector list/readback plus DB server, node, metric, and event checks.",
-        "sources": ["https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/database-visibility-api"],
+        "sources": [
+            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/database-visibility-api",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes",
+        ],
         "gate": None,
     },
     "splunk-appdynamics-analytics-setup": {
@@ -206,6 +215,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
             "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/browser-monitoring/browser-real-user-monitoring/overview-of-the-controller-ui-for-browser-rum/configure-the-controller-ui-for-browser-rum",
             "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/browser-monitoring/browser-real-user-monitoring/overview-of-the-controller-ui-for-browser-rum/session-replay-for-browser-rum/enable-session-replay",
             "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/25.9.0/end-user-monitoring/mobile-real-user-monitoring/overview-of-the-controller-ui-for-mobile-rum/session-replay-for-mobile-rum",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
         ],
         "gate": "eum_source_edit",
     },
@@ -215,7 +225,10 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "purpose": "Render synthetic jobs, private synthetic agent Docker/Kubernetes/Minikube assets, Shepherd URL checks, and run validation.",
         "apply": "Synthetic job API apply is documented where available; private agent rollout emits reviewed container or Kubernetes plans.",
         "validation": "Synthetic job, run, location, PSA health, and Shepherd connectivity checks.",
-        "sources": ["https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/synthetic-monitoring"],
+        "sources": [
+            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/synthetic-monitoring",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/agents-release-notes",
+        ],
         "gate": None,
     },
     "splunk-appdynamics-log-observer-connect-setup": {
@@ -238,6 +251,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/policies/policy-actions",
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/anomaly-detection",
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/aiml",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
         ],
         "gate": None,
     },
@@ -252,6 +266,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
             "https://help.splunk.com/en/appdynamics-on-premises/get-started/26.4.0/dashboards-and-reports/custom-dashboards/create-custom-dashboards",
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/custom-dashboards/virtual-war-rooms/war-room-templates",
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
+            "https://help.splunk.com/en/appdynamics-saas/release-notes-and-references/controller-release-notes",
         ],
         "gate": None,
     },
@@ -506,6 +521,10 @@ PLATFORM_REQUIRED_ARTIFACTS = {
     "controller-install-upgrade-runbook.md",
     "component-deployment-runbook.md",
     "virtual-appliance-deployment-runbook.md",
+    "virtual-appliance-vmware-inventory.yaml",
+    "virtual-appliance-ovftool-plan.sh",
+    "virtual-appliance-govc-plan.sh",
+    "virtual-appliance-vmware-validation.sh",
     "platform-ha-backup-runbook.md",
     "platform-security-checklist.md",
     "platform-validation-probes.sh",
@@ -726,8 +745,28 @@ def as_list(value: Any) -> list[Any]:
     return [value]
 
 
+def int_or_default(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def merged_dict(*values: Any) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for value in values:
+        result.update(as_dict(value))
+    return result
+
+
 def shell_quote(value: Any) -> str:
     return shlex.quote(str(value))
+
+
+def bash_default(value: Any) -> str:
+    text = str(value or "")
+    return text.replace("\\", "\\\\").replace('"', '\\"').replace("$", "\\$").replace("`", "\\`")
+
 
 def render_appd_curl_helper() -> str:
     return r"""APPD_CURL_TLS_ARGS=()
@@ -823,6 +862,27 @@ def normalize_deployment_model(value: Any) -> str:
     return aliases.get(normalized, normalized)
 
 
+def normalize_virtual_appliance_infra(spec: dict[str, Any]) -> str:
+    deployment = as_dict(spec.get("deployment"))
+    va = as_dict(spec.get("virtual_appliance"))
+    infra = str(va.get("infrastructure_platform") or deployment.get("infrastructure_platform") or "vmware_vsphere")
+    infra = infra.strip().lower().replace("-", "_")
+    infra_aliases = {
+        "vsphere": "vmware_vsphere",
+        "vcenter": "vmware_vsphere",
+        "vmware": "vmware_vsphere",
+        "esxi": "vmware_esxi",
+        "azure": "azure",
+        "microsoft_azure": "azure",
+        "aws": "aws",
+        "amazon_web_services": "aws",
+        "kvm": "kvm",
+        "rosa": "rosa",
+        "openshift_rosa": "rosa",
+    }
+    return infra_aliases.get(infra, infra)
+
+
 def selected_platform_method_ids(spec: dict[str, Any]) -> list[str]:
     platform = as_dict(spec.get("platform"))
     deployment = as_dict(spec.get("deployment"))
@@ -836,21 +896,7 @@ def selected_platform_method_ids(spec: dict[str, Any]) -> list[str]:
     )
     selected: list[str] = []
     if deployment_model == "virtual_appliance":
-        infra = str(va.get("infrastructure_platform") or deployment.get("infrastructure_platform") or "vmware_vsphere")
-        infra = infra.strip().lower().replace("-", "_")
-        infra_aliases = {
-            "vsphere": "vmware_vsphere",
-            "vcenter": "vmware_vsphere",
-            "esxi": "vmware_esxi",
-            "azure": "azure",
-            "microsoft_azure": "azure",
-            "aws": "aws",
-            "amazon_web_services": "aws",
-            "kvm": "kvm",
-            "rosa": "rosa",
-            "openshift_rosa": "rosa",
-        }
-        infra = infra_aliases.get(infra, infra)
+        infra = normalize_virtual_appliance_infra(spec)
         selected.append(
             {
                 "vmware_vsphere": "va_vmware_vsphere_ova",
@@ -964,7 +1010,11 @@ def render_platform_topology(spec: dict[str, Any]) -> str:
     security = as_dict(spec.get("security"))
     payload = {
         "doc_version": spec.get("doc_version", "26.4.0"),
-        "deployment_model": spec.get("deployment_model", "on_premises"),
+        "deployment_model": normalize_deployment_model(
+            as_dict(spec.get("deployment")).get("model")
+            or spec.get("deployment_model")
+            or platform.get("deployment_model")
+        ),
         "platform": {
             "name": platform.get("name", "prod-platform"),
             "target_version": platform.get("target_version", spec.get("doc_version", "26.4.0")),
@@ -1259,6 +1309,510 @@ def render_platform_security_checklist(spec: dict[str, Any]) -> str:
 """
 
 
+def safe_table_value(value: Any) -> str:
+    return str(value or "").replace("\n", " ").replace("|", "/").strip()
+
+
+def virtual_appliance_node_records(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    va = as_dict(spec.get("virtual_appliance"))
+    platform = as_dict(spec.get("platform"))
+    node_specs = as_list(va.get("nodes"))
+    node_ips = [str(value) for value in as_list(va.get("node_ips"))]
+    node_count = max(3, int_or_default(va.get("node_count"), 3), len(node_specs), len(node_ips))
+    platform_name = str(platform.get("name") or "appdynamics").replace("_", "-")
+    default_domain = str(va.get("dns_domain") or "")
+    default_gateway = str(va.get("gateway_ip") or "")
+    default_dns = str(va.get("dns_server_ip") or "")
+    default_subnet = str(va.get("subnet_prefix") or va.get("subnet_mask") or va.get("netmask") or "")
+    records: list[dict[str, Any]] = []
+    for index in range(node_count):
+        node = as_dict(node_specs[index]) if index < len(node_specs) else {}
+        raw_ip = str(node.get("host_ip_cidr") or node.get("cidr") or node.get("ip") or node.get("host_ip") or (node_ips[index] if index < len(node_ips) else ""))
+        ip = str(node.get("ip") or node.get("host_ip") or raw_ip.split("/", 1)[0])
+        host_ip_cidr = str(node.get("host_ip_cidr") or node.get("cidr") or raw_ip)
+        if ip and "/" in ip:
+            host_ip_cidr = ip
+            ip = ip.split("/", 1)[0]
+        if host_ip_cidr and "/" not in host_ip_cidr and default_subnet:
+            host_ip_cidr = f"{host_ip_cidr}/{default_subnet}"
+        name = str(node.get("name") or node.get("hostname") or f"{platform_name}-va-{index + 1}")
+        domain = str(node.get("dns_domain") or node.get("domain") or default_domain)
+        fqdn = str(node.get("fqdn") or (f"{name}.{domain}" if domain else name))
+        records.append(
+            {
+                "name": name,
+                "hostname": str(node.get("hostname") or name),
+                "fqdn": fqdn,
+                "ip": ip,
+                "host_ip_cidr": host_ip_cidr,
+                "gateway_ip": str(node.get("gateway_ip") or default_gateway),
+                "dns_server_ip": str(node.get("dns_server_ip") or default_dns),
+                "dns_domain": domain,
+                "role": str(node.get("role") or ("bootstrap" if index == 0 else "member")),
+            }
+        )
+    return records
+
+
+def vmware_settings_from_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    va = as_dict(spec.get("virtual_appliance"))
+    base = merged_dict(spec.get("vmware"), va.get("vmware"))
+    return {
+        "base": base,
+        "vsphere": merged_dict(base, base.get("vsphere"), spec.get("vsphere"), va.get("vsphere")),
+        "esxi": merged_dict(base, base.get("esxi"), spec.get("esxi"), va.get("esxi")),
+    }
+
+
+def selected_vmware_settings(spec: dict[str, Any]) -> dict[str, Any]:
+    settings = vmware_settings_from_spec(spec)
+    infra = normalize_virtual_appliance_infra(spec)
+    return settings["esxi"] if infra == "vmware_esxi" else settings["vsphere"]
+
+
+def bool_string(value: Any, default: bool = False) -> str:
+    if value in (None, ""):
+        return "true" if default else "false"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return "true" if str(value).strip().lower() in {"1", "true", "yes", "on"} else "false"
+
+
+def bash_node_table(nodes: list[dict[str, Any]]) -> str:
+    keys = ["name", "fqdn", "ip", "host_ip_cidr", "gateway_ip", "dns_server_ip", "dns_domain"]
+    return "\n".join("|".join(safe_table_value(node.get(key)) for key in keys) for node in nodes)
+
+
+def render_virtual_appliance_vmware_inventory(spec: dict[str, Any]) -> str:
+    va = as_dict(spec.get("virtual_appliance"))
+    infra = normalize_virtual_appliance_infra(spec)
+    vmware = vmware_settings_from_spec(spec)
+    profile = va.get("profile", as_dict(spec.get("platform")).get("controller_profile", "small"))
+    payload = {
+        "doc_version": spec.get("doc_version", "26.4.0"),
+        "documentation_note": "Use AppDynamics 26.4 On-Premises docs for platform operations. The current official Virtual Appliance VMware pages are versioned 25.10 and were last updated in November 2025.",
+        "source_docs": [
+            "https://help.splunk.com/en/appdynamics-on-premises/overview/splunk-appdynamics-on-premises-and-virtual-appliance-self-hosted/splunk-appdynamics-on-premises-virtual-appliance-self-hosted",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-vsphere",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/deploy-splunk-appdynamics-on-premises-virtual-appliance/vmware-esxi",
+        ],
+        "selection": {
+            "infrastructure_platform": infra,
+            "service_deployment": va.get("service_deployment", "standard"),
+            "profile": profile,
+            "node_count": max(3, int_or_default(va.get("node_count"), 3)),
+        },
+        "image": {
+            "ova_file": va.get("image_file", "/secure/appdynamics/appd-va.ova"),
+            "license_file": va.get("license_file"),
+        },
+        "vsphere": {
+            "vcenter_url": vmware["vsphere"].get("vcenter_url", "https://vcenter.example.com/sdk"),
+            "vcenter_host": vmware["vsphere"].get("vcenter_host", vmware["vsphere"].get("host", "vcenter.example.com")),
+            "vcenter_username_file": vmware["vsphere"].get("vcenter_username_file", vmware["vsphere"].get("username_file", "/secure/vmware/vcenter-username")),
+            "vcenter_password_file": vmware["vsphere"].get("vcenter_password_file", vmware["vsphere"].get("password_file", "/secure/vmware/vcenter-password")),
+            "datacenter": vmware["vsphere"].get("datacenter", "DC1"),
+            "cluster": vmware["vsphere"].get("cluster", "AppD-Cluster"),
+            "resource_pool": vmware["vsphere"].get("resource_pool", "Resources"),
+            "vm_folder": vmware["vsphere"].get("vm_folder", "AppDynamics"),
+            "datastore": vmware["vsphere"].get("datastore", "datastore1"),
+            "network": vmware["vsphere"].get("network", "VM Network"),
+        },
+        "esxi": {
+            "esxi_host": vmware["esxi"].get("esxi_host", vmware["esxi"].get("host", "esxi.example.com")),
+            "esxi_username_file": vmware["esxi"].get("esxi_username_file", vmware["esxi"].get("username_file", "/secure/vmware/esxi-username")),
+            "esxi_password_file": vmware["esxi"].get("esxi_password_file", vmware["esxi"].get("password_file", "/secure/vmware/esxi-password")),
+            "datastore": vmware["esxi"].get("datastore", "datastore1"),
+            "network": vmware["esxi"].get("network", "VM Network"),
+        },
+        "deployment_options": {
+            "disk_provisioning": selected_vmware_settings(spec).get("disk_provisioning", "thin"),
+            "power_on": bool_string(selected_vmware_settings(spec).get("power_on"), True),
+            "allow_insecure_tls": bool_string(selected_vmware_settings(spec).get("allow_insecure_tls"), False),
+            "ovf_source_network": selected_vmware_settings(spec).get("ovf_source_network", ""),
+            "ovf_property_keys": {
+                "hostname": selected_vmware_settings(spec).get("ovf_property_hostname_key", "inspect-with-ovftool-probe"),
+                "host_ip_cidr": selected_vmware_settings(spec).get("ovf_property_host_ip_cidr_key", "inspect-with-ovftool-probe"),
+                "gateway": selected_vmware_settings(spec).get("ovf_property_gateway_key", "inspect-with-ovftool-probe"),
+                "dns": selected_vmware_settings(spec).get("ovf_property_dns_key", "inspect-with-ovftool-probe"),
+                "domain": selected_vmware_settings(spec).get("ovf_property_domain_key", "inspect-with-ovftool-probe"),
+            },
+        },
+        "nodes": virtual_appliance_node_records(spec),
+        "post_deploy_validation": [
+            "Log in with appduser, change the default password, and run sudo appdctl host init when required by the selected VMware path.",
+            "Run appdctl show boot on every node.",
+            "Run appdctl show cluster after all three nodes boot.",
+            "Continue with appdcli service deployment only after host boot and cluster status are clean.",
+        ],
+    }
+    return dump_yaml(redact(payload))
+
+
+def render_virtual_appliance_ovftool_plan(spec: dict[str, Any]) -> str:
+    va = as_dict(spec.get("virtual_appliance"))
+    infra = normalize_virtual_appliance_infra(spec)
+    cfg = selected_vmware_settings(spec)
+    nodes = bash_node_table(virtual_appliance_node_records(spec))
+    image_file = va.get("image_file", "/secure/appdynamics/appd-va.ova")
+    profile = va.get("profile", as_dict(spec.get("platform")).get("controller_profile", "small"))
+    vcenter_host = cfg.get("vcenter_host", cfg.get("host", "vcenter.example.com"))
+    vcenter_url = cfg.get("vcenter_url", "https://vcenter.example.com/sdk")
+    esxi_host = cfg.get("esxi_host", cfg.get("host", "esxi.example.com"))
+    username_file = (
+        cfg.get("esxi_username_file", cfg.get("username_file", "/secure/vmware/esxi-username"))
+        if infra == "vmware_esxi"
+        else cfg.get("vcenter_username_file", cfg.get("username_file", "/secure/vmware/vcenter-username"))
+    )
+    password_file = (
+        cfg.get("esxi_password_file", cfg.get("password_file", "/secure/vmware/esxi-password"))
+        if infra == "vmware_esxi"
+        else cfg.get("vcenter_password_file", cfg.get("password_file", "/secure/vmware/vcenter-password"))
+    )
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# Splunk AppDynamics Virtual Appliance VMware OVA plan.
+# Dry-run by default. Set VMWARE_APPLY=1 after reviewing the probe output and target locator.
+# OVF Tool prompts for the password when it is omitted from the vi:// target; this script never
+# places the vCenter or ESXi password value in shell arguments.
+
+VMWARE_APPLY="${{VMWARE_APPLY:-0}}"
+OVFTOOL="${{OVFTOOL:-ovftool}}"
+INFRA={shell_quote(infra)}
+OVA_FILE="${{APPD_VA_OVA_FILE:-{bash_default(image_file)}}}"
+DEPLOYMENT_OPTION="${{APPD_OVF_DEPLOYMENT_OPTION:-{bash_default(profile)}}}"
+VCENTER_URL="${{VCENTER_URL:-{bash_default(vcenter_url)}}}"
+VCENTER_HOST="${{VCENTER_HOST:-{bash_default(vcenter_host)}}}"
+VCENTER_DATACENTER="${{VCENTER_DATACENTER:-{bash_default(cfg.get('datacenter', 'DC1'))}}}"
+VCENTER_CLUSTER="${{VCENTER_CLUSTER:-{bash_default(cfg.get('cluster', 'AppD-Cluster'))}}}"
+VCENTER_RESOURCE_POOL="${{VCENTER_RESOURCE_POOL:-{bash_default(cfg.get('resource_pool', 'Resources'))}}}"
+VM_FOLDER="${{VM_FOLDER:-{bash_default(cfg.get('vm_folder', 'AppDynamics'))}}}"
+ESXI_HOST="${{ESXI_HOST:-{bash_default(esxi_host)}}}"
+VMWARE_DATASTORE="${{VMWARE_DATASTORE:-{bash_default(cfg.get('datastore', 'datastore1'))}}}"
+VMWARE_NETWORK="${{VMWARE_NETWORK:-{bash_default(cfg.get('network', 'VM Network'))}}}"
+DISK_PROVISIONING="${{DISK_PROVISIONING:-{bash_default(cfg.get('disk_provisioning', 'thin'))}}}"
+POWER_ON="${{POWER_ON:-{bool_string(cfg.get('power_on'), True)}}}"
+ALLOW_INSECURE_TLS="${{ALLOW_INSECURE_TLS:-{bool_string(cfg.get('allow_insecure_tls'), False)}}}"
+OVF_SOURCE_NETWORK="${{OVF_SOURCE_NETWORK:-{bash_default(cfg.get('ovf_source_network', ''))}}}"
+VMWARE_USERNAME_FILE="${{VMWARE_USERNAME_FILE:-{bash_default(username_file)}}}"
+VMWARE_PASSWORD_FILE="${{VMWARE_PASSWORD_FILE:-{bash_default(password_file)}}}"
+
+# Exact OVF property keys can vary by package. Run the probe first and then set these
+# APPD_OVF_PROP_*_KEY variables if the package exposes CLI-settable properties.
+APPD_OVF_PROP_HOSTNAME_KEY="${{APPD_OVF_PROP_HOSTNAME_KEY:-{bash_default(cfg.get('ovf_property_hostname_key', ''))}}}"
+APPD_OVF_PROP_HOST_IP_CIDR_KEY="${{APPD_OVF_PROP_HOST_IP_CIDR_KEY:-{bash_default(cfg.get('ovf_property_host_ip_cidr_key', ''))}}}"
+APPD_OVF_PROP_GATEWAY_KEY="${{APPD_OVF_PROP_GATEWAY_KEY:-{bash_default(cfg.get('ovf_property_gateway_key', ''))}}}"
+APPD_OVF_PROP_DNS_KEY="${{APPD_OVF_PROP_DNS_KEY:-{bash_default(cfg.get('ovf_property_dns_key', ''))}}}"
+APPD_OVF_PROP_DOMAIN_KEY="${{APPD_OVF_PROP_DOMAIN_KEY:-{bash_default(cfg.get('ovf_property_domain_key', ''))}}}"
+
+read_first_line() {{
+  local file="$1"
+  [[ -f "${{file}}" ]] || return 0
+  IFS= read -r line < "${{file}}" || true
+  printf '%s' "${{line:-}}"
+}}
+
+run_or_print() {{
+  if [[ "${{VMWARE_APPLY}}" == "1" ]]; then
+    "$@"
+  else
+    printf 'DRY-RUN:'
+    printf ' %q' "$@"
+    printf '\\n'
+  fi
+}}
+
+require_apply_value() {{
+  local name="$1"
+  local value="$2"
+  if [[ "${{VMWARE_APPLY}}" == "1" && -z "${{value}}" ]]; then
+    echo "FAIL: ${{name}} is required for VMWARE_APPLY=1" >&2
+    exit 2
+  fi
+}}
+
+if [[ ! -f "${{OVA_FILE}}" && ! "${{OVA_FILE}}" =~ ^https?:// ]]; then
+  echo "WARN: OVA file is not local/readable: ${{OVA_FILE}}" >&2
+fi
+if [[ -n "${{VMWARE_USERNAME_FILE}}" && ! -f "${{VMWARE_USERNAME_FILE}}" ]]; then
+  echo "WARN: username file reference does not exist yet: ${{VMWARE_USERNAME_FILE}}" >&2
+fi
+if [[ -n "${{VMWARE_PASSWORD_FILE}}" && ! -f "${{VMWARE_PASSWORD_FILE}}" ]]; then
+  echo "WARN: password file reference does not exist yet: ${{VMWARE_PASSWORD_FILE}}" >&2
+fi
+
+VMWARE_USERNAME="${{VMWARE_USERNAME:-$(read_first_line "${{VMWARE_USERNAME_FILE}}")}}"
+if [[ -z "${{VMWARE_USERNAME}}" ]]; then
+  VMWARE_USERNAME="<vmware-user>"
+fi
+VMWARE_USERNAME_URL="${{VMWARE_USERNAME//@/%40}}"
+require_apply_value VMWARE_USERNAME "${{VMWARE_USERNAME}}"
+if [[ "${{VMWARE_APPLY}}" == "1" && "${{VMWARE_USERNAME}}" == "<vmware-user>" ]]; then
+  echo "FAIL: set VMWARE_USERNAME or provide VMWARE_USERNAME_FILE before VMWARE_APPLY=1" >&2
+  exit 2
+fi
+
+if command -v "${{OVFTOOL}}" >/dev/null 2>&1; then
+  run_or_print "${{OVFTOOL}}" --probe "${{OVA_FILE}}"
+else
+  echo "WARN: ovftool not found on PATH; install VMware OVF Tool before applying." >&2
+fi
+
+build_target() {{
+  if [[ "${{INFRA}}" == "vmware_esxi" ]]; then
+    printf 'vi://%s@%s/' "${{VMWARE_USERNAME_URL}}" "${{ESXI_HOST}}"
+  else
+    printf 'vi://%s@%s/%s/host/%s/Resources/%s' "${{VMWARE_USERNAME_URL}}" "${{VCENTER_HOST}}" "${{VCENTER_DATACENTER}}" "${{VCENTER_CLUSTER}}" "${{VCENTER_RESOURCE_POOL}}"
+  fi
+}}
+
+add_prop() {{
+  local key="$1"
+  local value="$2"
+  [[ -n "${{key}}" && -n "${{value}}" ]] || return 0
+  OVF_ARGS+=("--prop:${{key}}=${{value}}")
+}}
+
+APPD_VM_NODES=$(cat <<'NODES'
+{nodes}
+NODES
+)
+
+while IFS='|' read -r NODE_NAME NODE_FQDN NODE_IP NODE_CIDR NODE_GATEWAY NODE_DNS NODE_DOMAIN; do
+  [[ -n "${{NODE_NAME}}" ]] || continue
+  OVF_ARGS=(--acceptAllEulas "--name=${{NODE_NAME}}" "--datastore=${{VMWARE_DATASTORE}}" "--diskMode=${{DISK_PROVISIONING}}")
+  if [[ "${{ALLOW_INSECURE_TLS}}" == "true" ]]; then
+    OVF_ARGS+=(--noSSLVerify)
+  fi
+  if [[ -n "${{DEPLOYMENT_OPTION}}" ]]; then
+    OVF_ARGS+=("--deploymentOption=${{DEPLOYMENT_OPTION}}")
+  fi
+  if [[ -n "${{VM_FOLDER}}" ]]; then
+    OVF_ARGS+=("--vmFolder=${{VM_FOLDER}}")
+  fi
+  if [[ -n "${{OVF_SOURCE_NETWORK}}" ]]; then
+    OVF_ARGS+=("--net:${{OVF_SOURCE_NETWORK}}=${{VMWARE_NETWORK}}")
+  else
+    OVF_ARGS+=("--network=${{VMWARE_NETWORK}}")
+  fi
+  if [[ "${{POWER_ON}}" == "true" ]]; then
+    OVF_ARGS+=(--powerOn)
+  fi
+  add_prop "${{APPD_OVF_PROP_HOSTNAME_KEY}}" "${{NODE_NAME}}"
+  add_prop "${{APPD_OVF_PROP_HOST_IP_CIDR_KEY}}" "${{NODE_CIDR}}"
+  add_prop "${{APPD_OVF_PROP_GATEWAY_KEY}}" "${{NODE_GATEWAY}}"
+  add_prop "${{APPD_OVF_PROP_DNS_KEY}}" "${{NODE_DNS}}"
+  add_prop "${{APPD_OVF_PROP_DOMAIN_KEY}}" "${{NODE_DOMAIN}}"
+  run_or_print "${{OVFTOOL}}" "${{OVF_ARGS[@]}}" "${{OVA_FILE}}" "$(build_target)"
+done <<< "${{APPD_VM_NODES}}"
+
+echo "After deployment, validate each node with: sudo appdctl host init when prompted, then appdctl show boot."
+"""
+
+
+def render_virtual_appliance_govc_plan(spec: dict[str, Any]) -> str:
+    va = as_dict(spec.get("virtual_appliance"))
+    infra = normalize_virtual_appliance_infra(spec)
+    cfg = selected_vmware_settings(spec)
+    nodes = bash_node_table(virtual_appliance_node_records(spec))
+    image_file = va.get("image_file", "/secure/appdynamics/appd-va.ova")
+    vcenter_url = cfg.get("vcenter_url", "https://vcenter.example.com/sdk") if infra != "vmware_esxi" else f"https://{cfg.get('esxi_host', cfg.get('host', 'esxi.example.com'))}/sdk"
+    username_file = (
+        cfg.get("esxi_username_file", cfg.get("username_file", "/secure/vmware/esxi-username"))
+        if infra == "vmware_esxi"
+        else cfg.get("vcenter_username_file", cfg.get("username_file", "/secure/vmware/vcenter-username"))
+    )
+    password_file = (
+        cfg.get("esxi_password_file", cfg.get("password_file", "/secure/vmware/esxi-password"))
+        if infra == "vmware_esxi"
+        else cfg.get("vcenter_password_file", cfg.get("password_file", "/secure/vmware/vcenter-password"))
+    )
+    power_on_json = "true" if bool_string(cfg.get("power_on"), True) == "true" else "false"
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# govc-based AppDynamics Virtual Appliance OVA plan.
+# Dry-run by default. Set VMWARE_APPLY=1 after reviewing generated import options.
+# govc reads the password from VMWARE_PASSWORD_FILE only when applying.
+
+VMWARE_APPLY="${{VMWARE_APPLY:-0}}"
+GOVC="${{GOVC:-govc}}"
+OVA_FILE="${{APPD_VA_OVA_FILE:-{bash_default(image_file)}}}"
+export GOVC_URL="${{GOVC_URL:-{bash_default(vcenter_url)}}}"
+GOVC_USERNAME_FILE="${{GOVC_USERNAME_FILE:-{bash_default(username_file)}}}"
+VMWARE_PASSWORD_FILE="${{VMWARE_PASSWORD_FILE:-{bash_default(password_file)}}}"
+export GOVC_DATACENTER="${{GOVC_DATACENTER:-{bash_default(cfg.get('datacenter', 'DC1'))}}}"
+GOVC_CLUSTER="${{GOVC_CLUSTER:-{bash_default(cfg.get('cluster', 'AppD-Cluster'))}}}"
+GOVC_RESOURCE_POOL="${{GOVC_RESOURCE_POOL:-{bash_default(cfg.get('resource_pool', 'Resources'))}}}"
+GOVC_FOLDER="${{GOVC_FOLDER:-{bash_default(cfg.get('vm_folder', 'AppDynamics'))}}}"
+GOVC_DATASTORE="${{GOVC_DATASTORE:-{bash_default(cfg.get('datastore', 'datastore1'))}}}"
+GOVC_NETWORK="${{GOVC_NETWORK:-{bash_default(cfg.get('network', 'VM Network'))}}}"
+export GOVC_INSECURE="${{GOVC_INSECURE:-{bool_string(cfg.get('allow_insecure_tls'), False)}}}"
+DISK_PROVISIONING="${{DISK_PROVISIONING:-{bash_default(cfg.get('disk_provisioning', 'thin'))}}}"
+POWER_ON_JSON="${{POWER_ON_JSON:-{power_on_json}}}"
+OPTIONS_DIR="${{OPTIONS_DIR:-$(pwd)/appd-va-govc-options}}"
+
+APPD_OVF_PROP_HOSTNAME_KEY="${{APPD_OVF_PROP_HOSTNAME_KEY:-{bash_default(cfg.get('ovf_property_hostname_key', ''))}}}"
+APPD_OVF_PROP_HOST_IP_CIDR_KEY="${{APPD_OVF_PROP_HOST_IP_CIDR_KEY:-{bash_default(cfg.get('ovf_property_host_ip_cidr_key', ''))}}}"
+APPD_OVF_PROP_GATEWAY_KEY="${{APPD_OVF_PROP_GATEWAY_KEY:-{bash_default(cfg.get('ovf_property_gateway_key', ''))}}}"
+APPD_OVF_PROP_DNS_KEY="${{APPD_OVF_PROP_DNS_KEY:-{bash_default(cfg.get('ovf_property_dns_key', ''))}}}"
+APPD_OVF_PROP_DOMAIN_KEY="${{APPD_OVF_PROP_DOMAIN_KEY:-{bash_default(cfg.get('ovf_property_domain_key', ''))}}}"
+
+read_first_line() {{
+  local file="$1"
+  [[ -f "${{file}}" ]] || return 0
+  IFS= read -r line < "${{file}}" || true
+  printf '%s' "${{line:-}}"
+}}
+
+run_or_print() {{
+  if [[ "${{VMWARE_APPLY}}" == "1" ]]; then
+    "$@"
+  else
+    printf 'DRY-RUN:'
+    printf ' %q' "$@"
+    printf '\\n'
+  fi
+}}
+
+patch_property() {{
+  local options_file="$1"
+  local key="$2"
+  local value="$3"
+  [[ -n "${{key}}" && -n "${{value}}" ]] || return 0
+  if command -v jq >/dev/null 2>&1; then
+    local tmp="${{options_file}}.tmp"
+    jq --arg key "${{key}}" --arg value "${{value}}" 'if (.PropertyMapping | type) == "array" then .PropertyMapping |= map(if .Key == $key then .Value = $value else . end) else . end' "${{options_file}}" > "${{tmp}}"
+    mv "${{tmp}}" "${{options_file}}"
+  else
+    echo "WARN: jq not found; edit ${{options_file}} PropertyMapping for ${{key}} manually." >&2
+  fi
+}}
+
+export GOVC_USERNAME="${{GOVC_USERNAME:-$(read_first_line "${{GOVC_USERNAME_FILE}}")}}"
+if [[ "${{VMWARE_APPLY}}" == "1" ]]; then
+  if [[ ! -f "${{VMWARE_PASSWORD_FILE}}" ]]; then
+    echo "FAIL: VMWARE_PASSWORD_FILE is required for apply: ${{VMWARE_PASSWORD_FILE}}" >&2
+    exit 2
+  fi
+  export GOVC_PASSWORD="$(read_first_line "${{VMWARE_PASSWORD_FILE}}")"
+fi
+
+if [[ -z "${{GOVC_USERNAME}}" && "${{VMWARE_APPLY}}" == "1" ]]; then
+  echo "FAIL: GOVC_USERNAME or GOVC_USERNAME_FILE is required for apply." >&2
+  exit 2
+fi
+
+mkdir -p "${{OPTIONS_DIR}}"
+
+APPD_VM_NODES=$(cat <<'NODES'
+{nodes}
+NODES
+)
+
+while IFS='|' read -r NODE_NAME NODE_FQDN NODE_IP NODE_CIDR NODE_GATEWAY NODE_DNS NODE_DOMAIN; do
+  [[ -n "${{NODE_NAME}}" ]] || continue
+  OPTIONS_FILE="${{OPTIONS_DIR}}/${{NODE_NAME}}.json"
+  if [[ "${{VMWARE_APPLY}}" == "1" ]]; then
+    "${{GOVC}}" import.spec "${{OVA_FILE}}" > "${{OPTIONS_FILE}}.base"
+    if command -v jq >/dev/null 2>&1; then
+      jq --arg name "${{NODE_NAME}}" --arg disk "${{DISK_PROVISIONING}}" --arg network "${{GOVC_NETWORK}}" --argjson power "${{POWER_ON_JSON}}" '.Name = $name | .DiskProvisioning = $disk | .PowerOn = $power | if (.NetworkMapping | type) == "array" then .NetworkMapping |= map(.Network = $network) else . end' "${{OPTIONS_FILE}}.base" > "${{OPTIONS_FILE}}"
+    else
+      cp "${{OPTIONS_FILE}}.base" "${{OPTIONS_FILE}}"
+      echo "WARN: jq not found; edit ${{OPTIONS_FILE}} manually before import." >&2
+    fi
+    patch_property "${{OPTIONS_FILE}}" "${{APPD_OVF_PROP_HOSTNAME_KEY}}" "${{NODE_NAME}}"
+    patch_property "${{OPTIONS_FILE}}" "${{APPD_OVF_PROP_HOST_IP_CIDR_KEY}}" "${{NODE_CIDR}}"
+    patch_property "${{OPTIONS_FILE}}" "${{APPD_OVF_PROP_GATEWAY_KEY}}" "${{NODE_GATEWAY}}"
+    patch_property "${{OPTIONS_FILE}}" "${{APPD_OVF_PROP_DNS_KEY}}" "${{NODE_DNS}}"
+    patch_property "${{OPTIONS_FILE}}" "${{APPD_OVF_PROP_DOMAIN_KEY}}" "${{NODE_DOMAIN}}"
+  else
+    run_or_print "${{GOVC}}" import.spec "${{OVA_FILE}}" ">" "${{OPTIONS_FILE}}.base"
+    echo "DRY-RUN: patch ${{OPTIONS_FILE}} with Name=${{NODE_NAME}}, DiskProvisioning=${{DISK_PROVISIONING}}, Network=${{GOVC_NETWORK}}, PowerOn=${{POWER_ON_JSON}}"
+  fi
+  GOVC_IMPORT_ARGS=(import.ova "-ds=${{GOVC_DATASTORE}}" "-options=${{OPTIONS_FILE}}")
+  [[ -n "${{GOVC_RESOURCE_POOL}}" ]] && GOVC_IMPORT_ARGS+=("-pool=${{GOVC_RESOURCE_POOL}}")
+  [[ -n "${{GOVC_FOLDER}}" ]] && GOVC_IMPORT_ARGS+=("-folder=${{GOVC_FOLDER}}")
+  run_or_print "${{GOVC}}" "${{GOVC_IMPORT_ARGS[@]}}" "${{OVA_FILE}}"
+done <<< "${{APPD_VM_NODES}}"
+
+echo "After import, run virtual-appliance-vmware-validation.sh with VMWARE_VALIDATE_LIVE=1."
+"""
+
+
+def render_virtual_appliance_vmware_validation(spec: dict[str, Any]) -> str:
+    infra = normalize_virtual_appliance_infra(spec)
+    cfg = selected_vmware_settings(spec)
+    nodes = bash_node_table(virtual_appliance_node_records(spec))
+    vcenter_url = cfg.get("vcenter_url", "https://vcenter.example.com/sdk") if infra != "vmware_esxi" else f"https://{cfg.get('esxi_host', cfg.get('host', 'esxi.example.com'))}/sdk"
+    username_file = cfg.get("vcenter_username_file", cfg.get("esxi_username_file", cfg.get("username_file", "/secure/vmware/vcenter-username")))
+    password_file = cfg.get("vcenter_password_file", cfg.get("esxi_password_file", cfg.get("password_file", "/secure/vmware/vcenter-password")))
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+VMWARE_VALIDATE_LIVE="${{VMWARE_VALIDATE_LIVE:-0}}"
+GOVC="${{GOVC:-govc}}"
+export GOVC_URL="${{GOVC_URL:-{bash_default(vcenter_url)}}}"
+GOVC_USERNAME_FILE="${{GOVC_USERNAME_FILE:-{bash_default(username_file)}}}"
+VMWARE_PASSWORD_FILE="${{VMWARE_PASSWORD_FILE:-{bash_default(password_file)}}}"
+export GOVC_INSECURE="${{GOVC_INSECURE:-{bool_string(cfg.get('allow_insecure_tls'), False)}}}"
+APPD_SSH_USER="${{APPD_SSH_USER:-appduser}}"
+APPD_SSH_KEY_FILE="${{APPD_SSH_KEY_FILE:-}}"
+
+APPD_VM_NODES=$(cat <<'NODES'
+{nodes}
+NODES
+)
+
+read_first_line() {{
+  local file="$1"
+  [[ -f "${{file}}" ]] || return 0
+  IFS= read -r line < "${{file}}" || true
+  printf '%s' "${{line:-}}"
+}}
+
+check_pod_cidr_conflict() {{
+  local node="$1"
+  local ip="$2"
+  if [[ "${{ip}}" == 10.1.* ]]; then
+    echo "WARN: ${{node}} host IP ${{ip}} overlaps the default Virtual Appliance Kubernetes pod CIDR 10.1.0.0/16." >&2
+  fi
+}}
+
+while IFS='|' read -r NODE_NAME NODE_FQDN NODE_IP NODE_CIDR NODE_GATEWAY NODE_DNS NODE_DOMAIN; do
+  [[ -n "${{NODE_NAME}}" ]] || continue
+  [[ -n "${{NODE_IP}}" ]] || echo "WARN: ${{NODE_NAME}} is missing a host IP." >&2
+  [[ -n "${{NODE_GATEWAY}}" ]] || echo "WARN: ${{NODE_NAME}} is missing a default gateway." >&2
+  [[ -n "${{NODE_DNS}}" ]] || echo "WARN: ${{NODE_NAME}} is missing a DNS server." >&2
+  [[ -n "${{NODE_DOMAIN}}" ]] || echo "WARN: ${{NODE_NAME}} is missing a domain name." >&2
+  check_pod_cidr_conflict "${{NODE_NAME}}" "${{NODE_IP}}"
+done <<< "${{APPD_VM_NODES}}"
+
+if [[ "${{VMWARE_VALIDATE_LIVE}}" != "1" ]]; then
+  echo "Static VMware Virtual Appliance validation complete. Set VMWARE_VALIDATE_LIVE=1 for govc and SSH probes."
+  exit 0
+fi
+
+export GOVC_USERNAME="${{GOVC_USERNAME:-$(read_first_line "${{GOVC_USERNAME_FILE}}")}}"
+if [[ ! -f "${{VMWARE_PASSWORD_FILE}}" ]]; then
+  echo "FAIL: VMWARE_PASSWORD_FILE is required for live validation: ${{VMWARE_PASSWORD_FILE}}" >&2
+  exit 2
+fi
+export GOVC_PASSWORD="$(read_first_line "${{VMWARE_PASSWORD_FILE}}")"
+
+while IFS='|' read -r NODE_NAME NODE_FQDN NODE_IP NODE_CIDR NODE_GATEWAY NODE_DNS NODE_DOMAIN; do
+  [[ -n "${{NODE_NAME}}" ]] || continue
+  "${{GOVC}}" vm.info "${{NODE_NAME}}"
+  if [[ -n "${{APPD_SSH_KEY_FILE}}" && -n "${{NODE_IP}}" ]]; then
+    ssh -i "${{APPD_SSH_KEY_FILE}}" -o BatchMode=yes -o StrictHostKeyChecking=accept-new "${{APPD_SSH_USER}}@${{NODE_IP}}" 'appdctl show boot && appdctl show cluster || true'
+  else
+    echo "NOTE: skip SSH appdctl checks for ${{NODE_NAME}}; set APPD_SSH_KEY_FILE and node IPs to enable."
+  fi
+done <<< "${{APPD_VM_NODES}}"
+"""
+
+
 def render_virtual_appliance_deployment_runbook(spec: dict[str, Any]) -> str:
     va = as_dict(spec.get("virtual_appliance"))
     platform = as_dict(spec.get("platform"))
@@ -1286,12 +1840,23 @@ def render_virtual_appliance_deployment_runbook(spec: dict[str, Any]) -> str:
 
 ## Infrastructure Targets
 
-- VMware vSphere: deploy three VMs from OVA/OVF, set OVF properties, enable VMware Tools, then run `appdctl show boot` on every node.
-- VMware ESXi: deploy three VMs from the OVA, configure datastore/network/host fields, then verify boot status.
+- VMware vSphere: deploy three VMs from OVA/OVF, set OVF properties for host name, host IP/subnet, gateway, DNS, and domain, enable VMware Tools OVF environment, then run `appdctl show boot` on every node.
+- VMware ESXi: deploy three VMs from the OVA, configure datastore/network/host fields, run `sudo appdctl host init` when prompted for ESXi host details, then verify boot status.
 - Azure: use the VHD image, create or reuse resource group, NSG, VNet, storage, disk, image gallery, image version, then create three VMs.
 - AWS: use the AMI import path, VPC, S3 image bucket, IAM import role, snapshot/register steps, then create three m5a.4xlarge instances unless sizing guidance changes.
 - KVM: use QCOW2 and reference scripts; preflight NTP, `/dev/kvm`, bridge, storage pool, and config.cfg.
 - ROSA: use ROSA HCP with OpenShift Virtualization, upload QCOW2 to PVCs with `virtctl`, create three RHEL-template VMs, and configure firewall/NLB.
+
+## VMware OVA Automation Packet
+
+The renderer emits these VMware-specific files for vSphere and standalone ESXi handoff:
+
+- `virtual-appliance-vmware-inventory.yaml`: redacted infrastructure, OVA, node, network, and secret-file references.
+- `virtual-appliance-ovftool-plan.sh`: dry-run OVF Tool import commands. It omits the VMware password from shell arguments and lets OVF Tool prompt unless an operator chooses a local wrapper.
+- `virtual-appliance-govc-plan.sh`: dry-run govc import flow that can read the VMware password from a chmod-600 file only when `VMWARE_APPLY=1`.
+- `virtual-appliance-vmware-validation.sh`: static node checks, default pod-CIDR overlap warnings, optional govc VM inventory probes, and optional SSH `appdctl show boot` checks.
+
+Do not send the OVA through chat. Place it on the workstation or automation host that has OVF Tool or govc installed, set `virtual_appliance.image_file`, and run the dry-run scripts first. The official VMware Virtual Appliance pages currently expose 25.10 URL paths; pair them with the 26.4 On-Premises platform docs for Enterprise Console and Controller lifecycle work.
 
 ## Service Deployment
 
@@ -1365,6 +1930,13 @@ def render_platform_artifacts(out: Path, spec: dict[str, Any]) -> None:
     write(out / "controller-install-upgrade-runbook.md", render_controller_install_upgrade_runbook(spec))
     write(out / "component-deployment-runbook.md", render_component_deployment_runbook(spec))
     write(out / "virtual-appliance-deployment-runbook.md", render_virtual_appliance_deployment_runbook(spec))
+    write(out / "virtual-appliance-vmware-inventory.yaml", render_virtual_appliance_vmware_inventory(spec))
+    write(out / "virtual-appliance-ovftool-plan.sh", render_virtual_appliance_ovftool_plan(spec))
+    os.chmod(out / "virtual-appliance-ovftool-plan.sh", stat.S_IMODE((out / "virtual-appliance-ovftool-plan.sh").stat().st_mode) | stat.S_IXUSR)
+    write(out / "virtual-appliance-govc-plan.sh", render_virtual_appliance_govc_plan(spec))
+    os.chmod(out / "virtual-appliance-govc-plan.sh", stat.S_IMODE((out / "virtual-appliance-govc-plan.sh").stat().st_mode) | stat.S_IXUSR)
+    write(out / "virtual-appliance-vmware-validation.sh", render_virtual_appliance_vmware_validation(spec))
+    os.chmod(out / "virtual-appliance-vmware-validation.sh", stat.S_IMODE((out / "virtual-appliance-vmware-validation.sh").stat().st_mode) | stat.S_IXUSR)
     write(out / "platform-ha-backup-runbook.md", render_platform_ha_backup_runbook(spec))
     write(out / "platform-security-checklist.md", render_platform_security_checklist(spec))
     write(out / "platform-validation-probes.sh", render_platform_validation_probes(spec))
@@ -1380,6 +1952,8 @@ REQUIRED_SKILL_ARTIFACTS = {
         "saml-ldap-runbook.md",
         "sensitive-data-controls-runbook.md",
         "licensing-validation-plan.sh",
+        "controller-26-4-release-runbook.md",
+        "licensing-storage-metrics-plan.sh",
     },
     "splunk-appdynamics-agent-management-setup": {
         "agent-management-decision-guide.md",
@@ -1394,6 +1968,8 @@ REQUIRED_SKILL_ARTIFACTS = {
         "auto-attach-and-discovery-runbook.md",
         "smart-agent-cli-deprecation-runbook.md",
         "appdynamics-download-verification-runbook.md",
+        "agent-management-26-4-release-runbook.md",
+        "agent-upgrade-api-plan.sh",
         "smart-agent-validation-probes.sh",
     },
     "splunk-appdynamics-apm-setup": {
@@ -1415,6 +1991,7 @@ REQUIRED_SKILL_ARTIFACTS = {
         "cluster-agent-rbac-review.md",
         "cluster-agent-validation-probes.sh",
         "o11y-export-validation.sh",
+        "cluster-agent-26-4-release-runbook.md",
     },
     "splunk-appdynamics-infrastructure-visibility-setup": {
         "machine-agent-command-plan.sh",
@@ -1427,6 +2004,7 @@ REQUIRED_SKILL_ARTIFACTS = {
     },
     "splunk-appdynamics-database-visibility-setup": {
         "database-collector-payloads.redacted.json",
+        "database-26-4-release-readiness.yaml",
         "database-agent-command-plan.sh",
         "database-validation-probes.sh",
     },
@@ -1443,6 +2021,7 @@ REQUIRED_SKILL_ARTIFACTS = {
         "mobile-sdk-snippets.md",
         "session-replay-config.js",
         "mobile-session-replay-runbook.md",
+        "core-web-vitals-runbook.md",
         "source-map-upload-plan.sh",
         "eum-validation-probes.sh",
     },
@@ -1451,6 +2030,7 @@ REQUIRED_SKILL_ARTIFACTS = {
         "synthetic-api-monitor.json",
         "private-synthetic-agent-values.yaml",
         "private-synthetic-agent-docker-compose.yaml",
+        "private-synthetic-agent-26-4-runbook.md",
         "synthetic-validation-probes.sh",
     },
     "splunk-appdynamics-log-observer-connect-setup": {
@@ -1464,6 +2044,7 @@ REQUIRED_SKILL_ARTIFACTS = {
         "alerting-export-rollback-plan.sh",
         "anomaly-detection-rca-runbook.md",
         "aiml-baseline-diagnostics-runbook.md",
+        "alert-template-variables-runbook.md",
         "alerting-validation-probes.sh",
     },
     "splunk-appdynamics-dashboards-reports-setup": {
@@ -1472,6 +2053,9 @@ REQUIRED_SKILL_ARTIFACTS = {
         "dashboard-validation-probes.sh",
         "thousandeyes-dashboard-integration-runbook.md",
         "war-room-runbook.md",
+        "dash-studio-26-4-runbook.md",
+        "reports-26-4-runbook.md",
+        "log-tail-deprecation-runbook.md",
     },
     "splunk-appdynamics-tags-extensions-setup": {
         "custom-tags-payload.json",
@@ -1485,6 +2069,7 @@ REQUIRED_SKILL_ARTIFACTS = {
         "secure-application-policy-runbook.md",
         "otel-secure-application-snippet.md",
         "observability-ai-handoffs.md",
+        "cisco-ai-pod-monitoring-runbook.md",
     },
     "splunk-appdynamics-sap-agent-setup": {
         "sap-agent-runbook.md",
@@ -1551,6 +2136,24 @@ appd_curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER
     licensing = out / "licensing-validation-plan.sh"
     write(licensing, "#!/usr/bin/env bash\nset -euo pipefail\n: \"${APPD_CONTROLLER_URL:?set APPD_CONTROLLER_URL}\"\necho 'Validate license usage, subscriptions, and license rules through documented Controller/account APIs.'\n")
     chmod_exec(licensing)
+    write(
+        out / "controller-26-4-release-runbook.md",
+        "# Controller 26.4 Release Admin Runbook\n\n"
+        "- Local-credential administrators must re-enter the current password before modifying users in Administration > Users; treat this as an operator/UI validation step, not an automation bypass.\n"
+        "- Validate the APM-specific `Edit Applications Name` permission in role exports; default Admin and Administrator roles should include it, custom roles require explicit review.\n"
+        "- Validate Machine Agent tag-based RBAC for View Agent and Edit Agent permissions on host tags before granting broad Agent Management access.\n"
+        "- Review Controller third-party library updates and known issues before platform upgrades or regulated maintenance windows.\n",
+    )
+    storage_metrics = out / "licensing-storage-metrics-plan.sh"
+    write(
+        storage_metrics,
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "echo 'Validate 26.4 application-level storage usage metrics in Metric Browser: Usage(Bytes) and Usage(Count).'\n"
+        "echo 'Scope: Agent-based Licensing accounts; Transaction Analytics, Browser RUM, and Mobile RUM applications; Events Service 26.1.0 or later.'\n"
+        "echo 'Enablement is support-gated by appdynamics.licensing.usages.report.per-app.business-metrics.storage.enabled=true.'\n",
+    )
+    chmod_exec(storage_metrics)
 
 
 SMART_AGENT_SUPPORTED_AGENTS: list[dict[str, Any]] = [
@@ -2196,6 +2799,59 @@ echo "Controller reachable. Continue with UI Smart Agents tab and managed-agent 
 """
 
 
+def render_agent_management_26_4_release_runbook() -> str:
+    return """# Agent Management 26.4 Release Runbook
+
+## Controller 26.4 Enhancements
+
+- Supported agents can automatically release licenses to the pool when disabled
+  and reacquire licenses when re-enabled. This is support-gated; confirm the
+  feature flag with Cisco Support before using disable/enable as a license
+  balancing operation.
+- Agent Upgrade API support is in scope for upgrade workflows. Use
+  `agent-upgrade-api-plan.sh` for a reviewed API shape and keep OAuth tokens
+  file-backed.
+- Machine Agent permissions now support tag-based access control for View Agent
+  and Edit Agent permissions. Coordinate with `splunk-appdynamics-controller-admin-setup`
+  for role readbacks and avoid granting full admin privileges for machine-only
+  operations.
+
+## Agent Release Notes
+
+- Private Synthetic Agent 26.4 adds Podman deployment, Chrome Headful mode, a
+  StorageClass creation flag for Kubernetes file management, and Chrome 147.
+- Python Agent 26.4 adds Python 3.14 support and deprecates Python 3.8; 26.4.1
+  includes RHEL 8 amd64 and library updates.
+- Cluster Agent 26.4 adds enhanced Kubernetes event visibility when K8s alerting
+  is enabled.
+- Database Agent 26.4 adds PostgreSQL Blocking Session support, MongoDB
+  QueryExecutor metrics, Microsoft SQL Server 2025 support, and dual DB2 driver
+  behavior based on JRE level.
+- Network Agent and Analytics Agent 26.4 are mostly library and bug-fix
+  releases; record version compatibility before upgrade.
+"""
+
+
+def render_agent_upgrade_api_plan(spec: dict[str, Any]) -> str:
+    targets = agent_targets(spec)
+    target_lines = "\n".join(
+        f"echo 'Review Agent Upgrade API target: {target['host']} -> {', '.join(target['agent_types'])}'"
+        for target in targets
+    )
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+: "${{APPD_CONTROLLER_URL:={spec.get('controller_url', 'https://example.saas.appdynamics.com')}}}"
+: "${{APPD_OAUTH_TOKEN_FILE:?set APPD_OAUTH_TOKEN_FILE}}"
+
+AUTH_HEADER="Authorization: Bearer $(<"${{APPD_OAUTH_TOKEN_FILE}}")"
+echo "Fetch Smart Agent and managed-agent inventory before any upgrade request."
+echo "Use documented Agent Upgrade API endpoints only; this plan intentionally does not mutate."
+{target_lines}
+echo "Post-upgrade validation: managed-agent version, Controller registration, license release/reacquire behavior, and rollback package availability."
+"""
+
+
 def render_agent_management_artifacts(out: Path, spec: dict[str, Any]) -> None:
     targets = agent_targets(spec)
     smart_agent = as_dict(spec.get("smart_agent"))
@@ -2215,6 +2871,10 @@ def render_agent_management_artifacts(out: Path, spec: dict[str, Any]) -> None:
     write(out / "auto-attach-and-discovery-runbook.md", render_auto_attach_and_discovery_runbook(spec))
     write(out / "smart-agent-cli-deprecation-runbook.md", render_smart_agent_cli_deprecation_runbook())
     write(out / "appdynamics-download-verification-runbook.md", render_download_verification_runbook(spec))
+    write(out / "agent-management-26-4-release-runbook.md", render_agent_management_26_4_release_runbook())
+    upgrade_api = out / "agent-upgrade-api-plan.sh"
+    write(upgrade_api, render_agent_upgrade_api_plan(spec))
+    chmod_exec(upgrade_api)
     probes = out / "smart-agent-validation-probes.sh"
     write(probes, render_agent_validation_probes(spec))
     chmod_exec(probes)
@@ -2732,6 +3392,31 @@ def render_k8s_rbac_review() -> str:
 """
 
 
+def render_cluster_agent_26_4_release_runbook(collector: dict[str, Any]) -> str:
+    return f"""# Cluster Agent 26.4 Release Runbook
+
+## Enhanced Kubernetes Event Visibility
+
+- Cluster Agent 26.4 adds enhanced visibility for Kubernetes events when
+  Kubernetes alerting is enabled.
+- Validate that Controller-side Kubernetes alerting is enabled before expecting
+  event enrichment in the UI.
+- Review namespace scoping before broad event collection; this renderer uses
+  `{collector['namespace']}` as the Cluster Agent namespace and keeps workload
+  targets explicit.
+
+## Component Upgrade Checks
+
+- Confirm Cluster Agent, Operator, and Splunk OTel Collector compatibility
+  before upgrade.
+- Validate `installSplunkOtelCollector`, O11y realm, file-backed token secret,
+  OTLP service ports 4317/4318, and collector logs after rollout.
+- If GPU monitoring is enabled through Cluster Agent, coordinate rollout with
+  `splunk-appdynamics-infrastructure-visibility-setup` and the broader NVIDIA
+  or Cisco AI Pod observability skills.
+"""
+
+
 def render_combined_agent_runbook(targets: list[dict[str, Any]], collector: dict[str, Any], languages: list[str]) -> str:
     target_lines = "\n".join(
         f"- `{target['namespace']}/{target['workload']}`: `{target['language']}` in `{target['mode']}` mode, exporting `{target['o11y_export']}` to `{collector['endpoint'] if target['o11y_export'] != 'direct' else collector['ingest_url']}`."
@@ -2839,6 +3524,7 @@ def render_k8s_artifacts(out: Path, spec: dict[str, Any]) -> None:
     write(rollout, render_k8s_rollout_plan(targets, collector))
     chmod_exec(rollout)
     write(out / "cluster-agent-rbac-review.md", render_k8s_rbac_review())
+    write(out / "cluster-agent-26-4-release-runbook.md", render_cluster_agent_26_4_release_runbook(collector))
     probes = out / "cluster-agent-validation-probes.sh"
     write(probes, render_k8s_validation_probes(targets, collector))
     chmod_exec(probes)
@@ -2886,6 +3572,38 @@ def render_database_artifacts(out: Path, spec: dict[str, Any]) -> None:
         payload["password"] = "<redacted:file-backed>"
         payloads.append(payload)
     write_json(out / "database-collector-payloads.redacted.json", {"collectors": payloads})
+    write(
+        out / "database-26-4-release-readiness.yaml",
+        dump_yaml(
+            {
+                "release": "26.4",
+                "hashicorp_vault": {
+                    "status": "first_class_readiness_check",
+                    "notes": [
+                        "Store Database Visibility collector passwords as Vault secrets when the environment already uses HashiCorp Vault.",
+                        "Reference Vault access keys through chmod-600 files or Kubernetes/host secret stores; never render Vault token values.",
+                        "Validate collector password resolution by reading collector state and Database Agent logs after rollout.",
+                    ],
+                },
+                "postgresql": {
+                    "blocking_sessions": True,
+                    "validation": "Confirm PostgreSQL Blocking Session tab/data appears for supported collectors and that blocking query/session metadata is present.",
+                },
+                "mongodb": {
+                    "query_executor_metrics": True,
+                    "validation": "Confirm QueryExecutor metrics are present in DBMon metric paths and that index usage/cardinality is sane.",
+                },
+                "sql_server": {
+                    "version_2025_support": True,
+                    "validation": "Confirm Microsoft SQL Server 2025 collectors use supported driver settings and report database/server nodes.",
+                },
+                "db2": {
+                    "dual_driver_behavior": "db2jcc.jar for JRE 8; db2jcc4.jar for JRE 11+",
+                    "validation": "Confirm Database Agent JRE level, selected DB2 driver, connection test, and collector readback.",
+                },
+            }
+        ),
+    )
     agent = out / "database-agent-command-plan.sh"
     write(agent, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Render Database Agent install/start/rollback commands for the reviewed host.'\n")
     chmod_exec(agent)
@@ -2949,6 +3667,14 @@ window["adrum-start-time"] = new Date().getTime();
         "- Controller UI: administrators enable Session Replay under the selected mobile app's Configuration > Mobile App Group Configuration > Session Replay tab.\n"
         "- Validate that the Mobile Apps view shows replay availability, active session segments, and Video/Wireframe playback without exposing sensitive fields.\n",
     )
+    write(
+        out / "core-web-vitals-runbook.md",
+        "# Core Web Vitals Runbook\n\n"
+        "- Treat Interaction to Next Paint (INP) as the current Core Web Vitals responsiveness metric and First Input Delay (FID) as deprecated for new alerting and dashboards.\n"
+        "- Validate INP, Largest Contentful Paint, and Cumulative Layout Shift in Browser RUM dashboard widgets, Metric Browser, browser page/session metrics, and browser analytics events.\n"
+        "- Render custom alert candidates for P50, P75, and P90 percentiles before applying health rules; route actual alert content through `splunk-appdynamics-alerting-content-setup`.\n"
+        "- Use source maps and Session Replay only after privacy review when troubleshooting poor Core Web Vitals pages.\n",
+    )
     source_map = out / "source-map-upload-plan.sh"
     write(source_map, "#!/usr/bin/env bash\nset -euo pipefail\n: \"${APPD_EUM_TOKEN_FILE:?set APPD_EUM_TOKEN_FILE}\"\necho 'Upload source maps or mobile symbols from CI after reviewing app key, release, and mapping path.'\n")
     chmod_exec(source_map)
@@ -2965,6 +3691,14 @@ def render_synthetic_artifacts(out: Path, spec: dict[str, Any]) -> None:
     write_json(out / "synthetic-api-monitor.json", {"monitors": api_monitors, "assertions": spec.get("assertions", [{"type": "status_code", "equals": 200}] )})
     write(out / "private-synthetic-agent-values.yaml", dump_yaml({"privateSyntheticAgent": {"enabled": bool(psa.get("enabled", True)), "controllerUrl": spec.get("controller_url", "https://example.saas.appdynamics.com"), "shepherdUrl": psa.get("shepherd_url", spec.get("shepherd_url", "https://synthetic.api.appdynamics.com")), "secretName": psa.get("secret_name", "appdynamics-synthetic-agent-secret")}}))
     write(out / "private-synthetic-agent-docker-compose.yaml", dump_yaml({"services": {"private-synthetic-agent": {"image": "appdynamics/private-synthetic-agent:reviewed-version", "environment": {"APPDYNAMICS_CONTROLLER_URL": spec.get("controller_url", "https://example.saas.appdynamics.com"), "APPDYNAMICS_SECRET_FILE": "/run/secrets/appdynamics"}}}}))
+    write(
+        out / "private-synthetic-agent-26-4-runbook.md",
+        "# Private Synthetic Agent 26.4 Runbook\n\n"
+        "- Validate Podman deployment readiness when Docker is not the approved runtime.\n"
+        "- Validate Chrome Headful mode only for jobs that require a visible browser; default to headless unless the test explicitly needs headful behavior.\n"
+        "- For Kubernetes PSA file management, review the StorageClass creation flag before installing into clusters with restricted storage policies.\n"
+        "- Record Chrome 147 compatibility and synthetic job waterfall/screenshot behavior after upgrade.\n",
+    )
     probes = out / "synthetic-validation-probes.sh"
     write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate synthetic jobs, API monitors, latest runs, waterfall artifacts, locations, and PSA Shepherd connectivity.'\n")
     chmod_exec(probes)
@@ -2999,6 +3733,14 @@ def render_alerting_artifacts(out: Path, spec: dict[str, Any]) -> None:
         "- Validate Automated Transaction Diagnostics by reviewing anomalous transaction capture and suspected causes across slow methods, slow databases, and remote service calls.\n"
         "- Treat AI-generated recommendations as advisory; require operator verification before remediation actions or policy changes.\n",
     )
+    write(
+        out / "alert-template-variables-runbook.md",
+        "# Alert Template Variables Runbook\n\n"
+        "- Database health-rule notification templates can include the 26.4 database host variable `latestEvent.eventProperties.hostname`.\n"
+        "- Validate sample violation payloads before enabling downstream actions so the rendered hostname matches the database/server node expected by responders.\n"
+        "- For Core Web Vitals, prefer explicit INP, LCP, and CLS metrics and percentile thresholds; avoid new FID-based rules except for legacy comparison dashboards.\n"
+        "- Export alerting content before template changes and preserve rollback snapshots in `alerting-export-rollback-plan.sh`.\n",
+    )
     rollback = out / "alerting-export-rollback-plan.sh"
     write(rollback, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Export health rules, policies, actions, schedules, and suppressions before apply; render rollback from exported snapshots.'\n")
     chmod_exec(rollback)
@@ -3010,6 +3752,27 @@ def render_alerting_artifacts(out: Path, spec: dict[str, Any]) -> None:
 def render_dashboards_reports_artifacts(out: Path, spec: dict[str, Any]) -> None:
     write_json(out / "dashboard-payloads.json", {"dashboards": spec.get("dashboards", []), "dash_studio": as_dict(spec.get("dash_studio"))})
     write(out / "dashboard-report-runbook.md", "# Dashboard Report Runbook\n\n- Review custom dashboard widgets and permissions.\n- Reports and scheduled delivery are UI/runbook-first.\n- Dash Studio migration remains a handoff when not API-backed.\n")
+    write(
+        out / "dash-studio-26-4-runbook.md",
+        "# Dash Studio 26.4 Runbook\n\n"
+        "- Validate the time-series standard-deviation band option on trend charts where baseline spread matters.\n"
+        "- Validate ADQL autocomplete for widgets that query analytics data; keep saved queries readable and reviewed before dashboard promotion.\n"
+        "- Re-test ThousandEyes Dash Studio widgets after any dashboard migration because token setup and account-group/test selection remain separate handoffs.\n",
+    )
+    write(
+        out / "reports-26-4-runbook.md",
+        "# Reports 26.4 Runbook\n\n"
+        "- Validate direct PDF report download from the Reports page after upgrade.\n"
+        "- For scheduled reports with HTTPS image assets, confirm TLS certificate validation behavior and replace invalid or self-signed URLs before production schedules run.\n"
+        "- Keep report schedule, recipients, attachment behavior, and dashboard permissions in the rendered report inventory.\n",
+    )
+    write(
+        out / "log-tail-deprecation-runbook.md",
+        "# Log Tail Widget Deprecation Runbook\n\n"
+        "- Log Tail widgets are deprecated in Dash Studio. Inventory dashboards that still use them before upgrade or dashboard migration.\n"
+        "- Replace Log Tail usage with Log Observer Connect, Analytics/ADQL widgets, or Splunk Platform dashboard handoffs depending on the owning log source.\n"
+        "- Validate replacements with the same time range, filters, and deep links before deleting deprecated widgets.\n",
+    )
     write(
         out / "thousandeyes-dashboard-integration-runbook.md",
         "# ThousandEyes Dashboard Integration Runbook\n\n"
@@ -3050,6 +3813,14 @@ def render_security_ai_artifacts(out: Path, spec: dict[str, Any]) -> None:
     )
     write(out / "otel-secure-application-snippet.md", "# Secure Application OTel Snippet\n\n- Java: enable secure application settings on supported AppDynamics/OTel Java paths.\n- Validate runtime compatibility before restart.\n")
     write(out / "observability-ai-handoffs.md", "# Observability For AI Handoffs\n\n- OpenAI, LangChain, and Bedrock framework checks route through Observability for AI.\n- GPU work delegates to `splunk-observability-nvidia-gpu-integration`.\n- Cisco AI Pod work delegates to `splunk-observability-cisco-ai-pod-integration`.\n")
+    write(
+        out / "cisco-ai-pod-monitoring-runbook.md",
+        "# Cisco AI POD Monitoring Runbook\n\n"
+        "- Validate Cisco AI POD component scope before handoff: UCS/Intersight, Nexus fabric, NVIDIA GPU/DCGM, NIM or vLLM inference services, vector stores, and storage backends.\n"
+        "- For AppDynamics Observability for AI, confirm supported GenAI frameworks and Cisco AI POD dashboard expectations before instrumenting workloads.\n"
+        "- Delegate cluster-level GPU, Nexus, Intersight, NIM, vLLM, Milvus, NetApp, Pure Portworx, and Redfish telemetry to `splunk-observability-cisco-ai-pod-integration`.\n"
+        "- Validate correlation back to AppDynamics APM tiers, OTel service names, and Splunk Observability dimensions before declaring coverage complete.\n",
+    )
 
 
 def render_sap_artifacts(out: Path, spec: dict[str, Any]) -> None:
@@ -3212,6 +3983,19 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
             plan_text = (out / "enterprise-console-command-plan.sh").read_text(encoding="utf-8")
             if "controllerAdminPassword=" in plan_text or "mysqlRootPassword=" in plan_text:
                 errors.append("Enterprise Console command plan must not render password arguments")
+        vmware_inventory_path = out / "virtual-appliance-vmware-inventory.yaml"
+        if vmware_inventory_path.exists():
+            vmware_inventory = yaml.safe_load(vmware_inventory_path.read_text(encoding="utf-8")) or {}
+            if len(as_list(vmware_inventory.get("nodes"))) < 3:
+                errors.append("virtual-appliance-vmware-inventory.yaml must render three appliance nodes")
+        for vmware_plan_name in ("virtual-appliance-ovftool-plan.sh", "virtual-appliance-govc-plan.sh"):
+            vmware_plan_path = out / vmware_plan_name
+            if vmware_plan_path.exists():
+                vmware_plan_text = vmware_plan_path.read_text(encoding="utf-8")
+                if "VMWARE_APPLY" not in vmware_plan_text:
+                    errors.append(f"{vmware_plan_name} must default to dry-run and require VMWARE_APPLY=1")
+                if "://$GOVC_USERNAME:$GOVC_PASSWORD" in vmware_plan_text or "://${VMWARE_USERNAME}:${VMWARE_PASSWORD}" in vmware_plan_text:
+                    errors.append(f"{vmware_plan_name} must not place VMware password values in shell arguments")
         if live:
             notes.append(f"run live platform probes with APPD_PLATFORM_LIVE=1 bash {out / 'platform-validation-probes.sh'}")
     elif skill == "splunk-appdynamics-k8s-cluster-agent-setup":

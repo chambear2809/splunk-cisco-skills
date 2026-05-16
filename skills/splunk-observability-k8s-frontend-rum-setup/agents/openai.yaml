@@ -14,4 +14,4 @@ interface:
     spec, distroless detection, ingress-nginx CVE-2021-25742 preflight, and
     handoffs to splunk-observability-dashboard-builder for RUM dashboards
     and splunk-observability-native-ops for RUM detectors. This is Splunk
-    Browser RUM, NOT AppDynamics BRUM (handled by cisco-appdynamics-setup).
+    Browser RUM, NOT AppDynamics BRUM (handled by splunk-appdynamics-eum-setup).

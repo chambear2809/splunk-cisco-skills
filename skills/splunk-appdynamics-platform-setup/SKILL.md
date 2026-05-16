@@ -36,6 +36,10 @@ The renderer emits:
   `controller-install-upgrade-runbook.md`, `component-deployment-runbook.md`,
   `virtual-appliance-deployment-runbook.md`, `platform-ha-backup-runbook.md`,
   and `platform-security-checklist.md` for support-gated or outage-prone work.
+- `virtual-appliance-vmware-inventory.yaml`,
+  `virtual-appliance-ovftool-plan.sh`, `virtual-appliance-govc-plan.sh`, and
+  `virtual-appliance-vmware-validation.sh` for vSphere or standalone ESXi OVA
+  deployment handoff without passing VMware passwords on shell command lines.
 - `platform-validation-probes.sh` for local static checks and optional live
   reachability probes.
 
@@ -47,6 +51,8 @@ First-class deployment coverage:
   manual deployment, EUM Server GUI/console/silent installer modes, and
   Synthetic Server dependency sequencing.
 - Virtual Appliance infrastructure targets for VMware vSphere, VMware ESXi,
-  Microsoft Azure, AWS, KVM, and ROSA.
+  Microsoft Azure, AWS, KVM, and ROSA. The VMware path includes OVF Tool and
+  govc dry-run plans, OVA placement guidance, OVF property inspection, three
+  node network inventory, and `appdctl show boot` validation.
 - Virtual Appliance Standard and Hybrid service deployment with `appdcli`
   validation handoffs.

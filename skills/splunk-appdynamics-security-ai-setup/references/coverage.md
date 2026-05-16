@@ -6,3 +6,4 @@ Taxonomy rows owned by this skill:
 - `appd_secure_application_policies_apis`
 - `appd_secure_application_otel_java`
 - `appd_observability_for_ai`
+- `appd_cisco_ai_pod_monitoring`

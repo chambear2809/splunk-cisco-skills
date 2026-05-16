@@ -193,6 +193,8 @@ def test_specific_artifacts_render_for_all_appdynamics_children(tmp_path: Path) 
             "saml-ldap-runbook.md",
             "sensitive-data-controls-runbook.md",
             "licensing-validation-plan.sh",
+            "controller-26-4-release-runbook.md",
+            "licensing-storage-metrics-plan.sh",
         ],
         "splunk-appdynamics-agent-management-setup": [
             "agent-management-decision-guide.md",
@@ -207,6 +209,8 @@ def test_specific_artifacts_render_for_all_appdynamics_children(tmp_path: Path) 
             "auto-attach-and-discovery-runbook.md",
             "smart-agent-cli-deprecation-runbook.md",
             "appdynamics-download-verification-runbook.md",
+            "agent-management-26-4-release-runbook.md",
+            "agent-upgrade-api-plan.sh",
             "smart-agent-validation-probes.sh",
         ],
         "splunk-appdynamics-apm-setup": [
@@ -231,6 +235,7 @@ def test_specific_artifacts_render_for_all_appdynamics_children(tmp_path: Path) 
             "alerting-export-rollback-plan.sh",
             "anomaly-detection-rca-runbook.md",
             "aiml-baseline-diagnostics-runbook.md",
+            "alert-template-variables-runbook.md",
             "alerting-validation-probes.sh",
         ],
         "splunk-appdynamics-dashboards-reports-setup": [
@@ -239,6 +244,9 @@ def test_specific_artifacts_render_for_all_appdynamics_children(tmp_path: Path) 
             "dashboard-validation-probes.sh",
             "thousandeyes-dashboard-integration-runbook.md",
             "war-room-runbook.md",
+            "dash-studio-26-4-runbook.md",
+            "reports-26-4-runbook.md",
+            "log-tail-deprecation-runbook.md",
         ],
         "splunk-appdynamics-tags-extensions-setup": [
             "custom-tags-payload.json",
@@ -252,6 +260,7 @@ def test_specific_artifacts_render_for_all_appdynamics_children(tmp_path: Path) 
             "secure-application-policy-runbook.md",
             "otel-secure-application-snippet.md",
             "observability-ai-handoffs.md",
+            "cisco-ai-pod-monitoring-runbook.md",
         ],
         "splunk-appdynamics-analytics-setup": [
             "analytics-events-headers.redacted.json",
@@ -279,6 +288,10 @@ def test_platform_onprem_26_4_artifacts_render_and_gate(tmp_path: Path) -> None:
         "controller-install-upgrade-runbook.md",
         "component-deployment-runbook.md",
         "virtual-appliance-deployment-runbook.md",
+        "virtual-appliance-vmware-inventory.yaml",
+        "virtual-appliance-ovftool-plan.sh",
+        "virtual-appliance-govc-plan.sh",
+        "virtual-appliance-vmware-validation.sh",
         "platform-ha-backup-runbook.md",
         "platform-security-checklist.md",
         "platform-validation-probes.sh",
@@ -323,6 +336,31 @@ def test_platform_onprem_26_4_artifacts_render_and_gate(tmp_path: Path) -> None:
     va_runbook = (out / "virtual-appliance-deployment-runbook.md").read_text(encoding="utf-8")
     assert "VMware vSphere" in va_runbook
     assert "ROSA" in va_runbook
+    assert "virtual-appliance-ovftool-plan.sh" in va_runbook
+
+    vmware_inventory = (out / "virtual-appliance-vmware-inventory.yaml").read_text(encoding="utf-8")
+    assert "vcenter_password_file: /secure/vmware/vcenter-password" in vmware_inventory
+    assert "prod-platform-va-1" in vmware_inventory
+    assert "10.0.10.11/24" in vmware_inventory
+
+    ovftool_plan = (out / "virtual-appliance-ovftool-plan.sh").read_text(encoding="utf-8")
+    assert "VMWARE_APPLY" in ovftool_plan
+    assert "--probe" in ovftool_plan
+    assert "VMWARE_PASSWORD_FILE" in ovftool_plan
+    assert "GOVC_PASSWORD" not in ovftool_plan
+    assert 'VMWARE_NETWORK="${VMWARE_NETWORK:-VM Network}"' in ovftool_plan
+    assert ":-''" not in ovftool_plan
+
+    govc_plan = (out / "virtual-appliance-govc-plan.sh").read_text(encoding="utf-8")
+    assert "govc" in govc_plan
+    assert "import.spec" in govc_plan
+    assert "import.ova" in govc_plan
+    assert "VMWARE_APPLY" in govc_plan
+    assert ":-''" not in govc_plan
+
+    vmware_validate = (out / "virtual-appliance-vmware-validation.sh").read_text(encoding="utf-8")
+    assert "VMWARE_VALIDATE_LIVE" in vmware_validate
+    assert "appdctl show boot" in vmware_validate
 
     live_validate = run_script(
         SKILLS_DIR / "splunk-appdynamics-platform-setup/scripts/validate.sh",
@@ -404,6 +442,68 @@ synthetic_server:
     assert "`va_services_hybrid`" in runbook
 
 
+def test_platform_virtual_appliance_vmware_esxi_packet(tmp_path: Path) -> None:
+    spec = tmp_path / "va-esxi.yaml"
+    spec.write_text(
+        """
+deployment:
+  model: virtual_appliance
+virtual_appliance:
+  infrastructure_platform: vmware_esxi
+  service_deployment: standard
+  image_file: /secure/appdynamics/appd-va.ova
+  dns_domain: va.example.com
+  subnet_prefix: "24"
+  node_ips:
+    - 10.0.20.11
+    - 10.0.20.12
+    - 10.0.20.13
+  gateway_ip: 10.0.20.1
+  dns_server_ip: 10.0.20.53
+  vmware:
+    esxi:
+      esxi_host: esxi-1.example.com
+      esxi_username_file: /secure/vmware/esxi-username
+      esxi_password_file: /secure/vmware/esxi-password
+      datastore: local-ds
+      network: AppD-PortGroup
+platform:
+  name: appd-va
+controller:
+  primary_host: controller.example.com
+""",
+        encoding="utf-8",
+    )
+    out = tmp_path / "va-esxi-rendered"
+    result = run_script(
+        SKILLS_DIR / "splunk-appdynamics-platform-setup/scripts/setup.sh",
+        "--render",
+        "--spec",
+        str(spec),
+        "--output-dir",
+        str(out),
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+
+    selector = (out / "deployment-method-selector.yaml").read_text(encoding="utf-8")
+    assert "- va_vmware_esxi_ova" in selector
+
+    topology = (out / "platform-topology-inventory.yaml").read_text(encoding="utf-8")
+    assert "deployment_model: virtual_appliance" in topology
+
+    inventory = (out / "virtual-appliance-vmware-inventory.yaml").read_text(encoding="utf-8")
+    assert "esxi_host: esxi-1.example.com" in inventory
+    assert "esxi_password_file: /secure/vmware/esxi-password" in inventory
+    assert "10.0.20.11/24" in inventory
+
+    ovftool = (out / "virtual-appliance-ovftool-plan.sh").read_text(encoding="utf-8")
+    assert "vi://%s@%s/" in ovftool
+    assert "AppD-PortGroup" in ovftool
+
+    runbook = (out / "virtual-appliance-deployment-runbook.md").read_text(encoding="utf-8")
+    assert "sudo appdctl host init" in runbook
+
+
 def test_database_collector_payload_redacts_password(tmp_path: Path) -> None:
     out = render_skill("splunk-appdynamics-database-visibility-setup", tmp_path / "db")
     payload = json.loads((out / "database-collector-payloads.redacted.json").read_text(encoding="utf-8"))
@@ -438,6 +538,9 @@ def test_apm_and_alerting_deep_coverage_artifacts_render(tmp_path: Path) -> None
     aiml = (alerting / "aiml-baseline-diagnostics-runbook.md").read_text(encoding="utf-8")
     assert "Dynamic Baseline" in aiml
     assert "Automated Transaction Diagnostics" in aiml
+    variables = (alerting / "alert-template-variables-runbook.md").read_text(encoding="utf-8")
+    assert "latestEvent.eventProperties.hostname" in variables
+    assert "Core Web Vitals" in variables
     payload = json.loads((alerting / "alerting-content-payloads.json").read_text(encoding="utf-8"))
     assert "email_digests" in payload
     assert "anomaly_detection" in payload
@@ -448,11 +551,21 @@ def test_current_26_4_gap_artifacts_render(tmp_path: Path) -> None:
     sensitive = (controller / "sensitive-data-controls-runbook.md").read_text(encoding="utf-8")
     assert "Sensitive Data" in sensitive
     assert "Log Analytics masking" in sensitive
+    controller_release = (controller / "controller-26-4-release-runbook.md").read_text(encoding="utf-8")
+    assert "Edit Applications Name" in controller_release
+    assert "tag-based RBAC" in controller_release
+    storage_metrics = (controller / "licensing-storage-metrics-plan.sh").read_text(encoding="utf-8")
+    assert "Usage(Bytes)" in storage_metrics
 
     agent = render_skill("splunk-appdynamics-agent-management-setup", tmp_path / "agent-download")
     download = (agent / "appdynamics-download-verification-runbook.md").read_text(encoding="utf-8")
     assert "checksum" in download
     assert "digital signatures" in download
+    agent_release = (agent / "agent-management-26-4-release-runbook.md").read_text(encoding="utf-8")
+    assert "Agent Upgrade API" in agent_release
+    assert "Python 3.14" in agent_release
+    upgrade_api = (agent / "agent-upgrade-api-plan.sh").read_text(encoding="utf-8")
+    assert "APPD_OAUTH_TOKEN_FILE" in upgrade_api
 
     infra = render_skill("splunk-appdynamics-infrastructure-visibility-setup", tmp_path / "infra")
     gpu = (infra / "gpu-monitoring-runbook.md").read_text(encoding="utf-8")
@@ -465,12 +578,21 @@ def test_current_26_4_gap_artifacts_render(tmp_path: Path) -> None:
     thousandeyes = (dashboards / "thousandeyes-dashboard-integration-runbook.md").read_text(encoding="utf-8")
     assert "ThousandEyes" in thousandeyes
     assert "Dash Studio" in thousandeyes
+    dash_studio = (dashboards / "dash-studio-26-4-runbook.md").read_text(encoding="utf-8")
+    assert "standard-deviation" in dash_studio
+    reports = (dashboards / "reports-26-4-runbook.md").read_text(encoding="utf-8")
+    assert "TLS certificate" in reports
+    log_tail = (dashboards / "log-tail-deprecation-runbook.md").read_text(encoding="utf-8")
+    assert "Log Tail" in log_tail
 
     security = render_skill("splunk-appdynamics-security-ai-setup", tmp_path / "security")
     policy = (security / "secure-application-policy-runbook.md").read_text(encoding="utf-8")
     assert "runtime policy" in policy
     assert "Secure Application APIs" in policy
     assert "policyConfigs" in policy
+    ai_pod = (security / "cisco-ai-pod-monitoring-runbook.md").read_text(encoding="utf-8")
+    assert "Cisco AI POD" in ai_pod
+    assert "NVIDIA GPU" in ai_pod
 
     eum = render_skill("splunk-appdynamics-eum-setup", tmp_path / "eum")
     mobile_replay = (eum / "mobile-session-replay-runbook.md").read_text(encoding="utf-8")
@@ -478,6 +600,20 @@ def test_current_26_4_gap_artifacts_render(tmp_path: Path) -> None:
     assert "session.replay.enabled" in mobile_replay
     mobile_snippets = (eum / "mobile-sdk-snippets.md").read_text(encoding="utf-8")
     assert ".withSessionReplayEnabled(true)" in mobile_snippets
+    core_vitals = (eum / "core-web-vitals-runbook.md").read_text(encoding="utf-8")
+    assert "Interaction to Next Paint" in core_vitals
+    assert "First Input Delay" in core_vitals
+
+    db = render_skill("splunk-appdynamics-database-visibility-setup", tmp_path / "db-release")
+    db_release = (db / "database-26-4-release-readiness.yaml").read_text(encoding="utf-8")
+    assert "hashicorp_vault" in db_release
+    assert "blocking_sessions" in db_release
+    assert "query_executor_metrics" in db_release
+
+    synthetic = render_skill("splunk-appdynamics-synthetic-monitoring-setup", tmp_path / "synthetic-release")
+    psa = (synthetic / "private-synthetic-agent-26-4-runbook.md").read_text(encoding="utf-8")
+    assert "Podman" in psa
+    assert "Chrome 147" in psa
 
     analytics = render_skill("splunk-appdynamics-analytics-setup", tmp_path / "analytics")
     adql = (analytics / "analytics-adql-validation.sh").read_text(encoding="utf-8")
@@ -504,6 +640,25 @@ def test_second_pass_official_doc_family_rows_render(tmp_path: Path) -> None:
         "appd_eum_server_deployment",
         "appd_synthetic_server_deployment",
         "appd_sap_release_notes",
+        "appd_controller_local_credential_reauth",
+        "appd_edit_application_name_permission",
+        "appd_licensing_storage_usage_metrics",
+        "appd_machine_agent_tag_rbac",
+        "appd_agent_upgrade_api",
+        "appd_agent_license_release_reacquire",
+        "appd_cluster_agent_k8s_event_visibility",
+        "appd_dbmon_vault_access_keys",
+        "appd_dbmon_postgres_blocking_sessions",
+        "appd_dbmon_mongodb_query_executor_metrics",
+        "appd_dbmon_sqlserver_db2_support",
+        "appd_core_web_vitals_inp",
+        "appd_private_synthetic_agent_26_4_runtime",
+        "appd_alert_template_db_hostname",
+        "appd_core_web_vitals_alerting",
+        "appd_dash_studio_26_4_widgets",
+        "appd_reports_tls_direct_download",
+        "appd_log_tail_widget_deprecation",
+        "appd_cisco_ai_pod_monitoring",
     }
     assert expected <= ids
 
@@ -601,6 +756,9 @@ def test_cluster_agent_values_rendering(tmp_path: Path) -> None:
     assert "Splunk Observability Cloud" in runbook
     rbac = (out / "cluster-agent-rbac-review.md").read_text(encoding="utf-8")
     assert "26.4" in rbac
+    cluster_release = (out / "cluster-agent-26-4-release-runbook.md").read_text(encoding="utf-8")
+    assert "enhanced visibility" in cluster_release
+    assert "Kubernetes alerting" in cluster_release
     report = json.loads((out / "coverage-report.json").read_text(encoding="utf-8"))
     ids = {row["id"] for row in report["features"]}
     assert {
@@ -609,6 +767,7 @@ def test_cluster_agent_values_rendering(tmp_path: Path) -> None:
         "appd_cluster_agent_otel_collector",
         "appd_k8s_combined_agent_dual_signal",
         "appd_k8s_splunk_o11y_export",
+        "appd_cluster_agent_k8s_event_visibility",
     } <= ids
 
 

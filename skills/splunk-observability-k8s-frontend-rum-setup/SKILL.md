@@ -32,7 +32,7 @@ description: >-
   detectors to splunk-observability-native-ops, the SIM RUM modular input
   to splunk-observability-cloud-integration-setup, and RUM-to-APM trace
   linking to splunk-observability-k8s-auto-instrumentation-setup. Explicitly
-  NOT AppDynamics BRUM (handled by cisco-appdynamics-setup). Use when
+  NOT AppDynamics BRUM (handled by splunk-appdynamics-eum-setup). Use when
   wiring a Kubernetes-hosted frontend (React, Vue, Angular, Next.js, Nuxt,
   Remix, or any nginx/httpd/distroless-served SPA or MPA) to Splunk Browser
   RUM, enabling Session Replay, configuring Frustration Signals, uploading
@@ -44,7 +44,7 @@ description: >-
 
 This skill configures **Splunk Browser RUM** (`@splunk/otel-web` 2.x) plus optional **Session Replay** (Splunk recorder) for frontend applications served from Kubernetes pods. It is a **standalone reusable** skill: Splunk Browser RUM beacons land directly at `rum-ingest.<realm>.observability.splunkcloud.com/v1/rum`, so the Splunk OTel Collector is **not** a prerequisite for the browser side.
 
-> **Disambiguation**: this is **Splunk Browser RUM**, not **AppDynamics BRUM**. AppDynamics Browser Real User Monitoring is handled by [cisco-appdynamics-setup](../cisco-appdynamics-setup/SKILL.md). The two products and their SDKs are distinct.
+> **Disambiguation**: this is **Splunk Browser RUM**, not **AppDynamics BRUM**. AppDynamics Browser Real User Monitoring is handled by [splunk-appdynamics-eum-setup](../splunk-appdynamics-eum-setup/SKILL.md). The two products and their SDKs are distinct.
 
 ## Architecture: four injection modes
 
@@ -214,7 +214,7 @@ Splunk Browser RUM links front-end traces to back-end APM traces via the `Server
 - Modifying application source code or build pipelines beyond the Webpack plugin / CLI source-map helper. Mode B (runtime-config ConfigMap) covers the npm-bundled SDK case at the K8s layer.
 - CSP header rewriting (advisory only — emits exact `Content-Security-Policy` header lines but does not patch ingress headers).
 - Istio EnvoyFilter / Lua body-rewrite injection (intentionally not rendered — mesh users use mode A.i).
-- AppDynamics Browser RUM (handled by [cisco-appdynamics-setup](../cisco-appdynamics-setup/SKILL.md)).
+- AppDynamics Browser RUM (handled by [splunk-appdynamics-eum-setup](../splunk-appdynamics-eum-setup/SKILL.md)).
 - FedRAMP / GovCloud Browser RUM (not currently supported by the Splunk Browser RUM agent — documented in [references/realms-and-endpoints.md](references/realms-and-endpoints.md)).
 - Pre-emptive cookie-consent banner integration (operator's responsibility; documented as legal note in [references/session-replay-privacy.md](references/session-replay-privacy.md)).
 
