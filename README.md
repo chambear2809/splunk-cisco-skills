@@ -262,6 +262,23 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision inputs |
 | `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards |
 | `cisco-appdynamics-setup` | `Splunk_TA_AppDynamics` | Configure AppDynamics controller and analytics connections, inputs, and dashboards |
+| `splunk-appdynamics-setup` | AppDynamics suite router | Route AppDynamics requests, enforce taxonomy coverage, orchestrate child skills, and emit doctor reports |
+| `splunk-appdynamics-platform-setup` | AppDynamics On-Premises / Virtual Appliance | Render Enterprise Console, Controller, Events Service, EUM Server, Synthetic Server, HA, upgrade, and secure platform runbooks |
+| `splunk-appdynamics-controller-admin-setup` | AppDynamics Controller administration | Configure and validate API clients, OAuth, users, groups, roles, SAML, LDAP, permissions, licensing, and license rules |
+| `splunk-appdynamics-agent-management-setup` | Smart Agent / Agent Management | Render Smart Agent remote install, upgrade, rollback, and managed .NET, Database, Java, Machine, and Node.js agent plans |
+| `splunk-appdynamics-apm-setup` | AppDynamics APM | Configure and validate business applications, tiers, nodes, business transactions, endpoints, remote services, information points, snapshots, metrics, and app-server snippets |
+| `splunk-appdynamics-k8s-cluster-agent-setup` | AppDynamics Cluster Agent | Render Cluster Agent, Kubernetes auto-instrumentation, Splunk OTel Collector, and workload rollout validation assets |
+| `splunk-appdynamics-infrastructure-visibility-setup` | AppDynamics Infrastructure Visibility | Render Machine Agent, Server Visibility, Network Visibility, Docker/container visibility, service availability, tags, and infrastructure health rules |
+| `splunk-appdynamics-database-visibility-setup` | AppDynamics Database Visibility | Render Database Agent readiness, redacted Database Visibility API collector payloads, and DB server/node/event validation |
+| `splunk-appdynamics-analytics-setup` | AppDynamics Analytics | Render Transaction, Log, Browser, Mobile, Synthetic, IoT/Connected Devices Analytics, ADQL, Events API schemas, publish, and query validation |
+| `splunk-appdynamics-eum-setup` | AppDynamics EUM / RUM | Render Browser RUM, Mobile RUM, IoT RUM, app keys, JS injection, mobile snippets, Browser and Mobile Session Replay, source maps, and beacon validation |
+| `splunk-appdynamics-synthetic-monitoring-setup` | AppDynamics Synthetic Monitoring | Render Browser Synthetic, Synthetic API Monitoring, hosted and private agents, PSA Docker/Kubernetes/Minikube assets, Shepherd URLs, and run validation |
+| `splunk-appdynamics-log-observer-connect-setup` | AppDynamics Log Observer Connect | Render LOC setup, legacy Splunk integration detection/disablement, Splunk service-account handoffs, and deep-link validation |
+| `splunk-appdynamics-alerting-content-setup` | AppDynamics alerting content | Render health rules, schedules, policies, actions, email digests, suppression, import/export, rollback, and validation |
+| `splunk-appdynamics-dashboards-reports-setup` | AppDynamics dashboards and reports | Render custom dashboards, Dash Studio handoffs, reports, scheduled reports, War Rooms, and dashboard/report validation |
+| `splunk-appdynamics-tags-extensions-setup` | AppDynamics tags and extensions | Render Custom Tag APIs, tag enablement, Integration Modules, extensions, Machine Agent custom metrics, and external integration runbooks |
+| `splunk-appdynamics-security-ai-setup` | AppDynamics security and AI | Render Cisco Secure Application, Secure Application for OTel Java, Observability for AI, GenAI, GPU, and Cisco AI Pod handoffs |
+| `splunk-appdynamics-sap-agent-setup` | AppDynamics SAP Agent | Render SAP Agent, ABAP Agent, local and gateway HTTP SDK, SNP CrystalBridge, BiQ Collector, NetWeaver transports, authorization, and validation runbooks |
 | `cisco-security-cloud-setup` | `CiscoSecurityCloud` | Install and configure product-specific Cisco Security Cloud inputs with dashboard-ready defaults |
 | `cisco-secure-access-setup` | `cisco-cloud-security` + `TA-cisco-cloud-security-addon` | Install and configure Secure Access org accounts, event add-on prerequisites, app settings, and dashboard prerequisites |
 | `cisco-webex-setup` | `ta_cisco_webex_add_on_for_splunk` + `cisco_webex_meetings_app_for_splunk` | Configure Webex OAuth accounts, dashboard indexes/macros, and REST inputs for meetings, audit, qualities, calling, generic endpoints, and Contact Center |

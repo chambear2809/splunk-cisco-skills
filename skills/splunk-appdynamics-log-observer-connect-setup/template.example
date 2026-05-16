@@ -1,0 +1,11 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+splunk_platform:
+  type: cloud
+  stack: example
+  service_account: appd-loc-service-account
+legacy_integration:
+  detect: true
+  disable: render_only
+deep_links:
+  validate: true

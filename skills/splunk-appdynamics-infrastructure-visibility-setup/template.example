@@ -1,0 +1,12 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+machine_agent:
+  hosts: [host01.example.com]
+server_visibility: true
+network_visibility: validate_only
+container_visibility:
+  docker: true
+service_availability:
+  probes: []
+server_tags:
+  environment: production

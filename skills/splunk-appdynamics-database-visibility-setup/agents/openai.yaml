@@ -1,0 +1,5 @@
+name: splunk-appdynamics-database-visibility-setup
+short_description: "Render AppDynamics Database Visibility collector and validation plans"
+entrypoint: "skills/splunk-appdynamics-database-visibility-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-database-visibility-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-database-visibility-setup/scripts/validate.sh --help"

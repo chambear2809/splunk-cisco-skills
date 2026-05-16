@@ -1,0 +1,109 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+doc_version: 26.4.0
+operator_mode: render
+smart_agent:
+  controller_version: 26.4.0
+  package_source: download_portal
+  package_source_url: reviewed-package-url
+  install_dir: /opt/appdynamics/appdsmartagent
+  service_mode: service
+  run_user: appdynamics
+  run_group: appdynamics
+  enable_auto_attach: true
+  run_auto_discovery: true
+  config:
+    controller_port: 443
+    fm_service_port: 443
+    enable_ssl: true
+    polling_interval_seconds: 300
+    scanning_interval_seconds: 300
+    log_level: info
+    storage_dir: /opt/appdynamics/appdsmartagent/storage
+    tls_min_version: TLS 1.2
+    tls_max_version: TLS 1.3
+    include_system_ca_certs_pool: true
+    agent_http_proxy: ""
+    agent_https_proxy: ""
+    agent_no_proxy: ""
+  remote:
+    enabled: true
+    max_concurrency: 5
+    remote_dir: /opt/appdynamics/appdsmartagent
+    linux_protocol: ssh
+    windows_protocol: winrm
+    ssh_user: appdynamics
+    ssh_private_key_file: /secure/appdynamics/id_rsa
+    ssh_known_hosts_file: /secure/appdynamics/known_hosts
+    ssh_password_env_var: SSH_PASSWORD
+    ssh_proxy:
+      enabled: false
+      type: socks5
+      host: proxy.example.com
+      port: 1080
+    winrm_auth: certificate
+    winrm_cert_file: /secure/appdynamics/winrm-cert.pem
+    winrm_key_file: /secure/appdynamics/winrm-key.pem
+  remote_execution: false
+  access_key_file: /secure/appdynamics/account_access_key
+targets:
+  - host: app01.example.com
+    os_family: linux
+    agent_types: [java, machine]
+    install_dir: /opt/appdynamics
+  - host: win01.example.com
+    os_family: windows
+    agent_types: [dotnet_msi, machine]
+    install_dir: C:\AppDynamics
+managed_agents:
+  java:
+    enabled: true
+    application_name: checkout
+    tier_name: api
+    node_name: app01
+  machine:
+    enabled: true
+    server_visibility: true
+    install_as_service: true
+  dotnet_msi:
+    enabled: true
+    iis_restart_window: maintenance
+  node:
+    enabled: true
+    application_name: checkout
+    tier_name: node-web
+  db:
+    enabled: true
+    jvm_args: []
+  apache:
+    enabled: false
+  php:
+    enabled: false
+  python:
+    enabled: false
+deployment_groups:
+  enabled: true
+  groups:
+    - name: checkout-linux
+      agent_types: [java, machine]
+      auto_attach: true
+      hosts: [app01.example.com]
+auto_attach:
+  enabled: true
+  ld_preload_template: default
+  java_agent_path: /opt/appdynamics/java/javaagent.jar
+  node_agent_path: /opt/appdynamics/node
+auto_discovery:
+  enabled: true
+  exclude_labels: [process.cpu.usage, process.memory.usage]
+  exclude_processes: []
+  exclude_users: []
+download_validation:
+  require_checksum: true
+  require_signature_if_published: true
+  transfer_mode: binary
+  release_notes_required: true
+  rollback_package_required: true
+rollback:
+  keep_previous_version: true
+  ui_rollback_only_after_ui_upgrade: true

@@ -1,0 +1,5 @@
+name: splunk-appdynamics-dashboards-reports-setup
+short_description: "Render AppDynamics dashboards, reports, ThousandEyes, and War Room plans"
+entrypoint: "skills/splunk-appdynamics-dashboards-reports-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-dashboards-reports-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-dashboards-reports-setup/scripts/validate.sh --help"

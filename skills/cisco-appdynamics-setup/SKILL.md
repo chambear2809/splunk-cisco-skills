@@ -22,7 +22,8 @@ no separate companion Splunk app in the local package cache for this workflow.
 **Pull from Splunkbase first (latest version), then fall back to local or custom packages.**
 
 Use `splunk-app-install` with `--source splunkbase --app-id 3471` to get the
-latest release. If Splunkbase is unavailable, fall back to the local archive in
+latest release. Latest verified Splunkbase release is `3.2.1` as of
+2026-05-16. If Splunkbase is unavailable, fall back to the local archive in
 `splunk-ta/` (`cisco-splunk-add-on-for-appdynamics_*.tar.gz`) or a custom URL.
 This applies to both Splunk Cloud (ACS) and Splunk Enterprise.
 

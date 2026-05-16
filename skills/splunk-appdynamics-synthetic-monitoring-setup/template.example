@@ -1,0 +1,13 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+synthetic_endpoint: https://synthetic.api.appdynamics.com
+browser_jobs:
+  - name: checkout-homepage
+    url: https://example.com
+api_monitors:
+  - name: checkout-api
+    url: https://example.com/health
+private_synthetic_agent:
+  enabled: true
+  shepherd_url: https://synthetic.api.appdynamics.com
+  secret_name: appdynamics-synthetic-agent-secret

@@ -1,0 +1,5 @@
+name: splunk-appdynamics-infrastructure-visibility-setup
+short_description: "Render AppDynamics Machine Agent, GPU, and Infrastructure Visibility plans"
+entrypoint: "skills/splunk-appdynamics-infrastructure-visibility-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-infrastructure-visibility-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-infrastructure-visibility-setup/scripts/validate.sh --help"

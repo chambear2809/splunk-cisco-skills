@@ -1,0 +1,11 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+applications:
+  - name: checkout
+    tiers: [web, api, worker]
+business_transactions:
+  validate_detection: true
+service_endpoints:
+  render_examples: true
+agent_snippets:
+  languages: [java, dotnet, nodejs, python, php]

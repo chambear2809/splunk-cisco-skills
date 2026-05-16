@@ -348,6 +348,52 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
         "--apply",
         "--quickstart",
     ),
+    # Splunk AppDynamics suite wrappers render coverage, runbooks, doctor
+    # summaries, validation, and rollback plans by default. Treat those
+    # planning modes as read-only through MCP. Apply modes are classified as
+    # mutating when the generic --apply flag or a child-specific mutation gate
+    # is present, matching the public skill contract even though the current
+    # suite renderer still emits reviewed apply plans instead of running live
+    # AppDynamics mutations.
+    ("splunk-appdynamics-setup", "setup.sh"): (
+        "--apply",
+        "--accept-remote-execution",
+        "--accept-enterprise-console-mutation",
+        "--accept-k8s-rollout",
+        "--accept-eum-source-edit",
+        "--accept-analytics-event-publish",
+    ),
+    ("splunk-appdynamics-platform-setup", "setup.sh"): (
+        "--apply",
+        "--accept-enterprise-console-mutation",
+    ),
+    ("splunk-appdynamics-controller-admin-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-agent-management-setup", "setup.sh"): (
+        "--apply",
+        "--accept-remote-execution",
+    ),
+    ("splunk-appdynamics-apm-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-k8s-cluster-agent-setup", "setup.sh"): (
+        "--apply",
+        "--accept-k8s-rollout",
+    ),
+    ("splunk-appdynamics-infrastructure-visibility-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-database-visibility-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-analytics-setup", "setup.sh"): (
+        "--apply",
+        "--accept-analytics-event-publish",
+    ),
+    ("splunk-appdynamics-eum-setup", "setup.sh"): (
+        "--apply",
+        "--accept-eum-source-edit",
+    ),
+    ("splunk-appdynamics-synthetic-monitoring-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-log-observer-connect-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-alerting-content-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-dashboards-reports-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-tags-extensions-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-security-ai-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-sap-agent-setup", "setup.sh"): ("--apply",),
 }
 # Scripts that are read-only by definition (their entire purpose is to inspect
 # state). Validate scripts only check Splunk and never mutate it. The smoke_*
@@ -375,11 +421,13 @@ DIRECT_SECRET_FLAGS = {
     "--bearer-token",
     "--client-secret",
     "--connection-string",
+    "--controller-password",
     "--datasource",
     "--db-password",
     "--agent-control-admin-key",
     "--agent-control-api-key",
     "--external-id",
+    "--events-api-key",
     "--galileo-api-key",
     "--galileo-bearer-token",
     "--hec-token",
@@ -454,7 +502,9 @@ SECRET_FILE_FLAGS = {
     "--bearer-token-file",
     "--client-secret-file",
     "--cloudlock-token-file",
+    "--controller-password-file",
     "--discovery-secret-file",
+    "--events-api-key-file",
     "--galileo-api-key-file",
     "--hec-token-file",
     "--idxc-secret-file",

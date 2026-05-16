@@ -1,0 +1,10 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+health_rules:
+  - name: checkout latency
+    application: checkout
+policies: []
+actions: []
+schedules: []
+rollback:
+  export_before_apply: true

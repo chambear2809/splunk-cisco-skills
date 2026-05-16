@@ -1,0 +1,9 @@
+controller_url: https://example.saas.appdynamics.com
+analytics_endpoint: https://analytics.api.appdynamics.com
+global_account_name: customer1_abcdef
+events_api_key_file: /secure/appd/events_api_key
+adql:
+  - SELECT * FROM transactions LIMIT 10
+custom_events:
+  publish_enabled: false
+  schema: appd_custom_events

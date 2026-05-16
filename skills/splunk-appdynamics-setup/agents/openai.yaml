@@ -1,0 +1,5 @@
+name: splunk-appdynamics-setup
+short_description: "Route Splunk AppDynamics requests and render coverage reports"
+entrypoint: "skills/splunk-appdynamics-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-setup/scripts/validate.sh --help"

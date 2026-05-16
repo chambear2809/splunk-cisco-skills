@@ -1,0 +1,5 @@
+name: splunk-appdynamics-apm-setup
+short_description: "Render AppDynamics APM, serverless, OTel, and instrumentation plans"
+entrypoint: "skills/splunk-appdynamics-apm-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-apm-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-apm-setup/scripts/validate.sh --help"

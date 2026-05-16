@@ -1,0 +1,5 @@
+name: splunk-appdynamics-tags-extensions-setup
+short_description: "Render AppDynamics tags, extensions, and integration module plans"
+entrypoint: "skills/splunk-appdynamics-tags-extensions-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-tags-extensions-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-tags-extensions-setup/scripts/validate.sh --help"

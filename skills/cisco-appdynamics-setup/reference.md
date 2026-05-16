@@ -1,7 +1,8 @@
 # Cisco AppDynamics Add-on Reference
 
-Reference for the `Splunk_TA_AppDynamics` package shipped in
-`cisco-splunk-add-on-for-appdynamics_320.tar.gz`.
+Reference for the `Splunk_TA_AppDynamics` package. Install from Splunkbase ID
+`3471` first so users get the latest compatible release; use local
+`cisco-splunk-add-on-for-appdynamics_*.tar.gz` archives only as a fallback.
 
 ## Controller Connection Fields
 
@@ -276,9 +277,9 @@ value `appdynamics`. There is no macro indirection for the index.
 |------|-------|
 | App name | `Splunk_TA_AppDynamics` |
 | Package label | Cisco Splunk Add-on for AppDynamics |
-| Version | `3.2.0` |
+| Latest verified Splunkbase version | `3.2.1` |
+| Local fallback archive pattern | `cisco-splunk-add-on-for-appdynamics_*.tar.gz` |
 | Splunkbase ID | `3471` |
-| Local archive pattern | `cisco-splunk-add-on-for-appdynamics_*.tar.gz` |
 
 ## Optional Follow-on Content
 

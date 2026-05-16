@@ -1,0 +1,13 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+sap_system:
+  sid: PRD
+  netweaver: true
+sap_agent:
+  host: sap-agent01.example.com
+abap_agent:
+  transports: render_only
+http_sdk:
+  render_snippets: true
+snp_crystalbridge: validate_only
+biq_collector: validate_only

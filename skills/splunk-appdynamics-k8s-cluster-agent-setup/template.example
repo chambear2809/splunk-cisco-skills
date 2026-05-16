@@ -1,0 +1,14 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+namespace: appdynamics
+secret_name: appdynamics-controller-secret
+languages:
+  - java
+  - dotnet-core-linux
+  - nodejs
+splunk_otel_collector:
+  enabled: true
+  mode: cluster-agent-managed
+targets:
+  - namespace: checkout
+    workload: deployment/checkout-api

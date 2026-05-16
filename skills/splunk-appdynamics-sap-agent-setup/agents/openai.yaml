@@ -1,0 +1,5 @@
+name: splunk-appdynamics-sap-agent-setup
+short_description: "Render AppDynamics SAP Agent, ABAP, SDK, and collector runbooks"
+entrypoint: "skills/splunk-appdynamics-sap-agent-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-sap-agent-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-sap-agent-setup/scripts/validate.sh --help"

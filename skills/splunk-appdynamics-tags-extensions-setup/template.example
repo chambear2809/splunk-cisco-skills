@@ -1,0 +1,12 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+tags:
+  - entity_selector: application:checkout
+    key: service.owner
+    value: payments
+extensions:
+  machine_agent_custom_metrics: true
+integrations:
+  servicenow: runbook
+  jira: runbook
+  scalyr: runbook

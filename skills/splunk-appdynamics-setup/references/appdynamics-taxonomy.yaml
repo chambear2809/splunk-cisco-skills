@@ -1,0 +1,794 @@
+version: 1
+generated_from:
+  - https://help.splunk.com/appdynamics-saas
+  - https://help.splunk.com/en/appdynamics-on-premises
+  - https://help.splunk.com/en/appdynamics-sap-agent
+notes: >-
+  Checked-in source of truth for the gapless Splunk AppDynamics skill suite.
+  A row is covered only when it has an owner, official source URL, status,
+  validation method, and explicit apply boundary.
+features:
+  - id: appd_saas_overview
+    family: SaaS
+    feature: AppDynamics SaaS tenancy, regions, product navigation, and release posture
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/appdynamics-saas
+    status: validate_only
+    validation_method: Controller tenant reachability, account metadata readback, and doc-version review
+    apply_boundary: SaaS tenant provisioning is not automated; render onboarding and validation only.
+  - id: appd_saas_release_notes_references
+    family: Release Notes and References
+    feature: SaaS Controller, agents, services, version support, compatibility, maintenance, and known issues references
+    owner: splunk-appdynamics-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/release-notes-and-references
+    status: validate_only
+    validation_method: Doctor output confirms target doc family, release notes, known issues, support, and compatibility references were reviewed
+    apply_boundary: Release notes and compatibility references are read-only planning inputs; no product mutation.
+  - id: appd_product_announcements_alerts
+    family: Release Notes and References
+    feature: Product announcements, critical alerts, end-of-support notices, and upcoming-change review
+    owner: splunk-appdynamics-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/product-announcements-and-alerts
+    status: validate_only
+    validation_method: Doctor output records product announcement and alert review before apply-capable child workflows
+    apply_boundary: Product announcements and alerts are read-only planning inputs; child skills adjust runbooks but do not mutate from these pages directly.
+  - id: appd_onprem_overview
+    family: On-Premises
+    feature: AppDynamics On-Premises overview, self-hosted deployment navigation, and product-family routing
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises
+    status: validate_only
+    validation_method: Platform doctor confirms On-Premises product family, component scope, and self-hosted model selection
+    apply_boundary: Overview and navigation are read-only; component-specific changes route to platform child runbooks.
+  - id: appd_onprem_release_notes_references
+    family: Release Notes and References
+    feature: On-Premises Controller, agents, services, Virtual Appliance, version support, compatibility, maintenance, and known issues references
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/release-notes-and-references
+    status: validate_only
+    validation_method: Platform runbooks require target-version, known-issue, support-window, and component-compatibility review
+    apply_boundary: Release and compatibility review is read-only; install or upgrade changes remain gated platform runbooks.
+  - id: appd_onprem_deployment_planning
+    family: On-Premises
+    feature: Deployment planning, sizing, component requirements, host preparation, and installation path selection
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/appdynamics-on-premises/plan-your-deployment/plan-your-deployment
+    status: render_runbook
+    validation_method: Deployment method selector, host inventory, sizing checklist, component prerequisites, and readiness review
+    apply_boundary: Planning produces runbooks and validation assets only; no host or Controller mutation.
+  - id: appd_platform_installation_quickstart
+    family: Platform
+    feature: Platform Installation Quick Start, GUI installation quick start, and discovery or upgrade quick start
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/platform-installation-quick-start/platform-installation-quick-start
+    status: render_runbook
+    validation_method: Deployment method matrix, Enterprise Console readiness, Controller and Events Service quickstart checks
+    apply_boundary: Quickstart paths render guided steps; Enterprise Console mutation still requires --accept-enterprise-console-mutation.
+  - id: appd_onprem_controller
+    family: On-Premises
+    feature: On-Premises Controller installation and service lifecycle
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.4.0/controller-deployment/install-the-controller-using-the-cli
+    status: render_runbook
+    validation_method: Controller process, ports, health endpoint, and filesystem checks
+    apply_boundary: Installer and service changes are rendered; live mutation requires operator execution.
+  - id: appd_virtual_appliance
+    family: Virtual Appliance
+    feature: AppDynamics Virtual Appliance deployment and upgrade path
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/overview/splunk-appdynamics-on-premises-and-virtual-appliance-self-hosted/splunk-appdynamics-on-premises-virtual-appliance-self-hosted
+    status: render_runbook
+    validation_method: Appliance status, Controller health, and component version readback
+    apply_boundary: Appliance lifecycle is UI/support-gated; render runbook and validation only.
+  - id: appd_enterprise_console
+    family: Platform
+    feature: Enterprise Console host, Controller, Events Service, EUM Server, and Synthetic Server management
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/enterprise-console/26.4.0/administer-the-enterprise-console/enterprise-console-command-line
+    status: cli_apply
+    validation_method: Enterprise Console inventory and managed-component status readback
+    apply_boundary: Mutations require --accept-enterprise-console-mutation and reviewed host inventory.
+  - id: appd_events_service_deployment
+    family: Platform
+    feature: Events Service deployment, embedded-to-scaled conversion, Linux clusters, Windows manual deployment, and Controller integration
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/events-service-deployment
+    status: render_runbook
+    validation_method: Component deployment runbook, Events Service node inventory, Controller event-service settings, URL probes, and cluster status checks
+    apply_boundary: Events Service CLI/GUI changes are rendered and reviewed; Enterprise Console mutations require --accept-enterprise-console-mutation and Windows deployment stays manual.
+  - id: appd_eum_server_deployment
+    family: Platform
+    feature: EUM Server deployment, GUI/console/silent installer modes, demo or production mode, reverse proxy, and Controller/Events integration
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/eum-server-deployment
+    status: render_runbook
+    validation_method: Component deployment runbook, installer-mode checklist, EUM endpoint probes, reverse-proxy/TLS checks, and beacon validation
+    apply_boundary: Enterprise Console does not install EUM Server; package installer and proxy changes remain operator-run runbooks.
+  - id: appd_synthetic_server_deployment
+    family: Platform
+    feature: Synthetic Server deployment, installation dependencies, Synthetic Agents, EUM connectivity, and Controller integration
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/synthetic-server-deployment/synthetic-server-deployment/installation-overview
+    status: render_runbook
+    validation_method: Component deployment runbook, dependency gates for Controller/Events/EUM, Synthetic Server endpoint probes, and Synthetic Agent checks
+    apply_boundary: Synthetic Server installation is sequenced as a reviewed operator runbook after required platform components are healthy.
+  - id: appd_platform_ha
+    family: Platform
+    feature: High availability, backup, restore, and disaster recovery planning
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.4.0/controller-deployment/controller-high-availability/prerequisites-for-high-availability
+    status: render_runbook
+    validation_method: HA topology checklist, backup artifact presence, and failover readiness review
+    apply_boundary: HA cutovers and restore operations are operator-run runbooks.
+  - id: appd_platform_upgrade
+    family: Platform
+    feature: Controller, Events Service, EUM Server, Synthetic Server, and Enterprise Console upgrades
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/controller-deployment/26.4.0/controller-deployment/upgrade-the-controller-using-the-enterprise-console/upgrade-an-ha-pair/upgrade-the-ha-controller-pair-using-the-cli
+    status: render_runbook
+    validation_method: Version compatibility matrix and post-upgrade health checks
+    apply_boundary: Upgrade commands are rendered only; no unattended upgrade automation.
+  - id: appd_platform_security
+    family: Platform
+    feature: TLS, certificates, secure platform settings, and admin hardening
+    owner: splunk-appdynamics-platform-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/secure-the-platform/secure-the-platform
+    status: render_runbook
+    validation_method: TLS probe, certificate expiry review, and Controller secure-setting checklist
+    apply_boundary: Certificate and hardening changes are rendered as reviewed runbooks.
+  - id: appd_api_overview
+    family: APIs
+    feature: Splunk AppDynamics APIs overview and API family routing
+    owner: splunk-appdynamics-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/overview-of-splunk-appdynamics-apis
+    status: validate_only
+    validation_method: Parent coverage checker confirms API families route to child owners
+    apply_boundary: Parent does not apply API changes; child owners perform or render apply plans.
+  - id: appd_platform_api_index
+    family: APIs
+    feature: Platform API index coverage for Controller, access, and administrative APIs
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index
+    status: api_apply
+    validation_method: API list/readback for targeted resources
+    apply_boundary: Only documented endpoints are API-applied; missing endpoints render runbooks.
+  - id: appd_api_clients_oauth
+    family: Controller Admin
+    feature: API clients, OAuth flows, and token-file authentication
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index
+    status: api_apply
+    validation_method: API client inventory and OAuth token probe from client-secret file
+    apply_boundary: Client secrets are never rendered; only file-backed create/update plans.
+  - id: appd_users_groups_roles
+    family: Controller Admin
+    feature: Users, groups, roles, permissions, account permissions, SAML, and LDAP readiness
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/appdynamics-saas/appdynamics-saas-administration
+    status: api_apply
+    validation_method: User, group, role, and permission readback plus SAML/LDAP configuration checklist
+    apply_boundary: API-backed objects apply through Controller APIs; IdP-side SAML/LDAP changes are runbooks.
+  - id: appd_licensing_rules
+    family: Licensing
+    feature: Licensing, subscriptions, license rules, and consumption validation
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/appdynamics-saas/licensing
+    status: api_apply
+    validation_method: License usage, rule, and entitlement readbacks
+    apply_boundary: Documented license-rule APIs may apply; procurement and entitlement changes are not automated.
+  - id: appd_sensitive_data_collection_security
+    family: Controller Admin
+    feature: Sensitive data collection controls, privacy settings, SQL/log masking, and data collection dashboard validation
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/sensitive-data-collection-and-security
+    status: render_runbook
+    validation_method: Raw SQL suppression, query literal hiding, error-log exclusion, Log Analytics masking, environment-variable filters, RBAC, and Data Collection Dashboard review
+    apply_boundary: Privacy and data-collection controls are rendered as reviewed runbooks; agent, analytics, and database changes delegate to their child owners.
+  - id: appd_smart_agent_readiness
+    family: Agent Management
+    feature: Smart Agent prerequisites, supported platforms, supported agents, permissions, memory, disk, and license readiness
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
+    status: validate_only
+    validation_method: Readiness inventory checks Controller >=24.7.0, license availability, permissions, supported OS, resource minimums, and service user or group mapping
+    apply_boundary: Readiness review is read-only; host changes are rendered only after the target path is selected.
+  - id: appd_smart_agent
+    family: Agent Management
+    feature: Smart Agent inventory, health, Controller UI registration, and managed-agent lifecycle ownership
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent
+    status: cli_apply
+    validation_method: Smart Agent service status, Controller Smart Agents tab registration, host reachability, and managed-agent state readback
+    apply_boundary: Remote execution requires --accept-remote-execution; otherwise render commands only.
+  - id: appd_smart_agent_config
+    family: Agent Management
+    feature: Smart Agent config.ini, environment overrides, proxy configuration, TLS settings, telemetry, polling, scanning, storage, and auto-discovery settings
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/configure-smart-agent
+    status: render_runbook
+    validation_method: Rendered config template review verifies ControllerURL, AccountName, file-backed AccountAccessKey handling, proxy/TLS knobs, telemetry, polling, scanning, and auto-discovery values
+    apply_boundary: Config file updates are rendered for operator review; account access keys must be injected from chmod-600 files outside rendered artifacts.
+  - id: appd_smart_agent_local_remote_install
+    family: Agent Management
+    feature: Smart Agent local install, remote install, service or process mode, auto-attach flag, Linux SSH, Windows WinRM, and remote host ownership
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/get-started/install-smart-agent
+    status: cli_apply
+    validation_method: Command plan verifies unzip, config.ini, smartagentctl start options, remote.yaml, Linux ownership, Windows service behavior, and Controller registration
+    apply_boundary: Local and remote install commands require operator review; remote execution requires --accept-remote-execution and host-scoped targets.
+  - id: appd_smart_agent_validate_upgrade_uninstall_sync
+    family: Agent Management
+    feature: Smart Agent validate, upgrade, manual upgrade backup, uninstall, and primary-host to remote-host synchronization
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/upgrade-smart-agent
+    status: cli_apply
+    validation_method: Service status, Controller registration, upgrade history, Linux daemon reload/restart, Windows upgrade log, backup file list, and remote stop/start synchronization checks
+    apply_boundary: Upgrade, uninstall, and synchronization are rendered as reviewed command plans; direct remote execution is gated.
+  - id: appd_agent_management_ui_cli
+    family: Agent Management
+    feature: Agent Management UI for Smart Agent inventory plus app-server, Machine Agent, and Database Agent install, upgrade, and rollback
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-ui
+    status: render_runbook
+    validation_method: UI runbook verifies Smart Agents tab inventory, selected hosts, CSV import, package source, custom configuration, upgrade prerequisites, rollback constraints, and Database Agent Windows gates
+    apply_boundary: UI operations are operator-run; the skill renders the exact UI path, prerequisites, and post-action validation.
+  - id: appd_agent_management_deployment_groups
+    family: Agent Management
+    feature: Deployment groups for declarative large-scale agent deployment, agent configuration, Java and Node.js auto-attach setup, host assignment, edit, duplicate, delete, and view operations
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-deploy-agents-with-deployment-groups
+    status: render_runbook
+    validation_method: Deployment-group runbook validates group templates, selected agent types, host membership, auto-attach settings, edit or duplicate path, deletion review, and Smart Agent rollout status
+    apply_boundary: Deployment group changes are UI-driven and rendered for operator execution; no unattended Controller UI mutation.
+  - id: appd_agent_management_auto_attach
+    family: Agent Management
+    feature: Java and Node.js auto-attach, ld_preload.json customization, custom agent paths, filter rules, and generated application, tier, and node names
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-attach-java-and-nodejs-agents
+    status: render_runbook
+    validation_method: Auto-attach runbook validates enablement flag, ld_preload.json path, Java/Node.js supported runtimes, filter rules, custom paths, and post-restart node registration
+    apply_boundary: Auto-attach edits are rendered and require application owner approval before runtime restart.
+  - id: appd_agent_management_auto_discovery
+    family: Agent Management
+    feature: Application process auto-discovery for Java, .NET, Node.js, and Python processes and install routing from discovered process inventory
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/auto-discovery-of-application-process
+    status: validate_only
+    validation_method: Process discovery checks Smart Agent >=24.4, RunAutoDiscovery, excluded labels/processes/users, discovered process table, and agent-specific install routing
+    apply_boundary: Discovery is read-only until the operator selects an agent install or deployment group action.
+  - id: appd_smartagentctl_lifecycle
+    family: Agent Management
+    feature: smartagentctl local and remote install, upgrade, uninstall, and rollback for documented direct CLI agent types
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl
+    status: cli_apply
+    validation_method: Lifecycle plan validates agent type aliases, local or remote command shape, download source, service/process mode, upgrade source, uninstall path, rollback eligibility, and post-action Controller state
+    apply_boundary: Commands are generated for review; remote execution requires --accept-remote-execution and rollback is limited to supported prior-version state.
+  - id: appd_smartagentctl_remote_yaml_security
+    family: Agent Management
+    feature: smartagentctl remote.yaml, max concurrency, Linux SSH, Windows WinRM, SSH password environment variables, known hosts, and HTTP or SOCKS5 SSH proxy support
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-the-agents-using-smartagentctl/install-supported-agents-using-smartagentctl/ssh-configuration-for-remote-host
+    status: render_runbook
+    validation_method: remote.yaml template validates max_concurrency, host overrides, remote_dir, protocol selection, key/certificate/password-env references, known_hosts, and proxy settings without secret values
+    apply_boundary: remote.yaml is rendered as a template only; password values must come from environment variables or local secret files.
+  - id: appd_smart_agent_cli_deprecated
+    family: Agent Management
+    feature: Deprecated standalone Smart Agent CLI compatibility, build-time workflow, multiple-node install, and attach configuration
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/smart-agent-command-line-utility
+    status: render_runbook
+    validation_method: Deprecation runbook confirms Smart Agent CLI end-of-support date, Python version requirement for multiple-node automation, Database Agent exclusion, and smartagentctl preference
+    apply_boundary: Deprecated CLI usage is compatibility-only and rendered as a migration/runbook path; new automation should use smartagentctl or UI.
+  - id: appd_agent_downloads_package_validation
+    family: Agent Management
+    feature: Splunk AppDynamics downloads, filter/search, cURL automation, download-scoped OAuth, binary transfer, checksum validation, digital signatures, release notes, and rollback package posture
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/accounts/download-splunk-appdynamics-software
+    status: render_runbook
+    validation_method: Download catalog review, package version inventory, MD5/SHA256 comparison, PGP or certificate signature verification where published, binary transfer confirmation, release note link, and rollback package confirmation
+    apply_boundary: Package downloads and host placement are rendered; secrets use file-backed OAuth flows and remote installation remains gated.
+  - id: appd_managed_apache_agent
+    family: Agent Management
+    feature: Apache Web Server agent Smart Agent support and UI or deployment-group install routing
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
+    status: render_runbook
+    validation_method: Supported platform check for CentOS, RHEL, and Ubuntu plus UI/deployment-group install state and web server restart validation
+    apply_boundary: Apache runtime edits and restarts are rendered for operator execution; direct smartagentctl type is not assumed unless documented.
+  - id: appd_managed_java_agent
+    family: Agent Management
+    feature: Java agent managed install, upgrade, rollback, auto-attach, custom configuration, and version validation
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
+    status: cli_apply
+    validation_method: JVM process instrumentation, ld_preload.json when auto-attach is enabled, controller-info.xml, node registration, and rollback eligibility readback
+    apply_boundary: Host changes require reviewed command plan and remote-execution acceptance.
+  - id: appd_managed_dotnet_agent
+    family: Agent Management
+    feature: .NET MSI agent managed install, upgrade, rollback, Windows process discovery, and IIS/service validation
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
+    status: cli_apply
+    validation_method: Windows 2016/2019/2022 support check, dotnet_msi agent type, service/IIS checks, process discovery, and Controller node registration readback
+    apply_boundary: Windows host changes require reviewed command plan and remote-execution acceptance.
+  - id: appd_managed_machine_agent
+    family: Agent Management
+    feature: Machine Agent managed install, upgrade, rollback, extension carry-forward, service/process mode, and Server Visibility validation
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
+    status: cli_apply
+    validation_method: Machine Agent service/process check, extension stop-before-upgrade review, extension carry-forward validation, Server Visibility readback, and SELinux note review
+    apply_boundary: Host changes require reviewed command plan and remote-execution acceptance; remediation script configuration is not UI-managed.
+  - id: appd_managed_nodejs_agent
+    family: Agent Management
+    feature: Node.js agent managed install, upgrade, rollback, auto-attach, custom configuration, and app startup validation
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
+    status: cli_apply
+    validation_method: Node.js support check, node agent type, auto-attach settings, package/startup review, discovered process routing, and Controller node registration readback
+    apply_boundary: Runtime source or host changes are rendered and require operator approval.
+  - id: appd_managed_php_agent
+    family: Agent Management
+    feature: PHP agent Smart Agent support and UI or deployment-group install routing
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
+    status: render_runbook
+    validation_method: Ubuntu support check, root service-user requirement review, UI/deployment-group install state, PHP runtime restart, and Controller registration
+    apply_boundary: PHP runtime edits and restarts are rendered for operator execution; direct smartagentctl type is not assumed unless documented.
+  - id: appd_managed_python_agent
+    family: Agent Management
+    feature: Python agent Smart Agent support, process auto-discovery, and UI or deployment-group install routing
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/before-you-begin
+    status: render_runbook
+    validation_method: CentOS, Ubuntu, or Alpine support check, root service-user requirement review, discovered Python process routing, pip package signature validation, and Controller registration
+    apply_boundary: Python runtime edits and restarts are rendered for operator execution; direct smartagentctl type is not assumed unless documented.
+  - id: appd_managed_database_agent
+    family: Agent Management
+    feature: Database Agent managed install, upgrade, rollback, Windows version gates, JVM args, HA exclusion, and collector dependency checks
+    owner: splunk-appdynamics-agent-management-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/agent-management/26.4.0/smart-agent/manage-database-agent-using-ui
+    status: cli_apply
+    validation_method: Database Agent service/process check, Windows Controller/Database Agent/Smart Agent version gates, JVM argument retention, collector readback, and rollback eligibility
+    apply_boundary: Host changes require reviewed command plan and remote-execution acceptance; Database Agent HA is not supported through Agent Management UI.
+  - id: appd_business_applications
+    family: APM
+    feature: Business applications, tiers, nodes, and application model validation
+    owner: splunk-appdynamics-apm-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0
+    status: api_apply
+    validation_method: Controller readbacks for applications, tiers, nodes, and health state
+    apply_boundary: API-backed model updates apply; runtime instrumentation delegates to agent child skills.
+  - id: appd_business_transactions
+    family: APM
+    feature: Business transactions, transaction detection, and snapshots
+    owner: splunk-appdynamics-apm-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0
+    status: api_apply
+    validation_method: Business transaction list, snapshot count, and metric query validation
+    apply_boundary: Detection config applies only when documented API exists; UI-only discovery remains validation/runbook.
+  - id: appd_service_endpoints_remote_services
+    family: APM
+    feature: Service endpoints, remote services, backend calls, and information points
+    owner: splunk-appdynamics-apm-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0
+    status: api_apply
+    validation_method: Endpoint, remote-service, backend, and information-point readbacks
+    apply_boundary: API-backed objects apply; custom detection gaps render runbooks.
+  - id: appd_app_server_agent_snippets
+    family: APM
+    feature: Application server agent snippets for Java, .NET, Node.js, Python, PHP, Apache, and SDK paths
+    owner: splunk-appdynamics-apm-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0
+    status: render_runbook
+    validation_method: Snippet linting and Controller node registration checks
+    apply_boundary: Runtime source edits and restarts are never performed by this skill.
+  - id: appd_serverless_apm_development_monitoring
+    family: APM
+    feature: Serverless APM for AWS Lambda and Development Level Monitoring
+    owner: splunk-appdynamics-apm-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/install-app-server-agents/serverless-apm-for-aws-lambda/serverless-apm-in-the-controller
+    status: render_runbook
+    validation_method: Serverless tier/function visibility, tracer configuration checklist, and development monitoring retention review
+    apply_boundary: Serverless subscription, tracer deployment, and development monitoring enablement are rendered as operator runbooks.
+  - id: appd_apm_opentelemetry
+    family: APM
+    feature: Splunk AppDynamics for OpenTelemetry collector, access key, instrumentation, and Controller trace validation
+    owner: splunk-appdynamics-apm-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry
+    status: render_runbook
+    validation_method: OTel access-key readiness, collector configuration review, OTLP export probe, service/resource attribute mapping, and Controller trace visibility
+    apply_boundary: OTel collector deployment and app instrumentation are rendered and delegated to APM, Kubernetes, or OTel collector owners; access keys are file-backed only.
+  - id: appd_cluster_agent
+    family: Kubernetes
+    feature: Cluster Agent installation, secret wiring, controller registration, and namespace scoping
+    owner: splunk-appdynamics-k8s-cluster-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/use-the-cluster-agent
+    status: k8s_apply
+    validation_method: kubectl deployment, pod, secret, CR, and Controller cluster readbacks
+    apply_boundary: Kubernetes mutations require --accept-k8s-rollout; GitOps render is default.
+  - id: appd_k8s_auto_instrumentation
+    family: Kubernetes
+    feature: Kubernetes auto-instrumentation for Java, .NET Core Linux, and Node.js workloads
+    owner: splunk-appdynamics-k8s-cluster-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/use-the-cluster-agent
+    status: k8s_apply
+    validation_method: Workload annotation, rollout status, injected env, and Controller node checks
+    apply_boundary: Workload mutation requires --accept-k8s-rollout and target selectors.
+  - id: appd_cluster_agent_otel_collector
+    family: Kubernetes
+    feature: Splunk OTel Collector installation and telemetry through Cluster Agent
+    owner: splunk-appdynamics-k8s-cluster-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/installation-overview/cluster-agent-and-the-operator-compatibility-matrix
+    status: k8s_apply
+    validation_method: Collector pod health, OTLP endpoint, and telemetry export checks
+    apply_boundary: Collector rollout requires --accept-k8s-rollout; deep collector tuning delegates to splunk-observability-otel-collector-setup.
+  - id: appd_machine_agent_server_visibility
+    family: Infrastructure Visibility
+    feature: Machine Agent and Server Visibility host metrics
+    owner: splunk-appdynamics-infrastructure-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/infrastructure-visibility
+    status: cli_apply
+    validation_method: Machine Agent service status, host registration, and server metric query
+    apply_boundary: Agent install commands are rendered; host execution requires operator approval.
+  - id: appd_network_visibility
+    family: Infrastructure Visibility
+    feature: Network Visibility agents and flow validation
+    owner: splunk-appdynamics-infrastructure-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/infrastructure-visibility
+    status: render_runbook
+    validation_method: Agent process checks, flow metrics, and Controller Network Visibility view checks
+    apply_boundary: Packet/flow agents and privileged host changes are runbook-only.
+  - id: appd_docker_container_visibility
+    family: Infrastructure Visibility
+    feature: Docker and container visibility
+    owner: splunk-appdynamics-infrastructure-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/infrastructure-visibility
+    status: cli_apply
+    validation_method: Container metric query and host/container inventory readback
+    apply_boundary: Container runtime changes are rendered for operator execution.
+  - id: appd_service_availability
+    family: Infrastructure Visibility
+    feature: Service availability probes and infrastructure health rules
+    owner: splunk-appdynamics-infrastructure-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/infrastructure-visibility
+    status: api_apply
+    validation_method: Probe state, health-rule state, and metric checks
+    apply_boundary: API-backed probe/health-rule changes apply; unsupported checks render runbooks.
+  - id: appd_server_tags
+    family: Infrastructure Visibility
+    feature: Server tags and infrastructure grouping
+    owner: splunk-appdynamics-infrastructure-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/infrastructure-visibility
+    status: api_apply
+    validation_method: Tag API readback and server inventory grouping checks
+    apply_boundary: Tag APIs apply; host-local tag source changes render runbooks.
+  - id: appd_gpu_monitoring
+    family: Infrastructure Visibility
+    feature: GPU Monitoring through Machine Agent, Cluster Agent, NVIDIA-SMI, and DCGM Exporter
+    owner: splunk-appdynamics-infrastructure-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/gpu-monitoring
+    status: render_runbook
+    validation_method: Supported environment matrix, Machine Agent or Cluster Agent GPU enablement, DCGM/NVIDIA-SMI health, DNS/service locality checks, and Controller GPU metric readback
+    apply_boundary: GPU host and cluster changes are rendered; Kubernetes rollout delegates to the Cluster Agent skill and broader GPU estate work can delegate to NVIDIA/Cisco AI Pod observability skills.
+  - id: appd_prometheus_extension_machine_agent
+    family: Infrastructure Visibility
+    feature: Prometheus Extension for Machine Agent and AppDynamics Prometheus Monitoring Extension
+    owner: splunk-appdynamics-infrastructure-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/25.12.0/prometheus-extension-for-machine-agent
+    status: render_runbook
+    validation_method: Exporter reachability, Machine Agent extension logs, scrape settings, metric filters, and Controller metric path visibility
+    apply_boundary: Extension config and Machine Agent restarts are rendered for operator execution; exporter lifecycle stays with the owning platform.
+  - id: appd_database_agent
+    family: Database Visibility
+    feature: Database Agent installation and controller registration
+    owner: splunk-appdynamics-database-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/database-visibility-api
+    status: cli_apply
+    validation_method: Database Agent service and Controller registration readback
+    apply_boundary: Agent host commands render; execution is operator-controlled.
+  - id: appd_database_collectors
+    family: Database Visibility
+    feature: Database collector create, update, delete, and credential handling
+    owner: splunk-appdynamics-database-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/database-visibility-api
+    status: api_apply
+    validation_method: Database Visibility API collector list/readback
+    apply_boundary: Collector payloads are redacted and require password-file references.
+  - id: appd_database_servers_nodes_events
+    family: Database Visibility
+    feature: DB servers, nodes, metrics, and events validation
+    owner: splunk-appdynamics-database-visibility-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/database-visibility-api
+    status: validate_only
+    validation_method: DB server/node/event API readback and metric query
+    apply_boundary: Server/node lifecycle is observed through agents; this row validates only.
+  - id: appd_transaction_analytics
+    family: Analytics
+    feature: Transaction Analytics schemas, ADQL, and query validation
+    owner: splunk-appdynamics-analytics-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/analytics/26.4.0
+    status: api_apply
+    validation_method: ADQL query and schema readback
+    apply_boundary: Analytics query assets can be rendered/applied where API-backed; source instrumentation delegates to APM/EUM.
+  - id: appd_log_analytics
+    family: Analytics
+    feature: Log Analytics, log source validation, and ADQL query examples
+    owner: splunk-appdynamics-analytics-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/analytics/26.4.0
+    status: render_runbook
+    validation_method: ADQL log query and log source checklist
+    apply_boundary: Log source onboarding is product/UI-specific; render runbooks.
+  - id: appd_browser_mobile_analytics
+    family: Analytics
+    feature: Browser, Mobile, Synthetic, IoT, and Connected Devices Analytics
+    owner: splunk-appdynamics-analytics-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/25.4.0/end-user-monitoring/iot-monitoring/iot-analytics
+    status: api_apply
+    validation_method: Connected Device Data event type, Analytics schema, and ADQL readbacks
+    apply_boundary: Analytics-side assets apply; EUM/Synthetic instrumentation delegates to their child skills.
+  - id: appd_analytics_events_api
+    family: Analytics
+    feature: Analytics Events API schema, publish, and query workflows
+    owner: splunk-appdynamics-analytics-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/analytics/26.4.0
+    status: api_apply
+    validation_method: Events API schema/readback and optional publish probe
+    apply_boundary: Event publishing requires --accept-analytics-event-publish and events-api-key file.
+  - id: appd_business_journeys_xlm
+    family: Analytics
+    feature: Business Journeys and Experience Level Management for SLA/XLM reporting
+    owner: splunk-appdynamics-analytics-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/analytics/26.4.0/analytics/using-analytics-data/business-journeys
+    status: render_runbook
+    validation_method: Journey step inventory, XLM compliance target review, exclusion-period checklist, and dashboard/report handoff
+    apply_boundary: Business Journey and XLM UI configuration is rendered and validated; no blind apply.
+  - id: appd_browser_rum
+    family: End User Monitoring
+    feature: Browser RUM applications, app keys, JavaScript injection, and beacon validation
+    owner: splunk-appdynamics-eum-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/browser-monitoring/browser-real-user-monitoring/overview-of-the-controller-ui-for-browser-rum/configure-the-controller-ui-for-browser-rum
+    status: render_runbook
+    validation_method: App key inventory, page beacon probe, and browser analytics readback
+    apply_boundary: Source edits require --accept-eum-source-edit; default is snippet rendering only.
+  - id: appd_mobile_rum
+    family: End User Monitoring
+    feature: Mobile RUM for iOS, Android, React Native, Flutter, and .NET MAUI
+    owner: splunk-appdynamics-eum-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring
+    status: render_runbook
+    validation_method: Mobile app key, SDK config, and mobile event readback checks
+    apply_boundary: Mobile source edits are never automated; snippets and CI runbooks are rendered.
+  - id: appd_iot_rum
+    family: End User Monitoring
+    feature: IoT RUM and connected-device monitoring
+    owner: splunk-appdynamics-eum-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring
+    status: render_runbook
+    validation_method: App key, SDK payload, and connected-device event readback
+    apply_boundary: Device SDK integration is rendered as a runbook.
+  - id: appd_session_replay
+    family: End User Monitoring
+    feature: Browser and Mobile Session Replay privacy, capture, and validation
+    owner: splunk-appdynamics-eum-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/25.9.0/end-user-monitoring/mobile-real-user-monitoring/overview-of-the-controller-ui-for-mobile-rum/session-replay-for-mobile-rum
+    status: render_runbook
+    validation_method: Browser and Mobile Session Replay setting, app key, privacy, replay URL, and capture-readiness checklist
+    apply_boundary: Privacy and source changes are rendered; no automatic source edits by default.
+  - id: appd_eum_source_maps
+    family: End User Monitoring
+    feature: Browser and mobile source-map, mapping, and symbol upload workflows
+    owner: splunk-appdynamics-eum-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring
+    status: cli_apply
+    validation_method: Upload command dry-run and source-map inventory readback
+    apply_boundary: Upload commands use file-backed tokens and operator-controlled CI execution.
+  - id: appd_browser_synthetic
+    family: Synthetic Monitoring
+    feature: Browser Synthetic jobs, locations, screenshots, waterfall, and run validation
+    owner: splunk-appdynamics-synthetic-monitoring-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/synthetic-monitoring
+    status: api_apply
+    validation_method: Synthetic job API readback, run status, and artifact checks
+    apply_boundary: API-backed jobs apply; visual waterfall analysis is a validation runbook.
+  - id: appd_synthetic_api_monitoring
+    family: Synthetic Monitoring
+    feature: Synthetic API Monitoring tests, request payloads, assertions, and run validation
+    owner: splunk-appdynamics-synthetic-monitoring-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/synthetic-monitoring
+    status: api_apply
+    validation_method: API monitor readback and run result checks
+    apply_boundary: API monitors apply where documented; secrets use file-backed variables.
+  - id: appd_private_synthetic_agent
+    family: Synthetic Monitoring
+    feature: Hosted and Private Synthetic Agents, Docker, Kubernetes, Minikube, and Shepherd URLs
+    owner: splunk-appdynamics-synthetic-monitoring-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/synthetic-monitoring
+    status: k8s_apply
+    validation_method: PSA pod/container status, Shepherd connectivity, and agent registration checks
+    apply_boundary: Kubernetes/container rollout is rendered; operator applies reviewed manifests.
+  - id: appd_log_observer_connect
+    family: Log Observer Connect
+    feature: Splunk Log Observer Connect for Splunk AppDynamics configuration
+    owner: splunk-appdynamics-log-observer-connect-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/unified-observability-experience-with-the-splunk-platform/26.4.0/splunk-log-observer-connect-for-splunk-appdynamics
+    status: delegated_apply
+    validation_method: Controller LOC state, Splunk service account, deep-link, and log query checks
+    apply_boundary: Splunk-side service account, allow-list, and pairing changes delegate to Splunk Platform skills.
+  - id: appd_legacy_splunk_integration
+    family: Log Observer Connect
+    feature: Detect and disable older Splunk integration path before LOC adoption
+    owner: splunk-appdynamics-log-observer-connect-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/unified-observability-experience-with-the-splunk-platform/26.4.0/splunk-log-observer-connect-for-splunk-appdynamics
+    status: render_runbook
+    validation_method: Legacy integration inventory and disablement checklist
+    apply_boundary: Disablement is rendered for review; no blind deactivation.
+  - id: appd_health_rules
+    family: Alerting
+    feature: Health rules, evaluation scopes, baselines, and entity filters
+    owner: splunk-appdynamics-alerting-content-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/health-rules/how-to-set-up-health-rules
+    status: api_apply
+    validation_method: Health-rule readback and violation simulation checklist
+    apply_boundary: API-backed health rules apply; unsupported rule types render runbooks.
+  - id: appd_policies_actions
+    family: Alerting
+    feature: Policies, actions, notifications, email digests, and action suppression
+    owner: splunk-appdynamics-alerting-content-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/policies/policy-actions
+    status: api_apply
+    validation_method: Policy/action/suppression readback and sample notification checklist
+    apply_boundary: Documented APIs apply; external notification targets are handoffs.
+  - id: appd_alerting_import_export
+    family: Alerting
+    feature: Alerting content import, export, versioning, and rollback
+    owner: splunk-appdynamics-alerting-content-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/health-rules/how-to-set-up-health-rules
+    status: api_apply
+    validation_method: Export snapshot diff and post-apply readback
+    apply_boundary: Rollback is rendered from exported snapshots.
+  - id: appd_anomaly_detection_rca
+    family: Alerting
+    feature: Anomaly Detection and Automated Root Cause Analysis across applications, browser apps, databases, and mobile network requests
+    owner: splunk-appdynamics-alerting-content-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/alert-and-respond/anomaly-detection
+    status: render_runbook
+    validation_method: Anomaly enablement status, model training readiness, anomaly event filters, RCA detail review, and alert policy linkage
+    apply_boundary: Anomaly Detection enablement and RCA review are UI/support-gated runbooks; policy integrations render only.
+  - id: appd_aiml_baselines_diagnostics
+    family: AIML
+    feature: Dynamic Baseline, Anomaly Detection, Automated Root Cause Analysis, and Automated Transaction Diagnostics
+    owner: splunk-appdynamics-alerting-content-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/aiml
+    status: render_runbook
+    validation_method: Dynamic baseline review, anomaly/RCA readiness, anomalous transaction capture, slow method/database/remote-service suspected cause review, and recommendation verification
+    apply_boundary: AIML model behavior and AI-generated recommendations are validated and rendered as operator review; remediation actions are not applied automatically.
+  - id: appd_custom_dashboards
+    family: Dashboards Reports
+    feature: Custom dashboards and Dash Studio handoffs
+    owner: splunk-appdynamics-dashboards-reports-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports
+    status: api_apply
+    validation_method: Dashboard inventory/readback and widget count checks
+    apply_boundary: API-backed dashboards apply; Dash Studio assets delegate where appropriate.
+  - id: appd_reports_scheduled_reports
+    family: Dashboards Reports
+    feature: Reports, scheduled reports, and report delivery validation
+    owner: splunk-appdynamics-dashboards-reports-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports
+    status: render_runbook
+    validation_method: Report inventory, schedule checklist, and delivery validation
+    apply_boundary: UI-only report operations render runbooks.
+  - id: appd_war_rooms
+    family: Dashboards Reports
+    feature: War Rooms and collaborative troubleshooting views
+    owner: splunk-appdynamics-dashboards-reports-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/custom-dashboards/virtual-war-rooms/war-room-templates
+    status: render_runbook
+    validation_method: War Room inventory and access validation checklist
+    apply_boundary: War Room management is runbook-only unless API support is documented.
+  - id: appd_thousandeyes_dashboard_integration
+    family: Dashboards Reports
+    feature: ThousandEyes Integration with AppDynamics Dash Studio widgets, token setup, account groups, tests, and deeplinks
+    owner: splunk-appdynamics-dashboards-reports-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics
+    status: delegated_apply
+    validation_method: ThousandEyes integration toggle readiness, token handoff checklist, Dash Studio query/widget validation, test/account-group selection, and ThousandEyes deeplink checks
+    apply_boundary: AppDynamics dashboard binding renders runbooks; ThousandEyes-side tests, tokens, streams, and dashboards delegate to ThousandEyes skills and secret-file handoffs.
+  - id: appd_custom_tag_api
+    family: Tags Extensions
+    feature: Custom Tag APIs, tag enablement, and tag propagation validation
+    owner: splunk-appdynamics-tags-extensions-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/tag-management/26.4.0
+    status: api_apply
+    validation_method: Tag API readback and entity association checks
+    apply_boundary: Tag APIs apply; source-of-truth system updates are handoffs.
+  - id: appd_integration_modules_extensions
+    family: Tags Extensions
+    feature: Integration Modules, extensions, and Machine Agent custom metrics
+    owner: splunk-appdynamics-tags-extensions-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/integration-modules
+    status: render_runbook
+    validation_method: Extension file checks and custom metric visibility validation
+    apply_boundary: Extension installation and host restarts are rendered for operator execution.
+  - id: appd_servicenow_jira_scalyr_acc_log_auto_discovery
+    family: Tags Extensions
+    feature: ServiceNow, Jira, Scalyr, Agent Command Center, and Log Auto-Discovery runbooks
+    owner: splunk-appdynamics-tags-extensions-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/integration-modules
+    status: delegated_apply
+    validation_method: Connector readiness checklist and target-system validation
+    apply_boundary: Third-party system mutations delegate to the owning platform or stay runbook-only.
+  - id: appd_secure_application
+    family: Application Security Monitoring
+    feature: Secure Application entitlement, dashboard, architecture, vulnerabilities, attacks, libraries, and runtime security posture
+    owner: splunk-appdynamics-security-ai-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.4.0/application-security-monitoring
+    status: validate_only
+    validation_method: Secure Application entitlement, supported agent, Security Health widget, dashboard, vulnerability, attack, library, and node security checks
+    apply_boundary: Enablement is entitlement/support-gated; render validation and handoffs.
+  - id: appd_secure_application_policies_apis
+    family: Application Security Monitoring
+    feature: Secure Application runtime policies and Secure Application APIs for applications, tiers, nodes, vulnerabilities, libraries, attacks, business risks, and policy configurations
+    owner: splunk-appdynamics-security-ai-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.4.0/application-security-monitoring/secure-application-policies
+    status: render_runbook
+    validation_method: Runtime policy inventory, command/filesystem/header/transaction/network rule review, Secure Application API readbacks, policy status, and rollback checklist
+    apply_boundary: Policy changes are review-first runbooks; blocking or patching actions require application-owner approval and Secure Application API secrets use OAuth token files.
+  - id: appd_secure_application_otel_java
+    family: Application Security Monitoring
+    feature: Secure Application for OpenTelemetry Java
+    owner: splunk-appdynamics-security-ai-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-security-monitoring/26.4.0/application-security-monitoring/secure-application-for-opentelemetry
+    status: render_runbook
+    validation_method: OTel Java agent config review and security signal readback
+    apply_boundary: Java runtime changes are rendered and delegated to agent/APM owners.
+  - id: appd_observability_for_ai
+    family: Security AI
+    feature: Observability for AI, OpenAI, LangChain, Bedrock, GPU, and Cisco AI Pod checks
+    owner: splunk-appdynamics-security-ai-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/observability-for-ai/26.4.0/splunk-appdynamics-observability-for-ai/supported-ai-components
+    status: delegated_apply
+    validation_method: GenAI framework, GPU telemetry, and Cisco AI Pod readiness checks
+    apply_boundary: AI/GPU platform wiring delegates to Observability AI and Cisco AI Pod skills.
+  - id: appd_sap_agent
+    family: SAP Agent
+    feature: SAP Agent install, Controller registration, and metrics validation
+    owner: splunk-appdynamics-sap-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-sap-agent
+    status: render_runbook
+    validation_method: SAP Agent process, Controller node, and SAP metric readbacks
+    apply_boundary: SAP host commands are rendered; transport/import steps are operator-run.
+  - id: appd_sap_abap_agent_http_sdk
+    family: SAP Agent
+    feature: ABAP Agent, HTTP SDK, and SAP NetWeaver transports
+    owner: splunk-appdynamics-sap-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-sap-agent
+    status: render_runbook
+    validation_method: Transport import checklist, ABAP authorization checks, and HTTP SDK signal readback
+    apply_boundary: SAP transports and ABAP changes are runbook-only.
+  - id: appd_sap_snp_crystalbridge_biq
+    family: SAP Agent
+    feature: SNP CrystalBridge Monitoring and BiQ Collector
+    owner: splunk-appdynamics-sap-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-sap-agent
+    status: render_runbook
+    validation_method: Collector process, SAP connectivity, and Controller metric checks
+    apply_boundary: Third-party SAP collector setup is rendered as a handoff runbook.
+  - id: appd_sap_release_notes
+    family: Release Notes and References
+    feature: SAP Agent release notes, supported component versions, SAP monitoring enhancements, resolved issues, and compatibility review
+    owner: splunk-appdynamics-sap-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-sap-agent/release-notes
+    status: validate_only
+    validation_method: SAP runbook records target SAP Agent release, component-version notes, authorization changes, monitoring collector changes, and known upgrade impacts
+    apply_boundary: SAP release notes are read-only planning inputs; transport/import changes remain SAP Basis runbooks.
+  - id: appd_splunk_ta_appdynamics
+    family: Splunk Platform Integration
+    feature: Splunk_TA_AppDynamics install, account, analytics, input, index, and dashboard workflow
+    owner: cisco-appdynamics-setup
+    source_url: https://help.splunk.com/appdynamics-saas
+    status: delegated_apply
+    validation_method: Splunk REST app/input/account readbacks and AppDynamics sourcetype searches
+    apply_boundary: Delegated to existing cisco-appdynamics-setup; parent only routes and reports coverage.

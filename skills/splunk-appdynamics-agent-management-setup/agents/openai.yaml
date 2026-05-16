@@ -1,0 +1,5 @@
+name: splunk-appdynamics-agent-management-setup
+short_description: "Render Smart Agent, package download, and managed agent lifecycle plans"
+entrypoint: "skills/splunk-appdynamics-agent-management-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-agent-management-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-agent-management-setup/scripts/validate.sh --help"

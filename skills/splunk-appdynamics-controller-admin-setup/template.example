@@ -1,0 +1,14 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+api_client:
+  name: automation-client
+  client_secret_file: /secure/appd/client_secret
+rbac:
+  users: []
+  groups: []
+  roles: []
+identity:
+  saml: validate_only
+  ldap: validate_only
+licensing:
+  validate_rules: true

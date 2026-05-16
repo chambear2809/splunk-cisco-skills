@@ -1,0 +1,10 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+dashboards:
+  - name: checkout executive
+reports:
+  scheduled: []
+war_rooms:
+  validate: true
+dash_studio:
+  handoff: true

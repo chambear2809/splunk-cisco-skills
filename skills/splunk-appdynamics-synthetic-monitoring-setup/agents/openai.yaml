@@ -1,0 +1,5 @@
+name: splunk-appdynamics-synthetic-monitoring-setup
+short_description: "Render AppDynamics Synthetic Monitoring and Private Synthetic Agent plans"
+entrypoint: "skills/splunk-appdynamics-synthetic-monitoring-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-synthetic-monitoring-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-synthetic-monitoring-setup/scripts/validate.sh --help"

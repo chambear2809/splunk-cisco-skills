@@ -1,0 +1,5 @@
+name: splunk-appdynamics-analytics-setup
+short_description: "Render AppDynamics Analytics, ADQL, IoT, and Events API plans"
+entrypoint: "skills/splunk-appdynamics-analytics-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-analytics-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-analytics-setup/scripts/validate.sh --help"

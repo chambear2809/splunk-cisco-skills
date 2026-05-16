@@ -1,0 +1,5 @@
+name: splunk-appdynamics-eum-setup
+short_description: "Render AppDynamics EUM, RUM, and Session Replay plans"
+entrypoint: "skills/splunk-appdynamics-eum-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-eum-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-eum-setup/scripts/validate.sh --help"

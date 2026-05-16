@@ -1,0 +1,21 @@
+# Splunk AppDynamics parent router intake.
+#
+# Non-secret values only. Keep credentials in chmod-600 files referenced by
+# child skills.
+
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+scope:
+  - platform
+  - controller_admin
+  - apm
+  - infrastructure_visibility
+  - database_visibility
+  - analytics
+  - eum
+  - synthetic_monitoring
+  - log_observer_connect
+  - splunk_platform_integration
+output:
+  include_child_commands: true
+  include_coverage_report: true

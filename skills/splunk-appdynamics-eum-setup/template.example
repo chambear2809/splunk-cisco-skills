@@ -1,0 +1,12 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+browser_app_key: APPD_BROWSER_APP_KEY
+mobile_app_keys:
+  ios: APPD_IOS_APP_KEY
+  android: APPD_ANDROID_APP_KEY
+source_edit:
+  enabled: false
+session_replay:
+  enabled: false
+source_maps:
+  upload: render_only

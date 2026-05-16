@@ -1,0 +1,12 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+secure_application:
+  validate_entitlement: true
+otel_java:
+  render_snippet: true
+observability_for_ai:
+  frameworks: [openai, langchain, bedrock]
+gpu:
+  handoff_to: splunk-observability-nvidia-gpu-integration
+cisco_ai_pod:
+  handoff_to: splunk-observability-cisco-ai-pod-integration

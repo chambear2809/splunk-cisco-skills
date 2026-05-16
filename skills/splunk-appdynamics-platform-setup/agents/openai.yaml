@@ -1,0 +1,5 @@
+name: splunk-appdynamics-platform-setup
+short_description: "Render AppDynamics On-Premises and Enterprise Console runbooks"
+entrypoint: "skills/splunk-appdynamics-platform-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-platform-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-platform-setup/scripts/validate.sh --help"

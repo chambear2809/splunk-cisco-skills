@@ -1,0 +1,5 @@
+name: splunk-appdynamics-log-observer-connect-setup
+short_description: "Render AppDynamics Log Observer Connect handoff and validation plans"
+entrypoint: "skills/splunk-appdynamics-log-observer-connect-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-log-observer-connect-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-log-observer-connect-setup/scripts/validate.sh --help"

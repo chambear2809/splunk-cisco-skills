@@ -1,0 +1,13 @@
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+database_agent:
+  host: db-agent01.example.com
+collectors:
+  - name: orders-postgres
+    type: POSTGRESQL
+    hostname: db.example.com
+    port: 5432
+    username: appd_monitor
+    password_file: /secure/appd/db_password
+validation:
+  include_events: true

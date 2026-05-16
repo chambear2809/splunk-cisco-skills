@@ -1,0 +1,5 @@
+name: splunk-appdynamics-alerting-content-setup
+short_description: "Render AppDynamics alerting, anomaly, AIML, and rollback plans"
+entrypoint: "skills/splunk-appdynamics-alerting-content-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-alerting-content-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-alerting-content-setup/scripts/validate.sh --help"

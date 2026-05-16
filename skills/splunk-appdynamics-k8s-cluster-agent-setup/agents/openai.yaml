@@ -1,0 +1,5 @@
+name: splunk-appdynamics-k8s-cluster-agent-setup
+short_description: "Render AppDynamics Cluster Agent and Kubernetes auto-instrumentation plans"
+entrypoint: "skills/splunk-appdynamics-k8s-cluster-agent-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/validate.sh --help"

@@ -1,0 +1,115 @@
+doc_version: "26.4.0"
+controller_url: https://controller.example.com:8090
+deployment_model: on_premises
+
+deployment:
+  # on_premises or virtual_appliance
+  model: on_premises
+  # gui for Enterprise Console wizards, cli for reviewed platform-admin plans
+  operator_interface: cli
+  # custom, express, or discover_upgrade for classic on-premises
+  install_mode: custom
+
+platform:
+  name: prod-platform
+  target_version: "26.4.0"
+  installation_dir: /opt/appdynamics/platform
+  install_mode: custom
+  operator_interface: cli
+  os_family: linux
+  controller_profile: medium
+  maintenance_window: "Sunday 01:00-05:00 UTC"
+
+virtual_appliance:
+  # Used when deployment.model is virtual_appliance.
+  # Supported: vmware_vsphere, vmware_esxi, azure, aws, kvm, rosa.
+  infrastructure_platform: vmware_vsphere
+  # standard installs AppDynamics services in the appliance cluster.
+  # hybrid connects add-on services to existing classic Controller/Events/EUM.
+  service_deployment: standard
+  profile: small
+  node_count: 3
+  image_file: /secure/appdynamics/appd-va.ova
+  dns_domain: va.example.com
+  node_ips:
+    - 10.0.10.11
+    - 10.0.10.12
+    - 10.0.10.13
+  gateway_ip: 10.0.10.1
+  dns_server_ip: 10.0.10.53
+  license_file: /secure/appdynamics/license.lic
+
+enterprise_console:
+  host: ec.example.com
+  port: 9191
+  install_dir: /opt/appdynamics/enterpriseconsole
+  bin_dir: /opt/appdynamics/enterpriseconsole/platform-admin/bin
+  admin_username: admin
+  admin_password_file: /secure/appdynamics/ec-admin-password
+  mutation_enabled: false
+  credential_name: EC-appd
+  remote_user: appduser
+  ssh_key_file: /secure/appdynamics/ec-id_rsa.pem
+
+controller:
+  primary_host: controller-1.example.com
+  secondary_host: controller-2.example.com
+  http_port: 8090
+  https_port: 8181
+  admin_username: admin
+  admin_password_file: /secure/appdynamics/controller-admin-password
+  root_password_file: /secure/appdynamics/controller-root-password
+  mysql_root_password_file: /secure/appdynamics/mysql-root-password
+  database_user_password_file: /secure/appdynamics/controller-db-password
+  data_dir: /opt/appdynamics/controller/db/data
+  backup_location: /secure/backups/appdynamics/controller
+
+events_service:
+  enabled: true
+  profile: medium
+  vip_url: http://events-vip.example.com:9080
+  api_port: 9080
+  storage_retention_days: 30
+  nodes:
+    - host: events-1.example.com
+      roles: [master, data]
+      data_dir: /data/appdynamics/events-service
+    - host: events-2.example.com
+      roles: [master, data]
+      data_dir: /data/appdynamics/events-service
+    - host: events-3.example.com
+      roles: [master, data]
+      data_dir: /data/appdynamics/events-service
+
+eum_server:
+  enabled: true
+  host: eum.example.com
+  mode: production
+  http_port: 7001
+  https_port: 7002
+  reverse_proxy: true
+  install_dir: /opt/appdynamics/eum
+
+synthetic_server:
+  enabled: false
+  host: synthetic.example.com
+  http_ports: [10101, 12101]
+  https_ports: [10102, 12102]
+  install_dir: /opt/appdynamics/synthetic
+
+ha:
+  enabled: true
+  load_balancer_vip: appd-controller.example.com
+  replication_port: 3388
+  io_latency_ms_max: 3
+  secondary_license_ready: false
+  backup_location: /secure/backups/appdynamics
+
+security:
+  tls_profile: enterprise
+  controller_ca_cert_file: /secure/pki/appdynamics/controller-ca.pem
+  controller_cert_file: /secure/pki/appdynamics/controller.crt
+  controller_key_file: /secure/pki/appdynamics/controller.key
+  reverse_proxy_tls: true
+  disable_untrusted_http: true
+  hsts_enabled: true

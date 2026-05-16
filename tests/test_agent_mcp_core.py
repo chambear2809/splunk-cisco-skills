@@ -187,6 +187,8 @@ class AgentMCPCoreTests(unittest.TestCase):
             ("galileo-platform-setup", ["--splunk-hec-token=secret-value"]),
             ("galileo-agent-control-setup", ["--agent-control-api-key", "secret-value"]),
             ("galileo-agent-control-setup", ["--agent-control-admin-key=secret-value"]),
+            ("splunk-appdynamics-controller-admin-setup", ["--controller-password", "secret-value"]),
+            ("splunk-appdynamics-analytics-setup", ["--events-api-key=secret-value"]),
         ]
         for skill, args in cases:
             with self.subTest(skill=skill, args=args):
@@ -997,6 +999,55 @@ class AgentMCPCoreTests(unittest.TestCase):
                 plan = core.plan_skill_script(
                     "splunk-observability-k8s-frontend-rum-setup", "setup.sh", args
                 )
+                self.assertFalse(plan["read_only"])
+
+    def test_appdynamics_suite_setup_classification(self) -> None:
+        appd_skills = (
+            "splunk-appdynamics-setup",
+            "splunk-appdynamics-platform-setup",
+            "splunk-appdynamics-controller-admin-setup",
+            "splunk-appdynamics-agent-management-setup",
+            "splunk-appdynamics-apm-setup",
+            "splunk-appdynamics-k8s-cluster-agent-setup",
+            "splunk-appdynamics-infrastructure-visibility-setup",
+            "splunk-appdynamics-database-visibility-setup",
+            "splunk-appdynamics-analytics-setup",
+            "splunk-appdynamics-eum-setup",
+            "splunk-appdynamics-synthetic-monitoring-setup",
+            "splunk-appdynamics-log-observer-connect-setup",
+            "splunk-appdynamics-alerting-content-setup",
+            "splunk-appdynamics-dashboards-reports-setup",
+            "splunk-appdynamics-tags-extensions-setup",
+            "splunk-appdynamics-security-ai-setup",
+            "splunk-appdynamics-sap-agent-setup",
+        )
+        read_only_modes = (
+            [],
+            ["--render"],
+            ["--validate"],
+            ["--doctor"],
+            ["--quickstart"],
+            ["--rollback", "all"],
+        )
+        for skill in appd_skills:
+            for args in read_only_modes:
+                with self.subTest(skill=skill, args=args):
+                    plan = core.plan_skill_script(skill, "setup.sh", list(args))
+                    self.assertTrue(plan["read_only"])
+            with self.subTest(skill=skill, args=["--apply"]):
+                plan = core.plan_skill_script(skill, "setup.sh", ["--apply"])
+                self.assertFalse(plan["read_only"])
+
+        gated_cases = (
+            ("splunk-appdynamics-platform-setup", ["--accept-enterprise-console-mutation"]),
+            ("splunk-appdynamics-agent-management-setup", ["--accept-remote-execution"]),
+            ("splunk-appdynamics-k8s-cluster-agent-setup", ["--accept-k8s-rollout"]),
+            ("splunk-appdynamics-analytics-setup", ["--accept-analytics-event-publish"]),
+            ("splunk-appdynamics-eum-setup", ["--accept-eum-source-edit"]),
+        )
+        for skill, args in gated_cases:
+            with self.subTest(skill=skill, args=args):
+                plan = core.plan_skill_script(skill, "setup.sh", args)
                 self.assertFalse(plan["read_only"])
 
     def test_matches_mutation_flag_handles_prefix_and_equals_form(self) -> None:
