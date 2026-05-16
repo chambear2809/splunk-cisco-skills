@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -107,6 +108,57 @@ def test_direct_secret_flags_are_rejected() -> None:
     )
     assert result.returncode == 2
     assert "Refusing direct-secret" in result.stderr
+
+
+def test_appd_tls_helper_env_contract(tmp_path: Path) -> None:
+    ca_file = tmp_path / "lab-ca.pem"
+    ca_file.write_text("test-ca\n", encoding="utf-8")
+    helper = shlex.quote(str(SKILLS_DIR / "shared/lib/appdynamics_helpers.sh"))
+    ca_path = shlex.quote(str(ca_file))
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {helper}; "
+                "APPD_VERIFY_SSL=false; appd_prepare_curl_tls_args; "
+                "printf '<%s>\\n' \"${APPD_CURL_TLS_ARGS[@]}\"; "
+                f"APPD_CA_CERT={ca_path}; APPD_VERIFY_SSL=false; appd_prepare_curl_tls_args; "
+                "printf '<%s>\\n' \"${APPD_CURL_TLS_ARGS[@]}\""
+            ),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert "<-k>" in result.stdout
+    assert "<--cacert>" in result.stdout
+    assert f"<{ca_file}>" in result.stdout
+    assert "APPD_VERIFY_SSL=false" in result.stderr
+
+
+def test_rendered_appd_probe_scripts_support_lab_tls(tmp_path: Path) -> None:
+    platform = render_skill("splunk-appdynamics-platform-setup", tmp_path / "platform-tls")
+    platform_probe = (platform / "platform-validation-probes.sh").read_text(encoding="utf-8")
+    assert "APPD_CA_CERT" in platform_probe
+    assert "APPD_VERIFY_SSL" in platform_probe
+    assert "appd_curl --fail --silent --show-error --max-time 10" in platform_probe
+    assert '\ncurl --fail --silent --show-error --max-time 10 "${CONTROLLER_URL}/"' not in platform_probe
+
+    controller = render_skill("splunk-appdynamics-controller-admin-setup", tmp_path / "controller-tls")
+    controller_plan = (controller / "controller-admin-api-plan.sh").read_text(encoding="utf-8")
+    assert "APPD_CA_CERT" in controller_plan
+    assert "APPD_VERIFY_SSL" in controller_plan
+    assert "appd_curl --fail --silent --show-error -H" in controller_plan
+
+    agent = render_skill("splunk-appdynamics-agent-management-setup", tmp_path / "agent-tls")
+    agent_probe = (agent / "smart-agent-validation-probes.sh").read_text(encoding="utf-8")
+    assert "APPD_CA_CERT" in agent_probe
+    assert "APPD_VERIFY_SSL" in agent_probe
+    assert "appd_curl --fail --silent --show-error --max-time 10" in agent_probe
 
 
 def test_cli_help_for_all_appdynamics_skills() -> None:

@@ -25,5 +25,13 @@ validation for their feature families.
 | SAP Agent and SAP release notes | `splunk-appdynamics-sap-agent-setup` |
 | Splunk Platform TA | `cisco-appdynamics-setup` |
 
+## AppDynamics API TLS For Lab Controllers
+
+Rendered AppDynamics Controller, platform, and Smart Agent probe scripts verify
+TLS by default. For self-signed lab controllers, set `APPD_CA_CERT` to a
+trusted PEM bundle. As a lab-only escape hatch, set `APPD_VERIFY_SSL=false` to
+pass `curl -k` through the rendered `appd_curl` wrapper. `APPD_CA_CERT` takes
+precedence when both variables are set.
+
 Run `python3 skills/splunk-appdynamics-setup/scripts/check_coverage.py` before
 changing ownership or status values.

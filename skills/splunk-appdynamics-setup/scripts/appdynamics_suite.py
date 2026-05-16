@@ -729,6 +729,45 @@ def as_list(value: Any) -> list[Any]:
 def shell_quote(value: Any) -> str:
     return shlex.quote(str(value))
 
+def render_appd_curl_helper() -> str:
+    return r"""APPD_CURL_TLS_ARGS=()
+APPD_INSECURE_TLS_WARNED=0
+
+appd_prepare_curl_tls_args() {
+  APPD_CURL_TLS_ARGS=()
+
+  if [[ -n "${APPD_CA_CERT:-}" ]]; then
+    if [[ ! -f "${APPD_CA_CERT}" ]]; then
+      echo "FAIL: APPD_CA_CERT does not exist: ${APPD_CA_CERT}" >&2
+      return 2
+    fi
+    APPD_CURL_TLS_ARGS=(--cacert "${APPD_CA_CERT}")
+    return 0
+  fi
+
+  case "${APPD_VERIFY_SSL:-true}" in
+    false|False|FALSE|0|no|No|NO|off|Off|OFF)
+      if [[ "${APPD_INSECURE_TLS_WARNED}" != "1" ]]; then
+        echo "WARN: TLS verification is disabled for AppDynamics API probes (APPD_VERIFY_SSL=false). Prefer APPD_CA_CERT=/path/to/ca.pem for self-signed lab controllers." >&2
+        APPD_INSECURE_TLS_WARNED=1
+      fi
+      APPD_CURL_TLS_ARGS=(-k)
+      ;;
+    true|True|TRUE|1|yes|Yes|YES|on|On|ON|"")
+      ;;
+    *)
+      echo "FAIL: APPD_VERIFY_SSL must be true or false; got '${APPD_VERIFY_SSL}'" >&2
+      return 2
+      ;;
+  esac
+}
+
+appd_curl() {
+  appd_prepare_curl_tls_args || return $?
+  curl "${APPD_CURL_TLS_ARGS[@]}" "$@"
+}
+"""
+
 
 def host_records_from_platform_spec(spec: dict[str, Any]) -> list[dict[str, Any]]:
     ec = as_dict(spec.get("enterprise_console"))
@@ -1279,6 +1318,8 @@ def render_platform_validation_probes(spec: dict[str, Any]) -> str:
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
+{render_appd_curl_helper()}
+
 LIVE="${{APPD_PLATFORM_LIVE:-0}}"
 PLATFORM_ADMIN="${{APPD_PLATFORM_ADMIN:-{ec.get('bin_dir', '/opt/appdynamics/enterpriseconsole/platform-admin/bin').rstrip('/')}/platform-admin.sh}}"
 CONTROLLER_URL={shell_quote(controller_url)}
@@ -1297,11 +1338,11 @@ if [[ "${{LIVE}}" != "1" ]]; then
   exit 0
 fi
 
-curl --fail --silent --show-error --max-time 10 "${{CONTROLLER_URL}}/" >/dev/null
+appd_curl --fail --silent --show-error --max-time 10 "${{CONTROLLER_URL}}/" >/dev/null
 "${{PLATFORM_ADMIN}}" show-platform-admin-version
 "${{PLATFORM_ADMIN}}" get-available-versions --platform-name "${{PLATFORM_NAME}}" --service controller
 if [[ -n "${{EVENTS_URL}}" ]]; then
-  curl --fail --silent --show-error --max-time 10 "${{EVENTS_URL}}/" >/dev/null || echo "WARN: Events Service URL probe failed"
+  appd_curl --fail --silent --show-error --max-time 10 "${{EVENTS_URL}}/" >/dev/null || echo "WARN: Events Service URL probe failed"
 fi
 if [[ -n "${{EUM_HOST}}" ]]; then
   echo "Probe EUM host reachability: ${{EUM_HOST}}"
@@ -1485,13 +1526,16 @@ def render_controller_admin_artifacts(out: Path, spec: dict[str, Any]) -> None:
         plan,
         f"""#!/usr/bin/env bash
 set -euo pipefail
+
+{render_appd_curl_helper()}
+
 : "${{APPD_CONTROLLER_URL:={spec.get('controller_url', 'https://example.saas.appdynamics.com')}}}"
 : "${{APPD_ACCOUNT_NAME:={account}}}"
 : "${{APPD_OAUTH_TOKEN_FILE:?set APPD_OAUTH_TOKEN_FILE}}"
 AUTH_HEADER="Authorization: Bearer $(<"${{APPD_OAUTH_TOKEN_FILE}}")"
-curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/users" >/dev/null
-curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/groups" >/dev/null
-curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/roles" >/dev/null
+appd_curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/users" >/dev/null
+appd_curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/groups" >/dev/null
+appd_curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER_URL}}/controller/api/rbac/v1/roles" >/dev/null
 """,
     )
     chmod_exec(plan)
@@ -2130,6 +2174,8 @@ def render_agent_validation_probes(spec: dict[str, Any]) -> str:
     return f"""#!/usr/bin/env bash
 set -euo pipefail
 
+{render_appd_curl_helper()}
+
 LIVE="${{APPD_AGENT_MANAGEMENT_LIVE:-0}}"
 CONTROLLER_URL={shell_quote(controller_url)}
 
@@ -2145,7 +2191,7 @@ if [[ "${{LIVE}}" != "1" ]]; then
   exit 0
 fi
 
-curl --fail --silent --show-error --max-time 10 "${{CONTROLLER_URL}}/" >/dev/null
+appd_curl --fail --silent --show-error --max-time 10 "${{CONTROLLER_URL}}/" >/dev/null
 echo "Controller reachable. Continue with UI Smart Agents tab and managed-agent inventory readback."
 """
 

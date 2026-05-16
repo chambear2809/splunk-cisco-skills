@@ -77,13 +77,50 @@ print(json.dumps({"status": sys.argv[1], "message": sys.argv[2]}, sort_keys=True
 PY
 }
 
+APPD_CURL_TLS_ARGS=()
+_APPD_WARNED_INSECURE_TLS=0
+
+appd_prepare_curl_tls_args() {
+    APPD_CURL_TLS_ARGS=()
+
+    if [[ -n "${APPD_CA_CERT:-}" ]]; then
+        if [[ ! -f "${APPD_CA_CERT}" ]]; then
+            echo "FAIL: APPD_CA_CERT does not exist: ${APPD_CA_CERT}" >&2
+            return 2
+        fi
+        APPD_CURL_TLS_ARGS=(--cacert "${APPD_CA_CERT}")
+        return 0
+    fi
+
+    case "${APPD_VERIFY_SSL:-true}" in
+        false|False|FALSE|0|no|No|NO|off|Off|OFF)
+            if [[ "${_APPD_WARNED_INSECURE_TLS}" != "1" ]]; then
+                echo "WARN: TLS verification is disabled for AppDynamics API calls (APPD_VERIFY_SSL=false). Prefer APPD_CA_CERT=/path/to/ca.pem for self-signed lab controllers." >&2
+                _APPD_WARNED_INSECURE_TLS=1
+            fi
+            APPD_CURL_TLS_ARGS=(-k)
+            ;;
+        true|True|TRUE|1|yes|Yes|YES|on|On|ON|"")
+            ;;
+        *)
+            echo "FAIL: APPD_VERIFY_SSL must be true or false; got '${APPD_VERIFY_SSL}'" >&2
+            return 2
+            ;;
+    esac
+}
+
+appd_curl() {
+    appd_prepare_curl_tls_args || return $?
+    curl "${APPD_CURL_TLS_ARGS[@]}" "$@"
+}
+
 appd_controller_oauth_token() {
     local controller_url="$1"
     local account_name="$2"
     local client_name="$3"
     local client_secret_file="$4"
     appd_assert_secret_file "${client_secret_file}" "AppDynamics OAuth client secret file"
-    curl -fsS \
+    appd_curl -fsS \
         -X POST "$(appd_controller_api_url "${controller_url}" "/controller/api/oauth/access_token")" \
         -H "Content-Type: application/x-www-form-urlencoded" \
         --data-urlencode "grant_type=client_credentials" \
