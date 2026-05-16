@@ -424,6 +424,22 @@ features:
     status: k8s_apply
     validation_method: Collector pod health, OTLP endpoint, and telemetry export checks
     apply_boundary: Collector rollout requires --accept-k8s-rollout; deep collector tuning delegates to splunk-observability-otel-collector-setup.
+  - id: appd_k8s_combined_agent_dual_signal
+    family: Kubernetes
+    feature: AppDynamics combined-agent dual-signal Kubernetes workload environment for Java, .NET Core Linux, Node.js, and Machine Agent handoff
+    owner: splunk-appdynamics-k8s-cluster-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/monitor-applications-and-infrastructure-with-combined-agent
+    status: k8s_apply
+    validation_method: Workload env readback for AGENT_DEPLOYMENT_MODE, OTLP exporter settings, service/resource attributes, and Controller plus O11y service visibility
+    apply_boundary: Workload env and annotation mutation requires --accept-k8s-rollout; broad Machine Agent infrastructure rollout delegates to splunk-appdynamics-infrastructure-visibility-setup.
+  - id: appd_k8s_splunk_o11y_export
+    family: Kubernetes
+    feature: Splunk Observability Cloud export from AppDynamics Cluster Agent managed OTel Collector
+    owner: splunk-appdynamics-k8s-cluster-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/installation-overview/install-splunk-otel-collector-using-cluster-agent
+    status: k8s_apply
+    validation_method: File-backed O11y token secret, realm and environment values, collector logs, OTLP service reachability, and O11y API or UI readback
+    apply_boundary: O11y token and collector rollout require --accept-k8s-rollout; token values are never rendered and deep collector tuning delegates to splunk-observability-otel-collector-setup.
   - id: appd_machine_agent_server_visibility
     family: Infrastructure Visibility
     feature: Machine Agent and Server Visibility host metrics

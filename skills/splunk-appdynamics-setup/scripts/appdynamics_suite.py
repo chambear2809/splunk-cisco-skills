@@ -142,14 +142,20 @@ SKILL_META: dict[str, dict[str, Any]] = {
     },
     "splunk-appdynamics-k8s-cluster-agent-setup": {
         "title": "Splunk AppDynamics Kubernetes Cluster Agent Setup",
-        "target": "Cluster Agent, Kubernetes auto-instrumentation, and Splunk OTel Collector through Cluster Agent",
-        "purpose": "Render Cluster Agent values, workload instrumentation, Splunk OTel Collector wiring, and rollout validation.",
+        "target": "Cluster Agent, Kubernetes auto-instrumentation, AppDynamics combined agents, and Splunk OTel Collector export to Splunk Observability Cloud",
+        "purpose": "Render Cluster Agent values, workload instrumentation, dual-signal combined-agent environment patches, Splunk OTel Collector wiring to O11y, and rollout validation.",
         "apply": "Kubernetes resource changes require --accept-k8s-rollout; GitOps render remains the default.",
-        "validation": "kubectl/oc checks for Cluster Agent, instrumentation CRs, workload annotations, and OTel collector telemetry.",
+        "validation": "kubectl/oc checks for Cluster Agent, auto-instrumented workloads, combined-agent mode, OTel collector health, and Splunk Observability telemetry export.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/use-the-cluster-agent",
             "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/permissions-required-for-cluster-agent-and-infrastructure-visibility",
             "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/installation-overview/cluster-agent-and-the-operator-compatibility-matrix",
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.4.0/monitor-kubernetes-with-the-cluster-agent/installation-overview/install-splunk-otel-collector-using-cluster-agent",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/monitor-applications-and-infrastructure-with-combined-agent",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent/enable-dual-signal-mode",
+            "https://help.splunk.com/en/appdynamics-saas/application-performance-monitoring/26.4.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-.net-agent/enable-the-combined-mode-for-.net-agent",
+            "https://help.splunk.com/en/appdynamics-on-premises/application-performance-monitoring/26.3.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-node.js-agent/dual-signal-mode-for-node.js-combined-agent",
+            "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/machine-agent/combined-agent-for-infrastructure-visibility",
         ],
         "gate": "k8s_rollout",
     },
@@ -1359,10 +1365,15 @@ REQUIRED_SKILL_ARTIFACTS = {
     },
     "splunk-appdynamics-k8s-cluster-agent-setup": {
         "cluster-agent-values.yaml",
+        "splunk-otel-collector-values.yaml",
+        "splunk-otel-secret-template.yaml",
         "workload-instrumentation-patches.yaml",
+        "dual-signal-workload-env.yaml",
+        "combined-agent-o11y-runbook.md",
         "cluster-agent-rollout-plan.sh",
         "cluster-agent-rbac-review.md",
         "cluster-agent-validation-probes.sh",
+        "o11y-export-validation.sh",
     },
     "splunk-appdynamics-infrastructure-visibility-setup": {
         "machine-agent-command-plan.sh",
@@ -2192,17 +2203,602 @@ def render_apm_artifacts(out: Path, spec: dict[str, Any]) -> None:
     chmod_exec(probes)
 
 
+def to_bool(value: Any, default: bool = False) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value in (None, ""):
+        return default
+    return str(value).strip().lower() not in {"0", "false", "no", "off", "disabled"}
+
+
+def normalize_k8s_language(value: Any) -> str:
+    lowered = str(value or "java").strip().lower().replace("_", "-")
+    aliases = {
+        ".net": "dotnet-core-linux",
+        "dotnet": "dotnet-core-linux",
+        "dotnet-core": "dotnet-core-linux",
+        "dotnet-linux": "dotnet-core-linux",
+        "node": "nodejs",
+        "node.js": "nodejs",
+        "machine": "machine-agent",
+        "machineagent": "machine-agent",
+    }
+    return aliases.get(lowered, lowered)
+
+
+def normalize_combined_mode(value: Any) -> str:
+    lowered = str(value or "dual").strip().lower().replace("_", "-")
+    aliases = {
+        "dual-signal": "dual",
+        "combined": "dual",
+        "hybrid": "dual",
+        "o11y-only": "otel",
+        "splunk-only": "otel",
+        "otel-only": "otel",
+        "appd": "appd-only",
+        "controller-only": "appd-only",
+    }
+    return aliases.get(lowered, lowered)
+
+
+def k8s_workload_parts(workload: Any) -> tuple[str, str, str, str]:
+    raw = str(workload or "deployment/checkout-api").strip()
+    kind_part, name = raw.split("/", 1) if "/" in raw else ("deployment", raw)
+    normalized = kind_part.strip().lower()
+    kind_map = {
+        "deploy": ("apps/v1", "Deployment", "deployment"),
+        "deployment": ("apps/v1", "Deployment", "deployment"),
+        "statefulset": ("apps/v1", "StatefulSet", "statefulset"),
+        "sts": ("apps/v1", "StatefulSet", "statefulset"),
+        "daemonset": ("apps/v1", "DaemonSet", "daemonset"),
+        "ds": ("apps/v1", "DaemonSet", "daemonset"),
+    }
+    return kind_map.get(normalized, ("apps/v1", kind_part[:1].upper() + kind_part[1:], normalized)) + (name,)
+
+
+def k8s_collector_config(spec: dict[str, Any]) -> dict[str, Any]:
+    collector = as_dict(spec.get("splunk_otel_collector"))
+    o11y = as_dict(spec.get("splunk_observability"))
+    realm = collector.get("realm") or o11y.get("realm") or spec.get("realm") or "us1"
+    environment = collector.get("environment") or o11y.get("environment") or spec.get("environment") or "prod"
+    cluster_name = collector.get("cluster_name") or spec.get("cluster_name") or "appd-k8s-cluster"
+    token_file = (
+        collector.get("access_token_file")
+        or o11y.get("access_token_file")
+        or spec.get("splunk_o11y_token_file")
+        or "/secure/splunk/o11y_access_token"
+    )
+    token_env = collector.get("access_token_env") or o11y.get("access_token_env") or "SPLUNK_O11Y_ACCESS_TOKEN"
+    namespace = collector.get("namespace") or spec.get("namespace") or "appdynamics"
+    secret_name = collector.get("secret_name") or "appd-splunk-otel-secret"
+    endpoint = (
+        collector.get("otlp_endpoint")
+        or collector.get("endpoint")
+        or f"http://splunk-otel-collector-agent.{namespace}.svc.cluster.local:4318"
+    )
+    return {
+        "enabled": to_bool(collector.get("enabled"), True),
+        "install": to_bool(collector.get("install"), True),
+        "mode": collector.get("mode", "cluster-agent-managed"),
+        "realm": realm,
+        "environment": environment,
+        "cluster_name": cluster_name,
+        "namespace": namespace,
+        "secret_name": secret_name,
+        "token_file": token_file,
+        "token_env": token_env,
+        "endpoint": endpoint,
+        "api_url": collector.get("api_url") or f"https://api.{realm}.signalfx.com",
+        "ingest_url": collector.get("ingest_url") or f"https://ingest.{realm}.signalfx.com",
+        "profiling_enabled": to_bool(collector.get("profiling_enabled"), False),
+        "logs_enabled": to_bool(collector.get("logs_enabled"), True),
+        "metrics_enabled": to_bool(collector.get("metrics_enabled"), True),
+        "traces_enabled": to_bool(collector.get("traces_enabled"), True),
+    }
+
+
+def k8s_targets(spec: dict[str, Any], languages: list[str], collector: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_targets = as_list(spec.get("targets")) or [
+        {
+            "namespace": "checkout",
+            "workload": "deployment/checkout-api",
+            "container": "checkout-api",
+            "language": languages[0] if languages else "java",
+        }
+    ]
+    instrumentation = as_dict(spec.get("instrumentation"))
+    app_name = instrumentation.get("application_name") or spec.get("application_name") or collector["cluster_name"]
+    normalized: list[dict[str, Any]] = []
+    for index, target in enumerate(raw_targets, start=1):
+        target_dict = as_dict(target)
+        api_version, kind, kubectl_kind, name = k8s_workload_parts(target_dict.get("workload"))
+        language = normalize_k8s_language(target_dict.get("language") or (languages[(index - 1) % len(languages)] if languages else "java"))
+        service_name = target_dict.get("service_name") or name
+        service_namespace = target_dict.get("service_namespace") or target_dict.get("application_name") or app_name
+        deployment_environment = (
+            target_dict.get("deployment_environment")
+            or target_dict.get("environment")
+            or collector["environment"]
+        )
+        normalized.append(
+            {
+                "namespace": target_dict.get("namespace", "checkout"),
+                "workload": f"{kubectl_kind}/{name}",
+                "api_version": api_version,
+                "kind": kind,
+                "kubectl_kind": kubectl_kind,
+                "name": name,
+                "container": target_dict.get("container") or name,
+                "language": language,
+                "mode": normalize_combined_mode(target_dict.get("mode") or instrumentation.get("mode") or spec.get("mode") or "dual"),
+                "o11y_export": target_dict.get("o11y_export") or instrumentation.get("o11y_export") or "collector",
+                "service_name": service_name,
+                "service_namespace": service_namespace,
+                "deployment_environment": deployment_environment,
+                "resource_attributes": target_dict.get("resource_attributes", {}),
+            }
+        )
+    return normalized
+
+
+def env_entry(name: str, value: Any) -> dict[str, Any]:
+    return {"name": name, "value": str(value)}
+
+
+def combined_agent_env(target: dict[str, Any], collector: dict[str, Any]) -> list[dict[str, Any]]:
+    resource_attributes = {
+        "service.name": target["service_name"],
+        "service.namespace": target["service_namespace"],
+        "deployment.environment.name": target["deployment_environment"],
+        "k8s.namespace.name": target["namespace"],
+        "k8s.workload.name": target["name"],
+    }
+    resource_attributes.update(as_dict(target.get("resource_attributes")))
+    attributes_value = ",".join(f"{key}={value}" for key, value in resource_attributes.items())
+    export_to_collector = str(target.get("o11y_export", "collector")).lower() != "direct"
+    env: list[dict[str, Any]] = [
+        env_entry("AGENT_DEPLOYMENT_MODE", target["mode"]),
+        env_entry("OTEL_SERVICE_NAME", target["service_name"]),
+        env_entry("OTEL_RESOURCE_ATTRIBUTES", attributes_value),
+        env_entry("OTEL_TRACES_EXPORTER", "otlp" if collector["traces_enabled"] else "none"),
+        env_entry("OTEL_METRICS_EXPORTER", "otlp" if collector["metrics_enabled"] else "none"),
+        env_entry("OTEL_LOGS_EXPORTER", "otlp" if collector["logs_enabled"] else "none"),
+        env_entry("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf"),
+        env_entry("OTEL_EXPORTER_OTLP_ENDPOINT", collector["endpoint"] if export_to_collector else collector["ingest_url"]),
+    ]
+    if not export_to_collector:
+        env.extend(
+            [
+                {
+                    "name": "SPLUNK_ACCESS_TOKEN",
+                    "valueFrom": {
+                        "secretKeyRef": {
+                            "name": collector["secret_name"],
+                            "key": "splunk_observability_access_token",
+                        }
+                    },
+                },
+                env_entry("SPLUNK_REALM", collector["realm"]),
+            ]
+        )
+    language = target["language"]
+    if language == "dotnet-core-linux":
+        env.extend(
+            [
+                env_entry("DOTNET_ADDITIONAL_DEPS", "/opt/appdynamics/dotnet/additionalDeps"),
+                env_entry("DOTNET_SHARED_STORE", "/opt/appdynamics/dotnet/store"),
+                env_entry("DOTNET_STARTUP_HOOKS", "/opt/appdynamics/dotnet/startupHook/AppDynamics.AgentProfiler.dll"),
+            ]
+        )
+    elif language == "nodejs":
+        env.append(env_entry("NODE_OPTIONS", "--require appdynamics"))
+    elif language == "machine-agent":
+        env.append(env_entry("APPD_MACHINE_AGENT_COMBINED_MODE", "true"))
+    return env
+
+
+def render_cluster_agent_values(spec: dict[str, Any], languages: list[str], targets: list[dict[str, Any]], collector: dict[str, Any]) -> str:
+    cluster_agent = as_dict(spec.get("cluster_agent"))
+    instrumentation = as_dict(spec.get("instrumentation"))
+    controller_secret_name = spec.get("secret_name", "appdynamics-controller-secret")
+    payload: dict[str, Any] = {
+        "installClusterAgent": True,
+        "installSplunkOtelCollector": collector["enabled"] and collector["install"],
+        "controllerInfo": {
+            "url": spec.get("controller_url", "https://example.saas.appdynamics.com"),
+            "account": spec.get("account_name", "customer1"),
+            "username": spec.get("controller_username", "<controller-user>"),
+            "password": "${APPD_CONTROLLER_PASSWORD}",
+            "accessKey": "${APPD_CONTROLLER_ACCESS_KEY}",
+            "secretName": controller_secret_name,
+        },
+        "clusterAgent": {
+            "enabled": True,
+            "clusterName": collector["cluster_name"],
+            "appName": cluster_agent.get("app_name", collector["cluster_name"]),
+            "nsToMonitorRegex": cluster_agent.get("namespace_regex", spec.get("namespace_regex", ".*")),
+            "logLevel": cluster_agent.get("log_level", "INFO"),
+            "disableClusterAgentMonitoring": to_bool(cluster_agent.get("disable_cluster_agent_monitoring"), False),
+            "eventUploadInterval": cluster_agent.get("event_upload_interval", "10"),
+            "metricsSyncInterval": cluster_agent.get("metrics_sync_interval", "30"),
+        },
+        "instrumentation": {
+            "enabled": to_bool(instrumentation.get("enabled"), True),
+            "mode": normalize_combined_mode(instrumentation.get("mode", "dual")),
+            "languages": languages,
+            "targets": [
+                {
+                    "namespace": target["namespace"],
+                    "workload": target["workload"],
+                    "container": target["container"],
+                    "language": target["language"],
+                    "o11y_export": target["o11y_export"],
+                }
+                for target in targets
+            ],
+        },
+    }
+    if collector["enabled"]:
+        payload["splunk-otel-collector"] = {
+            "enabled": True,
+            "clusterName": collector["cluster_name"],
+            "environment": collector["environment"],
+            "secret": {
+                "create": False,
+                "name": collector["secret_name"],
+            },
+            "splunkObservability": {
+                "realm": collector["realm"],
+                "accessToken": f"${{{collector['token_env']}}}",
+                "profilingEnabled": collector["profiling_enabled"],
+                "logsEnabled": collector["logs_enabled"],
+                "metricsEnabled": collector["metrics_enabled"],
+                "tracesEnabled": collector["traces_enabled"],
+            },
+            "agent": {
+                "enabled": True,
+                "ports": {
+                    "otlp": {"containerPort": 4317, "protocol": "TCP"},
+                    "otlp-http": {"containerPort": 4318, "protocol": "TCP"},
+                },
+            },
+        }
+        payload["splunkOtelCollector"] = {
+            "enabled": True,
+            "mode": collector["mode"],
+            "realm": collector["realm"],
+            "endpoint": collector["endpoint"],
+        }
+    return dump_yaml(payload)
+
+
+def render_splunk_otel_values(collector: dict[str, Any]) -> str:
+    return dump_yaml(
+        {
+            "clusterName": collector["cluster_name"],
+            "environment": collector["environment"],
+            "splunkObservability": {
+                "realm": collector["realm"],
+                "accessToken": f"${{{collector['token_env']}}}",
+                "profilingEnabled": collector["profiling_enabled"],
+                "logsEnabled": collector["logs_enabled"],
+                "metricsEnabled": collector["metrics_enabled"],
+                "tracesEnabled": collector["traces_enabled"],
+            },
+            "secret": {
+                "create": False,
+                "name": collector["secret_name"],
+            },
+            "agent": {
+                "enabled": True,
+                "ports": {
+                    "otlp": {"containerPort": 4317, "protocol": "TCP"},
+                    "otlp-http": {"containerPort": 4318, "protocol": "TCP"},
+                },
+            },
+            "gateway": {
+                "enabled": True,
+            },
+        }
+    )
+
+
+def render_splunk_otel_secret_template(collector: dict[str, Any]) -> str:
+    return dump_yaml(
+        {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": collector["secret_name"],
+                "namespace": collector["namespace"],
+            },
+            "type": "Opaque",
+            "stringData": {
+                "splunk_observability_access_token": f"${{{collector['token_env']}}}",
+            },
+        }
+    )
+
+
+def render_workload_patches(targets: list[dict[str, Any]], collector: dict[str, Any]) -> str:
+    patches = []
+    for target in targets:
+        patches.append(
+            {
+                "target": {
+                    "apiVersion": target["api_version"],
+                    "kind": target["kind"],
+                    "name": target["name"],
+                    "namespace": target["namespace"],
+                },
+                "patch": {
+                    "apiVersion": target["api_version"],
+                    "kind": target["kind"],
+                    "metadata": {
+                        "name": target["name"],
+                        "namespace": target["namespace"],
+                    },
+                    "spec": {
+                        "template": {
+                            "metadata": {
+                                "annotations": {
+                                    "appdynamics.com/instrumentation": "enabled",
+                                    "appdynamics.com/instrumentation-language": target["language"],
+                                    "appdynamics.com/combined-agent-mode": target["mode"],
+                                }
+                            },
+                            "spec": {
+                                "containers": [
+                                    {
+                                        "name": target["container"],
+                                        "env": combined_agent_env(target, collector),
+                                    }
+                                ]
+                            },
+                        }
+                    },
+                },
+            }
+        )
+    return dump_yaml({"patches": patches})
+
+
+def render_dual_signal_workload_env(targets: list[dict[str, Any]], collector: dict[str, Any]) -> str:
+    return dump_yaml(
+        {
+            "defaults": {
+                "mode": "dual",
+                "o11y_export": "collector",
+                "collector_endpoint": collector["endpoint"],
+                "splunk_realm": collector["realm"],
+                "secret_name": collector["secret_name"],
+                "secret_key": "splunk_observability_access_token",
+            },
+            "targets": [
+                {
+                    "namespace": target["namespace"],
+                    "workload": target["workload"],
+                    "container": target["container"],
+                    "language": target["language"],
+                    "mode": target["mode"],
+                    "env": combined_agent_env(target, collector),
+                }
+                for target in targets
+            ],
+        }
+    )
+
+
+def render_k8s_rollout_plan(targets: list[dict[str, Any]], collector: dict[str, Any]) -> str:
+    patch_commands: list[str] = []
+    for target in targets:
+        patch = {
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "appdynamics.com/instrumentation": "enabled",
+                            "appdynamics.com/instrumentation-language": target["language"],
+                            "appdynamics.com/combined-agent-mode": target["mode"],
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "name": target["container"],
+                                "env": combined_agent_env(target, collector),
+                            }
+                        ]
+                    },
+                }
+            }
+        }
+        patch_commands.append(
+            "kubectl -n {namespace} patch {kind} {name} --type merge -p {patch}".format(
+                namespace=shell_quote(target["namespace"]),
+                kind=shell_quote(target["kubectl_kind"]),
+                name=shell_quote(target["name"]),
+                patch=shell_quote(json.dumps(patch, separators=(",", ":"))),
+            )
+        )
+    patch_block = "\n".join(patch_commands) or "echo 'No workload targets rendered.'"
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# Kubernetes mutation remains gated by --accept-k8s-rollout in the skill entrypoint.
+# Review cluster-agent-values.yaml, splunk-otel-secret-template.yaml, and workload-instrumentation-patches.yaml first.
+# This plan defaults to dry-run. Set K8S_APPLY=1 only inside an approved maintenance window.
+
+: "${{APPD_NAMESPACE:={collector['namespace']}}}"
+: "${{APPD_CLUSTER_AGENT_RELEASE:=appdynamics-cluster-agent}}"
+: "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE:={collector['token_file']}}}"
+: "${{SPLUNK_OTEL_SECRET_NAME:={collector['secret_name']}}}"
+
+test -f "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" || {{ echo "Missing ${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}"; exit 1; }}
+if [[ "${{K8S_APPLY:-0}}" == "1" ]]; then
+  kubectl get namespace "${{APPD_NAMESPACE}}" >/dev/null 2>&1 || kubectl create namespace "${{APPD_NAMESPACE}}"
+
+  kubectl -n "${{APPD_NAMESPACE}}" create secret generic "${{SPLUNK_OTEL_SECRET_NAME}}" \\
+    --from-file=splunk_observability_access_token="${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" \\
+    --dry-run=client -o yaml | kubectl apply -f -
+  HELM_DRY_RUN=()
+else
+  kubectl create namespace "${{APPD_NAMESPACE}}" --dry-run=client -o yaml >/dev/null
+  kubectl -n "${{APPD_NAMESPACE}}" create secret generic "${{SPLUNK_OTEL_SECRET_NAME}}" \\
+    --from-file=splunk_observability_access_token="${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" \\
+    --dry-run=client -o yaml >/dev/null
+  HELM_DRY_RUN=(--dry-run)
+fi
+
+helm repo add appdynamics-cloud-helmcharts https://appdynamics.jfrog.io/artifactory/appdynamics-cloud-helmcharts/
+helm repo update appdynamics-cloud-helmcharts
+helm upgrade --install "${{APPD_CLUSTER_AGENT_RELEASE}}" appdynamics-cloud-helmcharts/cluster-agent \\
+  --namespace "${{APPD_NAMESPACE}}" \\
+  --values "$(dirname "$0")/cluster-agent-values.yaml" \\
+  --set splunk-otel-collector.secret.create=false \\
+  --set splunk-otel-collector.secret.name="${{SPLUNK_OTEL_SECRET_NAME}}" \\
+  --set-file splunk-otel-collector.splunkObservability.accessToken="${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" \\
+  "${{HELM_DRY_RUN[@]}}"
+
+if [[ "${{K8S_APPLY:-0}}" != "1" ]]; then
+  echo "Dry run complete. Set K8S_APPLY=1 to apply the Helm release and workload patches."
+  cat <<'PATCH_COMMANDS'
+{patch_block}
+PATCH_COMMANDS
+  exit 0
+fi
+
+{patch_block}
+
+kubectl -n "${{APPD_NAMESPACE}}" rollout status deployment/"${{APPD_CLUSTER_AGENT_RELEASE}}" --timeout=180s || true
+"""
+
+
+def render_k8s_rbac_review() -> str:
+    return """# Cluster Agent RBAC Review
+
+- Confirm Operator, Cluster Agent, and Infrastructure Visibility RBAC from the 26.4 permissions page.
+- Confirm OpenShift SCC requirements before deploying on OpenShift.
+- Confirm Cluster Agent and Operator compatibility matrix versions before rollout.
+- If `installSplunkOtelCollector` is enabled, confirm the collector service account can list/watch Kubernetes metadata and write its secret-backed O11y token reference.
+- If workload auto-instrumentation is enabled, confirm the Cluster Agent may patch selected workloads only in the approved namespaces.
+- Do not grant broad namespace mutation unless the spec uses namespace scoping or explicit workload targets.
+"""
+
+
+def render_combined_agent_runbook(targets: list[dict[str, Any]], collector: dict[str, Any], languages: list[str]) -> str:
+    target_lines = "\n".join(
+        f"- `{target['namespace']}/{target['workload']}`: `{target['language']}` in `{target['mode']}` mode, exporting `{target['o11y_export']}` to `{collector['endpoint'] if target['o11y_export'] != 'direct' else collector['ingest_url']}`."
+        for target in targets
+    )
+    return f"""# Combined Agent And O11y Export Runbook
+
+## Rendered Coverage
+
+- Cluster Agent deploys through the AppDynamics Helm chart with `installSplunkOtelCollector` set from the spec.
+- Splunk OTel Collector is configured for realm `{collector['realm']}`, environment `{collector['environment']}`, and cluster `{collector['cluster_name']}`.
+- O11y access tokens stay file-backed. Runtime apply uses `--set-file` or a Kubernetes Secret generated from `SPLUNK_O11Y_ACCESS_TOKEN_FILE`.
+- Dual-signal workload plans cover: {", ".join(languages)}.
+
+## Workloads
+
+{target_lines}
+
+## Mode Guidance
+
+- `dual`: keep AppDynamics Controller visibility and emit OpenTelemetry signals toward Splunk Observability Cloud.
+- `otel`: emit OpenTelemetry signals only when Controller-side AppDynamics agent telemetry is not wanted.
+- `appd-only`: keep Controller telemetry and skip O11y export for that workload.
+- `collector` export is the default because it centralizes O11y token use in the collector.
+- `direct` export is available for constrained environments, but it mounts the O11y token into the workload through a Kubernetes Secret.
+
+## Language Notes
+
+- Java combined agent: use `AGENT_DEPLOYMENT_MODE=dual` with OTLP exporter variables and service/resource attributes.
+- .NET Core Linux combined mode is rendered with the startup hook variables required by the combined .NET agent path.
+- Node.js combined mode uses `AGENT_DEPLOYMENT_MODE=dual` plus OTLP exporter variables; application packaging must include the AppDynamics Node.js agent runtime.
+- Machine Agent combined mode is acknowledged for infrastructure use cases; broad host/node rollout belongs in `splunk-appdynamics-infrastructure-visibility-setup`.
+
+## Handoffs
+
+- Deep Splunk OTel Collector tuning, gateway sizing, processors, and enterprise O11y dashboards can delegate to `splunk-observability-otel-collector-setup`.
+- APM model ownership remains in `splunk-appdynamics-apm-setup`.
+"""
+
+
+def render_k8s_validation_probes(targets: list[dict[str, Any]], collector: dict[str, Any]) -> str:
+    rollout_checks = "\n".join(
+        f"kubectl -n {shell_quote(target['namespace'])} rollout status {shell_quote(target['kubectl_kind'])}/{shell_quote(target['name'])} --timeout=180s || true\n"
+        f"kubectl -n {shell_quote(target['namespace'])} get {shell_quote(target['kubectl_kind'])} {shell_quote(target['name'])} -o jsonpath='{{.spec.template.metadata.annotations}}' | grep -E 'appdynamics.com/(instrumentation|combined-agent-mode)' || true\n"
+        f"kubectl -n {shell_quote(target['namespace'])} get pod -l app -o jsonpath='{{range .items[*]}}{{.metadata.name}}{{\"\\n\"}}{{end}}' | head -5 || true"
+        for target in targets
+    )
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+: "${{APPD_NAMESPACE:={collector['namespace']}}}"
+
+kubectl -n "${{APPD_NAMESPACE}}" get deploy,ds,sts,pods,secret | grep -E 'appd|cluster-agent|otel|splunk' || true
+kubectl get pods -A | grep -E 'appd|cluster-agent|splunk-otel|otel-collector' || true
+kubectl get svc -A | grep -E '4317|4318|splunk-otel|otel-collector' || true
+
+{rollout_checks}
+
+echo "Controller validation: confirm the cluster appears in the AppDynamics Controller and that injected workloads create nodes/tiers as expected."
+echo "O11y validation: run o11y-export-validation.sh and confirm APM services, traces, metrics, and Kubernetes metadata in Splunk Observability Cloud."
+"""
+
+
+def render_o11y_export_validation(collector: dict[str, Any], targets: list[dict[str, Any]]) -> str:
+    services = " ".join(shell_quote(target["service_name"]) for target in targets)
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+: "${{SPLUNK_REALM:={collector['realm']}}}"
+: "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE:={collector['token_file']}}}"
+: "${{SPLUNK_O11Y_API_URL:={collector['api_url']}}}"
+: "${{APPD_NAMESPACE:={collector['namespace']}}}"
+
+if [[ -f "${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}" ]]; then
+  curl --fail --silent --show-error \\
+    -H "X-SF-Token: $(<"${{SPLUNK_O11Y_ACCESS_TOKEN_FILE}}")" \\
+    "${{SPLUNK_O11Y_API_URL}}/v2/organization" >/dev/null || echo "WARN: O11y API token probe failed"
+else
+  echo "WARN: SPLUNK_O11Y_ACCESS_TOKEN_FILE is missing; skipping O11y API token probe"
+fi
+
+kubectl -n "${{APPD_NAMESPACE}}" logs -l app.kubernetes.io/name=splunk-otel-collector --tail=200 2>/dev/null | grep -Ei 'signalfx|splunk|otlp|exporter|error' || true
+kubectl get pods -A | grep -E 'splunk-otel|otel-collector|cluster-agent|appd' || true
+
+echo "Expected O11y services: {services}"
+echo "Confirm these dimensions in Splunk Observability Cloud: k8s.cluster.name={collector['cluster_name']}, deployment.environment.name={collector['environment']}, service.name, service.namespace."
+"""
+
+
 def render_k8s_artifacts(out: Path, spec: dict[str, Any]) -> None:
-    targets = as_list(spec.get("targets")) or [{"namespace": "checkout", "workload": "deployment/checkout-api"}]
-    write(out / "cluster-agent-values.yaml", dump_yaml({"clusterAgent": {"enabled": True, "controllerUrl": spec.get("controller_url", "https://example.saas.appdynamics.com"), "accountName": spec.get("account_name", "customer1"), "secretName": spec.get("secret_name", "appdynamics-controller-secret")}, "instrumentation": {"enabled": True, "languages": spec.get("languages", ["java", "dotnet-core-linux", "nodejs"])}, "splunkOtelCollector": {"enabled": True, "mode": as_dict(spec.get("splunk_otel_collector")).get("mode", "cluster-agent-managed")}}))
-    write(out / "workload-instrumentation-patches.yaml", dump_yaml({"targets": targets, "patch": {"spec": {"template": {"metadata": {"annotations": {"appdynamics.com/instrumentation": "enabled"}}}}}}))
+    collector = k8s_collector_config(spec)
+    languages = [normalize_k8s_language(item) for item in as_list(spec.get("languages"))] or [
+        "java",
+        "dotnet-core-linux",
+        "nodejs",
+    ]
+    targets = k8s_targets(spec, languages, collector)
+    write(out / "cluster-agent-values.yaml", render_cluster_agent_values(spec, languages, targets, collector))
+    write(out / "splunk-otel-collector-values.yaml", render_splunk_otel_values(collector))
+    write(out / "splunk-otel-secret-template.yaml", render_splunk_otel_secret_template(collector))
+    write(out / "workload-instrumentation-patches.yaml", render_workload_patches(targets, collector))
+    write(out / "dual-signal-workload-env.yaml", render_dual_signal_workload_env(targets, collector))
+    write(out / "combined-agent-o11y-runbook.md", render_combined_agent_runbook(targets, collector, languages))
     rollout = out / "cluster-agent-rollout-plan.sh"
-    write(rollout, "#!/usr/bin/env bash\nset -euo pipefail\necho 'kubectl apply is gated by --accept-k8s-rollout; review cluster-agent-values.yaml and workload patches first.'\n")
+    write(rollout, render_k8s_rollout_plan(targets, collector))
     chmod_exec(rollout)
-    write(out / "cluster-agent-rbac-review.md", "# Cluster Agent RBAC Review\n\n- Confirm Operator, Cluster Agent, and Infrastructure Visibility RBAC from the 26.4 permissions page.\n- Confirm OpenShift SCC requirements where applicable.\n- Confirm compatibility matrix versions before rollout.\n")
+    write(out / "cluster-agent-rbac-review.md", render_k8s_rbac_review())
     probes = out / "cluster-agent-validation-probes.sh"
-    write(probes, "#!/usr/bin/env bash\nset -euo pipefail\nkubectl get pods -A | grep -E 'appd|cluster-agent' || true\necho 'Validate Controller cluster registration and injected workload env vars.'\n")
+    write(probes, render_k8s_validation_probes(targets, collector))
     chmod_exec(probes)
+    o11y = out / "o11y-export-validation.sh"
+    write(o11y, render_o11y_export_validation(collector, targets))
+    chmod_exec(o11y)
 
 
 def render_infrastructure_artifacts(out: Path, spec: dict[str, Any]) -> None:
@@ -2572,6 +3168,37 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
                 errors.append("Enterprise Console command plan must not render password arguments")
         if live:
             notes.append(f"run live platform probes with APPD_PLATFORM_LIVE=1 bash {out / 'platform-validation-probes.sh'}")
+    elif skill == "splunk-appdynamics-k8s-cluster-agent-setup":
+        values_path = out / "cluster-agent-values.yaml"
+        if values_path.exists():
+            values = yaml.safe_load(values_path.read_text(encoding="utf-8")) or {}
+            if values.get("installSplunkOtelCollector") and "splunk-otel-collector" not in values:
+                errors.append("cluster-agent-values.yaml enables installSplunkOtelCollector without splunk-otel-collector values")
+            collector_values = as_dict(values.get("splunk-otel-collector"))
+            splunk_observability = as_dict(collector_values.get("splunkObservability"))
+            access_token = str(splunk_observability.get("accessToken", ""))
+            if access_token and not access_token.startswith("${"):
+                errors.append("splunk-otel-collector accessToken must be an env placeholder; use --set-file at apply time")
+            if not as_dict(values.get("instrumentation")).get("languages"):
+                errors.append("cluster-agent-values.yaml missing instrumentation.languages")
+        env_path = out / "dual-signal-workload-env.yaml"
+        if env_path.exists():
+            env_text = env_path.read_text(encoding="utf-8")
+            for marker in ("AGENT_DEPLOYMENT_MODE", "OTEL_EXPORTER_OTLP_ENDPOINT", "SPLUNK_REALM"):
+                if marker == "SPLUNK_REALM" and "o11y_export: collector" in env_text:
+                    continue
+                if marker not in env_text:
+                    errors.append(f"dual-signal-workload-env.yaml missing {marker}")
+        rollout_path = out / "cluster-agent-rollout-plan.sh"
+        if rollout_path.exists():
+            rollout_text = rollout_path.read_text(encoding="utf-8")
+            if "--set-file splunk-otel-collector.splunkObservability.accessToken" not in rollout_text:
+                errors.append("cluster-agent-rollout-plan.sh must use --set-file for the O11y access token")
+            if "K8S_APPLY=1" not in rollout_text:
+                errors.append("cluster-agent-rollout-plan.sh must default to dry-run and require K8S_APPLY=1")
+        if live:
+            notes.append(f"run live Kubernetes probes with bash {out / 'cluster-agent-validation-probes.sh'}")
+            notes.append(f"run live O11y probes with bash {out / 'o11y-export-validation.sh'}")
     elif live:
         errors.append("live validation is not implemented in the generic renderer; use child runbook probes")
     status = "pass" if not errors else "fail"

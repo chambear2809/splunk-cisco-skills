@@ -521,13 +521,43 @@ def test_smart_agent_remote_command_rendering_and_gate(tmp_path: Path) -> None:
 def test_cluster_agent_values_rendering(tmp_path: Path) -> None:
     out = render_skill("splunk-appdynamics-k8s-cluster-agent-setup", tmp_path / "k8s")
     values = (out / "cluster-agent-values.yaml").read_text(encoding="utf-8")
+    assert "installSplunkOtelCollector: true" in values
     assert "clusterAgent:" in values
     assert "splunkOtelCollector:" in values
+    assert "splunk-otel-collector:" in values
+    assert "${SPLUNK_O11Y_ACCESS_TOKEN}" in values
     assert "dotnet-core-linux" in values
+    otel_values = (out / "splunk-otel-collector-values.yaml").read_text(encoding="utf-8")
+    assert "splunkObservability:" in otel_values
+    assert "secret:" in otel_values
+    secret = (out / "splunk-otel-secret-template.yaml").read_text(encoding="utf-8")
+    assert "splunk_observability_access_token" in secret
     patches = (out / "workload-instrumentation-patches.yaml").read_text(encoding="utf-8")
     assert "appdynamics.com/instrumentation" in patches
+    assert "AGENT_DEPLOYMENT_MODE" in patches
+    assert "OTEL_EXPORTER_OTLP_ENDPOINT" in patches
+    dual_env = (out / "dual-signal-workload-env.yaml").read_text(encoding="utf-8")
+    assert "AGENT_DEPLOYMENT_MODE" in dual_env
+    assert "DOTNET_STARTUP_HOOKS" in dual_env
+    rollout = (out / "cluster-agent-rollout-plan.sh").read_text(encoding="utf-8")
+    assert "--set-file splunk-otel-collector.splunkObservability.accessToken" in rollout
+    assert "K8S_APPLY=1" in rollout
+    o11y = (out / "o11y-export-validation.sh").read_text(encoding="utf-8")
+    assert "X-SF-Token" in o11y
+    runbook = (out / "combined-agent-o11y-runbook.md").read_text(encoding="utf-8")
+    assert "dual" in runbook
+    assert "Splunk Observability Cloud" in runbook
     rbac = (out / "cluster-agent-rbac-review.md").read_text(encoding="utf-8")
     assert "26.4" in rbac
+    report = json.loads((out / "coverage-report.json").read_text(encoding="utf-8"))
+    ids = {row["id"] for row in report["features"]}
+    assert {
+        "appd_cluster_agent",
+        "appd_k8s_auto_instrumentation",
+        "appd_cluster_agent_otel_collector",
+        "appd_k8s_combined_agent_dual_signal",
+        "appd_k8s_splunk_o11y_export",
+    } <= ids
 
 
 def test_eum_synthetic_and_sap_artifacts_render(tmp_path: Path) -> None:

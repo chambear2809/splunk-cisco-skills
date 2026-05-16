@@ -1,14 +1,43 @@
 controller_url: https://example.saas.appdynamics.com
 account_name: customer1
 namespace: appdynamics
+cluster_name: prod-eks-east
+environment: prod
 secret_name: appdynamics-controller-secret
 languages:
   - java
   - dotnet-core-linux
   - nodejs
+instrumentation:
+  enabled: true
+  mode: dual
+  o11y_export: collector
 splunk_otel_collector:
   enabled: true
+  install: true
   mode: cluster-agent-managed
+  realm: us1
+  environment: prod
+  access_token_file: /secure/splunk/o11y_access_token
+  secret_name: appd-splunk-otel-secret
+  profiling_enabled: false
+cluster_agent:
+  namespace_regex: checkout|payments|platform
+  disable_cluster_agent_monitoring: false
 targets:
   - namespace: checkout
     workload: deployment/checkout-api
+    container: checkout-api
+    language: java
+    service_name: checkout-api
+    service_namespace: commerce
+    deployment_environment: prod
+    o11y_export: collector
+  - namespace: payments
+    workload: deployment/payments-api
+    container: payments-api
+    language: dotnet-core-linux
+    service_name: payments-api
+    service_namespace: commerce
+    deployment_environment: prod
+    o11y_export: collector
