@@ -154,6 +154,22 @@
       "automation_state": "no_plans_available",
       "manual_gap_reason": "This product is marked under_development in the packaged SCAN catalog and has no verified Splunk app, sourcetype, or local setup workflow in this repo yet."
     },
+    "cisco_hyperflex": {
+      "automation_state": "partial",
+      "route_type": "intersight",
+      "notes": "HyperFlex coverage is routed through the Cisco Intersight Add-on because the repo's Intersight workflow covers UCS and HyperFlex inventory, alarms, and metrics from the Intersight management plane."
+    },
+    "cisco_iosxr_platforms": {
+      "automation_state": "partial",
+      "route_type": "workflow_handoff",
+      "primary_skill": "splunk-observability-cisco-nexus-integration",
+      "workflow_scripts": [
+        "skills/splunk-observability-cisco-nexus-integration/scripts/setup.sh",
+        "skills/splunk-observability-cisco-nexus-integration/scripts/validate.sh"
+      ],
+      "handoff": "Use the Splunk Observability Cisco Nexus/cisco_os receiver workflow for IOS-XR system and interface metrics. This is metrics-only coverage, not a Splunk Platform TA for IOS-XR syslog or model-driven telemetry.",
+      "notes": "The local cisco_os receiver skill explicitly supports IOS-XR devices, so the product router should expose it as a partial Observability handoff instead of leaving IOS-XR as an unrouted roadmap item."
+    },
     "cisco_secure_access": {
       "route_type": "secure_access"
     },

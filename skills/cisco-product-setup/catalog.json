@@ -3048,7 +3048,13 @@
       "value_proposition": "Unified XDR visibility correlating alerts from endpoints, network, cloud, and email."
     },
     {
-      "accepted_non_secret_keys": [],
+      "accepted_non_secret_keys": [
+        "client_id",
+        "create_defaults",
+        "hostname",
+        "name",
+        "verify_ssl"
+      ],
       "addon": "",
       "addon_label": "",
       "addon_uid": "",
@@ -3057,7 +3063,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "unsupported_roadmap",
+      "automation_state": "partial",
       "category": "networking",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -3065,7 +3071,9 @@
       "description": "Hyperconverged infrastructure platform combining compute, storage, and networking into a unified cluster managed through Intersight or HX Connect. Runs the HX Data Platform for distributed storage with native replication, deduplication, and compression. Distinct from UCS (compute-only) \u2014 HyperFlex adds software-defined storage and can be managed via Intersight alongside UCS.",
       "display_name": "Cisco HyperFlex",
       "id": "cisco_hyperflex",
-      "install_apps": [],
+      "install_apps": [
+        "Splunk_TA_Cisco_Intersight"
+      ],
       "keywords": [
         "hyperflex",
         "hx",
@@ -3076,7 +3084,7 @@
         "hx connect"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/computing/hyperconverged-infrastructure/index.html",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco hyperflex",
         "hyperflex",
@@ -3087,15 +3095,25 @@
         "software defined storage",
         "hx connect"
       ],
-      "notes": "",
-      "optional_non_secret_keys": [],
+      "notes": "HyperFlex coverage is routed through the Cisco Intersight Add-on because the repo's Intersight workflow covers UCS and HyperFlex inventory, alarms, and metrics from the Intersight management plane.",
+      "optional_non_secret_keys": [
+        "hostname",
+        "create_defaults",
+        "verify_ssl"
+      ],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
-      "required_non_secret_keys": [],
+      "primary_skill": "cisco-intersight-setup",
+      "required_non_secret_keys": [
+        "name",
+        "client_id"
+      ],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "default_index": "intersight",
+        "default_name": "INTERSIGHT_PROD"
+      },
+      "route_type": "intersight",
       "search_terms": [
         "cisco_hyperflex",
         "cisco hyperflex",
@@ -3108,12 +3126,20 @@
         "software defined storage",
         "hx connect"
       ],
-      "secret_keys": [],
+      "secret_keys": [
+        "client_secret"
+      ],
       "sourcetypes": [],
       "status": "roadmap",
       "subcategory": "compute_infra",
-      "template_checks": {},
-      "template_paths": [],
+      "template_checks": {
+        "ini_sections": [
+          "intersight_account"
+        ]
+      },
+      "template_paths": [
+        "skills/cisco-intersight-setup/template.example"
+      ],
       "value_proposition": "Ingest HyperFlex cluster health metrics, storage performance telemetry, replication status, and hardware alerts into Splunk for unified HCI operations monitoring alongside UCS and Intersight data."
     },
     {
@@ -3943,7 +3969,7 @@
       "app_viz_2": "",
       "app_viz_label": "",
       "app_viz_uid": "",
-      "automation_state": "unsupported_roadmap",
+      "automation_state": "partial",
       "category": "networking",
       "companion_skills": [],
       "conditional_required_secret_rules": [],
@@ -3971,7 +3997,7 @@
         "gnmi"
       ],
       "learn_more_url": "https://www.cisco.com/site/us/en/products/networking/sdwan-routers/network-convergence-system-5700-series/index.html",
-      "manual_gap_reason": "This product is a roadmap / coverage-gap item in the SCAN catalog.",
+      "manual_gap_reason": "",
       "normalized_search_terms": [
         "cisco iosxr platforms",
         "cisco ios xr platforms",
@@ -3992,15 +4018,22 @@
         "grpc",
         "gnmi"
       ],
-      "notes": "",
+      "notes": "The local cisco_os receiver skill explicitly supports IOS-XR devices, so the product router should expose it as a partial Observability handoff instead of leaving IOS-XR as an unrouted roadmap item.",
       "optional_non_secret_keys": [],
       "prereq_apps": [],
       "prereq_labels": [],
-      "primary_skill": "",
+      "primary_skill": "splunk-observability-cisco-nexus-integration",
       "required_non_secret_keys": [],
       "required_secret_keys": [],
-      "route": {},
-      "route_type": "",
+      "route": {
+        "handoff": "Use the Splunk Observability Cisco Nexus/cisco_os receiver workflow for IOS-XR system and interface metrics. This is metrics-only coverage, not a Splunk Platform TA for IOS-XR syslog or model-driven telemetry.",
+        "sourcetypes": [],
+        "workflow_scripts": [
+          "skills/splunk-observability-cisco-nexus-integration/scripts/setup.sh",
+          "skills/splunk-observability-cisco-nexus-integration/scripts/validate.sh"
+        ]
+      },
+      "route_type": "workflow_handoff",
       "search_terms": [
         "cisco_iosxr_platforms",
         "cisco iosxr platforms",

@@ -2119,7 +2119,11 @@ main() {
     resolve_product
     validate_known_keys
     prepare_effective_route
-    emit_role_warnings
+    if ${JSON_OUTPUT}; then
+        emit_role_warnings >&2
+    else
+        emit_role_warnings
+    fi
     if [[ "${AUTOMATION_STATE}" != "automated" ]]; then
         if ${JSON_OUTPUT}; then
             emit_summary_json
