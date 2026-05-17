@@ -467,6 +467,50 @@ version = {version}
         self.assertEqual(states["cisco_appomni"], "no_plans_available")
         self.assertEqual(states["cisco_radware"], "no_plans_available")
 
+    def test_hyperflex_routes_to_intersight_partial_handoff(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "Cisco HyperFlex",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["resolved_product"]["automation_state"], "partial")
+        self.assertEqual(payload["route"]["type"], "intersight")
+        self.assertEqual(payload["resolved_product"]["primary_skill"], "cisco-intersight-setup")
+        self.assertEqual(payload["install_apps"][0]["app_name"], "Splunk_TA_Cisco_Intersight")
+        self.assertIn("HyperFlex coverage is routed through", payload["resolved_product"]["notes"])
+
+    def test_iosxr_platforms_route_to_cisco_os_observability_handoff(self) -> None:
+        result = self.run_command(
+            "bash",
+            str(SETUP_SCRIPT),
+            "--catalog",
+            str(self.catalog_path),
+            "--product",
+            "Cisco IOS-XR Platforms",
+            "--dry-run",
+            "--json",
+        )
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["resolved_product"]["automation_state"], "partial")
+        self.assertEqual(payload["route"]["type"], "workflow_handoff")
+        self.assertEqual(
+            payload["resolved_product"]["primary_skill"],
+            "splunk-observability-cisco-nexus-integration",
+        )
+        self.assertIn("cisco_os receiver", payload["route"]["handoff"])
+        self.assertIn(
+            "skills/splunk-observability-cisco-nexus-integration/scripts/setup.sh",
+            payload["workflow_scripts"],
+        )
+
     def test_dry_run_secure_firewall_requires_variant(self) -> None:
         result = self.run_command(
             "bash",
