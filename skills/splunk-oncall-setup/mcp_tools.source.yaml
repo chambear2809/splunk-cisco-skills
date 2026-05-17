@@ -1,0 +1,94 @@
+name: Splunk On-Call MCP Tools
+description: Read-only MCP tools for Splunk On-Call app and add-on readiness.
+version: 1.0.0
+author: splunk-oncall-setup skill
+external_app_id: oncall
+tools:
+  - id: app_health
+    title: On-Call App Health
+    description: Check victorops_app and TA-splunk-add-on-for-victorops installation state.
+    tags: [oncall, victorops, app, health]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/apps/local count=0 | search title=victorops_app OR title=TA-splunk-add-on-for-victorops OR title=splunk-on-call OR title=*victorops* | table title label version disabled visible configured state | sort title
+    examples: [Check On-Call apps]
+  - id: required_indexes
+    title: On-Call Required Indexes
+    description: Check the VictorOps/On-Call indexes used by the add-on.
+    tags: [oncall, victorops, indexes]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/data/indexes count=0 | search title=victorops_incidents OR title=victorops_chats OR title=victorops_reports OR title=victorops_webhooks | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server | sort title
+    examples: [List On-Call indexes]
+  - id: modular_inputs
+    title: On-Call Modular Inputs
+    description: List VictorOps/On-Call modular input families and enabled state.
+    tags: [oncall, victorops, inputs]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/data/inputs/all count=0 | search title=victorops* OR title=*victorops* OR eai:acl.app=TA-splunk-add-on-for-victorops | table title eai:acl.app disabled index sourcetype interval | sort title
+    examples: [List On-Call modular inputs]
+  - id: recovery_saved_search
+    title: On-Call Recovery Saved Search
+    description: Find On-Call recovery or incident restoration saved searches.
+    tags: [oncall, victorops, savedsearches]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/saved/searches count=0 | search eai:acl.app=victorops_app OR title=*VictorOps* OR title=*On-Call* OR title=*recovery* | table title eai:acl.app disabled is_scheduled cron_schedule | sort title
+    examples: [Show On-Call recovery searches]
+  - id: kv_collections
+    title: On-Call KV Collections
+    description: List VictorOps/On-Call KV Store collection definitions.
+    tags: [oncall, victorops, kvstore]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/storage/collections/config count=0 | search eai:acl.app=victorops_app OR eai:acl.app=TA-splunk-add-on-for-victorops OR title=*victorops* | table title eai:acl.app accelerated_fields replicate | sort title
+    examples: [List On-Call KV collections]
+  - id: dashboards
+    title: On-Call Dashboards
+    description: List VictorOps/On-Call dashboards and views.
+    tags: [oncall, victorops, dashboards]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/data/ui/views count=0 | search eai:acl.app=victorops_app OR title=*victorops* OR title=*oncall* | table title label eai:acl.app isDashboard updated | sort title
+    examples: [List On-Call dashboards]
+  - id: recent_data
+    title: On-Call Recent Indexed Data
+    description: Summarize recent VictorOps/On-Call indexed data.
+    tags: [oncall, victorops, data]
+    time_range: true
+    row_limiter: true
+    spl: |
+      | tstats count latest(_time) as latest where index=victorops_incidents OR index=victorops_chats OR index=victorops_reports OR index=victorops_webhooks by index sourcetype host | eval latest=strftime(latest,"%Y-%m-%dT%H:%M:%SZ") | sort -count
+    examples: [Show recent On-Call data]
+coverage:
+  - id: victorops_app
+    status: mcp_tool
+    tool: app_health
+  - id: oncall_addon
+    status: mcp_tool
+    tool: app_health
+  - id: required_indexes
+    status: mcp_tool
+    tool: required_indexes
+  - id: modular_input_families
+    status: mcp_tool
+    tool: modular_inputs
+  - id: recovery_saved_search
+    status: mcp_tool
+    tool: recovery_saved_search
+  - id: kv_collections
+    status: mcp_tool
+    tool: kv_collections
+  - id: dashboards
+    status: mcp_tool
+    tool: dashboards
+  - id: recent_indexed_data
+    status: mcp_tool
+    tool: recent_data

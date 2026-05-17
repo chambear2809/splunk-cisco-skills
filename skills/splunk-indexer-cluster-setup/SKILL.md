@@ -2,21 +2,14 @@
 name: splunk-indexer-cluster-setup
 description: >-
   Render, preflight, apply, validate, and operate Splunk Enterprise indexer
-  clusters end-to-end: single-site multi-host bootstrap, multisite bootstrap
-  (per-site explicit factors, site_mappings, search affinity), cluster manager
-  redundancy (active/standby with manager_switchover_mode + LB or DNS),
-  configuration bundle (validate / status / apply / rollback / skip-validation),
-  rolling restart (default 10%, searchable with health checks, searchable
-  forced), fast and enforce-counts peer offline, peer removal from manager
-  list, maintenance mode, single-site to multisite migration, decommission a
-  site, move a peer to a new site, migrate a non-clustered indexer into the
-  cluster, and forwarder indexer-discovery output snippets. Cluster
-  pass4SymmKey is templated as `$IDXC_SECRET` for operator-managed rotation
-  (see Operations & Out of Scope). Use when the user asks to bootstrap an
-  indexer cluster, multisite cluster, configure site_replication_factor /
-  site_search_factor, apply or rollback a cluster bundle, perform a rolling
-  restart, take a peer offline, migrate single-site to multisite, or run
-  cluster manager redundancy.
+  clusters: single-site and multisite bootstrap, cluster manager redundancy,
+  bundle validate/apply/rollback, rolling restart modes, peer offline/removal,
+  maintenance mode, site migration, non-clustered indexer migration, and
+  indexer-discovery output snippets. Use when the user asks to bootstrap an
+  indexer cluster, configure site_replication_factor or site_search_factor,
+  apply or roll back a cluster bundle, perform searchable rolling restarts,
+  take a peer offline, migrate single-site to multisite, decommission a site,
+  or set up cluster manager redundancy.
 ---
 
 # Splunk Indexer Cluster Setup

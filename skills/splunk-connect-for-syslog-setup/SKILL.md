@@ -267,3 +267,25 @@ bash skills/splunk-connect-for-syslog-setup/scripts/validate.sh --check-k8s
 - [templates/host/README.md](templates/host/README.md) — host template notes
 - [templates/kubernetes/README.md](templates/kubernetes/README.md) — Helm
   template notes
+
+## MCP Tools
+
+This skill includes checked-in, read-only Splunk MCP custom tools generated
+from `mcp_tools.source.yaml`.
+
+Validate or regenerate the tool artifact:
+
+```bash
+python3 skills/shared/scripts/mcp_tools.py validate skills/splunk-connect-for-syslog-setup
+python3 skills/shared/scripts/mcp_tools.py generate skills/splunk-connect-for-syslog-setup
+```
+
+Load the tools into Splunk MCP Server:
+
+```bash
+bash skills/splunk-connect-for-syslog-setup/scripts/load_mcp_tools.sh
+```
+
+The loader uses the supported `/mcp_tools` REST batch endpoint by default. Use
+`--allow-legacy-kv` only for older MCP Server app versions that lack that
+endpoint.

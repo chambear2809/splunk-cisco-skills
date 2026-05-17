@@ -1,23 +1,14 @@
 ---
 name: splunk-observability-nvidia-gpu-integration
 description: >-
-  Standalone reusable skill for sending NVIDIA GPU telemetry (DCGM Exporter)
-  to Splunk Observability Cloud. Renders an agent.config receiver_creator
-  named receiver_creator/dcgm-cisco (NOT receiver_creator/nvidia, which
-  collides with the chart's autodetect when autodetect.prometheus=true).
-  Discovery rule matches both label conventions: `app=nvidia-dcgm-exporter`
-  AND `app.kubernetes.io/name=nvidia-dcgm-exporter`. Default unfiltered
-  metrics/nvidia-metrics pipeline so DCGM_FI_* dashboards have all series;
-  --filter strict opts into the canonical signalfx allow-list. Renders
-  --enable-dcgm-pod-labels patch (env-var + RBAC + SA-token + kubelet
-  mount) for the well-known GPU Operator pod-label gap. Hands off base
-  collector to splunk-observability-otel-collector-setup, dashboards to
-  splunk-observability-dashboard-builder, detectors to
-  splunk-observability-native-ops. Works for any GPU cluster -- NVIDIA
-  DGX, AI Pod, generic K8s + GPUs. Use when the user asks to send NVIDIA
-  GPU, DCGM, DCGM Exporter, GPU Operator, or CUDA workload telemetry to
-  Splunk Observability Cloud, configure receiver_creator/dcgm-cisco,
-  enable per-pod DCGM labels, or render GPU dashboards/detectors.
+  Render NVIDIA GPU telemetry from DCGM Exporter into Splunk Observability
+  Cloud. Uses receiver_creator/dcgm-cisco to avoid chart autodetect collisions,
+  matches both common DCGM labels, defaults to an unfiltered NVIDIA metrics
+  pipeline, optionally patches DCGM pod labels, and emits dashboard, detector,
+  base-collector, and apply handoffs. Use when the user asks to send NVIDIA GPU,
+  DCGM, DCGM Exporter, GPU Operator, DGX, AI Pod, or CUDA workload telemetry to
+  Splunk Observability Cloud, configure receiver_creator/dcgm-cisco, enable
+  per-pod DCGM labels, or render GPU dashboards and detectors.
 ---
 
 # Splunk Observability NVIDIA GPU Integration

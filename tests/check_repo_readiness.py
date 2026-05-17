@@ -50,6 +50,25 @@ DOC_PATHS_FOR_SECRET_EXAMPLES = [
     ".github",
 ]
 
+AGENT_SKILLS_CALLOUTS = {
+    "README.md": [
+        "https://agentskills.io/specification",
+        "https://agentskills.io/skill-creation/best-practices",
+        "https://agentskills.io/skill-creation/evaluating-skills",
+        "tests/check_skill_frontmatter.py",
+        "tests/check_repo_readiness.py",
+    ],
+    "CONTRIBUTING.md": [
+        "https://agentskills.io/specification",
+        "https://agentskills.io/skill-creation/best-practices",
+        "https://agentskills.io/skill-creation/evaluating-skills",
+    ],
+    ".github/pull_request_template.md": [
+        "Agent Skills specification",
+        "https://agentskills.io/specification",
+    ],
+}
+
 TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"^credentials$"),
     re.compile(r"(^|/)template\.local$"),
@@ -57,6 +76,9 @@ TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"^sc4snmp-rendered/"),
     re.compile(r"^splunk-agent-management-rendered/"),
     re.compile(r"^splunk-admin-doctor-rendered/"),
+    re.compile(r"^splunk-data-source-readiness-doctor-rendered/"),
+    re.compile(r"^splunk-ingest-processor-rendered/"),
+    re.compile(r"^splunk-spl2-pipeline-kit-rendered/"),
     re.compile(r"^splunk-workload-management-rendered/"),
     re.compile(r"^splunk-hec-service-rendered/"),
     re.compile(r"^splunk-federated-search-rendered/"),
@@ -70,6 +92,7 @@ TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"^splunk-observability-database-monitoring-rendered/"),
     re.compile(r"^splunk-observability-aws-integration-rendered/"),
     re.compile(r"^splunk-cloud-data-manager-rendered/"),
+    re.compile(r"^splunk-db-connect-rendered/"),
     re.compile(r"^cisco-secure-email-web-gateway-rendered/"),
     re.compile(r"^ta-for-indexers-rendered/"),
     re.compile(r"^splunk-mcp-rendered/(?!run-splunk-mcp\.js$)"),
@@ -94,7 +117,10 @@ def skill_names() -> list[str]:
     return sorted(
         path.name
         for path in SKILLS_DIR.iterdir()
-        if path.is_dir() and path.name != "shared" and not path.name.startswith(".")
+        if path.is_dir()
+        and path.name != "shared"
+        and not path.name.startswith(".")
+        and (path / "SKILL.md").is_file()
     )
 
 
@@ -197,6 +223,42 @@ def check_smoke_script_no_sudo_password(errors: list[str]) -> None:
         errors.append(
             "skills/shared/scripts/smoke_sc4x_live.sh must not embed SSH passwords into sudo commands"
         )
+
+
+def check_agent_skills_callouts(errors: list[str]) -> None:
+    for rel, required_fragments in AGENT_SKILLS_CALLOUTS.items():
+        path = REPO_ROOT / rel
+        if not path.exists():
+            errors.append(f"{rel}: missing Agent Skills specification callout file")
+            continue
+        text = path.read_text(encoding="utf-8")
+        missing = [fragment for fragment in required_fragments if fragment not in text]
+        if missing:
+            errors.append(
+                f"{rel}: missing Agent Skills specification callout fragment(s): "
+                + ", ".join(missing)
+            )
+
+
+def check_skill_script_references(errors: list[str]) -> None:
+    """Ensure UI-advertised safe-first/validation skill scripts exist.
+
+    Skill bodies sometimes mention scripts that are generated into rendered
+    output directories. The UI metadata commands, however, should only point at
+    repository-local scripts that already exist.
+    """
+    for skill_dir in sorted(SKILLS_DIR.iterdir()):
+        if not skill_dir.is_dir() or skill_dir.name == "shared":
+            continue
+        metadata_path = skill_dir / "agents/openai.yaml"
+        if not metadata_path.exists():
+            continue
+        corpus = metadata_path.read_text(encoding="utf-8")
+        script_pattern = re.compile(rf"skills/{re.escape(skill_dir.name)}/scripts/[A-Za-z0-9_.-]+")
+        for match in sorted(set(script_pattern.findall(corpus))):
+            script_path = REPO_ROOT / match
+            if not script_path.is_file():
+                errors.append(f"{match}: referenced by skill UI metadata but missing")
 
 
 def check_mcp_tool_schema(errors: list[str]) -> None:
@@ -307,6 +369,8 @@ def main() -> int:
     check_no_tracked_local_artifacts(errors)
     check_secret_examples(errors)
     check_smoke_script_no_sudo_password(errors)
+    check_agent_skills_callouts(errors)
+    check_skill_script_references(errors)
     check_mcp_tool_schema(errors)
     check_registry_skill_refs(errors)
     check_local_mcp_server_config(errors)

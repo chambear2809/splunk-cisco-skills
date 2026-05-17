@@ -1,0 +1,142 @@
+name: Splunk Enterprise Security MCP Tools
+description: Read-only MCP tools for Splunk Enterprise Security readiness and content validation.
+version: 1.0.0
+author: splunk-enterprise-security-config skill
+external_app_id: es
+tools:
+  - id: app_health
+    title: Enterprise Security App Health
+    description: Show Enterprise Security app installation, visibility, configured state, and version.
+    tags: [security, es, app, health]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/apps/local count=0 | search title=SplunkEnterpriseSecuritySuite OR title=MissionControl OR title=SA-ThreatIntelligence OR title=DA-ESS-ContentUpdate OR title=SA-ContentLibrary | table title label version disabled visible configured state | sort title
+    examples: [Check Enterprise Security app health]
+  - id: required_indexes
+    title: Enterprise Security Required Indexes
+    description: Check presence and basic settings for common ES, Mission Control, risk, notable, and threat indexes.
+    tags: [security, es, indexes]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/data/indexes count=0 | search title=notable OR title=risk OR title=threat_activity OR title=threat_intel OR title=mc_notable OR title=mc_inv OR title=mc_artefacts OR title=mc_action_run OR title=mc_audit | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB frozenTimePeriodInSecs splunk_server | sort title
+    examples: [List ES required indexes]
+  - id: kvstore_status
+    title: Enterprise Security KV Store Status
+    description: Report platform KV Store status for Enterprise Security readiness.
+    tags: [security, es, kvstore]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/server/info | table serverName kvStoreStatus kvStoreVersion version
+    examples: [Check KV Store status for ES]
+  - id: kv_collections
+    title: Enterprise Security KV Collections
+    description: List ES-owned asset, identity, threat, and notable KV Store collection definitions visible through REST.
+    tags: [security, es, kvstore, collections]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/storage/collections/config count=0 | search eai:acl.app=SplunkEnterpriseSecuritySuite OR eai:acl.app=SA-IdentityManagement OR eai:acl.app=SA-ThreatIntelligence OR title=asset_* OR title=identity_* OR title=threat_* OR title=notable* | table title eai:acl.app accelerated_fields replicate enforceTypes | sort eai:acl.app title
+    examples: [List ES KV Store collections]
+  - id: data_model_acceleration
+    title: Enterprise Security Data Model Acceleration
+    description: Inventory CIM and ES data model acceleration settings.
+    tags: [security, es, cim, datamodel]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/datamodel/model count=0 | search eai:acl.app=CIM OR eai:acl.app=SplunkEnterpriseSecuritySuite OR eai:acl.app=SA-* OR eai:acl.app=DA-ESS-* | table title eai:acl.app acceleration.enabled acceleration.earliest_time acceleration.cron_schedule acceleration.max_time | sort eai:acl.app title
+    examples: [Show ES data model acceleration]
+  - id: notable_risk_threat_data
+    title: Enterprise Security Notable Risk Threat Data
+    description: Summarize recent notable, risk, and threat activity data by index and sourcetype.
+    tags: [security, es, notable, risk, threat]
+    time_range: true
+    row_limiter: true
+    spl: |
+      | tstats count latest(_time) as latest where index=notable OR index=risk OR index=threat_activity OR index=threat_intel by index sourcetype | eval latest=strftime(latest,"%Y-%m-%dT%H:%M:%SZ") | sort -count
+    examples: [Summarize recent ES notable risk and threat data]
+  - id: urgency_matrix
+    title: Enterprise Security Urgency Matrix
+    description: Read ES urgency matrix stanzas from urgency.conf.
+    tags: [security, es, urgency]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/SplunkEnterpriseSecuritySuite/configs/conf-urgency count=0 | table title severity priority urgency eai:acl.app | sort title
+    examples: [Show ES urgency matrix]
+  - id: notable_suppressions
+    title: Enterprise Security Notable Suppressions
+    description: Inventory configured notable suppression stanzas.
+    tags: [security, es, notable, suppressions]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/SplunkEnterpriseSecuritySuite/configs/conf-notable_suppressions count=0 | table title disabled description search earliest_time latest_time eai:acl.owner | sort title
+    examples: [List notable suppressions]
+  - id: correlation_search_inventory
+    title: Enterprise Security Correlation Search Inventory
+    description: List ES correlation, notable, risk, and finding search definitions visible as saved searches.
+    tags: [security, es, detections, correlation_searches]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/saved/searches count=0 | search eai:acl.app=SplunkEnterpriseSecuritySuite OR eai:acl.app=DA-ESS-* OR action.notable=1 OR action.risk=1 OR action.correlationsearch.enabled=1 | table title eai:acl.app disabled is_scheduled cron_schedule action.notable action.risk action.correlationsearch.enabled | sort eai:acl.app title
+    examples: [Inventory ES correlation searches]
+  - id: glass_tables_views
+    title: Enterprise Security Glass Tables And Views
+    description: List ES dashboards, Glass Tables, and app views.
+    tags: [security, es, dashboards, glass_tables]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/data/ui/views count=0 | search eai:acl.app=SplunkEnterpriseSecuritySuite OR eai:acl.app=SA-* OR eai:acl.app=DA-ESS-* | table title label eai:acl.app isDashboard version updated | sort eai:acl.app title
+    examples: [List ES dashboards and glass tables]
+  - id: content_library_state
+    title: Enterprise Security Content Library State
+    description: Check ES content-library and ESCU-related app state without invoking external content APIs.
+    tags: [security, es, escu, content_library]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/apps/local count=0 | search title=DA-ESS-ContentUpdate OR title=SA-ContentLibrary OR title=Splunk_Security_Essentials OR title=SplunkEnterpriseSecuritySuite | table title label version disabled visible configured | sort title
+    examples: [Check ES content library state]
+coverage:
+  - id: es_app_health
+    status: mcp_tool
+    tool: app_health
+  - id: es_indexes
+    status: mcp_tool
+    tool: required_indexes
+  - id: es_kv_store
+    status: mcp_tool
+    tool: kvstore_status
+  - id: es_kv_collections
+    status: mcp_tool
+    tool: kv_collections
+  - id: es_data_model_acceleration
+    status: mcp_tool
+    tool: data_model_acceleration
+  - id: es_notable_risk_threat_data
+    status: mcp_tool
+    tool: notable_risk_threat_data
+  - id: es_urgency_matrix
+    status: mcp_tool
+    tool: urgency_matrix
+  - id: es_notable_suppressions
+    status: mcp_tool
+    tool: notable_suppressions
+  - id: es_correlation_search_inventory
+    status: mcp_tool
+    tool: correlation_search_inventory
+  - id: es_glass_tables_views
+    status: mcp_tool
+    tool: glass_tables_views
+  - id: es_escu_content_library_state
+    status: mcp_tool
+    tool: content_library_state
+  - id: generic_index_listing
+    status: covered_by_builtin_mcp
+    builtin_tool: get_indexes

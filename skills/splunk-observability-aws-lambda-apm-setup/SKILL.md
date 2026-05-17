@@ -1,37 +1,16 @@
 ---
 name: splunk-observability-aws-lambda-apm-setup
 description: >-
-  Render, validate, and optionally apply Splunk OpenTelemetry Lambda layer
-  (signalfx/splunk-otel-lambda, beta, publisher 254067382080) APM
-  instrumentation for AWS Lambda functions into Splunk Observability Cloud.
-  Covers Node.js 18/20/22, Python 3.8(deprecated)/3.9–3.13, Java 8/8.al2/11/17/21
-  on x86_64 and arm64; per-runtime AWS_LAMBDA_EXEC_WRAPPER wiring
-  (/opt/nodejs-otel-handler|otel-instrument|otel-handler|otel-stream-handler|
-  otel-proxy-handler|otel-sqs-handler); SPLUNK_TRACE_RESPONSE_HEADER_ENABLED
-  for Node.js RUM<->APM Server-Timing traceparent linking; secret-safe
-  SPLUNK_ACCESS_TOKEN delivery via AWS Secrets Manager or SSM SecureString
-  ({{resolve:secretsmanager:...}}/{{resolve:ssm-secure:...}} — token never
-  in files or argv); layer ARN baked snapshot with opt-in live refresh; separate
-  splunk-lambda-metrics extension layer (BETA, gated behind metrics_extension:
-  true) for Lambda Telemetry API metrics; container-image instrumentation path
-  (package_type: image, no exec wrapper, emit per-runtime Dockerfile snippet);
-  SAM template.yaml, CDK TypeScript + Python snippets, and SAR advisory note
-  alongside existing Terraform + CloudFormation + AWS CLI render targets;
-  execution-mode spec block per target (SnapStart Java warning, Provisioned
-  Concurrency SAM/CFN emission, Lambda@Edge refusal); vendor-coexistence
-  detection (Datadog/New Relic/AppDynamics/Dynatrace/ADOT); X-Ray coexistence
-  flag; GovCloud/China refusal; IAM egress stub; rollback for layer, env, iam,
-  and all sections; discover-functions; doctor (snapshot freshness, ADOT
-  conflict, vendor conflict, VPC egress reminder); cross-skill handoffs to
-  splunk-observability-aws-integration (CloudWatch metrics),
-  splunk-observability-dashboard-builder (Lambda APM dashboards),
-  splunk-observability-native-ops (cold-start/error/latency detectors),
-  splunk-connect-for-otlp-setup (Lambda log ingestion), and
-  splunk-observability-otel-collector-setup (gateway collector path).
-  Use when the user asks to instrument AWS Lambda functions for APM/tracing in
-  Splunk Observability Cloud, attach the Splunk OTel Lambda layer, wire
+  Render, validate, and optionally apply Splunk OpenTelemetry Lambda layer APM
+  instrumentation for AWS Lambda functions in Splunk Observability Cloud. Covers
+  Node.js, Python, and Java runtime wiring, safe token delivery through Secrets
+  Manager or SSM SecureString, layer ARN snapshots, Lambda metrics extension
+  opt-in, container-image snippets, SAM/CDK/Terraform/CloudFormation/AWS CLI
+  assets, vendor coexistence checks, X-Ray coexistence, GovCloud/China refusal,
+  rollback, discovery, and doctor reports. Use when the user asks to instrument
+  Lambda functions for APM/tracing, attach the Splunk OTel Lambda layer, wire
   SPLUNK_ACCESS_TOKEN safely, set up Lambda APM dashboards or detectors, or
-  migrate from Datadog/New Relic/ADOT to Splunk OTel.
+  migrate from Datadog, New Relic, or ADOT to Splunk OTel.
 ---
 
 # Splunk Observability Cloud — AWS Lambda APM Setup

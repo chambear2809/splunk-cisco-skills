@@ -1,0 +1,73 @@
+name: Splunk Connect for Syslog MCP Tools
+description: Read-only MCP tools for SC4S Splunk-side readiness and data checks.
+version: 1.0.0
+author: splunk-connect-for-syslog-setup skill
+external_app_id: sc4s
+tools:
+  - id: default_indexes
+    title: SC4S Default Indexes
+    description: Check common SC4S indexes and optional metrics index.
+    tags: [sc4s, syslog, indexes]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/data/indexes count=0 | search title=sc4s OR title=netops OR title=osnix OR title=infraops OR title=secops OR title=sc4s_metrics | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server | sort title
+    examples: [List SC4S indexes]
+  - id: hec_tokens
+    title: SC4S HEC Token State
+    description: Check HEC tokens that appear to target SC4S indexes.
+    tags: [sc4s, hec, tokens]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/data/inputs/http count=0 | search indexes=*sc4s* OR indexes=*netops* OR indexes=*secops* OR title=*sc4s* | table title disabled index indexes useACK sourcetype outputgroup | sort title
+    examples: [Check SC4S HEC tokens]
+  - id: ack_default_index
+    title: SC4S ACK And Default Index Diagnostics
+    description: Show SC4S-related HEC acknowledgement and default index settings.
+    tags: [sc4s, hec, ack, index]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/data/inputs/http count=0 | search title=*sc4s* OR indexes=*sc4s* OR indexes=*netops* OR indexes=*secops* | eval ack=if(useACK="1" OR useACK="true","enabled","disabled") | table title disabled index indexes ack sourcetype | sort title
+    examples: [Check SC4S ACK settings]
+  - id: startup_events
+    title: SC4S Startup Events
+    description: Find recent SC4S startup and collector status events indexed in Splunk.
+    tags: [sc4s, startup, collector]
+    time_range: true
+    row_limiter: true
+    spl: |
+      search index=sc4s (sourcetype=sc4s:startup OR sourcetype=sc4s:events OR source=*sc4s*) | stats count latest(_time) as latest by host source sourcetype | eval latest=strftime(latest,"%Y-%m-%dT%H:%M:%SZ") | sort -latest
+    examples: [Show SC4S startup events]
+  - id: syslog_distribution
+    title: SC4S Syslog Distribution
+    description: Summarize recent SC4S syslog distribution by index, sourcetype, and host.
+    tags: [sc4s, syslog, data]
+    time_range: true
+    row_limiter: true
+    spl: |
+      | tstats count latest(_time) as latest where index=sc4s OR index=netops OR index=osnix OR index=infraops OR index=secops by index sourcetype host | eval latest=strftime(latest,"%Y-%m-%dT%H:%M:%SZ") | sort -count
+    examples: [Show SC4S syslog distribution]
+coverage:
+  - id: default_indexes
+    status: mcp_tool
+    tool: default_indexes
+  - id: optional_metrics_index
+    status: mcp_tool
+    tool: default_indexes
+  - id: hec_token_state
+    status: mcp_tool
+    tool: hec_tokens
+  - id: ack_diagnostics
+    status: mcp_tool
+    tool: ack_default_index
+  - id: default_index_diagnostics
+    status: mcp_tool
+    tool: ack_default_index
+  - id: startup_events
+    status: mcp_tool
+    tool: startup_events
+  - id: recent_syslog_distribution
+    status: mcp_tool
+    tool: syslog_distribution

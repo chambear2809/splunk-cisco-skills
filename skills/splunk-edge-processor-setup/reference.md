@@ -8,7 +8,8 @@
   service. The control plane provides token-bearing install commands the
   operator copies onto the host.
 - Pipelines use SPL2 with `$pipeline` blocks. Partition definition uses
-  Keep / Remove on a field condition.
+  Keep / Remove on a field condition. Shared templates and compatibility lint
+  come from `splunk-spl2-pipeline-kit` using the `edgeProcessor` profile.
 - Source types ingest data via:
   - **Splunk forwarder S2S** receiver (port configurable; usually 9997).
   - **HTTP Event Collector** receiver (with HEC token authentication).
@@ -23,6 +24,8 @@
 - Default destination is REQUIRED — without one, unprocessed data is dropped.
 - TLS / mTLS for data sources requires PEM certs (server cert/key/CA, plus
   client cert for mTLS).
+- FIPS-compliant mode is supported for non-containerized Edge Processor
+  instances and is not supported for containerized EP deployments.
 - Privileged-port handling: ports < 1024 require root or capability grant.
 - Multi-instance scale-out + DNS-driven outputs.conf is the documented
   best-practice for forwarders sending to many EPs.
@@ -52,17 +55,33 @@ Official references:
 
 ## Pipeline Templates
 
-The skill renders four starter SPL2 pipeline templates under
-`pipelines/templates/`:
-
-- `filter.spl2` — drop events matching a `where` clause.
-- `mask.spl2` — replace sensitive substrings with `eval` and `replace()`.
-- `sample.spl2` — keep N% of events using `where random_int < 100 * <pct>`.
-- `route.spl2` — fan-out to multiple destinations from a single pipeline
-  via `into` blocks.
+The skill renders starter SPL2 pipeline templates under `pipelines/templates/`
+by reading the shared `splunk-spl2-pipeline-kit` `edgeProcessor` catalog. The
+  catalog includes filter, route, redact, hash, sample, lookup, JSON extraction,
+  timestamp, OCSF, stats, S3 archive, and compatibility-lint starters. If the
+  shared kit is unavailable, the renderer falls back to the legacy
+  filter/mask/sample/route starters.
 
 Fork-and-edit any of these into your own `pipelines/<name>.spl2` source file
 and reference them in `--ep-pipelines` specs.
+
+Run `splunk-spl2-pipeline-kit --phase lint --profile edgeProcessor` against
+edited pipelines before previewing them in the EP UI. The lint pass checks for
+required `$pipeline`, `from $source`, `into $destination`, PCRE2 named capture
+style, SPL1-shaped conversion gaps, and Ingest Processor-only constructs such
+as `logs_to_metrics` and `decrypt`. Edge Processor `stats` is supported and
+newer EP versions add state-window behavior that operators must review.
+
+## Current Release Guardrails
+
+- FIPS mode: non-containerized Edge Processor only.
+- Health metric rename: prefer `export_destination_errors_total`; older
+  `exporter_error_count` references are stale.
+- Source type sync: review plans over 4000 source types; current Cloud EP docs
+  increased the sync limit from 1000 to 4000.
+- S2S destinations: use bulk indexer configuration for large indexer lists
+  where available.
+- S3 destinations: review Parquet and gzip compression settings.
 
 ## systemd Unit
 
@@ -116,7 +135,9 @@ applies it before the destination becomes reachable.
 
 ## Out of Scope
 
-- Automated SPL→SPL2 conversion (use Splunk's in-product tool).
+- Live automated SPL-to-SPL2 conversion (use Splunk's in-product tool; the
+  shared kit renders static review warnings only).
 - Multi-tenant org management on Splunk Cloud.
 - Kafka and Azure Event Hubs destinations (not yet in the public EP catalog).
 - EP control-plane RBAC management.
+- Containerized FIPS mode.

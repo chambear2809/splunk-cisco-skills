@@ -1,0 +1,103 @@
+{
+  "name": "Splunk SOAR Platform MCP Tools",
+  "description": "Read-only MCP tools for Splunk-side SOAR integration readiness.",
+  "version": "1.0.0",
+  "author": "splunk-soar-setup skill",
+  "tools": [
+    {
+      "_key": "soar:soar_app_health",
+      "name": "soar_app_health",
+      "title": "SOAR App Health",
+      "description": "Check Splunk-side SOAR apps and add-ons installed on the search tier.",
+      "category": "soar",
+      "tags": [
+        "soar",
+        "app",
+        "health"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/apps/local count=0 | search title=splunk_app_soar OR title=phantom OR title=Splunk_App_SOAR OR title=TA-splunk-soar OR title=splunk_app_soar_export OR title=Splunk App for SOAR Export | table title label version disabled visible configured state | sort title",
+      "arguments": [],
+      "examples": [
+        "Check SOAR Splunk-side apps"
+      ]
+    },
+    {
+      "_key": "soar:soar_export_app_state",
+      "name": "soar_export_app_state",
+      "title": "SOAR Export App State",
+      "description": "Check the Splunk App for SOAR Export and export-related saved searches.",
+      "category": "soar",
+      "tags": [
+        "soar",
+        "export",
+        "savedsearches"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /servicesNS/nobody/-/saved/searches count=0 | search eai:acl.app=splunk_app_soar_export OR title=*SOAR* OR title=*Phantom* | table title eai:acl.app disabled is_scheduled cron_schedule action.* | sort title",
+      "arguments": [],
+      "examples": [
+        "List SOAR export searches"
+      ]
+    },
+    {
+      "_key": "soar:soar_visible_inputs_indexes",
+      "name": "soar_visible_inputs_indexes",
+      "title": "SOAR Visible Inputs And Indexes",
+      "description": "List SOAR-related local inputs visible to the search head.",
+      "category": "soar",
+      "tags": [
+        "soar",
+        "inputs",
+        "indexes"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /servicesNS/nobody/-/data/inputs/all count=0 | search title=*soar* OR title=*phantom* OR eai:acl.app=*soar* OR eai:acl.app=*phantom* | table title eai:acl.app disabled index sourcetype interval | sort title",
+      "arguments": [],
+      "examples": [
+        "Show SOAR related inputs"
+      ]
+    },
+    {
+      "_key": "soar:soar_visible_indexes",
+      "name": "soar_visible_indexes",
+      "title": "SOAR Visible Indexes",
+      "description": "List SOAR and Phantom related indexes visible to the Splunk search tier.",
+      "category": "soar",
+      "tags": [
+        "soar",
+        "indexes",
+        "phantom"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/data/indexes count=0 | search title=*soar* OR title=*phantom* | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server | sort title",
+      "arguments": [],
+      "examples": [
+        "Show SOAR related indexes"
+      ]
+    },
+    {
+      "_key": "soar:soar_placement_warnings",
+      "name": "soar_placement_warnings",
+      "title": "SOAR Placement Warnings",
+      "description": "Show server roles and SOAR app placement signals useful for deployment review.",
+      "category": "soar",
+      "tags": [
+        "soar",
+        "placement",
+        "deployment"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/server/info | table serverName server_roles guid version health_info",
+      "arguments": [],
+      "examples": [
+        "Show SOAR placement context"
+      ]
+    }
+  ]
+}

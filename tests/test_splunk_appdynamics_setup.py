@@ -24,6 +24,7 @@ APPD_SKILLS = [
     "splunk-appdynamics-log-observer-connect-setup",
     "splunk-appdynamics-alerting-content-setup",
     "splunk-appdynamics-dashboards-reports-setup",
+    "splunk-appdynamics-thousandeyes-integration-setup",
     "splunk-appdynamics-tags-extensions-setup",
     "splunk-appdynamics-security-ai-setup",
     "splunk-appdynamics-sap-agent-setup",
@@ -38,6 +39,12 @@ ALLOWED_STATUSES = {
     "validate_only",
     "not_applicable",
 }
+
+ALLOWED_SOURCE_PREFIXES = (
+    "https://help.splunk.com/",
+    "https://docs.thousandeyes.com/",
+    "https://developer.cisco.com/docs/thousandeyes/",
+)
 
 
 def run_script(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -93,7 +100,7 @@ def test_taxonomy_completeness_and_status_validity(tmp_path: Path) -> None:
     assert report["coverage_rows"] >= 80
     for row in report["features"]:
         assert row["owner"]
-        assert row["source_url"].startswith("https://help.splunk.com/")
+        assert row["source_url"].startswith(ALLOWED_SOURCE_PREFIXES)
         assert row["status"] in ALLOWED_STATUSES
         assert row["validation_method"]
         assert row["apply_boundary"]
@@ -108,6 +115,15 @@ def test_direct_secret_flags_are_rejected() -> None:
     )
     assert result.returncode == 2
     assert "Refusing direct-secret" in result.stderr
+
+
+def test_appd_thousandeyes_apply_requires_gate() -> None:
+    result = run_script(
+        SKILLS_DIR / "splunk-appdynamics-thousandeyes-integration-setup/scripts/setup.sh",
+        "--apply",
+    )
+    assert result.returncode == 2
+    assert "--accept-appd-te-mutation" in result.stderr
 
 
 def test_appd_tls_helper_env_contract(tmp_path: Path) -> None:
@@ -247,6 +263,22 @@ def test_specific_artifacts_render_for_all_appdynamics_children(tmp_path: Path) 
             "dash-studio-26-4-runbook.md",
             "reports-26-4-runbook.md",
             "log-tail-deprecation-runbook.md",
+        ],
+        "splunk-appdynamics-thousandeyes-integration-setup": [
+            "appd-te-readiness.yaml",
+            "thousandeyes-token-runbook.md",
+            "dash-studio-query-runbook.md",
+            "eum-network-metrics-runbook.md",
+            "te-assets-spec.yaml",
+            "handoff-thousandeyes-assets.sh",
+            "te-native-appd-integration-runbook.md",
+            "te-appd-webhook-payloads/connector.json",
+            "te-appd-webhook-payloads/operation.json",
+            "te-alert-notification-fragments.json",
+            "te-api-apply-plan.sh",
+            "appd-events-api-probe.sh",
+            "te-appd-admin-checklist.md",
+            "metadata.json",
         ],
         "splunk-appdynamics-tags-extensions-setup": [
             "custom-tags-payload.json",
@@ -577,7 +609,7 @@ def test_current_26_4_gap_artifacts_render(tmp_path: Path) -> None:
     dashboards = render_skill("splunk-appdynamics-dashboards-reports-setup", tmp_path / "dash")
     thousandeyes = (dashboards / "thousandeyes-dashboard-integration-runbook.md").read_text(encoding="utf-8")
     assert "ThousandEyes" in thousandeyes
-    assert "Dash Studio" in thousandeyes
+    assert "splunk-appdynamics-thousandeyes-integration-setup" in thousandeyes
     dash_studio = (dashboards / "dash-studio-26-4-runbook.md").read_text(encoding="utf-8")
     assert "standard-deviation" in dash_studio
     reports = (dashboards / "reports-26-4-runbook.md").read_text(encoding="utf-8")
@@ -623,6 +655,89 @@ def test_current_26_4_gap_artifacts_render(tmp_path: Path) -> None:
     sap_runbook = (sap / "sap-agent-runbook.md").read_text(encoding="utf-8")
     assert "gateway/proxy" in sap_runbook
     assert "BiQ business-process data" in sap_runbook
+
+
+def test_appd_thousandeyes_integration_artifacts_are_gated_and_secret_safe(tmp_path: Path) -> None:
+    out = render_skill("splunk-appdynamics-thousandeyes-integration-setup", tmp_path / "appd-te")
+
+    readiness = (out / "appd-te-readiness.yaml").read_text(encoding="utf-8")
+    assert "deployment_model: saas" in readiness
+    assert "- virtual_appliance" in readiness
+    assert "Government" in readiness
+
+    assets = (out / "te-assets-spec.yaml").read_text(encoding="utf-8")
+    assert "api_version: splunk-observability-thousandeyes-integration/v1" in assets
+    assert "type: http-server" in assets
+    assert "name: appdynamics" in assets
+    assert "expression: ((responseTime > 500 ms))" in assets
+    assert "severity: major" in assets
+
+    handoff = (out / "handoff-thousandeyes-assets.sh").read_text(encoding="utf-8")
+    assert "--i-accept-te-mutations" in handoff
+    assert "--apply tests,alert_rules,labels,tags,te_dashboards,templates" in handoff
+
+    connector = json.loads((out / "te-appd-webhook-payloads/connector.json").read_text(encoding="utf-8"))
+    assert connector["type"] == "generic"
+    assert connector["authentication"]["oauthClientSecret"] == "${APPD_OAUTH_CLIENT_SECRET}"
+
+    operation = json.loads((out / "te-appd-webhook-payloads/operation.json").read_text(encoding="utf-8"))
+    assert operation["type"] == "webhook"
+    assert operation["category"] == "alerts"
+    assert "eventtype" in operation["queryParams"]
+    assert "CUSTOM" in operation["queryParams"]
+
+    apply_plan = (out / "te-api-apply-plan.sh").read_text(encoding="utf-8")
+    assert "APPD_TE_APPLY=1" in apply_plan
+    assert "/v7/connectors/generic" in apply_plan
+    assert "/v7/operations/webhooks" in apply_plan
+    assert "/operations/webhooks/${OPERATION_ID}/connectors" in apply_plan
+
+    native = (out / "te-native-appd-integration-runbook.md").read_text(encoding="utf-8")
+    assert "Manage > Integrations" in native
+    assert "cSaaS" in native
+    assert "No public ThousandEyes API endpoint" in native
+
+    probe = (out / "appd-events-api-probe.sh").read_text(encoding="utf-8")
+    assert "APPD_TE_EVENT_PROBE=1" in probe
+    assert "eventtype=CUSTOM" in probe
+    assert "--data-urlencode" in probe
+    assert "APPD_AUTH_CONFIG" in probe
+    assert '-H "Authorization: Bearer ${ACCESS_TOKEN}"' not in probe
+
+
+def test_appd_thousandeyes_custom_webhook_operation_id_is_bound(tmp_path: Path) -> None:
+    spec = tmp_path / "appd-te.json"
+    spec.write_text(
+        json.dumps(
+            {
+                "controller_url": "https://controller.example.com",
+                "account_name": "customer1",
+                "appdynamics_target": {"application": "Checkout"},
+                "monitored_endpoints": [
+                    {"name": "Checkout health", "url": "https://checkout.example.com/health"}
+                ],
+                "thousandeyes": {
+                    "account_group_id": "1234",
+                    "custom_webhook_operation_id": "te-webhook-op-123",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = tmp_path / "appd-te-custom-webhook"
+    result = run_script(
+        SKILLS_DIR / "splunk-appdynamics-thousandeyes-integration-setup/scripts/setup.sh",
+        "--render",
+        "--spec",
+        str(spec),
+        "--output-dir",
+        str(out),
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+
+    assets = (out / "te-assets-spec.yaml").read_text(encoding="utf-8")
+    assert "integrationId: te-webhook-op-123" in assets
+    assert "integrationType: custom-webhook" in assets
 
 
 def test_second_pass_official_doc_family_rows_render(tmp_path: Path) -> None:

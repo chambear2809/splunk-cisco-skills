@@ -1,0 +1,103 @@
+{
+  "name": "Splunk Connect for SNMP MCP Tools",
+  "description": "Read-only MCP tools for SC4SNMP Splunk-side readiness and data checks.",
+  "version": "1.0.0",
+  "author": "splunk-connect-for-snmp-setup skill",
+  "tools": [
+    {
+      "_key": "sc4snmp:sc4snmp_indexes",
+      "name": "sc4snmp_indexes",
+      "title": "SC4SNMP Event And Metrics Indexes",
+      "description": "Check SC4SNMP event and metrics index readiness.",
+      "category": "sc4snmp",
+      "tags": [
+        "sc4snmp",
+        "snmp",
+        "indexes"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/data/indexes count=0 | search title=sc4snmp OR title=sc4snmp_metrics OR title=netops_metrics | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server | sort title",
+      "arguments": [],
+      "examples": [
+        "List SC4SNMP indexes"
+      ]
+    },
+    {
+      "_key": "sc4snmp:sc4snmp_hec_tokens",
+      "name": "sc4snmp_hec_tokens",
+      "title": "SC4SNMP HEC Token State",
+      "description": "Check HEC tokens that appear to target SC4SNMP indexes.",
+      "category": "sc4snmp",
+      "tags": [
+        "sc4snmp",
+        "hec",
+        "tokens"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/data/inputs/http count=0 | search title=*sc4snmp* OR indexes=*sc4snmp* OR indexes=*netops_metrics* | table title disabled index indexes useACK sourcetype outputgroup | sort title",
+      "arguments": [],
+      "examples": [
+        "Check SC4SNMP HEC tokens"
+      ]
+    },
+    {
+      "_key": "sc4snmp:sc4snmp_indexed_events",
+      "name": "sc4snmp_indexed_events",
+      "title": "SC4SNMP Indexed Events",
+      "description": "Summarize recent SC4SNMP event data by sourcetype and host.",
+      "category": "sc4snmp",
+      "tags": [
+        "sc4snmp",
+        "snmp",
+        "data"
+      ],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "| tstats count latest(_time) as latest where index=sc4snmp by index sourcetype host | eval latest=strftime(latest,\"%Y-%m-%dT%H:%M:%SZ\") | sort -count",
+      "arguments": [],
+      "examples": [
+        "Show recent SC4SNMP events"
+      ]
+    },
+    {
+      "_key": "sc4snmp:sc4snmp_metric_catalog",
+      "name": "sc4snmp_metric_catalog",
+      "title": "SC4SNMP Metric Catalog",
+      "description": "List visible SC4SNMP metric names from Splunk metrics indexes.",
+      "category": "sc4snmp",
+      "tags": [
+        "sc4snmp",
+        "snmp",
+        "metrics"
+      ],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "| mcatalog values(metric_name) as metric_name where index=sc4snmp_metrics OR index=netops_metrics by metric_name | sort metric_name",
+      "arguments": [],
+      "examples": [
+        "Show SC4SNMP metric catalog"
+      ]
+    },
+    {
+      "_key": "sc4snmp:sc4snmp_collector_logs",
+      "name": "sc4snmp_collector_logs",
+      "title": "SC4SNMP Collector Logs",
+      "description": "Summarize recent collector log events visible in Splunk.",
+      "category": "sc4snmp",
+      "tags": [
+        "sc4snmp",
+        "collector",
+        "logs"
+      ],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "search index=sc4snmp (sourcetype=sc4snmp:collector OR source=*sc4snmp*) | stats count latest(_time) as latest by host source sourcetype | eval latest=strftime(latest,\"%Y-%m-%dT%H:%M:%SZ\") | sort -latest",
+      "arguments": [],
+      "examples": [
+        "Show SC4SNMP collector logs"
+      ]
+    }
+  ]
+}

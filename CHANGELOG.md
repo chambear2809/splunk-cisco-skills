@@ -131,6 +131,9 @@ release section when cutting a release.
 
 ### Changed
 
+- Aligned all `SKILL.md` frontmatter with the Agent Skills description limit
+  and tightened the PKI skill body to stay under the progressive-disclosure
+  line-count guidance.
 - Refreshed Cisco Secure Access skill to install both the dashboard app and
   the Secure Access add-on (`TA-cisco-cloud-security-addon`) and reflect both
   apps in the README/AGENTS/CLAUDE catalogs.
@@ -167,6 +170,8 @@ release section when cutting a release.
 
 ### Documentation
 
+- Added explicit Agent Skills specification, best-practices, and evaluation
+  callouts to the README, contributor guide, and pull request template.
 - Documented in `splunk-mcp-server-setup` why the rendered Bearer header is
   written as the literal `${SPLUNK_MCP_TOKEN}` placeholder: `mcp-remote`
   performs `${VAR}` substitution at runtime and this keeps the token out of
@@ -212,6 +217,11 @@ release section when cutting a release.
 
 ### Tests
 
+- Added a repo-readiness guard that keeps the Agent Skills specification
+  callouts present in README, CONTRIBUTING, and the pull request template.
+- Expanded `tests/check_skill_frontmatter.py` to enforce Agent Skills
+  frontmatter fields, name syntax, description length, compatibility metadata,
+  and `SKILL.md` progressive-disclosure size limits.
 - Added `app_registry.json` regression tests for unique Splunkbase IDs,
   filesystem<->`skill_topologies` orphan checks, well-formed
   `min_splunk_version` values, and `cisco-scan-setup` script invariants.

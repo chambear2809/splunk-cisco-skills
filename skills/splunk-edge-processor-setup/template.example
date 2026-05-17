@@ -15,6 +15,7 @@ ep_tls_mode: none                 # none | tls | mtls
 ep_tls_server_cert:               # path to PEM file
 ep_tls_server_key:                # path to PEM file
 ep_tls_ca_cert:                   # path to PEM file (mtls only)
+ep_fips_mode: disabled            # disabled | enabled; enabled is not supported with docker mode
 
 # EP instances. Comma-separated host=mode pairs.
 # mode: systemd | nosystemd | docker

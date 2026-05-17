@@ -77,6 +77,7 @@ Environment-specific notes:
 | `splunk-appdynamics-log-observer-connect-setup` | Shared baseline; Splunk Platform tools inherit from delegated skills. | AppDynamics LOC access; Splunk Cloud/Enterprise service-account and allow-list readiness. |
 | `splunk-appdynamics-alerting-content-setup` | Shared baseline. | Controller API access for health rules, policies, actions, and export snapshots. |
 | `splunk-appdynamics-dashboards-reports-setup` | Shared baseline. | Controller API/UI access for dashboards, reports, schedules, and War Rooms. |
+| `splunk-appdynamics-thousandeyes-integration-setup` | Shared baseline; optional `curl` for API probes. | AppDynamics Controller and ThousandEyes access; tokens, passwords, OAuth client secrets, and API keys in chmod-600 files. |
 | `splunk-appdynamics-tags-extensions-setup` | Shared baseline; optional host access for Machine Agent extensions. | Controller tag API access; extension and third-party connector details; secrets in files. |
 | `splunk-appdynamics-security-ai-setup` | Shared baseline; downstream Observability/Cisco AI tools as needed. | Secure Application or Observability for AI entitlement/readiness; GPU and Cisco AI Pod handoff context. |
 | `splunk-appdynamics-sap-agent-setup` | Shared baseline; SAP Basis tools handled by operator runbooks. | SAP system details, transport/authorization readiness, and AppDynamics Controller access; SAP credentials in files. |
@@ -136,12 +137,16 @@ Environment-specific notes:
 | Skill | Additional local tooling | Live access and product requirements |
 | --- | --- | --- |
 | `splunk-admin-doctor` | `acs` for Cloud checks; optional `ssh`; `curl`. | Splunk Cloud ACS or Enterprise REST access; admin-domain permissions for the areas being diagnosed. |
+| `splunk-data-source-readiness-doctor` | Shared baseline. | Evidence JSON from readiness collection searches; expected index/sourcetype/macro contracts; optional ES, ITSI, ARI, CIM, OCSF, and dashboard inventory exports. |
+| `splunk-spl2-pipeline-kit` | Shared baseline. | SPL2 pipeline files or desired template profile; no Splunk tenant credentials required for offline render/lint. |
+| `splunk-ingest-processor-setup` | Shared baseline. | Splunk Cloud Platform Victoria Experience tenant details; Ingest Processor entitlement/provisioning status; source type, destination, index, lookup, and service-account readiness details. |
 | `splunk-agent-management-setup` | Shared baseline. | Splunk Enterprise deployment server or deployment-app file target access; server class/app ownership details. |
 | `splunk-ai-assistant-setup` | Shared baseline. | Splunk app workflow access; Splunk AI Assistant entitlement and activation/onboarding details. |
 | `splunk-ai-ml-toolkit-setup` | Shared baseline; `PyYAML` for YAML specs. | Splunk app workflow access; Splunkbase access for AI Toolkit, PSC, and DSDL packages; external DSDL runtime ownership for Docker, Kubernetes, OpenShift, HPC, GPU, or air-gapped handoffs. |
 | `splunk-app-install` | `acs`; optional `ssh`, `scp`, and `sshpass` for Enterprise remote staging. | Splunk Enterprise REST or Splunk Cloud ACS access; Splunkbase credentials or local package path. |
 | `splunk-cloud-acs-allowlist-setup` | `acs`; optional `terraform`; `curl` for source-IP discovery. | Splunk Cloud ACS stack permissions; exact allowlist feature/subnet plan; lock-out protection review. |
 | `splunk-cloud-data-manager-setup` | `aws`, `az`, `gcloud`, and `terraform` only for the cloud artifact families being validated/applied. | Data Manager-generated CloudFormation/ARM/Terraform artifacts; cloud-provider permissions; HEC/index prerequisites. |
+| `splunk-db-connect-setup` | Java `17` or `21` for Enterprise/customer-managed runtimes; Splunk-managed JRE validation for Cloud Victoria; JDBC driver packages or Splunkbase access for supported driver add-ons. | Splunk DB Connect topology plan; database endpoints; secret files or external references for DB identities; Cloud outbound allowlist details when applicable. |
 | `splunk-edge-processor-setup` | `docker` for local/container handoffs; `systemctl` for Linux service paths. | Splunk Cloud or Enterprise Edge Processor control-plane access; EP instance host permissions. |
 | `splunk-enterprise-host-setup` | `ssh`, `sudo`; package checksum tools from the host OS. | Target Linux hosts; Splunk Enterprise package access; role/topology settings for search/indexer/HF/cluster membership. |
 | `splunk-enterprise-kubernetes-setup` | `kubectl`, `helm`; `aws` for optional EKS kubeconfig helper. | Kubernetes cluster access; Splunk Operator for Kubernetes or Splunk POD installer/bastion access. |

@@ -5,13 +5,14 @@ description: >-
   AppDynamics SaaS, On-Premises, Virtual Appliance, SAP Agent, APM, agents,
   Smart Agent, Cluster Agent, Infrastructure Visibility, Database Visibility,
   Analytics, EUM, Synthetic Monitoring, Log Observer Connect, Controller/admin,
-  alerting, dashboards/reports, tags, extensions, Sensitive Data Collection and
-  Security, release notes and references, product announcements, AIML, GPU
-  Monitoring, Splunk AppDynamics for OpenTelemetry, Secure Application,
-  Observability for AI, and Splunk Platform integration requests to the owning
-  child skill, then emits a machine-readable coverage report from the checked-in
-  taxonomy. Use when the user asks for AppDynamics setup, AppDynamics coverage,
-  AppDynamics product routing, or a full AppDynamics doctor/gap report.
+  alerting, dashboards/reports, ThousandEyes integration, tags, extensions,
+  Sensitive Data Collection and Security, release notes and references, product
+  announcements, AIML, GPU Monitoring, Splunk AppDynamics for OpenTelemetry,
+  Secure Application, Observability for AI, and Splunk Platform integration
+  requests to the owning child skill, then emits a machine-readable coverage
+  report from the checked-in taxonomy. Use when the user asks for AppDynamics
+  setup, AppDynamics coverage, AppDynamics product routing, or a full
+  AppDynamics doctor/gap report.
 ---
 
 # Splunk AppDynamics Setup

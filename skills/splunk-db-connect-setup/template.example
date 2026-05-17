@@ -1,0 +1,162 @@
+# Splunk DB Connect Setup Worksheet
+#
+# Copy this file locally and fill in only non-secret values. Database
+# passwords, wallet passphrases, private keys, API tokens, CyberArk credentials,
+# and Vault tokens must stay in chmod-600 local files or external secret
+# references.
+
+version: splunk-db-connect-setup/v1
+
+platform:
+  type: enterprise
+  splunk_version: "10.0"
+  stack: ""
+
+topology:
+  mode: shc
+  install_targets:
+    - search-tier
+  shc_deployer: deployer01.example.com
+  shc_members:
+    - sh01.example.com
+    - sh02.example.com
+    - sh03.example.com
+  heavy_forwarders: []
+
+install:
+  install_apps: false
+  accept_install: false
+  db_connect_app_id: "2686"
+  driver_app_ids:
+    - "6150"
+    - "6152"
+  allow_archived_drivers: false
+  local_packages: []
+
+java:
+  version: "17"
+  java_home: /opt/java/openjdk-17
+  jvm_options:
+    - -Xms256m
+    - -Xmx1024m
+
+drivers:
+  - name: mssql
+    type: splunkbase
+    splunkbase_id: "6150"
+  - name: postgresql
+    type: splunkbase
+    splunkbase_id: "6152"
+  - name: informix-custom
+    type: custom
+    database: informix
+    jar_name: ifxjdbc.jar
+    cloud_custom_app: false
+  - name: databricks-custom
+    type: custom
+    database: databricks
+    jar_name: databricks-jdbc.jar
+    cloud_custom_app: true
+
+settings:
+  task_server_port: 9998
+  java_heap_size_mb: 1024
+  query_timeout_seconds: 60
+  max_rows_per_query: 50000
+  enable_health_dashboard: true
+
+identities:
+  - name: reporting_ro
+    username: dbx_reporting
+    password_file: /tmp/dbx_reporting_password
+    secrets_provider: file
+  - name: vault_writer
+    username: dbx_writer
+    vault_ref: secret/data/splunk/dbx/writer
+    secrets_provider: hashicorp_vault
+
+connections:
+  - name: finance_pg
+    driver: postgresql
+    identity: reporting_ro
+    jdbc_url: jdbc:postgresql://db01.example.com:5432/finance
+    require_client_cert: false
+  - name: warehouse_mssql
+    driver: mssql
+    identity: vault_writer
+    jdbc_url: jdbc:sqlserver://sql01.example.com:1433;databaseName=warehouse;encrypt=true;trustServerCertificate=false
+    auth_mode: sql_server
+
+inputs:
+  - name: orders_delta
+    connection: finance_pg
+    index: dbx_orders
+    sourcetype: dbx:orders
+    interval: "*/5 * * * *"
+    mode: rising_column
+    checkpoint_column: updated_at
+    query: |
+      SELECT id, updated_at, status, total
+      FROM public.orders
+      WHERE updated_at > ?
+      ORDER BY updated_at ASC
+
+outputs:
+  - name: notable_case_export
+    connection: warehouse_mssql
+    mode: disabled
+    target_table: dbo.splunk_notable_cases
+    source_search: savedsearch:DBX Notable Case Export
+
+lookups:
+  - name: customer_enrichment
+    connection: finance_pg
+    lookup_name: customer_dbx_lookup
+    key_columns:
+      - customer_id
+    query: |
+      SELECT customer_id, segment, region
+      FROM public.customers
+
+indexes:
+  - name: dbx_orders
+    datatype: event
+    retention_days: 365
+
+hec:
+  enabled: false
+  token_name: dbx_export
+  allowed_indexes:
+    - dbx_orders
+
+cloud_network:
+  outbound_allowlist:
+    - host: db01.example.com
+      port: 5432
+      protocol: tcp
+    - host: sql01.example.com
+      port: 1433
+      protocol: tcp
+
+ha:
+  enabled: false
+  mode: none
+  etcd_endpoints: []
+
+security:
+  fips_mode: false
+  fips_fresh_install: false
+  require_client_cert: false
+  client_certificate_ref: ""
+  client_private_key_ref: ""
+  secret_policy: file_or_external_ref_only
+  cyberark_enabled: false
+  vault_enabled: true
+  dbx_object_mutation: false
+
+validation:
+  run_rest_checks: true
+  run_btool_checks: true
+  run_spl_searches: true
+  expected_sourcetypes:
+    - dbx:orders

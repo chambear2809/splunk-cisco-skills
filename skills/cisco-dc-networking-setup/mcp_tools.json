@@ -54,21 +54,12 @@
       "time_range": true,
       "row_limiter": true,
       "spl": "search index=cisco_aci sourcetype=\"cisco:apic:faultInst\" | spath | table _time, code, severity, descr, dn, lc, cause | sort -_time",
-      "arguments": [
-        {
-          "name": "severity",
-          "type": "string",
-          "description": "Filter by fault severity (critical, major, minor, warning, cleared)",
-          "required": false,
-          "placeholder": "critical",
-          "quoted": false
-        }
-      ],
+      "arguments": [],
       "examples": [
         {
-          "name": "Show critical faults",
-          "description": "List all critical ACI faults in the last 24 hours",
-          "arguments": {"severity": "critical"},
+          "name": "Show recent faults",
+          "description": "List recent ACI faults",
+          "arguments": {},
           "expected_use": "Incident response and fault investigation"
         }
       ]

@@ -60,3 +60,25 @@ bash skills/splunk-attack-analyzer-setup/scripts/validate.sh
   unless a supported app REST contract is verified in the target deployment.
 
 Read `reference.md` for source links, app IDs, and handoff notes.
+
+## MCP Tools
+
+This skill includes checked-in, read-only Splunk MCP custom tools generated
+from `mcp_tools.source.yaml`.
+
+Validate or regenerate the tool artifact:
+
+```bash
+python3 skills/shared/scripts/mcp_tools.py validate skills/splunk-attack-analyzer-setup
+python3 skills/shared/scripts/mcp_tools.py generate skills/splunk-attack-analyzer-setup
+```
+
+Load the tools into Splunk MCP Server:
+
+```bash
+bash skills/splunk-attack-analyzer-setup/scripts/load_mcp_tools.sh
+```
+
+The loader uses the supported `/mcp_tools` REST batch endpoint by default. Use
+`--allow-legacy-kv` only for older MCP Server app versions that lack that
+endpoint.

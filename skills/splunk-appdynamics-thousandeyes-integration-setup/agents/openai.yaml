@@ -1,0 +1,5 @@
+name: splunk-appdynamics-thousandeyes-integration-setup
+short_description: "Render AppDynamics-ThousandEyes integration and TE API plans"
+entrypoint: "skills/splunk-appdynamics-thousandeyes-integration-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-thousandeyes-integration-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-thousandeyes-integration-setup/scripts/validate.sh --help"

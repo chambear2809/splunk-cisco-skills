@@ -1,22 +1,17 @@
 ---
 name: splunk-observability-cloud-integration-setup
 description: >-
-  Render, preflight, apply, validate, and diagnose the Splunk Platform <-> Splunk
-  Observability Cloud integration end-to-end for Splunk Cloud Platform and
-  Splunk Enterprise: token-auth enablement, region/realm preflight, Unified
-  Identity (UID) or API-token (Service Account) pairing, multi-org + default-org
-  selection, Centralized RBAC + role mapping, the in-platform "Discover Splunk
-  Observability Cloud" app Configurations tabs, Log Observer Connect (SCP and
-  SE TLS-cert paths), Related Content previews and Auto Field Mapping, Real
-  Time Metrics capability assignments, Dashboard Studio O11y metrics, and the
-  Splunk Infrastructure Monitoring Add-on (Splunk_TA_sim, Splunkbase 5247)
-  install + account + curated SignalFlow modular inputs. Use when a user asks
-  to pair Splunk Cloud Platform with Splunk Observability Cloud, set up
-  Unified Identity, configure the Discover Splunk Observability Cloud app,
-  enable Centralized RBAC, install the Splunk Infrastructure Monitoring
-  Add-on, configure Related Content previews, set up Log Observer Connect,
-  bring O11y metrics into Splunk via the sim SPL command, or run any
-  navigate-from-Splunk-Platform-into-O11y workflow.
+  Render, preflight, apply, validate, and diagnose Splunk Platform to Splunk
+  Observability Cloud pairing for Splunk Cloud Platform and Splunk Enterprise.
+  Covers token-auth enablement, realm checks, Unified Identity or service-account
+  pairing, multi-org defaults, Centralized RBAC, Discover Splunk Observability
+  Cloud app configuration, Log Observer Connect, Related Content, Real Time
+  Metrics, Dashboard Studio O11y metrics, and Splunk_TA_sim modular inputs.
+  Use when a user asks to pair Splunk Platform with Splunk Observability Cloud,
+  set up Unified Identity or Centralized RBAC, configure the Discover app,
+  install the Infrastructure Monitoring Add-on, configure Related Content or
+  Log Observer Connect, bring O11y metrics into Splunk with sim, or navigate
+  from Splunk Platform into Observability workflows.
 ---
 
 # Splunk Platform <-> Splunk Observability Cloud Integration Setup
@@ -332,3 +327,25 @@ bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh \
 - The skill never asks for nor logs secret material, refuses every direct
   secret CLI flag, and redacts every token, password, JWT, and pairing-id
   from the rendered artifacts on disk.
+
+## MCP Tools
+
+This skill includes checked-in, read-only Splunk MCP custom tools generated
+from `mcp_tools.source.yaml`.
+
+Validate or regenerate the tool artifact:
+
+```bash
+python3 skills/shared/scripts/mcp_tools.py validate skills/splunk-observability-cloud-integration-setup
+python3 skills/shared/scripts/mcp_tools.py generate skills/splunk-observability-cloud-integration-setup
+```
+
+Load the tools into Splunk MCP Server:
+
+```bash
+bash skills/splunk-observability-cloud-integration-setup/scripts/load_mcp_tools.sh
+```
+
+The loader uses the supported `/mcp_tools` REST batch endpoint by default. Use
+`--allow-legacy-kv` only for older MCP Server app versions that lack that
+endpoint.

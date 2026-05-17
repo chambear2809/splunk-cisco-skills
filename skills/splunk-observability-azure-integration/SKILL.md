@@ -1,28 +1,15 @@
 ---
 name: splunk-observability-azure-integration
 description: >-
-  Render, apply, validate, discover, and diagnose the Splunk Observability
-  Cloud Azure integration (REST type=Azure, poll-based via Azure Monitor API).
-  Covers all wire fields from signalfx/signalfx-go (tenantId, appId/secretKey
-  via file-only, azureEnvironment AZURE/AZURE_US_GOVERNMENT, subscriptions,
-  pollRate 60–600 s, useBatchApi, importAzureMonitor, syncGuestOsNamespaces,
-  services ~80-entry enum, additionalServices, customNamespacesPerService,
-  resourceFilterRules, namedToken ForceNew), Terraform signalfx_azure_integration
-  (provider splunk-terraform/signalfx ~> 9.0, latest 9.28.0), Azure CLI SP
-  creation (az ad sp create-for-rbac file-redirected, Monitoring Reader +
-  Reader role assignments), Bicep role-assignment template (subscription-scoped
-  or management-group-scoped), multi-subscription support, drift detection with
-  credential-hash sidecar (appId/secretKey redacted on GET), conflict-matrix
-  enforcement (services+additionalServices non-empty, poll_rate 60–600,
-  namedToken ForceNew warning), and GovCloud realm guard for AZURE_US_GOVERNMENT.
-  Cross-skill handoffs to splunk-app-install (Splunk_TA_microsoft_cloud_services
-  Splunkbase 3110 logs), splunk-observability-otel-collector-setup (AKS host
-  telemetry), splunk-observability-dashboard-builder (Azure dashboards),
-  splunk-observability-native-ops (detectors), splunk-observability-cloud-
-  integration-setup (Log Observer Connect), and splunk-hec-service-setup
-  (HEC tokens). Use when the user asks to connect Splunk Observability Cloud
-  to Azure Monitor metrics, wire the Azure integration, configure Service
-  Principal credentials, or set up Azure dashboards and detectors.
+  Render, apply, validate, discover, and diagnose the Splunk Observability Cloud
+  Azure integration for Azure Monitor metrics. Covers REST payloads, Terraform,
+  Azure CLI service-principal creation, Bicep role assignments, subscriptions,
+  service selection, custom namespaces, resource filters, credential-hash drift
+  detection, poll-rate and namedToken checks, and Azure Government guards. Use
+  when the user asks to connect Splunk Observability Cloud to Azure Monitor,
+  configure the Azure integration, manage service-principal credential files,
+  onboard multiple subscriptions, or set up Azure dashboards, detectors, logs,
+  AKS telemetry, Log Observer Connect, or HEC-token handoffs.
 ---
 
 # Splunk Observability Cloud — Azure Integration Setup

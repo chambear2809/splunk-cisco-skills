@@ -2,30 +2,15 @@
 name: splunk-deployment-server-setup
 description: >-
   Render, preflight, bootstrap, validate, and operate the Splunk Enterprise
-  Deployment Server (DS) runtime end-to-end: enable-deploy-server bootstrap,
-  `etc/deployment-apps/` layout and bundle-hash tracking, `phoneHome` tuning
-  (`phoneHomeIntervalInSecs`, `handshakeRetryIntervalInSecs`,
-  `maxNumberOfClientApps`) with researched scale numbers (60 s default to
-  300–600 s for 5000+ UF fleets), REST inspection (`GET
-  /services/deployment/server/clients`, `/serverclasses`, `/applications/local`,
-  `POST /services/deployment/server/_reload`), large-fleet HA pairing (two DS
-  instances behind HAProxy or AWS ELB, shared `etc/deployment-apps/` via rsync
-  or Git pull, LB health check `/services/server/info`), cascading-DS
-  anti-pattern guard (refused without `--accept-cascading-ds-workaround`),
-  SHC-deployer-as-DS anti-pattern guard, mass client re-enrollment
-  (`targetUri` change + `splunk reload deploy-client`), staged rollout
-  (10% per hour with rate-limit guidance), `filterType = whitelist` explicit
-  rendering for Splunk 9.4.3+ default change, and failure-mode runbooks
-  (503 log surge, app version drift, unenrolled client). Stays beneath
-  `splunk-agent-management-setup` (which continues to own `serverclass.conf`
-  and `deploymentclient.conf` authoring); this skill owns the DS runtime.
-  Handoffs: `splunk-agent-management-setup` for server-class authoring,
-  `splunk-universal-forwarder-setup` for UF enrollment,
-  `splunk-monitoring-console-setup` for fleet visibility,
-  `splunk-platform-restart-orchestrator` for DS restarts. Use when the user
-  asks to bootstrap a deployment server, tune phoneHome intervals, inspect
-  enrolled clients, set up DS high availability, diagnose a DS 503 flood,
-  migrate clients to a new DS, or scale to 5000+ universal forwarders.
+  Deployment Server runtime: enable-deploy-server bootstrap, deployment-app
+  layout checks, phoneHome tuning, REST inspection, large-fleet HA pairing,
+  client re-enrollment, staged rollout, Splunk 9.4.3+ filterType handling,
+  and failure-mode runbooks for 503 floods, app drift, and unenrolled clients.
+  Use when the user asks to bootstrap a deployment server, tune Universal
+  Forwarder phoneHome intervals, inspect enrolled clients, set up DS high
+  availability, migrate clients to a new DS, scale to 5000+ forwarders, or
+  diagnose DS runtime health. Hand off serverclass.conf and deploymentclient.conf
+  authoring to splunk-agent-management-setup.
 ---
 
 # Splunk Deployment Server Setup

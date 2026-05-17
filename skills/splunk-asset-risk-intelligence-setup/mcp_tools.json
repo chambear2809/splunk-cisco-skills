@@ -1,0 +1,139 @@
+{
+  "name": "Splunk Asset Risk Intelligence MCP Tools",
+  "description": "Read-only MCP tools for Splunk Asset and Risk Intelligence readiness validation.",
+  "version": "1.0.0",
+  "author": "splunk-asset-risk-intelligence-setup skill",
+  "tools": [
+    {
+      "_key": "ari:ari_app_health",
+      "name": "ari_app_health",
+      "title": "ARI App Health",
+      "description": "Check ARI app installation, visibility, configured state, and version.",
+      "category": "ari",
+      "tags": [
+        "ari",
+        "asset",
+        "risk",
+        "health"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/apps/local count=0 | search title=SplunkAssetRiskIntelligence OR title=Splunk_TA_ARI OR title=TA-ari* | table title label version disabled visible configured state | sort title",
+      "arguments": [],
+      "examples": [
+        "Check ARI app health"
+      ]
+    },
+    {
+      "_key": "ari:ari_required_indexes",
+      "name": "ari_required_indexes",
+      "title": "ARI Required Indexes",
+      "description": "Check required ARI indexes and basic storage/event counters.",
+      "category": "ari",
+      "tags": [
+        "ari",
+        "indexes"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/data/indexes count=0 | search title=ari_staging OR title=ari_asset OR title=ari_internal OR title=ari_ta | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server | sort title",
+      "arguments": [],
+      "examples": [
+        "List ARI required indexes"
+      ]
+    },
+    {
+      "_key": "ari:ari_kvstore_status",
+      "name": "ari_kvstore_status",
+      "title": "ARI KV Store Readiness",
+      "description": "Show platform KV Store status and ARI-owned collection definitions.",
+      "category": "ari",
+      "tags": [
+        "ari",
+        "kvstore"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/server/info | eval check=\"platform_status\", collection=\"\", app=\"\", accelerated_fields=\"\", replicate=\"\", kv_status=kvStoreStatus, kv_version=kvStoreVersion | table check serverName kv_status kv_version collection app accelerated_fields replicate | append [| rest /servicesNS/nobody/-/storage/collections/config count=0 | search eai:acl.app=SplunkAssetRiskIntelligence OR title=ari* | eval check=\"collection\", serverName=\"\", kv_status=\"\", kv_version=\"\", collection=title, app='eai:acl.app' | table check serverName kv_status kv_version collection app accelerated_fields replicate] | sort check app collection",
+      "arguments": [],
+      "examples": [
+        "Check ARI KV collections"
+      ]
+    },
+    {
+      "_key": "ari:ari_roles_capabilities",
+      "name": "ari_roles_capabilities",
+      "title": "ARI Roles And Capabilities",
+      "description": "Inventory roles and capabilities that appear to be ARI-related.",
+      "category": "ari",
+      "tags": [
+        "ari",
+        "roles",
+        "capabilities"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/authorization/roles count=0 | search title=ari* OR imported_roles=ari* OR capabilities=ari* | table title imported_roles capabilities srchIndexesAllowed srchIndexesDefault | sort title",
+      "arguments": [],
+      "examples": [
+        "Show ARI roles and capabilities"
+      ]
+    },
+    {
+      "_key": "ari:ari_saved_searches",
+      "name": "ari_saved_searches",
+      "title": "ARI Saved Search Inventory",
+      "description": "List ARI-owned saved searches and scheduling state.",
+      "category": "ari",
+      "tags": [
+        "ari",
+        "savedsearches"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /servicesNS/nobody/-/saved/searches count=0 | search eai:acl.app=SplunkAssetRiskIntelligence OR title=ari* | table title eai:acl.app disabled is_scheduled cron_schedule next_scheduled_time | sort title",
+      "arguments": [],
+      "examples": [
+        "List ARI saved searches"
+      ]
+    },
+    {
+      "_key": "ari:ari_ari_ta_data",
+      "name": "ari_ari_ta_data",
+      "title": "ARI TA Data Visibility",
+      "description": "Summarize recent ARI technical add-on data.",
+      "category": "ari",
+      "tags": [
+        "ari",
+        "data",
+        "ari_ta"
+      ],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "| tstats count latest(_time) as latest where index=ari_ta by index sourcetype host | eval latest=strftime(latest,\"%Y-%m-%dT%H:%M:%SZ\") | sort -count",
+      "arguments": [],
+      "examples": [
+        "Show recent ari_ta data"
+      ]
+    },
+    {
+      "_key": "ari:ari_exposure_analytics_readiness",
+      "name": "ari_exposure_analytics_readiness",
+      "title": "ARI ES Exposure Analytics Readiness",
+      "description": "Check ES and ARI app presence needed for Exposure Analytics handoff readiness.",
+      "category": "ari",
+      "tags": [
+        "ari",
+        "es",
+        "exposure_analytics"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/apps/local count=0 | search title=SplunkAssetRiskIntelligence OR title=SplunkEnterpriseSecuritySuite OR title=MissionControl | table title version disabled visible configured | sort title",
+      "arguments": [],
+      "examples": [
+        "Check ARI Exposure Analytics readiness"
+      ]
+    }
+  ]
+}

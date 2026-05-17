@@ -1,0 +1,19 @@
+name: splunk-db-connect-setup
+description: Render, preflight, validate, and hand off Splunk DB Connect JDBC ingestion, lookup, enrichment, export, and Federated Search assets.
+entrypoint: SKILL.md
+safe_first_commands:
+  - bash skills/splunk-db-connect-setup/scripts/setup.sh --help
+  - bash skills/splunk-db-connect-setup/scripts/setup.sh --preflight --spec skills/splunk-db-connect-setup/template.example
+validation_commands:
+  - bash skills/splunk-db-connect-setup/scripts/validate.sh --output-dir splunk-db-connect-rendered
+  - bash skills/splunk-db-connect-setup/scripts/smoke_offline.sh
+handoffs:
+  - splunk-app-install
+  - splunk-hec-service-setup
+  - splunk-platform-pki-setup
+guardrails:
+  - file-only or external-reference secret handling
+  - render-first DBX object previews only
+  - no Deployment Server, universal forwarder, or indexer DBX install targets
+  - no Splunk Cloud Classic self-service install path
+  - Cloud Victoria DB Connect runs on Cloud search heads with Splunk-managed JRE validation

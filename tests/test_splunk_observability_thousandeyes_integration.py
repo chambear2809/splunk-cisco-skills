@@ -248,3 +248,65 @@ def test_per_test_type_dashboards_use_canonical_metrics(tmp_path: Path) -> None:
     assert "bgp.path_changes.count" in bgp
     assert "rtp.client.request.mos" in voice
     assert "http.server.request.availability" in http
+
+
+def test_alert_rule_payloads_use_v7_expression_model(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        alert_rules=[
+            {
+                "name": "Checkout HTTP latency",
+                "test_type": "http-server",
+                "expression": "((responseTime > 500 ms))",
+                "severity": "Major",
+                "min_sources": 2,
+                "rounds_violating_required": 2,
+                "rounds_violating_out_of": 3,
+                "notifications": [
+                    {"type": "email", "recipients": ["alerts@example.com"]},
+                    {
+                        "type": "custom-webhook",
+                        "integrationId": "te-webhook-op-123",
+                        "integrationName": "AppDynamics custom events",
+                    },
+                ],
+            }
+        ],
+    )
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+
+    payload = json.loads(
+        (output / "te-payloads/alert-rules/checkout-http-latency.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert payload["alertType"] == "http-server"
+    assert payload["expression"] == "((responseTime > 500 ms))"
+    assert payload["severity"] == "major"
+    assert payload["minimumSources"] == 2
+    assert payload["roundsViolatingRequired"] == 2
+    assert payload["roundsViolatingOutOf"] == 3
+    assert payload["notifications"]["email"]["recipients"] == ["alerts@example.com"]
+    assert payload["notifications"]["customWebhook"][0]["integrationType"] == "custom-webhook"
+    assert payload["notifications"]["customWebhook"][0]["integrationId"] == "te-webhook-op-123"
+    assert "threshold" not in payload
+    assert "windowSeconds" not in payload
+
+
+def test_alert_rule_requires_expression(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        alert_rules=[
+            {
+                "name": "Missing expression",
+                "test_type": "http-server",
+                "severity": "major",
+            }
+        ],
+    )
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 1
+    assert "expression is required" in combined_output(result)

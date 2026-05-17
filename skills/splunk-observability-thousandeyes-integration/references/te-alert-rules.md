@@ -10,24 +10,27 @@ The skill renders alert rules as standalone `te-payloads/alert-rules/<slug>.json
 alert_rules:
   - name: "agent-to-server latency p95"
     test_type: agent-to-server
-    severity: Warning           # Info | Warning | Major | Critical
-    direction: increase         # increase | decrease
-    threshold: 200              # numeric value (units depend on metric)
-    window_seconds: 120
+    expression: "((avgLatency > 200 ms))"
+    severity: major             # info | minor | major | critical | unknown
     min_sources: 1              # how many agents must violate
     rounds_violating_required: 3
     rounds_violating_out_of: 5
-    notifications: []           # TE notification objects (see below)
+    notifications: {}           # TE v7 notification object (see below)
 ```
+
+The renderer rejects the older synthetic `threshold` and `window_seconds` fields. ThousandEyes v7 alert rules are expression based, so encode the metric, comparator, and unit in `expression`.
 
 ## Notification objects
 
 TE supports several notification destinations:
 
-- `email` — `{ "type": "email", "recipients": ["alerts@example.com"] }`
-- `webhook` — `{ "type": "webhook", "url": "https://...", "auth": { ... } }`
-- `pagerduty`, `servicenow`, `slack`, etc. via Integrations 1.0 / 2.0
+- `email` — `{ "email": { "recipients": ["alerts@example.com"] } }`
+- `customWebhook` — `{ "customWebhook": [{ "integrationId": "op-id", "integrationType": "custom-webhook", "integrationName": "AppDynamics custom events" }] }`
+- `thirdParty` — `{ "thirdParty": [{ "integrationId": "integration-id", "integrationType": "app-dynamics" }] }`
+- `webhook` — legacy webhook notification entries for older webhook integrations
 - `splunkOnCall` (formerly VictorOps) — preferred for on-call routing; coordinate with `splunk-oncall-setup` if you also need the matching Splunk On-Call escalation policy
+
+For convenience, the spec also accepts a list of shorthand entries with `type: email`, `type: custom-webhook`, `type: webhook`, `type: app-dynamics`, `type: pager-duty`, `type: service-now`, or `type: slack`; the renderer converts them into the v7 notification object.
 
 ## Severity → SignalFlow detector mapping
 

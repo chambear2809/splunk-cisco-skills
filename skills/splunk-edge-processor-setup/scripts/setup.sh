@@ -21,6 +21,7 @@ EP_TLS_MODE="none"
 EP_TLS_SERVER_CERT=""
 EP_TLS_SERVER_KEY=""
 EP_TLS_CA_CERT=""
+EP_FIPS_MODE="disabled"
 EP_INSTANCES=""
 EP_TARGET_DAILY_GB="50"
 EP_SOURCE_TYPES=""
@@ -53,6 +54,7 @@ Options:
   --ep-tls-server-cert PATH
   --ep-tls-server-key PATH
   --ep-tls-ca-cert PATH
+  --ep-fips-mode disabled|enabled
   --ep-instances "host=mode,..."   (mode: systemd|nosystemd|docker)
   --ep-target-daily-gb N
   --ep-source-types CSV
@@ -87,6 +89,7 @@ while [[ $# -gt 0 ]]; do
         --ep-tls-server-cert) require_arg "$1" $# || exit 1; EP_TLS_SERVER_CERT="$2"; shift 2 ;;
         --ep-tls-server-key) require_arg "$1" $# || exit 1; EP_TLS_SERVER_KEY="$2"; shift 2 ;;
         --ep-tls-ca-cert) require_arg "$1" $# || exit 1; EP_TLS_CA_CERT="$2"; shift 2 ;;
+        --ep-fips-mode) require_arg "$1" $# || exit 1; EP_FIPS_MODE="$2"; shift 2 ;;
         --ep-instances) require_arg "$1" $# || exit 1; EP_INSTANCES="$2"; shift 2 ;;
         --ep-target-daily-gb) require_arg "$1" $# || exit 1; EP_TARGET_DAILY_GB="$2"; shift 2 ;;
         --ep-source-types) require_arg "$1" $# || exit 1; EP_SOURCE_TYPES="$2"; shift 2 ;;
@@ -138,6 +141,7 @@ RENDER_ARGS=(
     --ep-tls-server-cert "${EP_TLS_SERVER_CERT}"
     --ep-tls-server-key "${EP_TLS_SERVER_KEY}"
     --ep-tls-ca-cert "${EP_TLS_CA_CERT}"
+    --ep-fips-mode "${EP_FIPS_MODE}"
     --ep-instances "${EP_INSTANCES}"
     --ep-target-daily-gb "${EP_TARGET_DAILY_GB}"
     --ep-source-types "${EP_SOURCE_TYPES}"

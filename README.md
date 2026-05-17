@@ -20,183 +20,156 @@ external-collector topologies.
 Most workflows are render-first and validation-heavy, with explicit apply
 phases and secret-file guardrails for production changes.
 
-## Start With The Intake Templates
+## Start Here
 
-For a scannable operator view of every skill, use
-[`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md). It gives each skill a
-plain-language purpose, the best first file to open, a safe `--help` command,
-the validation entry point, and the deeper docs to read next.
+This repo is meant to be used by operators and agents. Most workflows follow
+the same safe order: choose a skill, collect non-secret inputs, run a help or
+dry-run command, render or apply only the requested change, then validate.
 
-Before starting a setup, review the skill-local `template.example` files. They
-show the non-secret information you should collect from the product domain
-owners ahead of time, such as hostnames, account names, org IDs, regions,
-indexes, and feature choices.
+For a scannable operator view of every skill, start with
+[`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md). It lists each skill's purpose, the
+best first file to open, a safe `--help` command, the validation command, and
+the deeper docs to read next.
 
-Use the relevant `skills/<skill>/template.example` as your intake worksheet,
-then keep any completed copy local as `template.local` rather than committing it
-to git.
+## Quick Start
 
-The repo is designed for two use cases:
+Run commands from the repository root unless a skill says otherwise.
 
-- **Agent-driven work in Cursor, Codex, or Claude Code**: the agent reads the skill metadata
-  in `skills/*/SKILL.md` and runs the matching scripts for you.
-- **Direct shell use**: you can run the scripts under each skill manually if you
-  prefer to operate outside the agent.
+1. Configure your local target credentials:
 
-Common starting points:
+   ```bash
+   bash skills/shared/scripts/setup_credentials.sh
+   ```
 
-- If you know the Cisco product but not the Splunk app, run
-  `skills/cisco-product-setup/scripts/setup.sh --dry-run`.
-- If you already know the Splunkbase app or TA, use
-  `skills/splunk-app-install/scripts/install_app.sh`, then run the matching
-  setup skill.
-- If you need Linux host bootstrap, start with
-  `skills/splunk-enterprise-host-setup/`.
-- If you need lightweight Universal Forwarder runtime bootstrap, start with
-  `skills/splunk-universal-forwarder-setup/`; use Agent Management separately
-  for server classes and deployment apps.
-- If you need Splunk Enterprise on Kubernetes, start with
-  `skills/splunk-enterprise-kubernetes-setup/`. The workflow renders assets by
-  default and only applies them when you request an apply phase.
-- If you need Splunk Enterprise Security, start with
-  `skills/splunk-enterprise-security-install/` for package install and
-  `skills/splunk-enterprise-security-config/` for indexes, roles, data models,
-  enrichment, detections, and operational validation.
-- If you need a broader Splunk security product route, start with
-  `skills/splunk-security-portfolio-setup/`; it routes Enterprise Security,
-  SOAR, Security Essentials, UBA, Attack Analyzer, ARI, and related offerings
-  to the supported setup, install-only, or handoff path.
-- If you need a broad Splunk Cloud or Enterprise administration health review,
-  start with `skills/splunk-admin-doctor/`; it diagnoses admin-domain coverage
-  and renders doctor reports, fix plans, and safe handoffs.
-- If you need Splunk Cloud Data Manager onboarding for AWS, Azure, GCP, or
-  CrowdStrike, start with `skills/splunk-cloud-data-manager-setup/`. It works
-  from Data Manager-generated artifacts and keeps private Data Manager APIs out
-  of scope.
-- If you need Splunk Observability Cloud OTel collection on Kubernetes or a
-  Linux host, start with `skills/splunk-observability-otel-collector-setup/`.
-  The workflow renders Helm and Linux installer assets first, then applies only
-  when requested.
-- If you need OTLP senders to land in Splunk Platform through the Splunk Connect
-  for OTLP modular input, start with
-  `skills/splunk-connect-for-otlp-setup/`; use `skills/splunk-hec-service-setup/`
-  for the HEC token prerequisite.
-- If you need Splunk Observability Cloud Database Monitoring for PostgreSQL,
-  Microsoft SQL Server, or Oracle Database, start with
-  `skills/splunk-observability-database-monitoring-setup/`.
-- If you need Splunk AI Agent Monitoring or AI Infrastructure Monitoring, start
-  with `skills/splunk-observability-ai-agent-monitoring-setup/`.
-- If you need Splunk AI Toolkit / MLTK, Python for Scientific Computing, DSDL,
-  anomaly workflows, LLM `ai` command readiness, or legacy anomaly migration,
-  start with `skills/splunk-ai-ml-toolkit-setup/`.
-- If you need AWS metrics and CloudWatch integration assets for Splunk
-  Observability Cloud, start with `skills/splunk-observability-aws-integration/`.
-- If you need to pair the Splunk Platform with Splunk Observability Cloud
-  (Unified Identity, the Discover Splunk Observability Cloud app, Log Observer
-  Connect, Related Content, the Splunk Infrastructure Monitoring Add-on), start
-  with `skills/splunk-observability-cloud-integration-setup/`.
-- If you need zero-code Kubernetes application auto-instrumentation (APM
-  traces, AlwaysOn Profiling, runtime metrics), start with
-  `skills/splunk-observability-k8s-auto-instrumentation-setup/`. For browser
-  RUM and Session Replay injection into a Kubernetes-served frontend, start
-  with `skills/splunk-observability-k8s-frontend-rum-setup/`.
-- If you need a Cisco product wired into Splunk Observability Cloud, start with
-  the matching integration skill:
-  `skills/splunk-observability-cisco-nexus-integration/`,
-  `skills/splunk-observability-cisco-intersight-integration/`,
-  `skills/splunk-observability-nvidia-gpu-integration/`,
-  `skills/splunk-observability-cisco-ai-pod-integration/`,
-  `skills/splunk-observability-isovalent-integration/`, or
-  `skills/splunk-observability-thousandeyes-integration/`.
-- If you need Galileo platform readiness or Galileo Observe/Evaluate/Protect
-  data wired to Splunk Platform or Splunk Observability Cloud, start with
-  `skills/galileo-platform-setup/`. It renders `export_records` to HEC,
-  Galileo project/log stream/dataset/prompt/experiment lifecycle provisioning,
-  OpenTelemetry/OpenInference runtime snippets, Protect stage/invoke coverage,
-  Evaluate handoffs, custom scorer and workflow-run coverage, annotation and
-  feedback templates, Trends/run-insights handoffs, distributed tracing,
-  tags/metadata, enterprise retention/TTL/privacy, Agent Graph and console
-  debugging views, alerts, framework wrappers, Python/TypeScript SDK parity,
-  REST API/custom deployment healthchecks, SSO/OIDC/SAML, Luna-2
-  fine-tuning/evaluation, Galileo MCP tooling, MCP tool-call logging, async job
-  progress, playground/sample/CI workflows, official cookbook/use-case starter
-  examples, Agent Control target resolution, and delegated HEC, OTLP, OTel
-  Collector, dashboard, and detector setup. Use `--o11y-only` for
-  workflows with no Splunk Platform HEC dependency.
-- If you need Agent Control runtime governance wired to Splunk, start with
-  `skills/galileo-agent-control-setup/`. It renders server/auth/control
-  templates, Python and TypeScript runtime snippets, OTel and custom Splunk HEC
-  sinks, and delegated Splunk HEC/O11y handoffs.
-- If you need Splunk Observability Cloud dashboards, use
-  `skills/splunk-observability-dashboard-builder/` to turn an operational goal
-  into validated classic Observability dashboard API payloads, with modern
-  dashboard features called out as advisory work.
-- If you need deep native Splunk Observability Cloud product workflows, use
-  `skills/splunk-observability-deep-native-workflows/` for UI-aware packets
-  covering modern dashboards, APM service maps/service views/business
-  transactions/trace waterfalls/profiling, RUM replay/errors/URL grouping/mobile
-  RUM, DBMon explain-plan triage, Synthetic waterfalls, SLO API payloads,
-  Infrastructure/Kubernetes/Network Explorer, Related Content, AI Assistant,
-  modern logs charts, and Observability Cloud Mobile app handoffs.
-- If you need native Splunk Observability Cloud operations, use
-  `skills/splunk-observability-native-ops/` for detectors, alert routing,
-  Synthetics tests and artifacts, APM topology/traces, RUM sessions, modern
-  logs chart handoffs, and On-Call deeplinks. For the full Splunk On-Call
-  lifecycle (teams, rotations, escalation policies, routing keys, Rules
-  Engine, and the Splunk-side companion apps), use
-  `skills/splunk-oncall-setup/`.
-- If you need to install the Isovalent platform itself (Cilium, Tetragon,
-  optional Hubble Enterprise) on Kubernetes before wiring it to Splunk, start
-  with `skills/cisco-isovalent-platform-setup/`.
-- If you need to register the official ThousandEyes MCP Server with Cursor,
-  Claude Code, Codex, VS Code, or AWS Kiro, start with
-  `skills/cisco-thousandeyes-mcp-setup/`.
-- If you need Splunk platform administration services, start with
-  `skills/splunk-agent-management-setup/`,
-  `skills/splunk-workload-management-setup/`,
-  `skills/splunk-hec-service-setup/`,
-  `skills/splunk-platform-restart-orchestrator/`,
-  `skills/splunk-federated-search-setup/`,
-  `skills/splunk-index-lifecycle-smartstore-setup/`, or
-  `skills/splunk-monitoring-console-setup/`.
-- If you need to build or rotate a Splunk Enterprise PKI (Private PKI, CSRs
-  for a public CA, per-component certificates across Splunk Web / splunkd /
-  S2S / HEC / KV Store / indexer cluster / SHC / License Manager / Deployment
-  Server / Monitoring Console / Federated Search / DMZ HF / UF fleet / Edge
-  Processor / SAML / LDAPS / CLI trust, FIPS wiring, or delegated rotation),
-  start with `skills/splunk-platform-pki-setup/`.
-- If you need self-managed license, indexer-cluster, Edge Processor, or Splunk
-  Cloud ACS allowlist operations, start with
-  `skills/splunk-license-manager-setup/`,
-  `skills/splunk-indexer-cluster-setup/`,
-  `skills/splunk-edge-processor-setup/`, or
-  `skills/splunk-cloud-acs-allowlist-setup/`.
-- If you need to install Splunk SOAR On-prem (single or cluster), onboard
-  SOAR Cloud, stand up a Splunk SOAR Automation Broker, or install the
-  Splunk-side SOAR companion apps, start with `skills/splunk-soar-setup/`.
-- If you need external syslog or SNMP collection, start with
-  `skills/splunk-connect-for-syslog-setup/` or
-  `skills/splunk-connect-for-snmp-setup/`.
-- If you need to expose an on-prem Splunk Enterprise deployment to the public
-  internet, start with `skills/splunk-enterprise-public-exposure-hardening/`.
-  The workflow renders Splunk-side hardening plus nginx / HAProxy / firewall /
-  WAF reference templates, runs a 20-step preflight, and refuses to apply
-  without `--accept-public-exposure`.
+   The generated `credentials` file is gitignored. Keep passwords, API tokens,
+   and client secrets in `credentials` or separate secret files, not in chat or
+   command-line arguments.
 
-If you know the Cisco product name but not which TA or app it needs, start with
-`cisco-product-setup`. It resolves the product against the packaged SCAN
-catalog, points you at the right `template.example`, shows the required
-configure-time fields with `--dry-run`, classifies unsupported products
-explicitly, and routes automated products to the existing Cisco family
-workflow.
+2. Choose the workflow:
 
-The automation now supports two administration paths:
+   ```bash
+   rg "Duo|ACI|HEC|OTel|Enterprise Security|Data Manager" SKILL_UX_CATALOG.md skills/*/SKILL.md
+   ```
+
+   Or open [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md) and search by product,
+   app, data source, or task.
+
+3. Read the skill entry point:
+
+   ```bash
+   sed -n '1,180p' skills/<skill-name>/SKILL.md
+   ```
+
+4. Inspect the safe first command before changing anything:
+
+   ```bash
+   bash skills/<skill-name>/scripts/setup.sh --help
+   ```
+
+   This is the common pattern, but not every skill uses the same entrypoint.
+   Use the exact safe first command shown in
+   [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md) for the selected skill.
+
+5. Run a dry run, render, or preflight phase when the skill supports it:
+
+   ```bash
+   bash skills/cisco-product-setup/scripts/setup.sh \
+     --product "Cisco ACI" \
+     --dry-run
+   ```
+
+6. Run the setup phase, then validate:
+
+   ```bash
+   bash skills/<skill-name>/scripts/validate.sh
+   ```
+
+   Some skills use a Python validator, a status command, or a documented manual
+   validation path instead. Use the catalog's `Validation` column when it
+   differs from the common `validate.sh` pattern.
+
+## Choose A Workflow
+
+| Goal | Start with | First useful command |
+|------|------------|----------------------|
+| I know a Cisco product but not the Splunk app or TA | [cisco-product-setup](skills/cisco-product-setup/) | Run `bash skills/cisco-product-setup/scripts/setup.sh --product "Cisco ACI" --dry-run` |
+| I already know the Splunkbase app or local package | [splunk-app-install](skills/splunk-app-install/) | Run `bash skills/splunk-app-install/scripts/install_app.sh --help` |
+| I need Splunk Enterprise or Universal Forwarder on hosts | [splunk-enterprise-host-setup](skills/splunk-enterprise-host-setup/) or [splunk-universal-forwarder-setup](skills/splunk-universal-forwarder-setup/) | Run `bash skills/splunk-enterprise-host-setup/scripts/setup.sh --help` |
+| I need Splunk Enterprise on Kubernetes | [splunk-enterprise-kubernetes-setup](skills/splunk-enterprise-kubernetes-setup/) | Run `bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh --help` |
+| I need Splunk Cloud app installs, indexes, restarts, or allowlists | [splunk-app-install](skills/splunk-app-install/), [splunk-hec-service-setup](skills/splunk-hec-service-setup/), or [splunk-cloud-acs-allowlist-setup](skills/splunk-cloud-acs-allowlist-setup/) | Run `bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh --help` |
+| I need Enterprise Security, SOAR, ARI, Attack Analyzer, UBA, or security routing | [splunk-security-portfolio-setup](skills/splunk-security-portfolio-setup/) | Run `bash skills/splunk-security-portfolio-setup/scripts/setup.sh --help` |
+| I need Splunk Observability Cloud collection, APM, RUM, DBMon, AWS, Azure, or GCP | Search the `splunk-observability-*` skills | Run `rg "AWS|RUM|DBMon|OTel|Kubernetes" SKILL_UX_CATALOG.md` |
+| I need syslog, SNMP, Stream, OTLP, Edge Processor, or other external collection | [splunk-connect-for-syslog-setup](skills/splunk-connect-for-syslog-setup/), [splunk-connect-for-snmp-setup](skills/splunk-connect-for-snmp-setup/), [splunk-connect-for-otlp-setup](skills/splunk-connect-for-otlp-setup/), or [splunk-edge-processor-setup](skills/splunk-edge-processor-setup/) | Run `rg "SC4S|SC4SNMP|OTLP|Edge Processor" SKILL_UX_CATALOG.md` |
+| I need AppDynamics product coverage | [splunk-appdynamics-setup](skills/splunk-appdynamics-setup/) | Run `bash skills/splunk-appdynamics-setup/scripts/setup.sh --help` |
+| I need Galileo or Agent Control wired to Splunk | [galileo-platform-setup](skills/galileo-platform-setup/) or [galileo-agent-control-setup](skills/galileo-agent-control-setup/) | Run `bash skills/galileo-platform-setup/scripts/setup.sh --help` |
+| I need a broad admin health check | [splunk-admin-doctor](skills/splunk-admin-doctor/) | Run `bash skills/splunk-admin-doctor/scripts/setup.sh --help` |
+
+## Intake And Secrets
+
+Many account-driven skills include `template.example`. Use it as a worksheet
+for non-secret intake such as hostnames, org IDs, usernames, account names,
+indexes, regions, and feature choices. If you fill it out, save the local copy
+as `template.local`; those files are intended to stay out of git.
+
+The agent should ask only for non-secret values in conversation. Secrets should
+come from `credentials` or from temporary files passed to flags such as
+`--password-file`, `--api-token-file`, `--secret-file`, or equivalent
+skill-specific options.
+
+Rendered plans, generated manifests, package caches, live-validation
+checkpoints, and local intake files are review artifacts. They are intentionally
+gitignored under paths such as `splunk-*-rendered/`, `sc4s-rendered/`,
+`sc4snmp-rendered/`, `splunk-ta/`, and `template.local`. Review them locally,
+apply them when appropriate, and keep them out of commits unless a skill
+explicitly says an artifact is tracked.
+
+## Agent Or Shell Usage
+
+The repo is designed for two operating modes:
+
+- **Agent-driven work in Cursor, Codex, or Claude Code**: ask for the outcome in
+  plain language, for example `Set up Cisco ACI and show me the dry-run first`.
+  The agent reads `skills/*/SKILL.md`, uses the relevant template and scripts,
+  and should keep secrets out of chat.
+- **Direct shell use**: run the scripts under each skill yourself. Start with
+  `--help`, prefer dry-run/render/preflight phases, then run validation.
+
+## Local CLI Access Enables Live Setup
+
+Many skills can run in a render-only mode with just local shell and Python. If
+the CLI session also has access to the target environment, the same workflows
+can move past rendered plans into preflight checks, apply phases, and live
+validation.
+
+Examples of access that unlocks deeper automation:
+
+- `kubectl` and `helm` access let Kubernetes skills inspect clusters, render
+  overlays, apply manifests or Helm values, and validate running pods, services,
+  custom resources, and collector pipelines.
+- Docker or Podman access lets external-collector workflows prepare, run, or
+  validate customer-managed runtimes such as SC4S, SC4SNMP, SOAR Automation
+  Broker, or other containerized components.
+- Cloud CLIs such as `aws`, `az`, and `gcloud` let cloud integration skills
+  discover context, render or validate IAM and role assignments, check generated
+  artifacts, and hand off supported apply commands.
+- SSH access lets host-bootstrap and package-staging workflows install Splunk
+  Enterprise, Universal Forwarders, or apps on remote self-managed hosts.
+- Splunk Cloud ACS and search-tier REST access let cloud workflows install apps,
+  create indexes, manage restarts and allowlists, configure app objects, and
+  validate data.
+
+Each skill should still advertise its first safe command and whether the next
+step is render-only, preflight, apply, or validation. See
+[`SKILL_REQUIREMENTS.md`](SKILL_REQUIREMENTS.md) for the per-skill software and
+live-access matrix.
+
+The automation supports two Splunk administration paths:
 
 - **Splunk Enterprise**: direct Splunk REST API access on port `8089`, with SSH
   staging as a fallback for remote app package installs.
 - **Splunk Cloud**: Admin Config Service (ACS) for app installs, index
   management, and restarts, plus search-tier REST API access on port `8089` for
-  TA-specific account/input configuration after the app is installed.
+  TA-specific account and input configuration after the app is installed.
 
 For Splunk Cloud, the search-tier REST API requires the `search-api` allow list
 to include your source IP. App installation, index creation, and restart
@@ -245,16 +218,17 @@ At a high level, the repo gives you seven layers of automation:
 7. **Validation**: confirm the app is installed, the expected objects exist, and
    Splunk is actually receiving data.
 
-Most of the repo follows the same pattern:
+Most of the repo follows the same Agent Skills pattern:
 
-- `SKILL.md` explains when to use the skill and what values the agent may ask
-  for.
+- `SKILL.md` uses Agent Skills frontmatter (`name` matching the directory and
+  a <=1024-character `description` with a clear `Use when` trigger), then keeps
+  run-critical instructions concise enough for progressive disclosure.
 - `template.example` is present in account-driven skills as a non-secret intake
   worksheet that admins can copy to `template.local` before gathering account
   details.
-- `reference.md` contains vendor-specific details such as input families,
-  account fields, or app behavior.
-- `scripts/` contains the actual shell automation.
+- `reference.md` and `references/` contain vendor-specific details such as
+  input families, account fields, app behavior, and longer runbooks.
+- `scripts/` contains the actual shell and Python automation.
 - `mcp_tools.json` is present for skills that expose search tooling through MCP.
 
 This `README.md` is now the main overview document, while each `SKILL.md` and
@@ -282,7 +256,8 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-appdynamics-synthetic-monitoring-setup` | AppDynamics Synthetic Monitoring | Render Browser Synthetic, Synthetic API Monitoring, hosted and private agents, PSA Docker/Kubernetes/Minikube assets, Shepherd URLs, and run validation |
 | `splunk-appdynamics-log-observer-connect-setup` | AppDynamics Log Observer Connect | Render LOC setup, legacy Splunk integration detection/disablement, Splunk service-account handoffs, and deep-link validation |
 | `splunk-appdynamics-alerting-content-setup` | AppDynamics alerting content | Render health rules, schedules, policies, actions, email digests, suppression, import/export, rollback, anomaly detection, AIML baselines, automated diagnostics, and validation |
-| `splunk-appdynamics-dashboards-reports-setup` | AppDynamics dashboards and reports | Render custom dashboards, Dash Studio handoffs, ThousandEyes dashboard integration, reports, scheduled reports, War Rooms, and dashboard/report validation |
+| `splunk-appdynamics-dashboards-reports-setup` | AppDynamics dashboards and reports | Render custom dashboards, Dash Studio handoffs, reports, scheduled reports, War Rooms, and dashboard/report validation |
+| `splunk-appdynamics-thousandeyes-integration-setup` | AppDynamics + ThousandEyes integration | Render AppDynamics TE token, Dash Studio, EUM metrics, native TE integration, TE API assets, custom webhook, and administration runbooks |
 | `splunk-appdynamics-tags-extensions-setup` | AppDynamics tags and extensions | Render Custom Tag APIs, tag enablement, Integration Modules, extensions, Machine Agent custom metrics, and external integration runbooks |
 | `splunk-appdynamics-security-ai-setup` | AppDynamics security and AI | Render Application Security Monitoring, Secure Application policies/APIs, Secure Application for OTel Java, Observability for AI, GenAI, GPU, and Cisco AI Pod handoffs |
 | `splunk-appdynamics-sap-agent-setup` | AppDynamics SAP Agent | Render SAP Agent, ABAP Agent, local and gateway HTTP SDK, SNP CrystalBridge, BiQ Collector, NetWeaver transports, authorization, release-note, compatibility, and validation runbooks |
@@ -313,7 +288,11 @@ This `README.md` is now the main overview document, while each `SKILL.md` and
 | `splunk-ai-ml-toolkit-setup` | Splunk AI Toolkit / MLTK + PSC + DSDL | Install, render, validate, and audit Splunk-owned AI/ML workflows beyond AI Assistant, including AI Toolkit, Python for Scientific Computing, DSDL runtime handoffs, anomaly workflows, LLM `ai` command readiness, and legacy anomaly migration |
 | `splunk-mcp-server-setup` | `Splunk_MCP_Server` | Install and configure Splunk MCP Server settings, tokens, and shared Cursor/Codex/Claude Code bridge bundles |
 | `splunk-admin-doctor` | Splunk Cloud and Enterprise admin health | Diagnose full admin-domain coverage, render doctor/fix-plan reports, create safe fix packets or handoffs, and run checkpointed live validation sweeps |
+| `splunk-data-source-readiness-doctor` | ES/ITSI/ARI/CIM/OCSF/dashboard data usability | Score whether onboarded data is ready for Enterprise Security, ITSI, and ARI by checking expected indexes, sourcetypes, macros, sample events, CIM tags/eventtypes, data-model acceleration, OCSF transforms, dashboard population, and fix handoffs |
+| `splunk-spl2-pipeline-kit` | Shared SPL2 pipeline authoring for IP and EP | Render and lint reusable SPL2 templates for routing, redact, sample, metrics, OCSF, decrypt, stats, S3, custom templates, SPL-to-SPL2 review, and PCRE2 compatibility across Ingest Processor and Edge Processor |
+| `splunk-ingest-processor-setup` | Splunk Cloud Platform Ingest Processor | Render, doctor, status-check, and validate Ingest Processor readiness, source types, destinations, SPL2 pipelines, lifecycle handoffs, monitoring, queues, Usage Summary, S3 archive, OCSF, decrypt, metrics, and downstream data-readiness handoffs without private API CRUD claims |
 | `splunk-cloud-data-manager-setup` | Splunk Cloud Platform Data Manager | Render, doctor, validate, and safely apply supported Data Manager-generated AWS CloudFormation/StackSet, Azure ARM, and GCP Terraform artifacts; covers AWS, Azure, GCP, and CrowdStrike onboarding, HEC/index readiness, source catalogs, migration guardrails, and UI handoffs without private Data Manager API or Terraform CRUD claims |
+| `splunk-db-connect-setup` | Splunk DB Connect (`splunk_app_db_connect`) | Render, preflight, validate, and hand off production-safe DB Connect JDBC ingestion, lookup, enrichment, and export assets with Java, driver, topology, secret-file, and Cloud guardrails |
 | `splunk-app-install` | Any app or TA | Install, list, or uninstall Splunk apps |
 | `splunk-universal-forwarder-setup` | Splunk Universal Forwarder runtime | Bootstrap Linux, macOS, and rendered Windows Universal Forwarders; enroll clients with deployment server, static indexers, or Splunk Cloud credentials package |
 | `splunk-agent-management-setup` | Splunk Agent Management | Render, apply, and validate server classes, deployment apps, and deployment client assets |
@@ -838,6 +817,26 @@ Ruff, YAML linting, generated-doc freshness checks, and repo-readiness checks.
 Security issues and leaked secrets should not be reported through public issues.
 Use the process in `SECURITY.md`.
 
+## Agent Skills Specification Compliance
+
+This repository intentionally follows the public
+[Agent Skills specification](https://agentskills.io/specification) and its
+creator guidance for
+[best practices](https://agentskills.io/skill-creation/best-practices) and
+[evaluating skills](https://agentskills.io/skill-creation/evaluating-skills).
+Every skill is expected to keep the required `SKILL.md` contract, concise
+trigger metadata, progressive-disclosure structure, script-backed repeatable
+workflows, and validation coverage.
+
+Compliance is enforced in pre-commit and CI through:
+
+- `tests/check_skill_frontmatter.py` for the Agent Skills frontmatter,
+  description, naming, and progressive-disclosure limits.
+- `tests/check_repo_readiness.py` for catalog parity, agent command links,
+  local artifact guardrails, and this specification callout.
+- Required GitHub branch protection on `main` for the `validation`,
+  `python-tests`, `bats-tests`, and `shellcheck` jobs.
+
 ## Repository Layout
 
 ```text
@@ -948,8 +947,12 @@ splunk-cisco-skills/
 │   ├── splunk-connect-for-otlp-setup/
 │   ├── splunk-connect-for-snmp-setup/
 │   ├── splunk-connect-for-syslog-setup/
+│   ├── splunk-data-source-readiness-doctor/
+│   ├── splunk-db-connect-setup/
 │   ├── splunk-deployment-server-setup/
 │   ├── splunk-edge-processor-setup/
+│   ├── splunk-ingest-processor-setup/
+│   ├── splunk-spl2-pipeline-kit/
 │   ├── splunk-enterprise-host-setup/
 │   ├── splunk-enterprise-kubernetes-setup/
 │   ├── splunk-enterprise-public-exposure-hardening/
@@ -1001,11 +1004,23 @@ splunk-cisco-skills/
 
 ## What To Read For Detail
 
+Use these repo-level docs when choosing a path:
+
+| Question | Read |
+|----------|------|
+| Which skill should I use first? | [`SKILL_UX_CATALOG.md`](SKILL_UX_CATALOG.md) |
+| What tools and access does this skill need? | [`SKILL_REQUIREMENTS.md`](SKILL_REQUIREMENTS.md) |
+| Where should this app or workflow run? | [`DEPLOYMENT_ROLE_MATRIX.md`](DEPLOYMENT_ROLE_MATRIX.md) |
+| How does Splunk Cloud differ from Enterprise? | [`CLOUD_DEPLOYMENT_MATRIX.md`](CLOUD_DEPLOYMENT_MATRIX.md) |
+| How is the repo organized internally? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| How do I demo the workflow? | [`DEMO_SCRIPTS.md`](DEMO_SCRIPTS.md) |
+| How do I contribute safely? | [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`SECURITY.md`](SECURITY.md) |
+
 If you want to understand a specific skill, read these files in order:
 
 1. `skills/<skill>/SKILL.md`
 2. `skills/<skill>/reference.md` if present
-3. `skills/<skill>/scripts/*.sh`
+3. `skills/<skill>/scripts/*`
 
 That is where the real behavior lives.
 
@@ -1099,6 +1114,7 @@ Depending on the workflow, you may also need:
 - vendor credentials or tokens supplied through files for account setup scripts
 - `search-api` allow-list access for Cloud search-tier REST operations
 - `kubectl` and `helm` for Splunk Operator for Kubernetes workflows
+- Docker or Podman access for customer-managed container runtimes
 - `aws` CLI access when rendering the optional EKS kubeconfig helper
 - the Splunk Kubernetes Installer on the bastion host for Splunk POD workflows
 

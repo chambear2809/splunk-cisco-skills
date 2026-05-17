@@ -1,43 +1,17 @@
 ---
 name: splunk-observability-k8s-frontend-rum-setup
 description: >-
-  Render, apply, verify, and uninstall Splunk Browser RUM (`@splunk/otel-web`
-  2.x) + Session Replay (Splunk recorder) injection into Kubernetes-served
-  frontends. Standalone reusable skill (RUM beacons land directly at
-  rum-ingest.<realm>.observability.splunkcloud.com/v1/rum -- no OTel collector
-  is required for browser telemetry). Renders four injection modes
-  (nginx pod-side ConfigMap with sub_filter on </head>, ingress-nginx
-  configuration-snippet annotation, initContainer HTML rewriter with
-  busybox+emptyDir for distroless-safe rewrite, runtime-config ConfigMap
-  with window.SPLUNK_RUM_CONFIG for npm-bundled SDK), backup ConfigMap for
-  clean revert, full SplunkRum.init surface (cookieDomain, persistance,
-  user.trackingMode, disableBots, disableAutomationFrameworks,
-  globalAttributes, ignoreUrls, exporter.otlp, tracer.sampler, spaMetrics,
-  privacy.{maskAllText,sensitivityRules}, full per-instrumentation toggles),
-  Frustration Signals 2.0 (rage / dead / error / thrashed cursor with all
-  knobs), Session Replay (sensitivityRules + features.{canvas,video,iframes,
-  packAssets,cacheAssets,backgroundServiceSrc} + sampler.ratio) gated behind
-  --accept-session-replay-enterprise, JavaScript source-map upload helper
-  (wraps the splunk-rum CLI + Webpack @splunk/rum-build-plugins + GitHub
-  Actions / GitLab CI snippets) reusing SPLUNK_O11Y_TOKEN_FILE, RUM-to-APM
-  Server-Timing trace-linking validation with a handoff to
-  splunk-observability-k8s-auto-instrumentation-setup when the backend is
-  missing the traceparent header, multi-workload spec (per-workload
-  injection_mode override), distroless image auto-detection, ingress-nginx
-  CVE-2021-25742 allow-snippet-annotations preflight, version-pin enforcement
-  (v1 default, latest refused without --allow-latest-version), SRI hash
-  emission for exact-version CDN pins, IE11 legacy build opt-in, both
-  cdn.observability.splunkcloud and legacy cdn.signalfx endpoint domains.
-  Hands off RUM dashboards to splunk-observability-dashboard-builder, RUM
-  detectors to splunk-observability-native-ops, the SIM RUM modular input
-  to splunk-observability-cloud-integration-setup, and RUM-to-APM trace
-  linking to splunk-observability-k8s-auto-instrumentation-setup. Explicitly
-  NOT AppDynamics BRUM (handled by splunk-appdynamics-eum-setup). Use when
-  wiring a Kubernetes-hosted frontend (React, Vue, Angular, Next.js, Nuxt,
-  Remix, or any nginx/httpd/distroless-served SPA or MPA) to Splunk Browser
-  RUM, enabling Session Replay, configuring Frustration Signals, uploading
-  JavaScript source maps for readable production stack traces, validating
-  RUM-to-APM trace linking, or uninstalling RUM injection cleanly.
+  Render, apply, verify, and uninstall Splunk Browser RUM plus optional Session
+  Replay injection for Kubernetes-served frontends. Supports nginx sub_filter,
+  ingress-nginx snippets, initContainer HTML rewrites, runtime config, backup
+  and revert manifests, SplunkRum.init options, Frustration Signals, source-map
+  upload helpers, RUM-to-APM Server-Timing validation, multi-workload specs,
+  distroless detection, version pinning, SRI hashes, IE11 opt-in, and dashboard,
+  detector, SIM, and backend auto-instrumentation handoffs. Use when wiring a
+  React, Vue, Angular, Next.js, Nuxt, Remix, nginx/httpd, SPA, or MPA frontend
+  to Splunk Browser RUM, enabling Session Replay, configuring Frustration
+  Signals, uploading source maps, validating trace linking, or uninstalling RUM.
+  Do not use for AppDynamics BRUM.
 ---
 
 # Splunk Observability Kubernetes Frontend RUM + Session Replay

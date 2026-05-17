@@ -841,13 +841,116 @@ features:
     validation_method: War Room inventory and access validation checklist
     apply_boundary: War Room management is runbook-only unless API support is documented.
   - id: appd_thousandeyes_dashboard_integration
-    family: Dashboards Reports
+    family: AppDynamics ThousandEyes Integration
     feature: ThousandEyes Integration with AppDynamics Dash Studio widgets, token setup, account groups, tests, and deeplinks
-    owner: splunk-appdynamics-dashboards-reports-setup
+    owner: splunk-appdynamics-thousandeyes-integration-setup
     source_url: https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics
     status: delegated_apply
-    validation_method: ThousandEyes integration toggle readiness, token handoff checklist, Dash Studio query/widget validation, test/account-group selection, and ThousandEyes deeplink checks
-    apply_boundary: AppDynamics dashboard binding renders runbooks; ThousandEyes-side tests, tokens, streams, and dashboards delegate to ThousandEyes skills and secret-file handoffs.
+    validation_method: >-
+      ThousandEyes integration toggle readiness, token handoff checklist,
+      Dash Studio query/widget validation, test/account-group selection, and
+      ThousandEyes deeplink checks
+    apply_boundary: AppDynamics token and widget setup renders runbooks; ThousandEyes-side API-backed assets delegate through gated ThousandEyes scripts.
+  - id: appd_thousandeyes_token_admin
+    family: AppDynamics ThousandEyes Integration
+    feature: AppDynamics ThousandEyes token enablement, rotation, disablement, and account-group readiness
+    owner: splunk-appdynamics-thousandeyes-integration-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics
+    status: render_runbook
+    validation_method: >-
+      Token runbook confirms Administration > Integrations > ThousandEyes
+      access, secret-file handoff, account-group/test selection, and token
+      rotation validation
+    apply_boundary: Token entry stays in the AppDynamics UI with secret-file handoff; rendered artifacts never contain the bearer token value.
+  - id: appd_thousandeyes_eum_network_metrics
+    family: AppDynamics ThousandEyes Integration
+    feature: ThousandEyes network metrics in Browser and Mobile RUM, test association, sync, manual match, and unmatch workflows
+    owner: splunk-appdynamics-thousandeyes-integration-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring
+    status: render_runbook
+    validation_method: >-
+      EUM runbook validates SaaS support, Browser/Mobile app association,
+      supported test types, background sync, manual match/unmatch, and test
+      inventory caps
+    apply_boundary: >-
+      EUM association is rendered as an operator runbook; on-premises and
+      Virtual Appliance support is not claimed unless the target Controller
+      exposes the documented UI.
+  - id: appd_thousandeyes_native_appd_integration
+    family: AppDynamics ThousandEyes Integration
+    feature: Native ThousandEyes AppDynamics integration for test recommendations and alert notifications
+    owner: splunk-appdynamics-thousandeyes-integration-setup
+    source_url: https://docs.thousandeyes.com/product-documentation/integration-guides/custom-built-integrations/appdynamics-for-test-recs
+    status: render_runbook
+    validation_method: >-
+      Native integration runbook records AppDynamics instance URL,
+      authentication handoff, integration ID, test recommendation scope, and
+      cSaaS-only recommendation boundary
+    apply_boundary: >-
+      Native AppDynamics integration creation remains UI-runbook-only unless
+      Cisco publishes a documented creation API; alert rules may reference an
+      existing native integration ID.
+  - id: appd_thousandeyes_alert_notifications_api
+    family: AppDynamics ThousandEyes Integration
+    feature: ThousandEyes alert rule notification bindings for native AppDynamics and custom webhook operations
+    owner: splunk-appdynamics-thousandeyes-integration-setup
+    source_url: https://developer.cisco.com/docs/thousandeyes/create-alert-rule/
+    status: api_apply
+    validation_method: >-
+      Alert rule payloads validate thirdParty app-dynamics notification
+      fragments, customWebhook notification fragments, test IDs, severity
+      mapping, and Government API carve-outs
+    apply_boundary: Alert rule creation and notification binding use ThousandEyes Alerts API only after TE mutation gates and reviewed integration IDs.
+  - id: appd_thousandeyes_api_backed_assets
+    family: AppDynamics ThousandEyes Integration
+    feature: ThousandEyes API-backed tests, labels, tags, alert rules, dashboards, templates, and downstream asset handoff
+    owner: splunk-appdynamics-thousandeyes-integration-setup
+    source_url: https://developer.cisco.com/docs/thousandeyes/create-alert-rule/
+    status: delegated_apply
+    validation_method: >-
+      Generated te-assets-spec.yaml validates downstream
+      splunk-observability-thousandeyes-integration schema, selected tests,
+      labels, tags, alert rules, dashboards, templates, and mutation gate
+      command
+    apply_boundary: >-
+      Asset creation delegates to splunk-observability-thousandeyes-integration
+      and requires its --i-accept-te-mutations gate plus a chmod-600 TE token
+      file.
+  - id: appd_thousandeyes_custom_webhook_operation
+    family: AppDynamics ThousandEyes Integration
+    feature: ThousandEyes Integrations API generic connector and webhook operation for AppDynamics custom event fallback
+    owner: splunk-appdynamics-thousandeyes-integration-setup
+    source_url: https://developer.cisco.com/docs/thousandeyes/create-webhook-operation/
+    status: api_apply
+    validation_method: >-
+      Connector payload, webhook operation payload, operation-to-connector
+      assignment, OAuth client-secret placeholder, AppDynamics Events API probe,
+      and dry-run gate are validated
+    apply_boundary: >-
+      Webhook operation creation requires --accept-appd-te-mutation and
+      APPD_TE_APPLY=1; AppDynamics OAuth client secret is read from a chmod-600
+      file at execution time.
+  - id: appd_thousandeyes_custom_event_probe
+    family: AppDynamics ThousandEyes Integration
+    feature: AppDynamics custom event API probe for ThousandEyes alert fallback validation
+    owner: splunk-appdynamics-thousandeyes-integration-setup
+    source_url: https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index
+    status: api_apply
+    validation_method: >-
+      Probe script verifies Create Events permission, OAuth token retrieval,
+      severity mapping, eventtype=CUSTOM, customeventtype, and property-safe
+      dry-run behavior
+    apply_boundary: The probe defaults to dry-run; live custom event creation requires APPD_TE_EVENT_PROBE=1 and file-backed OAuth credentials.
+  - id: appd_thousandeyes_government_boundary
+    family: AppDynamics ThousandEyes Integration
+    feature: ThousandEyes for Government boundary for Webhook Operations APIs and alert-rule API support
+    owner: splunk-appdynamics-thousandeyes-integration-setup
+    source_url: https://developer.cisco.com/docs/thousandeyes/create-webhook-operation/
+    status: validate_only
+    validation_method: >-
+      Readiness report and admin checklist block custom webhook operation
+      automation for Government instances and route to supported native/UI paths
+    apply_boundary: Government instances do not use Webhook Operations API automation; render validation and handoff notes only.
   - id: appd_log_tail_widget_deprecation
     family: Dashboards Reports
     feature: Deprecated Log Tail widgets and replacement planning

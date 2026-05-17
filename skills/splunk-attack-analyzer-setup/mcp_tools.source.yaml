@@ -1,0 +1,70 @@
+name: Splunk Attack Analyzer MCP Tools
+description: Read-only MCP tools for Splunk Attack Analyzer platform integration readiness.
+version: 1.0.0
+author: splunk-attack-analyzer-setup skill
+external_app_id: saa
+tools:
+  - id: app_health
+    title: Attack Analyzer App Health
+    description: Check Splunk Attack Analyzer add-on and dashboard app installation state.
+    tags: [saa, attack_analyzer, app, health]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/apps/local count=0 | search title=Splunk_TA_SAA OR title=Splunk_App_SAA | table title label version disabled visible configured state | sort title
+    examples: [Check Attack Analyzer apps]
+  - id: index_state
+    title: Attack Analyzer Index State
+    description: Check the saa index used by Splunk Attack Analyzer data ingestion.
+    tags: [saa, attack_analyzer, index]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/data/indexes count=0 | search title=saa | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server
+    examples: [Check saa index]
+  - id: macro_state
+    title: Attack Analyzer Macro State
+    description: Read the saa_indexes macro definition used by the dashboard app.
+    tags: [saa, attack_analyzer, macros]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/configs/conf-macros count=0 | search title=saa_indexes | table title definition disabled eai:acl.app eai:acl.owner
+    examples: [Show saa_indexes macro]
+  - id: enabled_inputs
+    title: Attack Analyzer Enabled Inputs
+    description: List enabled Splunk Attack Analyzer add-on inputs visible through REST.
+    tags: [saa, attack_analyzer, inputs]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/data/inputs/all count=0 | search eai:acl.app=Splunk_TA_SAA | table title eai:acl.app disabled index sourcetype interval | sort title
+    examples: [List Attack Analyzer inputs]
+  - id: recent_data
+    title: Attack Analyzer Recent Data
+    description: Summarize recent SAA events by sourcetype and host.
+    tags: [saa, attack_analyzer, data]
+    time_range: true
+    row_limiter: true
+    spl: |
+      | tstats count latest(_time) as latest where index=saa by index sourcetype host | eval latest=strftime(latest,"%Y-%m-%dT%H:%M:%SZ") | sort -count
+    examples: [Show recent Attack Analyzer data]
+coverage:
+  - id: splunk_ta_saa_app
+    status: mcp_tool
+    tool: app_health
+  - id: splunk_app_saa_app
+    status: mcp_tool
+    tool: app_health
+  - id: saa_index
+    status: mcp_tool
+    tool: index_state
+  - id: saa_indexes_macro
+    status: mcp_tool
+    tool: macro_state
+  - id: enabled_ta_inputs
+    status: mcp_tool
+    tool: enabled_inputs
+  - id: recent_saa_data
+    status: mcp_tool
+    tool: recent_data

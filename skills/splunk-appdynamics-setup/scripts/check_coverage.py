@@ -40,6 +40,12 @@ ALLOWED_STATUSES = {
     "not_applicable",
 }
 
+ALLOWED_SOURCE_PREFIXES = (
+    "https://help.splunk.com/",
+    "https://docs.thousandeyes.com/",
+    "https://developer.cisco.com/docs/thousandeyes/",
+)
+
 
 def load_rows(path: Path) -> list[dict]:
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -67,8 +73,8 @@ def validate_rows(rows: list[dict]) -> list[str]:
         if status and status not in ALLOWED_STATUSES:
             errors.append(f"{row_id}: unsupported status {status!r}")
         source_url = str(row.get("source_url", ""))
-        if source_url and not source_url.startswith("https://help.splunk.com/"):
-            errors.append(f"{row_id}: source_url must use official help.splunk.com docs")
+        if source_url and not source_url.startswith(ALLOWED_SOURCE_PREFIXES):
+            errors.append(f"{row_id}: source_url must use official Splunk, ThousandEyes, or Cisco DevNet docs")
     return errors
 
 

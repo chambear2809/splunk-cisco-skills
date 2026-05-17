@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate SKILL.md frontmatter with the same YAML semantics agents read."""
+"""Validate SKILL.md files against the Agent Skills frontmatter contract."""
 
 import re
 import sys
@@ -13,9 +13,23 @@ except ModuleNotFoundError:  # pragma: no cover - exercised when PyYAML is absen
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SKILLS_DIR = REPO_ROOT / "skills"
 
-FRONTMATTER_RE = re.compile(
-    r"\A---\s*\n(.*?)\n---", re.DOTALL
-)
+FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
+NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+WORD_RE = re.compile(r"\S+")
+
+SPEC_FRONTMATTER_KEYS = {
+    "name",
+    "description",
+    "license",
+    "compatibility",
+    "metadata",
+    "allowed-tools",
+}
+MAX_NAME_LENGTH = 64
+MAX_DESCRIPTION_LENGTH = 1024
+MAX_COMPATIBILITY_LENGTH = 500
+MAX_SKILL_MD_LINES = 500
+MAX_BODY_WORDS = 5000
 
 
 def parse_frontmatter(block: str) -> dict[str, str]:
@@ -80,23 +94,98 @@ def check_skill(skill_dir: Path) -> list[str]:
         errors.append(f"{dir_name}: YAML frontmatter must be a mapping")
         return errors
 
+    unexpected_keys = sorted(set(metadata) - SPEC_FRONTMATTER_KEYS)
+    if unexpected_keys:
+        errors.append(
+            f"{dir_name}: frontmatter contains non-spec field(s): "
+            + ", ".join(unexpected_keys)
+        )
+
     name_value = metadata.get("name")
     if not isinstance(name_value, str) or not name_value.strip():
         errors.append(f"{dir_name}: frontmatter missing 'name' field")
-    elif name_value.strip() != dir_name:
-        errors.append(
-            f"{dir_name}: frontmatter name '{name_value}' does not match "
-            f"directory name '{dir_name}'"
-        )
+    else:
+        name = name_value.strip()
+        if len(name) > MAX_NAME_LENGTH:
+            errors.append(
+                f"{dir_name}: frontmatter name is {len(name)} characters; "
+                f"maximum is {MAX_NAME_LENGTH}"
+            )
+        if not NAME_RE.fullmatch(name):
+            errors.append(
+                f"{dir_name}: frontmatter name must use lowercase letters, "
+                "digits, and single hyphens only"
+            )
+        if name != dir_name:
+            errors.append(
+                f"{dir_name}: frontmatter name '{name_value}' does not match "
+                f"directory name '{dir_name}'"
+            )
 
     description = metadata.get("description")
     if not isinstance(description, str) or not description.strip():
         errors.append(f"{dir_name}: frontmatter missing non-empty 'description' field")
-    elif len(description.strip()) < 60:
-        errors.append(f"{dir_name}: frontmatter description is too short")
+    elif len(description.strip()) > MAX_DESCRIPTION_LENGTH:
+        errors.append(
+            f"{dir_name}: frontmatter description is {len(description.strip())} "
+            f"characters; maximum is {MAX_DESCRIPTION_LENGTH}"
+        )
+    else:
+        if len(description.strip()) < 60:
+            errors.append(f"{dir_name}: frontmatter description is too short")
+        if "Use when" not in description:
+            errors.append(
+                f"{dir_name}: frontmatter description must include a 'Use when' trigger"
+            )
 
-    if isinstance(description, str) and "Use when" not in description:
-        errors.append(f"{dir_name}: frontmatter description must include a 'Use when' trigger")
+    license_value = metadata.get("license")
+    if license_value is not None and not isinstance(license_value, str):
+        errors.append(f"{dir_name}: frontmatter license must be a string when present")
+
+    compatibility = metadata.get("compatibility")
+    if compatibility is not None:
+        if not isinstance(compatibility, str) or not compatibility.strip():
+            errors.append(
+                f"{dir_name}: frontmatter compatibility must be a non-empty string"
+            )
+        elif len(compatibility.strip()) > MAX_COMPATIBILITY_LENGTH:
+            errors.append(
+                f"{dir_name}: frontmatter compatibility is "
+                f"{len(compatibility.strip())} characters; maximum is "
+                f"{MAX_COMPATIBILITY_LENGTH}"
+            )
+
+    metadata_value = metadata.get("metadata")
+    if metadata_value is not None:
+        if not isinstance(metadata_value, dict):
+            errors.append(f"{dir_name}: frontmatter metadata must be a mapping")
+        else:
+            for key, value in metadata_value.items():
+                if not isinstance(key, str) or not isinstance(value, str):
+                    errors.append(
+                        f"{dir_name}: frontmatter metadata entries must be string "
+                        "keys and string values"
+                    )
+                    break
+
+    allowed_tools = metadata.get("allowed-tools")
+    if allowed_tools is not None and not isinstance(allowed_tools, str):
+        errors.append(f"{dir_name}: frontmatter allowed-tools must be a string")
+
+    lines = text.splitlines()
+    if len(lines) > MAX_SKILL_MD_LINES:
+        errors.append(
+            f"{dir_name}: SKILL.md has {len(lines)} lines; keep it under "
+            f"{MAX_SKILL_MD_LINES} lines and move details to references/"
+        )
+
+    body = text[fm.end() :]
+    body_words = len(WORD_RE.findall(body))
+    if body_words > MAX_BODY_WORDS:
+        errors.append(
+            f"{dir_name}: SKILL.md body has about {body_words} words; move "
+            "detailed reference material to references/"
+        )
 
     return errors
 
@@ -112,10 +201,16 @@ def main() -> int:
         return 1
 
     all_errors: list[str] = []
+    checked_count = 0
     for skill_dir in skill_dirs:
         if skill_dir.name == "shared":
             continue
+        if not (skill_dir / "SKILL.md").exists() and not any(
+            path.is_file() for path in skill_dir.rglob("*")
+        ):
+            continue
         all_errors.extend(check_skill(skill_dir))
+        checked_count += 1
 
     if all_errors:
         print("SKILL.md frontmatter errors:", file=sys.stderr)
@@ -123,7 +218,7 @@ def main() -> int:
             print(f"  - {err}", file=sys.stderr)
         return 1
 
-    print(f"All {len(skill_dirs) - 1} SKILL.md files pass frontmatter checks.")
+    print(f"All {checked_count} SKILL.md files pass frontmatter checks.")
     return 0
 
 

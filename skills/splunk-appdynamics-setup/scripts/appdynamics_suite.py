@@ -270,6 +270,25 @@ SKILL_META: dict[str, dict[str, Any]] = {
         ],
         "gate": None,
     },
+    "splunk-appdynamics-thousandeyes-integration-setup": {
+        "title": "Splunk AppDynamics ThousandEyes Integration Setup",
+        "target": "AppDynamics and ThousandEyes integration for SaaS, On-Premises, and Virtual Appliance",
+        "purpose": "Render and validate the complete AppDynamics-ThousandEyes integration: AppDynamics ThousandEyes token enablement, Dash Studio ThousandEyes widgets, EUM network metrics readiness, ThousandEyes native AppDynamics integration runbooks, TE API-backed tests/labels/tags/alert rules/dashboards/templates, and custom webhook fallback into AppDynamics custom events.",
+        "apply": "Default render mode does not mutate either product. AppDynamics UI-only surfaces remain runbooks. ThousandEyes API-backed assets and custom webhook plans require --accept-appd-te-mutation and still render reviewed scripts before any operator-run API calls.",
+        "validation": "Readiness checks for AppDynamics deployment model, admin permissions, TE token format, Dash Studio widget constraints, EUM support boundaries, TE API asset coverage, native integration ID handoff, custom webhook payloads, alert rule bindings, and AppDynamics custom event probe shape.",
+        "sources": [
+            "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
+            "https://help.splunk.com/en/appdynamics-on-premises/get-started/26.4.0/dashboards-and-reports/dash-studio/thousandeyes-integration-with-appdynamics",
+            "https://help.splunk.com/en/appdynamics-saas/end-user-monitoring/26.4.0/end-user-monitoring/thousandeyes-integration-with-browser-real-user-monitoring/thousandeyes-network-metrics-in-browser-rum",
+            "https://docs.thousandeyes.com/product-documentation/integration-guides/custom-built-integrations/appdynamics-for-test-recs",
+            "https://docs.thousandeyes.com/product-documentation/integration-guides/custom-built-integrations/appdynamics-for-alert-notifs",
+            "https://developer.cisco.com/docs/thousandeyes/integrations-api-overview/",
+            "https://developer.cisco.com/docs/thousandeyes/create-connector/",
+            "https://developer.cisco.com/docs/thousandeyes/create-webhook-operation/",
+            "https://developer.cisco.com/docs/thousandeyes/create-alert-rule/",
+        ],
+        "gate": "appd_te_mutation",
+    },
     "splunk-appdynamics-tags-extensions-setup": {
         "title": "Splunk AppDynamics Tags Extensions Setup",
         "target": "Custom Tags, Integration Modules, extensions, Machine Agent custom metrics, ServiceNow, Jira, Scalyr, ACC, Log Auto-Discovery",
@@ -318,6 +337,7 @@ GATE_FLAGS = {
     "k8s_rollout": "--accept-k8s-rollout",
     "eum_source_edit": "--accept-eum-source-edit",
     "analytics_event_publish": "--accept-analytics-event-publish",
+    "appd_te_mutation": "--accept-appd-te-mutation",
 }
 
 
@@ -2057,6 +2077,22 @@ REQUIRED_SKILL_ARTIFACTS = {
         "reports-26-4-runbook.md",
         "log-tail-deprecation-runbook.md",
     },
+    "splunk-appdynamics-thousandeyes-integration-setup": {
+        "appd-te-readiness.yaml",
+        "thousandeyes-token-runbook.md",
+        "dash-studio-query-runbook.md",
+        "eum-network-metrics-runbook.md",
+        "te-assets-spec.yaml",
+        "handoff-thousandeyes-assets.sh",
+        "te-native-appd-integration-runbook.md",
+        "te-appd-webhook-payloads/connector.json",
+        "te-appd-webhook-payloads/operation.json",
+        "te-alert-notification-fragments.json",
+        "te-api-apply-plan.sh",
+        "appd-events-api-probe.sh",
+        "te-appd-admin-checklist.md",
+        "metadata.json",
+    },
     "splunk-appdynamics-tags-extensions-setup": {
         "custom-tags-payload.json",
         "extensions-runbook.md",
@@ -3776,15 +3812,486 @@ def render_dashboards_reports_artifacts(out: Path, spec: dict[str, Any]) -> None
     write(
         out / "thousandeyes-dashboard-integration-runbook.md",
         "# ThousandEyes Dashboard Integration Runbook\n\n"
-        "- Validate that the AppDynamics tenant has the ThousandEyes integration available and that the operator has AppDynamics admin privileges.\n"
-        "- Configure the ThousandEyes bearer token through Administration > Integrations > ThousandEyes using a secret-file handoff; never render the token value.\n"
-        "- Validate Dash Studio widgets that use the ThousandEyes query for supported widget types, account groups, tests, labels, metric categories, and time ranges.\n"
-        "- Delegate ThousandEyes-side tests, labels, stream configuration, dashboards, and detectors to the existing ThousandEyes skills.\n",
+        "- Compatibility handoff: render `splunk-appdynamics-thousandeyes-integration-setup` for token, Dash Studio widget, EUM, native integration, and ThousandEyes API asset coverage.\n"
+        "- Keep dashboard/report validation here only for dashboards that already contain ThousandEyes widgets.\n"
+        "- Re-test supported widget types, account groups, tests, metric categories, time ranges, and deeplinks after dashboard migration.\n",
     )
     write(out / "war-room-runbook.md", "# War Room Runbook\n\n- Validate War Room templates, participants, save/sync behavior, and archive expectations.\n- War Room operations stay UI/runbook-only unless documented API support is available.\n")
     probes = out / "dashboard-validation-probes.sh"
     write(probes, "#!/usr/bin/env bash\nset -euo pipefail\necho 'Validate dashboard inventory, widget counts, report schedules, delivery, and War Room access.'\n")
     chmod_exec(probes)
+
+
+def appd_te_notifications(spec: dict[str, Any], controller_url: str, application: str) -> tuple[dict[str, Any], dict[str, Any]]:
+    te = as_dict(spec.get("thousandeyes"))
+    webhook = as_dict(spec.get("custom_webhook"))
+    native_id = str(te.get("native_appd_integration_id") or "").strip()
+    operation_id = str(
+        webhook.get("operation_id")
+        or te.get("custom_webhook_operation_id")
+        or ""
+    ).strip()
+    native_target = {
+        "thirdParty": [
+            {
+                "integrationId": native_id or "${TE_NATIVE_APPD_INTEGRATION_ID}",
+                "integrationType": "app-dynamics",
+            }
+        ]
+    }
+    custom_target = {
+        "customWebhook": [
+            {
+                "integrationId": operation_id or "${TE_CUSTOM_WEBHOOK_OPERATION_ID}",
+                "integrationType": "custom-webhook",
+                "integrationName": webhook.get("operation_name") or webhook.get("connector_name") or "AppDynamics custom events",
+                "target": f"{controller_url.rstrip('/')}/controller/rest/applications/{application}/events",
+            }
+        ]
+    }
+    active: dict[str, Any] = {}
+    if native_id:
+        active.update(native_target)
+    if operation_id:
+        active.update(custom_target)
+    return active, {"native_appd": native_target, "custom_webhook": custom_target}
+
+
+def default_appd_te_tests(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    declared = as_list(as_dict(spec.get("thousandeyes")).get("tests"))
+    if declared:
+        return [item for item in declared if isinstance(item, dict)]
+    endpoints = as_list(spec.get("monitored_endpoints"))
+    tests: list[dict[str, Any]] = []
+    for index, endpoint in enumerate(endpoints):
+        if isinstance(endpoint, dict):
+            name = endpoint.get("name") or f"AppDynamics endpoint {index + 1}"
+            target = endpoint.get("url") or endpoint.get("target") or "https://example.com/health"
+            test_type = endpoint.get("type") or "http-server"
+        else:
+            name = f"AppDynamics endpoint {index + 1}"
+            target = str(endpoint)
+            test_type = "http-server"
+        tests.append(
+            {
+                "type": test_type,
+                "name": name,
+                "target": target,
+                "interval": 60,
+                "enabled": True,
+                "alerts_enabled": False,
+                "agents": [],
+            }
+        )
+    if tests:
+        return tests
+    return [
+        {
+            "type": "http-server",
+            "name": "AppDynamics application availability",
+            "target": "https://example.com/health",
+            "interval": 60,
+            "enabled": True,
+            "alerts_enabled": False,
+            "agents": [],
+        }
+    ]
+
+
+def render_appd_te_apply_plan(account_group_id: str, connector_path: str, operation_path: str) -> str:
+    aid_arg = ""
+    if account_group_id:
+        aid_arg = f"?aid={bash_default(account_group_id)}"
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# Creates the API-backed ThousandEyes custom webhook path for AppDynamics custom events.
+# Native ThousandEyes AppDynamics integration creation remains a UI runbook unless Cisco documents an API for that native integration.
+#
+# Required env for live API calls:
+#   TE_TOKEN_FILE                         chmod-600 ThousandEyes bearer token file
+#   APPD_OAUTH_CLIENT_SECRET_FILE         chmod-600 AppDynamics API client secret file
+# Optional env:
+#   APPD_TE_APPLY=1                       execute API calls; otherwise dry-run
+
+if [[ "${{APPD_TE_APPLY:-0}}" != "1" ]]; then
+  echo "Dry-run only. Set APPD_TE_APPLY=1 after reviewing connector and operation payloads."
+  echo "Would POST /v7/connectors/generic{aid_arg}"
+  echo "Would POST /v7/operations/webhooks{aid_arg}"
+  echo "Would PUT /v7/operations/webhooks/<operation-id>/connectors{aid_arg}"
+  exit 0
+fi
+
+if [[ -z "${{TE_TOKEN_FILE:-}}" || ! -r "${{TE_TOKEN_FILE}}" ]]; then
+  echo "FAIL: TE_TOKEN_FILE must point at a readable chmod-600 ThousandEyes token file." >&2
+  exit 2
+fi
+if [[ -z "${{APPD_OAUTH_CLIENT_SECRET_FILE:-}}" || ! -r "${{APPD_OAUTH_CLIENT_SECRET_FILE}}" ]]; then
+  echo "FAIL: APPD_OAUTH_CLIENT_SECRET_FILE must point at a readable chmod-600 AppDynamics client secret file." >&2
+  exit 2
+fi
+
+CONNECTOR_FILE="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)/{connector_path}"
+OPERATION_FILE="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)/{operation_path}"
+CONNECTOR_PAYLOAD="$(mktemp)"
+TE_CURL_CONFIG="$(mktemp)"
+chmod 600 "${{CONNECTOR_PAYLOAD}}" "${{TE_CURL_CONFIG}}"
+trap 'rm -f "${{CONNECTOR_PAYLOAD}}" "${{TE_CURL_CONFIG}}"' EXIT
+
+{{ printf 'header = "Authorization: Bearer '; tr -d '\\r\\n' < "${{TE_TOKEN_FILE}}"; printf '"\\n'; }} > "${{TE_CURL_CONFIG}}"
+python3 - "${{CONNECTOR_FILE}}" "${{APPD_OAUTH_CLIENT_SECRET_FILE}}" "${{CONNECTOR_PAYLOAD}}" <<'PY'
+import json
+import sys
+
+payload = json.load(open(sys.argv[1], encoding="utf-8"))
+payload.setdefault("authentication", {{}})["oauthClientSecret"] = open(sys.argv[2], encoding="utf-8").read().strip()
+json.dump(payload, open(sys.argv[3], "w", encoding="utf-8"))
+PY
+
+CONNECTOR_RESPONSE="$(curl -sS -X POST "https://api.thousandeyes.com/v7/connectors/generic{aid_arg}" \\
+  -K "${{TE_CURL_CONFIG}}" \\
+  -H "Content-Type: application/json" \\
+  --data-binary @"${{CONNECTOR_PAYLOAD}}")"
+echo "${{CONNECTOR_RESPONSE}}" > /tmp/te-appd-connector-response.json
+CONNECTOR_ID="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("id", ""))' "${{CONNECTOR_RESPONSE}}")"
+if [[ -z "${{CONNECTOR_ID}}" ]]; then
+  echo "FAIL: connector create response did not contain id; see /tmp/te-appd-connector-response.json" >&2
+  exit 1
+fi
+
+OPERATION_RESPONSE="$(curl -sS -X POST "https://api.thousandeyes.com/v7/operations/webhooks{aid_arg}" \\
+  -K "${{TE_CURL_CONFIG}}" \\
+  -H "Content-Type: application/json" \\
+  --data-binary @"${{OPERATION_FILE}}")"
+echo "${{OPERATION_RESPONSE}}" > /tmp/te-appd-operation-response.json
+OPERATION_ID="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1]).get("id", ""))' "${{OPERATION_RESPONSE}}")"
+if [[ -z "${{OPERATION_ID}}" ]]; then
+  echo "FAIL: webhook operation create response did not contain id; see /tmp/te-appd-operation-response.json" >&2
+  exit 1
+fi
+
+printf '["%s"]\\n' "${{CONNECTOR_ID}}" | curl -sS -X PUT "https://api.thousandeyes.com/v7/operations/webhooks/${{OPERATION_ID}}/connectors{aid_arg}" \\
+  -K "${{TE_CURL_CONFIG}}" \\
+  -H "Content-Type: application/json" \\
+  --data-binary @- \\
+  -o /tmp/te-appd-operation-connectors-response.json -w '%{{http_code}}\\n'
+
+cat <<RESULT
+Created ThousandEyes AppDynamics custom webhook operation:
+  connector_id=${{CONNECTOR_ID}}
+  operation_id=${{OPERATION_ID}}
+
+Add this operation ID to alert rule notifications as customWebhook.integrationId.
+RESULT
+"""
+
+
+def render_appd_te_event_probe(controller_url: str, account_name: str, application: str) -> str:
+    repo_root = bash_default(REPO_ROOT)
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# Dry-run by default. Set APPD_TE_EVENT_PROBE=1 to create a real AppDynamics custom event.
+PROJECT_ROOT="${{PROJECT_ROOT:-{repo_root}}}"
+# shellcheck disable=SC1091
+# shellcheck source={repo_root}/skills/shared/lib/appdynamics_helpers.sh
+source "${{PROJECT_ROOT}}/skills/shared/lib/appdynamics_helpers.sh"
+
+APPD_CONTROLLER_URL="${{APPD_CONTROLLER_URL:-{bash_default(controller_url)}}}"
+APPD_ACCOUNT_NAME="${{APPD_ACCOUNT_NAME:-{bash_default(account_name)}}}"
+APPD_APPLICATION="${{APPD_APPLICATION:-{bash_default(application)}}}"
+APPD_API_CLIENT_NAME="${{APPD_API_CLIENT_NAME:-appd-te-api-client}}"
+APPD_OAUTH_CLIENT_SECRET_FILE="${{APPD_OAUTH_CLIENT_SECRET_FILE:-}}"
+APPD_CUSTOM_EVENT_TYPE="${{APPD_CUSTOM_EVENT_TYPE:-ThousandEyesAlert}}"
+
+EVENT_URL="$(appd_controller_api_url "${{APPD_CONTROLLER_URL}}" "/controller/rest/applications/${{APPD_APPLICATION}}/events")"
+if [[ "${{APPD_TE_EVENT_PROBE:-0}}" != "1" ]]; then
+  echo "Dry-run only. Set APPD_TE_EVENT_PROBE=1 to POST a CUSTOM event."
+  echo "Would POST ${{EVENT_URL}} with severity=WARN, eventtype=CUSTOM, customeventtype=${{APPD_CUSTOM_EVENT_TYPE}}"
+  exit 0
+fi
+
+if [[ -z "${{APPD_OAUTH_CLIENT_SECRET_FILE}}" ]]; then
+  echo "FAIL: APPD_OAUTH_CLIENT_SECRET_FILE is required for live event probe." >&2
+  exit 2
+fi
+appd_assert_secret_file "${{APPD_OAUTH_CLIENT_SECRET_FILE}}" "AppDynamics OAuth client secret file"
+
+TOKEN_JSON="$(appd_controller_oauth_token "${{APPD_CONTROLLER_URL}}" "${{APPD_ACCOUNT_NAME}}" "${{APPD_API_CLIENT_NAME}}" "${{APPD_OAUTH_CLIENT_SECRET_FILE}}")"
+ACCESS_TOKEN="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read()).get("access_token", ""))' <<<"${{TOKEN_JSON}}")"
+if [[ -z "${{ACCESS_TOKEN}}" ]]; then
+  echo "FAIL: OAuth response did not include access_token." >&2
+  exit 1
+fi
+APPD_AUTH_CONFIG="$(mktemp)"
+chmod 600 "${{APPD_AUTH_CONFIG}}"
+trap 'rm -f "${{APPD_AUTH_CONFIG}}"' EXIT
+printf 'header = "Authorization: Bearer %s"\\n' "${{ACCESS_TOKEN}}" > "${{APPD_AUTH_CONFIG}}"
+
+appd_curl -fsS -X POST "${{EVENT_URL}}" \\
+  -K "${{APPD_AUTH_CONFIG}}" \\
+  --data-urlencode "severity=WARN" \\
+  --data-urlencode "summary=ThousandEyes integration probe" \\
+  --data-urlencode "comment=Created by splunk-appdynamics-thousandeyes-integration-setup validation probe" \\
+  --data-urlencode "eventtype=CUSTOM" \\
+  --data-urlencode "customeventtype=${{APPD_CUSTOM_EVENT_TYPE}}" \\
+  --data-urlencode "output=JSON"
+"""
+
+
+def render_appd_te_artifacts(out: Path, spec: dict[str, Any]) -> None:
+    deployment_model = str(spec.get("deployment_model") or "saas")
+    controller_url = str(spec.get("controller_url") or "https://example.saas.appdynamics.com")
+    account_name = str(spec.get("account_name") or "customer1")
+    doc_version = str(spec.get("doc_version") or "26.4.0")
+    app_target = as_dict(spec.get("appdynamics_target"))
+    application = str(app_target.get("application") or spec.get("application") or "Checkout")
+    features = as_dict(spec.get("features"))
+    te = as_dict(spec.get("thousandeyes"))
+    webhook = as_dict(spec.get("custom_webhook"))
+    account_group_id = str(te.get("account_group_id") or spec.get("thousandeyes_account_group") or "")
+    realm = str(spec.get("realm") or "us0")
+    tests = default_appd_te_tests(spec)
+    notifications, notification_fragments = appd_te_notifications(spec, controller_url, application)
+    alert_rules = as_list(te.get("alert_rules")) or [
+        {
+            "name": "AppDynamics owned endpoint availability",
+            "test_type": "http-server",
+            "expression": "((responseTime > 500 ms))",
+            "severity": "major",
+            "min_sources": 1,
+            "rounds_violating_required": 2,
+            "rounds_violating_out_of": 3,
+            "description": "Starter HTTP Server latency alert for AppDynamics-owned ThousandEyes tests.",
+            "notifications": notifications,
+        }
+    ]
+    labels = as_list(te.get("labels")) or [{"name": "appdynamics", "color": "#0077cc"}]
+    tags = as_list(te.get("tags")) or [
+        {"name": f"appd:application:{application}"},
+        {"name": f"appd:deployment_model:{deployment_model}"},
+    ]
+    te_assets_spec = {
+        "api_version": "splunk-observability-thousandeyes-integration/v1",
+        "realm": realm,
+        "account_group_id": account_group_id or "1234",
+        "stream": {"enabled": False, "test_match": [], "filters": {"test_types": []}, "mode": ""},
+        "apm_connector": {"enabled": False},
+        "tests": tests,
+        "alert_rules": alert_rules,
+        "labels": labels,
+        "tags": tags,
+        "te_dashboards": as_list(te.get("dashboards")) or [
+            {
+                "name": f"AppDynamics {application} ThousandEyes",
+                "description": "Operator dashboard for AppDynamics-owned ThousandEyes tests.",
+                "widgets": [],
+            }
+        ],
+        "templates": as_list(te.get("templates")),
+        "dashboards": {"enabled": False, "test_types": []},
+        "detectors": {"enabled": False, "test_types": []},
+        "handoffs": {
+            "dashboard_builder": False,
+            "native_ops": False,
+            "mcp_setup": False,
+            "splunk_platform_ta": False,
+        },
+    }
+    readiness = {
+        "api_version": "splunk-appdynamics-thousandeyes-integration/v1",
+        "doc_version": doc_version,
+        "deployment_model": deployment_model,
+        "controller_url": controller_url,
+        "account_name": account_name,
+        "application": application,
+        "support_matrix": {
+            "dash_studio_thousandeyes_widgets": ["saas", "on_premises", "virtual_appliance"],
+            "eum_network_metrics": "saas_supported; validate UI before claiming on-premises or virtual_appliance support",
+            "te_test_recommendations": "csaas_only",
+            "te_alert_notifications": "native UI integration or API-backed custom webhook",
+            "te_webhook_operations_api": "not available for ThousandEyes for Government",
+        },
+        "required_permissions": [
+            "AppDynamics administrator for Administration > Integrations > ThousandEyes",
+            "AppDynamics Create Events permission for custom event webhook fallback",
+            "ThousandEyes API token with tests, alert rules, labels, tags, dashboards, templates, connectors, and operations privileges as selected",
+        ],
+        "selected_features": {
+            "dash_studio": bool(features.get("dash_studio", True)),
+            "eum_network_metrics": bool(features.get("eum_network_metrics", False)),
+            "native_te_appd_integration": bool(features.get("native_te_appd_integration", True)),
+            "te_asset_creation": bool(features.get("te_asset_creation", True)),
+            "custom_event_webhook": bool(features.get("custom_event_webhook", True)),
+        },
+    }
+    write(out / "appd-te-readiness.yaml", dump_yaml(readiness))
+    write(out / "te-assets-spec.yaml", dump_yaml(te_assets_spec))
+    write_json(out / "te-alert-notification-fragments.json", notification_fragments)
+
+    connector_auth = as_dict(webhook.get("authentication")) or {
+        "type": "oauth-client-credentials",
+        "oauthClientId": webhook.get("oauth_client_id", f"appd-te-api-client@{account_name}"),
+        "oauthClientSecret": "${APPD_OAUTH_CLIENT_SECRET}",
+        "oauthTokenUrl": f"{controller_url.rstrip('/')}/controller/api/oauth/access_token",
+    }
+    connector_payload = {
+        "type": "generic",
+        "name": webhook.get("connector_name", "AppDynamics custom events"),
+        "target": controller_url.rstrip("/"),
+        "authentication": connector_auth,
+        "headers": [{"name": "Accept", "value": "application/json"}],
+    }
+    operation_payload = {
+        "name": webhook.get("operation_name", "AppDynamics custom event alert"),
+        "enabled": True,
+        "category": "alerts",
+        "status": "pending",
+        "type": "webhook",
+        "path": f"/controller/rest/applications/{application}/events",
+        "headers": [{"name": "Accept", "value": "application/json"}],
+        "queryParams": json.dumps(
+            {
+                "severity": "WARN",
+                "summary": "ThousandEyes alert {{alert.rule.name}}",
+                "comment": "ThousandEyes test {{test.name}} generated alert {{alert.id}}",
+                "eventtype": "CUSTOM",
+                "customeventtype": webhook.get("custom_event_type", "ThousandEyesAlert"),
+                "output": "JSON",
+            }
+        ),
+    }
+    write_json(out / "te-appd-webhook-payloads/connector.json", connector_payload)
+    write_json(out / "te-appd-webhook-payloads/operation.json", operation_payload)
+
+    handoff = out / "handoff-thousandeyes-assets.sh"
+    write(
+        handoff,
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+PROJECT_ROOT="${{PROJECT_ROOT:-{bash_default(REPO_ROOT)}}}"
+SPEC="${{SCRIPT_DIR}}/te-assets-spec.yaml"
+
+cat <<'EOF'
+Review te-assets-spec.yaml before running this mutating ThousandEyes handoff.
+Required:
+  TE_TOKEN_FILE=/secure/path/to/thousandeyes_token
+Optional:
+  O11Y_INGEST_TOKEN_FILE and O11Y_API_TOKEN_FILE are not required unless you enable stream/apm in the generated spec.
+EOF
+
+bash "${{PROJECT_ROOT}}/skills/splunk-observability-thousandeyes-integration/scripts/setup.sh" \
+  --render \
+  --apply tests,alert_rules,labels,tags,te_dashboards,templates \
+  --spec "${{SPEC}}" \
+  --te-token-file "${{TE_TOKEN_FILE:?set TE_TOKEN_FILE}}" \
+  --i-accept-te-mutations
+""",
+    )
+    chmod_exec(handoff)
+
+    te_apply = out / "te-api-apply-plan.sh"
+    write(
+        te_apply,
+        render_appd_te_apply_plan(
+            account_group_id,
+            "te-appd-webhook-payloads/connector.json",
+            "te-appd-webhook-payloads/operation.json",
+        ),
+    )
+    chmod_exec(te_apply)
+
+    probe = out / "appd-events-api-probe.sh"
+    write(probe, render_appd_te_event_probe(controller_url, account_name, application))
+    chmod_exec(probe)
+
+    write(
+        out / "thousandeyes-token-runbook.md",
+        """# ThousandEyes Token Runbook
+
+- In AppDynamics, open Administration > Integrations > ThousandEyes.
+- Add or rotate the ThousandEyes bearer token through the UI; never paste it into rendered files.
+- For AppDynamics SaaS Controllers older than 21.5, confirm support has enabled the ThousandEyes integration before troubleshooting the UI.
+- Validate the token by selecting a ThousandEyes account group and test in a Dash Studio widget.
+- For on-premises or Virtual Appliance Controllers, confirm outbound connectivity from the Controller to ThousandEyes APIs and record the proxy/TLS path.
+""",
+    )
+    write(
+        out / "dash-studio-query-runbook.md",
+        """# Dash Studio ThousandEyes Query Runbook
+
+- Supported AppDynamics deployment models: SaaS, On-Premises, and Virtual Appliance.
+- Supported widget types: Time Series, Metric Number, and Gauge.
+- Use exactly one ThousandEyes query per widget.
+- Use group-by only with Time Series widgets.
+- Select an account group and enabled ThousandEyes test; disabled tests are excluded.
+- Keep widget time ranges at 90 days or less.
+- Do not enable time range comparison for ThousandEyes widgets.
+- Validate the Powered by ThousandEyes deeplink opens the expected ThousandEyes test context.
+""",
+    )
+    write(
+        out / "eum-network-metrics-runbook.md",
+        """# EUM ThousandEyes Network Metrics Runbook
+
+- Treat Browser and Mobile RUM ThousandEyes network metrics as SaaS-supported unless the target on-premises or Virtual Appliance Controller exposes the documented UI.
+- Associate Browser/Mobile apps with supported ThousandEyes tests before expecting metrics.
+- Validate background sync, manual match, and manual unmatch behavior.
+- For large inventories, expect background sync behavior and keep the 10,000-test cap visible in the readiness review.
+- Confirm license readiness before enabling operator workflows that depend on EUM ThousandEyes metrics.
+""",
+    )
+    write(
+        out / "te-native-appd-integration-runbook.md",
+        """# ThousandEyes Native AppDynamics Integration Runbook
+
+The native ThousandEyes AppDynamics integration is configured in the ThousandEyes UI:
+
+1. Open Manage > Integrations.
+2. Select + New integration.
+3. Choose AppDynamics.
+4. Enter the AppDynamics instance URL and approved authentication values from secret-file handoff.
+5. Enable test recommendations only for cSaaS targets.
+6. Enable alert notifications when the Controller URL is reachable from ThousandEyes and the API identity has Create Events permission.
+7. Record the resulting integration ID. Use it in alert rule notifications as:
+
+```json
+{{"thirdParty":[{{"integrationId":"<integration-id>","integrationType":"app-dynamics"}}]}}
+```
+
+No public ThousandEyes API endpoint was found for creating this native integration directly. Use `te-api-apply-plan.sh` for the API-backed custom webhook companion path.
+""",
+    )
+    write(
+        out / "te-appd-admin-checklist.md",
+        """# AppDynamics ThousandEyes Administration Checklist
+
+- Token rotation: rotate in AppDynamics Administration > Integrations > ThousandEyes and revalidate Dash Studio widgets.
+- Disablement: remove widget dependencies before disabling the token or native integration.
+- Native integration: store the ThousandEyes native AppDynamics integration ID in the local spec; never store credentials.
+- Custom webhook: create connector/operation with `te-api-apply-plan.sh`, then attach the operation ID to alert rule `customWebhook` notifications.
+- Alert rules: use native `thirdParty` AppDynamics notifications when the native integration ID exists; use `customWebhook` for the API-backed fallback.
+- Government: do not use Webhook Operations APIs for ThousandEyes for Government instances.
+- On-premises and Virtual Appliance: validate public reachability, TLS chain, proxy path, and Create Events permission before enabling alert notifications.
+- Dash Studio: retest widget type, one-query, group-by, 90-day, and comparison constraints after dashboard migration.
+""",
+    )
+    write_json(
+        out / "metadata.json",
+        {
+            "skill": "splunk-appdynamics-thousandeyes-integration-setup",
+            "deployment_model": deployment_model,
+            "controller_url": controller_url,
+            "account_name": account_name,
+            "application": application,
+            "te_account_group_id": account_group_id,
+            "api_backed_te_assets": ["tests", "alert_rules", "labels", "tags", "te_dashboards", "templates", "generic_connector", "webhook_operation"],
+            "ui_runbook_only": ["native_thousandeyes_appdynamics_integration"],
+            "mutation_gate": "--accept-appd-te-mutation",
+        },
+    )
 
 
 def render_tags_extensions_artifacts(out: Path, spec: dict[str, Any]) -> None:
@@ -3914,6 +4421,10 @@ def render_skill_specific(skill: str, out: Path, spec: dict[str, Any]) -> None:
         render_dashboards_reports_artifacts(out, spec)
         return
 
+    if skill == "splunk-appdynamics-thousandeyes-integration-setup":
+        render_appd_te_artifacts(out, spec)
+        return
+
     if skill == "splunk-appdynamics-tags-extensions-setup":
         render_tags_extensions_artifacts(out, spec)
         return
@@ -4029,6 +4540,47 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
         if live:
             notes.append(f"run live Kubernetes probes with bash {out / 'cluster-agent-validation-probes.sh'}")
             notes.append(f"run live O11y probes with bash {out / 'o11y-export-validation.sh'}")
+    elif skill == "splunk-appdynamics-thousandeyes-integration-setup":
+        readiness_path = out / "appd-te-readiness.yaml"
+        if readiness_path.exists():
+            readiness = yaml.safe_load(readiness_path.read_text(encoding="utf-8")) or {}
+            if readiness.get("deployment_model") not in {"saas", "on_premises", "virtual_appliance"}:
+                errors.append("appd-te-readiness.yaml deployment_model must be saas, on_premises, or virtual_appliance")
+            support = as_dict(readiness.get("support_matrix"))
+            if "Government" not in str(support.get("te_webhook_operations_api", "")):
+                errors.append("appd-te-readiness.yaml must warn that TE Webhook Operations APIs are unavailable for Government")
+        assets_path = out / "te-assets-spec.yaml"
+        if assets_path.exists():
+            assets = yaml.safe_load(assets_path.read_text(encoding="utf-8")) or {}
+            if assets.get("api_version") != "splunk-observability-thousandeyes-integration/v1":
+                errors.append("te-assets-spec.yaml must target the downstream ThousandEyes integration skill API version")
+            if not assets.get("tests"):
+                errors.append("te-assets-spec.yaml must include at least one test or reviewed test placeholder")
+        connector_path = out / "te-appd-webhook-payloads/connector.json"
+        if connector_path.exists():
+            connector = json.loads(connector_path.read_text(encoding="utf-8"))
+            auth = as_dict(connector.get("authentication"))
+            if auth.get("oauthClientSecret") != "${APPD_OAUTH_CLIENT_SECRET}":
+                errors.append("connector.json must render only the APPD_OAUTH_CLIENT_SECRET placeholder")
+            if connector.get("type") != "generic":
+                errors.append("connector.json must be a ThousandEyes generic connector payload")
+        operation_path = out / "te-appd-webhook-payloads/operation.json"
+        if operation_path.exists():
+            operation = json.loads(operation_path.read_text(encoding="utf-8"))
+            if operation.get("type") != "webhook" or operation.get("category") != "alerts":
+                errors.append("operation.json must be an alerts webhook operation payload")
+            if "CUSTOM" not in str(operation.get("queryParams", "")):
+                errors.append("operation.json must create AppDynamics CUSTOM events")
+        apply_plan = out / "te-api-apply-plan.sh"
+        if apply_plan.exists():
+            text = apply_plan.read_text(encoding="utf-8")
+            if "APPD_TE_APPLY=1" not in text:
+                errors.append("te-api-apply-plan.sh must default to dry-run and require APPD_TE_APPLY=1")
+            if "/operations/webhooks/${OPERATION_ID}/connectors" not in text:
+                errors.append("te-api-apply-plan.sh must assign the connector to the webhook operation")
+        if live:
+            notes.append(f"run ThousandEyes custom webhook apply with APPD_TE_APPLY=1 bash {out / 'te-api-apply-plan.sh'}")
+            notes.append(f"run AppDynamics custom event probe with APPD_TE_EVENT_PROBE=1 bash {out / 'appd-events-api-probe.sh'}")
     elif live:
         errors.append("live validation is not implemented in the generic renderer; use child runbook probes")
     status = "pass" if not errors else "fail"
@@ -4066,6 +4618,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--accept-k8s-rollout", action="store_true")
     parser.add_argument("--accept-eum-source-edit", action="store_true")
     parser.add_argument("--accept-analytics-event-publish", action="store_true")
+    parser.add_argument("--accept-appd-te-mutation", action="store_true")
     return parser.parse_args(argv)
 
 

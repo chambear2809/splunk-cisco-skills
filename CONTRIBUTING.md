@@ -4,6 +4,15 @@ Thanks for helping improve the Splunk Cisco skills library. This repo contains
 agent instructions and shell automation that can touch production Splunk
 deployments, so changes need to be reviewable, tested, and conservative.
 
+This project follows the public
+[Agent Skills specification](https://agentskills.io/specification), including
+the creator guidance for
+[best practices](https://agentskills.io/skill-creation/best-practices) and
+[evaluating skills](https://agentskills.io/skill-creation/evaluating-skills).
+Changes to skills should preserve that contract: concise trigger metadata,
+progressive disclosure, script-backed repeatable workflows where appropriate,
+and tests or evals that show the skill still behaves as intended.
+
 ## Before You Start
 
 - Do not commit credentials, tokens, package binaries, rendered deployment
@@ -61,8 +70,8 @@ pre-commit run --all-files
 ```
 
 Hooks include trailing-whitespace, JSON/YAML validity, private-key detection,
-`bash -n` on every skill script, the SKILL frontmatter contract, the
-repo-readiness check (catalog parity / symlinks),
+`bash -n` on every skill script, the Agent Skills frontmatter and
+progressive-disclosure contract, the repo-readiness check (catalog parity / symlinks),
 `generate_deployment_docs.py --check`, `ruff`, and `yamllint`. The full
 pytest / bats / shellcheck suite is intentionally not in pre-commit: keep
 those in CI and in the explicit commands below for fast local feedback.
@@ -101,7 +110,12 @@ freshness check may not be meaningful. In that case, say so in the pull request.
 
 When adding a skill under `skills/<skill-name>/`, include:
 
-- `SKILL.md` with YAML frontmatter where `name` matches the directory
+- `SKILL.md` with Agent Skills YAML frontmatter where `name` matches the
+  directory, uses lowercase letters/digits/single hyphens, and the
+  `description` is non-empty, <=1024 characters, and includes a clear
+  `Use when` trigger
+- Concise `SKILL.md` body content: keep the main file under 500 lines and move
+  detailed reference material to `reference.md` or `references/`
 - `scripts/setup.sh` and/or `scripts/validate.sh` when automation exists
 - `reference.md` when product behavior or operational details exceed the short
   skill instructions

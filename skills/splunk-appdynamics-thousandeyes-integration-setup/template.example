@@ -1,0 +1,47 @@
+api_version: splunk-appdynamics-thousandeyes-integration/v1
+doc_version: 26.4.0
+
+deployment_model: saas          # saas | on_premises | virtual_appliance
+controller_url: https://example.saas.appdynamics.com
+account_name: customer1
+realm: us0
+
+appdynamics_target:
+  application: Checkout
+
+features:
+  dash_studio: true
+  eum_network_metrics: false
+  native_te_appd_integration: true
+  te_asset_creation: true
+  custom_event_webhook: true
+
+thousandeyes:
+  account_group_id: "1234"
+  native_appd_integration_id: ""
+  custom_webhook_operation_id: ""
+  labels:
+    - name: appdynamics
+      color: "#0077cc"
+  tags:
+    - name: appd:application:Checkout
+  tests:
+    - type: http-server
+      name: Checkout availability
+      target: https://example.com/checkout/health
+      interval: 60
+      enabled: true
+      alerts_enabled: false
+      agents: []
+  alert_rules: []
+  dashboards: []
+  templates: []
+
+custom_webhook:
+  connector_name: AppDynamics custom events
+  operation_name: AppDynamics custom event alert
+  oauth_client_id: appd-te-api-client@customer1
+  custom_event_type: ThousandEyesAlert
+  operation_id: ""
+
+monitored_endpoints: []

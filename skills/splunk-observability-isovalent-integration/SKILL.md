@@ -1,25 +1,14 @@
 ---
 name: splunk-observability-isovalent-integration
 description: >-
-  Wire an installed Isovalent stack (Cilium, Hubble, Tetragon, optionally
-  Hubble Enterprise / cilium-dnsproxy) to Splunk Observability Cloud and
-  Splunk Platform. Renders the Splunk OpenTelemetry Collector agent.config
-  overlay with seven prometheus scrape jobs (cilium 9962, hubble 9965,
-  envoy 9964, operator 9963, tetragon 2112, tetragon-operator 2113,
-  optional cilium-dnsproxy) and a filter/includemetrics allow-list. The
-  Splunk Platform logs path defaults to the production-validated file-based
-  flow (OTel filelog receiver reading /var/run/cilium/tetragon/*.log via
-  agent.extraVolumes hostPath mount, ships through the splunkhec exporter
-  with sourcetype cisco:isovalent / index cisco_isovalent). Alternative
-  paths: --export-mode stdout, --legacy-fluentd-hec (deprecated, plugin
-  archived 2025-06-24). Hands off base collector to
-  splunk-observability-otel-collector-setup, HEC token to
-  splunk-hec-service-setup, Splunk Platform Tetragon log ingestion to
-  cisco-security-cloud-setup (PRODUCT=isovalent), dashboards to
-  splunk-observability-dashboard-builder, detectors to
-  splunk-observability-native-ops. Use when wiring Cilium / Tetragon /
-  Hubble metrics into Splunk Observability Cloud or piping Tetragon logs
-  to Splunk Platform.
+  Wire an installed Isovalent stack (Cilium, Hubble, Tetragon, optional Hubble
+  Enterprise or cilium-dnsproxy) to Splunk Observability Cloud and Splunk
+  Platform. Renders Splunk OTel Collector scrape overlays, metric filters,
+  Tetragon filelog ingestion defaults, stdout and legacy fluentd alternatives,
+  dashboards, detectors, and handoff scripts for base collector, HEC, and
+  Cisco Security Cloud ingestion. Use when wiring Cilium, Tetragon, or Hubble
+  metrics into Splunk Observability Cloud, shipping Tetragon logs to Splunk
+  Platform, or validating Isovalent telemetry after platform install.
 ---
 
 # Splunk Observability Isovalent Integration

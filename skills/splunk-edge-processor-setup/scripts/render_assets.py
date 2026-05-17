@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import re
 import shlex
 import stat
+import sys
 from pathlib import Path
 
 
@@ -15,6 +17,7 @@ VALID_CONTROL_PLANES = ("cloud", "enterprise")
 VALID_TLS_MODES = ("none", "tls", "mtls")
 VALID_INSTANCE_MODES = ("systemd", "nosystemd", "docker")
 VALID_DEST_TYPES = ("s2s", "hec", "s3", "syslog")
+VALID_FIPS_MODES = ("disabled", "enabled")
 
 
 def parse_args() -> argparse.Namespace:
@@ -27,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ep-tls-server-cert", default="")
     p.add_argument("--ep-tls-server-key", default="")
     p.add_argument("--ep-tls-ca-cert", default="")
+    p.add_argument("--ep-fips-mode", choices=VALID_FIPS_MODES, default="disabled")
     p.add_argument("--ep-instances", default="")
     p.add_argument("--ep-target-daily-gb", default="50")
     p.add_argument("--ep-source-types", default="")
@@ -178,6 +182,11 @@ def render_ep_object(args: argparse.Namespace) -> str:
             "server_key_path": args.ep_tls_server_key or None,
             "ca_certificate_path": args.ep_tls_ca_cert or None,
         },
+        "fips": {
+            "mode": args.ep_fips_mode,
+            "container_supported": False,
+            "notes": "FIPS mode is not supported for containerized Edge Processor environments.",
+        },
     }
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
@@ -274,6 +283,9 @@ $pipeline = | from $source where {cond}
 
 
 def render_pipeline_templates() -> dict[str, str]:
+    shared = shared_edge_pipeline_templates()
+    if shared:
+        return shared
     return {
         "filter.spl2": (
             "// Filter starter: keep events that match a where clause.\n"
@@ -297,6 +309,23 @@ def render_pipeline_templates() -> dict[str, str]:
             "                [ where true                       | into $destination_default ];\n"
         ),
     }
+
+
+def shared_edge_pipeline_templates() -> dict[str, str]:
+    kit_path = Path(__file__).resolve().parents[1].parent / "splunk-spl2-pipeline-kit" / "scripts" / "spl2_pipeline_kit.py"
+    if not kit_path.is_file():
+        return {}
+    spec = importlib.util.spec_from_file_location("spl2_pipeline_kit", kit_path)
+    if not spec or not spec.loader:
+        return {}
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    templates = getattr(module, "TEMPLATES", {}).get("edgeProcessor", {})
+    rendered = dict(templates)
+    if "redact.spl2" in rendered:
+        rendered.setdefault("mask.spl2", rendered["redact.spl2"])
+    return rendered
 
 
 def render_instance_install(args: argparse.Namespace, instance: dict) -> str:
@@ -668,6 +697,7 @@ def render_metadata(args: argparse.Namespace, instances: list[dict], destination
             "ep_tenant_url": args.ep_tenant_url,
             "ep_name": args.ep_name,
             "ep_tls_mode": args.ep_tls_mode,
+            "ep_fips_mode": args.ep_fips_mode,
             "instance_count": len(instances),
             "instance_modes": sorted({i["mode"] for i in instances}),
             "destination_names": sorted(d["name"] for d in destinations),
@@ -691,6 +721,7 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
         f"Tenant URL: `{args.ep_tenant_url}`\n"
         f"EP name: `{args.ep_name}`\n"
         f"TLS mode: `{args.ep_tls_mode}`\n"
+        f"FIPS mode: `{args.ep_fips_mode}`\n"
         f"Instances: {len(instances)} ({instance_summary})\n"
         f"Destinations: {dest_summary}\n"
         f"Default destination: `{args.ep_default_destination or '(NOT SET — apply will fail)'}`\n"
@@ -708,6 +739,12 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
         "- `pipelines/templates/{filter,mask,sample,route}.spl2` — Splunk-style starters.\n"
         "- `validate.sh`.\n"
         "- `handoffs/acs-allowlist.json` — promote into `splunk-cloud-acs-allowlist-setup`.\n\n"
+        "## Current release guardrails\n\n"
+        "- FIPS-compliant mode requires non-containerized Edge Processor; Docker is refused when `--ep-fips-mode enabled`.\n"
+        "- Use `export_destination_errors_total`; older `exporter_error_count` references were renamed.\n"
+        "- Source type sync coverage is documented up to 4000 source types.\n"
+        "- S2S destinations can use bulk indexer configuration in the UI.\n"
+        "- S3 destinations should review Parquet and gzip compression settings.\n\n"
         "## Default-destination guard\n\n"
         "Without a default destination, unprocessed data is silently dropped. The\n"
         "renderer requires `--ep-default-destination` to match a destination name.\n"
@@ -724,6 +761,9 @@ def render_all(args: argparse.Namespace) -> dict:
     destinations = parse_destinations(args.ep_destinations)
     pipelines = parse_pipelines(args.ep_pipelines)
     source_types = csv_list(args.ep_source_types)
+
+    if args.ep_fips_mode == "enabled" and any(i["mode"] == "docker" for i in instances):
+        die("FIPS mode is not supported for Docker/containerized Edge Processor instances.")
 
     # Default-destination guard at render time.
     if destinations and not args.ep_default_destination:

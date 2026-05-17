@@ -166,8 +166,8 @@ verify_search_api_connectivity() {
     local uri="${1:-${SPLUNK_URI:-https://localhost:8089}}"
     local host port http_code
 
-    host="$(python3 -c "import sys; from urllib.parse import urlparse; p=urlparse(sys.argv[1]); print(p.hostname or '')" -- "${uri}" 2>/dev/null || true)"
-    port="$(python3 -c "import sys; from urllib.parse import urlparse; p=urlparse(sys.argv[1]); print(p.port or 8089)" -- "${uri}" 2>/dev/null || echo 8089)"
+    host="$(python3 -c "import sys; from urllib.parse import urlparse; p=urlparse(sys.argv[1]); print(p.hostname or '')" "${uri}" 2>/dev/null || true)"
+    port="$(python3 -c "import sys; from urllib.parse import urlparse; p=urlparse(sys.argv[1]); print(p.port or 8089)" "${uri}" 2>/dev/null || echo 8089)"
 
     if command -v nc >/dev/null 2>&1; then
         local nc_timeout_flag="-G 5"  # macOS

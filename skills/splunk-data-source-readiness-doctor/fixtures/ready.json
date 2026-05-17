@@ -1,0 +1,66 @@
+{
+  "platform": "enterprise",
+  "targets": ["es", "itsi", "ari"],
+  "products": {
+    "es": {"installed": true},
+    "itsi": {"installed": true},
+    "ari": {"installed": true}
+  },
+  "data_sources": [
+    {
+      "name": "ARI endpoint inventory",
+      "app_name": "SplunkAssetRiskIntelligence",
+      "expected_indexes": ["ari_ta"],
+      "expected_sourcetypes": ["ari_ta:asset", "ari_ta:software"],
+      "expected_macros": ["ari_indexes"],
+      "indexes": {"missing": []},
+      "sourcetypes": {"missing": []},
+      "macros": {"missing": []},
+      "sample_events": {"count": 1400, "latest_age_minutes": 15},
+      "parser": {"timestamp_skew_minutes": 0, "line_breaking_errors": []},
+      "cim": {
+        "expected_models": ["Inventory"],
+        "missing_tags": [],
+        "missing_eventtypes": [],
+        "missing_required_fields": [],
+        "data_models_without_events": []
+      },
+      "data_models": {
+        "acceleration_disabled": [],
+        "acceleration_errors": [],
+        "lag_minutes": 20
+      },
+      "ocsf": {"required": false},
+      "es": {
+        "asset_identity_gaps": [],
+        "detection_data_models_missing": [],
+        "risk_index_missing": false,
+        "notable_index_missing": false
+      },
+      "itsi": {
+        "content_packs_missing": [],
+        "dependencies_missing": [],
+        "entity_discovery_disabled": [],
+        "kpi_base_searches_missing": [],
+        "kpi_search_zero_results": []
+      },
+      "ari": {
+        "indexes_missing": [],
+        "inactive_data_sources": [],
+        "missing_required_fields": [],
+        "field_mapping_errors": [],
+        "priority_gaps": []
+      },
+      "dashboards": {
+        "missing_macros": [],
+        "zero_result_panels": [],
+        "populated": true
+      },
+      "rbac": {
+        "search_denied": false,
+        "missing_indexes": []
+      }
+    }
+  ],
+  "handoffs": {"unrouted": []}
+}

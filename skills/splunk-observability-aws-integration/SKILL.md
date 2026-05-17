@@ -2,49 +2,17 @@
 name: splunk-observability-aws-integration
 description: >-
   Render, preflight, apply, validate, discover, and diagnose the Splunk
-  Observability Cloud `AWSCloudWatch` integration end-to-end across all four
-  documented connection paths (polling, Splunk-managed Metric Streams,
-  AWS-managed Metric Streams, and Terraform), including IAM trust policy and
-  per-use-case CloudWatch / Metric Streams / tag-sync / Cassandra-Keyspaces
-  policy emission, External-ID and SecurityToken auth flows, regional and
-  StackSets CloudFormation stubs from `signalfx/aws-cloudformation-templates`,
-  Splunk-side Terraform with `signalfx_aws_external_integration` +
-  `signalfx_aws_integration` pinned to provider `~> 9.0`, full canonical field
-  set (`pollRate` / `metadataPollRate` / `inactiveMetricsPollRate` (seconds with
-  millisecond serialization) / `services` / `customCloudwatchNamespaces` /
-  `customNamespaceSyncRules` / `namespaceSyncRules` / `metricStatsToSyncs` /
-  `collectOnlyRecommendedStats` / `useMetricStreamsSync` /
-  `metricStreamsManagedExternally` / `enableCheckLargeVolume` /
-  `enableAwsUsage` / `syncCustomNamespacesOnly` /
-  `syncLoadBalancerTargetGroupTags` / `ignoreAllStatusMetrics` / `namedToken`),
-  conflict-matrix enforcement (`services` vs `namespaceSyncRules`,
-  `customCloudwatchNamespaces` vs `customNamespaceSyncRules`,
-  `metricStreamsManagedExternally` requires `useMetricStreamsSync`), adaptive
-  polling tuning, AWS-recommended-stats catalog, AWS PrivateLink ingest stubs
-  with the legacy `signalfx.com` domain default, multi-account / AWS
-  Organizations CloudFormation StackSets emission, drift detection +
-  `--quickstart-from-live` adoption, and the documented troubleshooting
-  catalog. Live validation against the operator's existing integration via the
-  Splunk Observability Cloud REST API at
-  `https://api.<realm>.observability.splunkcloud.com/v2/integration` with
-  `X-SF-Token` admin user API access tokens. Hand-offs to
-  `splunk-observability-aws-lambda-apm-setup` (Lambda APM via the Splunk
-  OpenTelemetry Lambda layer publisher 254067382080), to `splunk-app-install`
-  for the Splunk Add-on for AWS (Splunkbase 1876, min v8.1.1; uninstall
-  `Splunk_TA_amazon_security_lake` first if present) and on to
-  `splunk-observability-cloud-integration-setup` for Log Observer Connect, to
-  `splunk-observability-dashboard-builder` for AWS dashboards, to
-  `splunk-observability-native-ops` for AutoDetect detectors, and to
-  `splunk-observability-otel-collector-setup` for EC2 / EKS host telemetry.
-  Use when the user asks to connect AWS to Splunk Observability Cloud, set up
-  CloudWatch Metric Streams (Splunk-managed or AWS-managed), render IAM
-  policies for the Splunk Observability AWS integration, configure the
-  `AWSCloudWatch` integration object via REST or Terraform, enable the
-  AWS-recommended-stats catalog, configure namespace sync rules with
-  SignalFlow filters, monitor Amazon Bedrock metrics, set up multi-account /
-  AWS Organizations integration with CloudFormation StackSets, configure AWS
-  PrivateLink ingest, audit an existing AWS integration for drift, or migrate
-  from CloudWatch polling to Metric Streams.
+  Observability Cloud AWSCloudWatch integration across polling, Splunk-managed
+  Metric Streams, AWS-managed Metric Streams, and Terraform paths. Covers IAM
+  trust and policy stubs, External ID and SecurityToken auth, CloudFormation
+  and StackSets assets, Terraform payloads, field conflict checks, recommended
+  stats, namespace sync rules, PrivateLink ingest stubs, drift adoption, and
+  troubleshooting. Use when the user asks to connect AWS to Splunk Observability
+  Cloud, configure CloudWatch Metric Streams, render IAM policies, manage the
+  AWSCloudWatch REST/Terraform object, monitor Bedrock metrics, set up
+  multi-account AWS Organizations onboarding, audit drift, or migrate polling
+  to Metric Streams. Hand off Lambda APM, AWS logs, dashboards, detectors, and
+  EC2/EKS host telemetry to their owning skills.
 ---
 
 # Splunk Observability Cloud <-> AWS Integration

@@ -313,3 +313,25 @@ Read-only checks for:
 
 - [reference.md](reference.md) — configuration coverage map, official source
   links, index checklist, and validation searches.
+
+## MCP Tools
+
+This skill includes checked-in, read-only Splunk MCP custom tools generated
+from `mcp_tools.source.yaml`.
+
+Validate or regenerate the tool artifact:
+
+```bash
+python3 skills/shared/scripts/mcp_tools.py validate skills/splunk-enterprise-security-config
+python3 skills/shared/scripts/mcp_tools.py generate skills/splunk-enterprise-security-config
+```
+
+Load the tools into Splunk MCP Server:
+
+```bash
+bash skills/splunk-enterprise-security-config/scripts/load_mcp_tools.sh
+```
+
+The loader uses the supported `/mcp_tools` REST batch endpoint by default. Use
+`--allow-legacy-kv` only for older MCP Server app versions that lack that
+endpoint.

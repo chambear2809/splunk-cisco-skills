@@ -1,0 +1,104 @@
+{
+  "name": "Splunk Attack Analyzer MCP Tools",
+  "description": "Read-only MCP tools for Splunk Attack Analyzer platform integration readiness.",
+  "version": "1.0.0",
+  "author": "splunk-attack-analyzer-setup skill",
+  "tools": [
+    {
+      "_key": "saa:saa_app_health",
+      "name": "saa_app_health",
+      "title": "Attack Analyzer App Health",
+      "description": "Check Splunk Attack Analyzer add-on and dashboard app installation state.",
+      "category": "saa",
+      "tags": [
+        "saa",
+        "attack_analyzer",
+        "app",
+        "health"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/apps/local count=0 | search title=Splunk_TA_SAA OR title=Splunk_App_SAA | table title label version disabled visible configured state | sort title",
+      "arguments": [],
+      "examples": [
+        "Check Attack Analyzer apps"
+      ]
+    },
+    {
+      "_key": "saa:saa_index_state",
+      "name": "saa_index_state",
+      "title": "Attack Analyzer Index State",
+      "description": "Check the saa index used by Splunk Attack Analyzer data ingestion.",
+      "category": "saa",
+      "tags": [
+        "saa",
+        "attack_analyzer",
+        "index"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /services/data/indexes count=0 | search title=saa | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server",
+      "arguments": [],
+      "examples": [
+        "Check saa index"
+      ]
+    },
+    {
+      "_key": "saa:saa_macro_state",
+      "name": "saa_macro_state",
+      "title": "Attack Analyzer Macro State",
+      "description": "Read the saa_indexes macro definition used by the dashboard app.",
+      "category": "saa",
+      "tags": [
+        "saa",
+        "attack_analyzer",
+        "macros"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /servicesNS/nobody/-/configs/conf-macros count=0 | search title=saa_indexes | table title definition disabled eai:acl.app eai:acl.owner",
+      "arguments": [],
+      "examples": [
+        "Show saa_indexes macro"
+      ]
+    },
+    {
+      "_key": "saa:saa_enabled_inputs",
+      "name": "saa_enabled_inputs",
+      "title": "Attack Analyzer Enabled Inputs",
+      "description": "List enabled Splunk Attack Analyzer add-on inputs visible through REST.",
+      "category": "saa",
+      "tags": [
+        "saa",
+        "attack_analyzer",
+        "inputs"
+      ],
+      "time_range": false,
+      "row_limiter": true,
+      "spl": "| rest /servicesNS/nobody/-/data/inputs/all count=0 | search eai:acl.app=Splunk_TA_SAA | table title eai:acl.app disabled index sourcetype interval | sort title",
+      "arguments": [],
+      "examples": [
+        "List Attack Analyzer inputs"
+      ]
+    },
+    {
+      "_key": "saa:saa_recent_data",
+      "name": "saa_recent_data",
+      "title": "Attack Analyzer Recent Data",
+      "description": "Summarize recent SAA events by sourcetype and host.",
+      "category": "saa",
+      "tags": [
+        "saa",
+        "attack_analyzer",
+        "data"
+      ],
+      "time_range": true,
+      "row_limiter": true,
+      "spl": "| tstats count latest(_time) as latest where index=saa by index sourcetype host | eval latest=strftime(latest,\"%Y-%m-%dT%H:%M:%SZ\") | sort -count",
+      "arguments": [],
+      "examples": [
+        "Show recent Attack Analyzer data"
+      ]
+    }
+  ]
+}

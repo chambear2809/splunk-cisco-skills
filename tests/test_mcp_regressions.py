@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Regression tests for Splunk MCP Server setup shell scripts."""
 
+import contextlib
+import importlib.util
+import io
 import json
 import os
 import shutil
+import ssl
 import subprocess
 import tempfile
 from pathlib import Path
@@ -11,23 +15,259 @@ from pathlib import Path
 from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase, write_executable
 
 
+def load_mcp_tools_loader_module():
+    module_path = REPO_ROOT / "skills/shared/scripts/load_mcp_tools.py"
+    spec = importlib.util.spec_from_file_location("load_mcp_tools_for_tests", module_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
 class MCPRegressionTests(ShellScriptRegressionBase):
     def test_mcp_loaders_follow_shared_tls_policy(self):
-        loader_paths = [
-            "skills/cisco-catalyst-ta-setup/scripts/load_mcp_tools.sh",
-            "skills/cisco-dc-networking-setup/scripts/load_mcp_tools.sh",
-            "skills/cisco-enterprise-networking-setup/scripts/load_mcp_tools.sh",
-            "skills/cisco-intersight-setup/scripts/load_mcp_tools.sh",
-            "skills/cisco-meraki-ta-setup/scripts/load_mcp_tools.sh",
-            "skills/cisco-thousandeyes-setup/scripts/load_mcp_tools.sh",
-        ]
+        loader_paths = sorted(
+            path.relative_to(REPO_ROOT).as_posix()
+            for path in REPO_ROOT.glob("skills/*/scripts/load_mcp_tools.sh")
+            if (path.parents[1] / "mcp_tools.json").exists()
+        )
 
+        self.assertIn("skills/cisco-appdynamics-setup/scripts/load_mcp_tools.sh", loader_paths)
+        self.assertIn("skills/splunk-enterprise-security-config/scripts/load_mcp_tools.sh", loader_paths)
+        shared_loader = (REPO_ROOT / "skills/shared/scripts/load_mcp_tools.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("splunk_export_python_tls_env", shared_loader)
+        self.assertNotIn("ssl.CERT_NONE", shared_loader)
+        self.assertNotIn("check_hostname = False", shared_loader)
         for rel_path in loader_paths:
             with self.subTest(script=rel_path):
                 script_text = (REPO_ROOT / rel_path).read_text(encoding="utf-8")
-                self.assertIn("splunk_export_python_tls_env", script_text)
+                self.assertIn("../../shared/scripts/load_mcp_tools.sh", script_text)
                 self.assertNotIn("ssl.CERT_NONE", script_text)
                 self.assertNotIn("check_hostname = False", script_text)
+
+    def test_mcp_shared_loader_uses_rest_batch_before_legacy_kv(self):
+        loader_text = (REPO_ROOT / "skills/shared/scripts/load_mcp_tools.py").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("mcp_tools/collisions", loader_text)
+        self.assertIn("rest_batch_payload", loader_text)
+        self.assertIn("cleanup_stale_legacy_keys", loader_text)
+        self.assertIn('method="DELETE"', loader_text)
+        self.assertIn("LEGACY_FALLBACK_STATUSES = {404, 405, 501}", loader_text)
+        self.assertIn("exc.status not in LEGACY_FALLBACK_STATUSES", loader_text)
+        self.assertIn("--allow-legacy-kv", loader_text)
+        self.assertIn("Use --allow-legacy-kv only when an older Splunk MCP Server app lacks the REST batch endpoint.", loader_text)
+
+    def test_mcp_python_loader_defaults_to_verified_tls(self):
+        loader = load_mcp_tools_loader_module()
+        saved = {
+            "__SPLUNK_TLS_MODE": os.environ.pop("__SPLUNK_TLS_MODE", None),
+            "__SPLUNK_TLS_CA_CERT": os.environ.pop("__SPLUNK_TLS_CA_CERT", None),
+        }
+        try:
+            ctx = loader.ssl_context_from_env()
+        finally:
+            for key, value in saved.items():
+                if value is not None:
+                    os.environ[key] = value
+
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertTrue(ctx.check_hostname)
+
+    def test_mcp_shared_loader_rest_batch_sequence_is_behavioral(self):
+        loader = load_mcp_tools_loader_module()
+        calls = []
+        legacy_doc = {
+            "name": "Demo MCP Tools",
+            "description": "Demo",
+            "version": "1.0.0",
+            "author": "tests",
+            "tools": [
+                {
+                    "_key": "demo:old_example",
+                    "name": "demo_example",
+                    "title": "Demo Example",
+                    "description": "Example",
+                    "category": "demo",
+                    "tags": ["demo"],
+                    "time_range": False,
+                    "row_limiter": True,
+                    "spl": "| rest /services/server/info | table serverName",
+                    "arguments": [],
+                    "examples": [],
+                }
+            ],
+        }
+
+        def fake_request_json(url, *, method, session_key, ctx, payload=None):
+            calls.append(
+                {
+                    "url": url,
+                    "method": method,
+                    "session_key": session_key,
+                    "payload": payload,
+                }
+            )
+            self.assertEqual(session_key, "session")
+            if url.endswith("/mcp_tools/collisions"):
+                return 200, {"collisions": {}}, "{}"
+            if method == "POST" and url.endswith("/mcp_tools") and "external_app_id" in payload:
+                return 200, {"registered_count": len(payload["tools"]), "deleted_count": 0}, "{}"
+            if method == "DELETE" and url.endswith("/mcp_tools"):
+                return 200, {}, "{}"
+            if method == "POST" and url.endswith("/mcp_tools") and payload.get("enabled") is True:
+                return 200, {"enabled": True}, "{}"
+            self.fail(f"Unexpected request: {method} {url} {payload}")
+
+        original_request_json = loader.request_json
+        loader.request_json = fake_request_json
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                loader.load_via_rest_batch(
+                    legacy_doc=legacy_doc,
+                    splunk_uri="https://splunk.example:8089",
+                    app_context="Splunk_MCP_Server",
+                    session_key="session",
+                    ctx=None,
+                    override_collisions=True,
+                )
+        finally:
+            loader.request_json = original_request_json
+
+        self.assertEqual([call["method"] for call in calls], ["POST", "POST", "DELETE", "POST"])
+        self.assertTrue(calls[0]["url"].endswith("/mcp_tools/collisions"))
+        self.assertEqual(calls[0]["payload"], {"tool_ids": ["demo:demo_example"]})
+        self.assertEqual(calls[1]["payload"]["external_app_id"], "demo")
+        self.assertEqual(calls[1]["payload"]["tools"][0]["name"], "demo_example")
+        self.assertEqual(calls[2]["payload"], {"tool_id": "demo:old_example"})
+        self.assertEqual(
+            calls[3]["payload"],
+            {
+                "tool_id": "demo:demo_example",
+                "tool_name": "demo_example",
+                "enabled": True,
+                "override": True,
+            },
+        )
+
+    def test_mcp_shared_loader_aborts_on_collision_without_override(self):
+        loader = load_mcp_tools_loader_module()
+        calls = []
+        legacy_doc = {
+            "name": "Demo MCP Tools",
+            "description": "Demo",
+            "version": "1.0.0",
+            "author": "tests",
+            "tools": [
+                {
+                    "_key": "demo:demo_example",
+                    "name": "demo_example",
+                    "title": "Demo Example",
+                    "description": "Example",
+                    "category": "demo",
+                    "tags": ["demo"],
+                    "time_range": False,
+                    "row_limiter": True,
+                    "spl": "| rest /services/server/info | table serverName",
+                    "arguments": [],
+                    "examples": [],
+                }
+            ],
+        }
+
+        def fake_request_json(url, *, method, session_key, ctx, payload=None):
+            calls.append({"url": url, "method": method, "payload": payload})
+            return 200, {"collisions": {"demo:demo_example": ["builtin:get_server_info"]}}, "{}"
+
+        original_request_json = loader.request_json
+        loader.request_json = fake_request_json
+        try:
+            with self.assertRaises(loader.ManifestError):
+                loader.load_via_rest_batch(
+                    legacy_doc=legacy_doc,
+                    splunk_uri="https://splunk.example:8089",
+                    app_context="Splunk_MCP_Server",
+                    session_key="session",
+                    ctx=None,
+                    override_collisions=False,
+                )
+        finally:
+            loader.request_json = original_request_json
+
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0]["url"].endswith("/mcp_tools/collisions"))
+
+    def test_mcp_shared_loader_legacy_kv_fallback_is_explicit_and_status_gated(self):
+        loader = load_mcp_tools_loader_module()
+        legacy_calls = []
+        legacy_doc = {
+            "name": "Demo MCP Tools",
+            "description": "Demo",
+            "version": "1.0.0",
+            "author": "tests",
+            "tools": [
+                {
+                    "_key": "demo:demo_example",
+                    "name": "demo_example",
+                    "title": "Demo Example",
+                    "description": "Example",
+                    "category": "demo",
+                    "tags": ["demo"],
+                    "time_range": False,
+                    "row_limiter": True,
+                    "spl": "| rest /services/server/info | table serverName",
+                    "arguments": [],
+                    "examples": [],
+                }
+            ],
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tools_path = Path(tmpdir) / "mcp_tools.json"
+            tools_path.write_text(json.dumps(legacy_doc), encoding="utf-8")
+
+            original_rest = loader.load_via_rest_batch
+            original_legacy = loader.load_via_legacy_kv
+
+            def fake_legacy(**kwargs):
+                legacy_calls.append(kwargs)
+
+            loader.load_via_legacy_kv = fake_legacy
+            try:
+                def run(status, allow_legacy):
+                    def fake_rest(**kwargs):
+                        raise loader.HTTPFailure(status, {}, f"HTTP {status}")
+
+                    loader.load_via_rest_batch = fake_rest
+                    os.environ["__SPLUNK_SK"] = "session"
+                    os.environ["__SPLUNK_TLS_MODE"] = "verify"
+                    argv = [
+                        "--tools-json",
+                        str(tools_path),
+                        "--splunk-uri",
+                        "https://splunk.example:8089",
+                    ]
+                    if allow_legacy:
+                        argv.append("--allow-legacy-kv")
+                    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                        return loader.main(argv)
+
+                self.assertEqual(run(404, allow_legacy=False), 1)
+                self.assertEqual(legacy_calls, [])
+
+                self.assertEqual(run(500, allow_legacy=True), 1)
+                self.assertEqual(legacy_calls, [])
+
+                self.assertEqual(run(404, allow_legacy=True), 0)
+                self.assertEqual(len(legacy_calls), 1)
+            finally:
+                loader.load_via_rest_batch = original_rest
+                loader.load_via_legacy_kv = original_legacy
+                os.environ.pop("__SPLUNK_SK", None)
+                os.environ.pop("__SPLUNK_TLS_MODE", None)
 
 
     def test_sanitize_response_reads_bodies_from_stdin_instead_of_process_args(self):

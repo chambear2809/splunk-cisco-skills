@@ -71,6 +71,65 @@ VALID_TEST_TYPES = {
     "voice",
     "ftp-server",
 }
+VALID_ALERT_TYPES = {
+    "page-load",
+    "http-server",
+    "end-to-end-server",
+    "end-to-end-agent",
+    "voice",
+    "dns-server",
+    "dns-trace",
+    "dnssec",
+    "bgp",
+    "path-trace",
+    "ftp",
+    "sip-server",
+    "transactions",
+    "web-transactions",
+    "agent",
+    "network-outage",
+    "application-outage",
+    "device-device",
+    "device-interface",
+    "endpoint-network-server",
+    "endpoint-http-server",
+    "endpoint-path-trace",
+    "endpoint-browser-sessions-agent",
+    "endpoint-browser-sessions-application",
+    "api",
+    "web-transaction",
+    "unknown",
+}
+ALERT_TYPE_BY_TEST_TYPE = {
+    "agent-to-server": "end-to-end-server",
+    "agent-to-agent": "end-to-end-agent",
+    "ftp-server": "ftp",
+    "api-step": "api",
+}
+ALERT_SEVERITY_ALIASES = {
+    "info": "info",
+    "informational": "info",
+    "minor": "minor",
+    "warning": "minor",
+    "warn": "minor",
+    "major": "major",
+    "critical": "critical",
+    "crit": "critical",
+    "unknown": "unknown",
+}
+ALERT_ROUNDS_MODE_ALIASES = {"exact": "exact", "any": "any", "auto": "auto"}
+ALERT_SENSITIVITY_ALIASES = {"high": "high", "medium": "medium", "low": "low"}
+ALERT_DIRECTIONS = {"to-target", "from-target", "bidirectional"}
+ALERT_GROUP_TYPES = {"bgp", "browser-session", "cloud-enterprise", "endpoint"}
+THIRD_PARTY_NOTIFICATION_ALIASES = {
+    "app-dynamics": "app-dynamics",
+    "appdynamics": "app-dynamics",
+    "pager-duty": "pager-duty",
+    "pagerduty": "pager-duty",
+    "service-now": "service-now",
+    "servicenow": "service-now",
+    "slack": "slack",
+}
 
 # Canonical TE OpenTelemetry Data Model v2 metric mapping per test type.
 # Sourced from docs.thousandeyes.com/.../opentelemetry/data-model/data-model-v2/metrics.
@@ -374,6 +433,216 @@ def test_payloads(spec: dict[str, Any]) -> list[dict[str, Any]]:
     return rendered
 
 
+def alert_type_for_rule(raw: dict[str, Any], test_type: str | None, index: int) -> str:
+    alert_type = str(raw.get("alert_type") or raw.get("alertType") or "").strip()
+    if not alert_type and test_type:
+        alert_type = ALERT_TYPE_BY_TEST_TYPE.get(test_type, test_type)
+    if not alert_type:
+        raise SpecError(
+            f"alert_rules[{index}].alert_type is required when test_type is omitted."
+        )
+    if alert_type not in VALID_ALERT_TYPES:
+        raise SpecError(
+            f"alert_rules[{index}].alert_type {alert_type!r} is not a known ThousandEyes v7 alertType."
+        )
+    return alert_type
+
+
+def normalize_alert_severity(raw: dict[str, Any], index: int) -> str:
+    value = str(raw.get("severity") or "minor").strip().lower()
+    severity = ALERT_SEVERITY_ALIASES.get(value)
+    if severity is None:
+        allowed = ", ".join(sorted(set(ALERT_SEVERITY_ALIASES.values())))
+        raise SpecError(
+            f"alert_rules[{index}].severity {value!r} is invalid; use one of: {allowed}."
+        )
+    return severity
+
+
+def normalize_notification_entry(entry: dict[str, Any], rule_index: int, notification_index: int) -> tuple[str, dict[str, Any]]:
+    kind = str(entry.get("type") or entry.get("integrationType") or "").strip().lower()
+    kind = kind.replace("_", "-")
+    if kind == "customwebhook":
+        kind = "custom-webhook"
+
+    if kind == "email":
+        recipients = entry.get("recipients") or entry.get("recipient")
+        if isinstance(recipients, str):
+            recipients = [recipients]
+        if not isinstance(recipients, list) or not recipients:
+            raise SpecError(
+                f"alert_rules[{rule_index}].notifications[{notification_index}] email requires recipients."
+            )
+        return "email", {"recipients": [str(item) for item in recipients]}
+
+    if kind == "custom-webhook":
+        integration_id = str(entry.get("integrationId") or entry.get("integration_id") or "").strip()
+        if not integration_id:
+            raise SpecError(
+                f"alert_rules[{rule_index}].notifications[{notification_index}] custom webhook requires integrationId."
+            )
+        payload = {
+            "integrationId": integration_id,
+            "integrationType": "custom-webhook",
+        }
+        for source_key, target_key in (
+            ("integrationName", "integrationName"),
+            ("integration_name", "integrationName"),
+            ("target", "target"),
+        ):
+            if entry.get(source_key):
+                payload[target_key] = entry[source_key]
+        return "customWebhook", payload
+
+    if kind == "webhook":
+        integration_id = str(entry.get("integrationId") or entry.get("integration_id") or "").strip()
+        if not integration_id:
+            raise SpecError(
+                f"alert_rules[{rule_index}].notifications[{notification_index}] webhook requires integrationId."
+            )
+        payload = {
+            "integrationId": integration_id,
+            "integrationType": "webhook",
+        }
+        if entry.get("integrationName") or entry.get("integration_name"):
+            payload["integrationName"] = entry.get("integrationName") or entry.get("integration_name")
+        if entry.get("target"):
+            payload["target"] = entry["target"]
+        return "webhook", payload
+
+    if kind in THIRD_PARTY_NOTIFICATION_ALIASES:
+        integration_id = str(entry.get("integrationId") or entry.get("integration_id") or "").strip()
+        if not integration_id:
+            raise SpecError(
+                f"alert_rules[{rule_index}].notifications[{notification_index}] {kind} requires integrationId."
+            )
+        payload = {
+            "integrationId": integration_id,
+            "integrationType": THIRD_PARTY_NOTIFICATION_ALIASES[kind],
+        }
+        if entry.get("integrationName") or entry.get("integration_name"):
+            payload["integrationName"] = entry.get("integrationName") or entry.get("integration_name")
+        return "thirdParty", payload
+
+    raise SpecError(
+        f"alert_rules[{rule_index}].notifications[{notification_index}].type {kind!r} is not supported."
+    )
+
+
+def normalize_alert_notifications(raw: Any, index: int) -> dict[str, Any]:
+    if raw in (None, ""):
+        return {}
+    if isinstance(raw, dict):
+        normalized: dict[str, Any] = {}
+        for key, value in raw.items():
+            if key in {"email", "thirdParty", "webhook", "customWebhook"}:
+                if key == "email":
+                    if not isinstance(value, dict):
+                        raise SpecError(f"alert_rules[{index}].notifications.email must be a mapping.")
+                    email = dict(value)
+                    if "recipient" in email and "recipients" not in email:
+                        email["recipients"] = email.pop("recipient")
+                    normalized[key] = email
+                elif not isinstance(value, list):
+                    raise SpecError(f"alert_rules[{index}].notifications.{key} must be a list.")
+                else:
+                    normalized[key] = value
+            else:
+                normalized[key] = value
+        return normalized
+    if not isinstance(raw, list):
+        raise SpecError(f"alert_rules[{index}].notifications must be a mapping or list.")
+
+    normalized: dict[str, Any] = {}
+    for notification_index, entry in enumerate(raw):
+        if not isinstance(entry, dict):
+            raise SpecError(
+                f"alert_rules[{index}].notifications[{notification_index}] must be a mapping."
+            )
+        key, payload = normalize_notification_entry(entry, index, notification_index)
+        if key == "email":
+            if "email" in normalized:
+                existing = normalized["email"].setdefault("recipients", [])
+                existing.extend(payload["recipients"])
+            else:
+                normalized["email"] = payload
+            continue
+        normalized.setdefault(key, []).append(payload)
+    return normalized
+
+
+def append_alert_optional_fields(body: dict[str, Any], raw: dict[str, Any], index: int) -> None:
+    if raw.get("description"):
+        body["description"] = raw["description"]
+    for source_key, target_key in (
+        ("notify_on_clear", "notifyOnClear"),
+        ("notifyOnClear", "notifyOnClear"),
+        ("is_default", "isDefault"),
+        ("isDefault", "isDefault"),
+        ("include_covered_prefixes", "includeCoveredPrefixes"),
+        ("includeCoveredPrefixes", "includeCoveredPrefixes"),
+    ):
+        if source_key in raw:
+            body[target_key] = bool(raw[source_key])
+
+    mode = raw.get("rounds_violating_mode") or raw.get("roundsViolatingMode")
+    if mode is not None:
+        normalized_mode = ALERT_ROUNDS_MODE_ALIASES.get(str(mode).strip().lower())
+        if normalized_mode is None:
+            raise SpecError(
+                f"alert_rules[{index}].rounds_violating_mode {mode!r} is invalid; use exact, any, or auto."
+            )
+        body["roundsViolatingMode"] = normalized_mode
+
+    sensitivity = raw.get("sensitivity_level") or raw.get("sensitivityLevel")
+    if sensitivity is not None:
+        normalized_sensitivity = ALERT_SENSITIVITY_ALIASES.get(str(sensitivity).strip().lower())
+        if normalized_sensitivity is None:
+            raise SpecError(
+                f"alert_rules[{index}].sensitivity_level {sensitivity!r} is invalid; use high, medium, or low."
+            )
+        body["sensitivityLevel"] = normalized_sensitivity
+
+    alert_group_type = raw.get("alert_group_type") or raw.get("alertGroupType")
+    if alert_group_type is not None:
+        normalized_group = str(alert_group_type).strip().lower()
+        if normalized_group not in ALERT_GROUP_TYPES:
+            allowed = ", ".join(sorted(ALERT_GROUP_TYPES))
+            raise SpecError(
+                f"alert_rules[{index}].alert_group_type {alert_group_type!r} is invalid; use one of: {allowed}."
+            )
+        body["alertGroupType"] = normalized_group
+
+    direction = raw.get("direction")
+    if direction is not None:
+        normalized_direction = str(direction).strip().lower()
+        if normalized_direction not in ALERT_DIRECTIONS:
+            allowed = ", ".join(sorted(ALERT_DIRECTIONS))
+            raise SpecError(
+                f"alert_rules[{index}].direction {direction!r} is invalid; use one of: {allowed}."
+            )
+        body["direction"] = normalized_direction
+
+    if raw.get("minimum_sources_pct") is not None:
+        body["minimumSourcesPct"] = int(raw["minimum_sources_pct"])
+
+    for source_key, target_key in (
+        ("endpoint_agent_ids", "endpointAgentIds"),
+        ("endpointAgentIds", "endpointAgentIds"),
+        ("endpoint_label_ids", "endpointLabelIds"),
+        ("endpointLabelIds", "endpointLabelIds"),
+        ("visited_sites_filter", "visitedSitesFilter"),
+        ("visitedSitesFilter", "visitedSitesFilter"),
+        ("test_ids", "testIds"),
+        ("testIds", "testIds"),
+    ):
+        if source_key in raw:
+            value = raw[source_key]
+            if not isinstance(value, list):
+                raise SpecError(f"alert_rules[{index}].{source_key} must be a list.")
+            body[target_key] = [str(item) for item in value]
+
+
 def alert_rule_payloads(spec: dict[str, Any]) -> list[dict[str, Any]]:
     items = spec.get("alert_rules") or []
     rendered: list[dict[str, Any]] = []
@@ -388,19 +657,32 @@ def alert_rule_payloads(spec: dict[str, Any]) -> list[dict[str, Any]]:
             raise SpecError(
                 f"alert_rules[{index}].test_type {test_type!r} is not a canonical TE OTel v2 type."
             )
+        deprecated_fields = sorted({"threshold", "window_seconds", "windowSeconds"} & set(raw))
+        if deprecated_fields:
+            raise SpecError(
+                f"alert_rules[{index}] uses deprecated synthetic fields {deprecated_fields}; "
+                "use ThousandEyes v7 expression instead."
+            )
+        expression = str(raw.get("expression") or "").strip()
+        if not expression:
+            raise SpecError(f"alert_rules[{index}].expression is required.")
+        rounds_required = int(raw.get("rounds_violating_required", 1))
+        rounds_out_of = int(raw.get("rounds_violating_out_of", 1))
+        if rounds_required < 1 or rounds_out_of < 1 or rounds_required > rounds_out_of:
+            raise SpecError(
+                f"alert_rules[{index}] rounds_violating_required must be between 1 and rounds_violating_out_of."
+            )
         body = {
             "ruleName": name,
-            "expression": raw.get("expression", ""),
-            "alertType": test_type or raw.get("alert_type", ""),
-            "minimumSources": int(raw.get("min_sources", 1)),
-            "roundsViolatingRequired": int(raw.get("rounds_violating_required", 1)),
-            "roundsViolatingOutOf": int(raw.get("rounds_violating_out_of", 1)),
-            "severity": raw.get("severity", "Warning"),
-            "direction": raw.get("direction", "increase"),
-            "threshold": raw.get("threshold"),
-            "windowSeconds": int(raw.get("window_seconds", 120)),
-            "notifications": raw.get("notifications", []),
+            "expression": expression,
+            "alertType": alert_type_for_rule(raw, test_type, index),
+            "minimumSources": int(raw.get("min_sources", raw.get("minimumSources", 1))),
+            "roundsViolatingRequired": rounds_required,
+            "roundsViolatingOutOf": rounds_out_of,
+            "severity": normalize_alert_severity(raw, index),
+            "notifications": normalize_alert_notifications(raw.get("notifications"), index),
         }
+        append_alert_optional_fields(body, raw, index)
         rendered.append({"slug": slugify(name), "body": body})
     return rendered
 
@@ -690,15 +972,37 @@ if [[ ! -f "${INDEX_FILE}" ]]; then
     echo "ERROR: ${INDEX_FILE} missing; cannot resolve test types." >&2
     exit 1
 fi
-python3 -c "import json,os,subprocess,sys;
-items=json.load(open(sys.argv[1]));
+python3 - "${INDEX_FILE}" <<'PY'
+import json
+import os
+import subprocess
+import sys
+
+items = json.load(open(sys.argv[1], encoding="utf-8"))
 for item in items:
-    payload_file=os.path.join(os.path.dirname(sys.argv[1]), item['file']);
-    url=f\"https://api.thousandeyes.com/v7/tests/{item['type']}\";
-    cmd=['curl','-sS','-X','POST',url,'-K',os.environ['TE_CURL_CONFIG'],'-H','Content-Type: application/json','--data-binary',f'@{payload_file}','-o',f'/tmp/te-test-{item[\"slug\"]}.json','-w','%{http_code}\\n'];
-    print(item['slug'], end=': ');
-    sys.stdout.flush();
-    subprocess.run(cmd, check=True)" "${INDEX_FILE}"
+    payload_file = os.path.join(os.path.dirname(sys.argv[1]), item["file"])
+    url = f"https://api.thousandeyes.com/v7/tests/{item['type']}"
+    cmd = [
+        "curl",
+        "-sS",
+        "-X",
+        "POST",
+        url,
+        "-K",
+        os.environ["TE_CURL_CONFIG"],
+        "-H",
+        "Content-Type: application/json",
+        "--data-binary",
+        f"@{payload_file}",
+        "-o",
+        f"/tmp/te-test-{item['slug']}.json",
+        "-w",
+        "%{http_code}\\n",
+    ]
+    print(item["slug"], end=": ")
+    sys.stdout.flush()
+    subprocess.run(cmd, check=True)
+PY
 """
 
 APPLY_ALERT_RULES_BODY = """\

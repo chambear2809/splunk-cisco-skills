@@ -1,22 +1,15 @@
 ---
 name: splunk-observability-cisco-intersight-integration
 description: >-
-  Standalone reusable skill for sending Cisco Intersight (UCS management
-  plane) metrics to Splunk Observability Cloud via the Intersight OTel
-  integration. Renders a separate intersight-otel namespace + K8s Secret
-  manifest stub for intersight-key-id/intersight-key + Deployment manifest
-  pointing at the Splunk OTel collector agent's OTLP gRPC endpoint
-  (port 4317) + ConfigMap for the intersight-otel.toml endpoint override.
-  Renders signalfx-pipeline metric series for intersight.* (alarms,
-  advisories, UCS host power/temp/fan, network, vm count). Hands off base
-  collector to splunk-observability-otel-collector-setup, dashboards to
-  splunk-observability-dashboard-builder, detectors to
-  splunk-observability-native-ops. Independent of Cisco AI Pod -- useful
-  for any UCS deployment. Companion to cisco-intersight-setup (Splunk
-  Platform TA Splunk_TA_Cisco_Intersight). Use when the user asks to send
-  Cisco Intersight, UCS, HyperFlex, or UCS-X compute infrastructure metrics
-  to Splunk Observability Cloud, configure the cisco_intersight OTel receiver,
-  or render dashboards/detectors for UCS chassis health.
+  Render and validate Cisco Intersight (UCS management plane) metrics into
+  Splunk Observability Cloud through the Intersight OTel integration. Emits the
+  namespace, Secret stub, Deployment, endpoint ConfigMap, Splunk OTel pipeline
+  overlay, dashboards, detectors, and handoff scripts without reading key
+  material. Use when the user asks to send Cisco Intersight, UCS, HyperFlex, or
+  UCS-X compute metrics to Splunk Observability Cloud, configure the
+  cisco_intersight OTel receiver, or render UCS chassis health dashboards and
+  detectors. This is independent of Cisco AI Pod and complements the Splunk
+  Platform TA skill cisco-intersight-setup.
 ---
 
 # Splunk Observability Cisco Intersight Integration

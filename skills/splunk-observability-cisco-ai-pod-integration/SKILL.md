@@ -1,30 +1,14 @@
 ---
 name: splunk-observability-cisco-ai-pod-integration
 description: >-
-  Umbrella skill that composes splunk-observability-cisco-nexus-integration +
-  splunk-observability-cisco-intersight-integration +
-  splunk-observability-nvidia-gpu-integration AND adds AI-Pod-specific
-  bits (NIM / vLLM / Milvus / NetApp Trident / Pure Portworx / Redfish
-  exporter, OpenShift SCC helper, workshop multi-tenant pattern). Mirrors
-  canonical signalfx/splunk-opentelemetry-examples/collector/cisco-ai-ready-pods
-  values + production-validated otel-gruve/6-splunk-otel-collector-values.yaml
-  (atl-ocp2 OpenShift). Encodes critical production lessons: rbac.customRules
-  block when endpoint-SD scrapes are used (base chart's ClusterRole grants
-  only pods+services), receiver_creator/dcgm-cisco custom name (NOT
-  receiver_creator/nvidia), DCGM dual-label discovery, dual-pipeline
-  filtering pattern (filtered metrics + unfiltered metrics/cisco-ai-pods +
-  metrics/nvidianim-metrics + metrics/cisco-os-metrics), k8s_attributes/nim
-  processor with model_name extraction, NIM scrape via TWO modes
-  (--nim-scrape-mode receiver_creator|endpoints), OpenShift defaults
-  (kubeletstats.insecure_skip_verify, certmanager off, cloudProvider
-  empty), file-backed Helm token pattern, existing-collector apply with stale
-  receiver_creator/nvidia cleanup. Hands off composed
-  render to splunk-observability-otel-collector-setup with --distribution,
-  HEC for K8s container logs to splunk-hec-service-setup, dashboards to
-  splunk-observability-dashboard-builder, detectors to
-  splunk-observability-native-ops. Use when deploying Splunk Observability
-  Cloud for a Cisco AI Pod (UCS + Nexus + NVIDIA GPUs + NIM/vLLM
-  inference + storage).
+  Compose Cisco Nexus, Cisco Intersight, and NVIDIA GPU Observability skills
+  into a Cisco AI Pod overlay, then add NIM, vLLM, Milvus, NetApp Trident,
+  Pure Portworx, Redfish exporter, OpenShift SCC, workshop tenancy, RBAC,
+  receiver naming, DCGM discovery, dual-pipeline filtering, NIM model-name
+  extraction, and existing-collector cleanup patterns. Use when deploying
+  Splunk Observability Cloud for a Cisco AI Pod with UCS, Nexus, NVIDIA GPUs,
+  NIM/vLLM inference, and storage telemetry. Hand off base collector, HEC,
+  dashboards, and detectors to the owning skills.
 ---
 
 # Splunk Observability Cisco AI Pod Integration (Umbrella)

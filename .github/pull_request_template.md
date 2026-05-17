@@ -4,6 +4,7 @@
 
 ## Testing
 
+- [ ] Agent Skills specification/best-practice impact reviewed: https://agentskills.io/specification
 - [ ] `pytest -q`
 - [ ] `bats tests/*.bats`
 - [ ] `bash -n` for changed shell scripts, or all scripts

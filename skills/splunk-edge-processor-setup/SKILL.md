@@ -8,7 +8,7 @@ description: >-
   no-systemd, plus optional Docker container), scales out to multi-instance
   with DNS-driven forwarder outputs.conf, manages source types, destinations
   (Splunk S2S, Splunk HEC, Amazon S3, syslog), SPL2 pipelines (with
-  routing / mask / sampling templates), applies pipelines to Edge Processors
+  shared splunk-spl2-pipeline-kit templates and PCRE2 linting), applies pipelines to Edge Processors
   via the operator-supplied control-plane API base, enforces the
   default-destination guard, runs sizing preflight, and emits an ACS
   allowlist hand-off stub for Splunk Cloud destinations. Use when the user
@@ -44,6 +44,11 @@ source-type lifecycle, all from one render-first workflow.
   service user without ever placing the token in argv.
 - **Multi-instance** — multiple EP instances behind a DNS record let
   forwarders route via a single hostname.
+- **Shared SPL2 kit** — use `splunk-spl2-pipeline-kit` for complex SPL2
+  authoring, SPL-to-SPL2 review, and PCRE2 migration lint before previewing
+  pipelines in the Edge Processor UI.
+- **FIPS mode** — pass `--ep-fips-mode enabled` only for non-containerized EP
+  instances. FIPS mode is not supported for Docker/containerized EP.
 
 ## Agent Behavior — Credentials
 
@@ -130,21 +135,22 @@ Under `splunk-edge-processor-rendered/`:
 - `host/<host>/install-docker.sh` — Docker compose skeleton (image + env are operator-supplied from the tenant install command).
 - `host/<host>/uninstall.sh`.
 - `forwarder-templates/outputs.conf` — DNS-driven forwarder outputs.
-- `pipelines/templates/{filter.spl2, mask.spl2, sample.spl2, route.spl2}` — Splunk-style starters.
+- `pipelines/templates/*.spl2` — shared SPL2 starters from
+  `splunk-spl2-pipeline-kit` for the `edgeProcessor` profile.
 - `validate.sh` — control-plane health, default-destination guard, sizing check.
 - `handoffs/acs-allowlist.json` — ACS allowlist plan stub for `s2s` + `hec` features.
 
 ## Out of Scope
 
-- Automated SPL→SPL2 conversion (use Splunk's in-product tool).
-- Authoring complex SPL2 transforms beyond `pipelines/*.spl2` files you
-  provide.
+- Live automated SPL→SPL2 conversion (use Splunk's in-product tool; this repo
+  renders compatibility lint and review guidance only).
 - Multi-tenant org management on Splunk Cloud.
 - Destinations not yet documented in Splunk's public EP destination catalog
   (Kafka, Azure Event Hubs).
 - RBAC management on the EP control plane.
 - Automatic resolution of the EP control-plane REST API base — the operator
   supplies `EP_API_BASE` when applying via REST.
+- Containerized FIPS mode.
 
 ## References
 

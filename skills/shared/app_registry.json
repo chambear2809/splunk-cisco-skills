@@ -356,6 +356,86 @@
         "notes": "Splunk App for Data Science and Deep Learning / DSDL (Splunkbase 4607). External runtimes remain operator-owned handoffs unless a downstream runtime skill applies them."
       },
       {
+        "kind": "app",
+        "app_name": "splunk_app_db_connect",
+        "label": "`splunk-db-connect-setup`",
+        "cloud_install_path": "ACS Splunkbase for supported Victoria search-tier deployments; Classic routes to IDM, customer-managed heavy forwarder, or Splunk Support",
+        "cloud_config_path": "Render-first DBX settings, Java, driver, identity, connection, input, output, lookup, and validation handoffs; v1 does not mutate live DBX objects",
+        "notes": "Splunk DB Connect (Splunkbase 2686), audited at 4.2.4 on April 20, 2026. Requires Java 17 or 21 on Enterprise/customer-managed runtimes, Splunk-managed JRE validation on Cloud Victoria search heads, KV Store, JDBC drivers on every DBX runtime host, SHC deployer workflow for SHC, and explicit Cloud Victoria outbound database allowlist planning."
+      },
+      {
+        "kind": "app",
+        "app_name": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` Redshift JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory and classpath validation only; DBX connection objects remain review/apply handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 6149, latest audited 1.2.2."
+      },
+      {
+        "kind": "app",
+        "app_name": "Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` SQL Server JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory plus SQL Server auth, stored procedure, Windows/Kerberos, and Entra planning handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 6150, latest audited 1.3.2."
+      },
+      {
+        "kind": "app",
+        "app_name": "Oracle JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` Oracle JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory plus wallet/client-certificate file handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 6151, latest audited 2.2.2."
+      },
+      {
+        "kind": "app",
+        "app_name": "PostgreSQL JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` PostgreSQL JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory and classpath validation only; DBX connection objects remain review/apply handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 6152, latest audited 1.2.2."
+      },
+      {
+        "kind": "app",
+        "app_name": "Snowflake JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` Snowflake JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory and classpath validation only; DBX connection objects remain review/apply handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 6153, latest audited 1.2.4."
+      },
+      {
+        "kind": "app",
+        "app_name": "MySQL JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` MySQL JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory and classpath validation only; DBX connection objects remain review/apply handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 6154, latest audited 1.1.3."
+      },
+      {
+        "kind": "app",
+        "app_name": "IBM DB2 JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` DB2 JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory and classpath validation only; DBX connection objects remain review/apply handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 6332, latest audited 1.1.1."
+      },
+      {
+        "kind": "app",
+        "app_name": "MongoDB JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` MongoDB JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory and classpath validation only; DBX connection objects remain review/apply handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 7095, latest audited 1.3.0."
+      },
+      {
+        "kind": "app",
+        "app_name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
+        "label": "`splunk-db-connect-setup` Athena JDBC add-on",
+        "cloud_install_path": "ACS Splunkbase wherever DB Connect is approved to run",
+        "cloud_config_path": "Driver inventory and classpath validation only; DBX connection objects remain review/apply handoffs",
+        "notes": "Supported DBX JDBC add-on, Splunkbase 8133, latest audited 1.0.1."
+      },
+      {
         "kind": "workflow",
         "skill": "splunk-mcp-server-setup",
         "label": "`splunk-mcp-server-setup`",
@@ -425,6 +505,33 @@
         "cloud_install_path": "No Splunk Cloud app install; diagnoses Splunk Cloud and Enterprise admin posture from evidence and safe local probes",
         "cloud_config_path": "Rendered doctor, fix-plan, coverage, handoff, and support-ticket packets; Cloud mutations remain delegated to ACS-capable skills",
         "notes": "Full-coverage admin doctor for Cloud and self-managed Enterprise. Classifies every major admin domain as direct local guidance, delegated fix, manual/support path, diagnose-only, or not applicable."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-data-source-readiness-doctor",
+        "label": "`splunk-data-source-readiness-doctor`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; diagnoses whether onboarded data is usable by ES, ITSI, ARI, CIM, OCSF, and dashboards",
+        "cloud_config_path": "Rendered readiness report, ES/ITSI/ARI scores, fix plan, collection SPL, registry projection, and handoff packets; live remediation remains delegated to product/setup skills",
+        "notes": "Post-ingest data-usability doctor. Consumes app registry hints, expected indexes/sourcetypes/macros, sample-event evidence, CIM tags/eventtypes, data-model acceleration state, OCSF transform status, and ES/ITSI/ARI readiness signals."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-spl2-pipeline-kit",
+        "label": "`splunk-spl2-pipeline-kit`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; renders and lints SPL2 pipeline assets offline",
+        "cloud_config_path": "SPL2 templates, custom pipeline template app stubs, compatibility lint, PCRE2 review, and profile checks for Ingest Processor and Edge Processor",
+        "notes": "Shared SPL2 authoring kit for Ingest Processor and Edge Processor. Covers route, redact, sample, metrics, OCSF, decrypt, stats, S3, custom templates, SPL-to-SPL2 review, and PCRE2 migration lint without live API calls."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-ingest-processor-setup",
+        "label": "`splunk-ingest-processor-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; Ingest Processor is a native Splunk Cloud Platform service provisioned through entitlement/support and UI workflows",
+        "cloud_config_path": "Render-first readiness, source type, destination, SPL2 pipeline, lifecycle, monitoring, queue, Usage Summary, and downstream data-readiness handoffs; no private Ingest Processor API CRUD is claimed",
+        "notes": "Full Ingest Processor setup workflow for Splunk Cloud Victoria Experience. Uses splunk-spl2-pipeline-kit for SPL2, refuses Splunk Enterprise destinations in favor of Edge Processor, and hands off post-ingest content readiness to splunk-data-source-readiness-doctor."
       },
       {
         "kind": "workflow",
@@ -901,6 +1008,21 @@
       "notes": "Splunkbase app 8704 modular input runs on search-tier or heavy-forwarder only after topology checks; external collectors and SDKs are OTLP senders/clients, not app install targets. Classic Cloud routes to IDM or customer-managed heavy forwarder."
     },
     {
+      "skill": "splunk-db-connect-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Render-first Splunk DB Connect workflow for JDBC ingestion, lookup, enrichment, and export. DBX runs on search-tier or heavy-forwarder only, with SHC deployer placement, Enterprise/customer-managed Java 17/21, Cloud Victoria Splunk-managed JRE validation, KV Store, driver parity, Cloud Victoria outbound allowlist planning, and Classic Cloud IDM/HF/support routing."
+    },
+    {
       "skill": "splunk-connect-for-syslog-setup",
       "role_support": {
         "search-tier": "supported",
@@ -1150,6 +1272,50 @@
         "external-collector"
       ],
       "notes": "Admin diagnosis and routing workflow for Splunk Cloud and self-managed Enterprise. Renders local doctor/fix/coverage packets and delegates specialized remediation to existing skills; it is not a Splunk runtime package."
+    },
+    {
+      "skill": "splunk-data-source-readiness-doctor",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder",
+        "external-collector"
+      ],
+      "notes": "Post-ingest data-usability diagnosis and routing workflow for Splunk Cloud and self-managed Enterprise. Scores ES, ITSI, and ARI readiness from expected index/sourcetype/macro contracts, sample events, CIM tags/eventtypes, data-model acceleration state, OCSF transforms, dashboard population, and product readiness evidence; it is not a Splunk runtime package."
+    },
+    {
+      "skill": "splunk-spl2-pipeline-kit",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Offline SPL2 authoring and compatibility workflow for Ingest Processor and Edge Processor. Renders pipeline templates, custom template app stubs, and lint reports; it is not a Splunk runtime package."
+    },
+    {
+      "skill": "splunk-ingest-processor-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "external-collector"
+      ],
+      "notes": "Splunk Cloud Platform Ingest Processor readiness and handoff workflow. Requires the Splunk Cloud UI/search tier for provisioning, roles, source types, destinations, and pipeline apply; supports external source and downstream destination handoffs without deploying a customer-managed runtime."
     },
     {
       "skill": "splunk-cloud-data-manager-setup",
@@ -1895,7 +2061,19 @@
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "External AppDynamics dashboard/report workflow covering custom dashboards, Dash Studio handoffs, ThousandEyes dashboard integration, reports, scheduled reports, War Rooms, and validation; no Splunk app placement."
+      "notes": "External AppDynamics dashboard/report workflow covering custom dashboards, Dash Studio handoffs, reports, scheduled reports, War Rooms, and validation; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-thousandeyes-integration-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics and ThousandEyes integration workflow covering AppDynamics TE token readiness, Dash Studio widgets, EUM network metrics, native TE AppDynamics integration runbooks, TE API asset creation, custom webhook fallback, and validation; no Splunk app placement."
     },
     {
       "skill": "splunk-appdynamics-tags-extensions-setup",
@@ -3196,6 +3374,296 @@
       "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only.",
       "latest_verified_version": "0.4.1",
       "latest_verified_date": "May 6, 2026"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "splunk_app_db_connect",
+      "splunkbase_id": "2686",
+      "label": "Splunk DB Connect",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-software-license-agreement.html",
+      "package_patterns": [
+        "splunk-db-connect_*.tgz",
+        "splunk_app_db_connect_*.tgz"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "Splunk DB Connect JDBC ingestion, lookup, enrichment, and export app. Requires Java 17 or 21 on Enterprise/customer-managed runtimes, Splunk-managed JRE validation on Cloud Victoria search heads, KV Store, JDBC drivers on every DBX runtime host, and topology-specific placement guardrails. Live DBX object mutation is intentionally out of splunk-db-connect-setup/v1.",
+      "latest_verified_version": "4.2.4",
+      "latest_verified_date": "April 20, 2026"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "6149",
+      "label": "Amazon Redshift JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "amazon-redshift-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.2.2",
+      "latest_verified_date": "September 3, 2025"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "6150",
+      "label": "Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "microsoft-sql-server-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.3.2",
+      "latest_verified_date": "August 8, 2025"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "Oracle JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "6151",
+      "label": "Oracle JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "oracle-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "2.2.2",
+      "latest_verified_date": "September 3, 2025"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "PostgreSQL JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "6152",
+      "label": "PostgreSQL JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "postgresql-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.2.2",
+      "latest_verified_date": "September 3, 2025"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "Snowflake JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "6153",
+      "label": "Snowflake JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "snowflake-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.2.4",
+      "latest_verified_date": "March 19, 2026"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "MySQL JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "6154",
+      "label": "MySQL JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "mysql-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.1.3",
+      "latest_verified_date": "September 3, 2025"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "IBM DB2 JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "6332",
+      "label": "IBM DB2 JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "ibm-db2-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.1.1",
+      "latest_verified_date": "September 22, 2025"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "MongoDB JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "7095",
+      "label": "MongoDB JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "mongodb-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.3.0",
+      "latest_verified_date": "September 3, 2025"
+    },
+    {
+      "skill": "splunk-db-connect-setup",
+      "app_name": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
+      "splunkbase_id": "8133",
+      "label": "Amazon Athena JDBC Driver Add-on for Splunk DB Connect",
+      "package_patterns": [
+        "amazon-athena-jdbc-driver-add-on-for-splunk-db-connect_*"
+      ],
+      "install_requires": [
+        "2686"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.0.1",
+      "latest_verified_date": "December 16, 2025"
     },
     {
       "skill": "splunk-observability-cloud-integration-setup",

@@ -1,27 +1,16 @@
 ---
 name: splunk-observability-k8s-auto-instrumentation-setup
 description: >-
-  Render, apply, verify, and uninstall Splunk / OpenTelemetry Operator
-  auto-instrumentation on Kubernetes workloads. Overlay-only (assumes the
-  base Splunk OTel Collector chart already installed the operator + CRDs
-  via splunk-observability-otel-collector-setup). Emits per-language
-  Instrumentation CRs (Java, Node.js, Python, .NET, Go, Apache HTTPD,
-  Nginx, SDK), workload-scoped annotation strategic-merge-patches targeting
-  spec.template.metadata.annotations with a backup ConfigMap for clean
-  revert, multi-CR support behind the operator's multi-instrumentation
-  feature gate, Splunk OBI (eBPF) DaemonSet with namespace selectors and
-  an OpenShift SCC stub when needed, AlwaysOn Profiling + runtime metrics
-  wiring (SPLUNK_PROFILER_*, SPLUNK_METRICS_*), propagator and sampler
-  configuration, Fargate gateway-endpoint path, vendor-coexistence
-  detection (Datadog / New Relic / AppDynamics / Dynatrace), and idempotent
-  apply + selective uninstall + --gitops-mode YAML-only rendering. Hands
-  off base collector to splunk-observability-otel-collector-setup,
-  starter APM detectors to splunk-observability-native-ops, APM topology
-  dashboards to splunk-observability-dashboard-builder. Use when wiring
-  zero-code Java / Node.js / Python / .NET / Go / Apache / Nginx application
-  auto-instrumentation into Splunk Observability Cloud APM, adding
-  AlwaysOn Profiling to annotated pods, or uninstalling operator-managed
-  auto-instrumentation cleanly.
+  Render, apply, verify, and uninstall Splunk/OpenTelemetry Operator
+  auto-instrumentation overlays for Kubernetes workloads after the base Splunk
+  OTel Collector skill has installed the operator and CRDs. Emits language
+  Instrumentation CRs, workload and namespace annotations, backup ConfigMaps,
+  Splunk OBI eBPF assets, profiling/runtime metric env vars, sampler settings,
+  Fargate gateway paths, vendor-coexistence checks, GitOps YAML, and clean
+  uninstall scripts. Use when wiring zero-code Java, Node.js, Python, .NET, Go,
+  Apache, Nginx, or SDK instrumentation into Splunk Observability Cloud APM,
+  adding AlwaysOn Profiling, discovering workloads, or reverting
+  operator-managed instrumentation.
 ---
 
 # Splunk Observability Kubernetes Auto-Instrumentation

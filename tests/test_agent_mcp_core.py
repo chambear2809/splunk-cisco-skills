@@ -567,6 +567,8 @@ class AgentMCPCoreTests(unittest.TestCase):
             ("splunk-cloud-acs-allowlist-setup", ["--phase", "apply"], False),
             ("splunk-edge-processor-setup", ["--phase", "preflight"], True),
             ("splunk-edge-processor-setup", ["--phase", "apply"], False),
+            ("splunk-ingest-processor-setup", ["--phase", "all"], True),
+            ("splunk-spl2-pipeline-kit", ["--phase", "lint"], True),
             ("splunk-indexer-cluster-setup", ["--phase", "bundle-validate"], True),
             ("splunk-indexer-cluster-setup", ["--phase", "bundle-status"], True),
             ("splunk-indexer-cluster-setup", ["--phase", "rolling-restart"], False),

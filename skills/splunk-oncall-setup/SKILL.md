@@ -202,3 +202,25 @@ parallel-stack guidance.
 The skill never asks for nor logs secret material, refuses any direct secret
 CLI flag, and redacts all `X-VO-Api-Key`, integration-key, and rendered
 payload secrets from artifacts on disk.
+
+## MCP Tools
+
+This skill includes checked-in, read-only Splunk MCP custom tools generated
+from `mcp_tools.source.yaml`.
+
+Validate or regenerate the tool artifact:
+
+```bash
+python3 skills/shared/scripts/mcp_tools.py validate skills/splunk-oncall-setup
+python3 skills/shared/scripts/mcp_tools.py generate skills/splunk-oncall-setup
+```
+
+Load the tools into Splunk MCP Server:
+
+```bash
+bash skills/splunk-oncall-setup/scripts/load_mcp_tools.sh
+```
+
+The loader uses the supported `/mcp_tools` REST batch endpoint by default. Use
+`--allow-legacy-kv` only for older MCP Server app versions that lack that
+endpoint.

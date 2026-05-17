@@ -1,25 +1,15 @@
 ---
 name: splunk-observability-gcp-integration
 description: >-
-  Render, apply, validate, discover, and diagnose the Splunk Observability
-  Cloud GCP integration (REST type=GCP, poll-based via Cloud Monitoring API).
-  Covers all wire fields: authMethod SERVICE_ACCOUNT_KEY (projectServiceKeys
-  with projectKey write-only, redacted on GET, drift via SHA-256 hash) or
-  WORKLOAD_IDENTITY_FEDERATION (pool_id, provider_id, splunk_principal per
-  realm), pollRate 60–600 s, useMetricSourceProjectForQuota,
-  importGCPMetrics, services 32-entry enum, customMetricTypeDomains,
-  excludeGceInstancesWithLabels, namedToken ForceNew warning. Terraform
-  signalfx_gcp_integration (provider splunk-terraform/signalfx ~> 9.0).
-  GCloud CLI SA creation + role binding scripts, multi-project support,
-  drift detection with credential-hash sidecar, conflict-matrix enforcement
-  (auth mode vs block, services/mode, poll-rate bounds, useMetricSourceProject
-  quota warning). Cross-skill handoffs to splunk-app-install
-  (Splunk_TA_google_cloud Splunkbase 3088 logs), splunk-observability-otel-
-  collector-setup (GKE host telemetry), splunk-observability-dashboard-builder
-  (GCP dashboards), splunk-observability-native-ops (detectors). Use when the
-  user asks to connect Splunk Observability Cloud to GCP Cloud Monitoring
-  metrics, wire the GCP integration, configure Service Account or WIF
-  credentials, or set up GCP dashboards and detectors.
+  Render, apply, validate, discover, and diagnose the Splunk Observability Cloud
+  GCP integration for Cloud Monitoring metrics. Covers service-account key and
+  Workload Identity Federation auth, poll-rate bounds, metric source quota,
+  service enums, custom metric domains, label exclusions, namedToken warnings,
+  Terraform, gcloud service-account and IAM scripts, multi-project support,
+  credential-hash drift detection, and conflict checks. Use when the user asks
+  to connect Splunk Observability Cloud to GCP metrics, configure Service
+  Account or WIF credentials, manage the GCP REST/Terraform integration, or set
+  up GCP dashboards, detectors, logs, or GKE telemetry handoffs.
 ---
 
 # Splunk Observability Cloud — GCP Integration Setup

@@ -17,6 +17,7 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "1761",
     "1809",
     "1841",
+    "2686",
     "2731",
     "2881",
     "2882",
@@ -38,11 +39,19 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "5391",
     "5558",
     "5580",
+    "6149",
+    "6150",
+    "6151",
+    "6152",
+    "6153",
+    "6154",
+    "6332",
     "6361",
     "6785",
     "6872",
     "6999",
     "7000",
+    "7095",
     "7180",
     "7214",
     "7245",
@@ -56,6 +65,7 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "7719",
     "7777",
     "7828",
+    "8133",
     "8365",
     "8485",
     "8566",
@@ -255,6 +265,11 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(otlp["role_support"]["search-tier"], "supported")
         self.assertEqual(otlp["role_support"]["heavy-forwarder"], "supported")
         self.assertEqual(otlp["role_support"]["external-collector"], "supported")
+        db_connect = skill_topologies["splunk-db-connect-setup"]
+        self.assertEqual(db_connect["role_support"]["search-tier"], "supported")
+        self.assertEqual(db_connect["role_support"]["heavy-forwarder"], "supported")
+        self.assertEqual(db_connect["role_support"]["indexer"], "none")
+        self.assertEqual(db_connect["cloud_pairing"], ["search-tier", "heavy-forwarder"])
         federated_search = skill_topologies["splunk-federated-search-setup"]
         self.assertEqual(federated_search["role_support"]["search-tier"], "required")
         smartstore = skill_topologies["splunk-index-lifecycle-smartstore-setup"]
@@ -385,6 +400,51 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(content_library_entry["app_name"], "DA-ITSI-ContentLibrary")
         self.assertEqual(content_library_entry.get("install_requires"), ["1841"])
         self.assertIn("splunk-app-for-content-packs_*", content_library_entry.get("package_patterns", []))
+
+    def test_db_connect_registry_entries_are_present(self):
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        apps_by_id = {
+            app["splunkbase_id"]: app
+            for app in registry.get("apps", [])
+        }
+
+        dbx = apps_by_id["2686"]
+        self.assertEqual(dbx["skill"], "splunk-db-connect-setup")
+        self.assertEqual(dbx["app_name"], "splunk_app_db_connect")
+        self.assertIn("splunk-db-connect_*.tgz", dbx.get("package_patterns", []))
+        self.assertTrue(dbx["capabilities"]["needs_custom_rest"])
+        self.assertTrue(dbx["capabilities"]["needs_kvstore"])
+        self.assertEqual(dbx["role_support"]["search-tier"], "supported")
+        self.assertEqual(dbx["role_support"]["heavy-forwarder"], "supported")
+        self.assertEqual(dbx["role_support"]["indexer"], "none")
+        self.assertEqual(dbx["latest_verified_version"], "4.2.4")
+        self.assertEqual(dbx["latest_verified_date"], "April 20, 2026")
+
+        driver_expectations = {
+            "6149": ("Amazon Redshift JDBC Driver Add-on for Splunk DB Connect", "1.2.2", "September 3, 2025"),
+            "6150": ("Microsoft SQL Server JDBC Driver Add-on for Splunk DB Connect", "1.3.2", "August 8, 2025"),
+            "6151": ("Oracle JDBC Driver Add-on for Splunk DB Connect", "2.2.2", "September 3, 2025"),
+            "6152": ("PostgreSQL JDBC Driver Add-on for Splunk DB Connect", "1.2.2", "September 3, 2025"),
+            "6153": ("Snowflake JDBC Driver Add-on for Splunk DB Connect", "1.2.4", "March 19, 2026"),
+            "6154": ("MySQL JDBC Driver Add-on for Splunk DB Connect", "1.1.3", "September 3, 2025"),
+            "6332": ("IBM DB2 JDBC Driver Add-on for Splunk DB Connect", "1.1.1", "September 22, 2025"),
+            "7095": ("MongoDB JDBC Driver Add-on for Splunk DB Connect", "1.3.0", "September 3, 2025"),
+            "8133": ("Amazon Athena JDBC Driver Add-on for Splunk DB Connect", "1.0.1", "December 16, 2025"),
+        }
+        for app_id, (app_name, version, release_date) in driver_expectations.items():
+            with self.subTest(app_id=app_id):
+                entry = apps_by_id[app_id]
+                self.assertEqual(entry["skill"], "splunk-db-connect-setup")
+                self.assertEqual(entry["app_name"], app_name)
+                self.assertEqual(entry.get("install_requires"), ["2686"])
+                self.assertEqual(entry["latest_verified_version"], version)
+                self.assertEqual(entry["latest_verified_date"], release_date)
+                self.assertEqual(entry["role_support"]["heavy-forwarder"], "supported")
+                self.assertFalse(entry["capabilities"]["uf_safe"])
+
+        self.assertNotIn("6759", apps_by_id)
 
     def test_app_registry_splunkbase_ids_are_unique(self):
         """Two registry entries must not share the same Splunkbase ID.

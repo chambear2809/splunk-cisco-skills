@@ -55,7 +55,7 @@ repos:
         files: ^skills/.*\.sh$
 
       - id: skill-frontmatter
-        name: SKILL.md frontmatter contract
+        name: Agent Skills SKILL.md contract
         entry: python3 tests/check_skill_frontmatter.py
         language: system
         pass_filenames: false

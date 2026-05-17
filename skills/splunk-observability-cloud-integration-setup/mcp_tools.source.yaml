@@ -1,0 +1,106 @@
+name: Splunk Observability Platform Integration MCP Tools
+description: Read-only MCP tools for Splunk Platform and Splunk Observability Cloud integration readiness.
+version: 1.0.0
+author: splunk-observability-cloud-integration-setup skill
+external_app_id: o11y_platform
+tools:
+  - id: app_health
+    title: Observability Integration App Health
+    description: Check Splunk-side Observability Cloud and Infrastructure Monitoring app state.
+    tags: [o11y, observability, app, health]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/apps/local count=0 | search title=splunk_app_infrastructure OR title=Splunk_TA_Infrastructure OR title=Splunk_TA_sim OR title=splunk_app_for_splunk_observability_cloud OR title=Splunk Observability Cloud | table title label version disabled visible configured state | sort title
+    examples: [Check Observability integration apps]
+  - id: token_auth_visibility
+    title: Observability Token Auth Visibility
+    description: Show visible auth and account stanzas for Splunk-side Observability integrations without exposing secret values.
+    tags: [o11y, observability, auth]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/configs/conf-passwords count=0 | search eai:acl.app=Splunk_TA_sim OR eai:acl.app=splunk_app_infrastructure OR title=*splunk*observability* | eval credential_present=if(isnotnull(clear_password),"true","false") | table title eai:acl.app realm username credential_present | sort title
+    examples: [Check Observability auth visibility]
+  - id: token_auth_state
+    title: Observability Token Auth State
+    description: Read Splunk Platform token-auth enablement state needed by Observability Cloud pairing.
+    tags: [o11y, observability, token_auth]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /services/admin/token-auth/tokens_auth count=0 | table title disabled eai:acl.app
+    examples: [Check Splunk token authentication state]
+  - id: discover_app_state
+    title: Discover Observability App State
+    description: Read Discover Splunk Observability Cloud configuration tab state visible through local Splunk REST handlers.
+    tags: [o11y, observability, discover, pairing]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/discover_splunk_observability_cloud/related_content_discovery count=0 | eval surface="related_content_discovery" | table surface title enabled disabled eai:acl.app | append [| rest /servicesNS/nobody/discover_splunk_observability_cloud/field_aliasing count=0 | eval surface="field_aliasing" | table surface title auto_field_mapping enabled disabled eai:acl.app] | append [| rest /servicesNS/nobody/discover_splunk_observability_cloud/automatic_ui_updates count=0 | eval surface="automatic_ui_updates" | table surface title enabled disabled eai:acl.app] | append [| rest /servicesNS/nobody/discover_splunk_observability_cloud/access_tokens count=0 | eval surface="access_tokens", token_configured=if(isnotnull(access_token),"true","false") | table surface title realm token_configured disabled eai:acl.app] | sort surface title
+    examples: [Check Discover app configuration state]
+  - id: loc_readiness
+    title: Log Observer Connect Readiness
+    description: Check Splunk-side Log Observer Connect saved searches, macros, and app state visible through REST.
+    tags: [o11y, loc, log_observer]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/saved/searches count=0 | search title=*Log*Observer* OR title=*Observability* OR eai:acl.app=splunk_app_for_splunk_observability_cloud | table title eai:acl.app disabled is_scheduled cron_schedule | sort title
+    examples: [Check Log Observer Connect readiness]
+  - id: sim_inputs
+    title: SIM Add-on Account And Input Health
+    description: List Splunk Infrastructure Monitoring add-on inputs and account-like configurations.
+    tags: [o11y, sim, inputs]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/-/data/inputs/all count=0 | search eai:acl.app=Splunk_TA_sim OR title=*signalfx* OR title=*sim* | table title eai:acl.app disabled index sourcetype interval | sort title
+    examples: [List SIM add-on inputs]
+  - id: sim_accounts
+    title: SIM Add-on Account Health
+    description: List Splunk Infrastructure Monitoring add-on accounts without exposing token values.
+    tags: [o11y, sim, accounts]
+    time_range: false
+    row_limiter: true
+    spl: |
+      | rest /servicesNS/nobody/Splunk_TA_sim/splunk_infrastructure_monitoring_account count=0 | eval token_configured=if(isnotnull(access_token),"true","false") | table title name realm disabled job_start_rate event_search_rate token_configured | sort title
+    examples: [List SIM add-on accounts]
+  - id: sim_metrics_data
+    title: SIM Metrics Data
+    description: Show recent metric names visible in the sim_metrics index.
+    tags: [o11y, sim, metrics]
+    time_range: true
+    row_limiter: true
+    spl: |
+      | mcatalog values(metric_name) as metric_name where index=sim_metrics by metric_name | sort metric_name
+    examples: [Show SIM metrics catalog]
+coverage:
+  - id: o11y_splunk_side_app_health
+    status: mcp_tool
+    tool: app_health
+  - id: token_auth_visibility
+    status: mcp_tool
+    tool: token_auth_state
+  - id: service_account_token_visibility
+    status: mcp_tool
+    tool: token_auth_visibility
+  - id: pairing_discover_app_readable_state
+    status: mcp_tool
+    tool: discover_app_state
+  - id: loc_splunk_side_readiness
+    status: mcp_tool
+    tool: loc_readiness
+  - id: sim_addon_account_health
+    status: mcp_tool
+    tool: sim_accounts
+  - id: sim_addon_input_health
+    status: mcp_tool
+    tool: sim_inputs
+  - id: sim_metrics_data
+    status: mcp_tool
+    tool: sim_metrics_data
+  - id: external_observability_mcp_gateway_tools
+    status: excluded_with_reason
+    reason: External Splunk Observability MCP Gateway tools are not duplicated by local Splunk Platform MCP tools.

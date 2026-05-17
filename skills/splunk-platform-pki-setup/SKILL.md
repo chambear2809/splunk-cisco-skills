@@ -1,29 +1,17 @@
 ---
 name: splunk-platform-pki-setup
 description: >-
-  Render, preflight, apply, validate, rotate, and inventory Private PKI
-  (operator becomes the CA) or Public PKI (CSR + handoff to a third-party
-  CA / HashiCorp Vault PKI / ACME / Microsoft AD CS / EJBCA) across every
-  Splunk Enterprise TLS surface — Splunk Web (8000), splunkd REST (8089),
-  S2S (9997), HEC (8088), KV Store, indexer cluster (including the
-  `[replication_port-ssl://9887]` channel), search-head cluster, License
-  Manager, Deployment Server, Monitoring Console, Federated Search, DMZ
-  heavy forwarder, the universal forwarder fleet, Splunk Edge Processor
-  (RSA + ECDSA), the SAML SP signing cert, LDAPS trust, and the local
-  `splunk` CLI's `cacert.pem`. Wires FIPS 140-2 / 140-3 mode through
-  `splunk-launch.conf`, ships three TLS algorithm presets
-  (`splunk-modern`, `fips-140-3`, `stig`), enforces the KV-Store
-  `serverAuth`+`clientAuth` EKU pair, refuses default Splunk certs,
-  mints leaves with operator-supplied SANs, and emits a delegated
-  rotation runbook that hands off rolling restart and cluster bundle
-  apply to `splunk-indexer-cluster-setup`. Use when the user asks to
-  build a Splunk PKI, mint TLS certs for a Splunk cluster, prepare CSRs
-  for a third-party CA, replace default Splunk certs, configure mTLS
-  on splunkd / S2S / HEC, encrypt the indexer-cluster replication
-  port, fix KV-Store cert validation errors after an upgrade,
-  configure SAML SP signing or LDAPS trust, or rotate Splunk TLS
-  certificates across an indexer cluster, SHC, License Manager,
-  Deployment Server, Monitoring Console, or universal forwarder fleet.
+  Render, preflight, apply, validate, rotate, and inventory private or public
+  PKI for Splunk Enterprise TLS surfaces: Splunk Web, splunkd REST, S2S, HEC,
+  KV Store, indexer clusters, SHC, License Manager, Deployment Server,
+  Monitoring Console, Federated Search, heavy forwarders, Universal Forwarders,
+  Edge Processor, SAML SP signing, LDAPS trust, and CLI CA trust. Covers CSR
+  handoffs, internal CA rendering, FIPS mode, TLS policy presets, KV Store EKU
+  enforcement, default-cert refusal, SAN-aware leaf certs, mTLS, replication-port
+  TLS, and delegated rotation runbooks. Use when the user asks to build Splunk
+  PKI, mint certs, prepare third-party CA CSRs, replace default certs, configure
+  mTLS, fix KV Store cert validation, encrypt replication traffic, configure
+  SAML/LDAPS trust, or rotate Splunk TLS certificates.
 ---
 
 # Splunk Platform PKI Setup
@@ -92,33 +80,15 @@ apply changes until the operator passes `--accept-pki-rotation`.
 
 ## Architecture the skill assumes
 
-```
-                 Private PKI mode                                       Public PKI mode
-                 ----------------                                       ---------------
-              Internal Root CA                                Operator's CA: Vault PKI /
-              (offline, 3650 d)                               ACME / AD CS / EJBCA /
-                     │                                        commercial CA
-                     ▼                                                    │
-           Internal Intermediate CA                                       │
-           (online, 1825 d)                                               │
-                     │                                                    │
-                     └──────────── signs ───────────┐    ┌── fulfills CSR ┘
-                                                   ▼    ▼
-                                  splunk-platform-pki-setup renderer
-                                          │
-                ┌─────────────────────────┼──────────────────────────┐
-                ▼                         ▼                          ▼
-        Cluster bundle drop-in    SHC deployer drop-in      Standalone / fleet
-        master-apps/000_pki_trust shcluster/apps/...        000_pki_trust + UF overlay
-                │                         │                          │
-                ▼                         ▼                          ▼
-        splunk-indexer-cluster-setup   splunk-agent-management       Operator runs install-leaf
-        --phase bundle-apply           -setup deployer push          on LM / DS / MC / single SH
-        --phase rolling-restart                                      / DMZ HF / UF fleet
-                │
-                ▼
-        Cluster peers + SHs install certs and restart in waves
-```
+- Private mode builds an internal root/intermediate CA and signs
+  the role-specific leaf certificates.
+- Public mode renders CSRs and operator handoffs for Vault PKI,
+  ACME, AD CS, EJBCA, or a commercial CA.
+- Rendered outputs become cluster-bundle drop-ins, SHC deployer
+  apps, standalone overlays, and UF fleet overlays.
+- Cluster bundle apply and rolling restart remain delegated to
+  `splunk-indexer-cluster-setup`; SHC app push remains delegated
+  to `splunk-agent-management-setup`.
 
 ## Agent behavior — credentials
 
@@ -441,40 +411,26 @@ adjacent skill's behaviour on top.
 
 ## TLS algorithm presets
 
-Pick with `--tls-policy {splunk-modern|fips-140-3|stig}`:
-
-- `splunk-modern` (default) — Splunk's documented modern cipher
-  set (`ECDHE-(EC)DSA/RSA-AES{128,256}-GCM-SHA{256,384}` family
-  with `ECDHE-AES{128,256}-SHA{256,384}` fallbacks); ECDH curves
-  `prime256v1, secp384r1, secp521r1`. Source:
-  [About TLS encryption and cipher suites](https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites).
-- `fips-140-3` — NIST-approved AEAD suites only (no CBC, no
-  SHA-1, no RSA-1024, no anonymous DH); RSA-2048+ or ECDSA P-256+;
-  SHA-256 / 384 / 512 only.
-- `stig` — DISA STIG-aligned (cross-references
-  `splunk-enterprise-public-exposure-hardening/references/disa-stig-cross-reference.md`).
+Pick with `--tls-policy {splunk-modern|fips-140-3|stig}`.
+Keep the detailed cipher and key constraints in
+[references/algorithm-presets.md](references/algorithm-presets.md);
+the renderer also consumes
+[references/algorithm-policy.json](references/algorithm-policy.json).
 
 ## TLS protocol floor
 
 Defaults to `sslVersions = tls1.2` and `sslVersionsForClient = tls1.2`.
-Splunk's
-[TLS-protocol-version doc](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
-lists the supported set as `SSLv3` (deprecated), `TLS1.0` (deprecated,
-9.4+), `TLS1.1` (deprecated, 9.4+), `TLS1.2`. **TLS 1.3 is not yet
-documented as a Splunk-supported TLS version.** Pass
-`--allow-deprecated-tls` to relax the floor (not recommended).
+Read [references/tls-protocol-policy.md](references/tls-protocol-policy.md)
+for the upstream support table and the guarded
+`--allow-deprecated-tls` path.
 
 ## FIPS mode
 
 `--fips-mode {none|140-2|140-3}` — when set, the renderer emits a
 `splunk-launch.conf` overlay with `SPLUNK_FIPS_VERSION = 140-3` (or
-`140-2`). Splunk 10.0+ ships both modules. The skill consumes the
-public-exposure-hardening skill's `--enable-fips` /
-`--fips-version` semantics when both run together. NIST deprecates
-FIPS 140-2 on 2026-09-21, so default for new deployments is
-`140-3`. The skill refuses to apply mid-migration (Phase 1 not yet
-complete) per the
-[Splunk FIPS upgrade doc](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.2/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments).
+`140-2`). Read
+[references/fips-and-common-criteria.md](references/fips-and-common-criteria.md)
+before apply; the skill refuses mid-migration states.
 
 ## Validity-day defaults
 
@@ -485,31 +441,22 @@ complete) per the
 | Server / client leaf (private mode) | 825 d | 825 d (preflight refuses higher) |
 | Server / client leaf (public mode) | 397 d | warns at 90 d (Let's Encrypt floor) and 397 d (CA/Browser Forum baseline); operator's CA enforces its own cap |
 
-Override with `--root-ca-days`, `--intermediate-ca-days`,
-`--leaf-days`.
+Override with `--root-ca-days`, `--intermediate-ca-days`, and `--leaf-days`.
 
 ## Key format / permissions
 
-- Default private key format is **encrypted PKCS#1 PEM** (matches
-  Splunk's `splunk cmd openssl genpkey -aes-256-cbc` example).
-- `--key-format pkcs8` switches to PKCS#8 (`BEGIN PRIVATE KEY`),
-  required for Edge Processor and Splunk DB Connect compatibility.
-- After install, the renderer runs `chmod 0600 <key>` and
-  `chmod 0644 <cert>` explicitly so Splunk's restart-time
-  permission flap starts from a known baseline.
-- `verify-leaf.sh` runs `splunk show-decrypted` to confirm the
-  encrypted `sslPassword` (Splunk encrypts on restart with
-  `splunk.secret`) round-trips back to the plaintext the operator
-  supplied via `--leaf-key-password-file`.
+Default private keys are encrypted PKCS#1 PEM. Use `--key-format pkcs8`
+for Edge Processor or DB Connect compatibility. The install and
+validation details live in
+[references/key-format-and-permissions.md](references/key-format-and-permissions.md).
 
 ## mTLS surfaces
 
 Opt-in via `--enable-mtls {none|s2s|hec|splunkd|all}`. Default is
-`s2s,hec`. When `all`, sets `requireClientCert=true` on splunkd
-(8089), S2S (9997), and HEC (8088) per the
-[Splunk 10.0 mTLS doc](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-mutually-authenticated-transport-layer-security-mtls-on-the-splunk-platform).
-Default leaves splunkd off because turning it on can break
-operator tooling that does not present a client cert.
+`s2s,hec`. Read
+[references/mtls-and-hostname-validation.md](references/mtls-and-hostname-validation.md)
+before enabling splunkd mTLS because it can break operator tooling
+that does not present a client cert.
 
 ## References
 

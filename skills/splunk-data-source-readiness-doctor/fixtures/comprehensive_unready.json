@@ -1,0 +1,166 @@
+{
+  "platform": "cloud",
+  "targets": ["es", "itsi", "ari"],
+  "products": {
+    "es": {"installed": true},
+    "itsi": {"installed": true},
+    "ari": {"installed": true}
+  },
+  "data_sources": [
+    {
+      "name": "Cisco Secure Firewall",
+      "skill": "cisco-security-cloud-setup",
+      "expected_indexes": ["cisco_security"],
+      "expected_sourcetypes": ["cisco:secure:firewall"],
+      "expected_macros": ["cisco_security_indexes"],
+      "indexes": {"missing": ["cisco_security"]},
+      "retention": {
+        "lookback_gaps": ["30-day firewall analytic only has 7 days searchable"],
+        "frozen_time_too_short": ["cisco_security frozenTimePeriodInSecs is shorter than required dashboard lookback"],
+        "archive_unsearchable_gaps": ["older firewall buckets are archived outside searchable storage"]
+      },
+      "sourcetypes": {"missing": ["cisco:secure:firewall"]},
+      "macros": {"missing": ["cisco_security_indexes"]},
+      "sample_events": {
+        "count": 0,
+        "latest_age_minutes": 4320,
+        "volume_below_baseline": true,
+        "ingest_latency_minutes": 90,
+        "duplicate_rate_pct": 12,
+        "history_depth_gaps": ["only 2 days available for a 30-day detection lookback"]
+      },
+      "ingest": {
+        "pipeline_errors": ["Edge Processor firewall route failed"],
+        "destination_errors": ["HEC destination rejected cisco_security index"],
+        "dropped_events": ["100 firewall events dropped before indexing"],
+        "metadata_rewrite_gaps": ["sourcetype rewritten away from cisco:secure:firewall"]
+      },
+      "parser": {
+        "timestamp_skew_minutes": 45,
+        "line_breaking_errors": ["multiline firewall events merge together"],
+        "host_source_gaps": ["host is collector instead of device"]
+      },
+      "cim": {
+        "expected_models": ["Network_Traffic", "Intrusion_Detection"],
+        "missing_tags": ["network", "communicate"],
+        "missing_eventtypes": ["cisco_secure_firewall_traffic"],
+        "missing_required_fields": ["src", "dest", "action"],
+        "data_models_without_events": ["Network_Traffic"],
+        "validation_errors": ["action values do not match CIM expected values"],
+        "dataset_constraint_gaps": ["child dataset missing parent network tag"],
+        "field_value_regex_failures": ["src contains device names instead of IP addresses"]
+      },
+      "data_models": {
+        "acceleration_disabled": ["Network_Traffic"],
+        "acceleration_errors": ["summarization skipped"],
+        "lag_minutes": 720,
+        "index_constraint_gaps": ["Network_Traffic does not include cisco_security"],
+        "tags_whitelist_gaps": ["custom firewall tags not allowed for Network_Traffic"],
+        "summary_range_gaps": ["Network_Traffic summary range shorter than detection lookback"],
+        "summary_range_shorter_than_detection": ["Network_Traffic summary covers 7 days but detection needs 30 days"]
+      },
+      "knowledge": {
+        "automatic_lookup_gaps": ["asset lookup is not automatic for the firewall sourcetype"],
+        "lookup_definition_gaps": ["threat lookup missing match field"],
+        "lookup_table_empty": ["identity lookup is empty"],
+        "field_alias_gaps": ["src_ip does not alias to src"],
+        "calculated_field_errors": ["action eval fails for blocked events"]
+      },
+      "metrics": {
+        "indexes_missing": ["net_metrics"],
+        "metric_names_missing": ["cpu.utilization"],
+        "dimensions_missing": ["host", "device"],
+        "mstats_zero_results": true
+      },
+      "ocsf": {
+        "required": true,
+        "addon_installed": false,
+        "missing_transforms": ["ocsf_network_activity_to_network_traffic"],
+        "mapped_to_cim": false,
+        "unprefixed_sourcetypes": ["aws:asl"],
+        "unconfigured_sourcetypes": ["ocsf:aws:asl"],
+        "timestamp_extraction_gaps": ["OCSF time field not extracted"]
+      },
+      "es": {
+        "asset_identity_gaps": ["firewall hosts missing from asset lookup"],
+        "detection_data_models_missing": ["Network_Traffic"],
+        "correlation_searches_disabled": ["Brute Force Access Behavior Detected"],
+        "correlation_search_skips": ["Brute Force Access Behavior Detected skipped twice in the last 24h"],
+        "correlation_search_lag_gaps": ["Firewall correlation search runs behind event arrival window"],
+        "adaptive_response_gaps": ["missing notable action"],
+        "content_mapping_gaps": ["Network traffic data not mapped in SSE"],
+        "security_content_update_stale": true,
+        "analytic_story_gaps": ["Cisco firewall detections not mapped to analytic stories"],
+        "risk_modifier_field_gaps": ["risk_object missing from firewall risk action"],
+        "risk_object_type_gaps": ["risk_object_type resolves to other for firewall hosts"],
+        "threat_intel_source_gaps": ["firewall IP observables not matching threat collections"],
+        "threat_match_gaps": ["Threat Activity Detected has no events for firewall source"],
+        "risk_index_missing": false,
+        "notable_index_missing": false
+      },
+      "federated": {
+        "provider_gaps": ["Amazon Security Lake provider is unreachable"],
+        "federated_index_gaps": ["federated:asl_network_activity missing"],
+        "mode_unsupported": ["transparent mode unavailable for this remote dataset"],
+        "remote_search_errors": ["provider timeout during security content validation"],
+        "amazon_security_lake_mapping_gaps": ["OCSF Network Activity fields do not map to CIM Network_Traffic"]
+      },
+      "itsi": {
+        "content_packs_missing": ["Cisco Enterprise Networks"],
+        "entity_discovery_disabled": ["Cisco network entities"],
+        "kpi_base_searches_missing": ["Cisco firewall health"],
+        "kpi_search_zero_results": ["Device health"],
+        "kpi_scheduler_skips": ["Device health KPI skipped during search quota pressure"],
+        "threshold_gaps": ["Firewall latency KPI has no severity thresholds"],
+        "entity_split_field_gaps": ["Device health KPI missing entity split field"],
+        "kpi_runtime_gaps": ["Firewall KPI base search runtime exceeds schedule"],
+        "event_analytics_gaps": ["Firewall alerts are not entering Episode Review"],
+        "aggregation_policy_gaps": ["Cisco firewall events do not match NEAP filters"],
+        "episode_split_field_gaps": ["Episode split field does not exist in source events"],
+        "summary_index_gaps": ["index=itsi_summary has no records for the firewall service"],
+        "summary_metrics_gaps": ["index=itsi_summary_metrics has no KPI metric records"],
+        "service_health_score_gaps": ["service health score is missing for firewall service"],
+        "kpi_summary_zero_results": ["KPI summary search returns no rows"]
+      },
+      "ari": {
+        "indexes_missing": ["ari_ta"],
+        "inactive_data_sources": ["Firewall inventory"],
+        "missing_required_fields": ["ari_nt_host"],
+        "field_mapping_errors": ["no ari_ip mapping"],
+        "priority_gaps": ["Firewall inventory priority unset"],
+        "key_field_gaps": ["VPN inventory lacks user_id"],
+        "relevant_event_filter_gaps": ["firewall inventory search includes non-asset events"],
+        "event_search_shape_errors": ["batched event search does not return tabulated fields"],
+        "event_search_schedule_gaps": ["Firewall inventory event search did not run inside its expected window"]
+      },
+      "dashboards": {
+        "missing_macros": ["cisco_security_indexes"],
+        "zero_result_panels": ["Threat overview"],
+        "base_search_errors": ["Firewall overview base search is non-transforming"],
+        "chain_search_gaps": ["Threat chain references fields not emitted by base search"],
+        "token_gaps": ["time token missing default"],
+        "saved_search_staleness_gaps": ["Threat overview saved search result is older than panel time range"],
+        "time_range_retention_gaps": ["Threat overview defaults to 30 days but cisco_security only retains 7 searchable days"]
+      },
+      "scheduled_searches": {
+        "skipped": ["Firewall dashboard saved search skipped"],
+        "failed": ["Firewall enrichment report failed"],
+        "latest_run_stale": ["Firewall inventory scheduled search is stale"]
+      },
+      "rbac": {
+        "search_denied": true,
+        "missing_indexes": ["cisco_security"]
+      }
+    },
+    {
+      "name": "Unknown SaaS Audit",
+      "app_name": "Unknown_SaaS_Audit",
+      "sample_events": {"count": 10, "latest_age_minutes": 30},
+      "cim": {"missing_required_fields": ["user", "action"]},
+      "dashboards": {"populated": false}
+    }
+  ],
+  "handoffs": {
+    "unrouted": ["custom SaaS TA owner not declared"]
+  }
+}

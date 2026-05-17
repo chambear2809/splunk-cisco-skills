@@ -102,3 +102,25 @@ with `--install`:
 
 Read `reference.md` for the official coverage map, app IDs, lifecycle surfaces,
 and source links.
+
+## MCP Tools
+
+This skill includes checked-in, read-only Splunk MCP custom tools generated
+from `mcp_tools.source.yaml`.
+
+Validate or regenerate the tool artifact:
+
+```bash
+python3 skills/shared/scripts/mcp_tools.py validate skills/splunk-asset-risk-intelligence-setup
+python3 skills/shared/scripts/mcp_tools.py generate skills/splunk-asset-risk-intelligence-setup
+```
+
+Load the tools into Splunk MCP Server:
+
+```bash
+bash skills/splunk-asset-risk-intelligence-setup/scripts/load_mcp_tools.sh
+```
+
+The loader uses the supported `/mcp_tools` REST batch endpoint by default. Use
+`--allow-legacy-kv` only for older MCP Server app versions that lack that
+endpoint.

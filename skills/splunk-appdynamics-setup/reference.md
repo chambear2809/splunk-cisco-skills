@@ -19,7 +19,8 @@ validation for their feature families.
 | Synthetic Monitoring and Private Synthetic Agents | `splunk-appdynamics-synthetic-monitoring-setup` |
 | Log Observer Connect | `splunk-appdynamics-log-observer-connect-setup` |
 | Alerting content / AIML baselines and diagnostics | `splunk-appdynamics-alerting-content-setup` |
-| Dashboards, reports, War Rooms, and ThousandEyes dashboards | `splunk-appdynamics-dashboards-reports-setup` |
+| Dashboards, reports, and War Rooms | `splunk-appdynamics-dashboards-reports-setup` |
+| ThousandEyes token, Dash Studio widgets, EUM metrics, TE native integration, and TE API assets | `splunk-appdynamics-thousandeyes-integration-setup` |
 | Tags, extensions, and integration modules | `splunk-appdynamics-tags-extensions-setup` |
 | Application Security Monitoring, Secure Application, and Observability for AI | `splunk-appdynamics-security-ai-setup` |
 | SAP Agent and SAP release notes | `splunk-appdynamics-sap-agent-setup` |
