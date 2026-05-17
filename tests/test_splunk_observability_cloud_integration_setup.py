@@ -477,12 +477,15 @@ def test_validate_secret_leak_scan_catches_injected_jwt(tmp_path: Path) -> None:
     assert "secret-looking content" in (result.stdout + result.stderr)
 
 
-def test_skill_is_registered_in_all_catalogs() -> None:
-    """README + AGENTS + CLAUDE catalog tables must include the skill row."""
+def test_skill_is_registered_in_operator_and_agent_catalogs() -> None:
+    """Generated operator catalog and agent context catalogs include the skill."""
     expected = "splunk-observability-cloud-integration-setup"
-    for doc in ("README.md", "AGENTS.md", "CLAUDE.md"):
+    for doc in ("SKILL_UX_CATALOG.md", "AGENTS.md", "CLAUDE.md"):
         text = (REPO_ROOT / doc).read_text(encoding="utf-8")
         assert f"`{expected}`" in text, f"{doc}: missing catalog row for {expected}"
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    assert "SKILL_UX_CATALOG.md" in readme
 
 
 def test_skill_has_real_cursor_symlink() -> None:

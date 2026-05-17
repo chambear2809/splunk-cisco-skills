@@ -49,16 +49,16 @@ modify role membership.
 ## Operator Handoffs
 
 - Preflight: search head/indexer sizing, KV Store, platform version, Splunk
-  Cloud vs Enterprise vs SHC path, restart requirement, usage-data notice,
+  Cloud vs Enterprise vs SHC path, restart requirement, usage data notice,
   restricted entitlement.
 - Post-install: restart, Post-install configuration, internal lookups,
   enrichment rules, `ari_admin`/`ari_analyst`, ARI capabilities.
 - Admin/data: company subnet and user directories, known/custom data sources,
-  event searches, data source activation, source priorities, field priorities,
-  field mappings, custom fields, discovery searches, saved filters, asset and
-  identity types, entity zones, ephemeral discovery, vulnerability key mode,
-  transparent federated-search mode, inventory retention, and data deletion
-  danger-zone review.
+  event searches, data source activation, data source priorities, field
+  priorities, field mappings, custom fields, discovery searches, saved filters,
+  asset and identity types, entity zones, ephemeral discovery, vulnerability
+  key mode, transparent federated-search mode, inventory retention, and data
+  deletion danger-zone review.
 - Risk/compliance: known/custom metrics, metric logic, metric split fields,
   metric exceptions, cybersecurity frameworks, risk scoring filters/rules,
   identity risk scoring, and risk processing settings.
@@ -68,9 +68,10 @@ modify role membership.
 - Investigation: asset, identity, IP, MAC, software, vulnerability, and subnet
   investigation; activity views; anomaly reports; attack surface explorer;
   notes; field reference.
-- Lifecycle: upgrade backup, disable processing searches, upgrade, rerun
-  post-install configuration, re-enable processing searches, browser cache/bump
-  guidance, and uninstall prerequisite to remove ES integration first.
+- Lifecycle: release notes review, upgrade backup, disable processing searches,
+  upgrade, rerun post-install configuration, re-enable processing searches,
+  browser cache/bump guidance, and uninstall prerequisite to remove ES
+  integration first.
 
 ## Enterprise Security Modes
 
@@ -98,7 +99,7 @@ Route Exposure Analytics implementation detail through
 
 ## Related Products
 
-ARI Technical Add-ons:
+ARI Add-ons (Technical Add-ons):
 
 - Windows: Splunkbase `7214`
 - Linux: Splunkbase `7416`

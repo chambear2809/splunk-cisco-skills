@@ -71,8 +71,9 @@ pre-commit run --all-files
 
 Hooks include trailing-whitespace, JSON/YAML validity, private-key detection,
 `bash -n` on every skill script, the Agent Skills frontmatter and
-progressive-disclosure contract, the repo-readiness check (catalog parity / symlinks),
-`generate_deployment_docs.py --check`, `ruff`, and `yamllint`. The full
+progressive-disclosure contract, the repo-readiness check (operator catalog links,
+agent catalog parity, and symlinks), `generate_deployment_docs.py --check`, `ruff`,
+and `yamllint`. The full
 pytest / bats / shellcheck suite is intentionally not in pre-commit: keep
 those in CI and in the explicit commands below for fast local feedback.
 
@@ -126,7 +127,10 @@ When adding a skill under `skills/<skill-name>/`, include:
 
 Also update:
 
-- `README.md`, `AGENTS.md`, and `CLAUDE.md` skill catalogs
+- `SKILL_UX_CATALOG.md` through its generator, plus `AGENTS.md` and
+  `CLAUDE.md` skill catalogs
+- `README.md` only when the operator entry flow, routing table, or repo-level
+  docs links change
 - `.cursor/skills/<skill-name>` symlink
 - `.claude/commands/<skill-name>.md`
 - `skills/shared/app_registry.json` when the skill maps to a Splunk app or
