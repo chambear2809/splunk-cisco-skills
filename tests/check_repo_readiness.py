@@ -185,7 +185,7 @@ def skill_names() -> list[str]:
 
 def catalog_skills(doc_path: Path) -> set[str]:
     text = doc_path.read_text(encoding="utf-8")
-    return set(re.findall(r"\| `([^`]+)` \|", text))
+    return set(re.findall(r"^\| `([^`]+)` \|", text, flags=re.MULTILINE))
 
 
 def iter_secret_doc_files() -> list[Path]:
@@ -209,7 +209,12 @@ def check_required_files(errors: list[str]) -> None:
 
 def check_catalog_sync(errors: list[str]) -> None:
     expected = set(skill_names())
-    for rel in ["README.md", "AGENTS.md", "CLAUDE.md"]:
+    readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    for required_link in ("SKILL_UX_CATALOG.md", "SKILL_REQUIREMENTS.md"):
+        if required_link not in readme_text:
+            errors.append(f"README.md: missing operator catalog link: {required_link}")
+
+    for rel in ["AGENTS.md", "CLAUDE.md"]:
         actual = catalog_skills(REPO_ROOT / rel)
         missing = sorted(expected - actual)
         extra = sorted(actual - expected)

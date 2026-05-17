@@ -24,12 +24,15 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertIn("setup.sh", skills["cisco-product-setup"]["scripts"])
         self.assertFalse(skills["cisco-product-setup"]["has_template"])
 
-    def test_readme_supported_skills_table_matches_skill_catalog(self) -> None:
+    def test_operator_catalog_matches_skill_catalog(self) -> None:
         readme = (core.REPO_ROOT / "README.md").read_text(encoding="utf-8")
-        readme_skills = set(re.findall(r"\| `([^`]+)` \|", readme))
+        self.assertIn("SKILL_UX_CATALOG.md", readme)
+
+        catalog = (core.REPO_ROOT / "SKILL_UX_CATALOG.md").read_text(encoding="utf-8")
+        catalog_doc_skills = set(re.findall(r"^\| `([^`]+)` \|", catalog, flags=re.MULTILINE))
         catalog_skills = {item["name"] for item in core.list_skills()["skills"]}
 
-        self.assertEqual(readme_skills, catalog_skills)
+        self.assertEqual(catalog_doc_skills, catalog_skills)
 
     def test_list_skills_exposes_references_directory(self) -> None:
         payload = core.list_skills()
