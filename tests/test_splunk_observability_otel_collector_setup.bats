@@ -201,6 +201,8 @@ make_mock_path() {
       --apply-k8s \
       --realm us0 \
       --cluster-name demo-cluster \
+      --platform-hec-url https://splunk.example.com:8088/services/collector \
+      --platform-hec-token-file "${HEC_TOKEN_FILE}" \
       --o11y-token-file "${O11Y_TOKEN_FILE}" \
       --allow-loose-token-perms \
       --output-dir "${output_dir}"
