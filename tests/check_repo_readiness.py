@@ -69,36 +69,95 @@ AGENT_SKILLS_CALLOUTS = {
     ],
 }
 
+LOCAL_ARTIFACT_ROOTS = [
+    "cisco-isovalent-platform-rendered",
+    "cisco-secure-email-web-gateway-rendered",
+    "cisco-thousandeyes-mcp-rendered",
+    "galileo-agent-control-rendered",
+    "galileo-platform-rendered",
+    "sc4s-rendered",
+    "sc4snmp-rendered",
+    "splunk-admin-doctor-rendered",
+    "splunk-agent-management-rendered",
+    "splunk-ai-ml-toolkit-rendered",
+    "splunk-appdynamics-setup-rendered",
+    "splunk-cloud-acs-allowlist-rendered",
+    "splunk-cloud-data-manager-rendered",
+    "splunk-connect-for-otlp-rendered",
+    "splunk-data-source-readiness-doctor-rendered",
+    "splunk-db-connect-rendered",
+    "splunk-deployment-server-rendered",
+    "splunk-edge-processor-rendered",
+    "splunk-enterprise-k8s-rendered",
+    "splunk-federated-search-rendered",
+    "splunk-hec-service-rendered",
+    "splunk-indexer-cluster-rendered",
+    "splunk-ingest-processor-rendered",
+    "splunk-license-manager-rendered",
+    "splunk-live-validation-runs",
+    "splunk-monitoring-console-rendered",
+    "splunk-observability-ai-agent-monitoring-rendered",
+    "splunk-observability-aws-integration-rendered",
+    "splunk-observability-aws-lambda-apm-rendered",
+    "splunk-observability-azure-integration-rendered",
+    "splunk-observability-cisco-ai-pod-rendered",
+    "splunk-observability-cisco-intersight-rendered",
+    "splunk-observability-cisco-nexus-rendered",
+    "splunk-observability-cloud-integration-rendered",
+    "splunk-observability-dashboard-rendered",
+    "splunk-observability-database-monitoring-rendered",
+    "splunk-observability-deep-native-rendered",
+    "splunk-observability-gcp-integration-rendered",
+    "splunk-observability-isovalent-rendered",
+    "splunk-observability-k8s-auto-instrumentation-rendered",
+    "splunk-observability-k8s-frontend-rum-rendered",
+    "splunk-observability-native-rendered",
+    "splunk-observability-nvidia-gpu-rendered",
+    "splunk-observability-otel-rendered",
+    "splunk-observability-thousandeyes-rendered",
+    "splunk-oncall-rendered",
+    "splunk-platform-pki-rendered",
+    "splunk-platform-restart-rendered",
+    "splunk-public-exposure-rendered",
+    "splunk-search-head-cluster-rendered",
+    "splunk-smartstore-rendered",
+    "splunk-soar-rendered",
+    "splunk-spl2-pipeline-kit-rendered",
+    "splunk-universal-forwarder-rendered",
+    "splunk-workload-management-rendered",
+    "ta-for-indexers-rendered",
+]
+
 TRACKED_ARTIFACT_PATTERNS = [
     re.compile(r"^credentials$"),
     re.compile(r"(^|/)template\.local$"),
-    re.compile(r"^sc4s-rendered/"),
-    re.compile(r"^sc4snmp-rendered/"),
-    re.compile(r"^splunk-agent-management-rendered/"),
-    re.compile(r"^splunk-admin-doctor-rendered/"),
-    re.compile(r"^splunk-data-source-readiness-doctor-rendered/"),
-    re.compile(r"^splunk-ingest-processor-rendered/"),
-    re.compile(r"^splunk-spl2-pipeline-kit-rendered/"),
-    re.compile(r"^splunk-workload-management-rendered/"),
-    re.compile(r"^splunk-hec-service-rendered/"),
-    re.compile(r"^splunk-federated-search-rendered/"),
-    re.compile(r"^splunk-smartstore-rendered/"),
-    re.compile(r"^splunk-monitoring-console-rendered/"),
-    re.compile(r"^splunk-universal-forwarder-rendered/"),
-    re.compile(r"^splunk-enterprise-k8s-rendered/"),
-    re.compile(r"^splunk-observability-otel-rendered/"),
-    re.compile(r"^splunk-observability-dashboard-rendered/"),
-    re.compile(r"^splunk-observability-cloud-integration-rendered/"),
-    re.compile(r"^splunk-observability-database-monitoring-rendered/"),
-    re.compile(r"^splunk-observability-aws-integration-rendered/"),
-    re.compile(r"^splunk-cloud-data-manager-rendered/"),
-    re.compile(r"^splunk-db-connect-rendered/"),
-    re.compile(r"^cisco-secure-email-web-gateway-rendered/"),
-    re.compile(r"^ta-for-indexers-rendered/"),
+    *[re.compile(rf"^{re.escape(root)}/") for root in LOCAL_ARTIFACT_ROOTS],
     re.compile(r"^splunk-mcp-rendered/(?!run-splunk-mcp\.js$)"),
     re.compile(r"^splunk-ta/_unpacked/"),
     re.compile(r"^splunk-ta/.*\.(?:tgz|tar\.gz|spl|rpm|deb|msi|dmg|pkg|txz|p5p|Z)$"),
     re.compile(r"^splunk-ta/\.latest-splunk-universal-forwarder-.*\.json$"),
+]
+
+REQUIRED_GITIGNORE_LINES = [
+    "credentials",
+    "**/template.local",
+    *[f"/{root}/" for root in LOCAL_ARTIFACT_ROOTS],
+    "/splunk-mcp-rendered/*",
+    "!/splunk-mcp-rendered/run-splunk-mcp.js",
+    "splunk-ta/_unpacked/",
+    "splunk-ta/*.tgz",
+    "splunk-ta/*.spl",
+    "splunk-ta/*.tar.gz",
+    "splunk-ta/*.rpm",
+    "splunk-ta/*.deb",
+    "splunk-ta/*.msi",
+    "splunk-ta/*.dmg",
+    "splunk-ta/*.pkg",
+    "splunk-ta/*.txz",
+    "splunk-ta/*.p5p",
+    "splunk-ta/*.Z",
+    "splunk-ta/.latest-splunk-enterprise-*.json",
+    "splunk-ta/.latest-splunk-universal-forwarder-*.json",
 ]
 
 
@@ -206,6 +265,26 @@ def check_no_tracked_local_artifacts(errors: list[str]) -> None:
             if pattern.search(rel):
                 errors.append(f"local/generated artifact is tracked: {rel}")
                 break
+
+
+def check_gitignore_local_artifacts(errors: list[str]) -> None:
+    gitignore_path = REPO_ROOT / ".gitignore"
+    lines = [
+        line.strip()
+        for line in gitignore_path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    line_set = set(lines)
+    for required in REQUIRED_GITIGNORE_LINES:
+        if required not in line_set:
+            errors.append(f".gitignore: missing local artifact ignore rule: {required}")
+
+    seen: dict[str, int] = {}
+    for lineno, line in enumerate(lines, start=1):
+        if line in seen:
+            errors.append(f".gitignore:{lineno}: duplicate ignore rule also appears at logical line {seen[line]}")
+        else:
+            seen[line] = lineno
 
 
 def check_secret_examples(errors: list[str]) -> None:
@@ -367,6 +446,7 @@ def main() -> int:
     check_skill_requirements_catalog(errors)
     check_cursor_and_claude_commands(errors)
     check_no_tracked_local_artifacts(errors)
+    check_gitignore_local_artifacts(errors)
     check_secret_examples(errors)
     check_smoke_script_no_sudo_password(errors)
     check_agent_skills_callouts(errors)
