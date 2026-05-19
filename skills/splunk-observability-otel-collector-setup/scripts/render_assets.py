@@ -5,9 +5,76 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shlex
 import shutil
+import tarfile
 from pathlib import Path
+
+
+TA_APP_ID = "7125"
+TA_LATEST_VERSION = "0.152.0"
+TA_PUBLISHED_DATE = "2026-05-14"
+TA_SPLUNK_MIN_VERSION = "8.0"
+TA_SPLUNK_MAX_VERSION = "10.3"
+TA_SUPPORTED_ROOTS = (
+    "Splunk_TA_otel",
+    "Splunk_TA_otel_linux_x86_64",
+    "Splunk_TA_otel_windows_x86_64",
+)
+TA_REQUIRED_FILES = (
+    "default/app.conf",
+    "default/inputs.conf",
+    "README/inputs.conf.spec",
+    "configs/agent_config.yaml",
+    "configs/gateway_config.yaml",
+)
+TA_PLATFORM_BINARIES = {
+    "linux-x86-64": "linux_x86_64/bin/Splunk_TA_otel",
+    "windows-x86-64": "windows_x86_64/bin/Splunk_TA_otel.exe",
+}
+SECRET_KEY_PATTERN = re.compile(r"(token|secret|password|api[_-]?key|access[_-]?key)", re.IGNORECASE)
+SECRET_ASSIGNMENT_PATTERN = re.compile(
+    r"(splunk_access_token|splunk_hec_token|access_token\s*=|token\s*=|password\s*=|secret\s*=|api[_-]?key\s*=|access[_-]?key\s*=)",
+    re.IGNORECASE,
+)
+SECRET_FLAG_PATTERN = re.compile(
+    r"^--?(splunk[-_])?(access[-_]?token|token|password|secret|api[-_]?key|access[-_]?key)(=|$)",
+    re.IGNORECASE,
+)
+TA_SPLUNKBASE_METADATA = {
+    "splunkbase_app_id": TA_APP_ID,
+    "name": "Splunk Add-On for OpenTelemetry Collector",
+    "latest_version": TA_LATEST_VERSION,
+    "published_date": TA_PUBLISHED_DATE,
+    "compatible_splunk_versions": {
+        "min": TA_SPLUNK_MIN_VERSION,
+        "max": TA_SPLUNK_MAX_VERSION,
+        "listed": [
+            "10.3",
+            "10.2",
+            "10.1",
+            "10.0",
+            "9.4",
+            "9.3",
+            "9.2",
+            "9.1",
+            "9.0",
+            "8.2",
+            "8.1",
+            "8.0",
+        ],
+    },
+    "splunk_enterprise_compatible": True,
+    "splunk_cloud_compatible": True,
+    "fips_compatible": False,
+    "fedramp_validated": False,
+    "sources": {
+        "splunkbase": "https://splunkbase.splunk.com/app/7125",
+        "docs_install": "https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/splunk-add-on-for-opentelemetry-collector/install-the-technical-add-on",
+        "upstream": "https://github.com/signalfx/splunk-otel-collector/tree/v0.152.0/packaging/ta-v2",
+    },
+}
 
 
 def str_bool(value: str) -> bool:
@@ -52,12 +119,54 @@ def bool_arg(parser: argparse.ArgumentParser, name: str, default: bool) -> None:
     )
 
 
+def version_tuple(value: str) -> tuple[int, ...]:
+    parts = [int(part) for part in re.findall(r"\d+", value)]
+    return tuple(parts[:3])
+
+
+def version_in_range(value: str, minimum: str, maximum: str) -> bool:
+    current = version_tuple(value)
+    low = version_tuple(minimum)
+    high = version_tuple(maximum)
+    if not current or not low or not high:
+        return False
+    lower_width = len(low)
+    upper_width = len(high)
+    current_for_low = (current + (0,) * lower_width)[:lower_width]
+    current_for_high = (current + (0,) * upper_width)[:upper_width]
+    return low <= current_for_low and current_for_high <= high
+
+
+def ta_effective_listen_interface(args: argparse.Namespace) -> str:
+    if args.ta_listen_interface:
+        return args.ta_listen_interface
+    if args.ta_mode == "gateway":
+        return "0.0.0.0"
+    return "localhost"
+
+
+def validate_ta_env(value: str) -> None:
+    if "=" not in value or value.startswith("="):
+        raise ValueError("expected KEY=VALUE")
+    key, env_value = value.split("=", 1)
+    if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+        raise ValueError("environment variable key must match [A-Za-z_][A-Za-z0-9_]*")
+    if SECRET_KEY_PATTERN.search(key) or SECRET_ASSIGNMENT_PATTERN.search(env_value):
+        raise ValueError("secret-like TA collector env values must not be rendered; use TA secret modes or runtime environment injection")
+
+
+def validate_ta_cmd_arg(value: str) -> None:
+    if SECRET_FLAG_PATTERN.search(value) or SECRET_ASSIGNMENT_PATTERN.search(value):
+        raise ValueError("secret-like TA collector command args must not be rendered")
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--realm", required=True)
     parser.add_argument("--render-k8s", action="store_true")
     parser.add_argument("--render-linux", action="store_true")
+    parser.add_argument("--render-ta", action="store_true")
     parser.add_argument("--render-platform-hec-helper", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")
@@ -147,6 +256,34 @@ def parse_args() -> argparse.Namespace:
         "--installer-url",
         default="https://dl.observability.splunkcloud.com/splunk-otel-collector.sh",
     )
+    parser.add_argument("--ta-target", choices=("deployment-server", "universal-forwarder"), default="deployment-server")
+    parser.add_argument("--ta-package-path", action="append", default=[])
+    parser.add_argument(
+        "--ta-package-flavor",
+        choices=("auto", "multi-os", "linux-x86-64", "windows-x86-64"),
+        default="auto",
+    )
+    parser.add_argument("--ta-mode", choices=("agent", "gateway", "agent-to-gateway"), default="agent")
+    parser.add_argument("--ta-listen-interface", default="")
+    parser.add_argument("--ta-gateway-url", default="")
+    parser.add_argument(
+        "--ta-collector-log-level",
+        choices=("error", "warn", "info", "debug"),
+        default="error",
+    )
+    parser.add_argument("--ta-collector-env", action="append", default=[])
+    parser.add_argument("--ta-collector-cmd-arg", action="append", default=[])
+    parser.add_argument("--ta-enable-opamp", action="store_true")
+    parser.add_argument("--splunk-version", default="")
+    parser.add_argument(
+        "--ta-secret-mode",
+        choices=("placeholder", "inputs-conf", "legacy-file", "environment"),
+        default="placeholder",
+    )
+    parser.add_argument("--accept-ta-token-in-conf", action="store_true")
+    parser.add_argument("--ta-fips-required", action="store_true")
+    parser.add_argument("--ta-fedramp-required", action="store_true")
+    parser.add_argument("--accept-ta-regulated-override", action="store_true")
 
     bool_arg(parser, "enable-metrics", True)
     bool_arg(parser, "enable-traces", True)
@@ -176,6 +313,33 @@ def parse_args() -> argparse.Namespace:
             f"--gateway-replicas must be >= 1 (got {replicas})"
         )
     args.gateway_replicas = str(replicas)
+    if args.ta_mode == "agent-to-gateway" and not args.ta_gateway_url:
+        parser.error("--ta-gateway-url is required when --ta-mode agent-to-gateway")
+    for env_value in args.ta_collector_env:
+        try:
+            validate_ta_env(env_value)
+        except ValueError as exc:
+            parser.error(f"--ta-collector-env {env_value!r}: {exc}")
+    for cmd_arg in args.ta_collector_cmd_arg:
+        try:
+            validate_ta_cmd_arg(cmd_arg)
+        except ValueError as exc:
+            parser.error(f"--ta-collector-cmd-arg {cmd_arg!r}: {exc}")
+    if args.splunk_version and not version_in_range(
+        args.splunk_version,
+        TA_SPLUNK_MIN_VERSION,
+        TA_SPLUNK_MAX_VERSION,
+    ):
+        parser.error(
+            f"--splunk-version {args.splunk_version} is outside app {TA_APP_ID} "
+            f"compatibility range {TA_SPLUNK_MIN_VERSION}-{TA_SPLUNK_MAX_VERSION}"
+        )
+    regulated_requested = args.ta_fips_required or args.ta_fedramp_required
+    if regulated_requested and not args.accept_ta_regulated_override:
+        parser.error(
+            "Splunkbase app 7125 is not FIPS-compatible or FedRAMP validated; "
+            "pass --accept-ta-regulated-override to render an explicit warning packet."
+        )
     return args
 
 
@@ -204,10 +368,18 @@ def rendered_plan(args: argparse.Namespace) -> dict[str, object]:
     if args.render_linux:
         linux_script = "install-ssh.sh" if args.execution == "ssh" else "install-local.sh"
         commands.append(f"bash {output_dir / 'linux' / linux_script}")
+    if args.render_ta:
+        commands.append(f"bash {output_dir / 'ta' / 'preflight-ta.sh'}")
+        commands.append(f"bash {output_dir / 'ta' / 'stage-ta-package.sh'}")
+        if args.ta_target == "deployment-server":
+            commands.append(f"bash {output_dir / 'ta' / 'apply-deployment-server.sh'}")
+        else:
+            commands.append(f"bash {output_dir / 'ta' / 'apply-local-uf.sh'}")
     return {
         "output_dir": str(output_dir),
         "render_k8s": args.render_k8s,
         "render_linux": args.render_linux,
+        "render_ta": args.render_ta,
         "render_platform_hec_helper": args.render_platform_hec_helper,
         "preparation_commands": preparation_commands,
         "apply_commands": commands,
@@ -271,6 +443,22 @@ def warnings(args: argparse.Namespace) -> list[str]:
     if str_bool(args.enable_obi):
         result.append(
             "OBI is enabled; confirm cluster or host privilege requirements before applying."
+        )
+    if args.render_ta and not args.ta_package_path:
+        result.append(
+            "TA rendering has no --ta-package-path; output uses generic app 7125 metadata and cannot stage packages until a .tgz is supplied."
+        )
+    if args.render_ta and args.ta_secret_mode == "placeholder":
+        result.append(
+            "TA token handling is placeholder-only; rendered local/inputs.conf.template intentionally omits token values."
+        )
+    if args.render_ta and args.ta_secret_mode == "environment":
+        result.append(
+            "TA environment secret mode requires the runtime environment to provide SPLUNK_ACCESS_TOKEN; Splunk conf does not store the token."
+        )
+    if args.render_ta and (args.ta_fips_required or args.ta_fedramp_required):
+        result.append(
+            "Regulated-environment override accepted for app 7125 even though Splunkbase metadata marks FIPS compatibility false and FedRAMP validation no."
         )
     return result
 
@@ -937,8 +1125,781 @@ Rendered HEC allowed indexes: `{hec_allowed_indexes(args)}`
     )
 
 
-def metadata(args: argparse.Namespace, output_dir: Path) -> dict[str, object]:
+def _normal_member_name(name: str) -> str:
+    normalized = name.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def _read_tar_text(tar: tarfile.TarFile, member_name: str) -> str:
+    extracted = tar.extractfile(member_name)
+    if extracted is None:
+        return ""
+    return extracted.read().decode("utf-8", errors="replace")
+
+
+def _parse_conf(text: str) -> tuple[list[str], dict[str, dict[str, str]]]:
+    stanzas: list[str] = []
+    fields: dict[str, dict[str, str]] = {}
+    current = ""
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        stanza_match = re.match(r"^\[([^\]]+)\]$", stripped)
+        if stanza_match:
+            current = stanza_match.group(1)
+            stanzas.append(current)
+            fields.setdefault(current, {})
+            continue
+        if current and "=" in stripped:
+            key, value = stripped.split("=", 1)
+            fields[current][key.strip()] = value.strip()
+    return stanzas, fields
+
+
+def _first_stanza_matching(stanzas: list[str], prefix: str) -> str:
+    for stanza in stanzas:
+        if stanza.startswith(prefix):
+            return stanza
+    return stanzas[0] if stanzas else ""
+
+
+def _extract_app_version(app_conf: str) -> str:
+    for pattern in (
+        r"(?ims)^\[launcher\].*?^\s*version\s*=\s*([^\s#]+)",
+        r"(?ims)^\[id\].*?^\s*version\s*=\s*([^\s#]+)",
+        r"(?im)^\s*version\s*=\s*([^\s#]+)",
+    ):
+        match = re.search(pattern, app_conf)
+        if match:
+            return match.group(1).strip()
+    return ""
+
+
+def _spec_rendered_stanza(spec_stanza: str) -> str:
+    if not spec_stanza or "://" not in spec_stanza:
+        return "Splunk_TA_otel://Splunk_TA_otel"
+    if "<name>" in spec_stanza:
+        return spec_stanza.replace("<name>", "Splunk_TA_otel")
+    return spec_stanza
+
+
+def _token_field_style(default_fields: dict[str, str], spec_fields: dict[str, str]) -> str:
+    fields = set(default_fields) | set(spec_fields)
+    if "splunk_access_token" in fields:
+        return "current"
+    if "splunk_access_token_file" in fields:
+        return "legacy-file"
+    return "unknown"
+
+
+def _flavor_from_os(supported_os: list[str]) -> str:
+    if supported_os == ["linux-x86-64"]:
+        return "linux-x86-64"
+    if supported_os == ["windows-x86-64"]:
+        return "windows-x86-64"
+    if supported_os == ["linux-x86-64", "windows-x86-64"]:
+        return "multi-os"
+    return "unknown"
+
+
+def _inspect_ta_package(package_path: str) -> dict[str, object]:
+    path = Path(package_path).expanduser()
+    if not path.is_file():
+        raise SystemExit(f"--ta-package-path does not exist or is not a file: {path}")
+    try:
+        tar = tarfile.open(path, "r:*")
+    except tarfile.TarError as exc:
+        raise SystemExit(f"--ta-package-path is not a readable tar archive: {path}: {exc}") from exc
+    with tar:
+        all_members = tar.getmembers()
+        for member in all_members:
+            name = _normal_member_name(member.name)
+            if name.startswith("/") or ".." in Path(name).parts:
+                raise SystemExit(f"unsafe TA package member path in --ta-package-path: {path}")
+            if not (member.isfile() or member.isdir()):
+                raise SystemExit(f"unsupported TA package member type in --ta-package-path: {member.name}")
+        members = [member for member in all_members if member.isfile()]
+        names = [_normal_member_name(member.name) for member in members]
+        member_by_name = dict(zip(names, members))
+        roots = [root for root in TA_SUPPORTED_ROOTS if any(name.startswith(f"{root}/") for name in names)]
+        if not roots:
+            raise SystemExit(
+                f"{path} does not contain a supported app root. Expected one of: {', '.join(TA_SUPPORTED_ROOTS)}"
+            )
+        for name in (_normal_member_name(member.name) for member in all_members):
+            if not name or name == ".":
+                continue
+            top_level = Path(name).parts[0]
+            if top_level not in roots:
+                raise SystemExit(f"{path} contains an unsupported top-level TA package member: {name}")
+        app_root = roots[0]
+        relative_names = {
+            name[len(app_root) + 1 :]
+            for name in names
+            if name.startswith(f"{app_root}/")
+        }
+        missing = [relative for relative in TA_REQUIRED_FILES if relative not in relative_names]
+        supported_os = [
+            flavor
+            for flavor, binary in TA_PLATFORM_BINARIES.items()
+            if binary in relative_names
+        ]
+        binary_missing = []
+        if app_root.endswith("_linux_x86_64") and "linux-x86-64" not in supported_os:
+            binary_missing.append(TA_PLATFORM_BINARIES["linux-x86-64"])
+        elif app_root.endswith("_windows_x86_64") and "windows-x86-64" not in supported_os:
+            binary_missing.append(TA_PLATFORM_BINARIES["windows-x86-64"])
+        elif app_root == "Splunk_TA_otel" and not supported_os:
+            binary_missing.extend(TA_PLATFORM_BINARIES.values())
+        if missing or binary_missing:
+            problems = missing + binary_missing
+            raise SystemExit(f"{path} is missing required TA files: {', '.join(problems)}")
+
+        def text(relative: str) -> str:
+            return _read_tar_text(tar, member_by_name[f"{app_root}/{relative}"].name)
+
+        default_inputs = text("default/inputs.conf")
+        spec = text("README/inputs.conf.spec")
+        app_conf = text("default/app.conf")
+        default_stanzas, default_fields_by_stanza = _parse_conf(default_inputs)
+        spec_stanzas, spec_fields_by_stanza = _parse_conf(spec)
+        default_stanza = _first_stanza_matching(default_stanzas, "Splunk_TA_otel")
+        spec_stanza = _first_stanza_matching(spec_stanzas, "Splunk_TA_otel://")
+        rendered_stanza = _spec_rendered_stanza(spec_stanza)
+        default_fields = default_fields_by_stanza.get(default_stanza, {})
+        spec_fields = spec_fields_by_stanza.get(spec_stanza, {})
+        token_style = _token_field_style(default_fields, spec_fields)
+        supported_os = sorted(supported_os)
+        flavor = _flavor_from_os(supported_os)
+        return {
+            "path": str(path),
+            "app_root": app_root,
+            "version": _extract_app_version(app_conf),
+            "package_flavor": flavor,
+            "supported_os": supported_os,
+            "token_field_style": token_style,
+            "default_stanza": default_stanza,
+            "spec_stanza": spec_stanza,
+            "rendered_stanza": rendered_stanza,
+            "stanza_mismatch": default_stanza != rendered_stanza,
+            "default_fields": default_fields,
+            "spec_fields": spec_fields,
+            "config_files": {
+                "agent": "configs/agent_config.yaml" in relative_names,
+                "gateway": "configs/gateway_config.yaml" in relative_names,
+            },
+            "platform_binaries": {
+                "linux_x86_64": TA_PLATFORM_BINARIES["linux-x86-64"] in relative_names,
+                "windows_x86_64": TA_PLATFORM_BINARIES["windows-x86-64"] in relative_names,
+            },
+        }
+
+
+def _redact_conf_fields(fields: dict[str, str]) -> dict[str, str]:
+    redacted: dict[str, str] = {}
+    for key, value in fields.items():
+        redacted[key] = "__REDACTED_SECRET_FIELD__" if SECRET_KEY_PATTERN.search(key) else value
+    return redacted
+
+
+def _metadata_safe_package(package: dict[str, object]) -> dict[str, object]:
+    safe = dict(package)
+    safe["default_fields"] = _redact_conf_fields(dict(package.get("default_fields", {})))
+    safe["spec_fields"] = _redact_conf_fields(dict(package.get("spec_fields", {})))
+    return safe
+
+
+def _generic_ta_package() -> dict[str, object]:
     return {
+        "path": "",
+        "app_root": "Splunk_TA_otel",
+        "version": TA_LATEST_VERSION,
+        "package_flavor": "unknown",
+        "supported_os": [],
+        "token_field_style": "current",
+        "default_stanza": "Splunk_TA_otel",
+        "spec_stanza": "Splunk_TA_otel://<name>",
+        "rendered_stanza": "Splunk_TA_otel://Splunk_TA_otel",
+        "stanza_mismatch": True,
+        "default_fields": {},
+        "spec_fields": {
+            "splunk_access_token": "<value>",
+            "splunk_realm": "<value>",
+            "splunk_config": "<value>",
+            "splunk_collector_log_level": "<value>",
+            "splunk_collector_env_vars": "<value>",
+            "splunk_collector_cmd_args": "<value>",
+        },
+        "config_files": {"agent": True, "gateway": True},
+        "platform_binaries": {"linux_x86_64": False, "windows_x86_64": False},
+    }
+
+
+def inspect_ta_packages(args: argparse.Namespace) -> list[dict[str, object]]:
+    packages = [_inspect_ta_package(package_path) for package_path in args.ta_package_path]
+    if not packages:
+        packages = [_generic_ta_package()]
+    if args.ta_package_flavor != "auto":
+        for package in packages:
+            flavor = package["package_flavor"]
+            if flavor != "unknown" and flavor != args.ta_package_flavor:
+                raise SystemExit(
+                    f"{package['path']} flavor is {flavor}, not requested --ta-package-flavor {args.ta_package_flavor}"
+                )
+    for package in packages:
+        token_style = package["token_field_style"]
+        if args.ta_secret_mode == "legacy-file" and token_style not in ("legacy-file", "unknown"):
+            raise SystemExit(
+                f"{package['path'] or package['app_root']} uses splunk_access_token, not legacy splunk_access_token_file."
+            )
+        if args.ta_secret_mode == "inputs-conf" and token_style == "legacy-file":
+            raise SystemExit(
+                f"{package['path']} uses legacy splunk_access_token_file; use --ta-secret-mode legacy-file."
+            )
+    return packages
+
+
+def _percent_encode_env_value(value: str) -> str:
+    return value.replace("%", "%25").replace(",", "%2C")
+
+
+def ta_env_vars(args: argparse.Namespace) -> list[str]:
+    values = [f"SPLUNK_LISTEN_INTERFACE={ta_effective_listen_interface(args)}"]
+    if args.ta_mode == "agent-to-gateway":
+        values.append(f"SPLUNK_GATEWAY_URL={args.ta_gateway_url}")
+    for env_value in args.ta_collector_env:
+        key, value = env_value.split("=", 1)
+        values.append(f"{key}={_percent_encode_env_value(value)}")
+    return values
+
+
+def ta_cmd_args(args: argparse.Namespace) -> list[str]:
+    values = list(args.ta_collector_cmd_arg)
+    if args.ta_enable_opamp:
+        values.append("--feature-gates=+splunk.opamp.enabled")
+    return values
+
+
+def ta_config_path(args: argparse.Namespace, app_root: str) -> str:
+    if args.ta_mode == "gateway":
+        return f"$SPLUNK_HOME/etc/apps/{app_root}/configs/gateway_config.yaml"
+    if args.ta_mode == "agent-to-gateway":
+        return f"$SPLUNK_HOME/etc/apps/{app_root}/local/agent_to_gateway_config.yaml"
+    return f"$SPLUNK_HOME/etc/apps/{app_root}/configs/agent_config.yaml"
+
+
+def render_ta_inputs_conf_template(args: argparse.Namespace, package: dict[str, object]) -> str:
+    app_root = str(package["app_root"])
+    token_style = str(package["token_field_style"])
+    if token_style == "unknown":
+        token_style = "legacy-file" if args.ta_secret_mode == "legacy-file" else "current"
+    fields = dict(package.get("default_fields", {}))
+    lines = [
+        "# Generated by splunk-observability-otel-collector-setup.",
+        "# Token values are intentionally omitted during render.",
+        f"[{package['rendered_stanza']}]",
+        "disabled = false",
+        "start_by_shell = false",
+        f"interval = {fields.get('interval', '0') or '0'}",
+        f"index = {fields.get('index', '_internal') or '_internal'}",
+        f"sourcetype = {fields.get('sourcetype', 'Splunk_TA_otel') or 'Splunk_TA_otel'}",
+    ]
+    if token_style == "legacy-file":
+        lines.append(f"splunk_access_token_file = $SPLUNK_HOME/etc/apps/{app_root}/local/access_token")
+    elif args.ta_secret_mode == "environment":
+        lines.append("splunk_access_token = ${SPLUNK_ACCESS_TOKEN}")
+    elif args.ta_secret_mode == "inputs-conf":
+        lines.append("splunk_access_token = __SPLUNK_O11Y_ACCESS_TOKEN__")
+    else:
+        lines.append("splunk_access_token =")
+    lines.extend(
+        [
+            f"splunk_realm = {args.realm}",
+            f"splunk_config = {ta_config_path(args, app_root)}",
+            f"splunk_collector_log_level = {args.ta_collector_log_level}",
+            f"splunk_collector_env_vars = {','.join(ta_env_vars(args))}",
+            f"splunk_collector_cmd_args = {shlex.join(ta_cmd_args(args))}",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def render_agent_to_gateway_config(args: argparse.Namespace) -> str:
+    listen = ta_effective_listen_interface(args)
+    return f"""# Generated by splunk-observability-otel-collector-setup.
+# This fallback config receives local OTLP and forwards metrics, traces, and logs
+# to a gateway collector at {args.ta_gateway_url}.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: {listen}:4317
+      http:
+        endpoint: {listen}:4318
+
+exporters:
+  otlp:
+    endpoint: {args.ta_gateway_url}
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      exporters: [otlp]
+"""
+
+
+def ta_package_audit_md(args: argparse.Namespace, packages: list[dict[str, object]]) -> str:
+    lines = [
+        "# Splunk Add-On for OpenTelemetry Collector Package Audit",
+        "",
+        f"Splunkbase app: `{TA_APP_ID}`",
+        f"Latest audited release: `{TA_LATEST_VERSION}` ({TA_PUBLISHED_DATE})",
+        f"Splunk compatibility: `{TA_SPLUNK_MIN_VERSION}` through `{TA_SPLUNK_MAX_VERSION}`",
+        "Cloud-compatible: `true`",
+        "FIPS-compatible: `false`",
+        "FedRAMP validated: `false`",
+        "",
+    ]
+    for index, package in enumerate(packages, start=1):
+        lines.extend(
+            [
+                f"## Package {index}",
+                "",
+                f"- Path: `{package['path'] or '(not supplied)'}`",
+                f"- App root: `{package['app_root']}`",
+                f"- App version: `{package['version'] or '(not found)'}`",
+                f"- Package flavor: `{package['package_flavor']}`",
+                f"- Supported OS: `{', '.join(package['supported_os']) or '(not detected)'}`",
+                f"- Token field style: `{package['token_field_style']}`",
+                f"- Packaged default stanza: `{package['default_stanza']}`",
+                f"- Spec stanza: `{package['spec_stanza']}`",
+                f"- Rendered stanza: `{package['rendered_stanza']}`",
+                f"- Stanza mismatch: `{str(package['stanza_mismatch']).lower()}`",
+                f"- Agent config present: `{str(package['config_files']['agent']).lower()}`",
+                f"- Gateway config present: `{str(package['config_files']['gateway']).lower()}`",
+                f"- Linux binary present: `{str(package['platform_binaries']['linux_x86_64']).lower()}`",
+                f"- Windows binary present: `{str(package['platform_binaries']['windows_x86_64']).lower()}`",
+                "",
+            ]
+        )
+    if args.splunk_version:
+        lines.extend(
+            [
+                "## Splunk Version Check",
+                "",
+                f"- Requested Splunk version: `{args.splunk_version}`",
+                "- Result: `compatible`",
+                "",
+            ]
+        )
+    return "\n".join(lines)
+
+
+def ta_metadata(args: argparse.Namespace, packages: list[dict[str, object]]) -> dict[str, object]:
+    return {
+        "splunkbase": TA_SPLUNKBASE_METADATA,
+        "target": args.ta_target,
+        "mode": args.ta_mode,
+        "listen_interface": ta_effective_listen_interface(args),
+        "gateway_url": args.ta_gateway_url,
+        "collector_log_level": args.ta_collector_log_level,
+        "collector_env": ta_env_vars(args),
+        "collector_cmd_args": ta_cmd_args(args),
+        "secret_mode": args.ta_secret_mode,
+        "token_in_conf_accepted": args.accept_ta_token_in_conf,
+        "regulated_requirements": {
+            "fips_required": args.ta_fips_required,
+            "fedramp_required": args.ta_fedramp_required,
+            "override_accepted": args.accept_ta_regulated_override,
+        },
+        "packages": [_metadata_safe_package(package) for package in packages],
+    }
+
+
+def render_ta_shell_array(name: str, values: list[str]) -> str:
+    return bash_array(name, values)
+
+
+def render_ta_overlay_function(args: argparse.Namespace, packages: list[dict[str, object]], target_expr: str) -> str:
+    app_roots = [str(package["app_root"]) for package in packages if package["path"]]
+    token_file = args.o11y_token_file or "/path/to/splunk_o11y_access_token"
+    return f"""
+script_dir="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+TOKEN_FILE="${{SPLUNK_O11Y_TOKEN_FILE:-{shell_quote(token_file)}}}"
+TA_SECRET_MODE="${{SPLUNK_OTEL_TA_SECRET_MODE:-{args.ta_secret_mode}}}"
+ACCEPT_TA_TOKEN_IN_CONF="${{ACCEPT_TA_TOKEN_IN_CONF:-{str(args.accept_ta_token_in_conf).lower()}}}"
+target_base={target_expr}
+
+{render_ta_shell_array("app_roots", app_roots)}
+
+copy_local_overlay() {{
+    local app_root="$1"
+    local template="${{script_dir}}/local/${{app_root}}/inputs.conf.template"
+    if [[ ! -f "${{template}}" ]]; then
+        template="${{script_dir}}/local/inputs.conf.template"
+    fi
+    local app_dir="${{target_base}}/${{app_root}}"
+    local local_dir="${{app_dir}}/local"
+    mkdir -p "${{local_dir}}"
+    case "${{TA_SECRET_MODE}}" in
+        inputs-conf)
+            if [[ "${{ACCEPT_TA_TOKEN_IN_CONF}}" != "true" ]]; then
+                echo "ERROR: Writing splunk_access_token into local/inputs.conf requires ACCEPT_TA_TOKEN_IN_CONF=true." >&2
+                exit 1
+            fi
+            if [[ ! -r "${{TOKEN_FILE}}" ]]; then
+                echo "ERROR: Token file is not readable: ${{TOKEN_FILE}}" >&2
+                exit 1
+            fi
+            python3 - "${{template}}" "${{local_dir}}/inputs.conf" "${{TOKEN_FILE}}" <<'PY'
+from pathlib import Path
+import sys
+
+template = Path(sys.argv[1])
+target = Path(sys.argv[2])
+token_file = Path(sys.argv[3])
+token = token_file.read_text(encoding="utf-8").strip()
+text = template.read_text(encoding="utf-8").replace("__SPLUNK_O11Y_ACCESS_TOKEN__", token)
+target.write_text(text, encoding="utf-8")
+PY
+            chmod 600 "${{local_dir}}/inputs.conf"
+            ;;
+        legacy-file)
+            cp "${{template}}" "${{local_dir}}/inputs.conf"
+            if [[ ! -r "${{TOKEN_FILE}}" ]]; then
+                echo "ERROR: Token file is not readable: ${{TOKEN_FILE}}" >&2
+                exit 1
+            fi
+            cp "${{TOKEN_FILE}}" "${{local_dir}}/access_token"
+            chmod 600 "${{local_dir}}/access_token"
+            ;;
+        placeholder|environment)
+            cp "${{template}}" "${{local_dir}}/inputs.conf"
+            ;;
+        *)
+            echo "ERROR: Unsupported TA secret mode: ${{TA_SECRET_MODE}}" >&2
+            exit 1
+            ;;
+    esac
+    if [[ -f "${{script_dir}}/local/${{app_root}}/agent_to_gateway_config.yaml" ]]; then
+        cp "${{script_dir}}/local/${{app_root}}/agent_to_gateway_config.yaml" "${{local_dir}}/agent_to_gateway_config.yaml"
+    fi
+}}
+
+for app_root in "${{app_roots[@]}}"; do
+    copy_local_overlay "${{app_root}}"
+done
+"""
+
+
+def render_ta_scripts(args: argparse.Namespace, ta_dir: Path, packages: list[dict[str, object]]) -> None:
+    package_paths = [str(package["path"]) for package in packages if package["path"]]
+    app_roots = [str(package["app_root"]) for package in packages if package["path"]]
+    supported_roots = ", ".join(repr(root) for root in TA_SUPPORTED_ROOTS)
+    write_text(
+        ta_dir / "preflight-ta.sh",
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+{render_ta_shell_array("packages", package_paths)}
+{render_ta_shell_array("app_roots", app_roots)}
+
+if [[ "${{#packages[@]}}" -eq 0 ]]; then
+    echo "ERROR: No TA packages were supplied. Re-render with --ta-package-path PATH." >&2
+    exit 1
+fi
+for package in "${{packages[@]}}"; do
+    [[ -r "${{package}}" ]] || {{ echo "ERROR: TA package is not readable: ${{package}}" >&2; exit 1; }}
+    python3 - "${{package}}" <<'PY'
+from pathlib import Path
+import sys
+import tarfile
+
+package = Path(sys.argv[1])
+supported_roots = ({supported_roots},)
+try:
+    with tarfile.open(package, "r:*") as archive:
+        names = []
+        for member in archive.getmembers():
+            name = member.name.replace("\\\\", "/")
+            while name.startswith("./"):
+                name = name[2:]
+            parts = Path(name).parts
+            if name.startswith("/") or ".." in parts:
+                raise SystemExit(f"ERROR: unsafe TA package member path: {{member.name}}")
+            if not (member.isfile() or member.isdir()):
+                raise SystemExit(f"ERROR: unsupported TA package member type: {{member.name}}")
+            names.append(name)
+        package_roots = [
+            root
+            for root in supported_roots
+            if any(name == root or name.startswith(root + "/") for name in names)
+        ]
+        if not package_roots:
+            raise SystemExit("ERROR: TA package does not contain a supported Splunk_TA_otel app root.")
+        for name in names:
+            if not name or name == ".":
+                continue
+            top_level = Path(name).parts[0]
+            if top_level not in package_roots:
+                raise SystemExit(f"ERROR: unsupported top-level TA package member: {{name}}")
+except tarfile.TarError as exc:
+    raise SystemExit(f"ERROR: unreadable TA package archive: {{package}}: {{exc}}") from exc
+PY
+done
+echo "TA package preflight passed for ${{#packages[@]}} package(s): ${{app_roots[*]}}"
+""",
+        executable=True,
+    )
+    target_expr = '"${SPLUNK_DEPLOYMENT_APPS:-${SPLUNK_HOME:-/opt/splunk}/etc/deployment-apps}"'
+    if args.ta_target == "universal-forwarder":
+        target_expr = '"${SPLUNK_APPS_DIR:-${SPLUNK_HOME:-/opt/splunkforwarder}/etc/apps}"'
+    write_text(
+        ta_dir / "stage-ta-package.sh",
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+{render_ta_shell_array("packages", package_paths)}
+target_base={target_expr}
+
+if [[ "${{#packages[@]}}" -eq 0 ]]; then
+    echo "ERROR: No TA packages were supplied. Re-render with --ta-package-path PATH." >&2
+    exit 1
+fi
+mkdir -p "${{target_base}}"
+for package in "${{packages[@]}}"; do
+    python3 - "${{package}}" "${{target_base}}" <<'PY'
+from pathlib import Path
+import os
+import shutil
+import sys
+import tarfile
+
+package = Path(sys.argv[1])
+target = Path(sys.argv[2]).resolve()
+supported_roots = ({supported_roots},)
+
+try:
+    with tarfile.open(package, "r:*") as archive:
+        members = archive.getmembers()
+        normalized = []
+        for member in members:
+            name = member.name.replace("\\\\", "/")
+            while name.startswith("./"):
+                name = name[2:]
+            parts = Path(name).parts
+            if name.startswith("/") or ".." in parts:
+                raise SystemExit(f"ERROR: unsafe TA package member path: {{member.name}}")
+            if not (member.isfile() or member.isdir()):
+                raise SystemExit(f"ERROR: unsupported TA package member type: {{member.name}}")
+            if name:
+                normalized.append((member, name))
+        names = [name for _, name in normalized]
+        package_roots = [
+            root
+            for root in supported_roots
+            if any(name == root or name.startswith(root + "/") for name in names)
+        ]
+        if not package_roots:
+            raise SystemExit("ERROR: TA package does not contain a supported Splunk_TA_otel app root.")
+        for name in names:
+            if not name or name == ".":
+                continue
+            top_level = Path(name).parts[0]
+            if top_level not in package_roots:
+                raise SystemExit(f"ERROR: unsupported top-level TA package member: {{name}}")
+        target.mkdir(parents=True, exist_ok=True)
+        for member, name in normalized:
+            destination = (target / name).resolve()
+            if destination != target and target not in destination.parents:
+                raise SystemExit(f"ERROR: TA package member escapes target directory: {{member.name}}")
+            if member.isdir():
+                destination.mkdir(parents=True, exist_ok=True)
+                continue
+            source = archive.extractfile(member)
+            if source is None:
+                raise SystemExit(f"ERROR: could not read TA package member: {{member.name}}")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with source, destination.open("wb") as handle:
+                shutil.copyfileobj(source, handle)
+            os.chmod(destination, member.mode & 0o777)
+except tarfile.TarError as exc:
+    raise SystemExit(f"ERROR: unreadable TA package archive: {{package}}: {{exc}}") from exc
+PY
+done
+echo "Staged Splunk_TA_otel package(s) into ${{target_base}}"
+""",
+        executable=True,
+    )
+    deployment_target_expr = '"${SPLUNK_DEPLOYMENT_APPS:-${SPLUNK_HOME:-/opt/splunk}/etc/deployment-apps}"'
+    write_text(
+        ta_dir / "apply-deployment-server.sh",
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+{render_ta_overlay_function(args, packages, deployment_target_expr)}
+echo "Applied TA local overlays under ${{target_base}}."
+echo "Render server classes with: bash agent-management/render-serverclass-handoff.sh"
+echo "Reload and inspect deployment server with splunk-deployment-server-setup after review."
+""",
+        executable=True,
+    )
+    uf_target_expr = '"${SPLUNK_APPS_DIR:-${SPLUNK_HOME:-/opt/splunkforwarder}/etc/apps}"'
+    write_text(
+        ta_dir / "apply-local-uf.sh",
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+{render_ta_overlay_function(args, packages, uf_target_expr)}
+echo "Applied TA local overlays under ${{target_base}}."
+echo "Use splunk-universal-forwarder-setup for UF install/enrollment and restart planning."
+""",
+        executable=True,
+    )
+    write_text(
+        ta_dir / "status-ta.sh",
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+{render_ta_shell_array("app_roots", app_roots)}
+
+SPLUNK_HOME="${{SPLUNK_HOME:-/opt/splunk}}"
+if [[ -x "${{SPLUNK_HOME}}/bin/splunk" ]]; then
+    if [[ "${{#app_roots[@]}}" -eq 0 ]]; then
+        app_roots=(Splunk_TA_otel)
+    fi
+    for app_root in "${{app_roots[@]}}"; do
+        "${{SPLUNK_HOME}}/bin/splunk" btool inputs list "${{app_root}}" --debug || true
+        "${{SPLUNK_HOME}}/bin/splunk" btool inputs list "Splunk_TA_otel://Splunk_TA_otel" --debug || true
+        "${{SPLUNK_HOME}}/bin/splunk" list app "${{app_root}}" || true
+    done
+else
+    echo "WARN: ${{SPLUNK_HOME}}/bin/splunk is not executable; set SPLUNK_HOME and rerun."
+fi
+""",
+        executable=True,
+    )
+    agent_dir = ta_dir / "agent-management"
+    agent_setup = Path(__file__).resolve().parents[3] / "skills/splunk-agent-management-setup/scripts/setup.sh"
+    handoff_lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        'script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"',
+        'deployment_apps="${SPLUNK_DEPLOYMENT_APPS:-${SPLUNK_HOME:-/opt/splunk}/etc/deployment-apps}"',
+        "",
+    ]
+    for app_root in app_roots:
+        handoff_lines.extend(
+            [
+                f"bash {shell_quote(str(agent_setup))} \\",
+                "  --mode agent-manager \\",
+                "  --phase render \\",
+                "  --serverclass-name splunk_otel_ta_forwarders \\",
+                f"  --deployment-app-name {shell_quote(app_root)} \\",
+                f"  --app-source-dir \"${{deployment_apps}}/{app_root}\" \\",
+                f"  --output-dir \"${{script_dir}}/rendered-{app_root}\"",
+                "",
+            ]
+        )
+    write_text(agent_dir / "render-serverclass-handoff.sh", "\n".join(handoff_lines), executable=True)
+
+
+def render_ta(args: argparse.Namespace, output_dir: Path) -> None:
+    ta_dir = output_dir / "ta"
+    if ta_dir.exists():
+        shutil.rmtree(ta_dir)
+    ta_dir.mkdir(parents=True, exist_ok=True)
+    local_dir = ta_dir / "local"
+    local_dir.mkdir(parents=True, exist_ok=True)
+
+    packages = inspect_ta_packages(args)
+    for index, package in enumerate(packages):
+        template = render_ta_inputs_conf_template(args, package)
+        app_root = str(package["app_root"])
+        package_local = local_dir / app_root
+        package_local.mkdir(parents=True, exist_ok=True)
+        write_text(package_local / "inputs.conf.template", template)
+        if index == 0:
+            write_text(local_dir / "inputs.conf.template", template)
+        if args.ta_mode == "agent-to-gateway":
+            write_text(package_local / "agent_to_gateway_config.yaml", render_agent_to_gateway_config(args))
+            if index == 0:
+                write_text(local_dir / "agent_to_gateway_config.yaml", render_agent_to_gateway_config(args))
+
+    render_ta_scripts(args, ta_dir, packages)
+    write_text(ta_dir / "package-audit.md", ta_package_audit_md(args, packages))
+    write_text(ta_dir / "metadata.json", json.dumps(ta_metadata(args, packages), indent=2, sort_keys=True) + "\n")
+    if args.ta_fips_required or args.ta_fedramp_required:
+        write_text(
+            ta_dir / "regulated-environment-warning.md",
+            f"""# Regulated Environment Warning
+
+Splunkbase app `{TA_APP_ID}` metadata is not FIPS-compatible and is not FedRAMP
+validated. This packet was rendered only because
+`--accept-ta-regulated-override` was supplied.
+
+- FIPS required: `{str(args.ta_fips_required).lower()}`
+- FedRAMP required: `{str(args.ta_fedramp_required).lower()}`
+- Override accepted: `{str(args.accept_ta_regulated_override).lower()}`
+""",
+        )
+    write_text(
+        ta_dir / "README.md",
+        f"""# Splunk Add-On for OpenTelemetry Collector
+
+This folder renders reviewable assets for Splunkbase app `{TA_APP_ID}`.
+
+Rendered target: `{args.ta_target}`
+Rendered mode: `{args.ta_mode}`
+Rendered secret mode: `{args.ta_secret_mode}`
+
+Review `package-audit.md`, `metadata.json`, and `local/inputs.conf.template`.
+
+Apply sequence after review:
+
+```bash
+bash preflight-ta.sh
+bash stage-ta-package.sh
+```
+
+For deployment server targets, continue with:
+
+```bash
+bash apply-deployment-server.sh
+bash agent-management/render-serverclass-handoff.sh
+```
+
+For local Universal Forwarder targets, continue with:
+
+```bash
+bash apply-local-uf.sh
+```
+
+Use `splunk-deployment-server-setup` for deployment-server reload/health and
+`splunk-universal-forwarder-setup` for UF install or enrollment. Use
+`splunk-hec-service-setup` only when overriding `SPLUNK_HEC_URL` or
+`SPLUNK_HEC_TOKEN` for Splunk Platform HEC logs; otherwise this TA keeps the
+current Observability log-ingest defaults.
+""",
+    )
+
+
+def metadata(args: argparse.Namespace, output_dir: Path) -> dict[str, object]:
+    result: dict[str, object] = {
         "skill": "splunk-observability-otel-collector-setup",
         "realm": args.realm,
         "kubernetes": {
@@ -986,6 +1947,18 @@ def metadata(args: argparse.Namespace, output_dir: Path) -> dict[str, object]:
         },
         "warnings": warnings(args),
     }
+    if args.render_ta:
+        ta_metadata_path = output_dir / "ta" / "metadata.json"
+        if ta_metadata_path.is_file():
+            result["technical_addon"] = json.loads(ta_metadata_path.read_text(encoding="utf-8"))
+        else:
+            result["technical_addon"] = {
+                "splunkbase": TA_SPLUNKBASE_METADATA,
+                "target": args.ta_target,
+                "mode": args.ta_mode,
+                "secret_mode": args.ta_secret_mode,
+            }
+    return result
 
 
 def main() -> int:
@@ -1014,6 +1987,8 @@ def main() -> int:
         render_k8s(args, output_dir)
     if args.render_linux:
         render_linux(args, output_dir)
+    if args.render_ta:
+        render_ta(args, output_dir)
     write_text(output_dir / "metadata.json", json.dumps(metadata(args, output_dir), indent=2, sort_keys=True) + "\n")
     print(f"Rendered Splunk Observability OTel Collector assets to {output_dir}")
     for warning in warnings(args):

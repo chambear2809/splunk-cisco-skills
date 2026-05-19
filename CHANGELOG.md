@@ -74,7 +74,7 @@ release section when cutting a release.
   - `splunk-edge-processor-setup` (Edge Processor instances + control plane,
     Linux install via systemd / no-systemd / Docker, multi-instance scale-out,
     source types / destinations / SPL2 pipelines, apply orchestration).
-  - `splunk-cloud-acs-allowlist-setup` (Splunk Cloud ACS IP allowlist
+  - `splunk-cloud-acs-admin-setup` (Splunk Cloud ACS IP allowlist
     management for all seven features with IPv4 and IPv6, subnet limit
     preflight, ACS lock-out protection, drift detection, optional Terraform
     emission).

@@ -407,7 +407,7 @@ adjacent skill's behaviour on top.
 | [splunk-mcp-server-setup](../splunk-mcp-server-setup/SKILL.md) | MCP server install + token issuance | MCP `mcp.conf [server] ssl_verify=true` aligns with the new trust anchor |
 | [splunk-edge-processor-setup](../splunk-edge-processor-setup/SKILL.md) | EP control-plane object, instance install, pipelines | EP cert profile (RSA + ECDSA) + REST upload helper when `--include-edge-processor=true` |
 | [splunk-enterprise-host-setup](../splunk-enterprise-host-setup/SKILL.md) | Splunk host install / cluster bootstrap | Unblocks the v1 "TLS certificate generation — out of scope" gap noted in its [reference.md](../splunk-enterprise-host-setup/reference.md) lines 49–55 |
-| [splunk-cloud-acs-allowlist-setup](../splunk-cloud-acs-allowlist-setup/SKILL.md) | Splunk Cloud ACS IP allowlists | Out of scope — this skill is on-prem only; the Splunk Cloud HEC custom-domain BYOC handoff lives in `handoff/splunk-cloud-byoc.md` |
+| [splunk-cloud-acs-admin-setup](../splunk-cloud-acs-admin-setup/SKILL.md) | Splunk Cloud ACS IP allowlists | Out of scope — this skill is on-prem only; the Splunk Cloud HEC custom-domain BYOC handoff lives in `handoff/splunk-cloud-byoc.md` |
 
 ## TLS algorithm presets
 

@@ -42,7 +42,7 @@ READ_ONLY_MODE_FLAGS = (
     "--validate",
 )
 ONPREM_LIVE_MODE_EXCLUDED_SKILLS = {
-    "splunk-cloud-acs-allowlist-setup",
+    "splunk-cloud-acs-admin-setup",
 }
 SPLUNK_REST_TIMEOUT_SECONDS = 90
 

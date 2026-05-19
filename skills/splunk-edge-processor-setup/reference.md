@@ -130,7 +130,7 @@ a Splunk Cloud destination, the EP instances' egress IPs must be on the
 matching ACS allowlist. The skill emits a stub at
 `handoffs/acs-allowlist.json` listing every EP instance host (the operator
 expands each to its `/32` egress IP) targeting the appropriate features. The
-operator promotes the stub into a `splunk-cloud-acs-allowlist-setup` plan and
+operator promotes the stub into a `splunk-cloud-acs-admin-setup` plan and
 applies it before the destination becomes reachable.
 
 ## Out of Scope

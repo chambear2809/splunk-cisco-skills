@@ -96,4 +96,4 @@ allowlist before the SIM Add-on account can connect to the HEC receiver.
 When `sim_addon.victoria_stack_hec_allowlist_handoff: auto`, the skill
 detects the Victoria stack from ACS metadata and renders an
 `apply-acs-allowlist-hec.sh` stub that delegates to
-`splunk-cloud-acs-allowlist-setup --features hec`.
+`splunk-cloud-acs-admin-setup --features hec`.

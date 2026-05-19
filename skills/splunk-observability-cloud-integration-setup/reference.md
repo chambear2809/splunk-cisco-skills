@@ -70,7 +70,7 @@ and Splunk Enterprise documentation:
 - Splunk Cloud Platform Victoria stacks require the search-head IP to be
   added to the `hec` allowlist before the SIM Add-on account can connect to
   the HEC receiver — the renderer hands this off to
-  `splunk-cloud-acs-allowlist-setup`.
+  `splunk-cloud-acs-admin-setup`.
 - ACS observability commands accept an optional `--o11y-realm` flag for
   paired non-default realms. The pairing token must be a Splunk
   Observability Cloud admin token; the SIM Add-on org token can be a

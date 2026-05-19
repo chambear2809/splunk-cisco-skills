@@ -20,8 +20,10 @@ Usage:
 Modes:
   --render-k8s                  Render Kubernetes Helm assets
   --render-linux                Render Linux installer assets
+  --render-ta                   Render Splunkbase 7125 TA deployment assets
   --apply-k8s                   Render and apply Kubernetes assets
   --apply-linux                 Render and apply Linux assets
+  --apply-ta                    Render and apply Splunkbase 7125 TA assets
   --dry-run                     Show the plan without writing or applying
   --json                        Emit JSON dry-run output
 
@@ -119,6 +121,26 @@ Linux options:
   --obi-install-dir PATH        OBI install directory
   --installer-url URL           Linux installer URL
 
+Splunk Add-On for OpenTelemetry Collector (Splunkbase 7125):
+  --ta-target deployment-server|universal-forwarder
+                                TA runtime target (default: deployment-server)
+  --ta-package-path PATH        Splunkbase 7125 .tgz package; may be repeated
+  --ta-package-flavor auto|multi-os|linux-x86-64|windows-x86-64
+  --ta-mode agent|gateway|agent-to-gateway
+  --ta-listen-interface ADDR    Default is localhost for agent, 0.0.0.0 for gateway
+  --ta-gateway-url HOST:PORT    Required for --ta-mode agent-to-gateway
+  --ta-collector-log-level error|warn|info|debug
+  --ta-collector-env KEY=VALUE  Extra collector env var; may be repeated
+  --ta-collector-cmd-arg ARG    Extra collector command arg; may be repeated
+  --ta-enable-opamp             Add --feature-gates=+splunk.opamp.enabled
+  --splunk-version VERSION      Check version against app 7125 compatibility
+  --ta-secret-mode placeholder|inputs-conf|legacy-file|environment
+  --accept-ta-token-in-conf     Required before apply writes token into inputs.conf
+  --ta-fips-required            Refuse unless --accept-ta-regulated-override is set
+  --ta-fedramp-required         Refuse unless --accept-ta-regulated-override is set
+  --accept-ta-regulated-override
+                                Render warning packet for unsupported regulated target
+
 Other:
   --output-dir DIR              Rendered output directory
   --all-signals                 Re-enable default signal options
@@ -129,7 +151,7 @@ Other:
   --disable-autoinstrumentation
   --help                        Show this help
 
-Direct token flags such as --access-token, --o11y-token, --hec-token, and --platform-hec-token are rejected.
+Direct token flags such as --access-token, --o11y-token, --hec-token, --platform-hec-token, and --ta-access-token are rejected.
 EOF
 }
 
@@ -163,9 +185,11 @@ PY
 
 RENDER_K8S=false
 RENDER_LINUX=false
+RENDER_TA=false
 RENDER_PLATFORM_HEC_HELPER=false
 APPLY_K8S=false
 APPLY_LINUX=false
+APPLY_TA=false
 DRY_RUN=false
 JSON_OUTPUT=false
 
@@ -247,6 +271,23 @@ OBI_VERSION=""
 OBI_INSTALL_DIR=""
 INSTALLER_URL="https://dl.observability.splunkcloud.com/splunk-otel-collector.sh"
 
+TA_TARGET="deployment-server"
+TA_PACKAGE_PATHS=()
+TA_PACKAGE_FLAVOR="auto"
+TA_MODE="agent"
+TA_LISTEN_INTERFACE=""
+TA_GATEWAY_URL=""
+TA_COLLECTOR_LOG_LEVEL="error"
+TA_COLLECTOR_ENVS=()
+TA_COLLECTOR_CMD_ARGS=()
+TA_ENABLE_OPAMP=false
+SPLUNK_VERSION=""
+TA_SECRET_MODE="placeholder"
+ACCEPT_TA_TOKEN_IN_CONF=false
+TA_FIPS_REQUIRED=false
+TA_FEDRAMP_REQUIRED=false
+ACCEPT_TA_REGULATED_OVERRIDE=false
+
 ENABLE_METRICS=true
 ENABLE_TRACES=true
 ENABLE_LOGS=true
@@ -270,8 +311,10 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --render-k8s) RENDER_K8S=true; shift ;;
         --render-linux) RENDER_LINUX=true; shift ;;
+        --render-ta) RENDER_TA=true; shift ;;
         --apply-k8s) APPLY_K8S=true; RENDER_K8S=true; shift ;;
         --apply-linux) APPLY_LINUX=true; RENDER_LINUX=true; shift ;;
+        --apply-ta) APPLY_TA=true; RENDER_TA=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --realm) require_arg "$1" "$#" || exit 1; REALM="$2"; shift 2 ;;
@@ -349,6 +392,22 @@ while [[ $# -gt 0 ]]; do
         --obi-version) require_arg "$1" "$#" || exit 1; OBI_VERSION="$2"; shift 2 ;;
         --obi-install-dir) require_arg "$1" "$#" || exit 1; OBI_INSTALL_DIR="$2"; shift 2 ;;
         --installer-url) require_arg "$1" "$#" || exit 1; INSTALLER_URL="$2"; shift 2 ;;
+        --ta-target) require_arg "$1" "$#" || exit 1; TA_TARGET="$2"; shift 2 ;;
+        --ta-package-path) require_arg "$1" "$#" || exit 1; TA_PACKAGE_PATHS+=("$2"); shift 2 ;;
+        --ta-package-flavor) require_arg "$1" "$#" || exit 1; TA_PACKAGE_FLAVOR="$2"; shift 2 ;;
+        --ta-mode) require_arg "$1" "$#" || exit 1; TA_MODE="$2"; shift 2 ;;
+        --ta-listen-interface) require_arg "$1" "$#" || exit 1; TA_LISTEN_INTERFACE="$2"; shift 2 ;;
+        --ta-gateway-url) require_arg "$1" "$#" || exit 1; TA_GATEWAY_URL="$2"; shift 2 ;;
+        --ta-collector-log-level) require_arg "$1" "$#" || exit 1; TA_COLLECTOR_LOG_LEVEL="$2"; shift 2 ;;
+        --ta-collector-env) require_arg "$1" "$#" || exit 1; TA_COLLECTOR_ENVS+=("$2"); shift 2 ;;
+        --ta-collector-cmd-arg) require_arg "$1" "$#" || exit 1; TA_COLLECTOR_CMD_ARGS+=("$2"); shift 2 ;;
+        --ta-enable-opamp) TA_ENABLE_OPAMP=true; shift ;;
+        --splunk-version) require_arg "$1" "$#" || exit 1; SPLUNK_VERSION="$2"; shift 2 ;;
+        --ta-secret-mode) require_arg "$1" "$#" || exit 1; TA_SECRET_MODE="$2"; shift 2 ;;
+        --accept-ta-token-in-conf) ACCEPT_TA_TOKEN_IN_CONF=true; shift ;;
+        --ta-fips-required) TA_FIPS_REQUIRED=true; shift ;;
+        --ta-fedramp-required) TA_FEDRAMP_REQUIRED=true; shift ;;
+        --accept-ta-regulated-override) ACCEPT_TA_REGULATED_OVERRIDE=true; shift ;;
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --all-signals)
             ENABLE_METRICS=true
@@ -385,6 +444,10 @@ while [[ $# -gt 0 ]]; do
             reject_secret_arg "$1" "--platform-hec-token-file"
             exit 1
             ;;
+        --ta-access-token|--splunk-access-token|--otel-ta-access-token)
+            reject_secret_arg "$1" "--o11y-token-file"
+            exit 1
+            ;;
         --help|-h)
             usage
             exit 0
@@ -399,7 +462,7 @@ done
 
 OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
 
-if [[ "${RENDER_K8S}" != "true" && "${RENDER_LINUX}" != "true" && "${RENDER_PLATFORM_HEC_HELPER}" != "true" && "${APPLY_K8S}" != "true" && "${APPLY_LINUX}" != "true" ]]; then
+if [[ "${RENDER_K8S}" != "true" && "${RENDER_LINUX}" != "true" && "${RENDER_TA}" != "true" && "${RENDER_PLATFORM_HEC_HELPER}" != "true" && "${APPLY_K8S}" != "true" && "${APPLY_LINUX}" != "true" && "${APPLY_TA}" != "true" ]]; then
     RENDER_K8S=true
     RENDER_LINUX=true
 fi
@@ -424,6 +487,69 @@ if [[ "${RENDER_PLATFORM_HEC_HELPER}" == "true" && -z "${PLATFORM_HEC_TOKEN_FILE
     PLATFORM_HEC_TOKEN_FILE="${OUTPUT_DIR}/platform-hec/.splunk_platform_hec_token"
 fi
 
+case "${TA_TARGET}" in
+    deployment-server|universal-forwarder) ;;
+    *)
+        log "ERROR: --ta-target must be deployment-server or universal-forwarder."
+        exit 1
+        ;;
+esac
+
+case "${TA_PACKAGE_FLAVOR}" in
+    auto|multi-os|linux-x86-64|windows-x86-64) ;;
+    *)
+        log "ERROR: --ta-package-flavor must be auto, multi-os, linux-x86-64, or windows-x86-64."
+        exit 1
+        ;;
+esac
+
+case "${TA_MODE}" in
+    agent|gateway|agent-to-gateway) ;;
+    *)
+        log "ERROR: --ta-mode must be agent, gateway, or agent-to-gateway."
+        exit 1
+        ;;
+esac
+
+case "${TA_COLLECTOR_LOG_LEVEL}" in
+    error|warn|info|debug) ;;
+    *)
+        log "ERROR: --ta-collector-log-level must be error, warn, info, or debug."
+        exit 1
+        ;;
+esac
+
+case "${TA_SECRET_MODE}" in
+    placeholder|inputs-conf|legacy-file|environment) ;;
+    *)
+        log "ERROR: --ta-secret-mode must be placeholder, inputs-conf, legacy-file, or environment."
+        exit 1
+        ;;
+esac
+
+if [[ "${TA_MODE}" == "agent-to-gateway" && -z "${TA_GATEWAY_URL}" ]]; then
+    log "ERROR: --ta-gateway-url is required when --ta-mode agent-to-gateway."
+    exit 1
+fi
+
+for ta_env in "${TA_COLLECTOR_ENVS[@]}"; do
+    if [[ ! "${ta_env}" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+        log "ERROR: --ta-collector-env must be KEY=VALUE with a shell-style environment key."
+        exit 1
+    fi
+done
+
+if [[ ("${TA_FIPS_REQUIRED}" == "true" || "${TA_FEDRAMP_REQUIRED}" == "true") && "${ACCEPT_TA_REGULATED_OVERRIDE}" != "true" ]]; then
+    log "ERROR: Splunkbase app 7125 metadata is not FIPS-compatible or FedRAMP validated."
+    log "       Pass --accept-ta-regulated-override to render a warning packet."
+    exit 1
+fi
+
+if [[ "${APPLY_TA}" == "true" && "${#TA_PACKAGE_PATHS[@]}" -eq 0 ]]; then
+    log "ERROR: --apply-ta requires at least one --ta-package-path."
+    exit 1
+fi
+
 if [[ -n "${PLATFORM_HEC_URL}" && -z "${PLATFORM_HEC_TOKEN_FILE}" ]]; then
     log "ERROR: --platform-hec-url requires --platform-hec-token-file."
     exit 1
@@ -432,6 +558,24 @@ fi
 if [[ "${APPLY_K8S}" == "true" || "${APPLY_LINUX}" == "true" ]]; then
     if [[ -z "${O11Y_TOKEN_FILE}" || ! -r "${O11Y_TOKEN_FILE}" ]]; then
         log "ERROR: Apply requires a readable --o11y-token-file."
+        exit 1
+    fi
+fi
+
+if [[ "${APPLY_TA}" == "true" && "${TA_SECRET_MODE}" == "inputs-conf" ]]; then
+    if [[ "${ACCEPT_TA_TOKEN_IN_CONF}" != "true" ]]; then
+        log "ERROR: --apply-ta with --ta-secret-mode inputs-conf requires --accept-ta-token-in-conf."
+        exit 1
+    fi
+    if [[ -z "${O11Y_TOKEN_FILE}" || ! -r "${O11Y_TOKEN_FILE}" ]]; then
+        log "ERROR: --apply-ta with --ta-secret-mode inputs-conf requires a readable --o11y-token-file."
+        exit 1
+    fi
+fi
+
+if [[ "${APPLY_TA}" == "true" && "${TA_SECRET_MODE}" == "legacy-file" ]]; then
+    if [[ -z "${O11Y_TOKEN_FILE}" || ! -r "${O11Y_TOKEN_FILE}" ]]; then
+        log "ERROR: --apply-ta with --ta-secret-mode legacy-file requires a readable --o11y-token-file."
         exit 1
     fi
 fi
@@ -479,7 +623,7 @@ _check_token_perms() {
     return 0
 }
 
-if [[ "${APPLY_K8S}" == "true" || "${APPLY_LINUX}" == "true" ]]; then
+if [[ "${APPLY_K8S}" == "true" || "${APPLY_LINUX}" == "true" || ( "${APPLY_TA}" == "true" && ( "${TA_SECRET_MODE}" == "inputs-conf" || "${TA_SECRET_MODE}" == "legacy-file" ) ) ]]; then
     _check_token_perms "--o11y-token-file" "${O11Y_TOKEN_FILE}" || exit 1
     if [[ -n "${PLATFORM_HEC_TOKEN_FILE}" ]]; then
         _check_token_perms "--platform-hec-token-file" "${PLATFORM_HEC_TOKEN_FILE}" || exit 1
@@ -647,6 +791,14 @@ RENDER_ARGS=(
     --obi-version "${OBI_VERSION}"
     --obi-install-dir "${OBI_INSTALL_DIR}"
     --installer-url "${INSTALLER_URL}"
+    --ta-target "${TA_TARGET}"
+    --ta-package-flavor "${TA_PACKAGE_FLAVOR}"
+    --ta-mode "${TA_MODE}"
+    --ta-listen-interface "${TA_LISTEN_INTERFACE}"
+    --ta-gateway-url "${TA_GATEWAY_URL}"
+    --ta-collector-log-level "${TA_COLLECTOR_LOG_LEVEL}"
+    --splunk-version "${SPLUNK_VERSION}"
+    --ta-secret-mode "${TA_SECRET_MODE}"
     --enable-metrics "$(bool_text "${ENABLE_METRICS}")"
     --enable-traces "$(bool_text "${ENABLE_TRACES}")"
     --enable-logs "$(bool_text "${ENABLE_LOGS}")"
@@ -661,6 +813,15 @@ RENDER_ARGS=(
     --enable-certmanager "$(bool_text "${ENABLE_CERTMANAGER}")"
     --enable-secure-app "$(bool_text "${ENABLE_SECURE_APP}")"
 )
+for ta_package_path in "${TA_PACKAGE_PATHS[@]}"; do
+    RENDER_ARGS+=(--ta-package-path "${ta_package_path}")
+done
+for ta_collector_env in "${TA_COLLECTOR_ENVS[@]}"; do
+    RENDER_ARGS+=(--ta-collector-env "${ta_collector_env}")
+done
+for ta_collector_cmd_arg in "${TA_COLLECTOR_CMD_ARGS[@]}"; do
+    RENDER_ARGS+=("--ta-collector-cmd-arg=${ta_collector_cmd_arg}")
+done
 for extra_values_file in "${EXTRA_VALUES_FILES[@]}"; do
     RENDER_ARGS+=(--extra-values-file "${extra_values_file}")
 done
@@ -671,8 +832,26 @@ fi
 if [[ "${RENDER_LINUX}" == "true" ]]; then
     RENDER_ARGS+=(--render-linux)
 fi
+if [[ "${RENDER_TA}" == "true" ]]; then
+    RENDER_ARGS+=(--render-ta)
+fi
 if [[ "${RENDER_PLATFORM_HEC_HELPER}" == "true" ]]; then
     RENDER_ARGS+=(--render-platform-hec-helper)
+fi
+if [[ "${TA_ENABLE_OPAMP}" == "true" ]]; then
+    RENDER_ARGS+=(--ta-enable-opamp)
+fi
+if [[ "${ACCEPT_TA_TOKEN_IN_CONF}" == "true" ]]; then
+    RENDER_ARGS+=(--accept-ta-token-in-conf)
+fi
+if [[ "${TA_FIPS_REQUIRED}" == "true" ]]; then
+    RENDER_ARGS+=(--ta-fips-required)
+fi
+if [[ "${TA_FEDRAMP_REQUIRED}" == "true" ]]; then
+    RENDER_ARGS+=(--ta-fedramp-required)
+fi
+if [[ "${ACCEPT_TA_REGULATED_OVERRIDE}" == "true" ]]; then
+    RENDER_ARGS+=(--accept-ta-regulated-override)
 fi
 if [[ "${DRY_RUN}" == "true" ]]; then
     RENDER_ARGS+=(--dry-run)
@@ -717,5 +896,15 @@ if [[ "${APPLY_LINUX}" == "true" ]]; then
         run_rendered_script "${OUTPUT_DIR}/linux/install-ssh.sh"
     else
         run_rendered_script "${OUTPUT_DIR}/linux/install-local.sh"
+    fi
+fi
+
+if [[ "${APPLY_TA}" == "true" ]]; then
+    run_rendered_script "${OUTPUT_DIR}/ta/preflight-ta.sh"
+    run_rendered_script "${OUTPUT_DIR}/ta/stage-ta-package.sh"
+    if [[ "${TA_TARGET}" == "deployment-server" ]]; then
+        run_rendered_script "${OUTPUT_DIR}/ta/apply-deployment-server.sh"
+    else
+        run_rendered_script "${OUTPUT_DIR}/ta/apply-local-uf.sh"
     fi
 fi

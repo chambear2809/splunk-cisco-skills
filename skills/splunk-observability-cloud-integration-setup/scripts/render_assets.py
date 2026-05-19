@@ -534,7 +534,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
         coverage["log_observer_connect.role"] = {"status": "api_apply", "notes": "Splunk authorize REST: create LOC role with caps + indexes + limits."}
         coverage["log_observer_connect.workload"] = {"status": "api_apply", "notes": "Splunk workload-management REST: create runtime>5m abort rule."}
         if target == "cloud":
-            coverage["log_observer_connect.allowlist"] = {"status": "handoff", "notes": "Delegate LOC realm IPs to splunk-cloud-acs-allowlist-setup --features search-api."}
+            coverage["log_observer_connect.allowlist"] = {"status": "handoff", "notes": "Delegate LOC realm IPs to splunk-cloud-acs-admin-setup --features search-api."}
             coverage["log_observer_connect.tls_cert"] = {"status": "not_applicable", "notes": "TLS-cert paste path is SE-only."}
         else:
             coverage["log_observer_connect.allowlist"] = {"status": "handoff", "notes": "SE customers manage their own firewall; rendered IPs are advisory."}
@@ -569,7 +569,7 @@ def coverage_for(spec: dict[str, Any]) -> dict[str, dict[str, str]]:
             "notes": f"SIM Add-on UCC custom REST handler: modular-input create x{len(sim.get('modular_inputs') or [])}.",
         }
         if target == "cloud":
-            coverage["sim_addon.victoria_hec"] = {"status": "handoff", "notes": "Delegate Victoria-stack search-head HEC allowlist to splunk-cloud-acs-allowlist-setup --features hec."}
+            coverage["sim_addon.victoria_hec"] = {"status": "handoff", "notes": "Delegate Victoria-stack search-head HEC allowlist to splunk-cloud-acs-admin-setup --features hec."}
         else:
             coverage["sim_addon.victoria_hec"] = {"status": "not_applicable", "notes": "Victoria-stack carve-out is Splunk Cloud Platform only."}
         coverage["sim_addon.itsi_pack"] = {
@@ -1026,10 +1026,10 @@ def section_loc(spec: dict[str, Any]) -> str:
             lines.append(f"- `{ip}`")
         lines.extend([
             "",
-            "Handed off to `splunk-cloud-acs-allowlist-setup`:",
+            "Handed off to `splunk-cloud-acs-admin-setup`:",
             "",
             "```bash",
-            "bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh \\",
+            "bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\",
             "  --phase render \\",
             "  --features search-api \\",
             f"  --search-api-subnets {','.join(ips)}",
@@ -1158,10 +1158,10 @@ def section_sim_addon(spec: dict[str, Any]) -> str:
     if target == "cloud" and sim.get("victoria_stack_hec_allowlist_handoff") in ("auto", True):
         lines.extend([
             "",
-            "Splunk Cloud Victoria stacks require the search-head IP in the `hec` allowlist before the SIM Add-on can connect to the HEC receiver. Handed off to `splunk-cloud-acs-allowlist-setup`:",
+            "Splunk Cloud Victoria stacks require the search-head IP in the `hec` allowlist before the SIM Add-on can connect to the HEC receiver. Handed off to `splunk-cloud-acs-admin-setup`:",
             "",
             "```bash",
-            "bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh \\",
+            "bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\",
             "  --phase render \\",
             "  --features hec",
             "```",
@@ -1214,7 +1214,7 @@ def section_handoff(spec: dict[str, Any]) -> str:
             "## ACS Log Observer Connect search-api allowlist",
             "",
             "```bash",
-            "bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh \\",
+            "bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\",
             "  --phase render --features search-api \\",
             f"  --search-api-subnets {','.join(ips)}",
             "```",
@@ -1225,7 +1225,7 @@ def section_handoff(spec: dict[str, Any]) -> str:
             "## ACS Splunk Cloud Victoria-stack HEC allowlist",
             "",
             "```bash",
-            "bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh \\",
+            "bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\",
             "  --phase render --features hec",
             "```",
         ])
@@ -1485,8 +1485,8 @@ def handoff_script_acs_loc(spec: dict[str, Any]) -> str:
     realm = spec["realm"]
     ips = LOC_REALM_IPS.get(realm, [])
     return SHEBANG + (
-        "# Log Observer Connect realm-IP allowlist handoff to splunk-cloud-acs-allowlist-setup.\n"
-        "exec bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh \\\n"
+        "# Log Observer Connect realm-IP allowlist handoff to splunk-cloud-acs-admin-setup.\n"
+        "exec bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\\n"
         "  --phase render --features search-api \\\n"
         f"  --search-api-subnets {','.join(ips) or '<no-realm-ips>'} \"$@\"\n"
     )
@@ -1494,8 +1494,8 @@ def handoff_script_acs_loc(spec: dict[str, Any]) -> str:
 
 def handoff_script_acs_hec() -> str:
     return SHEBANG + (
-        "# Splunk Cloud Victoria-stack HEC allowlist handoff to splunk-cloud-acs-allowlist-setup.\n"
-        "exec bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh \\\n"
+        "# Splunk Cloud Victoria-stack HEC allowlist handoff to splunk-cloud-acs-admin-setup.\n"
+        "exec bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \\\n"
         "  --phase render --features hec \"$@\"\n"
     )
 

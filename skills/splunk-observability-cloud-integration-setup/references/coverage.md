@@ -13,7 +13,7 @@ Cloud integration. Every spec section emits one of the coverage values below.
   Observability UI link.
 - `handoff` — cross-skill orchestration; the skill emits a script that
   delegates to another skill (`splunk-app-install`,
-  `splunk-cloud-acs-allowlist-setup`, `splunk-itsi-config`, ...).
+  `splunk-cloud-acs-admin-setup`, `splunk-itsi-config`, ...).
 - `install_apply` — the skill installs or configures a Splunk-side companion
   app or saved search via Splunkbase + REST.
 - `not_applicable` — the section does not apply to the chosen target (UID on
@@ -41,7 +41,7 @@ Cloud integration. Every spec section emits one of the coverage values below.
 | `log_observer_connect.user`     | `api_apply`        | Splunk users REST (create + role assign).                                          |
 | `log_observer_connect.role`     | `api_apply`        | Splunk authorize REST (role create with caps + indexes + limits).                  |
 | `log_observer_connect.workload` | `api_apply`        | Splunk workload-management REST (workload rule create).                            |
-| `log_observer_connect.allowlist` | `handoff`          | Delegates to `splunk-cloud-acs-allowlist-setup --features search-api`.             |
+| `log_observer_connect.allowlist` | `handoff`          | Delegates to `splunk-cloud-acs-admin-setup --features search-api`.             |
 | `log_observer_connect.wizard`   | `deeplink`         | O11y > Settings > Log Observer connections > Add new connection.                   |
 | `dashboard_studio_o11y.default` | `api_validate`     | Discover app + Splunk REST read of default-connection state.                       |
 | `dashboard_studio_o11y.sample`  | `api_apply`        | Splunk Dashboard Studio dashboard create REST.                                     |
@@ -49,7 +49,7 @@ Cloud integration. Every spec section emits one of the coverage values below.
 | `sim_addon.index`               | `api_apply`        | Splunk indexes REST (or ACS indexes on Cloud).                                     |
 | `sim_addon.account`             | `api_apply`        | SIM Add-on UCC custom REST handler (account create + check connection + enable).   |
 | `sim_addon.modular_inputs`      | `api_apply`        | SIM Add-on UCC custom REST handler (modular input create with curated SignalFlow). |
-| `sim_addon.victoria_hec`        | `handoff`          | Delegates to `splunk-cloud-acs-allowlist-setup --features hec`.                    |
+| `sim_addon.victoria_hec`        | `handoff`          | Delegates to `splunk-cloud-acs-admin-setup --features hec`.                    |
 | `sim_addon.itsi_pack`           | `handoff`          | Delegates to `splunk-itsi-config` for the Content Pack for Splunk Observability.   |
 
 ## Enterprise Target Coverage
@@ -103,5 +103,5 @@ These adjacent surfaces are intentionally NOT in this skill:
 - AppDynamics Log Observer Connect — separate AppDynamics SaaS workflow;
   outside the scope of the Splunk Platform <-> O11y pairing.
 - Splunk Cloud Platform IP allowlist administration — handled by
-  `splunk-cloud-acs-allowlist-setup`. This skill renders the deltas it
+  `splunk-cloud-acs-admin-setup`. This skill renders the deltas it
   needs (LOC realm IPs and Victoria-stack HEC) and hands off there.

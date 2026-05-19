@@ -244,13 +244,13 @@
         "https://research.splunk.com/sources/platforms/linux/"
       ],
       "match": {
-        "app_names": ["Splunk_TA_nix", "Splunk_TA_linux"],
+        "app_names": ["Splunk_TA_nix", "Splunk_TA_Linux"],
         "products": ["Unix and Linux", "Linux"],
         "names": ["Linux Secure", "Linux Auditd"],
-        "sourcetypes": ["linux_secure", "auditd"]
+        "sourcetypes": ["linux_secure", "auditd", "linux_audit", "linux:audit"]
       },
       "defaults": {
-        "expected_sourcetypes": ["linux_secure", "auditd"],
+        "expected_sourcetypes": ["linux_secure", "auditd", "linux_audit", "linux:audit"],
         "cim.expected_models": ["Authentication", "Change", "Endpoint"],
         "cim.required_fields": ["action", "user", "src", "dest", "process"],
         "itsi.expected_content_packs": ["Unix and Linux"],
@@ -266,7 +266,7 @@
           "relevant_event_filter": "host=* OR user=*"
         }
       },
-      "handoffs": ["splunk-universal-forwarder-setup", "splunk-enterprise-security-config", "splunk-itsi-config"],
+      "handoffs": ["splunk-supported-addons-setup", "splunk-universal-forwarder-setup", "splunk-enterprise-security-config", "splunk-itsi-config"],
       "collection_searches": [
         {
           "id": "linux-auth-activity",

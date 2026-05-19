@@ -66,6 +66,7 @@ projects/tmp-*
 /splunk-appdynamics-setup-rendered/
 /splunk-live-validation-runs/
 /splunk-cloud-acs-allowlist-rendered/
+/splunk-cloud-acs-admin-rendered/
 /splunk-cloud-data-manager-rendered/
 /splunk-connect-for-otlp-rendered/
 /splunk-data-source-readiness-doctor-rendered/

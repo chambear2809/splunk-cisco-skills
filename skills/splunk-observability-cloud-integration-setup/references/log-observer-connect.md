@@ -15,7 +15,7 @@ no-code UI. The logs stay in Splunk; LOC does not store or index them.
 ## Splunk Cloud Platform Realm IPs (search-api allowlist)
 
 The skill renders these as `--search-api-subnets` for the
-`splunk-cloud-acs-allowlist-setup` handoff. Operators can hand the resulting
+`splunk-cloud-acs-admin-setup` handoff. Operators can hand the resulting
 ACS allowlist scripts to their Splunk Cloud Platform admin team for change
 management.
 
@@ -72,7 +72,7 @@ The runtime threshold defaults to 300 seconds; tune via
    runs the rendered apply script (or `setup.sh --apply log_observer_connect`).
 2. The skill creates the role + user via Splunk REST and the workload rule
    via the workload-management REST.
-3. The skill calls `splunk-cloud-acs-allowlist-setup` to add the realm IPs
+3. The skill calls `splunk-cloud-acs-admin-setup` to add the realm IPs
    to the `search-api` allowlist (operator must approve `--apply` there).
 4. The operator opens Splunk Observability Cloud > Settings > Log Observer
    connections > Add new connection > Splunk Cloud Platform; pastes the

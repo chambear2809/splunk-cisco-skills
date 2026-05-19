@@ -207,7 +207,7 @@ def test_handoff_references_partner_skills(tmp_path: Path) -> None:
     renderer.render(spec, tmp_path)
     handoff = (tmp_path / "09-handoff.md").read_text()
     assert "skills/splunk-app-install" in handoff
-    assert "skills/splunk-cloud-acs-allowlist-setup" in handoff
+    assert "skills/splunk-cloud-acs-admin-setup" in handoff
     assert "skills/splunk-itsi-config" in handoff
     assert "skills/splunk-observability-otel-collector-setup" in handoff
     assert "skills/splunk-oncall-setup" in handoff

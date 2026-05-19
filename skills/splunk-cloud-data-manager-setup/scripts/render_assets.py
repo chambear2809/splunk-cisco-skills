@@ -998,7 +998,7 @@ def render_doctor(findings: list[dict[str, str]]) -> str:
 ## Common Fix Handoffs
 
 - Missing HEC/index prerequisites: use `splunk-hec-service-setup`.
-- Search API or Data Manager UI allowlist issues: use `splunk-cloud-acs-allowlist-setup`.
+- Search API or Data Manager UI allowlist issues: use `splunk-cloud-acs-admin-setup`.
 - Add-on prerequisites: use `splunk-app-install`.
 - Unknown admin posture: use `splunk-admin-doctor`.
 """

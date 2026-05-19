@@ -82,6 +82,7 @@ LOCAL_ARTIFACT_ROOTS = [
     "splunk-ai-ml-toolkit-rendered",
     "splunk-appdynamics-setup-rendered",
     "splunk-cloud-acs-allowlist-rendered",
+    "splunk-cloud-acs-admin-rendered",
     "splunk-cloud-data-manager-rendered",
     "splunk-connect-for-otlp-rendered",
     "splunk-data-source-readiness-doctor-rendered",

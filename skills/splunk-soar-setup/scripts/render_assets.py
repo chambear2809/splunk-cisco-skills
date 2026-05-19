@@ -830,7 +830,7 @@ def render_readme(args: argparse.Namespace) -> str:
         "- `validate.sh`\n\n"
         "## Next steps\n\n"
         "1. After SOAR is reachable, run `splunk-side/configure-phantom-endpoint.sh` to wire ES Mission Control.\n"
-        "2. If Automation Broker connects to a Splunk Cloud stack, promote the stub at `handoffs/acs-allowlist.json` into a `splunk-cloud-acs-allowlist-setup` plan and apply it.\n"
+        "2. If Automation Broker connects to a Splunk Cloud stack, promote the stub at `handoffs/acs-allowlist.json` into a `splunk-cloud-acs-admin-setup` plan and apply it.\n"
     )
 
 
@@ -840,7 +840,7 @@ def render_handoffs(args: argparse.Namespace) -> dict:
             {
                 "feature": "search-api",
                 "subnets": [],
-                "comment": "Replace subnets with the Automation Broker host's egress IP(s) and feed into splunk-cloud-acs-allowlist-setup.",
+                "comment": "Replace subnets with the Automation Broker host's egress IP(s) and feed into splunk-cloud-acs-admin-setup.",
             },
             indent=2,
             sort_keys=True,

@@ -1,0 +1,11 @@
+interface:
+  display_name: "Splunk Observability Mobile RUM"
+  short_description: "Instrument iOS, Android, React Native, and Flutter apps with Splunk Mobile RUM"
+  default_prompt: >-
+    Use $splunk-observability-mobile-rum-setup to render Splunk Observability
+    Cloud Mobile RUM snippets, guarded source patches, Session Replay privacy
+    controls, dSYM and Android mapping upload helpers, WebView Browser RUM
+    handoffs, release attributes, and RUM-to-APM Server-Timing validation for
+    native iOS, native Android, React Native, and Flutter apps. Keep tokens in
+    file or build-time references, pin versions, and do not use this for
+    AppDynamics EUM or Kubernetes Browser RUM injection.

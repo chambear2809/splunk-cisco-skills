@@ -1,0 +1,410 @@
+{
+  "version": 1,
+  "last_researched": "2026-05-19",
+  "description": "Splunk Supported Add-ons router catalog. The initial domain is Unix/Linux and covers the supported Splunk Add-on for Unix and Linux plus the supported Splunk Add-on for Linux CollectD/AuditD path.",
+  "supported_statuses": [
+    "first_class_profile",
+    "handoff_profile",
+    "install_only_handoff",
+    "manual_gap"
+  ],
+  "official_glossary": {
+    "source_url": "https://help.splunk.com/en/supported-add-ons/about-the-splunk-supported-add-ons",
+    "last_researched": "2026-05-19",
+    "entries": [
+      {"key": "amazon-kinesis-firehose", "name": "Amazon Kinesis Firehose"},
+      {"key": "amazon-web-services", "name": "Amazon Web Services"},
+      {"key": "apache-web-server", "name": "Apache Web Server"},
+      {"key": "appdynamics", "name": "AppDynamics"},
+      {"key": "bmc-remedy", "name": "BMC Remedy"},
+      {"key": "asset-and-risk-intelligence", "name": "Asset and Risk Intelligence"},
+      {"key": "box", "name": "Box"},
+      {"key": "carbon-black", "name": "Carbon Black"},
+      {"key": "check-point-log-exporter", "name": "Check Point Log Exporter"},
+      {"key": "cisco-asa", "name": "Cisco ASA"},
+      {"key": "cisco-esa", "name": "Cisco ESA"},
+      {"key": "cisco-firesight", "name": "Cisco FireSIGHT"},
+      {"key": "cisco-ise", "name": "Cisco ISE"},
+      {"key": "cisco-meraki", "name": "Cisco Meraki"},
+      {"key": "cisco-ucs", "name": "Cisco UCS"},
+      {"key": "cisco-wsa", "name": "Cisco WSA"},
+      {"key": "citrix-netscaler", "name": "Citrix NetScaler"},
+      {"key": "crowdstrike-fdr", "name": "CrowdStrike FDR"},
+      {"key": "cyberark", "name": "CyberArk"},
+      {"key": "cyberark-epm", "name": "CyberArk EPM"},
+      {"key": "emc-vnx", "name": "EMC VNX"},
+      {"key": "f5-big-ip", "name": "F5 BIG-IP"},
+      {"key": "forcepoint-web-security", "name": "Forcepoint Web Security"},
+      {"key": "github", "name": "GitHub"},
+      {"key": "google-cloud-platform", "name": "Google Cloud Platform"},
+      {"key": "google-workspace", "name": "Google Workspace"},
+      {"key": "haproxy", "name": "HAProxy"},
+      {"key": "ibm-websphere-application-server", "name": "IBM WebSphere Application Server"},
+      {"key": "imperva-securesphere-waf", "name": "Imperva SecureSphere WAF"},
+      {"key": "infoblox", "name": "Infoblox"},
+      {"key": "isc-bind", "name": "ISC BIND"},
+      {"key": "isc-dhcp", "name": "ISC DHCP"},
+      {"key": "java-management-extensions", "name": "Java Management Extensions"},
+      {"key": "jboss", "name": "JBoss"},
+      {"key": "jira-cloud", "name": "Jira Cloud"},
+      {"key": "jira-data-center", "name": "Jira Data Center"},
+      {"key": "linux", "name": "Linux"},
+      {"key": "mcafee-epo-syslog", "name": "McAfee ePO Syslog"},
+      {"key": "mcafee-nsp", "name": "McAfee NSP"},
+      {"key": "mcafee-web-gateway", "name": "McAfee Web Gateway"},
+      {"key": "microsoft-cloud-services", "name": "Microsoft Cloud Services"},
+      {"key": "microsoft-exchange", "name": "Microsoft Exchange"},
+      {"key": "microsoft-iis", "name": "Microsoft IIS"},
+      {"key": "microsoft-office-365", "name": "Microsoft Office 365"},
+      {"key": "microsoft-hyper-v", "name": "Microsoft Hyper-V"},
+      {"key": "microsoft-scom", "name": "Microsoft SCOM"},
+      {"key": "microsoft-security", "name": "Microsoft Security"},
+      {"key": "microsoft-sql-server", "name": "Microsoft SQL Server"},
+      {"key": "microsoft-windows", "name": "Microsoft Windows"},
+      {"key": "mysql", "name": "MySQL"},
+      {"key": "nagios-core", "name": "Nagios Core"},
+      {"key": "netapp-data-ontap", "name": "NetApp Data ONTAP"},
+      {"key": "netapp-data-ontap-extractions", "name": "NetApp Data ONTAP Extractions"},
+      {"key": "netapp-data-ontap-indexes", "name": "NetApp Data ONTAP Indexes"},
+      {"key": "nginx", "name": "NGINX"},
+      {"key": "okta-identity-cloud", "name": "Okta Identity Cloud"},
+      {"key": "oracle-database", "name": "Oracle Database"},
+      {"key": "ossec", "name": "OSSEC"},
+      {"key": "rsa-dlp", "name": "RSA DLP"},
+      {"key": "rsa-securid", "name": "RSA SecurID"},
+      {"key": "rsa-securid-cas", "name": "RSA SecurID CAS"},
+      {"key": "salesforce", "name": "Salesforce"},
+      {"key": "servicenow", "name": "ServiceNow", "aliases": ["service now", "snow"]},
+      {"key": "sophos", "name": "Sophos"},
+      {"key": "squid-proxy", "name": "Squid Proxy"},
+      {"key": "symantec-blue-coat-proxysg", "name": "Symantec Blue Coat ProxySG"},
+      {"key": "symantec-dlp", "name": "Symantec DLP"},
+      {"key": "symantec-endpoint-protection", "name": "Symantec Endpoint Protection"},
+      {"key": "sysmon", "name": "Sysmon"},
+      {"key": "sysmon-for-linux", "name": "Sysmon for Linux"},
+      {"key": "tomcat", "name": "Tomcat"},
+      {"key": "unix-and-linux", "name": "Unix and Linux", "aliases": ["unix linux", "*nix"]},
+      {"key": "vcenter-logs", "name": "vCenter Logs"},
+      {"key": "vmware", "name": "VMware", "aliases": ["vmware", "vmware app"]},
+      {"key": "vmware-extractions", "name": "VMware Extractions"},
+      {"key": "vmware-esxi-logs", "name": "VMware ESXi Logs"},
+      {"key": "vmware-indexes", "name": "VMware Indexes"},
+      {"key": "vmware-metrics", "name": "VMware Metrics"},
+      {"key": "vmware-metrics-indexes", "name": "VMware Metrics Indexes"},
+      {"key": "websense-dlp", "name": "Websense DLP"}
+    ],
+    "routes": {
+      "amazon-kinesis-firehose": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "aws_cloudtrail"},
+      "amazon-web-services": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "aws_cloudtrail"},
+      "appdynamics": {"status": "handoff_profile", "handoff_skill": "splunk-appdynamics-setup"},
+      "asset-and-risk-intelligence": {"status": "handoff_profile", "handoff_skill": "splunk-asset-risk-intelligence-setup"},
+      "cisco-asa": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "cisco_asa"},
+      "cisco-esa": {"status": "handoff_profile", "handoff_skill": "cisco-secure-email-web-gateway-setup"},
+      "cisco-firesight": {"status": "handoff_profile", "handoff_skill": "cisco-security-cloud-setup"},
+      "cisco-ise": {"status": "handoff_profile", "handoff_skill": "cisco-catalyst-ta-setup"},
+      "cisco-meraki": {"status": "handoff_profile", "handoff_skill": "cisco-meraki-ta-setup"},
+      "cisco-ucs": {"status": "handoff_profile", "handoff_skill": "cisco-ucs-ta-setup"},
+      "cisco-wsa": {"status": "handoff_profile", "handoff_skill": "cisco-secure-email-web-gateway-setup"},
+      "crowdstrike-fdr": {"status": "handoff_profile", "handoff_skill": "splunk-cloud-data-manager-setup"},
+      "google-cloud-platform": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install"},
+      "google-workspace": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "google_workspace"},
+      "linux": {"status": "first_class_profile", "profile": "linux-collectd-auditd"},
+      "microsoft-cloud-services": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "microsoft_entra_id"},
+      "microsoft-office-365": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "microsoft_o365_management_activity"},
+      "microsoft-windows": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "windows_security"},
+      "okta-identity-cloud": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "okta_identity_cloud"},
+      "servicenow": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install"},
+      "unix-and-linux": {"status": "first_class_profile", "profile": "unix-linux-os-scripts"}
+    }
+  },
+  "domains": [
+    {
+      "key": "unix-linux",
+      "name": "Unix/Linux",
+      "aliases": [
+        "unix",
+        "nix",
+        "unix linux",
+        "*nix"
+      ],
+      "default_profile": "unix-linux-os-scripts",
+      "profiles": [
+        "unix-linux-os-scripts",
+        "linux-collectd-auditd"
+      ]
+    }
+  ],
+  "profiles": [
+    {
+      "key": "unix-linux-os-scripts",
+      "domain": "unix-linux",
+      "name": "Unix and Linux OS scripts and file inputs",
+      "status": "first_class_profile",
+      "aliases": [
+        "unix-linux",
+        "unix and linux",
+        "splunk add-on for unix and linux",
+        "splunk_ta_nix",
+        "splunk-ta-nix",
+        "ta nix",
+        "nix",
+        "833",
+        "linux secure",
+        "linux audit",
+        "auditd",
+        "scripted inputs"
+      ],
+      "add_on": {
+        "name": "Splunk Add-on for Unix and Linux",
+        "app_name": "Splunk_TA_nix",
+        "splunkbase_id": "833",
+        "latest_verified_version": "10.2.0",
+        "latest_verified_date": "October 8, 2025",
+        "min_splunk_version": "9.2",
+        "cim_version": "6.x",
+        "support": "Splunk Supported addon"
+      },
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder"
+      ],
+      "source_types": [
+        "aix_secure",
+        "auditd",
+        "bandwidth",
+        "bash_history",
+        "config_file",
+        "cpu",
+        "df",
+        "dhcpd",
+        "fs_notification",
+        "hardware",
+        "interfaces",
+        "iostat",
+        "lastlog",
+        "linux_audit",
+        "Linux:SELinuxConfig",
+        "linux_secure",
+        "lsof",
+        "netstat",
+        "nfsiostat",
+        "openPorts",
+        "osx_secure",
+        "package",
+        "protocol",
+        "ps",
+        "time",
+        "top",
+        "Unix:CPUTime",
+        "Unix:ListeningPorts",
+        "Unix:Service",
+        "Unix:SSHDConfig",
+        "Unix:Update",
+        "Unix:Uptime",
+        "Unix:UserAccounts",
+        "Unix:Version",
+        "Unix:VSFTPDConfig",
+        "usersWithLoginPrivs",
+        "vmstat",
+        "who"
+      ],
+      "metric_source_types": [
+        "cpu_metric",
+        "df_metric",
+        "interfaces_metric",
+        "iostat_metric",
+        "ps_metric",
+        "vmstat_metric"
+      ],
+      "cim_models": [
+        "Authentication",
+        "Change",
+        "Endpoint",
+        "Inventory",
+        "Network Sessions",
+        "Performance"
+      ],
+      "commands": {
+        "install": [
+          "bash",
+          "skills/splunk-app-install/scripts/install_app.sh",
+          "--source",
+          "splunkbase",
+          "--app-id",
+          "833"
+        ],
+        "forwarder_app": [
+          "bash",
+          "skills/splunk-agent-management-setup/scripts/setup.sh",
+          "--mode",
+          "agent-manager",
+          "--deployment-app-name",
+          "Splunk_TA_nix"
+        ],
+        "uf_runtime": [
+          "bash",
+          "skills/splunk-universal-forwarder-setup/scripts/setup.sh",
+          "--help"
+        ],
+        "readiness_collect": [
+          "bash",
+          "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+          "--phase",
+          "collect",
+          "--source-pack",
+          "linux_secure_auditd"
+        ],
+        "readiness_doctor": [
+          "bash",
+          "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+          "--phase",
+          "doctor",
+          "--source-pack",
+          "linux_secure_auditd"
+        ],
+        "spl2_templates": [
+          "bash",
+          "skills/splunk-spl2-pipeline-kit/scripts/setup.sh",
+          "--help"
+        ]
+      },
+      "guardrails": [
+        "Install on all search heads where Unix/Linux knowledge management is required, but keep add-on visibility off on search heads to reduce accidental input execution.",
+        "Install on indexers when universal forwarders send this data directly; heavy forwarders can own parsing when they collect and forward the data.",
+        "On Universal Forwarders, enable inputs with local configuration files, not with the Splunk Web setup page.",
+        "Copy only the input stanzas you need into local/inputs.conf; do not copy the entire default inputs.conf because broad local overrides survive upgrades.",
+        "Create metric indexes before enabling metric source types.",
+        "For Splunk_TA_nix 8.8.0 and later, review nix_ta_custom_eventtype if local custom sourcetypes used to match broad legacy eventtypes.",
+        "For upgrades from older pre-6.0 deployments, review default-index changes and test outside production before rollout."
+      ],
+      "docs": [
+        "https://help.splunk.com/en/splunk-cloud-platform/get-data-in/splunk-supported-add-ons/unix-and-linux",
+        "https://splunkbase.splunk.com/app/833",
+        "https://splunk.github.io/splunk-add-on-for-unix-and-linux/Releasenotes/",
+        "https://splunk.github.io/splunk-add-on-for-unix-and-linux/Install/",
+        "https://splunk.github.io/splunk-add-on-for-unix-and-linux/Enabledataandscriptedinputs/",
+        "https://splunk.github.io/splunk-add-on-for-unix-and-linux/Sourcetypes/",
+        "https://splunk.github.io/splunk-add-on-for-unix-and-linux/SPL2/"
+      ]
+    },
+    {
+      "key": "linux-collectd-auditd",
+      "domain": "unix-linux",
+      "name": "Linux CollectD metrics and AuditD",
+      "status": "first_class_profile",
+      "aliases": [
+        "linux collectd",
+        "linux",
+        "splunk add-on for linux",
+        "splunk_ta_linux",
+        "splunk_ta_linux collectd",
+        "splunk_ta_linux auditd",
+        "splunk-ta-linux",
+        "collectd",
+        "linux:audit",
+        "3412"
+      ],
+      "add_on": {
+        "name": "Splunk Add-on for Linux",
+        "app_name": "Splunk_TA_Linux",
+        "splunkbase_id": "3412",
+        "latest_verified_version": "2.1.1",
+        "latest_verified_date": "March 30, 2026",
+        "min_splunk_version": "9.3",
+        "cim_version": "5.x",
+        "support": "Splunk Supported addon"
+      },
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder",
+        "external-collector"
+      ],
+      "source_types": [
+        "linux:collectd:http:json",
+        "linux:collectd:http:metrics",
+        "linux:collectd:graphite",
+        "linux:audit"
+      ],
+      "metric_source_types": [
+        "linux:collectd:http:metrics"
+      ],
+      "cim_models": [
+        "Authentication",
+        "Change",
+        "Endpoint"
+      ],
+      "itsi_models": [
+        "Operating System Module"
+      ],
+      "commands": {
+        "install": [
+          "bash",
+          "skills/splunk-app-install/scripts/install_app.sh",
+          "--source",
+          "splunkbase",
+          "--app-id",
+          "3412"
+        ],
+        "hec": [
+          "bash",
+          "skills/splunk-hec-service-setup/scripts/setup.sh",
+          "--sourcetype",
+          "linux:collectd:http:json"
+        ],
+        "readiness_collect": [
+          "bash",
+          "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+          "--phase",
+          "collect",
+          "--source-pack",
+          "linux_secure_auditd"
+        ],
+        "readiness_doctor": [
+          "bash",
+          "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+          "--phase",
+          "doctor",
+          "--source-pack",
+          "linux_secure_auditd"
+        ]
+      },
+      "guardrails": [
+        "This add-on is the CollectD and AuditD path, not the same package as Splunk_TA_nix.",
+        "For metrics, use HEC with linux:collectd:http:metrics and create a metrics index before routing data to it.",
+        "For HEC JSON events, set the HEC source type to linux:collectd:http:json.",
+        "For Graphite over TCP, set the TCP source type to linux:collectd:graphite; TCP cannot collect metrics.",
+        "For AuditD file or TCP collection, use source type linux:audit and set auditd log_format=ENRICHED for CIM mapping.",
+        "Do not use Deployment Server to deploy configured credential-bearing copies of this add-on to many forwarders; the official docs flag credential-vault and duplicate collection risks.",
+        "The Splunkbase compatibility table for version 2.1.1 is newer than parts of the GitHub Pages release-note compatibility text; verify compatibility in Splunkbase before pinning an older platform."
+      ],
+      "docs": [
+        "https://help.splunk.com/en/splunk-cloud-platform/get-data-in/splunk-supported-add-ons/linux",
+        "https://splunkbase.splunk.com/app/3412",
+        "https://splunk.github.io/splunk-add-on-for-linux/",
+        "https://splunk.github.io/splunk-add-on-for-linux/Releasenotes/",
+        "https://splunk.github.io/splunk-add-on-for-linux/Install/",
+        "https://splunk.github.io/splunk-add-on-for-linux/Configure/",
+        "https://splunk.github.io/splunk-add-on-for-linux/Configure2/",
+        "https://splunk.github.io/splunk-add-on-for-linux/Configure3/",
+        "https://splunk.github.io/splunk-add-on-for-linux/Configure4/",
+        "https://splunk.github.io/splunk-add-on-for-linux/Sourcetypes/"
+      ]
+    }
+  ]
+}

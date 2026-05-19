@@ -1,0 +1,114 @@
+api_version: splunk-observability-mobile-rum-setup/v1
+realm: us0
+rum_token_ref: SPLUNK_O11Y_RUM_TOKEN_FILE
+org_access_token_ref: SPLUNK_O11Y_TOKEN_FILE
+source_mode: render-snippets
+versions:
+  ios_agent: 2.2.3
+  android_agent: 2.3.0
+  android_gradle_plugins: 2.3.0
+  react_native_agent: 1.0.0
+  react_native_session_replay: 1.0.0
+  flutter_agent: 1.0.1
+  flutter_session_replay: 1.0.1
+privacy:
+  redact_query_strings: true
+  user_tracking_mode: anonymousTracking
+  ignore_urls:
+    - /oauth/
+    - /payment/
+  drop_enduser_attributes: true
+session_replay:
+  enabled: false
+symbol_upload:
+  enabled: true
+platforms:
+  - platform: ios
+    app_root: examples/ios
+    bundle_id: com.example.checkout.ios
+    app_name: checkout-ios
+    deployment_environment: prod
+    app_version: 1.42.0
+    release:
+      name: checkout-ios-1.42.0
+      build: "1042"
+      distribution: app-store
+    modules:
+      urlsession: true
+      navigation: true
+      crash_reporting: true
+      slow_rendering: true
+      interactions: true
+    webviews:
+      - name: checkout-help
+        url: https://checkout.example.com/help
+    validation_urls:
+      - https://api.example.com/health
+  - platform: android
+    app_root: examples/android
+    application_id: com.example.checkout.android
+    app_name: checkout-android
+    deployment_environment: prod
+    app_version: 1.42.0
+    release:
+      name: checkout-android-1.42.0
+      build: "2042"
+      distribution: play-store
+    requirements:
+      android_min_api: 24
+    modules:
+      okhttp: true
+      http_url_connection: true
+      crash: true
+      anr: true
+      slow_rendering: true
+      interactions: true
+      lifecycle: true
+      network_monitor: true
+    webviews:
+      - name: terms
+        url: https://checkout.example.com/terms
+    validation_urls:
+      - https://api.example.com/health
+  - platform: react_native
+    app_root: examples/react-native
+    bundle_id: com.example.checkout.rn
+    application_id: com.example.checkout.rn
+    app_name: checkout-rn
+    deployment_environment: staging
+    app_version: 0.9.0
+    release:
+      name: checkout-rn-0.9.0
+      build: "77"
+      distribution: internal
+    requirements:
+      react_native: 0.75.0
+      react: 18.2.0
+      android_min_api: 24
+      ios_minimum: "15.0"
+    session_replay:
+      enabled: false
+      sampling_rate: 0.2
+    validation_urls:
+      - https://staging-api.example.com/health
+  - platform: flutter
+    app_root: examples/flutter
+    bundle_id: com.example.checkout.flutter
+    application_id: com.example.checkout.flutter
+    app_name: checkout-flutter
+    deployment_environment: dev
+    app_version: 0.8.0
+    release:
+      name: checkout-flutter-0.8.0
+      build: "23"
+      distribution: internal
+    requirements:
+      flutter: 3.32.0
+      dart: 3.8.0
+      android_min_api: 24
+      ios_minimum: "15.0"
+    session_replay:
+      enabled: false
+      sampling_rate: 0.2
+    validation_urls:
+      - https://dev-api.example.com/health

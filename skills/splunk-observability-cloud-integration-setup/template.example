@@ -118,7 +118,7 @@ discover_app:
 # with a 30-day window, 90-day earliest event time, and 1000 MB disk.
 #
 # `realm_ip_allowlist_handoff: true` produces an apply-acs-allowlist-loc.sh
-# stub that delegates to splunk-cloud-acs-allowlist-setup with the per-realm
+# stub that delegates to splunk-cloud-acs-admin-setup with the per-realm
 # /32 set baked in.
 log_observer_connect:
   enable: true

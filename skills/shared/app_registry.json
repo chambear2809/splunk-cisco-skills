@@ -517,6 +517,31 @@
       },
       {
         "kind": "workflow",
+        "skill": "splunk-supported-addons-setup",
+        "label": "`splunk-supported-addons-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install of its own; routes supported add-on package delivery to splunk-app-install and customer-managed forwarder/runtime handoffs",
+        "cloud_config_path": "Render-first supported-addons profile plan, starter local input overlays, validation SPL, and handoff commands for install, UF rollout, HEC, SPL2 pipeline templates, and post-ingest readiness",
+        "notes": "Top-level Splunk Supported Add-ons router. Tracks the official glossary as first-class profiles, skill handoffs, or generic install-only paths. Initial first-class domain coverage is Unix/Linux: Splunk_TA_nix for *nix scripted/file inputs and Splunk_TA_Linux for CollectD/AuditD. Live installation remains delegated to splunk-app-install."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_nix",
+        "label": "`splunk-supported-addons-setup` Unix/Linux",
+        "cloud_install_path": "ACS Splunkbase for the Cloud search tier; customer-managed package deployment to heavy forwarders or Universal Forwarders for collection",
+        "cloud_config_path": "Rendered local/inputs.conf starter overlays for linux_secure, linux_audit, scripted event inputs, and metric inputs; post-ingest readiness delegated to splunk-data-source-readiness-doctor",
+        "notes": "Splunk Supported Add-on for Unix and Linux, Splunkbase 833. Install search-time knowledge on search heads and deploy configured collection only to intended collection nodes."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_Linux",
+        "label": "`splunk-supported-addons-setup` Linux CollectD",
+        "cloud_install_path": "ACS Splunkbase for supported Cloud search-tier knowledge; customer-managed CollectD, HEC, TCP, or AuditD collection path",
+        "cloud_config_path": "Rendered CollectD write_http/write_graphite skeletons, AuditD input overlay, HEC handoff, metrics-index props.conf template, and validation SPL",
+        "notes": "Splunk Supported Add-on for Linux, Splunkbase 3412. This is the CollectD/AuditD package, distinct from Splunk_TA_nix."
+      },
+      {
+        "kind": "workflow",
         "skill": "splunk-spl2-pipeline-kit",
         "label": "`splunk-spl2-pipeline-kit`",
         "splunkbase_id": "N/A",
@@ -676,6 +701,15 @@
       },
       {
         "kind": "workflow",
+        "skill": "splunk-observability-mobile-rum-setup",
+        "label": "`splunk-observability-mobile-rum-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk Cloud app install; render-first workflow for native iOS, native Android, React Native, and Flutter Mobile RUM instrumentation",
+        "cloud_config_path": "Rendered pinned SDK snippets, guarded source patches, Session Replay privacy controls, iOS dSYM and Android mapping upload helpers, React Native and Flutter native artifact handoffs, WebView Browser RUM bridge snippets, and RUM-to-APM Server-Timing validation",
+        "notes": "Splunk Observability Cloud Mobile RUM + optional Session Replay. NOT AppDynamics EUM and NOT Kubernetes Browser RUM injection. Default source mode renders snippets only; source patches are optional and app source edits require --accept-mobile-rum-source-edit. RUM token values stay in build-time/token-file references; org access tokens for symbol uploads use SPLUNK_O11Y_TOKEN_FILE. Hands off WebView Browser RUM to splunk-observability-k8s-frontend-rum-setup, dashboards to splunk-observability-dashboard-builder, detectors to splunk-observability-native-ops, and backend trace headers to splunk-observability-k8s-auto-instrumentation-setup."
+      },
+      {
+        "kind": "workflow",
         "skill": "splunk-observability-dashboard-builder",
         "label": "`splunk-observability-dashboard-builder`",
         "splunkbase_id": "N/A",
@@ -739,12 +773,12 @@
       },
       {
         "kind": "workflow",
-        "skill": "splunk-cloud-acs-allowlist-setup",
-        "label": "`splunk-cloud-acs-allowlist-setup`",
+        "skill": "splunk-cloud-acs-admin-setup",
+        "label": "`splunk-cloud-acs-admin-setup`",
         "splunkbase_id": "N/A",
-        "cloud_install_path": "No Splunk Cloud app install; manages Splunk Cloud ACS IP allowlists for all 7 ACS features",
-        "cloud_config_path": "Renders desired-state plan for acs / search-api / hec / s2s / search-ui / idm-api / idm-ui (IPv4 + IPv6); preflight enforces AWS 200/feature + 230/group and GCP 200/feature limits; lock-out protection refuses acs feature edits without operator IP; status polling on /adminconfig/v2/status; optional terraform-snippets.tf via splunk/scp",
-        "notes": "Explicit user-driven counterpart to acs_helpers.sh acs_ensure_search_api_access. FedRAMP High excluded (Splunk Support only)."
+        "cloud_install_path": "No Splunk Cloud app install; manages Splunk Cloud ACS control-plane administration",
+        "cloud_config_path": "Renders desired-state plans and inventory for ACS IP allowlists, indexes, HEC tokens, users, roles, capabilities, app permissions, private connectivity, outbound ports, DDSS self-storage, limits, maintenance windows, restarts, apps, authentication tokens, deployment task status, license state, and Observability pairing handoffs",
+        "notes": "Preserves allowlist lock-out protection and subnet-limit preflights while adding broader ACS admin inventory and guarded apply assets. FedRAMP High allowlists and FedRAMP Moderate private-connectivity enablement remain Splunk Support paths."
       },
       {
         "kind": "workflow",
@@ -777,7 +811,7 @@
         "skill": "splunk-observability-cloud-integration-setup",
         "label": "`splunk-observability-cloud-integration-setup`",
         "splunkbase_id": "N/A",
-        "cloud_install_path": "No Splunk Cloud app install of its own; orchestrates pairing + Discover-app + LOC + SIM Add-on (Splunkbase 5247) + cross-skill handoffs to splunk-cloud-acs-allowlist-setup, splunk-app-install, and splunk-itsi-config",
+        "cloud_install_path": "No Splunk Cloud app install of its own; orchestrates pairing + Discover-app + LOC + SIM Add-on (Splunkbase 5247) + cross-skill handoffs to splunk-cloud-acs-admin-setup, splunk-app-install, and splunk-itsi-config",
         "cloud_config_path": "Render-first integration setup: token-auth flip, Unified Identity or Service Account pairing (acs observability + /adminconfig/v2/observability/sso-pairing), multi-org default-org deeplink, Centralized RBAC (enable-capabilities + enable-centralized-rbac), Discover Splunk Observability Cloud app five Configurations tabs, Log Observer Connect service-account user/role/workload rule, Related Content + Real Time Metrics capability assignments, Dashboard Studio O11y metrics, Splunk Infrastructure Monitoring Add-on account + curated SignalFlow modular inputs with MTS sizing preflight; file-based tokens only, --i-accept-rbac-cutover guard for the destructive RBAC step",
         "notes": "Single skill that turns a Splunk Cloud Platform or Splunk Enterprise stack into a fully-paired Splunk Observability Cloud experience. Uses Splunk_TA_sim (Splunkbase 5247) for the in-Splunk navigation surface (sim SPL command + streaming modular inputs)."
       },
@@ -1123,6 +1157,18 @@
       "notes": "Standalone reusable skill for Splunk Browser RUM (@splunk/otel-web 2.x) + Session Replay (Splunk recorder) injection into Kubernetes-served frontends. RUM beacons land directly at rum-ingest.<realm>.observability.splunkcloud.com -- no OTel collector required for browser telemetry. Four injection modes (nginx pod-side ConfigMap with sub_filter, ingress-nginx configuration-snippet annotation, busybox+emptyDir initContainer rewriter for distroless, runtime-config ConfigMap for npm-bundled SDK), full Frustration Signals 2.0 (rage / dead / error / thrashed cursor) and Session Replay (sensitivityRules + features.{canvas,video,iframes,packAssets,cacheAssets,backgroundServiceSrc} + sampler) gated behind --accept-session-replay-enterprise, JavaScript source-map upload helper wrapping the splunk-rum CLI + @splunk/rum-build-plugins Webpack plugin (reuses SPLUNK_O11Y_TOKEN_FILE), RUM-to-APM Server-Timing trace-linking validation, multi-workload spec, distroless image auto-detection, ingress-nginx CVE-2021-25742 preflight, version-pin enforcement, SRI hash emission, and --gitops-mode YAML-only rendering. Hands off RUM dashboards to splunk-observability-dashboard-builder, RUM detectors to splunk-observability-native-ops, the SIM rum modular input to splunk-observability-cloud-integration-setup, and RUM-to-APM trace linking to splunk-observability-k8s-auto-instrumentation-setup. Two credential files: SPLUNK_O11Y_RUM_TOKEN_FILE for the browser-embedded RUM token, SPLUNK_O11Y_TOKEN_FILE for the server-to-server source-map upload. Explicitly NOT AppDynamics BRUM."
     },
     {
+      "skill": "splunk-observability-mobile-rum-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Render-first Splunk Observability Cloud Mobile RUM workflow for native iOS, native Android, React Native, and Flutter apps. Emits pinned SDK snippets, optional source patches, guarded source apply helper, Session Replay enterprise/privacy controls, dSYM and Android mapping upload helpers, WebView Browser RUM handoff snippets, and Server-Timing traceparent validation. Does not install a Splunk app or require Splunk Platform runtime placement."
+    },
+    {
       "skill": "splunk-observability-dashboard-builder",
       "role_support": {
         "search-tier": "none",
@@ -1170,7 +1216,7 @@
       "cloud_pairing": [
         "search-tier"
       ],
-      "notes": "Splunk Platform <-> Splunk Observability Cloud pairing + Discover app + Log Observer Connect + Related Content + Real Time Metrics + Splunk Infrastructure Monitoring Add-on (Splunkbase 5247). Search-tier required; heavy-forwarder optional for ITSI / SIM modular-input streaming. Hands off Splunkbase install to splunk-app-install, ACS allowlist deltas to splunk-cloud-acs-allowlist-setup, and the Content Pack to splunk-itsi-config."
+      "notes": "Splunk Platform <-> Splunk Observability Cloud pairing + Discover app + Log Observer Connect + Related Content + Real Time Metrics + Splunk Infrastructure Monitoring Add-on (Splunkbase 5247). Search-tier required; heavy-forwarder optional for ITSI / SIM modular-input streaming. Hands off Splunkbase install to splunk-app-install, ACS allowlist/admin deltas to splunk-cloud-acs-admin-setup, and the Content Pack to splunk-itsi-config."
     },
     {
       "skill": "splunk-oncall-setup",
@@ -1289,6 +1335,23 @@
         "external-collector"
       ],
       "notes": "Post-ingest data-usability diagnosis and routing workflow for Splunk Cloud and self-managed Enterprise. Scores ES, ITSI, and ARI readiness from expected index/sourcetype/macro contracts, sample events, CIM tags/eventtypes, data-model acceleration state, OCSF transforms, dashboard population, and product readiness evidence; it is not a Splunk runtime package."
+    },
+    {
+      "skill": "splunk-supported-addons-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder",
+        "external-collector"
+      ],
+      "notes": "Splunk Supported Add-ons router and profile renderer. Tracks the official glossary as first-class profiles, skill handoffs, or generic install-only paths. Initial Unix/Linux domain coverage routes Splunk_TA_nix and Splunk_TA_Linux installs to splunk-app-install, forwarder rollout to splunk-agent-management-setup or splunk-universal-forwarder-setup, HEC to splunk-hec-service-setup, SPL2 templates to splunk-spl2-pipeline-kit, and post-ingest checks to splunk-data-source-readiness-doctor."
     },
     {
       "skill": "splunk-spl2-pipeline-kit",
@@ -1550,6 +1613,18 @@
       "notes": "Splunk Edge Processor instances run as a customer-managed external collector tier (Linux, systemd / no-systemd / Docker) joined to a Splunk Cloud Platform tenant or Splunk Enterprise 10.0+ data management node. Emits an ACS allowlist handoff stub for s2s + hec features when destinations target Splunk Cloud."
     },
     {
+      "skill": "splunk-cloud-acs-admin-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Splunk Cloud ACS control-plane workflow; inventories and renders guarded operations across allowlists, indexes, HEC tokens, users, roles, capabilities, app permissions, private connectivity, outbound ports, DDSS self-storage, limits, maintenance windows, restarts, apps, authentication tokens, deployment task status, license state, and Observability pairing handoffs. No Splunk Enterprise role placement."
+    },
+    {
       "skill": "splunk-cloud-acs-allowlist-setup",
       "role_support": {
         "search-tier": "none",
@@ -1559,7 +1634,7 @@
         "external-collector": "none"
       },
       "cloud_pairing": [],
-      "notes": "Splunk Cloud ACS IP allowlist control-plane workflow; manages all 7 ACS features (acs / search-api / hec / s2s / search-ui / idm-api / idm-ui) for IPv4 + IPv6. No Splunk Enterprise role placement."
+      "notes": "Compatibility alias for the older Splunk Cloud ACS IP allowlist workflow. New work should use splunk-cloud-acs-admin-setup."
     },
     {
       "skill": "splunk-uba-setup",
@@ -2113,6 +2188,62 @@
     }
   ],
   "apps": [
+    {
+      "skill": "splunk-supported-addons-setup",
+      "app_name": "Splunk_TA_nix",
+      "splunkbase_id": "833",
+      "label": "Splunk Add-on for Unix and Linux",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-unix-and-linux_*"
+      ],
+      "min_splunk_version": "9.2",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "10.2.0",
+      "latest_verified_date": "October 8, 2025"
+    },
+    {
+      "skill": "splunk-supported-addons-setup",
+      "app_name": "Splunk_TA_Linux",
+      "splunkbase_id": "3412",
+      "label": "Splunk Add-on for Linux",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-linux_*"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "2.1.1",
+      "latest_verified_date": "March 30, 2026"
+    },
     {
       "skill": "cisco-scan-setup",
       "app_name": "splunk-cisco-app-navigator",

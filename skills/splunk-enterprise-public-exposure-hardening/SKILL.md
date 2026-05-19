@@ -227,7 +227,7 @@ skill's hardening on top.
 | [splunk-indexer-cluster-setup](../splunk-indexer-cluster-setup/SKILL.md) | Indexer cluster bundle | `pass4SymmKey` rotation helper + acceptFrom enforcement for cluster CIDR |
 | [splunk-agent-management-setup](../splunk-agent-management-setup/SKILL.md) | SHC deployer, server classes | Hardening app drops into `shcluster/apps/`; SHC deployer pass4SymmKey rotation |
 | [splunk-license-manager-setup](../splunk-license-manager-setup/SKILL.md) | License manager / peer wiring | License master 8089 acceptFrom + pass4SymmKey rotation |
-| [splunk-cloud-acs-allowlist-setup](../splunk-cloud-acs-allowlist-setup/SKILL.md) | Splunk **Cloud** ACS allowlists | Out of scope — this skill is on-prem only |
+| [splunk-cloud-acs-admin-setup](../splunk-cloud-acs-admin-setup/SKILL.md) | Splunk **Cloud** ACS allowlists | Out of scope — this skill is on-prem only |
 | [splunk-federated-search-setup](../splunk-federated-search-setup/SKILL.md) | Federation provider/consumer wiring | Provider-side acceptFrom + service-account rotation helper (federation auth is NOT pass4SymmKey) |
 | [splunk-monitoring-console-setup](../splunk-monitoring-console-setup/SKILL.md) | Monitoring Console distributed config | MC integration: forward `_audit` and platform alerts on hardening drift |
 | [splunk-connect-for-syslog-setup](../splunk-connect-for-syslog-setup/SKILL.md) | SC4S Docker/Helm runtime, syslog TLS listener | If SC4S delivers via HEC, run THIS skill against the HEC-receiving SH first |

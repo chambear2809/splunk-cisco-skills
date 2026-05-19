@@ -1,0 +1,20 @@
+# Splunk Supported Add-ons setup profile.
+# Copy to template.local when you want a local runbook.
+
+profile: unix-linux
+event_index: os
+metrics_index: os_metrics
+
+# Linux CollectD profile only.
+hec_token_name: linux_collectd_hec
+tcp_port: 2104
+
+# Typical render command:
+# bash skills/splunk-supported-addons-setup/scripts/setup.sh \
+#   --profile unix-linux \
+#   --phase render \
+#   --event-index os \
+#   --metrics-index os_metrics
+
+# Coverage audit:
+# bash skills/splunk-supported-addons-setup/scripts/setup.sh --phase coverage --json

@@ -682,7 +682,7 @@ def render_handoff_acs(args: argparse.Namespace, instances: list[dict], destinat
         elif d.get("type") == "hec":
             cloud_features.add("hec")
     payload = {
-        "comment": "ACS allowlist plan stub. Replace each instance host with its egress public IP /32 and feed into splunk-cloud-acs-allowlist-setup.",
+        "comment": "ACS allowlist plan stub. Replace each instance host with its egress public IP /32 and feed into splunk-cloud-acs-admin-setup.",
         "instance_hosts": sorted(i["host"] for i in instances),
         "features": sorted(cloud_features),
     }
@@ -738,7 +738,7 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
         "- `forwarder-templates/outputs.conf`.\n"
         "- `pipelines/templates/{filter,mask,sample,route}.spl2` — Splunk-style starters.\n"
         "- `validate.sh`.\n"
-        "- `handoffs/acs-allowlist.json` — promote into `splunk-cloud-acs-allowlist-setup`.\n\n"
+        "- `handoffs/acs-allowlist.json` — promote into `splunk-cloud-acs-admin-setup`.\n\n"
         "## Current release guardrails\n\n"
         "- FIPS-compliant mode requires non-containerized Edge Processor; Docker is refused when `--ep-fips-mode enabled`.\n"
         "- Use `export_destination_errors_total`; older `exporter_error_count` references were renamed.\n"
@@ -751,7 +751,7 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
         "`validate.sh` re-checks this on every run.\n\n"
         "## Next steps\n\n"
         "1. After `apply-objects.sh` succeeds, run `host/<host>/install-with-systemd.sh` on each instance host.\n"
-        "2. Promote `handoffs/acs-allowlist.json` into `splunk-cloud-acs-allowlist-setup` so destinations on Splunk Cloud become reachable.\n"
+        "2. Promote `handoffs/acs-allowlist.json` into `splunk-cloud-acs-admin-setup` so destinations on Splunk Cloud become reachable.\n"
         "3. If forwarders need to send through this EP, deploy `forwarder-templates/outputs.conf` to each forwarder.\n"
     )
 

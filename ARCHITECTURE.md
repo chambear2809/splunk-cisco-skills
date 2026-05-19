@@ -151,8 +151,9 @@ The current skills fall into eight architectural roles:
   readiness), and `splunk-security-portfolio-setup` (router that resolves
   product names to the right delegate skill).
 - **Splunk Cloud control-plane skills** — manage Cloud-only platform surfaces.
-  Example: `splunk-cloud-acs-allowlist-setup` (the seven ACS IP allowlist
-  features for IPv4 and IPv6 with subnet-limit and lock-out preflight).
+  Example: `splunk-cloud-acs-admin-setup` (ACS allowlists, indexes, HEC
+  tokens, users, roles, app permissions, private connectivity, outbound ports,
+  DDSS, limits, maintenance windows, and restarts).
 
 ### CI And Validation
 

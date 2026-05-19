@@ -299,9 +299,9 @@ RULE_CATALOG = [
         evidence="acs.allowlist.search_api_allowed is false or acs.allowlist.gaps is populated.",
         source_doc=SOURCE_DOCS["acs"],
         fix_kind="delegated_fix",
-        preview_command="bash skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh --phase audit --dry-run",
+        preview_command="bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh --phase audit --dry-run",
         apply_command="Render an ACS allowlist handoff; actual allowlist mutation stays in the ACS skill.",
-        handoff_skill="splunk-cloud-acs-allowlist-setup",
+        handoff_skill="splunk-cloud-acs-admin-setup",
         rollback_or_validation="Audit ACS allowlists again and rerun doctor.",
         trigger={
             "any": [

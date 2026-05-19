@@ -13,6 +13,7 @@ SKILL_TOPOLOGY_EXEMPTIONS: set[str] = set()
 
 SPLUNKBASE_APP_COVERAGE_IDS = {
     "263",
+    "833",
     "1747",
     "1761",
     "1809",
@@ -26,6 +27,7 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "3088",
     "3110",
     "3411",
+    "3412",
     "3435",
     "3449",
     "3471",

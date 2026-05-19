@@ -563,8 +563,11 @@ class AgentMCPCoreTests(unittest.TestCase):
 
     def test_new_render_first_skills_read_only_phases(self) -> None:
         # Covers skills added after the initial READ_ONLY_PHASE_SCRIPTS map:
-        # ACS allowlist, Edge Processor, Indexer Cluster, License Manager, SOAR.
+        # ACS admin/allowlist, Edge Processor, Indexer Cluster, License Manager, SOAR.
         cases = [
+            ("splunk-cloud-acs-admin-setup", ["--phase", "audit"], True),
+            ("splunk-cloud-acs-admin-setup", ["--phase", "validate"], True),
+            ("splunk-cloud-acs-admin-setup", ["--phase", "apply"], False),
             ("splunk-cloud-acs-allowlist-setup", ["--phase", "audit"], True),
             ("splunk-cloud-acs-allowlist-setup", ["--phase", "validate"], True),
             ("splunk-cloud-acs-allowlist-setup", ["--phase", "apply"], False),
@@ -689,6 +692,7 @@ class AgentMCPCoreTests(unittest.TestCase):
         # as read-only so operators can see what apply would do without
         # opening the SPLUNK_SKILLS_MCP_ALLOW_MUTATION gate.
         cases = [
+            ("splunk-cloud-acs-admin-setup", ["--phase", "apply"]),
             ("splunk-cloud-acs-allowlist-setup", ["--phase", "apply"]),
             ("splunk-edge-processor-setup", ["--phase", "apply"]),
             ("splunk-federated-search-setup", ["--phase", "apply"]),
@@ -836,6 +840,7 @@ class AgentMCPCoreTests(unittest.TestCase):
 
     def test_smoke_offline_scripts_are_read_only(self) -> None:
         for skill in (
+            "splunk-cloud-acs-admin-setup",
             "splunk-cloud-acs-allowlist-setup",
             "splunk-edge-processor-setup",
             "splunk-enterprise-public-exposure-hardening",

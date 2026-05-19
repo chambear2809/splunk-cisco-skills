@@ -86,3 +86,22 @@ godebug = ""
 enable_obi = false
 obi_version = ""
 obi_install_dir = ""
+
+[technical_addon]
+enabled = false
+target = "deployment-server" # deployment-server or universal-forwarder
+package_paths = ["./Splunk_TA_otel-0.152.0.tgz"]
+package_flavor = "auto" # auto, multi-os, linux-x86-64, windows-x86-64
+mode = "agent" # agent, gateway, agent-to-gateway
+listen_interface = "" # empty = localhost for agent, 0.0.0.0 for gateway
+gateway_url = ""
+collector_log_level = "error"
+collector_env = []
+collector_cmd_args = []
+enable_opamp = false
+splunk_version = ""
+secret_mode = "placeholder" # placeholder, inputs-conf, legacy-file, environment
+accept_token_in_conf = false
+fips_required = false
+fedramp_required = false
+accept_regulated_override = false

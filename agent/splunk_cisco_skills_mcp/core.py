@@ -87,7 +87,8 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     ("splunk-agent-management-setup", "setup.sh"),
     ("splunk-asset-risk-intelligence-setup", "setup.sh"),
     ("splunk-attack-analyzer-setup", "setup.sh"),
-    # splunk-cloud-acs-allowlist-setup, splunk-edge-processor-setup,
+    # splunk-cloud-acs-admin-setup, splunk-cloud-acs-allowlist-setup,
+    # splunk-edge-processor-setup,
     # splunk-federated-search-setup, splunk-indexer-cluster-setup,
     # splunk-license-manager-setup, splunk-soar-setup all share the same
     # render-first --dry-run contract: the renderer runs with --dry-run,
@@ -96,6 +97,7 @@ READ_ONLY_DRY_RUN_SCRIPTS: set[tuple[str, str]] = {
     # operators preview --phase apply / --phase rolling-restart / etc.
     # under the read-only classification.
     ("splunk-cloud-acs-allowlist-setup", "setup.sh"),
+    ("splunk-cloud-acs-admin-setup", "setup.sh"),
     ("splunk-edge-processor-setup", "setup.sh"),
     ("splunk-enterprise-kubernetes-setup", "setup.sh"),
     # splunk-enterprise-public-exposure-hardening uses --phase + --dry-run.
@@ -204,6 +206,13 @@ READ_ONLY_PHASE_SCRIPTS: dict[tuple[str, str], set[str]] = {
     ("splunk-enterprise-kubernetes-setup", "setup.sh"): {"render", "preflight", "status"},
     ("splunk-universal-forwarder-setup", "setup.sh"): {"render", "download", "status"},
     ("splunk-cloud-acs-allowlist-setup", "setup.sh"): {
+        "render",
+        "preflight",
+        "status",
+        "audit",
+        "validate",
+    },
+    ("splunk-cloud-acs-admin-setup", "setup.sh"): {
         "render",
         "preflight",
         "status",
@@ -359,6 +368,12 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
     ("splunk-observability-k8s-frontend-rum-setup", "setup.sh"): (
         "--apply-injection",
         "--uninstall-injection",
+    ),
+    # Mobile RUM renders snippets and optional patch files by default. Only
+    # --apply-patches edits application source, and the script also requires
+    # --accept-mobile-rum-source-edit before it will run git apply.
+    ("splunk-observability-mobile-rum-setup", "setup.sh"): (
+        "--apply-patches",
     ),
     # Galileo platform / Agent Control skills are render-first; live work
     # happens only through --apply sections, while --dry-run is a plan-only

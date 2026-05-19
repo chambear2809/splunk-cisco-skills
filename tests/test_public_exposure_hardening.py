@@ -1323,7 +1323,7 @@ def test_cross_skill_table_lists_handoff_partners() -> None:
         "splunk-indexer-cluster-setup",
         "splunk-agent-management-setup",
         "splunk-license-manager-setup",
-        "splunk-cloud-acs-allowlist-setup",
+        "splunk-cloud-acs-admin-setup",
         "splunk-federated-search-setup",
         "splunk-monitoring-console-setup",
         "splunk-connect-for-syslog-setup",

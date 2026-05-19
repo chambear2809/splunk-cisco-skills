@@ -10,6 +10,7 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-otel-rendered"
 CHECK_K8S=false
 CHECK_LINUX=false
+CHECK_TA=false
 CHECK_PLATFORM_HEC=false
 LIVE=false
 EXECUTION="local"
@@ -25,6 +26,7 @@ Options:
   --output-dir DIR       Rendered output directory
   --check-k8s            Check Kubernetes rendered assets
   --check-linux          Check Linux rendered assets
+  --check-ta             Check Splunkbase 7125 TA rendered assets
   --check-platform-hec   Check rendered Splunk Platform HEC helper assets
   --live                 Run live status checks using rendered status scripts
   --execution local|ssh  Linux live validation mode (default: local)
@@ -37,6 +39,7 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --check-k8s) CHECK_K8S=true; shift ;;
         --check-linux) CHECK_LINUX=true; shift ;;
+        --check-ta) CHECK_TA=true; shift ;;
         --check-platform-hec) CHECK_PLATFORM_HEC=true; shift ;;
         --live) LIVE=true; shift ;;
         --execution) require_arg "$1" "$#" || exit 1; EXECUTION="$2"; shift 2 ;;
@@ -57,14 +60,15 @@ case "${EXECUTION}" in
         ;;
 esac
 
-if [[ "${CHECK_K8S}" != "true" && "${CHECK_LINUX}" != "true" && "${CHECK_PLATFORM_HEC}" != "true" ]]; then
+if [[ "${CHECK_K8S}" != "true" && "${CHECK_LINUX}" != "true" && "${CHECK_TA}" != "true" && "${CHECK_PLATFORM_HEC}" != "true" ]]; then
     [[ -d "${OUTPUT_DIR}/k8s" ]] && CHECK_K8S=true
     [[ -d "${OUTPUT_DIR}/linux" ]] && CHECK_LINUX=true
+    [[ -d "${OUTPUT_DIR}/ta" ]] && CHECK_TA=true
     [[ -d "${OUTPUT_DIR}/platform-hec" ]] && CHECK_PLATFORM_HEC=true
 fi
 
-if [[ "${CHECK_K8S}" != "true" && "${CHECK_LINUX}" != "true" && "${CHECK_PLATFORM_HEC}" != "true" ]]; then
-    log "ERROR: No rendered Kubernetes, Linux, or Splunk Platform HEC assets found under ${OUTPUT_DIR}."
+if [[ "${CHECK_K8S}" != "true" && "${CHECK_LINUX}" != "true" && "${CHECK_TA}" != "true" && "${CHECK_PLATFORM_HEC}" != "true" ]]; then
+    log "ERROR: No rendered Kubernetes, Linux, TA, or Splunk Platform HEC assets found under ${OUTPUT_DIR}."
     exit 1
 fi
 
@@ -113,6 +117,47 @@ if [[ "${CHECK_PLATFORM_HEC}" == "true" ]]; then
     log "Splunk Platform HEC helper assets passed static validation."
     if [[ "${LIVE}" == "true" ]]; then
         bash "${OUTPUT_DIR}/platform-hec/status-hec-service.sh"
+    fi
+fi
+
+if [[ "${CHECK_TA}" == "true" ]]; then
+    check_file "${OUTPUT_DIR}/ta/README.md"
+    check_file "${OUTPUT_DIR}/ta/metadata.json"
+    check_file "${OUTPUT_DIR}/ta/package-audit.md"
+    check_file "${OUTPUT_DIR}/ta/local/inputs.conf.template"
+    check_file "${OUTPUT_DIR}/ta/preflight-ta.sh"
+    check_file "${OUTPUT_DIR}/ta/stage-ta-package.sh"
+    check_file "${OUTPUT_DIR}/ta/apply-local-uf.sh"
+    check_file "${OUTPUT_DIR}/ta/apply-deployment-server.sh"
+    check_file "${OUTPUT_DIR}/ta/status-ta.sh"
+    check_file "${OUTPUT_DIR}/ta/agent-management/render-serverclass-handoff.sh"
+    for script in \
+        "${OUTPUT_DIR}/ta/preflight-ta.sh" \
+        "${OUTPUT_DIR}/ta/stage-ta-package.sh" \
+        "${OUTPUT_DIR}/ta/apply-local-uf.sh" \
+        "${OUTPUT_DIR}/ta/apply-deployment-server.sh" \
+        "${OUTPUT_DIR}/ta/status-ta.sh" \
+        "${OUTPUT_DIR}/ta/agent-management/render-serverclass-handoff.sh"; do
+        bash -n "${script}" || {
+            log "ERROR: TA rendered script failed shell syntax validation: ${script}"
+            exit 1
+        }
+    done
+    grep -q '"splunkbase_app_id": "7125"' "${OUTPUT_DIR}/ta/metadata.json" || {
+        log "ERROR: TA metadata must identify Splunkbase app 7125."
+        exit 1
+    }
+    grep -Eq '^\[Splunk_TA_otel://[^]]+\]' "${OUTPUT_DIR}/ta/local/inputs.conf.template" || {
+        log "ERROR: TA inputs.conf.template must render a modular input stanza from inputs.conf.spec."
+        exit 1
+    }
+    if grep -R -E 'O11Y_SECRET_SHOULD_NOT|HEC_SECRET_SHOULD_NOT|SPLUNK_SECRET_SHOULD_NOT' "${OUTPUT_DIR}/ta" >/dev/null 2>&1; then
+        log "ERROR: TA rendered assets appear to contain test token values."
+        exit 1
+    fi
+    log "Splunk Add-On for OpenTelemetry Collector TA assets passed static validation."
+    if [[ "${LIVE}" == "true" ]]; then
+        bash "${OUTPUT_DIR}/ta/status-ta.sh"
     fi
 fi
 

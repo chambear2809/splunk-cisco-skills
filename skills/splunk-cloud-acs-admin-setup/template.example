@@ -1,0 +1,57 @@
+# Splunk Cloud ACS Admin Worksheet
+#
+# Copy this file locally and fill in non-secret values. Keep credentials,
+# passwords, JWTs, HEC token values, and stack-specific secrets in the project
+# credentials file or local chmod-600 files. The setup wrapper accepts CLI flags;
+# broader admin operations are read from a JSON file passed with
+# --admin-plan-file.
+
+phase: render
+
+# Comma-separated subset of ACS admin modules to inventory/render.
+modules: allowlists,indexes,hec-tokens,users,roles,capabilities,app-permissions,private-connectivity,outbound-ports,ddss,limits,maintenance-windows,restarts,apps,tokens,deployment,license,observability
+
+# Optional JSON file with broader ACS admin operations. See reference.md for
+# the schema.
+admin_plan_file: ./acs-admin-plan.local.json
+
+# Comma-separated subset of ACS allowlist features to manage in this run.
+# Allowed values: acs, search-api, hec, s2s, search-ui, idm-api, idm-ui
+features: search-api,s2s,hec
+
+# IPv4 subnets per feature. Leave blank to skip that feature for IPv4.
+acs_subnets:
+search_api_subnets: 198.51.100.0/24
+hec_subnets: 203.0.113.0/24
+s2s_subnets: 198.51.100.0/24,203.0.113.0/24
+search_ui_subnets:
+idm_api_subnets:
+idm_ui_subnets:
+
+# IPv6 subnets per feature. Leave blank to skip that feature for IPv6.
+acs_subnets_v6:
+search_api_subnets_v6:
+hec_subnets_v6:
+s2s_subnets_v6:
+search_ui_subnets_v6:
+idm_api_subnets_v6:
+idm_ui_subnets_v6:
+
+# Cloud provider for subnet limit math.
+cloud_provider: aws
+
+# Premium SH targeting (optional). Only needed if ACS operations need a target
+# search head prefix.
+target_search_head:
+
+# Set to true ONLY after explicit confirmation that you accept losing IP
+# allowlist UI / Federated Search / Maintenance Windows / Observability APIs /
+# Limits when restricting the `acs` feature.
+allow_acs_lockout: false
+
+# true refuses to apply when live allowlist state has drifted from the rendered
+# plan. false bypasses the check; prefer the CLI --force one-shot override.
+strict_drift: true
+
+# Optional Terraform snippets for IPv4 allowlists using the splunk/scp provider.
+emit_terraform: false

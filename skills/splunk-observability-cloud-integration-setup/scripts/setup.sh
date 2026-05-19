@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Splunk Platform <-> Splunk Observability Cloud integration: primary CLI.
 #
-# Mirrors the `splunk-cloud-acs-allowlist-setup` and `splunk-observability-otel-collector-setup`
+# Mirrors the `splunk-cloud-acs-admin-setup` and `splunk-observability-otel-collector-setup`
 # patterns: render-first by default, file-based-secrets only, idempotent applies
 # tracked through `<rendered>/state/apply-state.json`, doctor + discover modes
 # for inheriting an existing integration.

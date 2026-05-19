@@ -202,7 +202,7 @@ can include:
   Access tokens. Read-permission grant on the app to selected roles.
 - `log_observer_connect` — service-account user + role + workload rule;
   Splunk Cloud Platform path or Splunk Enterprise TLS-certificate path.
-  Hands off realm-IP allowlist deltas to `splunk-cloud-acs-allowlist-setup`.
+  Hands off realm-IP allowlist deltas to `splunk-cloud-acs-admin-setup`.
 - `dashboard_studio_o11y` — default-connection + capability validations + a
   starter Dashboard Studio JSON snippet using O11y metrics.
 - `sim_addon` — installs `Splunk_TA_sim` (Splunkbase 5247), creates the
@@ -297,10 +297,10 @@ bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh \
 - App install ➜ `skills/splunk-app-install/scripts/install_app.sh --source
   splunkbase --app-id 5247` (Splunk_TA_sim).
 - ACS Log Observer Connect realm-IP allowlist deltas ➜
-  `skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh --phase render
+  `skills/splunk-cloud-acs-admin-setup/scripts/setup.sh --phase render
   --features search-api --search-api-subnets <pre-baked-realm-IPs>`.
 - ACS Splunk Cloud Victoria-stack search-head HEC allowlist (SIM Add-on
-  prerequisite) ➜ `skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh
+  prerequisite) ➜ `skills/splunk-cloud-acs-admin-setup/scripts/setup.sh
   --phase render --features hec`.
 - ITSI Content Pack for Splunk Observability Cloud ➜
   `skills/splunk-itsi-config/SKILL.md`.
