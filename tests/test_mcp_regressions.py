@@ -499,6 +499,229 @@ class MCPRegressionTests(ShellScriptRegressionBase):
             self.assertNotIn(token_value, json.dumps(mcp_remote_args))
 
 
+    def test_splunk_mcp_gateway_headers_are_shell_safe_and_not_in_argv(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            bin_dir = tmp_path / "bin"
+            bin_dir.mkdir()
+            output_dir = tmp_path / "rendered"
+            o11y_token_file = tmp_path / "o11y.token"
+            splunk_jwt_file = tmp_path / "splunk.jwt"
+            mcp_remote_log = tmp_path / "mcp-remote-log.json"
+            url_marker = tmp_path / "url-marker"
+            o11y_marker = tmp_path / "o11y-marker"
+            splunk_marker = tmp_path / "splunk-marker"
+            tenant_marker = tmp_path / "tenant-marker"
+            gateway_url = f"https://region-pdx10.api.scs.splunk.com/system/mcp-gateway/v1/?target=$(touch {url_marker})"
+            o11y_token = f"sf tok'\"$(touch {o11y_marker})\\tail"
+            splunk_jwt = f"spl unk'\"$(touch {splunk_marker})\\tail"
+            tenant = f"tenant$(touch {tenant_marker})"
+
+            o11y_token_file.write_text(o11y_token, encoding="utf-8")
+            splunk_jwt_file.write_text(splunk_jwt, encoding="utf-8")
+            o11y_token_file.chmod(0o600)
+            splunk_jwt_file.chmod(0o600)
+
+            write_executable(
+                bin_dir / "mcp-remote",
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                import sys
+                from pathlib import Path
+
+                payload = {
+                    "args": sys.argv[1:],
+                    "url": os.environ.get("SPLUNK_MCP_URL"),
+                    "authorization": os.environ.get("SPLUNK_MCP_HEADER_AUTHORIZATION"),
+                    "tenant": os.environ.get("SPLUNK_MCP_HEADER_SPLUNK_TENANT"),
+                    "sf_token": os.environ.get("SPLUNK_MCP_HEADER_X_SF_TOKEN"),
+                    "sf_realm": os.environ.get("SPLUNK_MCP_HEADER_X_SF_REALM"),
+                }
+                Path(os.environ["MCP_REMOTE_LOG"]).write_text(json.dumps(payload), encoding="utf-8")
+                """,
+            )
+
+            env = os.environ.copy()
+            env["PATH"] = f"{bin_dir}:{env['PATH']}"
+            env["MCP_REMOTE_LOG"] = str(mcp_remote_log)
+
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--gateway-mode",
+                "combined",
+                "--gateway-url",
+                gateway_url,
+                "--o11y-realm",
+                "us1",
+                "--o11y-token-file",
+                str(o11y_token_file),
+                "--splunk-tenant",
+                tenant,
+                "--splunk-jwt-file",
+                str(splunk_jwt_file),
+                "--output-dir",
+                str(output_dir),
+                "--no-register-codex",
+                "--no-configure-cursor",
+                "--no-configure-claude",
+                env=env,
+            )
+
+            output = result.stdout + result.stderr
+            self.assertEqual(result.returncode, 0, msg=output)
+
+            expected_args = [
+                gateway_url,
+                "--transport",
+                "http-only",
+                "--allow-http",
+                "--header",
+                "Authorization: ${SPLUNK_MCP_HEADER_AUTHORIZATION}",
+                "--header",
+                "splunk_tenant: ${SPLUNK_MCP_HEADER_SPLUNK_TENANT}",
+                "--header",
+                "X-SF-TOKEN: ${SPLUNK_MCP_HEADER_X_SF_TOKEN}",
+                "--header",
+                "X-SF-REALM: ${SPLUNK_MCP_HEADER_X_SF_REALM}",
+            ]
+
+            for command in (["bash", str(output_dir / "run-splunk-mcp.sh")],):
+                wrapper_result = subprocess.run(
+                    command,
+                    cwd=REPO_ROOT,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(
+                    wrapper_result.returncode,
+                    0,
+                    msg=wrapper_result.stdout + wrapper_result.stderr,
+                )
+                payload = json.loads(mcp_remote_log.read_text(encoding="utf-8"))
+                self.assertEqual(payload["args"], expected_args)
+                self.assertEqual(payload["url"], gateway_url)
+                self.assertEqual(payload["authorization"], f"Bearer {splunk_jwt}")
+                self.assertEqual(payload["tenant"], tenant)
+                self.assertEqual(payload["sf_token"], o11y_token)
+                self.assertEqual(payload["sf_realm"], "us1")
+                argv_json = json.dumps(payload["args"])
+                self.assertNotIn(o11y_token, argv_json)
+                self.assertNotIn(splunk_jwt, argv_json)
+                self.assertNotIn(tenant, argv_json)
+                self.assertFalse(url_marker.exists(), "gateway URL command substitution should not execute")
+                self.assertFalse(o11y_marker.exists(), "O11y token command substitution should not execute")
+                self.assertFalse(splunk_marker.exists(), "Splunk token command substitution should not execute")
+                self.assertFalse(tenant_marker.exists(), "tenant command substitution should not execute")
+
+            node_path = shutil.which("node")
+            if not node_path:
+                self.skipTest("node is required to exercise the rendered JS wrapper")
+
+            mcp_remote_log.unlink()
+            js_wrapper_result = subprocess.run(
+                [node_path, str(output_dir / "run-splunk-mcp.js")],
+                cwd=REPO_ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(
+                js_wrapper_result.returncode,
+                0,
+                msg=js_wrapper_result.stdout + js_wrapper_result.stderr,
+            )
+            payload = json.loads(mcp_remote_log.read_text(encoding="utf-8"))
+            self.assertEqual(payload["args"], expected_args)
+            self.assertEqual(payload["authorization"], f"Bearer {splunk_jwt}")
+            self.assertEqual(payload["tenant"], tenant)
+            self.assertEqual(payload["sf_token"], o11y_token)
+            self.assertEqual(payload["sf_realm"], "us1")
+            argv_json = json.dumps(payload["args"])
+            self.assertNotIn(o11y_token, argv_json)
+            self.assertNotIn(splunk_jwt, argv_json)
+            self.assertNotIn(tenant, argv_json)
+
+
+    def test_splunk_mcp_gateway_rejects_unsupported_o11y_realms(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            output_dir = tmp_path / "rendered"
+            o11y_token_file = tmp_path / "o11y.token"
+            o11y_token_file.write_text("o11y-token-value", encoding="utf-8")
+            o11y_token_file.chmod(0o600)
+
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--gateway-mode",
+                "o11y",
+                "--gateway-url",
+                "https://region-pdx10.api.scs.splunk.com/system/mcp-gateway/v1/",
+                "--o11y-realm",
+                "us2",
+                "--o11y-token-file",
+                str(o11y_token_file),
+                "--output-dir",
+                str(output_dir),
+                "--no-register-codex",
+                "--no-configure-cursor",
+                "--no-configure-claude",
+                env=os.environ.copy(),
+            )
+
+            self.assertEqual(result.returncode, 1, msg=result.stdout + result.stderr)
+            self.assertIn("Google Cloud Platform realms or GovCloud realms", result.stdout + result.stderr)
+
+            reference = (
+                REPO_ROOT / "skills/splunk-mcp-server-setup/reference.md"
+            ).read_text(encoding="utf-8")
+            self.assertIn("Google Cloud Platform realms and GovCloud realms", reference)
+            self.assertIn("us2", reference)
+
+
+    def test_splunk_mcp_explicit_gateway_url_overrides_scs_region_mismatch(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            output_dir = tmp_path / "rendered"
+            o11y_token_file = tmp_path / "o11y.token"
+            o11y_token_file.write_text("o11y-token-value", encoding="utf-8")
+            o11y_token_file.chmod(0o600)
+
+            result = self.run_script(
+                "skills/splunk-mcp-server-setup/scripts/setup.sh",
+                "--render-clients",
+                "--gateway-mode",
+                "o11y",
+                "--gateway-url",
+                "https://region-fra10.api.scs.splunk.com/system/mcp-gateway/v1/",
+                "--scs-region",
+                "pdx10",
+                "--o11y-realm",
+                "eu1",
+                "--o11y-token-file",
+                str(o11y_token_file),
+                "--output-dir",
+                str(output_dir),
+                "--no-register-codex",
+                "--no-configure-cursor",
+                "--no-configure-claude",
+                env=os.environ.copy(),
+            )
+
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            env_text = (output_dir / ".env.splunk-mcp").read_text(encoding="utf-8")
+            self.assertIn(
+                "SPLUNK_MCP_URL=https://region-fra10.api.scs.splunk.com/system/mcp-gateway/v1/",
+                env_text,
+            )
+
+
     def test_splunk_mcp_validate_uses_root_protected_resource_endpoint(self):
         script_text = (
             REPO_ROOT / "skills/splunk-mcp-server-setup/scripts/validate.sh"

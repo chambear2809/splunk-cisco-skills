@@ -6,7 +6,8 @@ description: >-
   rate limits, encrypted token issuance, and renders a shared client bridge
   bundle that works with Cursor, Codex, and Claude Code. Use when the user asks about
   Splunk MCP server setup, Splunk MCP TA, Splunk_MCP_Server, /services/mcp,
-  Cursor MCP, Codex MCP, or Claude Code MCP connectivity to Splunk.
+  the hosted SCS MCP Gateway for Splunk Observability Cloud, Cursor MCP,
+  Codex MCP, or Claude Code MCP connectivity to Splunk.
 ---
 
 # Splunk MCP Server Setup
@@ -20,12 +21,15 @@ This skill handles five operator tasks:
 1. Install or update the packaged app from the repo-local `splunk-ta/` cache
 2. Configure supported runtime settings in `mcp.conf`
 3. Mint encrypted bearer tokens into local-only files
-4. Render a reusable local bridge bundle for Cursor, Codex, and Claude Code
+4. Render a reusable local bridge bundle for Cursor, Codex, and Claude Code,
+   targeting either local Splunk Platform `/services/mcp` or the hosted SCS MCP Gateway
 5. Uninstall the app cleanly when lab teardown is needed
 
 The bridge bundle uses the same `mcp-remote` wrapper pattern for all three tools, so
 one rendered directory can be opened in Cursor, registered with Codex, and auto-wired
-into Claude Code's `.mcp.json`.
+into Claude Code's `.mcp.json`. The wrapper passes header placeholders such as
+`${SPLUNK_MCP_HEADER_X_SF_TOKEN}` to `mcp-remote`, keeping token values in the
+local env file instead of command argv.
 
 ## Package Model
 
@@ -82,6 +86,7 @@ The agent may freely ask for non-secret values such as:
 - row limits
 - rate-limit thresholds
 - whether the rendered client bridge should assume insecure TLS for lab use
+- hosted SCS region, Observability realm, and Splunk tenant name
 
 Use an existing Splunk user that has the `mcp_tool_admin` capability. In most
 lab setups that should be the same account already configured in
@@ -181,12 +186,71 @@ in the same run.
 
 ### Step 5: Render And Apply The Shared Cursor/Codex Bridge Bundle
 
+Choose one gateway mode:
+
+| Mode | Endpoint | Required secret files |
+|------|----------|-----------------------|
+| `platform` | Splunk Platform app endpoint, usually `/services/mcp` on port `8089` | encrypted MCP bearer token file when writing a live `.env.splunk-mcp` |
+| `o11y` | hosted SCS MCP Gateway | `--o11y-token-file` |
+| `combined` | hosted SCS MCP Gateway with Splunk Platform + Observability headers | `--o11y-token-file` and `--splunk-jwt-file` |
+
+Default platform mode preserves the existing local app workflow:
+
 ```bash
 bash skills/splunk-mcp-server-setup/scripts/setup.sh \
   --render-clients \
   --bearer-token-file /tmp/splunk_mcp.token \
   --cursor-workspace ~/Projects/my-cursor-workspace
 ```
+
+O11y-only hosted gateway:
+
+```bash
+bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --render-clients \
+  --gateway-mode o11y \
+  --scs-region pdx10 \
+  --o11y-realm us1 \
+  --o11y-token-file /tmp/splunk_o11y_api_token
+```
+
+Combined Splunk Platform + Observability gateway:
+
+```bash
+bash skills/splunk-mcp-server-setup/scripts/setup.sh \
+  --render-clients \
+  --gateway-mode combined \
+  --scs-region pdx10 \
+  --o11y-realm us1 \
+  --o11y-token-file /tmp/splunk_o11y_api_token \
+  --splunk-tenant mytenant \
+  --splunk-jwt-file /tmp/splunk_mcp_jwt
+```
+
+The SCS gateway URL is derived as:
+
+```text
+https://region-<REGION>.api.scs.splunk.com/system/mcp-gateway/v1/
+```
+
+Current documented realm-to-SCS-region mappings:
+
+| O11y realm | SCS region |
+|------------|------------|
+| `eu0` | `dub10` |
+| `eu1` | `fra10` |
+| `eu2` | `lon10` |
+| `us0` | `iad10` |
+| `us1` | `pdx10` |
+| `us3` | `pdx10` |
+| `jp0` | `tyo10` |
+| `au0` | `syd10` |
+| `sg0` | `sin10` |
+
+Google Cloud Platform realms and GovCloud realms are not supported by the
+hosted MCP Gateway; the renderer rejects known unsupported values such as
+`us2` and `gov*`. Use `--gateway-url` only when Splunk provides an explicit
+gateway endpoint.
 
 Default render target:
 
@@ -214,6 +278,12 @@ out of any client update while still rendering the bundle.
 
 The shell wrapper expects `mcp-remote` on `PATH`; the Node wrapper used by client
 registrations prefers `mcp-remote` on `PATH` and falls back to `npx mcp-remote`.
+For `o11y` and `combined` gateway modes, the wrapper also passes
+`--transport http-only --allow-http` to match Splunk's hosted gateway examples.
+
+Do not add hosted Observability AI Assistant MCP tools to local
+`Splunk_MCP_Server` custom tool manifests. Gateway mode only configures client
+headers and endpoint selection.
 
 ### Step 6: Validate
 
@@ -255,6 +325,9 @@ See [reference.md](reference.md) for the exact implications.
    runtime controls such as row limits, TLS verification, and token policy.
 5. **The app needs search-tier placement**: it exposes `/services/mcp` and
    depends on custom REST handlers plus KV Store-backed tool metadata.
+6. **Hosted SCS MCP Gateway is client-side configuration**: it uses
+   `--gateway-mode o11y` or `combined` and does not install hosted
+   Observability tools into the local Splunk Platform app.
 
 ## Cursor IDE Integration
 

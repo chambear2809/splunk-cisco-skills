@@ -77,6 +77,8 @@ teardown() {
     [[ "$output" =~ "--no-register-codex" ]]
     [[ "$output" =~ "--no-configure-cursor" ]]
     [[ "$output" =~ "--no-configure-claude" ]]
+    [[ "$output" =~ "--gateway-mode" ]]
+    [[ "$output" =~ "--scs-region" ]]
 }
 
 @test "splunk-mcp-server validate --help exits 0" {
@@ -136,6 +138,159 @@ teardown() {
     [ "$status" -eq 0 ]
     [[ "$output" =~ "\"name\":\"splunk-shared\"" || "$output" =~ "\"name\": \"splunk-shared\"" ]]
     [[ "$output" == *"${home_dir}/.codex/mcp-bridges/splunk-shared/run-splunk-mcp.js"* ]]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup platform rendering keeps bearer placeholder" {
+    work_dir="$(mktemp -d)"
+    token_file="${work_dir}/splunk.token"
+    output_dir="${work_dir}/rendered"
+
+    printf '%s' 'encrypted-token-value' > "${token_file}"
+    chmod 600 "${token_file}"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --mcp-url "https://splunk.example.invalid:8089/services/mcp" \
+      --bearer-token-file "${token_file}" \
+      --output-dir "${output_dir}" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 0 ]
+
+    run cat "${output_dir}/.env.splunk-mcp"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SPLUNK_MCP_GATEWAY_MODE=platform" ]]
+    [[ "$output" =~ "SPLUNK_MCP_TOKEN=encrypted-token-value" ]]
+
+    run cat "${output_dir}/run-splunk-mcp.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Authorization: Bearer \${SPLUNK_MCP_TOKEN}"* ]]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup renders o11y SCS gateway headers" {
+    work_dir="$(mktemp -d)"
+    o11y_token_file="${work_dir}/o11y.token"
+    output_dir="${work_dir}/rendered"
+
+    printf '%s' 'o11y-token-value' > "${o11y_token_file}"
+    chmod 600 "${o11y_token_file}"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --gateway-mode o11y \
+      --scs-region pdx10 \
+      --o11y-realm us1 \
+      --o11y-token-file "${o11y_token_file}" \
+      --output-dir "${output_dir}" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 0 ]
+
+    run cat "${output_dir}/.env.splunk-mcp"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SPLUNK_MCP_GATEWAY_MODE=o11y" ]]
+    [[ "$output" =~ "SPLUNK_MCP_URL=https://region-pdx10.api.scs.splunk.com/system/mcp-gateway/v1/" ]]
+    [[ "$output" =~ "SPLUNK_MCP_HEADER_X_SF_TOKEN=o11y-token-value" ]]
+    [[ "$output" =~ "SPLUNK_MCP_HEADER_X_SF_REALM=us1" ]]
+
+    run cat "${output_dir}/run-splunk-mcp.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"X-SF-TOKEN: \${SPLUNK_MCP_HEADER_X_SF_TOKEN}"* ]]
+    [[ "$output" == *"X-SF-REALM: \${SPLUNK_MCP_HEADER_X_SF_REALM}"* ]]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup renders combined gateway headers" {
+    work_dir="$(mktemp -d)"
+    o11y_token_file="${work_dir}/o11y.token"
+    splunk_jwt_file="${work_dir}/splunk.jwt"
+    output_dir="${work_dir}/rendered"
+
+    printf '%s' 'o11y-token-value' > "${o11y_token_file}"
+    printf '%s' 'splunk-token-value' > "${splunk_jwt_file}"
+    chmod 600 "${o11y_token_file}" "${splunk_jwt_file}"
+
+    run bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --gateway-mode combined \
+      --scs-region pdx10 \
+      --o11y-realm us1 \
+      --o11y-token-file "${o11y_token_file}" \
+      --splunk-tenant mytenant \
+      --splunk-jwt-file "${splunk_jwt_file}" \
+      --output-dir "${output_dir}" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 0 ]
+
+    run cat "${output_dir}/.env.splunk-mcp"
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "SPLUNK_MCP_GATEWAY_MODE=combined" ]]
+    [[ "$output" =~ "SPLUNK_MCP_HEADER_AUTHORIZATION=Bearer" ]]
+    [[ "$output" =~ "splunk-token-value" ]]
+    [[ "$output" =~ "SPLUNK_MCP_HEADER_SPLUNK_TENANT=mytenant" ]]
+    [[ "$output" =~ "SPLUNK_MCP_HEADER_X_SF_TOKEN=o11y-token-value" ]]
+    [[ "$output" =~ "SPLUNK_MCP_HEADER_X_SF_REALM=us1" ]]
+
+    run cat "${output_dir}/run-splunk-mcp.sh"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Authorization: \${SPLUNK_MCP_HEADER_AUTHORIZATION}"* ]]
+    [[ "$output" == *"splunk_tenant: \${SPLUNK_MCP_HEADER_SPLUNK_TENANT}"* ]]
+    [[ "$output" == *"X-SF-TOKEN: \${SPLUNK_MCP_HEADER_X_SF_TOKEN}"* ]]
+    [[ "$output" == *"X-SF-REALM: \${SPLUNK_MCP_HEADER_X_SF_REALM}"* ]]
+
+    rm -rf "${work_dir}"
+}
+
+@test "splunk-mcp-server setup rejects missing gateway args by mode" {
+    work_dir="$(mktemp -d)"
+    o11y_token_file="${work_dir}/o11y.token"
+    splunk_jwt_file="${work_dir}/splunk.jwt"
+    empty_credentials="${work_dir}/credentials"
+
+    : > "${empty_credentials}"
+    printf '%s' 'o11y-token-value' > "${o11y_token_file}"
+    printf '%s' 'splunk-token-value' > "${splunk_jwt_file}"
+    chmod 600 "${o11y_token_file}" "${splunk_jwt_file}"
+
+    run env SPLUNK_CREDENTIALS_FILE="${empty_credentials}" SPLUNK_O11Y_TOKEN_FILE= SPLUNK_MCP_SPLUNK_TENANT= SPLUNK_MCP_SPLUNK_JWT_FILE= bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --gateway-mode o11y \
+      --scs-region pdx10 \
+      --o11y-realm us1 \
+      --output-dir "${work_dir}/missing-o11y-token" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "--o11y-token-file" ]]
+
+    run env SPLUNK_CREDENTIALS_FILE="${empty_credentials}" SPLUNK_O11Y_TOKEN_FILE= SPLUNK_MCP_SPLUNK_TENANT= SPLUNK_MCP_SPLUNK_JWT_FILE= bash "${PROJECT_ROOT}/skills/splunk-mcp-server-setup/scripts/setup.sh" \
+      --render-clients \
+      --gateway-mode combined \
+      --scs-region pdx10 \
+      --o11y-realm us1 \
+      --o11y-token-file "${o11y_token_file}" \
+      --splunk-jwt-file "${splunk_jwt_file}" \
+      --output-dir "${work_dir}/missing-tenant" \
+      --no-register-codex \
+      --no-configure-cursor \
+      --no-configure-claude
+
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "--splunk-tenant" ]]
 
     rm -rf "${work_dir}"
 }
