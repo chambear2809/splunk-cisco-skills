@@ -40,6 +40,10 @@ ALLOWED_KEYS = [
     "SPLUNK_CLOUD_INDEX_SEARCHABLE_DAYS",
     "SPLUNK_O11Y_REALM",
     "SPLUNK_O11Y_TOKEN_FILE",
+    "SPLUNK_MCP_GATEWAY_URL",
+    "SPLUNK_MCP_SCS_REGION",
+    "SPLUNK_MCP_SPLUNK_TENANT",
+    "SPLUNK_MCP_SPLUNK_JWT_FILE",
     "ACS_SERVER",
     "STACK_USERNAME",
     "STACK_PASSWORD",
@@ -279,8 +283,12 @@ class TestCredentialParsing(unittest.TestCase):
         text = textwrap.dedent("""\
             SPLUNK_O11Y_REALM="us1"
             SPLUNK_O11Y_TOKEN_FILE="/tmp/splunk_o11y_api_token"
+            SPLUNK_MCP_SCS_REGION="pdx10"
+            SPLUNK_MCP_SPLUNK_TENANT="tenant-a"
+            SPLUNK_MCP_SPLUNK_JWT_FILE="/tmp/splunk_mcp_jwt"
             PROFILE_o11y__SPLUNK_O11Y_REALM="eu0"
             PROFILE_o11y__SPLUNK_O11Y_TOKEN_FILE="/tmp/eu0_o11y_token"
+            PROFILE_o11y__SPLUNK_MCP_GATEWAY_URL="https://region-dub10.api.scs.splunk.com/system/mcp-gateway/v1/"
         """)
 
         flat = parse_credential_file(text)
@@ -288,8 +296,15 @@ class TestCredentialParsing(unittest.TestCase):
 
         self.assertEqual(flat["SPLUNK_O11Y_REALM"], "us1")
         self.assertEqual(flat["SPLUNK_O11Y_TOKEN_FILE"], "/tmp/splunk_o11y_api_token")
+        self.assertEqual(flat["SPLUNK_MCP_SCS_REGION"], "pdx10")
+        self.assertEqual(flat["SPLUNK_MCP_SPLUNK_TENANT"], "tenant-a")
+        self.assertEqual(flat["SPLUNK_MCP_SPLUNK_JWT_FILE"], "/tmp/splunk_mcp_jwt")
         self.assertEqual(profile["SPLUNK_O11Y_REALM"], "eu0")
         self.assertEqual(profile["SPLUNK_O11Y_TOKEN_FILE"], "/tmp/eu0_o11y_token")
+        self.assertEqual(
+            profile["SPLUNK_MCP_GATEWAY_URL"],
+            "https://region-dub10.api.scs.splunk.com/system/mcp-gateway/v1/",
+        )
 
 
 class TestCredentialFileRoundtrip(unittest.TestCase):

@@ -20,6 +20,15 @@ OUTPUT_DIR=""
 CLIENT_NAME="splunk-mcp"
 CLIENT_INSECURE_TLS=false
 MCP_URL=""
+GATEWAY_MODE="platform"
+GATEWAY_URL="${SPLUNK_MCP_GATEWAY_URL:-}"
+SCS_REGION="${SPLUNK_MCP_SCS_REGION:-}"
+GATEWAY_URL_SET=false
+SCS_REGION_SET=false
+O11Y_REALM="${SPLUNK_O11Y_REALM:-}"
+O11Y_TOKEN_FILE="${SPLUNK_O11Y_TOKEN_FILE:-}"
+SPLUNK_TENANT="${SPLUNK_MCP_SPLUNK_TENANT:-}"
+SPLUNK_JWT_FILE="${SPLUNK_MCP_SPLUNK_JWT_FILE:-}"
 CURSOR_WORKSPACE=""
 REGISTER_CODEX=true
 CONFIGURE_CURSOR=true
@@ -76,7 +85,14 @@ Primary actions:
   --no-register-codex                    Render the bundle but skip codex mcp registration
   --no-configure-cursor                  Render the bundle but skip updating Cursor workspace config
   --no-configure-claude                  Render the bundle but skip writing Claude Code .mcp.json
-  --mcp-url URL                          Explicit MCP endpoint override for the client bundle
+  --mcp-url URL                          Explicit Splunk Platform /services/mcp endpoint override
+  --gateway-mode platform|o11y|combined  Client endpoint mode (default: platform)
+  --gateway-url URL                      Explicit hosted SCS MCP Gateway URL for o11y or combined mode
+  --scs-region REGION                    SCS region used to derive https://region-REGION.api.scs.splunk.com/system/mcp-gateway/v1/
+  --o11y-realm REALM                     Splunk Observability realm (default: SPLUNK_O11Y_REALM)
+  --o11y-token-file PATH                 Splunk Observability token file (default: SPLUNK_O11Y_TOKEN_FILE)
+  --splunk-tenant NAME                   Splunk tenant header value for combined mode
+  --splunk-jwt-file PATH                 Splunk Platform authorization token file for combined mode
   --package-file PATH                    Override the local package path used with --install
 
 Server settings:
@@ -106,6 +122,8 @@ Examples:
   $(basename "$0") --token-user existing-user --write-token-file /tmp/splunk_mcp.token
   $(basename "$0") --render-clients --bearer-token-file /tmp/splunk_mcp.token
   $(basename "$0") --render-clients --cursor-workspace ~/Projects/my-cursor-workspace
+  $(basename "$0") --render-clients --gateway-mode o11y --scs-region pdx10 --o11y-realm us1 --o11y-token-file /tmp/splunk_o11y_api_token
+  $(basename "$0") --render-clients --gateway-mode combined --scs-region pdx10 --o11y-realm us1 --o11y-token-file /tmp/splunk_o11y_api_token --splunk-tenant mytenant --splunk-jwt-file /tmp/splunk_mcp.token
 
 EOF
     exit "${exit_code}"
@@ -229,6 +247,108 @@ if not netloc:
 
 print(f"{scheme}://{netloc}/services/mcp", end="")
 PY
+}
+
+normalize_gateway_mode() {
+    case "${1:-platform}" in
+        platform|o11y|combined) printf '%s' "${1:-platform}" ;;
+        *)
+            log "ERROR: --gateway-mode must be platform, o11y, or combined." >&2
+            exit 1
+            ;;
+    esac
+}
+
+normalize_o11y_realm() {
+    printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]'
+}
+
+validate_o11y_realm_for_gateway() {
+    local realm
+    realm="$(normalize_o11y_realm "${1:-}")"
+    case "${realm}" in
+        us2|*gcp*|*gov*)
+            log "ERROR: Splunk MCP Gateway does not support Google Cloud Platform realms or GovCloud realms. Realm '${realm}' is not supported." >&2
+            exit 1
+            ;;
+    esac
+}
+
+scs_region_for_o11y_realm() {
+    case "$(normalize_o11y_realm "${1:-}")" in
+        eu0) printf '%s' "dub10" ;;
+        eu1) printf '%s' "fra10" ;;
+        eu2) printf '%s' "lon10" ;;
+        us0) printf '%s' "iad10" ;;
+        us1|us3) printf '%s' "pdx10" ;;
+        jp0) printf '%s' "tyo10" ;;
+        au0) printf '%s' "syd10" ;;
+        sg0) printf '%s' "sin10" ;;
+        *) return 1 ;;
+    esac
+}
+
+normalize_scs_region() {
+    local value
+    value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+    value="${value#region-}"
+    if [[ ! "${value}" =~ ^[a-z]{3}[0-9]{2}$ ]]; then
+        log "ERROR: --scs-region must be an SCS region value such as pdx10, dub10, or fra10." >&2
+        exit 1
+    fi
+    printf '%s' "${value}"
+}
+
+derive_scs_gateway_url() {
+    local region
+    region="$(normalize_scs_region "${1:-}")"
+    printf 'https://region-%s.api.scs.splunk.com/system/mcp-gateway/v1/' "${region}"
+}
+
+resolve_scs_gateway_url() {
+    local realm="${1:-}" region="${2:-}" expected_region=""
+
+    if [[ -n "${realm}" ]]; then
+        realm="$(normalize_o11y_realm "${realm}")"
+        validate_o11y_realm_for_gateway "${realm}"
+        if expected_region="$(scs_region_for_o11y_realm "${realm}")"; then
+            :
+        else
+            expected_region=""
+        fi
+    fi
+
+    if [[ -n "${GATEWAY_URL}" ]]; then
+        printf '%s' "${GATEWAY_URL}"
+        return 0
+    fi
+
+    if [[ -n "${region}" ]]; then
+        region="$(normalize_scs_region "${region}")"
+        if [[ -n "${expected_region}" && "${region}" != "${expected_region}" ]]; then
+            log "ERROR: --scs-region ${region} does not match o11y realm ${realm}; expected ${expected_region}." >&2
+            exit 1
+        fi
+    elif [[ -n "${expected_region}" ]]; then
+        region="${expected_region}"
+    fi
+
+    if [[ -z "${region}" ]]; then
+        log "ERROR: --gateway-mode ${GATEWAY_MODE} requires --scs-region or --gateway-url." >&2
+        exit 1
+    fi
+
+    SCS_REGION="${region}"
+    derive_scs_gateway_url "${region}"
+}
+
+apply_gateway_defaults_from_env() {
+    O11Y_REALM="${O11Y_REALM:-${SPLUNK_O11Y_REALM:-}}"
+    O11Y_TOKEN_FILE="${O11Y_TOKEN_FILE:-${SPLUNK_O11Y_TOKEN_FILE:-}}"
+    SCS_REGION="${SCS_REGION:-${SPLUNK_MCP_SCS_REGION:-}}"
+    GATEWAY_URL="${GATEWAY_URL:-${SPLUNK_MCP_GATEWAY_URL:-}}"
+    SPLUNK_TENANT="${SPLUNK_TENANT:-${SPLUNK_MCP_SPLUNK_TENANT:-}}"
+    SPLUNK_JWT_FILE="${SPLUNK_JWT_FILE:-${SPLUNK_MCP_SPLUNK_JWT_FILE:-}}"
 }
 
 ensure_session() {
@@ -491,37 +611,120 @@ validate_secret_render_target() {
 }
 
 render_client_bundle() {
-    local token_source token_value token_value_quoted mcp_url mcp_url_quoted env_example env_live cursor_json wrapper_script codex_script output_abs cursor_name default_server_name_quoted
+    local token_source token_value token_value_quoted mcp_url mcp_url_quoted env_example env_live cursor_json wrapper_script js_wrapper_script codex_script output_abs cursor_name default_server_name_quoted
+    local gateway_mode gateway_mode_quoted o11y_realm o11y_realm_quoted o11y_token_source o11y_token_value o11y_token_value_quoted
+    local splunk_jwt_source splunk_jwt_value splunk_auth_header splunk_auth_header_quoted splunk_tenant_quoted has_secret_source
 
     if [[ -z "${OUTPUT_DIR}" ]]; then
         OUTPUT_DIR="${PROJECT_ROOT}/${DEFAULT_OUTPUT_DIR_NAME}"
     fi
 
-    if [[ -n "${WRITE_TOKEN_FILE}" && -z "${BEARER_TOKEN_FILE}" ]]; then
+    apply_gateway_defaults_from_env
+    gateway_mode="$(normalize_gateway_mode "${GATEWAY_MODE}")"
+    GATEWAY_MODE="${gateway_mode}"
+
+    if [[ -n "${WRITE_TOKEN_FILE}" && -z "${BEARER_TOKEN_FILE}" && "${gateway_mode}" == "platform" ]]; then
         BEARER_TOKEN_FILE="${WRITE_TOKEN_FILE}"
     fi
 
-    token_source="${BEARER_TOKEN_FILE}"
-    if [[ -n "${token_source}" && ! -f "${token_source}" ]]; then
-        log "ERROR: Bearer token file not found: ${token_source}"
-        exit 1
+    if [[ -n "${WRITE_TOKEN_FILE}" && -z "${SPLUNK_JWT_FILE}" && "${gateway_mode}" == "combined" ]]; then
+        SPLUNK_JWT_FILE="${WRITE_TOKEN_FILE}"
     fi
 
-    validate_secret_render_target "${token_source}"
+    token_source=""
+    o11y_token_source=""
+    splunk_jwt_source=""
+    has_secret_source=false
 
-    if [[ -n "${MCP_URL}" ]]; then
-        mcp_url="${MCP_URL}"
-    else
-        mcp_url="$(derive_mcp_url "${SPLUNK_URI}")" || {
-            log "ERROR: Could not derive the MCP URL from ${SPLUNK_URI}."
-            exit 1
-        }
+    case "${gateway_mode}" in
+        platform)
+            if [[ "${GATEWAY_URL_SET}" == "true" || "${SCS_REGION_SET}" == "true" ]]; then
+                log "ERROR: --gateway-url and --scs-region are only valid with --gateway-mode o11y or combined."
+                exit 1
+            fi
+            token_source="${BEARER_TOKEN_FILE}"
+            if [[ -n "${token_source}" && ! -f "${token_source}" ]]; then
+                log "ERROR: Bearer token file not found: ${token_source}"
+                exit 1
+            fi
+            if [[ -n "${MCP_URL}" ]]; then
+                mcp_url="${MCP_URL}"
+            else
+                mcp_url="$(derive_mcp_url "${SPLUNK_URI}")" || {
+                    log "ERROR: Could not derive the MCP URL from ${SPLUNK_URI}."
+                    exit 1
+                }
+            fi
+            ;;
+        o11y)
+            if [[ -n "${MCP_URL}" ]]; then
+                log "ERROR: --mcp-url is for platform mode. Use --gateway-url or --scs-region with --gateway-mode o11y."
+                exit 1
+            fi
+            o11y_realm="$(normalize_o11y_realm "${O11Y_REALM}")"
+            if [[ -z "${o11y_realm}" ]]; then
+                log "ERROR: --gateway-mode o11y requires --o11y-realm or SPLUNK_O11Y_REALM."
+                exit 1
+            fi
+            if [[ -z "${O11Y_TOKEN_FILE}" ]]; then
+                log "ERROR: --gateway-mode o11y requires --o11y-token-file or SPLUNK_O11Y_TOKEN_FILE."
+                exit 1
+            fi
+            o11y_token_source="${O11Y_TOKEN_FILE}"
+            if [[ ! -f "${o11y_token_source}" ]]; then
+                log "ERROR: Observability token file not found: ${o11y_token_source}"
+                exit 1
+            fi
+            mcp_url="$(resolve_scs_gateway_url "${o11y_realm}" "${SCS_REGION}")"
+            ;;
+        combined)
+            if [[ -n "${MCP_URL}" ]]; then
+                log "ERROR: --mcp-url is for platform mode. Use --gateway-url or --scs-region with --gateway-mode combined."
+                exit 1
+            fi
+            o11y_realm="$(normalize_o11y_realm "${O11Y_REALM}")"
+            if [[ -z "${o11y_realm}" ]]; then
+                log "ERROR: --gateway-mode combined requires --o11y-realm or SPLUNK_O11Y_REALM."
+                exit 1
+            fi
+            if [[ -z "${O11Y_TOKEN_FILE}" ]]; then
+                log "ERROR: --gateway-mode combined requires --o11y-token-file or SPLUNK_O11Y_TOKEN_FILE."
+                exit 1
+            fi
+            if [[ -z "${SPLUNK_TENANT}" ]]; then
+                log "ERROR: --gateway-mode combined requires --splunk-tenant or SPLUNK_MCP_SPLUNK_TENANT."
+                exit 1
+            fi
+            if [[ -z "${SPLUNK_JWT_FILE}" ]]; then
+                log "ERROR: --gateway-mode combined requires --splunk-jwt-file or SPLUNK_MCP_SPLUNK_JWT_FILE."
+                exit 1
+            fi
+            o11y_token_source="${O11Y_TOKEN_FILE}"
+            splunk_jwt_source="${SPLUNK_JWT_FILE}"
+            if [[ ! -f "${o11y_token_source}" ]]; then
+                log "ERROR: Observability token file not found: ${o11y_token_source}"
+                exit 1
+            fi
+            if [[ ! -f "${splunk_jwt_source}" ]]; then
+                log "ERROR: Splunk Platform authorization token file not found: ${splunk_jwt_source}"
+                exit 1
+            fi
+            mcp_url="$(resolve_scs_gateway_url "${o11y_realm}" "${SCS_REGION}")"
+            ;;
+    esac
+
+    if [[ -n "${token_source}" || -n "${o11y_token_source}" || -n "${splunk_jwt_source}" ]]; then
+        has_secret_source=true
+    fi
+    if [[ "${has_secret_source}" == "true" ]]; then
+        validate_secret_render_target "secrets"
     fi
 
     mkdir -p "${OUTPUT_DIR}/.cursor"
     output_abs="$(resolve_abs_path "${OUTPUT_DIR}")"
     cursor_name="${CLIENT_NAME}"
     mcp_url_quoted="$(shell_quote "${mcp_url}")"
+    gateway_mode_quoted="$(shell_quote "${gateway_mode}")"
     default_server_name_quoted="$(shell_quote "${CLIENT_NAME}")"
 
     cursor_json="$(
@@ -550,8 +753,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env.splunk-mcp"
 
 _PRE_SPLUNK_MCP_URL="${SPLUNK_MCP_URL-}"
-_PRE_SPLUNK_MCP_TOKEN="${SPLUNK_MCP_TOKEN-}"
+_PRE_SPLUNK_MCP_GATEWAY_MODE="${SPLUNK_MCP_GATEWAY_MODE-}"
 _PRE_SPLUNK_MCP_INSECURE_TLS="${SPLUNK_MCP_INSECURE_TLS-}"
+_PRE_SPLUNK_MCP_TOKEN="${SPLUNK_MCP_TOKEN-}"
+_PRE_SPLUNK_MCP_HEADER_AUTHORIZATION="${SPLUNK_MCP_HEADER_AUTHORIZATION-}"
+_PRE_SPLUNK_MCP_HEADER_SPLUNK_TENANT="${SPLUNK_MCP_HEADER_SPLUNK_TENANT-}"
+_PRE_SPLUNK_MCP_HEADER_X_SF_TOKEN="${SPLUNK_MCP_HEADER_X_SF_TOKEN-}"
+_PRE_SPLUNK_MCP_HEADER_X_SF_REALM="${SPLUNK_MCP_HEADER_X_SF_REALM-}"
 
 set -a
 # shellcheck source=/dev/null
@@ -559,18 +767,52 @@ set -a
 set +a
 
 [[ -n "${_PRE_SPLUNK_MCP_URL}" ]] && SPLUNK_MCP_URL="${_PRE_SPLUNK_MCP_URL}"
-[[ -n "${_PRE_SPLUNK_MCP_TOKEN}" ]] && SPLUNK_MCP_TOKEN="${_PRE_SPLUNK_MCP_TOKEN}"
+[[ -n "${_PRE_SPLUNK_MCP_GATEWAY_MODE}" ]] && SPLUNK_MCP_GATEWAY_MODE="${_PRE_SPLUNK_MCP_GATEWAY_MODE}"
 [[ -n "${_PRE_SPLUNK_MCP_INSECURE_TLS}" ]] && SPLUNK_MCP_INSECURE_TLS="${_PRE_SPLUNK_MCP_INSECURE_TLS}"
+[[ -n "${_PRE_SPLUNK_MCP_TOKEN}" ]] && SPLUNK_MCP_TOKEN="${_PRE_SPLUNK_MCP_TOKEN}"
+[[ -n "${_PRE_SPLUNK_MCP_HEADER_AUTHORIZATION}" ]] && SPLUNK_MCP_HEADER_AUTHORIZATION="${_PRE_SPLUNK_MCP_HEADER_AUTHORIZATION}"
+[[ -n "${_PRE_SPLUNK_MCP_HEADER_SPLUNK_TENANT}" ]] && SPLUNK_MCP_HEADER_SPLUNK_TENANT="${_PRE_SPLUNK_MCP_HEADER_SPLUNK_TENANT}"
+[[ -n "${_PRE_SPLUNK_MCP_HEADER_X_SF_TOKEN}" ]] && SPLUNK_MCP_HEADER_X_SF_TOKEN="${_PRE_SPLUNK_MCP_HEADER_X_SF_TOKEN}"
+[[ -n "${_PRE_SPLUNK_MCP_HEADER_X_SF_REALM}" ]] && SPLUNK_MCP_HEADER_X_SF_REALM="${_PRE_SPLUNK_MCP_HEADER_X_SF_REALM}"
 
 if [[ -z "${SPLUNK_MCP_URL:-}" ]]; then
   echo "splunk-mcp: set SPLUNK_MCP_URL in ${ENV_FILE}" >&2
   exit 1
 fi
 
-if [[ -z "${SPLUNK_MCP_TOKEN:-}" ]]; then
-  echo "splunk-mcp: set SPLUNK_MCP_TOKEN in ${ENV_FILE}" >&2
-  exit 1
-fi
+SPLUNK_MCP_GATEWAY_MODE="${SPLUNK_MCP_GATEWAY_MODE:-platform}"
+case "${SPLUNK_MCP_GATEWAY_MODE}" in
+  platform|o11y|combined) ;;
+  *)
+    echo "splunk-mcp: SPLUNK_MCP_GATEWAY_MODE must be platform, o11y, or combined" >&2
+    exit 1
+    ;;
+esac
+
+case "${SPLUNK_MCP_GATEWAY_MODE}" in
+  platform)
+    if [[ -z "${SPLUNK_MCP_TOKEN:-}" && -z "${SPLUNK_MCP_HEADER_AUTHORIZATION:-}" ]]; then
+      echo "splunk-mcp: set SPLUNK_MCP_TOKEN or SPLUNK_MCP_HEADER_AUTHORIZATION in ${ENV_FILE}" >&2
+      exit 1
+    fi
+    ;;
+  o11y)
+    if [[ -z "${SPLUNK_MCP_HEADER_X_SF_TOKEN:-}" || -z "${SPLUNK_MCP_HEADER_X_SF_REALM:-}" ]]; then
+      echo "splunk-mcp: set SPLUNK_MCP_HEADER_X_SF_TOKEN and SPLUNK_MCP_HEADER_X_SF_REALM in ${ENV_FILE}" >&2
+      exit 1
+    fi
+    ;;
+  combined)
+    if [[ -z "${SPLUNK_MCP_TOKEN:-}" && -z "${SPLUNK_MCP_HEADER_AUTHORIZATION:-}" ]]; then
+      echo "splunk-mcp: set SPLUNK_MCP_HEADER_AUTHORIZATION or SPLUNK_MCP_TOKEN in ${ENV_FILE}" >&2
+      exit 1
+    fi
+    if [[ -z "${SPLUNK_MCP_HEADER_SPLUNK_TENANT:-}" || -z "${SPLUNK_MCP_HEADER_X_SF_TOKEN:-}" || -z "${SPLUNK_MCP_HEADER_X_SF_REALM:-}" ]]; then
+      echo "splunk-mcp: set SPLUNK_MCP_HEADER_SPLUNK_TENANT, SPLUNK_MCP_HEADER_X_SF_TOKEN, and SPLUNK_MCP_HEADER_X_SF_REALM in ${ENV_FILE}" >&2
+      exit 1
+    fi
+    ;;
+esac
 
 if [[ "${SPLUNK_MCP_INSECURE_TLS:-}" == "1" ]]; then
   export NODE_TLS_REJECT_UNAUTHORIZED=0
@@ -581,11 +823,30 @@ if ! command -v mcp-remote >/dev/null 2>&1; then
   exit 1
 fi
 
-# Single-quote the header so bash does NOT expand SPLUNK_MCP_TOKEN here.
+# Single-quote the header placeholders so bash does NOT expand secrets here.
 # mcp-remote performs ${VAR} substitution on --header values at runtime
-# using the inherited environment, which keeps the bearer token out of
-# argv (process listings) while still sending the real value upstream.
-exec mcp-remote "${SPLUNK_MCP_URL}" --header 'Authorization: Bearer ${SPLUNK_MCP_TOKEN}'
+# using the inherited environment, which keeps token values out of argv.
+remote_args=("${SPLUNK_MCP_URL}")
+if [[ "${SPLUNK_MCP_GATEWAY_MODE}" != "platform" ]]; then
+  remote_args+=(--transport http-only --allow-http)
+fi
+header_args=()
+if [[ -n "${SPLUNK_MCP_HEADER_AUTHORIZATION:-}" ]]; then
+  header_args+=(--header 'Authorization: ${SPLUNK_MCP_HEADER_AUTHORIZATION}')
+elif [[ -n "${SPLUNK_MCP_TOKEN:-}" ]]; then
+  header_args+=(--header 'Authorization: Bearer ${SPLUNK_MCP_TOKEN}')
+fi
+if [[ -n "${SPLUNK_MCP_HEADER_SPLUNK_TENANT:-}" ]]; then
+  header_args+=(--header 'splunk_tenant: ${SPLUNK_MCP_HEADER_SPLUNK_TENANT}')
+fi
+if [[ -n "${SPLUNK_MCP_HEADER_X_SF_TOKEN:-}" ]]; then
+  header_args+=(--header 'X-SF-TOKEN: ${SPLUNK_MCP_HEADER_X_SF_TOKEN}')
+fi
+if [[ -n "${SPLUNK_MCP_HEADER_X_SF_REALM:-}" ]]; then
+  header_args+=(--header 'X-SF-REALM: ${SPLUNK_MCP_HEADER_X_SF_REALM}')
+fi
+
+exec mcp-remote "${remote_args[@]}" "${header_args[@]}"
 EOF
 )"
 
@@ -681,15 +942,41 @@ function loadEnvFile(filePath) {
 loadEnvFile(envFile);
 
 const mcpUrl = process.env.SPLUNK_MCP_URL;
-const mcpToken = process.env.SPLUNK_MCP_TOKEN;
+const gatewayMode = process.env.SPLUNK_MCP_GATEWAY_MODE || "platform";
 
 if (!mcpUrl) {
   process.stderr.write("splunk-mcp: set SPLUNK_MCP_URL in " + envFile + "\n");
   process.exit(1);
 }
-if (!mcpToken) {
-  process.stderr.write("splunk-mcp: set SPLUNK_MCP_TOKEN in " + envFile + "\n");
+
+function hasEnv(name) {
+  return Boolean(process.env[name]);
+}
+
+function fail(message) {
+  process.stderr.write("splunk-mcp: " + message + "\n");
   process.exit(1);
+}
+
+if (!["platform", "o11y", "combined"].includes(gatewayMode)) {
+  fail("SPLUNK_MCP_GATEWAY_MODE must be platform, o11y, or combined");
+}
+
+if (gatewayMode === "platform") {
+  if (!hasEnv("SPLUNK_MCP_TOKEN") && !hasEnv("SPLUNK_MCP_HEADER_AUTHORIZATION")) {
+    fail("set SPLUNK_MCP_TOKEN or SPLUNK_MCP_HEADER_AUTHORIZATION in " + envFile);
+  }
+} else if (gatewayMode === "o11y") {
+  if (!hasEnv("SPLUNK_MCP_HEADER_X_SF_TOKEN") || !hasEnv("SPLUNK_MCP_HEADER_X_SF_REALM")) {
+    fail("set SPLUNK_MCP_HEADER_X_SF_TOKEN and SPLUNK_MCP_HEADER_X_SF_REALM in " + envFile);
+  }
+} else if (gatewayMode === "combined") {
+  if (!hasEnv("SPLUNK_MCP_HEADER_AUTHORIZATION") && !hasEnv("SPLUNK_MCP_TOKEN")) {
+    fail("set SPLUNK_MCP_HEADER_AUTHORIZATION or SPLUNK_MCP_TOKEN in " + envFile);
+  }
+  if (!hasEnv("SPLUNK_MCP_HEADER_SPLUNK_TENANT") || !hasEnv("SPLUNK_MCP_HEADER_X_SF_TOKEN") || !hasEnv("SPLUNK_MCP_HEADER_X_SF_REALM")) {
+    fail("set SPLUNK_MCP_HEADER_SPLUNK_TENANT, SPLUNK_MCP_HEADER_X_SF_TOKEN, and SPLUNK_MCP_HEADER_X_SF_REALM in " + envFile);
+  }
 }
 
 if (process.env.SPLUNK_MCP_INSECURE_TLS === "1") {
@@ -715,15 +1002,35 @@ function findMcpRemote() {
 }
 
 const { cmd, args: prefixArgs } = findMcpRemote();
-// Pass the literal placeholder so mcp-remote performs ${VAR} substitution
-// at runtime against the inherited env. This keeps SPLUNK_MCP_TOKEN out of
-// argv (visible to `ps`) while still sending the real bearer value
-// upstream. mcpToken is read above only to fail fast if it is unset.
-const tokenHeader = "Authorization: Bearer ${SPLUNK_MCP_TOKEN}";
-void mcpToken;
+// Pass literal placeholders so mcp-remote performs ${VAR} substitution
+// at runtime against the inherited env. This keeps secret header values out
+// of argv (visible to process listings).
+const headerArgs = [];
+const remoteArgs = [mcpUrl];
+if (gatewayMode !== "platform") {
+  remoteArgs.push("--transport", "http-only", "--allow-http");
+}
+function addHeader(name, placeholder) {
+  headerArgs.push("--header", name + ": " + placeholder);
+}
+if (hasEnv("SPLUNK_MCP_HEADER_AUTHORIZATION")) {
+  addHeader("Authorization", "${SPLUNK_MCP_HEADER_AUTHORIZATION}");
+} else if (hasEnv("SPLUNK_MCP_TOKEN")) {
+  addHeader("Authorization", "Bearer ${SPLUNK_MCP_TOKEN}");
+}
+if (hasEnv("SPLUNK_MCP_HEADER_SPLUNK_TENANT")) {
+  addHeader("splunk_tenant", "${SPLUNK_MCP_HEADER_SPLUNK_TENANT}");
+}
+if (hasEnv("SPLUNK_MCP_HEADER_X_SF_TOKEN")) {
+  addHeader("X-SF-TOKEN", "${SPLUNK_MCP_HEADER_X_SF_TOKEN}");
+}
+if (hasEnv("SPLUNK_MCP_HEADER_X_SF_REALM")) {
+  addHeader("X-SF-REALM", "${SPLUNK_MCP_HEADER_X_SF_REALM}");
+}
+
 const child = spawn(
   cmd,
-  [...prefixArgs, mcpUrl, "--header", tokenHeader],
+  [...prefixArgs, ...remoteArgs, ...headerArgs],
   { stdio: "inherit" }
 );
 
@@ -788,12 +1095,42 @@ exec codex mcp add "\${SERVER_NAME}" -- node "\${CODEX_BUNDLE_DIR}/run-splunk-mc
 EOF
 )"
 
-    env_example="$(cat <<EOF
+    case "${gateway_mode}" in
+        platform)
+            env_example="$(cat <<EOF
 # Copy to .env.splunk-mcp and keep the populated file local only.
+SPLUNK_MCP_GATEWAY_MODE=${gateway_mode_quoted}
 SPLUNK_MCP_URL=${mcp_url_quoted}
 SPLUNK_MCP_TOKEN=''
 EOF
 )"
+            ;;
+        o11y)
+            o11y_realm_quoted="$(shell_quote "${o11y_realm}")"
+            env_example="$(cat <<EOF
+# Copy to .env.splunk-mcp and keep the populated file local only.
+SPLUNK_MCP_GATEWAY_MODE=${gateway_mode_quoted}
+SPLUNK_MCP_URL=${mcp_url_quoted}
+SPLUNK_MCP_HEADER_X_SF_TOKEN=''
+SPLUNK_MCP_HEADER_X_SF_REALM=${o11y_realm_quoted}
+EOF
+)"
+            ;;
+        combined)
+            o11y_realm_quoted="$(shell_quote "${o11y_realm}")"
+            splunk_tenant_quoted="$(shell_quote "${SPLUNK_TENANT}")"
+            env_example="$(cat <<EOF
+# Copy to .env.splunk-mcp and keep the populated file local only.
+SPLUNK_MCP_GATEWAY_MODE=${gateway_mode_quoted}
+SPLUNK_MCP_URL=${mcp_url_quoted}
+SPLUNK_MCP_HEADER_AUTHORIZATION=''
+SPLUNK_MCP_HEADER_SPLUNK_TENANT=${splunk_tenant_quoted}
+SPLUNK_MCP_HEADER_X_SF_TOKEN=''
+SPLUNK_MCP_HEADER_X_SF_REALM=${o11y_realm_quoted}
+EOF
+)"
+            ;;
+    esac
     if [[ "${CLIENT_INSECURE_TLS}" == "true" ]]; then
         env_example="${env_example}"$'\n''SPLUNK_MCP_INSECURE_TLS=1'
     else
@@ -809,14 +1146,52 @@ EOF
     chmod 755 "${OUTPUT_DIR}/register-codex-mcp.sh"
     write_text_file "${OUTPUT_DIR}/.env.splunk-mcp.example" "${env_example}"
 
-    if [[ -n "${token_source}" ]]; then
-        token_value="$(read_secret_file "${token_source}")" || exit 1
-        token_value_quoted="$(shell_quote "${token_value}")"
-        env_live="$(cat <<EOF
+    case "${gateway_mode}" in
+        platform)
+            if [[ -n "${token_source}" ]]; then
+                token_value="$(read_secret_file "${token_source}")" || exit 1
+                token_value_quoted="$(shell_quote "${token_value}")"
+                env_live="$(cat <<EOF
+SPLUNK_MCP_GATEWAY_MODE=${gateway_mode_quoted}
 SPLUNK_MCP_URL=${mcp_url_quoted}
 SPLUNK_MCP_TOKEN=${token_value_quoted}
 EOF
 )"
+            fi
+            ;;
+        o11y)
+            o11y_token_value="$(read_secret_file "${o11y_token_source}")" || exit 1
+            o11y_token_value_quoted="$(shell_quote "${o11y_token_value}")"
+            o11y_realm_quoted="$(shell_quote "${o11y_realm}")"
+            env_live="$(cat <<EOF
+SPLUNK_MCP_GATEWAY_MODE=${gateway_mode_quoted}
+SPLUNK_MCP_URL=${mcp_url_quoted}
+SPLUNK_MCP_HEADER_X_SF_TOKEN=${o11y_token_value_quoted}
+SPLUNK_MCP_HEADER_X_SF_REALM=${o11y_realm_quoted}
+EOF
+)"
+            ;;
+        combined)
+            o11y_token_value="$(read_secret_file "${o11y_token_source}")" || exit 1
+            splunk_jwt_value="$(read_secret_file "${splunk_jwt_source}")" || exit 1
+            splunk_auth_header="Bearer ${splunk_jwt_value}"
+            splunk_auth_header_quoted="$(shell_quote "${splunk_auth_header}")"
+            splunk_tenant_quoted="$(shell_quote "${SPLUNK_TENANT}")"
+            o11y_token_value_quoted="$(shell_quote "${o11y_token_value}")"
+            o11y_realm_quoted="$(shell_quote "${o11y_realm}")"
+            env_live="$(cat <<EOF
+SPLUNK_MCP_GATEWAY_MODE=${gateway_mode_quoted}
+SPLUNK_MCP_URL=${mcp_url_quoted}
+SPLUNK_MCP_HEADER_AUTHORIZATION=${splunk_auth_header_quoted}
+SPLUNK_MCP_HEADER_SPLUNK_TENANT=${splunk_tenant_quoted}
+SPLUNK_MCP_HEADER_X_SF_TOKEN=${o11y_token_value_quoted}
+SPLUNK_MCP_HEADER_X_SF_REALM=${o11y_realm_quoted}
+EOF
+)"
+            ;;
+    esac
+
+    if [[ -n "${env_live:-}" ]]; then
         if [[ "${CLIENT_INSECURE_TLS}" == "true" ]]; then
             env_live="${env_live}"$'\n''SPLUNK_MCP_INSECURE_TLS=1'
         fi
@@ -1032,6 +1407,13 @@ while [[ $# -gt 0 ]]; do
         --no-configure-cursor) HAS_UNINSTALL_CONFLICT=true; CONFIGURE_CURSOR=false; shift ;;
         --no-configure-claude) HAS_UNINSTALL_CONFLICT=true; CONFIGURE_CLAUDE=false; shift ;;
         --mcp-url) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; MCP_URL="$2"; shift 2 ;;
+        --gateway-mode) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; GATEWAY_MODE="$2"; shift 2 ;;
+        --gateway-url) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; GATEWAY_URL="$2"; GATEWAY_URL_SET=true; shift 2 ;;
+        --scs-region) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; SCS_REGION="$2"; SCS_REGION_SET=true; shift 2 ;;
+        --o11y-realm) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; O11Y_REALM="$2"; shift 2 ;;
+        --o11y-token-file) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; O11Y_TOKEN_FILE="$2"; shift 2 ;;
+        --splunk-tenant) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; SPLUNK_TENANT="$2"; shift 2 ;;
+        --splunk-jwt-file) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; SPLUNK_JWT_FILE="$2"; shift 2 ;;
         --token-user) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; TOKEN_USER="$2"; shift 2 ;;
         --token-expires-on) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; TOKEN_EXPIRES_ON="$2"; shift 2 ;;
         --token-not-before) HAS_UNINSTALL_CONFLICT=true; require_arg "$1" $# || exit 1; TOKEN_NOT_BEFORE="$2"; shift 2 ;;
@@ -1065,6 +1447,8 @@ case "${ROTATE_KEY_SIZE}" in
         exit 1
         ;;
 esac
+
+GATEWAY_MODE="$(normalize_gateway_mode "${GATEWAY_MODE}")"
 
 if [[ "${DO_INSTALL}" == "true" && "${DO_UNINSTALL}" == "true" ]]; then
     log "ERROR: --install and --uninstall cannot be used together."
@@ -1134,7 +1518,7 @@ if [[ "${LIVE_SPLUNK_ACTIONS}" == "true" ]]; then
     if [[ -n "${WRITE_TOKEN_FILE}" ]]; then
         mint_token_to_file "${WRITE_TOKEN_FILE}"
     fi
-elif [[ "${RENDER_CLIENTS}" == "true" && -z "${MCP_URL}" ]]; then
+elif [[ "${RENDER_CLIENTS}" == "true" && "${GATEWAY_MODE}" == "platform" && -z "${MCP_URL}" ]]; then
     load_splunk_credentials || {
         log "ERROR: --render-clients without --mcp-url requires Splunk credentials so the MCP URL can be derived."
         exit 1
@@ -1142,6 +1526,19 @@ elif [[ "${RENDER_CLIENTS}" == "true" && -z "${MCP_URL}" ]]; then
 fi
 
 if [[ "${RENDER_CLIENTS}" == "true" ]]; then
+    if [[ "${GATEWAY_MODE}" != "platform" ]]; then
+        NEED_O11Y_DEFAULTS=false
+        if [[ -z "${O11Y_REALM}" || -z "${O11Y_TOKEN_FILE}" || ( -z "${SCS_REGION}" && -z "${GATEWAY_URL}" ) ]]; then
+            NEED_O11Y_DEFAULTS=true
+        fi
+        if [[ "${GATEWAY_MODE}" == "combined" && ( -z "${SPLUNK_TENANT}" || -z "${SPLUNK_JWT_FILE}" ) ]]; then
+            NEED_O11Y_DEFAULTS=true
+        fi
+        if [[ "${NEED_O11Y_DEFAULTS}" == "true" ]]; then
+            load_observability_cloud_settings
+            apply_gateway_defaults_from_env
+        fi
+    fi
     render_client_bundle
     apply_client_setup
 fi

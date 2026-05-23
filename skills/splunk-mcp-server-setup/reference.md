@@ -7,6 +7,7 @@ These are the main endpoints surfaced by the packaged app:
 | Endpoint | Purpose |
 |----------|---------|
 | `/services/mcp` | Main MCP HTTP endpoint used by external clients |
+| `https://region-<REGION>.api.scs.splunk.com/system/mcp-gateway/v1/` | Hosted SCS MCP Gateway endpoint for Splunk Observability Cloud tools |
 | `/servicesNS/nobody/Splunk_MCP_Server/mcp_token` | Mint encrypted bearer tokens and rotate RSA keys |
 | `/servicesNS/nobody/Splunk_MCP_Server/mcp_rate_limits` | Read or update effective rate limits |
 | `/servicesNS/nobody/Splunk_MCP_Server/mcp_tools` | Custom tool CRUD endpoint |
@@ -73,6 +74,39 @@ The setup skill renders a shared bridge bundle and can then apply that bundle to
 Codex, a real Cursor workspace, and a Claude Code project instead of relying on
 each tool’s HTTP transport details directly.
 
+Supported gateway modes:
+
+| Mode | URL source | Headers |
+|------|------------|---------|
+| `platform` | `--mcp-url` or derived `<SPLUNK_URI>/services/mcp` | `Authorization: Bearer ${SPLUNK_MCP_TOKEN}` |
+| `o11y` | `--gateway-url` or `--scs-region` derived hosted gateway URL | `X-SF-TOKEN`, `X-SF-REALM` |
+| `combined` | `--gateway-url` or `--scs-region` derived hosted gateway URL | `Authorization`, `splunk_tenant`, `X-SF-TOKEN`, `X-SF-REALM` |
+
+The rendered wrappers pass literal `${VAR}` placeholders to `mcp-remote` in
+each `--header` value. `mcp-remote` expands those placeholders from the
+wrapper environment at runtime, so token values stay in `.env.splunk-mcp` and
+do not appear in process argv.
+Hosted gateway modes also add `--transport http-only --allow-http`, matching
+Splunk's `mcp-remote` examples for the SCS endpoint.
+
+Current hosted gateway region mapping:
+
+| O11y realm | SCS region |
+|------------|------------|
+| `eu0` | `dub10` |
+| `eu1` | `fra10` |
+| `eu2` | `lon10` |
+| `us0` | `iad10` |
+| `us1` | `pdx10` |
+| `us3` | `pdx10` |
+| `jp0` | `tyo10` |
+| `au0` | `syd10` |
+| `sg0` | `sin10` |
+
+Google Cloud Platform realms and GovCloud realms are not supported by the
+hosted gateway. The setup renderer rejects known unsupported values such as
+`us2`, `gov*`, and values containing `gcp`.
+
 Rendered files:
 
 | File | Purpose |
@@ -103,6 +137,10 @@ This approach is useful because:
 - Codex can keep using stdio MCP registration without pinning the command to a repo checkout path
 - Claude Code reads `.mcp.json` at the project root and uses the same stdio wrapper
 - the same wrapper can handle `SPLUNK_MCP_INSECURE_TLS=1` for lab certificates
+
+Gateway mode does not alter local `Splunk_MCP_Server` custom tool manifests.
+External hosted Observability AI Assistant MCP tools remain served by Splunk's
+hosted gateway rather than by local Splunk Platform app content.
 
 ## Wrapper Prerequisite
 
@@ -138,3 +176,6 @@ For a general-purpose admin/search workflow:
 - the packaged `authorize.conf` grants that capability to `admin` and `sc_admin`
 - app visibility may need to be forced to `true` after ACS install
 - `/services/mcp` is exposed on the Splunk management port, typically `8089`
+- live hosted-gateway validation should use standard MCP JSON-RPC calls such
+  as `tools/list` and then `tools/call` against the rendered gateway URL with
+  the same headers

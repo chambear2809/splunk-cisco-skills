@@ -14,6 +14,24 @@ splunk_search_api_uri=
 # Leave blank to derive from the management URI as <scheme>://<host>:<port>/services/mcp
 mcp_url=
 
+# Client gateway mode:
+#   platform  - local Splunk Platform /services/mcp endpoint
+#   o11y      - hosted SCS MCP Gateway with X-SF-TOKEN and X-SF-REALM
+#   combined  - hosted SCS MCP Gateway with Splunk Platform + Observability headers
+gateway_mode=platform
+
+# Hosted SCS MCP Gateway options for o11y or combined mode.
+# Leave gateway_url blank to derive:
+#   https://region-<scs_region>.api.scs.splunk.com/system/mcp-gateway/v1/
+gateway_url=
+scs_region=
+o11y_realm=
+o11y_token_file=
+
+# Combined mode platform headers. Store the token in splunk_jwt_file only.
+splunk_tenant=
+splunk_jwt_file=
+
 # Username to mint the encrypted MCP bearer token for.
 token_user=
 

@@ -89,15 +89,41 @@ function loadEnvFile(filePath) {
 loadEnvFile(envFile);
 
 const mcpUrl = process.env.SPLUNK_MCP_URL;
-const mcpToken = process.env.SPLUNK_MCP_TOKEN;
+const gatewayMode = process.env.SPLUNK_MCP_GATEWAY_MODE || "platform";
 
 if (!mcpUrl) {
   process.stderr.write("splunk-mcp: set SPLUNK_MCP_URL in " + envFile + "\n");
   process.exit(1);
 }
-if (!mcpToken) {
-  process.stderr.write("splunk-mcp: set SPLUNK_MCP_TOKEN in " + envFile + "\n");
+
+function hasEnv(name) {
+  return Boolean(process.env[name]);
+}
+
+function fail(message) {
+  process.stderr.write("splunk-mcp: " + message + "\n");
   process.exit(1);
+}
+
+if (!["platform", "o11y", "combined"].includes(gatewayMode)) {
+  fail("SPLUNK_MCP_GATEWAY_MODE must be platform, o11y, or combined");
+}
+
+if (gatewayMode === "platform") {
+  if (!hasEnv("SPLUNK_MCP_TOKEN") && !hasEnv("SPLUNK_MCP_HEADER_AUTHORIZATION")) {
+    fail("set SPLUNK_MCP_TOKEN or SPLUNK_MCP_HEADER_AUTHORIZATION in " + envFile);
+  }
+} else if (gatewayMode === "o11y") {
+  if (!hasEnv("SPLUNK_MCP_HEADER_X_SF_TOKEN") || !hasEnv("SPLUNK_MCP_HEADER_X_SF_REALM")) {
+    fail("set SPLUNK_MCP_HEADER_X_SF_TOKEN and SPLUNK_MCP_HEADER_X_SF_REALM in " + envFile);
+  }
+} else if (gatewayMode === "combined") {
+  if (!hasEnv("SPLUNK_MCP_HEADER_AUTHORIZATION") && !hasEnv("SPLUNK_MCP_TOKEN")) {
+    fail("set SPLUNK_MCP_HEADER_AUTHORIZATION or SPLUNK_MCP_TOKEN in " + envFile);
+  }
+  if (!hasEnv("SPLUNK_MCP_HEADER_SPLUNK_TENANT") || !hasEnv("SPLUNK_MCP_HEADER_X_SF_TOKEN") || !hasEnv("SPLUNK_MCP_HEADER_X_SF_REALM")) {
+    fail("set SPLUNK_MCP_HEADER_SPLUNK_TENANT, SPLUNK_MCP_HEADER_X_SF_TOKEN, and SPLUNK_MCP_HEADER_X_SF_REALM in " + envFile);
+  }
 }
 
 if (process.env.SPLUNK_MCP_INSECURE_TLS === "1") {
@@ -123,15 +149,35 @@ function findMcpRemote() {
 }
 
 const { cmd, args: prefixArgs } = findMcpRemote();
-// Pass the literal placeholder so mcp-remote performs ${VAR} substitution
-// at runtime against the inherited env. This keeps SPLUNK_MCP_TOKEN out of
-// argv (visible to `ps`) while still sending the real bearer value
-// upstream. mcpToken is read above only to fail fast if it is unset.
-const tokenHeader = "Authorization: Bearer ${SPLUNK_MCP_TOKEN}";
-void mcpToken;
+// Pass literal placeholders so mcp-remote performs ${VAR} substitution
+// at runtime against the inherited env. This keeps secret header values out
+// of argv (visible to process listings).
+const headerArgs = [];
+const remoteArgs = [mcpUrl];
+if (gatewayMode !== "platform") {
+  remoteArgs.push("--transport", "http-only", "--allow-http");
+}
+function addHeader(name, placeholder) {
+  headerArgs.push("--header", name + ": " + placeholder);
+}
+if (hasEnv("SPLUNK_MCP_HEADER_AUTHORIZATION")) {
+  addHeader("Authorization", "${SPLUNK_MCP_HEADER_AUTHORIZATION}");
+} else if (hasEnv("SPLUNK_MCP_TOKEN")) {
+  addHeader("Authorization", "Bearer ${SPLUNK_MCP_TOKEN}");
+}
+if (hasEnv("SPLUNK_MCP_HEADER_SPLUNK_TENANT")) {
+  addHeader("splunk_tenant", "${SPLUNK_MCP_HEADER_SPLUNK_TENANT}");
+}
+if (hasEnv("SPLUNK_MCP_HEADER_X_SF_TOKEN")) {
+  addHeader("X-SF-TOKEN", "${SPLUNK_MCP_HEADER_X_SF_TOKEN}");
+}
+if (hasEnv("SPLUNK_MCP_HEADER_X_SF_REALM")) {
+  addHeader("X-SF-REALM", "${SPLUNK_MCP_HEADER_X_SF_REALM}");
+}
+
 const child = spawn(
   cmd,
-  [...prefixArgs, mcpUrl, "--header", tokenHeader],
+  [...prefixArgs, ...remoteArgs, ...headerArgs],
   { stdio: "inherit" }
 );
 
