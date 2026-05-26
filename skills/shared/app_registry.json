@@ -200,7 +200,7 @@
         "splunkbase_id": "N/A",
         "cloud_install_path": "No additional app install; requires ES already provisioned",
         "cloud_config_path": "REST validation and supported search-tier settings; Splunk Cloud indexer-side changes remain support-managed",
-        "notes": "Operational ES configuration workflow for indexes, roles, CIM data models, enrichment, detections, risk, and validation."
+        "notes": "Operational ES configuration workflow for indexes, roles, CIM data models, enrichment, detections, risk, native SOAR, ES AI Assistant settings, Federated Analytics handoffs, and validation."
       },
       {
         "kind": "workflow",
