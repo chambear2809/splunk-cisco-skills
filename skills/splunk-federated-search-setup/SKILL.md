@@ -1,15 +1,18 @@
 ---
 name: splunk-federated-search-setup
 description: >-
-  Use when configuring Splunk Federated Search. Render, preflight, apply, and
-  validate the full product surface: Federated Search for Splunk (FSS2S,
-  type=splunk) in standard or transparent mode with multiple providers and
-  federated indexes per render, Federated Search for Amazon S3 (FSS3,
-  type=aws_s3, Splunk Cloud Platform only) via REST payloads with AWS
-  prerequisites, file-based apply for Splunk Enterprise standalone search heads
-  or SHC deployers, REST-based apply that works on Splunk Enterprise and Splunk
-  Cloud, the global federated-search enable/disable switch, and a status helper
-  that reports per-provider connectivityStatus.
+  Use when configuring Cisco Data Fabric federated search or standalone Splunk
+  Federated Search. Render, preflight, apply, and validate the full product
+  surface: Federated Search for Splunk (FSS2S, type=splunk) in standard or
+  transparent mode with multiple providers and federated indexes per render,
+  Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud Platform only)
+  via REST payloads with AWS prerequisites, file-based apply for Splunk
+  Enterprise standalone search heads or SHC deployers, REST-based apply that
+  works on Splunk Enterprise and Splunk Cloud, the global federated-search
+  enable/disable switch, and a status helper that reports per-provider
+  connectivityStatus. Use as the first route for Cisco Data Fabric requests
+  involving cross-domain search, federated analytics, S3 data-lake search, or
+  querying data where it resides.
 ---
 
 # Splunk Federated Search Setup
@@ -18,6 +21,11 @@ This skill prepares the entire Splunk Federated Search product surface across
 remote Splunk platform deployments and Amazon S3 data lakes. It renders
 reviewable assets before any apply phase and never embeds secrets in the
 rendered files.
+
+For newer Cisco Data Fabric wording, this is the first-class federated search
+route. Data Fabric is broader Splunk Platform architecture; route edge/ingest
+pipeline work to Edge Processor, Ingest Processor, or the SPL2 pipeline kit,
+and route AI Toolkit / MCP work to their dedicated skills.
 
 Covered:
 

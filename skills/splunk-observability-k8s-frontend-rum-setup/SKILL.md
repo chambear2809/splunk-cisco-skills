@@ -1,8 +1,9 @@
 ---
 name: splunk-observability-k8s-frontend-rum-setup
 description: >-
-  Render, apply, verify, and uninstall Splunk Browser RUM plus optional Session
-  Replay injection for Kubernetes-served frontends. Supports nginx sub_filter,
+  Render, apply, verify, and uninstall Splunk Browser RUM and browser-side
+  Digital Experience Analytics (DXA) prerequisites plus optional Session Replay
+  injection for Kubernetes-served frontends. Supports nginx sub_filter,
   ingress-nginx snippets, initContainer HTML rewrites, runtime config, backup
   and revert manifests, SplunkRum.init options, Frustration Signals, source-map
   upload helpers, RUM-to-APM Server-Timing validation, multi-workload specs,
@@ -10,13 +11,14 @@ description: >-
   detector, SIM, and backend auto-instrumentation handoffs. Use when wiring a
   React, Vue, Angular, Next.js, Nuxt, Remix, nginx/httpd, SPA, or MPA frontend
   to Splunk Browser RUM, enabling Session Replay, configuring Frustration
-  Signals, uploading source maps, validating trace linking, or uninstalling RUM.
-  Do not use for AppDynamics BRUM.
+  Signals, preparing browser-side Digital Experience Analytics (DXA), uploading
+  source maps, validating trace linking, or uninstalling RUM. Do not use for
+  AppDynamics BRUM.
 ---
 
 # Splunk Observability Kubernetes Frontend RUM + Session Replay
 
-This skill configures **Splunk Browser RUM** (`@splunk/otel-web` 2.x) plus optional **Session Replay** (Splunk recorder) for frontend applications served from Kubernetes pods. It is a **standalone reusable** skill: Splunk Browser RUM beacons land directly at `rum-ingest.<realm>.observability.splunkcloud.com/v1/rum`, so the Splunk OTel Collector is **not** a prerequisite for the browser side.
+This skill configures **Splunk Browser RUM** (`@splunk/otel-web` 2.x) plus optional **Session Replay** (Splunk recorder) for frontend applications served from Kubernetes pods. It is a **standalone reusable** skill: Splunk Browser RUM beacons land directly at `rum-ingest.<realm>.observability.splunkcloud.com/v1/rum`, so the Splunk OTel Collector is **not** a prerequisite for the browser side. Use it as the browser instrumentation handoff when a Digital Experience Analytics (DXA) request needs RUM agent setup, source maps, user tracking, session replay, or frustration signals.
 
 > **Disambiguation**: this is **Splunk Browser RUM**, not **AppDynamics BRUM**. AppDynamics Browser Real User Monitoring is handled by [splunk-appdynamics-eum-setup](../splunk-appdynamics-eum-setup/SKILL.md). The two products and their SDKs are distinct.
 

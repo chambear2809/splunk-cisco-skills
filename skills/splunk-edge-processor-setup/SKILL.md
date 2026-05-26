@@ -1,20 +1,15 @@
 ---
 name: splunk-edge-processor-setup
 description: >-
-  Render, preflight, apply, and validate the full Splunk Edge Processor
-  lifecycle for both Splunk Cloud Platform tenants and Splunk Enterprise
-  10.0+ data management control planes. Adds the EP control-plane object
-  with TLS / mTLS, installs Edge Processor instances on Linux (systemd or
-  no-systemd, plus optional Docker container), scales out to multi-instance
-  with DNS-driven forwarder outputs.conf, manages source types, destinations
-  (Splunk S2S, Splunk HEC, Amazon S3, syslog), SPL2 pipelines (with
-  shared splunk-spl2-pipeline-kit templates and PCRE2 linting), applies pipelines to Edge Processors
-  via the operator-supplied control-plane API base, enforces the
-  default-destination guard, runs sizing preflight, and emits an ACS
-  allowlist hand-off stub for Splunk Cloud destinations. Use when the user
-  asks to install Splunk Edge Processor, manage EP pipelines, configure EP
-  destinations or source types, scale out an EP, or migrate forwarders to
-  send through an Edge Processor.
+  Render Cisco Data Fabric edge-routing workflows and the full Splunk Edge
+  Processor lifecycle for Splunk Cloud Platform tenants and Splunk Enterprise
+  10.0+ data management control planes. Covers EP objects, TLS / mTLS, Linux or
+  Docker instances, multi-instance scale-out, source types, destinations,
+  SPL2 pipelines with splunk-spl2-pipeline-kit linting, apply handoffs, default
+  destination guardrails, sizing preflight, and ACS allowlist stubs. Use when
+  installing Edge Processor, managing EP pipelines, routing forwarders, or
+  handling Cisco Data Fabric / telemetry pipeline management requests that need
+  Splunk Platform edge routing and transformation.
 ---
 
 # Splunk Edge Processor Setup
@@ -22,6 +17,11 @@ description: >-
 This skill covers the full Edge Processor surface: control-plane object
 management plus Linux instance install plus pipeline / destination /
 source-type lifecycle, all from one render-first workflow.
+
+For newer Cisco Data Fabric wording, this is the Splunk Platform edge-routing
+and data-shaping route. Keep native Observability Metrics Pipeline Management
+requests in `splunk-observability-deep-native-workflows` unless the user needs
+log/event pipelines, forwarder routing, or edge transformation.
 
 ## Architecture First
 

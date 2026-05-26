@@ -14,6 +14,11 @@ from typing import Any
 from urllib.parse import quote, urlencode
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(PROJECT_ROOT / "skills" / "shared" / "lib"))
+from yaml_compat import YamlCompatError, load_yaml_or_json  # noqa: E402
+
+
 API_VERSION = "splunk-observability-deep-native-workflows/v1"
 MODE = "deep-native-workflows"
 ALLOWED_COVERAGE = {
@@ -36,16 +41,26 @@ SURFACES = {
     "rum_error_analysis",
     "rum_url_grouping",
     "rum_mobile",
+    "digital_experience_analytics",
     "db_query_explain_plan",
     "synthetic_waterfall",
     "slo_creation",
     "infrastructure_navigator",
     "kubernetes_navigator",
     "network_explorer",
+    "metrics_pipeline_management",
     "related_content",
     "ai_assistant_investigation",
     "observability_mobile_app",
     "log_observer_chart",
+}
+SURFACE_ALIASES = {
+    "dxa": "digital_experience_analytics",
+    "digital_experience": "digital_experience_analytics",
+    "digital_experience_management": "digital_experience_analytics",
+    "metric_pipeline_management": "metrics_pipeline_management",
+    "mpm": "metrics_pipeline_management",
+    "telemetry_pipeline_management": "metrics_pipeline_management",
 }
 DIRECT_SECRET_KEYS = {
     "token",
@@ -82,6 +97,10 @@ DOC_SOURCES = {
     "rum_errors": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/monitor-errors-and-crashes-in-tag-spotlight/monitor-browser-errors",
     "rum_url_grouping": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/write-rules-for-url-grouping",
     "rum_mobile_crashes": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/monitor-errors-and-crashes-in-tag-spotlight/monitor-mobile-crashes",
+    "dxa": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/introduction-to-digital-experience-analytics",
+    "dxa_setup": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/set-up-digital-experience-analytics",
+    "dxa_events": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-and-manage-event-definitions",
+    "dxa_funnels": "https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-conversion-funnel-analysis",
     "metric_api": "https://dev.splunk.com/observability/docs/datamodel/metrics_metadata",
     "dbmon": "https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/introduction-to-splunk-database-monitoring",
     "db_queries": "https://help.splunk.com/en/splunk-observability-cloud/monitor-databases/monitor-database-platform-instances/queries",
@@ -92,6 +111,7 @@ DOC_SOURCES = {
     "slo": "https://help.splunk.com/en/splunk-observability-cloud/create-alerts-detectors-and-service-level-objectives/create-service-level-objectives-slos",
     "slo_api": "https://dev.splunk.com/observability/reference/api/slo/latest",
     "infrastructure": "https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/monitor-services-and-hosts",
+    "metrics_pipeline_management": "https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/metrics-pipeline-management/introduction-to-metrics-pipeline-management",
     "kubernetes": "https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/monitor-services-and-hosts/monitor-kubernetes/monitor-kubernetes-entities",
     "network_explorer": "https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/network-explorer",
     "navigator_dashboards": "https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/use-navigators/customize-dashboards-in-splunk-infrastructure-monitoring-navigators",
@@ -108,14 +128,7 @@ class SpecError(ValueError):
 
 def load_structured(path: Path) -> dict[str, Any]:
     text = path.read_text(encoding="utf-8")
-    if path.suffix.lower() == ".json":
-        data = json.loads(text)
-    else:
-        try:
-            import yaml  # type: ignore[import-untyped]
-        except ImportError as exc:
-            raise SpecError("YAML specs require PyYAML. Use JSON or install repo dependencies.") from exc
-        data = yaml.safe_load(text)
+    data = load_yaml_or_json(text, source=str(path))
     if not isinstance(data, dict):
         raise SpecError("Spec root must be a mapping/object.")
     return data
@@ -157,6 +170,10 @@ def get_any(mapping: dict[str, Any], *names: str, default: Any = None) -> Any:
         if name in mapping:
             return mapping[name]
     return default
+
+
+def canonical_surface(surface: str) -> str:
+    return SURFACE_ALIASES.get(surface.strip(), surface.strip())
 
 
 def reject_inline_secrets(value: Any, path: tuple[str, ...] = ()) -> None:
@@ -218,9 +235,9 @@ def validate_spec(spec: dict[str, Any]) -> None:
         surface = str(workflow.get("surface", "")).strip()
         if not name:
             raise SpecError(f"workflows[{index}] requires name.")
-        if surface not in SURFACES:
+        if canonical_surface(surface) not in SURFACES:
             raise SpecError(f"workflow {name!r} uses unsupported surface {surface!r}.")
-        if surface == "slo_creation":
+        if canonical_surface(surface) == "slo_creation":
             payload = workflow.get("payload")
             if payload is not None and not isinstance(payload, dict):
                 raise SpecError(f"SLO workflow {name!r} payload must be an object.")
@@ -656,6 +673,56 @@ def render_rum_mobile(ctx: RenderContext, workflow: dict[str, Any]) -> None:
     )
 
 
+def render_digital_experience_analytics(ctx: RenderContext, workflow: dict[str, Any]) -> None:
+    name = workflow["name"]
+    rel = ctx.write_payload(Path("payloads") / "dxa" / f"{slugify(name)}.intent.json", workflow)
+    url = deeplink(
+        ctx.app_base,
+        "/rum",
+        {
+            "application": workflow.get("application"),
+            "project": workflow.get("project"),
+            "experience": "digital",
+        },
+    )
+    ctx.add_link(
+        "digital_experience_analytics",
+        name,
+        url,
+        "Open the RUM and Digital Experience Analytics entry point.",
+    )
+    ctx.add_handoff(
+        "digital_experience_analytics",
+        name,
+        "Plan Digital Experience Analytics projects, events, segments, and funnels.",
+        [
+            f"Use rendered DXA intent: {rel}",
+            "Confirm the DXA add-on is available and that Browser RUM or Mobile RUM data exists for the target applications.",
+            "For web apps, verify Splunk Browser RUM agent 2.0.0 or later; for mobile apps, verify supported iOS or Android RUM agent 2.x instrumentation.",
+            "Review user tracking, privacy, source mapping, session replay, and frustration-signal settings before building behavior analysis.",
+            "Create or review DXA projects, event definitions, element-picker rules, user segments, conversion funnels, and time-series analyses.",
+            "Hand off missing browser instrumentation to splunk-observability-k8s-frontend-rum-setup and missing mobile instrumentation to splunk-observability-mobile-rum-setup.",
+        ],
+        DOC_SOURCES["dxa"],
+    )
+    ctx.add_coverage(
+        "digital_experience_analytics",
+        name,
+        "delegated_apply",
+        "DXA uses RUM instrumentation and native UI analytics; setup changes delegate to Browser RUM and Mobile RUM skills.",
+        [rel, "workflow-handoff.md"],
+        DOC_SOURCES["dxa_setup"],
+    )
+    ctx.add_coverage(
+        "digital_experience_analytics",
+        name,
+        "handoff",
+        "DXA event definitions, segments, conversion funnels, and analysis views are native UI workflows.",
+        [rel],
+        DOC_SOURCES["dxa_events"],
+    )
+
+
 def render_db_query_explain_plan(ctx: RenderContext, workflow: dict[str, Any]) -> None:
     name = workflow["name"]
     rel = ctx.write_payload(Path("payloads") / "dbmon" / f"{slugify(name)}.query-intent.json", workflow)
@@ -758,6 +825,38 @@ def render_network_explorer(ctx: RenderContext, workflow: dict[str, Any]) -> Non
             "Treat eBPF chart operation as a customer-managed runtime handoff; Splunk supports the navigator but not the upstream chart lifecycle.",
         ],
         DOC_SOURCES["network_explorer"],
+    )
+
+
+def render_metrics_pipeline_management(ctx: RenderContext, workflow: dict[str, Any]) -> None:
+    name = workflow["name"]
+    rel = ctx.write_payload(
+        Path("payloads") / "metrics-pipeline-management" / f"{slugify(name)}.intent.json",
+        workflow,
+    )
+    url = deeplink(
+        ctx.app_base,
+        "/infrastructure/metrics-pipeline-management",
+        {"metric": workflow.get("metric"), "rule": workflow.get("rule")},
+    )
+    ctx.add_link(
+        "metrics_pipeline_management",
+        name,
+        url,
+        "Open Metrics Pipeline Management in Infrastructure Monitoring.",
+    )
+    ctx.add_handoff(
+        "metrics_pipeline_management",
+        name,
+        "Use Metrics Pipeline Management for metric cardinality and storage control.",
+        [
+            f"Use rendered MPM intent: {rel}",
+            "Confirm Enterprise Edition availability before planning routing, aggregation, archiving, or dropping rules.",
+            "Start from metric usage and MTS/cardinality analysis, then decide which metrics stay real-time, move to archived metrics, or are dropped.",
+            "Define aggregation rules only on metric dimensions; keep rollback and routing-exception needs explicit before dropping original high-cardinality data.",
+            "For pre-ingest removal or attribute cleanup, hand off to splunk-observability-otel-collector-setup; for log/event routing pipelines, hand off to Edge Processor, Ingest Processor, or the SPL2 pipeline kit.",
+        ],
+        DOC_SOURCES["metrics_pipeline_management"],
     )
 
 
@@ -947,12 +1046,14 @@ RENDERERS = {
     "rum_error_analysis": render_rum_error_analysis,
     "rum_url_grouping": render_rum_url_grouping,
     "rum_mobile": render_rum_mobile,
+    "digital_experience_analytics": render_digital_experience_analytics,
     "db_query_explain_plan": render_db_query_explain_plan,
     "synthetic_waterfall": render_synthetic_waterfall,
     "slo_creation": render_slo_creation,
     "infrastructure_navigator": render_infrastructure_navigator,
     "kubernetes_navigator": render_kubernetes_navigator,
     "network_explorer": render_network_explorer,
+    "metrics_pipeline_management": render_metrics_pipeline_management,
     "related_content": render_related_content,
     "ai_assistant_investigation": render_ai_assistant_investigation,
     "observability_mobile_app": render_observability_mobile_app,
@@ -996,7 +1097,7 @@ def render_spec(spec: dict[str, Any], output_dir: Path, realm_override: str | No
 
     for raw in as_list(spec.get("workflows", []), "workflows"):
         workflow = as_mapping(raw, "workflows[]")
-        surface = str(workflow["surface"])
+        surface = canonical_surface(str(workflow["surface"]))
         RENDERERS[surface](ctx, workflow)
 
     deeplinks_rel = ctx.write_payload(Path("deeplinks.json"), {"links": ctx.links, "realm": realm})
@@ -1074,7 +1175,13 @@ def validate_output(output_dir: Path) -> dict[str, Any]:
             raise SpecError(f"coverage-report.json objects[{index}] has invalid coverage.")
         if item.get("surface") == "modern_dashboard" and item.get("coverage") == "api_apply":
             raise SpecError("modern_dashboard must not be marked api_apply.")
-        if item.get("surface") in {"rum_session_replay", "db_query_explain_plan", "observability_mobile_app"} and item.get("coverage") == "api_apply":
+        if item.get("surface") in {
+            "digital_experience_analytics",
+            "metrics_pipeline_management",
+            "rum_session_replay",
+            "db_query_explain_plan",
+            "observability_mobile_app",
+        } and item.get("coverage") == "api_apply":
             raise SpecError(f"{item.get('surface')} must not be marked api_apply.")
     apply_plan = load_json_obj(output_dir / "apply-plan.json")
     if apply_plan.get("mode") != MODE:
@@ -1125,7 +1232,7 @@ def main(argv: list[str] | None = None) -> int:
                 parser.error("--spec and --output-dir are required for rendering")
             spec = load_structured(args.spec)
             result = render_spec(spec, args.output_dir, args.realm or None)
-    except (OSError, SpecError, json.JSONDecodeError) as exc:
+    except (OSError, SpecError, YamlCompatError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
     if args.json:

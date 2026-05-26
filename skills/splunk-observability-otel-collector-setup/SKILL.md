@@ -1,6 +1,6 @@
 ---
 name: splunk-observability-otel-collector-setup
-description: Use when deploying the Splunk Distribution of OpenTelemetry Collector for Splunk Observability Cloud to Kubernetes clusters, individual Linux hosts, or Universal Forwarder fleets through Splunkbase app 7125 with render-first, file-based-secret workflows.
+description: Use when telemetry pipeline management needs Splunk OTel Collector pre-ingest filtering, attribute cleanup, receiver/exporter changes, or collector-side data control instead of native Metrics Pipeline Management rules; also use when deploying the Splunk Distribution of OpenTelemetry Collector for Splunk Observability Cloud to Kubernetes clusters, individual Linux hosts, or Universal Forwarder fleets through Splunkbase app 7125 with render-first, file-based-secret workflows.
 ---
 
 # Splunk Observability OTel Collector Setup
@@ -8,6 +8,13 @@ description: Use when deploying the Splunk Distribution of OpenTelemetry Collect
 ## Overview
 
 Use this skill to render, review, and optionally apply Splunk Distribution of OpenTelemetry Collector deployments for Kubernetes, Linux hosts, and Splunkbase app `7125` (Splunk Add-On for OpenTelemetry Collector) on Universal Forwarders.
+
+When a user says telemetry pipeline management, first disambiguate scope. Native
+Splunk Observability **Metrics Pipeline Management (MPM)** is owned by
+`splunk-observability-deep-native-workflows`; this OTel skill owns collector-side
+pre-ingest control, including receivers, processors, exporters, filtering,
+attribute cleanup, batching, gateway topology, and Splunk Platform HEC log
+handoffs.
 
 The workflow is render-first by default. Live changes only happen when the user explicitly asks for `--apply-k8s`, `--apply-linux`, or `--apply-ta`.
 

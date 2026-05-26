@@ -1,5 +1,5 @@
 {
-  "last_verified": "2026-05-03",
+  "last_verified": "2026-05-26",
   "statuses": [
     "first_class",
     "existing_skill",
@@ -12,7 +12,7 @@
     {
       "key": "enterprise-security",
       "name": "Splunk Enterprise Security",
-      "aliases": ["es", "enterprise security", "splunk es", "siem"],
+      "aliases": ["es", "enterprise security", "splunk es", "siem", "es 8", "es 8.x", "enterprise security 8", "enterprise security 8.x", "splunk enterprise security 8", "tdir"],
       "status": "existing_skill",
       "route": ["splunk-enterprise-security-install", "splunk-enterprise-security-config"],
       "splunkbase_ids": ["263"],
@@ -45,6 +45,16 @@
       "route_args": ["--install-export-app"],
       "splunkbase_ids": ["3411"],
       "notes": "Optional Splunk platform to SOAR export app, handled by splunk-soar-setup without installing a SOAR server."
+    },
+    {
+      "key": "es-native-soar",
+      "name": "Enterprise Security Native SOAR",
+      "aliases": ["es native soar", "native soar", "enterprise security native soar", "enterprise security soar", "es 8 native soar", "es 8.x native soar", "es premier soar", "premier soar", "soar in es", "soar integration"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config", "splunk-soar-setup"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "ES Premier native SOAR capability. ES configuration owns pairing, response workflow readiness, and automation history review; the SOAR runtime, Cloud onboarding, Automation Broker, and Splunk-side SOAR apps remain handled by splunk-soar-setup."
     },
     {
       "key": "uba",
@@ -82,6 +92,16 @@
       "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
       "splunkbase_ids": [],
       "notes": "Bundled ES 8.x component."
+    },
+    {
+      "key": "es-ai-assistant",
+      "name": "AI Assistant in Enterprise Security",
+      "aliases": ["es ai assistant", "security ai assistant", "ai assistant for security", "splunk ai assistant for security", "ai assistant in security", "ai assistant in es", "enterprise security ai assistant", "enterprise security security ai assistant", "es 8 ai assistant", "es 8.x ai assistant"],
+      "status": "bundled_es",
+      "route": ["splunk-enterprise-security-config", "splunk-ai-assistant-setup"],
+      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "splunkbase_ids": [],
+      "notes": "ES Cloud Security AI Assistant capability. ES configuration handles documented es_ai_settings readiness and support/account-team handoff; the generic Splunk_AI_Assistant_Cloud app route stays available for non-ES Splunk AI Assistant onboarding."
     },
     {
       "key": "exposure-analytics",
@@ -122,6 +142,16 @@
       "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
       "splunkbase_ids": [],
       "notes": "ES cloud integration readiness."
+    },
+    {
+      "key": "federated-analytics",
+      "name": "Federated Analytics",
+      "aliases": ["federated analytics", "es federated analytics", "enterprise security federated analytics", "security federated analytics", "amazon security lake analytics", "asl analytics", "asl ocsf detections", "ocsf detections", "data lake detections", "data lake indexes"],
+      "status": "existing_skill",
+      "route": ["splunk-federated-search-setup", "splunk-enterprise-security-config"],
+      "route_command": ["bash", "skills/splunk-federated-search-setup/scripts/setup.sh", "--spec", "skills/splunk-federated-search-setup/template.example", "--dry-run"],
+      "splunkbase_ids": [],
+      "notes": "Routes Amazon Security Lake / OCSF Federated Analytics setup to the federated search skill, then back to ES configuration for ASL macros, ESCU detections, and ES 8.x threat detection readiness."
     },
     {
       "key": "dlx",

@@ -1,12 +1,14 @@
 ---
 name: splunk-spl2-pipeline-kit
 description: >-
-  Render and lint reusable SPL2 pipeline templates for Splunk Ingest Processor
-  and Edge Processor, including routing, redaction, sampling, lookups,
-  metrics, OCSF, decrypt, stats, custom templates, SPL-to-SPL2 compatibility,
-  and PCRE2 migration checks. Use when the user needs SPL2 pipeline authoring,
-  conversion review, compatibility linting, or shared templates for Ingest
-  Processor or Edge Processor workflows.
+  Render and lint reusable SPL2 pipeline templates for Cisco Data Fabric,
+  Splunk Ingest Processor, and Edge Processor, including routing, redaction,
+  sampling, lookups, metrics, OCSF, decrypt, stats, custom templates,
+  SPL-to-SPL2 compatibility, and PCRE2 migration checks. Use when the user needs
+  SPL2 pipeline authoring, conversion review, compatibility linting, or shared
+  templates for Ingest Processor or Edge Processor workflows, including Cisco
+  Data Fabric or telemetry pipeline management requests that need reusable SPL2
+  pipeline logic.
 ---
 
 # Splunk SPL2 Pipeline Kit
@@ -15,6 +17,10 @@ This skill is the shared SPL2 authoring and validation surface for
 `splunk-ingest-processor-setup` and `splunk-edge-processor-setup`. It is
 offline-only: it renders starter SPL2, lints pipeline files, and reports
 profile compatibility issues without calling Splunk APIs.
+
+For newer Cisco Data Fabric wording, this is the reusable SPL2 authoring route.
+Native Observability Metrics Pipeline Management remains a separate UI workflow
+covered by `splunk-observability-deep-native-workflows`.
 
 ## Agent Behavior
 
