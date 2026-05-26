@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk License Manager Setup"
+  short_description: "Configure license manager, groups, pools, and peers"
+  default_prompt: >-
+    Use $splunk-license-manager-setup to render, preflight, apply, validate,
+    and audit Splunk Enterprise license manager configuration, license files,
+    groups, stacks, pools, and license peers.

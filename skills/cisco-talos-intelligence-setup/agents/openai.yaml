@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Talos Intelligence Setup"
+  short_description: "Validate Talos Intelligence readiness for ES Cloud"
+  default_prompt: >-
+    Use $cisco-talos-intelligence-setup to validate Cisco Talos Intelligence
+    readiness for Splunk Enterprise Security Cloud, service account certificate
+    posture, capabilities, alert actions, and threatlist state.

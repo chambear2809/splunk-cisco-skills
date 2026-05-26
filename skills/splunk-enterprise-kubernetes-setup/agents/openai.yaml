@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Enterprise Kubernetes Setup"
+  short_description: "Deploy Splunk Enterprise on Kubernetes"
+  default_prompt: >-
+    Use $splunk-enterprise-kubernetes-setup to render, preflight, apply, and
+    validate Splunk Enterprise on Kubernetes with Splunk Operator, Helm, or
+    Splunk POD on Cisco UCS workflows.

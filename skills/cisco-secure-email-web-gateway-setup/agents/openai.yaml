@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Secure Email/Web Gateway Setup"
+  short_description: "Configure ESA and WSA add-ons, macros, and ingestion"
+  default_prompt: >-
+    Use $cisco-secure-email-web-gateway-setup to install, configure, and
+    validate Cisco ESA/WSA add-ons, indexes, macros, parser placement, SC4S or
+    file-monitor handoffs, and CIM readiness.

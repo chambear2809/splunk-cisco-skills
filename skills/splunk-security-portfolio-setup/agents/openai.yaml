@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Security Portfolio Setup"
+  short_description: "Route Splunk security products to setup workflows"
+  default_prompt: >-
+    Use $splunk-security-portfolio-setup to resolve Splunk security products to
+    local setup skills, install-only paths, bundled ES workflows, manual
+    handoffs, and security portfolio gap analysis.

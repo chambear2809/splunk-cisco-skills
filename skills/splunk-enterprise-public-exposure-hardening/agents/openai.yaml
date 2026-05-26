@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Enterprise Public Exposure Hardening"
+  short_description: "Harden public Splunk Enterprise edge surfaces"
+  default_prompt: >-
+    Use $splunk-enterprise-public-exposure-hardening to render, preflight,
+    apply, and validate hardening for Splunk Web, HEC, S2S, splunkd REST,
+    reverse-proxy, WAF, firewall, and audit surfaces.

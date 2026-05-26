@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Attack Analyzer Setup"
+  short_description: "Install and validate Attack Analyzer platform integration"
+  default_prompt: >-
+    Use $splunk-attack-analyzer-setup to install and validate Splunk Attack
+    Analyzer add-on and app readiness, saa index and macros, API key handoffs,
+    and phishing or malware analysis workflows.

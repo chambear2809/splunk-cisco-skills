@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Supported Add-ons Setup"
+  short_description: "Route supported add-ons to setup and readiness workflows"
+  default_prompt: >-
+    Use $splunk-supported-addons-setup to resolve Splunk-supported add-ons to
+    install, configuration, forwarder, ingest, post-ingest readiness, Unix/Linux
+    TA, or generic handoff workflows.

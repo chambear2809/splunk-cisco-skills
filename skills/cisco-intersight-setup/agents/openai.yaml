@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Intersight Setup"
+  short_description: "Configure Cisco Intersight accounts, indexes, and inputs"
+  default_prompt: >-
+    Use $cisco-intersight-setup to configure Splunk_TA_Cisco_Intersight OAuth
+    accounts, indexes, audit/alarm, inventory, metrics inputs, and validation
+    with secret values supplied through files.

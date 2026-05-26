@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Enterprise Security Config"
+  short_description: "Configure ES indexes, roles, data models, and detections"
+  default_prompt: >-
+    Use $splunk-enterprise-security-config to configure and validate Splunk
+    Enterprise Security indexes, roles, CIM data models, assets, identities,
+    threat intelligence, detections, and risk-based alerting.

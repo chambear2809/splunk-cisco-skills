@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Universal Forwarder Setup"
+  short_description: "Bootstrap Universal Forwarders and enrollment assets"
+  default_prompt: >-
+    Use $splunk-universal-forwarder-setup to bootstrap Splunk Universal
+    Forwarders on Linux, macOS, or Windows, render deployment-server, indexer,
+    or Splunk Cloud enrollment assets, and validate installed forwarders.

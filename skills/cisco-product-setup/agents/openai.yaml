@@ -1,0 +1,8 @@
+interface:
+  display_name: "Cisco Product Setup"
+  short_description: "Resolve Cisco products and route Splunk setup safely"
+  default_prompt: >-
+    Use $cisco-product-setup to resolve a Cisco product name or alias from the
+    SCAN catalog, classify automation coverage, and produce the safe routed
+    install, configure, and validation handoff without asking for secrets in
+    chat.

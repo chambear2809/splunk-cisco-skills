@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Security Cloud Setup"
+  short_description: "Configure Cisco Security Cloud product inputs"
+  default_prompt: >-
+    Use $cisco-security-cloud-setup to install and configure CiscoSecurityCloud
+    inputs for Duo, XDR, Secure Endpoint, Secure Firewall, ETD, Secure Network
+    Analytics, Secure Workload, and related Cisco Security Cloud sources.

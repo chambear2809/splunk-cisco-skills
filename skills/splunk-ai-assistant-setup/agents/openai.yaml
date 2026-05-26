@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk AI Assistant Setup"
+  short_description: "Install and validate Splunk AI Assistant onboarding"
+  default_prompt: >-
+    Use $splunk-ai-assistant-setup to install, validate, and guide Splunk AI
+    Assistant setup on Splunk Cloud or Enterprise, including cloud-connected
+    onboarding, activation, and proxy readiness.

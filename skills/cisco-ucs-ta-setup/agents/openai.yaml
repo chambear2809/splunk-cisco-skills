@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco UCS TA Setup"
+  short_description: "Configure UCS Manager records, templates, and inputs"
+  default_prompt: >-
+    Use $cisco-ucs-ta-setup to install, configure, and validate
+    Splunk_TA_cisco-ucs server records, encrypted credential files, templates,
+    cisco_ucs_task inputs, indexes, and cisco:ucs data.

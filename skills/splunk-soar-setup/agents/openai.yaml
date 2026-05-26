@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk SOAR Setup"
+  short_description: "Render and validate Splunk SOAR lifecycle plans"
+  default_prompt: >-
+    Use $splunk-soar-setup to render, preflight, apply, and validate Splunk
+    SOAR on-prem, clustered, SOAR Cloud onboarding, IP allowlist, connector,
+    and ES/Splunk-side handoff workflows.

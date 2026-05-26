@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Data Source Readiness Doctor"
+  short_description: "Score ES, ITSI, ARI, CIM, OCSF, and dashboard readiness"
+  default_prompt: >-
+    Use $splunk-data-source-readiness-doctor to diagnose whether onboarded data
+    sources are ready for ES, ITSI, ARI, CIM, OCSF, dashboards, data models,
+    and source-specific fix handoffs.

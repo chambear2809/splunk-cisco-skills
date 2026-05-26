@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Catalyst Enhanced Netflow Setup"
+  short_description: "Install and validate Cisco HSL/IPFIX mappings"
+  default_prompt: >-
+    Use $cisco-catalyst-enhanced-netflow-setup to install and validate the
+    optional Cisco Catalyst Enhanced Netflow add-on, HSL/IPFIX mappings, and
+    related Enterprise Networking dashboard prerequisites.

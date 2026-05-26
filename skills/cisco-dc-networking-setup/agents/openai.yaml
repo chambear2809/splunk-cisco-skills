@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco DC Networking Setup"
+  short_description: "Configure ACI, Nexus Dashboard, and Nexus 9K inputs"
+  default_prompt: >-
+    Use $cisco-dc-networking-setup to configure Cisco DC Networking indexes,
+    ACI/APIC, Nexus Dashboard, Nexus 9K accounts and inputs, and deployment
+    validation with file-backed secrets.

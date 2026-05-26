@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Agent Management Setup"
+  short_description: "Render Agent Management server classes and clients"
+  default_prompt: >-
+    Use $splunk-agent-management-setup to render, preflight, apply, and
+    validate Splunk Agent Management server classes, deployment apps,
+    deployment clients, and forwarder fleet handoffs.

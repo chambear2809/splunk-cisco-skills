@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Edge Processor Setup"
+  short_description: "Render and validate Edge Processor lifecycle assets"
+  default_prompt: >-
+    Use $splunk-edge-processor-setup to render, preflight, apply, and validate
+    Splunk Edge Processor control-plane objects, Linux instances, SPL2
+    pipelines, destinations, and operational handoffs.

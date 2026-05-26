@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Connect for Syslog Setup"
+  short_description: "Deploy and validate SC4S collectors"
+  default_prompt: >-
+    Use $splunk-connect-for-syslog-setup to prepare Splunk indexes and HEC,
+    render Docker, Podman, systemd, or Kubernetes assets, and validate SC4S
+    startup and syslog ingestion readiness.

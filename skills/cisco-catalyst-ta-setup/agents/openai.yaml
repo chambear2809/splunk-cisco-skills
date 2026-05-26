@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Catalyst TA Setup"
+  short_description: "Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision"
+  default_prompt: >-
+    Use $cisco-catalyst-ta-setup to configure TA_cisco_catalyst indexes,
+    accounts, inputs, secure credential files, and validation for Catalyst
+    Center, ISE, SD-WAN, or Cyber Vision.

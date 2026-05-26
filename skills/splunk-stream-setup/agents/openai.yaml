@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Stream Setup"
+  short_description: "Install and configure Splunk Stream components"
+  default_prompt: >-
+    Use $splunk-stream-setup to install and configure Splunk Stream, Stream
+    Forwarder, wire data add-ons, indexes, NetFlow receivers, protocol streams,
+    and validation.

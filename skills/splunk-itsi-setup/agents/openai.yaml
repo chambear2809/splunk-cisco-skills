@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk ITSI Setup"
+  short_description: "Install and validate Splunk IT Service Intelligence"
+  default_prompt: >-
+    Use $splunk-itsi-setup to install and validate Splunk IT Service
+    Intelligence on Splunk Cloud or Enterprise, including core component checks
+    and integration readiness for apps such as Cisco ThousandEyes.

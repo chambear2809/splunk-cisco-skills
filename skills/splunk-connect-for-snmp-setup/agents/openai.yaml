@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Connect for SNMP Setup"
+  short_description: "Deploy and validate SC4SNMP collectors"
+  default_prompt: >-
+    Use $splunk-connect-for-snmp-setup to prepare Splunk indexes and HEC,
+    render Docker Compose or Kubernetes Helm assets, and validate SC4SNMP
+    polling or trap readiness.

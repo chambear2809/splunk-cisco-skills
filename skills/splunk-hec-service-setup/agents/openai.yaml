@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk HEC Service Setup"
+  short_description: "Render and validate reusable HEC token configuration"
+  default_prompt: >-
+    Use $splunk-hec-service-setup to render, preflight, apply, and validate
+    Splunk HEC tokens, allowed indexes, indexer acknowledgement, TLS settings,
+    Enterprise inputs.conf assets, and Splunk Cloud ACS payloads.

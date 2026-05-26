@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco AppDynamics Setup"
+  short_description: "Configure the Splunk Add-on for Cisco AppDynamics"
+  default_prompt: >-
+    Use $cisco-appdynamics-setup to configure Splunk_TA_AppDynamics controller
+    and analytics connections, data inputs, indexes, and validation without
+    placing secrets in chat.
