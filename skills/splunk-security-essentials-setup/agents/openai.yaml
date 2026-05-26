@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Security Essentials Setup"
+  short_description: "Install and validate Splunk Security Essentials"
+  default_prompt: >-
+    Use $splunk-security-essentials-setup to install, configure readiness, and
+    validate Splunk Security Essentials for MITRE/Kill Chain content,
+    recommendations, starter dashboards, and ES planning.

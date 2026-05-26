@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Cloud ACS Admin Setup"
+  short_description: "Manage Splunk Cloud ACS admin objects safely"
+  default_prompt: >-
+    Use $splunk-cloud-acs-admin-setup to render, preflight, apply, audit, and
+    validate Splunk Cloud ACS allowlists, indexes, HEC tokens, users, roles,
+    app permissions, limits, and related admin settings.

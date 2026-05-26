@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Enterprise Networking Setup"
+  short_description: "Configure Cisco Catalyst app macros and dashboards"
+  default_prompt: >-
+    Use $cisco-enterprise-networking-setup to configure cisco-catalyst-app
+    macros, saved searches, data model acceleration, and Cisco Enterprise
+    Networking dashboard readiness.

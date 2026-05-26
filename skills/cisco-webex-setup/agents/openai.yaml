@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Webex Setup"
+  short_description: "Configure Webex OAuth accounts, inputs, and dashboards"
+  default_prompt: >-
+    Use $cisco-webex-setup to install, configure, and validate Webex REST OAuth
+    accounts, meetings, audit, qualities, calling, generic endpoint, Contact
+    Center inputs, and companion dashboards.

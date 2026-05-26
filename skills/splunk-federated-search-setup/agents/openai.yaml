@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Federated Search Setup"
+  short_description: "Configure Splunk-to-Splunk and S3 federated search"
+  default_prompt: >-
+    Use $splunk-federated-search-setup to render, preflight, apply, and
+    validate Splunk Federated Search providers, federated indexes, transparent
+    or standard mode, and S3 provider handoffs.

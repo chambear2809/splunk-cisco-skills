@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco SCAN Setup"
+  short_description: "Install and validate Splunk Cisco App Navigator"
+  default_prompt: >-
+    Use $cisco-scan-setup to install and validate Splunk Cisco App Navigator
+    (SCAN), verify its Cisco product catalog, and trigger catalog sync from S3
+    when requested.

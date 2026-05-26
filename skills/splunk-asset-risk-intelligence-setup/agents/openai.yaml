@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Asset and Risk Intelligence Setup"
+  short_description: "Install and validate Splunk ARI readiness"
+  default_prompt: >-
+    Use $splunk-asset-risk-intelligence-setup to install and validate Splunk
+    Asset and Risk Intelligence, including ARI indexes, KV Store, roles,
+    Enterprise Security integration, and Exposure Analytics handoffs.

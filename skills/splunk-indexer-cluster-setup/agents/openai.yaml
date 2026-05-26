@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Indexer Cluster Setup"
+  short_description: "Operate Splunk indexer clusters safely"
+  default_prompt: >-
+    Use $splunk-indexer-cluster-setup to render, preflight, apply, validate,
+    and operate Splunk single-site or multisite indexer clusters, bundle
+    workflows, maintenance mode, rolling restarts, and peer lifecycle tasks.

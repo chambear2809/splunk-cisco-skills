@@ -2,15 +2,16 @@
 name: splunk-observability-mobile-rum-setup
 description: >-
   Render, validate, and optionally apply guarded source patches for Splunk
-  Observability Cloud Mobile RUM across native iOS, native Android, React
-  Native, and Flutter apps. Covers pinned agent versions, Session Replay
-  enterprise gating, privacy controls, release attributes, dSYM and Android
-  mapping upload helpers, React Native and Flutter native artifact handoffs,
-  WebView Browser RUM bridge snippets, and RUM-to-APM Server-Timing
-  traceparent validation. Use when instrumenting mobile apps with Splunk RUM,
-  preparing Mobile Session Replay, validating RUM-to-APM linking, or rendering
-  mobile source patches. Do not use for AppDynamics EUM or Kubernetes Browser
-  RUM injection.
+  Observability Cloud Mobile RUM and mobile-side Digital Experience Analytics
+  (DXA) prerequisites across native iOS, native Android, React Native, and
+  Flutter apps. Covers pinned agent versions, Session Replay enterprise gating,
+  privacy controls, release attributes, dSYM and Android mapping upload helpers,
+  React Native and Flutter native artifact handoffs, WebView Browser RUM bridge
+  snippets, and RUM-to-APM Server-Timing traceparent validation. Use when
+  instrumenting mobile apps with Splunk RUM, preparing Mobile Session Replay,
+  preparing mobile-side Digital Experience Analytics (DXA), validating
+  RUM-to-APM linking, or rendering mobile source patches. Do not use for
+  AppDynamics EUM or Kubernetes Browser RUM injection.
 ---
 
 # Splunk Observability Mobile RUM
@@ -19,7 +20,9 @@ This skill configures **Splunk Observability Cloud Mobile RUM**, separate from
 Kubernetes Browser RUM injection and AppDynamics EUM. It is render-first:
 snippets and runbooks are the default output; patch files are optional; app
 source is changed only when `--apply-patches --accept-mobile-rum-source-edit`
-is explicitly used.
+is explicitly used. Use it as the mobile instrumentation handoff when a Digital
+Experience Analytics (DXA) request needs supported iOS or Android RUM agents,
+user tracking, readable stack traces, or Mobile Session Replay.
 
 ## Scope
 

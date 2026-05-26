@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Cloud ACS Allowlist Setup"
+  short_description: "Compatibility path for Splunk Cloud ACS allowlists"
+  default_prompt: >-
+    Use $splunk-cloud-acs-allowlist-setup for older ACS IP allowlist workflows,
+    or route broader Splunk Cloud ACS admin work to
+    $splunk-cloud-acs-admin-setup.

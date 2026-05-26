@@ -1,6 +1,6 @@
 ---
 name: splunk-observability-deep-native-workflows
-description: Render and validate deep native Splunk Observability Cloud operator workflows for modern dashboards, APM service maps, service views, business transactions, Trace Analyzer and trace waterfalls, AlwaysOn Profiling flame graphs, RUM session replay for browser and mobile, RUM error analysis, RUM URL grouping, Database Monitoring query and explain-plan triage, Synthetic waterfall details and artifacts, SLO creation and burn-rate alerting, Infrastructure/Kubernetes/Network Explorer navigators, Related Content, AI Assistant investigations, and Splunk Observability Cloud for Mobile app workflows. Use when the user asks for full native UI/product workflow coverage beyond collection, classic dashboards, or basic detector setup.
+description: Render and validate Digital Experience Analytics (DXA), Metrics Pipeline Management (MPM), and deep native Splunk Observability Cloud operator workflows for modern dashboards, APM service maps, service views, business transactions, Trace Analyzer and trace waterfalls, AlwaysOn Profiling flame graphs, RUM session replay for browser and mobile, RUM error analysis, RUM URL grouping, Database Monitoring query and explain-plan triage, Synthetic waterfall details and artifacts, SLO creation and burn-rate alerting, Infrastructure/Kubernetes/Network Explorer navigators, Related Content, AI Assistant investigations, and Splunk Observability Cloud for Mobile app workflows. Use when the user asks for full native UI/product workflow coverage beyond collection, classic dashboards, or basic detector setup, including emerging Cisco/Splunk Observability routes such as Digital Experience Analytics, DXA, Metrics Pipeline Management, MPM, or telemetry pipeline management.
 ---
 
 # Splunk Observability Deep Native Workflows
@@ -15,8 +15,14 @@ operator experience matters as much as the underlying API object. It complements
 - `splunk-observability-database-monitoring-setup` for DBMon collector wiring.
 - `splunk-observability-k8s-frontend-rum-setup` for Browser RUM and Session
   Replay instrumentation injection.
+- `splunk-observability-mobile-rum-setup` for native iOS/Android, React
+  Native, and Flutter RUM instrumentation used by Mobile RUM and DXA.
 - `splunk-observability-cloud-integration-setup` for Log Observer Connect,
   Related Content, Dashboard Studio O11y metrics, and SIM add-on streams.
+- `splunk-observability-otel-collector-setup`, `splunk-edge-processor-setup`,
+  `splunk-ingest-processor-setup`, and `splunk-spl2-pipeline-kit` for
+  collection-side or Splunk Platform pipeline changes behind telemetry pipeline
+  management requests.
 
 The default workflow is render-first and non-mutating. This skill produces a
 reviewable workflow packet: coverage report, deeplinks, UI handoff steps, and
@@ -73,6 +79,9 @@ for that exact action.
    - RUM session search, replay playback, browser or mobile replay
      instrumentation checks, crashes/errors, source maps, URL grouping, mobile
      app health dashboards, or RUM/APM linking.
+   - Digital Experience Analytics (DXA) projects, event definitions, element
+     picker planning, user segments, conversion funnels, time-series analyses,
+     source mapping, or RUM instrumentation prerequisites.
    - Splunk Database Monitoring query details, explain plans, query samples,
      query metrics, trace correlation, infrastructure correlation, or AI
      Assistant handoff.
@@ -82,6 +91,9 @@ for that exact action.
      burn-rate alert rules, or SLO dashboards.
    - Infrastructure Monitoring, Kubernetes entities, Network Explorer, Related
      Content pivots, or AI Assistant investigations.
+   - Metrics Pipeline Management (MPM) / telemetry pipeline management planning
+     for metric cardinality, real-time versus archived metrics, dropping,
+     aggregation rules, or downstream collector and SPL2 pipeline handoffs.
    - Splunk Observability Cloud for Mobile dashboards, alerts, push
      notifications, sharing, and on-call handoff.
 
@@ -146,6 +158,11 @@ surface-specific fields.
 - `rum_mobile`: RUM for Mobile workflows: app summary, crashes, app errors,
   session timeline, stack-trace symbolication/mapping files, launch and network
   performance, and mobile app health dashboards.
+- `digital_experience_analytics`: Splunk Digital Experience Analytics (DXA)
+  workflows: RUM agent prerequisites, source mapping, projects, event
+  definitions, element picker, user segments, conversion funnels, time-series
+  analyses, session replay, frustration signals, and Browser/Mobile RUM
+  instrumentation handoffs.
 - `db_query_explain_plan`: DBMon query details, explain plans, query samples,
   query metrics, traces, dependencies, metadata, AI Assistant, and APM/IM
   correlation.
@@ -162,6 +179,11 @@ surface-specific fields.
   pivots.
 - `network_explorer`: network map, service dependencies, eBPF telemetry caveats,
   TCP/DNS/drop/error/retransmit review, and gateway handoff.
+- `metrics_pipeline_management`: Splunk Observability Cloud Metrics Pipeline
+  Management (MPM): metric usage, MTS/cardinality review, keep/archive/drop
+  routing, aggregation rule planning, routing exceptions, limitations, and
+  handoffs to OTel Collector, Edge Processor, Ingest Processor, or the SPL2
+  pipeline kit for broader telemetry pipeline management.
 - `related_content`: APM, Infrastructure, Log Observer Connect, Kubernetes,
   database, host, trace, and log pivots plus metadata/entity-index checks.
 - `ai_assistant_investigation`: scoped AI Assistant prompt packs for service
@@ -171,6 +193,13 @@ surface-specific fields.
   filters, alert visualizations, sharing, and push notification/on-call handoff.
 - `log_observer_chart`: modern logs chart workflow using SPL1, SPL2, or JSON
   query intent inside the new dashboard experience.
+
+Aliases remain supported for usability: `dxa` and `digital_experience` resolve
+to `digital_experience_analytics`; `mpm`, `metric_pipeline_management`, and
+`telemetry_pipeline_management` resolve to `metrics_pipeline_management`. Older
+surface names such as `rum_session_replay`, `rum_mobile`, `synthetic_waterfall`,
+`infrastructure_navigator`, and `log_observer_chart` remain first-class and are
+not renamed.
 
 For official-source details and the full feature matrix, read
 [reference.md](reference.md).

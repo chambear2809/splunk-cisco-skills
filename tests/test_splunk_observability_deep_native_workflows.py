@@ -48,12 +48,18 @@ def test_deep_native_template_renders_coverage_packet(tmp_path: Path) -> None:
     assert "modern_dashboard" in surfaces
     assert "slo_creation" in surfaces
     assert "rum_session_replay" in surfaces
+    assert "rum_mobile" in surfaces
+    assert "synthetic_waterfall" in surfaces
+    assert "digital_experience_analytics" in surfaces
+    assert "metrics_pipeline_management" in surfaces
 
     for rel_path in (
         "coverage-report.json",
         "deeplinks.json",
         "apply-plan.json",
         "workflow-handoff.md",
+        "payloads/dxa/checkout-dxa-funnel-workflow.intent.json",
+        "payloads/metrics-pipeline-management/checkout-metrics-cardinality-review.intent.json",
         "payloads/slo/checkout-request-success-slo.json",
     ):
         assert (tmp_path / rel_path).is_file()
@@ -78,3 +84,45 @@ def test_deep_native_setup_rejects_inline_secret_flags() -> None:
 
     assert result.returncode != 0
     assert "would expose a secret in process listings" in result.stdout + result.stderr
+
+
+def test_deep_native_keeps_old_surfaces_and_new_aliases(tmp_path: Path) -> None:
+    spec = {
+        "api_version": "splunk-observability-deep-native-workflows/v1",
+        "realm": "us0",
+        "workflows": [
+            {"surface": "rum_session_replay", "name": "Old replay name"},
+            {"surface": "rum_mobile", "name": "Old mobile name"},
+            {"surface": "synthetic_waterfall", "name": "Old synthetic name"},
+            {"surface": "dxa", "name": "Short DXA alias"},
+            {"surface": "telemetry_pipeline_management", "name": "Telemetry wording alias"},
+        ],
+    }
+    spec_path = tmp_path / "aliases.json"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+    output_dir = tmp_path / "rendered"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPT_DIR / "render_workflows.py"),
+            "--spec",
+            str(spec_path),
+            "--output-dir",
+            str(output_dir),
+            "--json",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    payload = json.loads(result.stdout)
+    surfaces = {item["surface"] for item in payload["coverage_report"]["objects"]}
+    assert "rum_session_replay" in surfaces
+    assert "rum_mobile" in surfaces
+    assert "synthetic_waterfall" in surfaces
+    assert "digital_experience_analytics" in surfaces
+    assert "metrics_pipeline_management" in surfaces

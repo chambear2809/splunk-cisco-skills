@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk App Install"
+  short_description: "Install, list, update, or remove Splunk apps and add-ons"
+  default_prompt: >-
+    Use $splunk-app-install to install, update, list, or uninstall Splunk apps
+    and add-ons from local packages, URLs, or Splunkbase with safe planning and
+    validation.

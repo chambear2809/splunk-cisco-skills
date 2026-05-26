@@ -19,13 +19,15 @@ detector creation.
 | RUM session replay | `deeplink`, `handoff`, optional `api_validate` for metric metadata | Session search link, replay privacy checklist, browser/mobile replay checks, RUM/APM linking checks | `splunk-observability-k8s-frontend-rum-setup` for browser injection |
 | RUM browser error analysis | `deeplink`, `handoff` | JavaScript error IDs, source-map readiness, backend XHR/fetch errors, Tag Spotlight, session and replay pivots | RUM source-map handoff in `splunk-observability-k8s-frontend-rum-setup` |
 | RUM URL grouping | `deeplink`, `handoff` | v1/v2 rule intent, path/domain/parameter/hash matching, migration impact checklist | Native Data Management UI; rerender dashboards/detectors when groups change |
-| RUM for Mobile | `handoff`, `deeplink` | App summary, crashes/errors, session timeline, dSYM/mapping-file checks, launch/network workflow | Mobile app instrumentation work outside this repo unless a future skill owns it |
+| RUM for Mobile | `handoff`, `deeplink` | App summary, crashes/errors, session timeline, dSYM/mapping-file checks, launch/network workflow | `splunk-observability-mobile-rum-setup` for mobile instrumentation |
+| Digital Experience Analytics (DXA) | `handoff`, `delegated_apply`, `deeplink` | DXA project/event/segment/funnel intent, RUM agent prerequisites, user tracking, source mapping, replay/privacy checks | Browser RUM and Mobile RUM skills for instrumentation; native DXA UI for analytics |
 | Database Query Performance and DBMon explain plans | `handoff`, `deeplink` | Query-details plan: statement, explain plans, metrics, samples, traces, dependencies, metadata, AI Assistant | `splunk-observability-database-monitoring-setup` for collection |
 | Synthetic waterfall detail | `api_validate`, `deeplink`, `handoff` | Run/artifact lookup plan, waterfall/HAR/video/filmstrip checks, resource filters, APM/RUM link checks | `splunk-observability-native-ops` for Synthetic test CRUD |
 | SLO creation | `api_apply`, `api_validate`, `deeplink` | `/slo/validate`, `/slo`, `/slo/{id}`, `/slo/search` action plan and payloads | Apply through an approved Observability API client or updated native-ops path |
 | Infrastructure navigators | `deeplink`, `handoff` | Host/cloud/integration navigator intent, aggregate/instance dashboard checks, alert and Related Content pivots | Cloud integration or OTel collector skills for missing data |
 | Kubernetes entities | `deeplink`, `handoff` | New K8s entities workflow, permissions, collector version check, analyzer/events/dependencies/logs/APM pivots | `splunk-observability-otel-collector-setup` |
 | Network Explorer | `deeplink`, `handoff` | Network map, service dependency, eBPF support caveat, TCP/DNS/drop/error/retransmit checklist | Customer-managed eBPF plus OTel gateway handoff |
+| Metrics Pipeline Management (MPM) | `deeplink`, `handoff` | Metric usage, MTS/cardinality review, real-time/archive/drop routing, aggregation and exception planning | Native MPM UI; OTel Collector/EP/IP/SPL2 skills when the user means broader telemetry pipeline management |
 | Related Content | `deeplink`, `handoff` | Cross-product pivot matrix, metadata key checks, LOC entity-index mapping checks | `splunk-observability-cloud-integration-setup` and OTel collector setup |
 | AI Assistant investigation | `deeplink`, `handoff` | Prompt pack, realm/policy checks, service/trace/log/incident/K8s/SignalFlow workflows, quota and ChatId notes | Native AI Assistant UI |
 | Observability Cloud for Mobile app | `handoff` | Dashboards, filters, alert details, sharing, push notification/on-call checks | `splunk-oncall-setup` for paging policies and incident lifecycle |
@@ -99,12 +101,15 @@ Source anchors:
 
 Splunk RUM covers Browser and Mobile. Browser RUM collects web vitals, errors,
 resource timing, route/page views, custom events, and RUM/APM links through the
-Server-Timing header. Session replay is privacy-sensitive and must include
-consent, masking, sensitivity rules, and enterprise-edition/subscription checks.
-Mobile session replay uses platform-specific SDK modules and is played in the
-RUM UI. Mobile RUM workflows also include app summary, crashes, app errors,
-session timelines, readable stack traces when dSYM or Android mapping files are
-available, app launch, and network performance.
+Server-Timing header. Keep those older product names usable: Browser RUM, RUM
+session replay, Mobile RUM, and Synthetic Monitoring remain explicit surfaces
+even though Digital Experience Analytics is now a first-class add-on layer.
+Session replay is privacy-sensitive and must include consent, masking,
+sensitivity rules, and enterprise-edition/subscription checks. Mobile session
+replay uses platform-specific SDK modules and is played in the RUM UI. Mobile
+RUM workflows also include app summary, crashes, app errors, session timelines,
+readable stack traces when dSYM or Android mapping files are available, app
+launch, and network performance.
 
 RUM browser error analysis is its own workflow. JavaScript errors are grouped by
 error ID, and readable stack traces depend on source maps. Backend XHR/fetch
@@ -128,6 +133,35 @@ Source anchors:
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/write-rules-for-url-grouping
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/monitor-errors-and-crashes-in-tag-spotlight/monitor-mobile-crashes
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/real-user-monitoring/splunk-rum-dashboards/splunk-rum-built-in-dashboards
+
+### Digital Experience Analytics
+
+Splunk Digital Experience Analytics (DXA) is an Observability Cloud add-on that
+complements existing Real User Monitoring and Synthetic Monitoring rather than
+replacing those older names. Route DXA requests as a first-class native workflow
+when the user asks for customer-journey analysis, conversion funnels, event
+definitions, user segmentation, behavior analysis, element picker, source
+mapping, session replay insight, or frustration-signal analysis.
+
+DXA setup follows the RUM instrumentation path. Browser applications need
+Splunk Browser RUM agent 2.0.0 or later for DXA capabilities. Mobile
+applications need Splunk RUM iOS agent 2.0.0 or later, or Splunk RUM Android
+agent 2.0.0 or later. DXA also depends on RUM data being linked to user
+tracking; for the documented defaults, check the current setup page before
+changing agent guidance.
+
+Do not claim a public DXA apply API for projects, event definitions, segments,
+conversion funnels, or analysis views unless Splunk publishes one. Render
+operator handoffs and delegate missing instrumentation to Browser RUM or Mobile
+RUM skills.
+
+Source anchors:
+
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/set-up-digital-experience-analytics
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-and-manage-event-definitions
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-conversion-funnel-analysis
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-end-user-experience/digital-experience-analytics/create-user-segments
 
 ### Database Monitoring And Explain Plans
 
@@ -207,9 +241,23 @@ Log Observer Connect, Kubernetes, database, host, trace, and log pivots depend
 on exact metadata names and, for logs, entity-index mapping. Missing pivots are
 usually metadata or collector configuration issues.
 
+Metrics Pipeline Management (MPM) is the official Splunk Observability Cloud
+name for centrally managing metric cardinality and controlling how metrics are
+ingested and stored. Treat MPM as the first-class native Observability route
+for metric usage, MTS/cardinality reduction, real-time versus archived metrics,
+dropping, aggregation rules, and routing exceptions. It is Enterprise Edition
+only. Do not broaden MPM into all telemetry pipeline work: if the user asks for
+pre-ingest filtering, attribute cleanup, or collector-side data control, hand
+off to `splunk-observability-otel-collector-setup`; if they ask for Splunk
+Platform log/event routing or transformation pipelines, hand off to
+`splunk-edge-processor-setup`, `splunk-ingest-processor-setup`, or
+`splunk-spl2-pipeline-kit`.
+
 Source anchors:
 
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/monitor-services-and-hosts
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/metrics-pipeline-management
+- https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/metrics-pipeline-management/introduction-to-metrics-pipeline-management
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/use-navigators/customize-dashboards-in-splunk-infrastructure-monitoring-navigators
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/monitor-services-and-hosts/monitor-kubernetes/monitor-kubernetes-entities
 - https://help.splunk.com/en/splunk-observability-cloud/monitor-infrastructure/network-explorer

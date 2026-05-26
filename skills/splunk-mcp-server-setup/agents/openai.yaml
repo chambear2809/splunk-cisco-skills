@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk MCP Server Setup"
+  short_description: "Install and configure Splunk MCP Server"
+  default_prompt: >-
+    Use $splunk-mcp-server-setup to install, configure, validate, or uninstall
+    the Splunk MCP Server app, token settings, rate limits, and Cursor, Codex,
+    or Claude Code client bridge bundles.

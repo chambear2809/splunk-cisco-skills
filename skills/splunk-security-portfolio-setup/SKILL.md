@@ -4,9 +4,10 @@ description: >-
   Resolve Splunk security products and associated security offerings to the
   correct local setup skill, install-only path, ES bundled workflow, or manual
   handoff. Use when a user asks for total Splunk security portfolio coverage,
-  product gap analysis, or which Splunk security skill handles ES, SOAR,
-  Security Essentials, UBA, Attack Analyzer, ARI, Mission Control, PCI,
-  InfoSec, CIM, or related security apps.
+  product gap analysis, or which Splunk security skill handles ES, ES 8.x
+  native SOAR, Security AI Assistant / AI Assistant in Security, Federated
+  Analytics, SOAR, Security Essentials, UBA, Attack Analyzer, ARI, Mission
+  Control, PCI, InfoSec, CIM, or related security apps.
 ---
 
 # Splunk Security Portfolio Setup
@@ -23,6 +24,8 @@ specific setup skill.
 - Routes first-class products to the product setup skills in this repo.
 - Makes associated offerings explicit so a missing product is not hidden by
   generic app install coverage.
+- Preserves legacy names such as Phantom, UBA, Mission Control, and ES while
+  making current ES 8.x capability names resolve directly.
 
 ## Primary Commands
 
@@ -56,6 +59,15 @@ bash skills/splunk-security-portfolio-setup/scripts/setup.sh \
 - Use `splunk-app-install` for `install_only` apps unless a future product
   skill is added.
 - Treat `bundled_es` results as Enterprise Security configuration scope.
+- For ES 8.x native SOAR, route through ES configuration first, then use
+  `splunk-soar-setup` for SOAR runtime, Cloud onboarding, Automation Broker,
+  and Splunk-side SOAR apps.
+- For Security AI Assistant / AI Assistant in Security, keep the ES
+  configuration route authoritative and use `splunk-ai-assistant-setup` only
+  for the generic `Splunk_AI_Assistant_Cloud` app workflow.
+- For Federated Analytics, route the provider/index setup through
+  `splunk-federated-search-setup`, then return to ES configuration for ASL,
+  OCSF, ESCU, and detection-readiness handoffs.
 - Treat `manual_gap` and `partial` results as handoff/readiness workflows and
   do not imply full automation.
 

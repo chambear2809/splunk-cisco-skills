@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk UBA Setup"
+  short_description: "Validate UBA readiness and ES Premier UEBA migration"
+  default_prompt: >-
+    Use $splunk-uba-setup to validate Splunk UBA or UEBA readiness, optional
+    Kafka ingestion app placement, and migration guidance toward Splunk
+    Enterprise Security Premier UEBA.

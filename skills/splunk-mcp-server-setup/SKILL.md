@@ -1,18 +1,24 @@
 ---
 name: splunk-mcp-server-setup
 description: >-
-  Install, configure, validate, and uninstall the Splunk MCP Server app
-  (Splunk_MCP_Server / "Splunk MCP TA"). Configures mcp.conf server settings,
-  rate limits, encrypted token issuance, and renders a shared client bridge
-  bundle that works with Cursor, Codex, and Claude Code. Use when the user asks about
+  Install, configure, validate, and uninstall the Splunk MCP Server app for
+  Cisco Data Fabric agentic/tool access (Splunk_MCP_Server / "Splunk MCP TA").
+  Configures mcp.conf server settings, rate limits, encrypted token issuance,
+  and renders a shared client bridge bundle that works with Cursor, Codex, and
+  Claude Code. Use when the user asks about
   Splunk MCP server setup, Splunk MCP TA, Splunk_MCP_Server, /services/mcp,
   the hosted SCS MCP Gateway for Splunk Observability Cloud, Cursor MCP,
-  Codex MCP, or Claude Code MCP connectivity to Splunk.
+  Codex MCP, Claude Code MCP connectivity to Splunk, or Cisco Data Fabric
+  agentic/tool access through Splunk MCP.
 ---
 
 # Splunk MCP Server Setup
 
 Automates setup of the **Splunk MCP Server** app (`Splunk_MCP_Server`).
+
+For newer Cisco Data Fabric wording, this is the MCP/tool-access route for
+agentic workflows. Federated search, data pipelines, and AI Toolkit workflows
+remain in their dedicated skills.
 
 ## What This Skill Covers
 

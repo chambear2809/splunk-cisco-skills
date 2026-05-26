@@ -53,10 +53,15 @@ required_products = {
     "attack-analyzer",
     "asset-risk-intelligence",
 }
+required_current_es_routes = {
+    "es-native-soar",
+    "es-ai-assistant",
+    "federated-analytics",
+}
 entries = {entry["key"]: entry for entry in catalog.get("entries", [])}
-missing = sorted(required_products - set(entries))
+missing = sorted((required_products | required_current_es_routes) - set(entries))
 if missing:
-    errors.append(f"missing required product keys: {', '.join(missing)}")
+    errors.append(f"missing required security portfolio keys: {', '.join(missing)}")
 
 for entry in entries.values():
     status = entry.get("status")

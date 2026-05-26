@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Meraki TA Setup"
+  short_description: "Configure Meraki organization accounts and polling inputs"
+  default_prompt: >-
+    Use $cisco-meraki-ta-setup to configure Splunk_TA_cisco_meraki indexes,
+    Meraki organization accounts, polling inputs, secure credential files, and
+    deployment validation.

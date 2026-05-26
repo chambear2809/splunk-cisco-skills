@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 import json
 import os
 import subprocess
@@ -63,8 +64,17 @@ def test_security_portfolio_router_classifies_products_and_offerings() -> None:
         "--json",
     )
 
-    assert payload["last_verified"] == "2026-05-03"
+    assert payload["last_verified"] == "2026-05-26"
     entries = {entry["key"]: entry for entry in payload["entries"]}
+    assert len(entries) == 27
+    assert Counter(entry["status"] for entry in payload["entries"]) == {
+        "first_class": 7,
+        "existing_skill": 2,
+        "install_only": 5,
+        "partial": 3,
+        "bundled_es": 9,
+        "manual_gap": 1,
+    }
 
     expected_products = {
         "enterprise-security": "existing_skill",
@@ -81,10 +91,13 @@ def test_security_portfolio_router_classifies_products_and_offerings() -> None:
     associated = {
         "soar-export": "first_class",
         "mission-control": "bundled_es",
+        "es-native-soar": "bundled_es",
+        "es-ai-assistant": "bundled_es",
         "exposure-analytics": "bundled_es",
         "detection-studio": "bundled_es",
         "tim-cloud": "bundled_es",
         "splunk-cloud-connect": "bundled_es",
+        "federated-analytics": "existing_skill",
         "dlx": "bundled_es",
         "security-content-update": "install_only",
         "pci-compliance": "install_only",
@@ -94,6 +107,61 @@ def test_security_portfolio_router_classifies_products_and_offerings() -> None:
     }
     for key, status in associated.items():
         assert entries[key]["status"] == status
+
+
+def test_security_portfolio_router_resolves_current_es_capability_names() -> None:
+    native_soar = load_json_from_bash(
+        "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+        "--product",
+        "ES 8 native SOAR",
+        "--json",
+    )
+    assert native_soar["entry"]["key"] == "es-native-soar"
+    assert native_soar["entry"]["route"] == [
+        "splunk-enterprise-security-config",
+        "splunk-soar-setup",
+    ]
+    assert native_soar["route_command"] == [
+        "bash",
+        "skills/splunk-enterprise-security-config/scripts/setup.sh",
+        "--spec",
+        "skills/splunk-enterprise-security-config/templates/es-config.example.yaml",
+        "--mode",
+        "preview",
+    ]
+
+    security_ai = load_json_from_bash(
+        "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+        "--product",
+        "Splunk AI Assistant for Security",
+        "--json",
+    )
+    assert security_ai["entry"]["key"] == "es-ai-assistant"
+    assert security_ai["entry"]["route"] == [
+        "splunk-enterprise-security-config",
+        "splunk-ai-assistant-setup",
+    ]
+
+    federated_analytics = load_json_from_bash(
+        "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+        "--product",
+        "ASL OCSF detections",
+        "--json",
+    )
+    assert federated_analytics["entry"]["key"] == "federated-analytics"
+    assert federated_analytics["entry"]["route"] == [
+        "splunk-federated-search-setup",
+        "splunk-enterprise-security-config",
+    ]
+    assert federated_analytics["route_command"] == [
+        "bash",
+        "skills/splunk-federated-search-setup/scripts/setup.sh",
+        "--provider",
+        "type=aws_s3,name=asl_security_lake,aws_account_id=123456789012,aws_region=us-east-1,database=amazon_security_lake,data_catalog=arn:aws:glue:us-east-1:123456789012:catalog,aws_glue_tables_allowlist=ocsf_findings,aws_s3_paths_allowlist=s3://example-security-lake/AWSLogs/",
+        "--federated-index",
+        "name=asl_findings,provider=asl_security_lake,dataset_type=glue_table,dataset_name=ocsf_findings",
+        "--dry-run",
+    ]
 
 
 def test_security_portfolio_router_preserves_specific_handoffs() -> None:

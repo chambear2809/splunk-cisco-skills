@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Enterprise Host Setup"
+  short_description: "Bootstrap Linux Splunk Enterprise host roles"
+  default_prompt: >-
+    Use $splunk-enterprise-host-setup to install Splunk Enterprise packages on
+    Linux hosts and configure search-tier, indexer, heavy-forwarder, cluster
+    manager, peer, deployer, or search head member roles.

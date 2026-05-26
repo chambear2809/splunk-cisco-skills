@@ -1,0 +1,6 @@
+interface:
+  display_name: "Cisco Spaces Setup"
+  short_description: "Configure Cisco Spaces meta stream and firehose inputs"
+  default_prompt: >-
+    Use $cisco-spaces-setup to configure ta_cisco_spaces indexes, meta stream
+    accounts, firehose inputs, activation-token secret files, and validation.

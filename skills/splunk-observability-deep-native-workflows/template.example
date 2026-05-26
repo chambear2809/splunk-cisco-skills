@@ -145,6 +145,27 @@ workflows:
       - dsym_uploaded
       - network_performance
 
+  - surface: digital_experience_analytics
+    name: Checkout DXA funnel workflow
+    application: checkout-web
+    project: checkout-growth
+    events:
+      - product_view
+      - add_to_cart
+      - checkout_submit
+    funnels:
+      - checkout conversion
+    segments:
+      - returning_users
+      - mobile_web
+    checks:
+      - browser_rum_2x
+      - mobile_rum_2x
+      - source_mapping
+      - user_tracking
+      - session_replay_privacy
+      - frustration_signals
+
   - surface: db_query_explain_plan
     name: Checkout DB query details
     database: checkout-postgres
@@ -204,6 +225,26 @@ workflows:
       - tcp_retransmits
       - dns_errors
       - dropped_packets
+
+  - surface: metrics_pipeline_management
+    name: Checkout metrics cardinality review
+    metric: http.server.duration
+    rule: checkout-container-rollup
+    dimensions_to_keep:
+      - region
+      - service.name
+      - http.route
+    routing:
+      default: archived
+      exceptions:
+        - service.name=checkoutservice
+    checks:
+      - enterprise_edition
+      - metric_usage
+      - high_cardinality_dimensions
+      - aggregation_rule
+      - routing_exceptions
+      - otel_pre_ingest_handoff
 
   - surface: related_content
     name: Checkout related content validation

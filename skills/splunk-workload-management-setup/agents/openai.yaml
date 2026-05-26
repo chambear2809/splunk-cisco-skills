@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Workload Management Setup"
+  short_description: "Configure workload pools, rules, and admission controls"
+  default_prompt: >-
+    Use $splunk-workload-management-setup to render, preflight, apply, and
+    validate Splunk Workload Management pools, workload rules, admission rules,
+    cgroups prerequisites, and search or ingest resource controls.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco Secure Access Setup"
+  short_description: "Install Secure Access app and event add-on prerequisites"
+  default_prompt: >-
+    Use $cisco-secure-access-setup to install and configure the Cisco Secure
+    Access app, required event add-on, org accounts, indexes, and dashboard
+    prerequisites using file-backed secrets.

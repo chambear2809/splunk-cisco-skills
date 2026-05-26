@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco ThousandEyes Setup"
+  short_description: "Configure ThousandEyes OAuth, HEC, and inputs"
+  default_prompt: >-
+    Use $cisco-thousandeyes-setup to configure ta_cisco_thousandeyes OAuth,
+    HEC token handoffs, indexes, streaming and polling inputs, dashboards, and
+    optional ITSI integration.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Index Lifecycle / SmartStore Setup"
+  short_description: "Configure index lifecycle and SmartStore assets"
+  default_prompt: >-
+    Use $splunk-index-lifecycle-smartstore-setup to render and validate
+    indexes.conf, server.conf, limits.conf, remote volumes, object storage, and
+    lifecycle settings for Splunk indexers or cluster managers.

@@ -5,8 +5,9 @@ description: >-
   including ES indexes, Splunk_TA_ForIndexers readiness, users and roles,
   managed custom roles, CIM data models, data model acceleration, assets and
   identities, threat intelligence, detections, risk-based alerting, Mission
-  Control, exposure analytics, UEBA, SOAR integrations, and configuration
-  health checks. Use when the user asks to configure, tune, validate, or
+  Control, exposure analytics, UEBA, native SOAR integrations, ES AI Assistant
+  settings, Federated Analytics inventory/handoffs, and configuration health
+  checks. Use when the user asks to configure, tune, validate, or
   operationalize Splunk Enterprise Security.
 ---
 
@@ -120,6 +121,8 @@ bash skills/splunk-enterprise-security-config/scripts/setup.sh \
    - Analyst queue/Mission Control queues and response workflows
    - SOAR, Attack Analyzer, UEBA, exposure analytics, and Splunk Cloud Connect
      where licensed and supported
+   - ES AI Assistant settings and Federated Analytics / ASL readiness where
+     licensed and supported
 
 7. **Validate and iterate**:
 

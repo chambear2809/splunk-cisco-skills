@@ -1,10 +1,14 @@
 # Splunk Security Portfolio Coverage
 
-`last_verified: 2026-05-03`
+`last_verified: 2026-05-26`
 
 The first-class coverage target is the public Splunk Products security row:
 Enterprise Security, Security Essentials, SOAR, User Behavior Analytics,
 Attack Analyzer, and Asset and Risk Intelligence.
+
+Current ES 8.x branding also gets explicit resolver coverage for native SOAR,
+Security AI Assistant / AI Assistant in Security, and Federated Analytics so
+operators do not have to know the older skill names before routing work.
 
 ## Product Coverage
 
@@ -22,10 +26,13 @@ Attack Analyzer, and Asset and Risk Intelligence.
 | Offering | Status | Route | Notes |
 |---|---|---|---|
 | Mission Control | `bundled_es` | `splunk-enterprise-security-config` | ES 8.x component; do not uninstall or split into a product skill. |
+| Enterprise Security Native SOAR | `bundled_es` | `splunk-enterprise-security-config`, `splunk-soar-setup` | ES Premier capability; ES configuration owns pairing/readiness and SOAR runtime/onboarding remains in the SOAR skill. |
+| AI Assistant in Enterprise Security | `bundled_es` | `splunk-enterprise-security-config`, `splunk-ai-assistant-setup` | ES Cloud Security AI Assistant capability; availability and model settings are ES-controlled, with generic AI Assistant app setup kept as a companion route. |
 | Exposure Analytics | `bundled_es` | `splunk-enterprise-security-config` | ES capability; ARI integration links back to ES config. |
 | Detection Studio | `bundled_es` | `splunk-enterprise-security-config` | ES detection lifecycle capability. |
 | TIM Cloud | `bundled_es` | `splunk-enterprise-security-config` | ES threat intelligence workflow. |
 | Splunk Cloud Connect | `bundled_es` | `splunk-enterprise-security-config` | ES cloud integration readiness. |
+| Federated Analytics | `existing_skill` | `splunk-federated-search-setup`, `splunk-enterprise-security-config` | Amazon Security Lake / OCSF provider and index setup routes to Federated Search, then ES handles ASL macros, ESCU detections, and detection readiness. |
 | DLX | `bundled_es` | `splunk-enterprise-security-install` | ES packaged support component. |
 | Splunk ES Content Update | `install_only` | `splunk-enterprise-security-config` content library | Splunkbase `3449`, app `DA-ESS-ContentUpdate`. |
 | Splunk UBA Kafka Ingestion App | `partial` | `splunk-uba-setup` | Splunkbase `4147`, search-head-only, restricted. |
@@ -42,7 +49,14 @@ Attack Analyzer, and Asset and Risk Intelligence.
 ## Source Links
 
 - Splunk Products: https://www.splunk.com/en_us/products.html
+- Splunk Enterprise Security product page: https://www.splunk.com/en_us/products/enterprise-security.html
+- Splunk Enterprise Security features: https://www.splunk.com/en_us/products/splunk-enterprise-security-features.html
+- ES 8.5 compatibility and regional availability: https://help.splunk.com/en/splunk-enterprise-security-8/release-notes-and-resources/8.5/splunk-enterprise-security-release-notes/compatibility-and-regional-availability
+- ES editions overview: https://help.splunk.com/en/splunk-enterprise-security-8/enterprise-security-editions/overview-of-splunk-enterprise-security-editions
 - Security offerings help index: https://help.splunk.com/en/release-notes-and-updates/about-the-help-portal/splunk-enterprise-security-and-security-offerings
+- AI Assistant model settings in ES: https://help.splunk.com/en/splunk-enterprise-security-8/administer/8.3/ai-assistant-in-security-and-agentic-capabilities/choose-which-models-the-ai-assistant-uses-in-splunk-enterprise-security
+- Federated Analytics with ES for ASL: https://help.splunk.com/en/splunk-enterprise-security-8/user-guide/8.4/introduction/use-federated-analytics-with-splunk-enterprise-security-for-threat-detection-in-amazon-security-lake-asl-datasets
+- About Federated Analytics: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.3.2512/ingest-and-search-amazon-security-lake-datasets
 - Security Essentials install/config: https://help.splunk.com/en/splunk-enterprise-security-8/security-essentials/install-and-configure/3.8/install-splunk-security-essentials/install-splunk-security-essentials
 - UBA end-of-sale/end-of-life: https://help.splunk.com/en/security-offerings/splunk-user-behavior-analytics/release-notes/5.4.5/additional-resources/splunk-announces-end-of-sale-and-end-of-life-for-standalone-splunk-user-behavior-analytics-software
 - Attack Analyzer add-on configuration: https://help.splunk.com/en/security-offerings/splunk-attack-analyzer/splunk-add-on-for-splunk-attack-analyzer/1.2/install-and-configure-the-splunk-add-on-for-splunk-attack-analyzer/configure-the-splunk-add-on-for-splunk-attack-analyzer

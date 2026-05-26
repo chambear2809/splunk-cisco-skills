@@ -200,7 +200,7 @@
         "splunkbase_id": "N/A",
         "cloud_install_path": "No additional app install; requires ES already provisioned",
         "cloud_config_path": "REST validation and supported search-tier settings; Splunk Cloud indexer-side changes remain support-managed",
-        "notes": "Operational ES configuration workflow for indexes, roles, CIM data models, enrichment, detections, risk, and validation."
+        "notes": "Operational ES configuration workflow for indexes, roles, CIM data models, enrichment, detections, risk, native SOAR, ES AI Assistant settings, Federated Analytics handoffs, and validation."
       },
       {
         "kind": "workflow",
@@ -209,7 +209,7 @@
         "splunkbase_id": "N/A",
         "cloud_install_path": "Delegates to the routed Splunk security product install path for the resolved product",
         "cloud_config_path": "Delegates to the routed setup, config, or explicit handoff workflow after resolving the security product catalog entry",
-        "notes": "Top-level Splunk security product router/audit workflow covering Enterprise Security, Security Essentials, SOAR, UBA, Attack Analyzer, Asset and Risk Intelligence, and associated security offerings."
+        "notes": "Top-level Splunk security product router/audit workflow covering Enterprise Security, ES native SOAR, Security AI Assistant, Federated Analytics, Security Essentials, SOAR, UBA, Attack Analyzer, Asset and Risk Intelligence, and associated security offerings."
       },
       {
         "kind": "app",

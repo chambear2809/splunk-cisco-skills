@@ -1,15 +1,17 @@
 ---
 name: splunk-ai-ml-toolkit-setup
 description: >-
-  Install, render, validate, and audit Splunk-owned AI and machine-learning
-  workflows beyond Splunk AI Assistant: Splunk AI Toolkit / MLTK
+  Install, render, validate, and audit Cisco Data Fabric AI Toolkit and
+  Splunk-owned AI and machine-learning workflows beyond Splunk AI Assistant:
+  Splunk AI Toolkit / MLTK
   (`Splunk_ML_Toolkit`), Python for Scientific Computing (PSC), Splunk App for
   Data Science and Deep Learning (DSDL), MLTK anomaly workflows, LLM/`ai`
   command readiness, external model runtimes, and legacy anomaly app migration.
   Use when the user asks about MLTK, Splunk AI Toolkit, Machine Learning
   Toolkit, PSC, Python for Scientific Computing, DSDL, Deep Learning Toolkit,
   Splunk anomaly detection assistants, Smart Alerts Assistant, or AI/ML product
-  coverage outside Splunk AI Assistant.
+  coverage outside Splunk AI Assistant, including Cisco Data Fabric requests
+  about AI Toolkit or machine-data model workflows.
 ---
 
 # Splunk AI/ML Toolkit Setup
@@ -18,6 +20,10 @@ Use this skill for Splunk-owned AI and machine-learning platform workflows
 that are not Splunk AI Assistant. It owns coverage reporting, install
 orchestration, compatibility validation, DSDL runtime handoffs, and migration
 guidance for legacy anomaly apps.
+
+For newer Cisco Data Fabric wording, this is the AI Toolkit / model-workflow
+route. Federated search, edge/ingest pipelines, and MCP server setup remain in
+their dedicated skills.
 
 ## Coverage Boundary
 

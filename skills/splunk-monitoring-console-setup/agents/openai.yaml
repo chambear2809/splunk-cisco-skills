@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Monitoring Console Setup"
+  short_description: "Configure distributed or standalone Monitoring Console"
+  default_prompt: >-
+    Use $splunk-monitoring-console-setup to render, preflight, apply, and
+    validate Splunk Monitoring Console mode, peer groups, forwarder monitoring,
+    health views, and platform alert handoffs.

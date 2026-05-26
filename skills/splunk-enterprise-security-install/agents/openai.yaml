@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Enterprise Security Install"
+  short_description: "Install and validate Splunk Enterprise Security"
+  default_prompt: >-
+    Use $splunk-enterprise-security-install to install, post-install, upgrade,
+    and validate Splunk Enterprise Security on standalone search heads or SHC
+    deployers with required framework app checks.
