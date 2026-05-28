@@ -268,6 +268,12 @@ def test_license_usage_report_oauth_deep_outputs_and_redacts(tmp_path: Path) -> 
     assert payload["succeeded"] is True
     assert payload["auth_context"]["token_format"] == "opaque"
     assert any(endpoint["name"] == "account_usage" and endpoint["ok"] for endpoint in payload["endpoint_results"])
+    assert "license-secret-key" not in json.dumps(payload)
+    assert any(
+        endpoint["name"] == "allocation_usage:Production"
+        and endpoint["path"].endswith("/allocation/<redacted:license-key>?dateFrom=2026-05-27T00%3A00%3A00Z&dateTo=2026-05-28T00%3A00%3A00Z&granularityMinutes=60&includeEntityTypes=true")
+        for endpoint in payload["endpoint_results"]
+    )
 
     csv_text = (output_dir / "license-usage-report.csv").read_text(encoding="utf-8")
     assert "ENTERPRISE" in csv_text

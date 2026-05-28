@@ -222,6 +222,7 @@ def redact_url_path(value: str) -> str:
     if not value:
         return value
     text = UUID_LIKE_RE.sub("<redacted:id-or-key>", value)
+    text = re.sub(r"(/allocation/)[^/?#]+", r"\1<redacted:license-key>", text)
     parsed = parse.urlsplit(text)
     if not parsed.query:
         return text
