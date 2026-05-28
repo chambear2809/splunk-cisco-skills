@@ -2,6 +2,7 @@ controller_url: https://example.saas.appdynamics.com
 account_name: customer1
 api_client:
   name: automation-client
+  # Path to chmod-600 file, not the client secret value.
   client_secret_file: /secure/appd/client_secret
 rbac:
   users: []
@@ -12,3 +13,9 @@ identity:
   ldap: validate_only
 licensing:
   validate_rules: true
+  # Numeric License API accountId, not account name or OAuth acctId/tntId.
+  account_id: 1965
+  report:
+    granularity_minutes: 60
+    deep: true
+    output_dir: ./appd-license-report

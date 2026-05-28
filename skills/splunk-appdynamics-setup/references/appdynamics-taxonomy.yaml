@@ -192,6 +192,14 @@ features:
     status: api_apply
     validation_method: License usage, rule, and entitlement readbacks
     apply_boundary: Documented license-rule APIs may apply; procurement and entitlement changes are not automated.
+  - id: appd_controller_license_usage_report
+    family: Licensing
+    feature: Customer license consumption reporting through Controller License APIs
+    owner: splunk-appdynamics-controller-admin-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/license-api
+    status: validate_only
+    validation_method: Read-only report polls account info, account usage, optional grouped usage, allocation usage, and license rules with OAuth token-file or client-secret-file authentication
+    apply_boundary: Reporting is read-only; license entitlement, procurement, and rule mutations are not performed by the report command.
   - id: appd_licensing_storage_usage_metrics
     family: Licensing
     feature: Application-level storage usage metrics for Agent-based Licensing accounts

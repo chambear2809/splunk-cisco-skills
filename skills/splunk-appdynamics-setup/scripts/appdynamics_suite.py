@@ -96,6 +96,7 @@ SKILL_META: dict[str, dict[str, Any]] = {
         "validation": "Controller API readbacks for security, access, license, audit, and sensitive-data-control state.",
         "sources": [
             "https://help.splunk.com/en/appdynamics-saas/extend-splunk-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/platform-api-index",
+            "https://help.splunk.com/en/appdynamics-on-premises/extend-appdynamics/26.4.0/extend-splunk-appdynamics/splunk-appdynamics-apis/license-api",
             "https://help.splunk.com/en/appdynamics-saas/appdynamics-saas-administration",
             "https://help.splunk.com/appdynamics-saas/licensing",
             "https://help.splunk.com/en/appdynamics-saas/get-started/26.4.0/sensitive-data-collection-and-security",
@@ -1972,6 +1973,8 @@ REQUIRED_SKILL_ARTIFACTS = {
         "saml-ldap-runbook.md",
         "sensitive-data-controls-runbook.md",
         "licensing-validation-plan.sh",
+        "license-usage-report.sh",
+        "license-usage-report-readme.md",
         "controller-26-4-release-runbook.md",
         "licensing-storage-metrics-plan.sh",
     },
@@ -2127,7 +2130,7 @@ def render_controller_admin_artifacts(out: Path, spec: dict[str, Any]) -> None:
         {
             "client_name": client.get("name", "automation-client"),
             "client_secret_file": client.get("client_secret_file", "/secure/appd/client_secret"),
-            "oauth_token_endpoint": "/auth/v1/oauth/token",
+            "oauth_token_endpoint": "/controller/api/oauth/access_token",
             "client_id_format": "{api_client_name}@{account_name}",
             "account_name": account,
             "client_secret": "<redacted:file-backed>",
@@ -2170,8 +2173,106 @@ appd_curl --fail --silent --show-error -H "${{AUTH_HEADER}}" "${{APPD_CONTROLLER
         "- Runtime agent, database, and analytics-side edits delegate to the owning child skills.\n",
     )
     licensing = out / "licensing-validation-plan.sh"
-    write(licensing, "#!/usr/bin/env bash\nset -euo pipefail\n: \"${APPD_CONTROLLER_URL:?set APPD_CONTROLLER_URL}\"\necho 'Validate license usage, subscriptions, and license rules through documented Controller/account APIs.'\n")
+    write(
+        licensing,
+        """#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+: "${APPD_CONTROLLER_URL:?set APPD_CONTROLLER_URL}"
+: "${APPD_ACCOUNT_NAME:?set APPD_ACCOUNT_NAME}"
+: "${APPD_ACCOUNT_ID:?set APPD_ACCOUNT_ID to the integer AppDynamics account ID}"
+echo 'Validate license usage, subscriptions, allocations, and license rules through documented Controller/account APIs.'
+if [[ "${APPD_LICENSE_VALIDATE_LIVE:-0}" != "1" ]]; then
+  echo "Static validation only. Set APPD_LICENSE_VALIDATE_LIVE=1 to run ${SCRIPT_DIR}/license-usage-report.sh."
+  exit 0
+fi
+exec "${SCRIPT_DIR}/license-usage-report.sh"
+""",
+    )
     chmod_exec(licensing)
+    license_report = out / "license-usage-report.sh"
+    write(
+        license_report,
+        """#!/usr/bin/env bash
+set -euo pipefail
+
+REPORTER="${APPD_LICENSE_REPORTER:-skills/splunk-appdynamics-controller-admin-setup/scripts/license_usage_report.sh}"
+: "${APPD_CONTROLLER_URL:?set APPD_CONTROLLER_URL}"
+: "${APPD_ACCOUNT_NAME:?set APPD_ACCOUNT_NAME}"
+: "${APPD_ACCOUNT_ID:?set APPD_ACCOUNT_ID to the integer AppDynamics account ID}"
+
+WINDOW="$(python3 - <<'PY'
+from datetime import datetime, timedelta, timezone
+now = datetime.now(timezone.utc).replace(microsecond=0)
+start = now - timedelta(hours=24)
+print(start.isoformat().replace("+00:00", "Z"), now.isoformat().replace("+00:00", "Z"))
+PY
+)"
+DEFAULT_FROM="${WINDOW%% *}"
+DEFAULT_TO="${WINDOW##* }"
+DATE_FROM="${APPD_LICENSE_REPORT_FROM:-${DEFAULT_FROM}}"
+DATE_TO="${APPD_LICENSE_REPORT_TO:-${DEFAULT_TO}}"
+OUTPUT_DIR="${APPD_LICENSE_REPORT_OUTPUT_DIR:-./appd-license-report}"
+GRANULARITY="${APPD_LICENSE_GRANULARITY_MINUTES:-60}"
+
+SECRET_ARGS=()
+if [[ -n "${APPD_OAUTH_TOKEN_FILE:-}" ]]; then
+  SECRET_ARGS=(--oauth-token-file "${APPD_OAUTH_TOKEN_FILE}")
+else
+  : "${APPD_API_CLIENT_NAME:?set APPD_API_CLIENT_NAME unless APPD_OAUTH_TOKEN_FILE is used}"
+  : "${APPD_OAUTH_CLIENT_SECRET_FILE:?set APPD_OAUTH_CLIENT_SECRET_FILE or APPD_OAUTH_TOKEN_FILE}"
+  SECRET_ARGS=(--client-secret-file "${APPD_OAUTH_CLIENT_SECRET_FILE}")
+fi
+
+DEEP_ARGS=()
+if [[ "${APPD_LICENSE_DEEP:-1}" != "0" ]]; then
+  DEEP_ARGS=(--deep)
+fi
+
+RAW_ARGS=()
+if [[ "${APPD_LICENSE_INCLUDE_RAW:-0}" == "1" ]]; then
+  RAW_ARGS=(--include-raw)
+fi
+
+exec bash "${REPORTER}" \
+  --controller-url "${APPD_CONTROLLER_URL}" \
+  --account-name "${APPD_ACCOUNT_NAME}" \
+  --account-id "${APPD_ACCOUNT_ID}" \
+  --api-client-name "${APPD_API_CLIENT_NAME:-}" \
+  "${SECRET_ARGS[@]}" \
+  --from "${DATE_FROM}" \
+  --to "${DATE_TO}" \
+  --granularity-minutes "${GRANULARITY}" \
+  "${DEEP_ARGS[@]}" \
+  "${RAW_ARGS[@]}" \
+  --output-dir "${OUTPUT_DIR}"
+""",
+    )
+    chmod_exec(license_report)
+    write(
+        out / "license-usage-report-readme.md",
+        "# License Usage Report\n\n"
+        "Run `license-usage-report.sh` from the repository root after exporting AppDynamics SaaS or on-prem Controller settings.\n\n"
+        "Required environment:\n\n"
+        "- `APPD_CONTROLLER_URL`\n"
+        "- `APPD_ACCOUNT_NAME`\n"
+        "- `APPD_ACCOUNT_ID` as the integer account ID used by the License API\n"
+        "- `APPD_API_CLIENT_NAME`\n"
+        "- `APPD_OAUTH_CLIENT_SECRET_FILE` or `APPD_OAUTH_TOKEN_FILE`, each chmod 600\n\n"
+        "Validation lessons:\n\n"
+        "- `APPD_ACCOUNT_ID` must be the numeric License API account ID; do not use the account name, tenant key, or GUID-like OAuth `acctId`/`tntId` claim.\n"
+        "- API Client roles are assigned on Administration > API Clients, separately from Administration > Users. 403 responses for `ACCOUNT_LICENSE`, `LICENSE_USAGE`, or `LICENSE_RULE` usually mean the API Client role was not assigned or saved.\n"
+        "- OAuth JWT role and account-permission claim counts are diagnostic only; some SaaS tokens omit effective API Client permissions even when License API readbacks succeed.\n"
+        "- `APPD_OAUTH_CLIENT_SECRET_FILE` and `APPD_OAUTH_TOKEN_FILE` are file paths, not secret values. Prefer a durable chmod-600 file under `$HOME/.appd-secrets/`.\n"
+        "- The reporter sends the AppDynamics vendor JSON `Accept` header required by some SaaS controllers and falls back to application inventory when grouped application usage returns no rows.\n\n"
+        "Optional environment:\n\n"
+        "- `APPD_LICENSE_REPORT_FROM` and `APPD_LICENSE_REPORT_TO` as ISO-8601 UTC timestamps; default is previous 24 hours.\n"
+        "- `APPD_LICENSE_GRANULARITY_MINUTES`; default is 60.\n"
+        "- `APPD_LICENSE_DEEP=0` for summary-only mode; default is deep mode.\n"
+        "- `APPD_LICENSE_INCLUDE_RAW=1` to write sanitized raw JSON payloads under `raw/`.\n"
+        "- `APPD_CA_CERT` or `APPD_VERIFY_SSL=false` for lab TLS.\n\n"
+        "The report writes `license-usage-report.md`, `license-usage-report.json`, and `license-usage-report.csv`. The Markdown report is customer-facing and summarizes peak/latest consumption; JSON and CSV retain complete timestamp-level detail. Do not commit customer-specific output, controller URLs, account IDs, or raw API payloads.\n",
+    )
     write(
         out / "controller-26-4-release-runbook.md",
         "# Controller 26.4 Release Admin Runbook\n\n"
@@ -4509,6 +4610,24 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
                     errors.append(f"{vmware_plan_name} must not place VMware password values in shell arguments")
         if live:
             notes.append(f"run live platform probes with APPD_PLATFORM_LIVE=1 bash {out / 'platform-validation-probes.sh'}")
+    elif skill == "splunk-appdynamics-controller-admin-setup":
+        report_path = out / "license-usage-report.sh"
+        if report_path.exists():
+            report_text = report_path.read_text(encoding="utf-8")
+            for marker in (
+                "APPD_CONTROLLER_URL",
+                "APPD_ACCOUNT_ID",
+                "APPD_OAUTH_CLIENT_SECRET_FILE",
+                "APPD_OAUTH_TOKEN_FILE",
+                "--granularity-minutes",
+                "--deep",
+            ):
+                if marker not in report_text:
+                    errors.append(f"license-usage-report.sh missing {marker}")
+            if "--client-secret " in report_text or "--token " in report_text:
+                errors.append("license-usage-report.sh must not render direct-secret arguments")
+        if live:
+            notes.append(f"run live license usage validation with APPD_LICENSE_VALIDATE_LIVE=1 bash {out / 'licensing-validation-plan.sh'}")
     elif skill == "splunk-appdynamics-k8s-cluster-agent-setup":
         values_path = out / "cluster-agent-values.yaml"
         if values_path.exists():
