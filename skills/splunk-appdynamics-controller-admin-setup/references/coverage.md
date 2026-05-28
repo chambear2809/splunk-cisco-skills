@@ -9,6 +9,7 @@ Taxonomy rows owned by this skill:
 - `appd_controller_local_credential_reauth`
 - `appd_edit_application_name_permission`
 - `appd_licensing_rules`
+- `appd_controller_license_usage_report`
 - `appd_licensing_storage_usage_metrics`
 - `appd_sensitive_data_collection_security`
 - `appd_machine_agent_tag_rbac`

@@ -209,6 +209,8 @@ def test_specific_artifacts_render_for_all_appdynamics_children(tmp_path: Path) 
             "saml-ldap-runbook.md",
             "sensitive-data-controls-runbook.md",
             "licensing-validation-plan.sh",
+            "license-usage-report.sh",
+            "license-usage-report-readme.md",
             "controller-26-4-release-runbook.md",
             "licensing-storage-metrics-plan.sh",
         ],
@@ -588,6 +590,12 @@ def test_current_26_4_gap_artifacts_render(tmp_path: Path) -> None:
     assert "tag-based RBAC" in controller_release
     storage_metrics = (controller / "licensing-storage-metrics-plan.sh").read_text(encoding="utf-8")
     assert "Usage(Bytes)" in storage_metrics
+    license_report = (controller / "license-usage-report.sh").read_text(encoding="utf-8")
+    assert "APPD_ACCOUNT_ID" in license_report
+    assert "APPD_OAUTH_CLIENT_SECRET_FILE" in license_report
+    assert "--deep" in license_report
+    license_readme = (controller / "license-usage-report-readme.md").read_text(encoding="utf-8")
+    assert "license-usage-report.md" in license_readme
 
     agent = render_skill("splunk-appdynamics-agent-management-setup", tmp_path / "agent-download")
     download = (agent / "appdynamics-download-verification-runbook.md").read_text(encoding="utf-8")
@@ -757,6 +765,7 @@ def test_second_pass_official_doc_family_rows_render(tmp_path: Path) -> None:
         "appd_sap_release_notes",
         "appd_controller_local_credential_reauth",
         "appd_edit_application_name_permission",
+        "appd_controller_license_usage_report",
         "appd_licensing_storage_usage_metrics",
         "appd_machine_agent_tag_rbac",
         "appd_agent_upgrade_api",
