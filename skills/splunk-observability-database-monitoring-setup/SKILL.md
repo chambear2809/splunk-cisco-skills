@@ -6,8 +6,10 @@ description: Render and validate Splunk Observability Cloud Database Monitoring 
 # Splunk Observability Database Monitoring Setup
 
 Use this skill to render and validate Splunk Database Monitoring (DBMon)
-configuration for the Splunk Distribution of OpenTelemetry Collector. This is a
-render-first workflow; v1 does not mutate clusters, hosts, or Splunk tenants.
+configuration for the Splunk Distribution of OpenTelemetry Collector. The
+default workflow is render-first; an opt-in `--apply --accept-k8s-apply` path
+merges the rendered overlay onto the existing Splunk OTel collector helm
+release for Kubernetes targets.
 
 ## Supported Targets
 
@@ -65,7 +67,17 @@ bash skills/splunk-observability-database-monitoring-setup/scripts/validate.sh \
 4. Review `metadata.json` warnings, including the DBMon license reminder and
    any support-matrix notes.
 5. Hand off the rendered collector overlay to
-   `splunk-observability-otel-collector-setup`.
+   `splunk-observability-otel-collector-setup`, or apply directly with
+   `--apply --accept-k8s-apply` (Kubernetes only). The apply path runs
+   `helm get values` + `yq` deep-merge + `helm upgrade --atomic`, refuses if
+   any DBMon DB credential Secret is missing in the collector namespace, and
+   prints the active kube-context first. Add `--dry-run` to run
+   `helm upgrade --dry-run` without mutating the cluster.
+
+   ```bash
+   bash skills/splunk-observability-database-monitoring-setup/scripts/setup.sh \
+     --apply --accept-k8s-apply
+   ```
 
 ## Rendered Output
 
@@ -73,6 +85,10 @@ bash skills/splunk-observability-database-monitoring-setup/scripts/validate.sh \
   places DB receivers under `clusterReceiver` with `replicas: 1`.
 - `k8s/secrets.dbmon.stub.yaml` - placeholder-only Secret manifests.
 - `k8s/handoff-base-collector.sh` - render/merge guidance for the base chart.
+- `scripts/apply-dbmon-overlay.sh` - direct apply helper invoked by
+  `setup.sh --apply --accept-k8s-apply`. Verifies all DBMon DB credential
+  Secrets exist in the collector namespace before merging the overlay onto the
+  existing helm release values.
 - `linux/collector-dbmon.yaml` - collector fragment for Linux hosts.
 - `linux/dbmon.env.template` - env var names for DB credentials and the O11y
   token placeholder.

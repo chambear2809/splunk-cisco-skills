@@ -62,10 +62,25 @@ This skill wires an installed Isovalent stack to Splunk Observability Cloud and 
    - `detectors/*.yaml` — starter detectors.
    - `scripts/handoff-*.sh` — hand-off drivers for the four downstream skills.
 
-4. Apply the base collector with the overlay merged, then provision HEC, then route Tetragon logs to Splunk Platform via Cisco Security Cloud:
+4. Apply the overlay onto the existing Splunk OTel collector helm release
+   (recommended one-shot path). Merges this overlay onto current release
+   values via `yq`, runs `helm upgrade --atomic`, and rolls the agent +
+   cluster-receiver. Refuses without `--accept-k8s-apply`, refuses if no
+   Cilium/Tetragon install is detected, and prints the active kube-context
+   first:
 
    ```bash
-   bash splunk-observability-isovalent-rendered/scripts/handoff-base-collector.sh
+   bash skills/splunk-observability-isovalent-integration/scripts/setup.sh \
+     --apply --accept-k8s-apply
+   ```
+
+   `--apply --accept-k8s-apply --dry-run` runs `helm upgrade --dry-run`
+   without mutating the cluster.
+
+   Then provision HEC and route Tetragon logs to Splunk Platform via Cisco
+   Security Cloud:
+
+   ```bash
    bash splunk-observability-isovalent-rendered/scripts/handoff-hec-token.sh
    bash splunk-observability-isovalent-rendered/scripts/handoff-cisco-security-cloud.sh
    bash splunk-observability-isovalent-rendered/scripts/handoff-dashboards.sh

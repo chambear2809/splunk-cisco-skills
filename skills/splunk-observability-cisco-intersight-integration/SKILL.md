@@ -65,11 +65,22 @@ The Splunk Platform TA path (`Splunk_TA_Cisco_Intersight`) lives in [cisco-inter
 4. Apply the manifests + handoffs:
 
    ```bash
+   # Direct one-shot apply via the skill (recommended). Refuses without
+   # --accept-k8s-apply, prints the active kube-context first, and runs the
+   # rendered apply-intersight-manifests.sh helper.
+   bash skills/splunk-observability-cisco-intersight-integration/scripts/setup.sh \
+     --apply --accept-k8s-apply
+
+   # Equivalent manual flow (helpful for review or CI staging):
    bash splunk-observability-cisco-intersight-rendered/scripts/apply-intersight-manifests.sh
    bash splunk-observability-cisco-intersight-rendered/scripts/handoff-base-collector.sh
    bash splunk-observability-cisco-intersight-rendered/scripts/handoff-dashboards.sh
    bash splunk-observability-cisco-intersight-rendered/scripts/handoff-detectors.sh
    ```
+
+   `--apply --accept-k8s-apply --dry-run` performs a server-side dry-run via
+   `kubectl --dry-run=server` without mutating the cluster. The Secret created
+   in step 3 is never auto-applied — the apply helper aborts if it is missing.
 
 ## Hand-offs
 

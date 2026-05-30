@@ -6,6 +6,7 @@ SKILL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
+source "${PROJECT_ROOT}/skills/shared/lib/k8s_apply_helpers.sh"
 load_observability_cloud_settings
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-isovalent-rendered"
@@ -19,11 +20,19 @@ Usage:
   bash skills/splunk-observability-isovalent-integration/scripts/setup.sh [mode] [options]
 
 Modes:
-  --render               Render overlay + handoff scripts (default)
+  --render               Render overlay + apply helper + handoff scripts (default)
   --validate             Run static validation against an already-rendered output
-  --dry-run              Show the plan without writing
+  --apply                Merge overlay onto the existing Splunk OTel collector helm
+                         release values and run helm upgrade. Requires
+                         --accept-k8s-apply, an existing Cilium/Tetragon install,
+                         and O11Y_TOKEN_FILE env.
+  --dry-run              When combined with --apply, runs helm with --dry-run.
+                         Otherwise shows render plan without writing.
   --json                 Emit JSON dry-run output
   --explain              Print plan in plain English
+
+Apply gates:
+  --accept-k8s-apply     REQUIRED for --apply.
 
 Options:
   --spec PATH            YAML or JSON spec (default: template.example)
@@ -58,6 +67,7 @@ PY
 
 MODE_RENDER=true
 MODE_VALIDATE=false
+MODE_APPLY=false
 DRY_RUN=false
 JSON_OUTPUT=false
 EXPLAIN=false
@@ -82,7 +92,9 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --render) MODE_RENDER=true; shift ;;
         --validate) MODE_VALIDATE=true; shift ;;
-        --dry-run) DRY_RUN=true; shift ;;
+        --apply) MODE_APPLY=true; shift ;;
+        --accept-k8s-apply) K8S_APPLY_ACCEPTED=true; shift ;;
+        --dry-run) DRY_RUN=true; K8S_APPLY_DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --explain) EXPLAIN=true; shift ;;
         --spec) require_arg "$1" "$#" || exit 1; SPEC="$2"; shift 2 ;;
@@ -184,8 +196,24 @@ if [[ "${MODE_RENDER}" == "true" ]]; then
     python3 "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
 fi
 
-if [[ "${DRY_RUN}" == "true" ]]; then exit 0; fi
+if [[ "${DRY_RUN}" == "true" && "${MODE_APPLY}" != "true" ]]; then exit 0; fi
 
 if [[ "${MODE_VALIDATE}" == "true" ]]; then
     bash "${SCRIPT_DIR}/validate.sh" --output-dir "${OUTPUT_DIR}"
+fi
+
+if [[ "${MODE_APPLY}" == "true" ]]; then
+    APPLY_SCRIPT="${OUTPUT_DIR}/scripts/apply-isovalent-overlay.sh"
+    if [[ ! -x "${APPLY_SCRIPT}" ]]; then
+        log "ERROR: Rendered apply script not found at ${APPLY_SCRIPT}. Run --render first."
+        exit 1
+    fi
+    if [[ -z "${O11Y_TOKEN_FILE}" ]]; then
+        log "ERROR: --apply requires --o11y-token-file or SPLUNK_O11Y_TOKEN_FILE."
+        exit 1
+    fi
+    require_apply_acceptance
+    show_kube_context
+    log "Applying Isovalent overlay via rendered helper..."
+    K8S_APPLY_DRY_RUN="${K8S_APPLY_DRY_RUN}" O11Y_TOKEN_FILE="${O11Y_TOKEN_FILE}" bash "${APPLY_SCRIPT}"
 fi

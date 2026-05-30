@@ -64,10 +64,27 @@ The Splunk Platform TA path for Nexus / ACI / Nexus Dashboard lives in [cisco-dc
      -n splunk-otel
    ```
 
-4. Apply via the base collector hand-off script:
+4. Apply directly via the skill (recommended). This merges the rendered
+   overlay onto the existing Splunk OTel collector helm release values and
+   runs `helm upgrade --atomic`. Refuses without `--accept-k8s-apply`,
+   refuses if the `cisco-nexus-ssh` Secret from step 3 is missing, and
+   prints the active kube-context first:
 
    ```bash
-   bash splunk-observability-cisco-nexus-rendered/scripts/handoff-base-collector.sh
+   bash skills/splunk-observability-cisco-nexus-integration/scripts/setup.sh \
+     --apply --accept-k8s-apply \
+     --realm us0 --cluster-name lab-cluster \
+     --nexus-device "core-switch-01:192.168.1.10" \
+     --nexus-device "core-switch-02:192.168.1.11"
+   ```
+
+   `--apply --accept-k8s-apply --dry-run` runs `helm upgrade --dry-run`
+   without mutating the cluster.
+
+   For dashboards / detectors, the rendered handoff scripts call into the
+   owning skills:
+
+   ```bash
    bash splunk-observability-cisco-nexus-rendered/scripts/handoff-dashboards.sh
    bash splunk-observability-cisco-nexus-rendered/scripts/handoff-detectors.sh
    ```

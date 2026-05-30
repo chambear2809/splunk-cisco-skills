@@ -395,6 +395,73 @@ def detector_specs(spec: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return detectors
 
 
+def render_apply_overlay_script(spec: dict[str, Any]) -> str:
+    collector = spec.get("collector") or {}
+    release = collector.get("release", "splunk-otel-collector")
+    namespace = collector.get("namespace", "splunk-otel")
+    chart_ref = collector.get("chart_ref", "splunk-otel-collector-chart/splunk-otel-collector")
+    return (
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# Apply the Cisco Nexus overlay to an existing Splunk OTel Collector helm release
+# by merging this overlay onto the existing values and running helm upgrade.
+# Honors K8S_APPLY_DRY_RUN=true (helm --dry-run, no mutation).
+#
+# Required env: O11Y_TOKEN_FILE (path to the Org access token, chmod 600).
+# Required tooling: helm, kubectl, yq.
+
+if ! command -v helm >/dev/null 2>&1; then echo 'ERROR: helm required.' >&2; exit 1; fi
+if ! command -v kubectl >/dev/null 2>&1; then echo 'ERROR: kubectl required.' >&2; exit 1; fi
+if ! command -v yq >/dev/null 2>&1; then echo 'ERROR: yq required for overlay merge.' >&2; exit 1; fi
+
+if [[ -z "${{O11Y_TOKEN_FILE:-}}" || ! -r "${{O11Y_TOKEN_FILE}}" ]]; then
+    echo 'ERROR: O11Y_TOKEN_FILE must point to a readable token file (chmod 600).' >&2
+    exit 1
+fi
+
+DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)"
+OVERLAY="${{DIR}}/splunk-otel-overlay/values.overlay.yaml"
+
+RELEASE="{release}"
+NAMESPACE="{namespace}"
+CHART_REF="{chart_ref}"
+
+# Confirm the SSH Secret exists; we never auto-create it from the placeholder stub.
+if ! kubectl -n "${{NAMESPACE}}" get secret cisco-nexus-ssh >/dev/null 2>&1; then
+    echo "ERROR: Secret 'cisco-nexus-ssh' not found in namespace ${{NAMESPACE}}." >&2
+    echo "       Create it from your real SSH credentials (see secrets/cisco-nexus-ssh-secret.yaml stub)." >&2
+    exit 1
+fi
+
+# Pull current release values + merge overlay deterministically.
+TMPDIR_LOCAL="$(mktemp -d)"
+trap 'rm -rf "${{TMPDIR_LOCAL}}"' EXIT
+helm get values "${{RELEASE}}" -n "${{NAMESPACE}}" -o yaml > "${{TMPDIR_LOCAL}}/current-values.yaml"
+yq eval-all '. as $i ireduce ({{}}; . * $i)' "${{TMPDIR_LOCAL}}/current-values.yaml" "${{OVERLAY}}" > "${{TMPDIR_LOCAL}}/merged.yaml"
+
+DRY_RUN_FLAG=()
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" == "true" ]]; then
+    DRY_RUN_FLAG=(--dry-run)
+    echo "DRY-RUN MODE: passing --dry-run to helm"
+fi
+
+helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
+    --namespace "${{NAMESPACE}}" \\
+    --values "${{TMPDIR_LOCAL}}/merged.yaml" \\
+    --set "splunkObservability.accessToken=$(cat "${{O11Y_TOKEN_FILE}}")" \\
+    --atomic \\
+    --timeout 5m \\
+    "${{DRY_RUN_FLAG[@]}}"
+
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
+    kubectl -n "${{NAMESPACE}}" rollout status daemonset/${{RELEASE}}-agent --timeout=180s || true
+    kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-cluster-receiver --timeout=180s || true
+fi
+"""
+    )
+
+
 def render_handoffs(spec: dict[str, Any], realm: str, cluster_name: str, distribution: str) -> dict[str, str]:
     handoffs = spec.get("handoffs") or {}
     helpers: dict[str, str] = {}
@@ -536,6 +603,12 @@ def main() -> int:
 
     for name, body in render_handoffs(spec, realm, cluster_name, distribution).items():
         write_text(out / f"scripts/{name}", body, executable=True)
+
+    write_text(
+        out / "scripts/apply-nexus-overlay.sh",
+        render_apply_overlay_script(spec),
+        executable=True,
+    )
 
     write_json(out / "metadata.json", render_metadata(spec, realm, cluster_name, devices))
     return 0

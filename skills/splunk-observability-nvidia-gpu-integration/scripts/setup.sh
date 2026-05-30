@@ -6,6 +6,7 @@ SKILL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 PROJECT_ROOT="$(cd "${SKILL_DIR}/../.." && pwd)"
 
 source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
+source "${PROJECT_ROOT}/skills/shared/lib/k8s_apply_helpers.sh"
 load_observability_cloud_settings
 
 DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/splunk-observability-nvidia-gpu-rendered"
@@ -27,9 +28,17 @@ Usage:
 Modes:
   --render                       Render overlay + (optional) DCGM patch + handoffs (default)
   --validate                     Run static validation
-  --dry-run                      Show plan without writing
+  --apply-pod-labels-patch       Apply the rendered DCGM pod-label patch (RBAC + SA +
+                                 DaemonSet env). Requires --enable-dcgm-pod-labels
+                                 and --accept-k8s-apply.
+  --dry-run                      When combined with --apply-*, runs kubectl with
+                                 --dry-run=server. Otherwise shows render plan.
   --json                         Emit JSON dry-run output
   --explain                      Print plan in plain English
+
+Apply gates:
+  --accept-k8s-apply             REQUIRED for --apply-pod-labels-patch. Confirms
+                                 operator intent to mutate the active kube-context.
 
 Options:
   --spec PATH                    YAML or JSON spec (default: template.example)
@@ -62,6 +71,7 @@ PY
 
 MODE_RENDER=true
 MODE_VALIDATE=false
+MODE_APPLY_POD_LABELS=false
 DRY_RUN=false
 JSON_OUTPUT=false
 EXPLAIN=false
@@ -83,7 +93,9 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --render) MODE_RENDER=true; shift ;;
         --validate) MODE_VALIDATE=true; shift ;;
-        --dry-run) DRY_RUN=true; shift ;;
+        --apply-pod-labels-patch) MODE_APPLY_POD_LABELS=true; shift ;;
+        --accept-k8s-apply) K8S_APPLY_ACCEPTED=true; shift ;;
+        --dry-run) DRY_RUN=true; K8S_APPLY_DRY_RUN=true; shift ;;
         --json) JSON_OUTPUT=true; shift ;;
         --explain) EXPLAIN=true; shift ;;
         --spec) require_arg "$1" "$#" || exit 1; SPEC="$2"; shift 2 ;;
@@ -166,8 +178,24 @@ if [[ "${MODE_RENDER}" == "true" ]]; then
     "${PYTHON_BIN}" "${SCRIPT_DIR}/render_assets.py" "${RENDER_ARGS[@]}"
 fi
 
-if [[ "${DRY_RUN}" == "true" ]]; then exit 0; fi
+if [[ "${DRY_RUN}" == "true" && "${MODE_APPLY_POD_LABELS}" != "true" ]]; then exit 0; fi
 
 if [[ "${MODE_VALIDATE}" == "true" ]]; then
     bash "${SCRIPT_DIR}/validate.sh" --output-dir "${OUTPUT_DIR}"
+fi
+
+if [[ "${MODE_APPLY_POD_LABELS}" == "true" ]]; then
+    if [[ "${ENABLE_DCGM_POD_LABELS}" != "true" ]]; then
+        log "ERROR: --apply-pod-labels-patch requires --enable-dcgm-pod-labels (the patch must be rendered first)."
+        exit 1
+    fi
+    APPLY_SCRIPT="${OUTPUT_DIR}/scripts/apply-dcgm-pod-labels-patch.sh"
+    if [[ ! -x "${APPLY_SCRIPT}" ]]; then
+        log "ERROR: Rendered DCGM patch script not found at ${APPLY_SCRIPT}. Render with --enable-dcgm-pod-labels first."
+        exit 1
+    fi
+    require_apply_acceptance
+    show_kube_context
+    log "Applying DCGM pod-labels patch via rendered helper..."
+    K8S_APPLY_DRY_RUN="${K8S_APPLY_DRY_RUN}" bash "${APPLY_SCRIPT}"
 fi
