@@ -353,35 +353,46 @@ set -euo pipefail
 
 # Apply the Intersight OTel namespace, ConfigMap, and Deployment.
 # The Secret must be created out-of-band (this script does NOT create it).
+# Honors K8S_APPLY_DRY_RUN=true (server-side dry-run, no mutation).
 
 if ! command -v kubectl >/dev/null 2>&1; then
     echo 'ERROR: kubectl required.' >&2
     exit 1
 fi
 
+DRY_RUN_FLAG=()
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" == "true" ]]; then
+    DRY_RUN_FLAG=(--dry-run=server)
+    echo "DRY-RUN MODE: passing --dry-run=server to kubectl"
+fi
+
 DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)/intersight-integration"
 
 echo "Applying Namespace..."
-kubectl apply -f "${{DIR}}/intersight-otel-namespace.yaml"
+kubectl apply "${{DRY_RUN_FLAG[@]}}" -f "${{DIR}}/intersight-otel-namespace.yaml"
 
-echo "Confirming Intersight credentials Secret exists in {ns}..."
-if ! kubectl get secret intersight-api-credentials -n {ns} >/dev/null 2>&1; then
-    echo "ERROR: Secret 'intersight-api-credentials' not found in namespace {ns}." >&2
-    echo "       Create it with:" >&2
-    echo "         kubectl create secret generic intersight-api-credentials -n {ns} \\\\" >&2
-    echo "           --from-file=intersight-key-id=/tmp/intersight_key_id \\\\" >&2
-    echo "           --from-file=intersight-key=/tmp/intersight_private_key.pem" >&2
-    exit 1
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
+    echo "Confirming Intersight credentials Secret exists in {ns}..."
+    if ! kubectl get secret intersight-api-credentials -n {ns} >/dev/null 2>&1; then
+        echo "ERROR: Secret 'intersight-api-credentials' not found in namespace {ns}." >&2
+        echo "       Create it with:" >&2
+        echo "         kubectl create secret generic intersight-api-credentials -n {ns} \\\\" >&2
+        echo "           --from-file=intersight-key-id=/tmp/intersight_key_id \\\\" >&2
+        echo "           --from-file=intersight-key=/tmp/intersight_private_key.pem" >&2
+        exit 1
+    fi
 fi
 
 echo "Applying ConfigMap..."
-kubectl apply -f "${{DIR}}/intersight-otel-config.yaml"
+kubectl apply "${{DRY_RUN_FLAG[@]}}" -f "${{DIR}}/intersight-otel-config.yaml"
 
 echo "Applying Deployment..."
-kubectl apply -f "${{DIR}}/intersight-otel-deployment.yaml"
+kubectl apply "${{DRY_RUN_FLAG[@]}}" -f "${{DIR}}/intersight-otel-deployment.yaml"
 
-echo "Waiting for rollout..."
-kubectl -n {ns} rollout status deployment/intersight-otel --timeout=180s
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
+    echo "Waiting for rollout..."
+    kubectl -n {ns} rollout status deployment/intersight-otel --timeout=180s
+fi
 """
     )
 

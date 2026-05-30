@@ -66,7 +66,19 @@ This is a **standalone reusable skill** for NVIDIA GPU telemetry (DCGM Exporter)
      --output-dir splunk-observability-nvidia-gpu-rendered
    ```
 
-   Then apply: `kubectl apply -f splunk-observability-nvidia-gpu-rendered/dcgm-pod-labels-patch/`.
+   Then apply directly via the skill (recommended; refuses without
+   `--accept-k8s-apply` and prints the active kube-context):
+
+   ```bash
+   bash skills/splunk-observability-nvidia-gpu-integration/scripts/setup.sh \
+     --render --enable-dcgm-pod-labels \
+     --apply-pod-labels-patch --accept-k8s-apply
+   ```
+
+   `--apply-pod-labels-patch --accept-k8s-apply --dry-run` runs `kubectl
+   --dry-run=server` without mutating the cluster. The DaemonSet env patch
+   (`04-daemonset-env-patch.yaml`) remains a strategic-merge patch the
+   operator applies separately so GPU Operator reconciles cleanly.
 
 4. Hand off:
 

@@ -584,6 +584,76 @@ echo "    -n {collector['namespace']} --create-namespace -f ${{MERGED_VALUES}}"
 """
 
 
+def render_apply_overlay_script(
+    *, collector: dict[str, str], targets: list[dict[str, Any]]
+) -> str:
+    release = collector["release_name"]
+    namespace = collector["namespace"]
+    chart_ref = "splunk-otel-collector-chart/splunk-otel-collector"
+    secret_names = sorted({t["credentials"]["kubernetes_secret"]["name"] for t in targets})
+    secret_check_block = "\n".join(
+        f"if ! kubectl -n \"${{NAMESPACE}}\" get secret {n} >/dev/null 2>&1; then "
+        f"echo \"ERROR: Secret '{n}' not found in namespace ${{NAMESPACE}}.\" >&2; "
+        f"echo \"       Create it from your real DB credentials (see k8s/secrets.dbmon.stub.yaml).\" >&2; "
+        f"exit 1; fi"
+        for n in secret_names
+    )
+    return (
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# Apply the DBMon overlay to an existing Splunk OTel Collector helm release by
+# merging this overlay onto the existing values and running helm upgrade.
+# Honors K8S_APPLY_DRY_RUN=true (helm --dry-run, no mutation).
+#
+# Required env: O11Y_TOKEN_FILE (path to the Org access token, chmod 600).
+# Required tooling: helm, kubectl, yq.
+
+if ! command -v helm >/dev/null 2>&1; then echo 'ERROR: helm required.' >&2; exit 1; fi
+if ! command -v kubectl >/dev/null 2>&1; then echo 'ERROR: kubectl required.' >&2; exit 1; fi
+if ! command -v yq >/dev/null 2>&1; then echo 'ERROR: yq required for overlay merge.' >&2; exit 1; fi
+
+if [[ -z "${{O11Y_TOKEN_FILE:-}}" || ! -r "${{O11Y_TOKEN_FILE}}" ]]; then
+    echo 'ERROR: O11Y_TOKEN_FILE must point to a readable token file (chmod 600).' >&2
+    exit 1
+fi
+
+DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)"
+OVERLAY="${{DIR}}/k8s/values.dbmon.clusterreceiver.yaml"
+
+RELEASE="{release}"
+NAMESPACE="{namespace}"
+CHART_REF="{chart_ref}"
+
+# Confirm DB credential Secrets exist; we never auto-create them from the placeholder stub.
+{secret_check_block}
+
+TMPDIR_LOCAL="$(mktemp -d)"
+trap 'rm -rf "${{TMPDIR_LOCAL}}"' EXIT
+helm get values "${{RELEASE}}" -n "${{NAMESPACE}}" -o yaml > "${{TMPDIR_LOCAL}}/current-values.yaml"
+yq eval-all '. as $i ireduce ({{}}; . * $i)' "${{TMPDIR_LOCAL}}/current-values.yaml" "${{OVERLAY}}" > "${{TMPDIR_LOCAL}}/merged.yaml"
+
+DRY_RUN_FLAG=()
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" == "true" ]]; then
+    DRY_RUN_FLAG=(--dry-run)
+    echo "DRY-RUN MODE: passing --dry-run to helm"
+fi
+
+helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
+    --namespace "${{NAMESPACE}}" \\
+    --values "${{TMPDIR_LOCAL}}/merged.yaml" \\
+    --set "splunkObservability.accessToken=$(cat "${{O11Y_TOKEN_FILE}}")" \\
+    --atomic \\
+    --timeout 5m \\
+    "${{DRY_RUN_FLAG[@]}}"
+
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
+    kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-cluster-receiver --timeout=180s || true
+fi
+"""
+    )
+
+
 def handoff_linux() -> str:
     return """#!/usr/bin/env bash
 set -euo pipefail
@@ -782,6 +852,11 @@ def render(args: argparse.Namespace) -> int:
                 distribution=distribution,
                 collector=collector,
             ),
+            executable=True,
+        )
+        write_text(
+            out / "scripts" / "apply-dbmon-overlay.sh",
+            render_apply_overlay_script(collector=collector, targets=targets),
             executable=True,
         )
         if args.base_values:

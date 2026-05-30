@@ -482,6 +482,75 @@ if __name__ == "__main__":
 '''
 
 
+def render_apply_overlay_script(spec: dict[str, Any]) -> str:
+    collector = spec.get("collector") or {}
+    release = collector.get("release", "splunk-otel-collector")
+    namespace = collector.get("namespace", "splunk-otel")
+    chart_ref = collector.get("chart_ref", "splunk-otel-collector-chart/splunk-otel-collector")
+    return (
+        f"""#!/usr/bin/env bash
+set -euo pipefail
+
+# Apply the Isovalent overlay to an existing Splunk OTel Collector helm release
+# by merging this overlay onto current values and running helm upgrade.
+# Honors K8S_APPLY_DRY_RUN=true (helm --dry-run).
+#
+# Required env: O11Y_TOKEN_FILE (path to Org access token, chmod 600).
+# Required tooling: helm, kubectl, yq.
+# Cilium/Hubble/Tetragon must already be installed in the cluster.
+
+if ! command -v helm >/dev/null 2>&1; then echo 'ERROR: helm required.' >&2; exit 1; fi
+if ! command -v kubectl >/dev/null 2>&1; then echo 'ERROR: kubectl required.' >&2; exit 1; fi
+if ! command -v yq >/dev/null 2>&1; then echo 'ERROR: yq required.' >&2; exit 1; fi
+
+if [[ -z "${{O11Y_TOKEN_FILE:-}}" || ! -r "${{O11Y_TOKEN_FILE}}" ]]; then
+    echo 'ERROR: O11Y_TOKEN_FILE must point to a readable token file (chmod 600).' >&2
+    exit 1
+fi
+
+# Confirm Cilium / Tetragon presence; refuse to proceed if neither is found.
+if ! kubectl get ns cilium >/dev/null 2>&1 \\
+   && ! kubectl -n kube-system get ds cilium >/dev/null 2>&1 \\
+   && ! kubectl get ns isovalent-system >/dev/null 2>&1; then
+    echo 'ERROR: Could not detect a Cilium/Tetragon installation (looked for ns cilium, ns isovalent-system, ds kube-system/cilium).' >&2
+    echo '       Install the Isovalent platform first via skills/cisco-isovalent-platform-setup.' >&2
+    exit 1
+fi
+
+DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")/.." && pwd)"
+OVERLAY="${{DIR}}/splunk-otel-overlay/values.overlay.yaml"
+
+RELEASE="{release}"
+NAMESPACE="{namespace}"
+CHART_REF="{chart_ref}"
+
+TMPDIR_LOCAL="$(mktemp -d)"
+trap 'rm -rf "${{TMPDIR_LOCAL}}"' EXIT
+helm get values "${{RELEASE}}" -n "${{NAMESPACE}}" -o yaml > "${{TMPDIR_LOCAL}}/current-values.yaml"
+yq eval-all '. as $i ireduce ({{}}; . * $i)' "${{TMPDIR_LOCAL}}/current-values.yaml" "${{OVERLAY}}" > "${{TMPDIR_LOCAL}}/merged.yaml"
+
+DRY_RUN_FLAG=()
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" == "true" ]]; then
+    DRY_RUN_FLAG=(--dry-run)
+    echo "DRY-RUN MODE: passing --dry-run to helm"
+fi
+
+helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
+    --namespace "${{NAMESPACE}}" \\
+    --values "${{TMPDIR_LOCAL}}/merged.yaml" \\
+    --set "splunkObservability.accessToken=$(cat "${{O11Y_TOKEN_FILE}}")" \\
+    --atomic \\
+    --timeout 5m \\
+    "${{DRY_RUN_FLAG[@]}}"
+
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
+    kubectl -n "${{NAMESPACE}}" rollout status daemonset/${{RELEASE}}-agent --timeout=180s || true
+    kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-cluster-receiver --timeout=180s || true
+fi
+"""
+    )
+
+
 def render_handoffs(args: argparse.Namespace, spec: dict[str, Any], realm: str, cluster_name: str, distribution: str) -> dict[str, str]:
     handoffs = spec.get("handoffs") or {}
     helpers: dict[str, str] = {}
@@ -781,6 +850,12 @@ def main() -> int:
     helpers = render_handoffs(args, spec, realm, cluster_name, distribution)
     for name, body in helpers.items():
         write_text(out / f"scripts/{name}", body, executable=True)
+
+    write_text(
+        out / "scripts/apply-isovalent-overlay.sh",
+        render_apply_overlay_script(spec),
+        executable=True,
+    )
 
     write_json(out / "metadata.json", render_metadata(args, spec))
     return 0
