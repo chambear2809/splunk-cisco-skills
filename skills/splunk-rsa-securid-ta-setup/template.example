@@ -1,0 +1,12 @@
+# RSA SecurID TA render template
+index: rsa
+account_name: rsa_cas_prod
+products: cas,am
+cas_endpoints: adminlog,usereventlog,riskuser
+syslog_port: 514
+interface:
+  display_name: "RSA SecurID Splunk Add-on Setup"
+  short_description: "Render RSA CAS API inputs and RSA AM syslog handoffs"
+  default_prompt: >-
+    Use $splunk-rsa-securid-ta-setup to render RSA SecurID CAS inputs, AM
+    syslog handoffs, install commands, indexes, and readiness validation.

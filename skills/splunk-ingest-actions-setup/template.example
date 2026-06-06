@@ -1,0 +1,33 @@
+# Splunk Ingest Actions Worksheet
+#
+# Non-secret values only. S3 keys go in separate files passed with
+# --s3-access-key-file / --s3-secret-key-file. The admin password comes from the
+# project credentials file.
+
+phase: render
+app_name: ZZZ_cisco_skills_ingest_actions
+
+ruleset_sourcetype: cisco:asa
+ruleset_name: drop_debug
+rule_type: drop            # eval | mask | drop | route-s3
+
+# rule-type eval
+eval_expression:
+
+# rule-type mask
+mask_regex:
+mask_replacement: "########"
+
+# rule-type drop
+drop_regex: level=DEBUG
+
+# rule-type route-s3 (RFS destination; max 8 per deployment)
+s3_destination_name:
+s3_path:                   # s3://bucket/path
+s3_auth_region:
+s3_encryption: unset       # unset | none | sse-s3 | sse-kms
+s3_kms_key_id:
+# s3_access_key_file: /tmp/s3_access   (pass on the command line)
+# s3_secret_key_file: /tmp/s3_secret
+
+# Apply requires --accept-irreversible-ingest

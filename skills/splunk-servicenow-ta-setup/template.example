@@ -1,0 +1,22 @@
+# Splunk Add-on for ServiceNow intake template.
+# Copy to template.local and fill non-secret values only. No passwords/secrets here.
+
+[index]
+index = snow
+
+[account]
+# Account stanza name configured in the add-on UI.
+account_name = snow_prod
+url = https://yourinstance.service-now.com
+# auth_type: basic or OAuth
+auth_type = basic
+username = splunk_integration
+# basic: write the password to a file for the UI
+password_file = /tmp/snow_password
+# OAuth: non-secret client id; write the client secret to a file for the UI
+client_id =
+client_secret_file = /tmp/snow_client_secret
+
+[inputs]
+# Comma-separated tables: incident,change_request,problem,em_event,sys_user,sys_user_group,cmdb_ci
+tables = incident,change_request,problem,em_event

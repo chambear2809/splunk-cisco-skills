@@ -1,0 +1,39 @@
+# Splunk Ingest Actions Worksheet
+#
+# Non-secret values only. Do not store S3 keys here.
+
+phase: render                # render | apply | status
+platform: enterprise         # cloud | enterprise
+
+splunk_home: /opt/splunk
+app_name: splunk_ingest_actions
+
+# Ruleset (created via the Ingest Actions UI or /services/data/ingest/rulesets).
+sourcetype: cisco:asa
+ruleset_name:                # blank = derive from sourcetype
+rules: filter,mask           # any of: filter,mask,setindex,route
+filter_regex: DEBUG
+mask_regex: \d{16}
+mask_replacement: XXXXXXXXXXXXXXXX
+target_index:                # required for the setindex rule
+
+# RFS destination (outputs.conf [rfs:<name>]).
+destination_type: none       # none | s3 | filesystem
+destination_name:            # e.g. archive_s3
+s3_path:                     # s3://bucket/prefix
+fs_path:                     # /mnt/archive (filesystem destination)
+s3_endpoint:
+s3_auth_region: us-east-1
+s3_encryption: unset         # unset | none | sse-s3 | sse-kms
+s3_kms_key_id:
+s3_access_key_file:          # optional; prefer IAM roles
+s3_secret_key_file:
+partition_by:                # e.g. day
+format: json                 # raw | json
+compression: gzip            # none | gzip | zstd
+batch_size_kb:
+drop_events_on_upload_error: false
+
+# If static S3 keys are unavoidable:
+# bash skills/shared/scripts/write_secret_file.sh /tmp/ingest_actions_s3_access_key
+# bash skills/shared/scripts/write_secret_file.sh /tmp/ingest_actions_s3_secret_key

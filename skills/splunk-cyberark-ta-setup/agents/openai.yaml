@@ -1,0 +1,9 @@
+name: splunk-cyberark-ta-setup
+description: Render CyberArk EPM API collection and archived EPV/PTA parser handoffs.
+safe_first:
+  - bash skills/splunk-cyberark-ta-setup/scripts/setup.sh --help
+  - bash skills/splunk-cyberark-ta-setup/scripts/setup.sh --render --dry-run --json
+validation:
+  - bash skills/splunk-cyberark-ta-setup/scripts/validate.sh --help
+notes:
+  - CyberArk EPV/PTA is archived and parser-only; do not present it as a supported API collector.

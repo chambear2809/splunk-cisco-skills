@@ -1,0 +1,25 @@
+# Splunk CIM Data Model Worksheet
+#
+# Non-secret values only. The admin password comes from the project credentials file.
+
+phase: render
+
+app_name: Splunk_SA_CIM
+datamodel: Network_Traffic
+allow_custom_datamodel: false
+
+# Acceleration (apply requires --accept-acceleration)
+acceleration: false
+earliest_time: -7d
+backfill_time:
+max_concurrent:
+manual_rebuilds: unset
+cron_schedule:
+
+# Allowed-index constraint macro cim_<model>_indexes
+constrain_indexes:
+
+# CIM compliance mapping
+eventtype_name:
+eventtype_search:
+tags:

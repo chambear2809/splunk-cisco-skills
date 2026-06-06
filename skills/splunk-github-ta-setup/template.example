@@ -1,0 +1,7 @@
+# Splunk GitHub TA render template
+index: github
+account_name: github_prod
+org: my-org
+enterprise: my-enterprise
+account_type: Organization
+inputs: audit,user,code_scanning,dependabot,secret_scanning

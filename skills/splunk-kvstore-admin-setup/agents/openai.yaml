@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk KV Store Admin Setup"
+  short_description: "Back up, restore, migrate, upgrade, and govern the KV Store"
+  default_prompt: >-
+    Use $splunk-kvstore-admin-setup to render and apply Splunk KV Store backup,
+    restore, clean, storage-engine migration, server-version upgrade,
+    maintenance mode, and collections/lookup-definition governance for
+    standalone or search head cluster deployments.

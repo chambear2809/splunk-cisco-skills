@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk Knowledge-Object Governance"
+  short_description: "Govern saved searches, lookups, macros, and permissions"
+  default_prompt: >-
+    Use $splunk-knowledge-objects to inventory and audit saved searches,
+    lookups, macros, eventtypes, and tags, find orphaned or private objects, fix
+    sharing/ownership, and stage governed knowledge objects and metadata into an
+    app.

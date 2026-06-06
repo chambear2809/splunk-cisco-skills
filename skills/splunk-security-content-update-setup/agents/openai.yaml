@@ -1,0 +1,7 @@
+interface:
+  display_name: "Security Content Update Setup"
+  short_description: "Render ESCU install, story inventory, and correlation-search review"
+  default_prompt: >-
+    Use $splunk-security-content-update-setup to render an ESCU install or
+    upgrade plan, ES search-head placement, analytic story inventory, content
+    checks, correlation-search activation review, and ES configuration handoffs.

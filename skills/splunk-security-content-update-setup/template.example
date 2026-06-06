@@ -1,0 +1,5 @@
+# Security Content Update render template
+platform: auto
+es_app: SplunkEnterpriseSecuritySuite
+story_filter: all
+activation_policy: review-only

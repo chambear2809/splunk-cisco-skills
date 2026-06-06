@@ -1,0 +1,3 @@
+display_name: "Splunk SLO Setup"
+short_description: "Render focused Observability SLO intents and deep workflow handoffs"
+default_prompt: "Use $splunk-observability-slo-setup to render SLI/SLO payload intents, validation plans, and deep-native workflow handoffs."

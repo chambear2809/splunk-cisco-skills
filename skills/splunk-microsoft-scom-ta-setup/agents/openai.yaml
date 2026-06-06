@@ -1,0 +1,8 @@
+interface:
+  display_name: "Microsoft SCOM Supported Add-on Setup"
+  short_description: "Render SCOM PowerShell inputs and microsoft:scom source-type validation"
+  default_prompt: >-
+    Use $splunk-microsoft-scom-ta-setup to render, install, and validate the
+    package-verified Splunk_TA_microsoft-scom workflow, including PowerShell
+    input stanzas, account handoffs, source type validation, and readiness
+    collection.

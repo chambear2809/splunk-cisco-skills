@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Ingest Actions"
+  short_description: "Filter, mask, and route data at ingest time"
+  default_prompt: >-
+    Use $splunk-ingest-actions to render and validate Ingest Actions RFS S3 or
+    filesystem destinations, ruleset specs for filter/mask/set-index/route rules,
+    a manual heavy-forwarder preview, and ruleset status checks.

@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk Fraud Analytics Setup"
+  short_description: "Render Fraud Analytics ES/RBA prerequisites and validation"
+  default_prompt: >-
+    Use $splunk-fraud-analytics-setup to render Fraud Analytics prerequisites,
+    ES dependency checks, use-case intake, RBA/risk index readiness,
+    correlation-search review, data-model checks, Lookup Editor handoff, and
+    validation evidence.

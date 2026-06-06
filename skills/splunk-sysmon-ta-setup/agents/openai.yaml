@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk Add-on for Microsoft Sysmon Setup"
+  short_description: "Render endpoint or WEC Sysmon inputs and source-constrained validation"
+  default_prompt: >-
+    Use $splunk-sysmon-ta-setup to render Splunk_TA_microsoft_sysmon endpoint
+    or WEC inputs, avoid duplicate collection, install the add-on, create the
+    sysmon index, hand off UF rollout, and validate source-constrained Sysmon
+    data.

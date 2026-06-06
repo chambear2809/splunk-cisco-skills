@@ -1,0 +1,26 @@
+# Splunk Platform Dashboard Studio Worksheet
+#
+# Non-secret values only.
+
+phase: render                # render | apply | status
+
+splunk_home: /opt/splunk
+title: Cisco ASA Overview
+description: Traffic and threat overview
+dashboard_id:                # blank = derive from title
+app: search
+owner: nobody                # nobody = app-shared; or a username
+theme: dark                  # light | dark
+layout: grid                 # grid | absolute
+default_earliest: -24h@h
+default_latest: now
+
+# Inline panels (repeat the --panel flag), format: Title::type::content
+# types: table, single, line, area, column, bar, pie, markdown
+# Examples (pass on the command line):
+#   --panel "Event volume::column::index=cisco_asa | timechart count"
+#   --panel "Top sources::table::index=cisco_asa | top src_ip"
+#   --panel "Notes::markdown::## Cisco ASA\nReview daily."
+#
+# Or provide a panels file (JSON list of {title,type,query} / {title,type:markdown,markdown}):
+panels_file:

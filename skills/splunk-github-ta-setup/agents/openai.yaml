@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Add-on for GitHub Setup"
+  short_description: "Render GitHub audit/user/alert inputs, PAT/HEC runbooks, and validation"
+  default_prompt: >-
+    Use $splunk-github-ta-setup to render Splunk_TA_github Cloud audit, user,
+    and security scanning alert inputs; emit PAT and HEC/GHES handoffs; install
+    the add-on; create the github index; and validate ingestion.

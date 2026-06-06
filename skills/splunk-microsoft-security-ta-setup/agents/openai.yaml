@@ -1,0 +1,9 @@
+interface:
+  display_name: "Splunk Add-on for Microsoft Security Setup"
+  short_description: "Render Defender inputs, account runbook, macros, and validation"
+  default_prompt: >-
+    Use $splunk-microsoft-security-ta-setup to render Splunk_TA_MS_Security
+    Defender incidents, endpoint alerts, machines, simulations, Event Hub, and
+    threat intelligence inputs; emit the Entra app account runbook and macros;
+    install the add-on; create the microsoft_security index; and validate
+    ingestion.

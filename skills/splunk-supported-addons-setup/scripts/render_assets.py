@@ -309,6 +309,28 @@ def generic_install_commands() -> dict[str, list[str]]:
     }
 
 
+def handoff_install_command(coverage: dict[str, Any]) -> list[str] | None:
+    """Return the most actionable setup command for a handoff profile."""
+    skill = str(coverage.get("handoff_skill", "")).strip()
+    if not skill or skill == "splunk-app-install":
+        return None
+    setup = REPO_ROOT / "skills" / skill / "scripts" / "setup.sh"
+    if not setup.is_file():
+        return None
+
+    text = setup.read_text(encoding="utf-8", errors="ignore")
+    command = ["bash", f"skills/{skill}/scripts/setup.sh"]
+    if "--all" in text:
+        command.append("--all")
+    elif "--install" in text:
+        command.append("--install")
+
+    selector = str(coverage.get("product_selector", "")).strip()
+    if selector and "--products" in text:
+        command.extend(["--products", selector])
+    return command
+
+
 def glossary_terms(entry: dict[str, Any]) -> set[str]:
     values = [entry.get("key", ""), entry.get("name", ""), *entry.get("aliases", [])]
     return {normalize(str(value)) for value in values if normalize(str(value))}
@@ -353,6 +375,13 @@ def resolve_glossary_entry(catalog: dict[str, Any], query: str) -> dict[str, Any
     if not scored or scored[0][0] <= 0:
         return None
     return glossary_entry_payload(catalog, scored[0][1])
+
+
+def coverage_exact_query(coverage: dict[str, Any], query: str) -> bool:
+    normalized_query = normalize(query or "")
+    terms = {normalize(str(coverage.get("key", ""))), normalize(str(coverage.get("name", "")))}
+    terms.update(normalize(str(alias)) for alias in coverage.get("aliases", []))
+    return bool(normalized_query and normalized_query in terms)
 
 
 def profile_payload(profile: dict[str, Any]) -> dict[str, Any]:
@@ -747,15 +776,33 @@ def render_coverage_plan_md(coverage: dict[str, Any]) -> str:
             f"bash skills/splunk-data-source-readiness-doctor/scripts/setup.sh --phase collect --source-pack {coverage['readiness_source_pack']}\n"
             "```\n"
         )
+    if coverage["status"] == "handoff_profile":
+        coverage_note = (
+            "This entry is in the official Splunk Supported Add-ons glossary. A "
+            f"local first-class domain skill owns the configuration workflow: "
+            f"`{coverage.get('handoff_skill', 'splunk-app-install')}`."
+        )
+        config_note = (
+            f"Use `{coverage.get('handoff_skill', 'splunk-app-install')}` for source types, "
+            "index placement, input ownership, credential storage, and deployment role placement."
+        )
+    else:
+        coverage_note = (
+            "This entry is in the official Splunk Supported Add-ons glossary. This router "
+            "does not have a first-class domain renderer for it yet, so it emits a generic "
+            "install and documentation handoff instead of failing as a gap."
+        )
+        config_note = (
+            "Follow the official add-on documentation for source types, index placement, "
+            "input ownership, credential storage, and deployment role placement."
+        )
     return f"""# {coverage['name']} Supported Add-on Handoff
 
 Coverage key: `{coverage['key']}`
 Coverage status: `{coverage['status']}`
 Handoff skill: `{coverage.get('handoff_skill', 'splunk-app-install')}`
 
-This entry is in the official Splunk Supported Add-ons glossary. This router
-does not have a first-class domain renderer for it yet, so it emits a generic
-install and documentation handoff instead of failing as a gap.
+{coverage_note}
 
 ## Install Path
 
@@ -767,8 +814,7 @@ Use `install-commands.sh` with one of these environment variables:
 
 ## Configuration Path
 
-Follow the official add-on documentation for source types, index placement,
-input ownership, credential storage, and deployment role placement.
+{config_note}
 
 {readiness}
 ## Sources
@@ -871,12 +917,18 @@ def main() -> int:
         emit(payload, args.json)
         return 0
 
+    coverage = resolve_glossary_entry(catalog, args.profile)
     profile = find_profile(catalog, args.profile)
+    if (
+        coverage is not None
+        and coverage.get("status") != "first_class_profile"
+        and coverage_exact_query(coverage, args.profile)
+    ):
+        profile = None
     if args.phase == "resolve":
         if profile is not None:
             emit({"ok": True, "profile": profile_payload(profile)}, args.json)
             return 0
-        coverage = resolve_glossary_entry(catalog, args.profile)
         if coverage is not None:
             emit({"ok": True, "coverage": coverage}, args.json)
             return 0
@@ -885,7 +937,7 @@ def main() -> int:
         coverage = resolve_glossary_entry(catalog, args.profile)
         if coverage is not None:
             if args.phase == "install-command":
-                command = coverage.get("commands", generic_install_commands()).get("install_help")
+                command = handoff_install_command(coverage) or coverage.get("commands", generic_install_commands()).get("install_help")
                 emit({"ok": True, "coverage": coverage, "command": command}, args.json)
                 return 0
             if args.phase == "readiness-command" and coverage.get("readiness_source_pack"):

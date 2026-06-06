@@ -1,0 +1,23 @@
+# Microsoft cloud add-ons intake template.
+# Copy to template.local and fill non-secret values only. No client secrets here.
+
+[indexes]
+o365_index = o365
+azure_index = azure
+
+[entra_app_registration]
+# Non-secret identifiers from the Azure app registration.
+tenant_id = 00000000-0000-0000-0000-000000000000
+client_id = 00000000-0000-0000-0000-000000000000
+# Write the client secret to a file and configure it in the add-on UI:
+client_secret_file = /tmp/msentra_client_secret
+endpoint = WorldWide
+
+[office365]
+tenant_name = contoso
+# Comma-separated content types: Audit.AzureActiveDirectory,Audit.Exchange,Audit.SharePoint,Audit.General,DLP.All
+content_types = Audit.AzureActiveDirectory,Audit.Exchange,Audit.General
+
+[mscs]
+account_name = msentra
+subscription_id = 00000000-0000-0000-0000-000000000000

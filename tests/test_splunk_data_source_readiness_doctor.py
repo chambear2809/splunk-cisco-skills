@@ -252,6 +252,7 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
         for pack_id, blocked in {
             "kubernetes_audit": "_json",
             "github_audit": "httpevent",
+            "sysmon": "XmlWinEventLog",
         }.items():
             with self.subTest(pack=pack_id):
                 self.assertNotIn(blocked, catalog[pack_id]["match"].get("sourcetypes", []))
@@ -269,6 +270,54 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
         self.assertIsNone(
             doctor.find_source_pack({"name": "generic hec", "sourcetype": "httpevent"}, packs_by_id, set())
         )
+        self.assertIsNone(
+            doctor.find_source_pack({"name": "generic xml", "sourcetype": "XmlWinEventLog"}, packs_by_id, set())
+        )
+        self.assertIsNone(
+            doctor.find_source_pack(
+                {"name": "generic firehose json", "sourcetype": "_json"},
+                packs_by_id,
+                set(),
+            )
+        )
+        self.assertIsNone(
+            doctor.find_source_pack(
+                {"name": "generic firehose hec", "sourcetype": "httpevent"},
+                packs_by_id,
+                set(),
+            )
+        )
+        self.assertEqual(
+            doctor.find_source_pack(
+                {
+                    "name": "firehose raw json",
+                    "source": "aws:firehose:raw-json",
+                    "sourcetype": "_json",
+                },
+                packs_by_id,
+                set(),
+            )["id"],
+            "amazon_kinesis_firehose",
+        )
+        self.assertEqual(
+            doctor.find_source_pack(
+                {
+                    "name": "firehose raw hec",
+                    "source": "aws:firehose:raw",
+                    "sourcetype": "httpevent",
+                },
+                packs_by_id,
+                set(),
+            )["id"],
+            "amazon_kinesis_firehose",
+        )
+        self.assertIsNone(
+            doctor.find_source_pack(
+                {"name": "generic raw json source only", "source": "aws:firehose:raw-json"},
+                packs_by_id,
+                set(),
+            )
+        )
         self.assertEqual(
             doctor.find_source_pack(
                 {"name": "github enterprise", "source": "http:github", "sourcetype": "httpevent"},
@@ -276,6 +325,152 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
                 set(),
             )["id"],
             "github_audit",
+        )
+        self.assertEqual(
+            doctor.find_source_pack(
+                {
+                    "name": "sysmon",
+                    "source": "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational",
+                    "sourcetype": "XmlWinEventLog",
+                },
+                packs_by_id,
+                set(),
+            )["id"],
+            "sysmon",
+        )
+
+    def test_new_source_pack_matching_and_generic_false_positives(self) -> None:
+        source_packs = json.loads(SOURCE_PACKS_FILE.read_text(encoding="utf-8"))
+        packs_by_id = doctor.source_pack_index(source_packs)
+        self.assertIsNone(doctor.find_source_pack({"name": "generic cef", "sourcetype": "cef"}, packs_by_id, set()))
+        self.assertIsNone(doctor.find_source_pack({"name": "generic syslog", "sourcetype": "syslog"}, packs_by_id, set()))
+        self.assertIsNone(doctor.find_source_pack({"name": "generic access", "sourcetype": "access_combined"}, packs_by_id, set()))
+        cases = [
+            ({"name": "Salesforce", "sourcetype": "sfdc:loginhistory"}, "salesforce"),
+            ({"name": "Box", "sourcetype": "box:events"}, "box"),
+            ({"name": "CyberArk EPM", "sourcetype": "cyberark:epm:threat:detection"}, "cyberark_epm"),
+            ({"name": "CyberArk Vault", "sourcetype": "cyberark:epv:cef"}, "cyberark_epv_pta"),
+            ({"name": "RSA CAS", "sourcetype": "rsa:securid:cas:adminlog:json"}, "rsa_securid_cas"),
+            ({"name": "RSA AM", "sourcetype": "rsa:securid:syslog"}, "rsa_securid_am"),
+            ({"name": "Apache", "sourcetype": "apache:access:combined"}, "apache_web"),
+            ({"name": "Blue Coat", "sourcetype": "bluecoat:proxysg:access:syslog"}, "bluecoat_proxy"),
+            ({"name": "Cisco ISE", "sourcetype": "cisco:ise:syslog"}, "cisco_ise"),
+            ({"name": "AppDynamics", "sourcetype": "appdynamics_events"}, "appdynamics"),
+        ]
+        for evidence, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(doctor.find_source_pack(evidence, packs_by_id, set())["id"], expected)
+
+    def test_source_pack_matchers_cover_new_supported_tas(self) -> None:
+        source_packs = json.loads(SOURCE_PACKS_FILE.read_text(encoding="utf-8"))
+        catalog = {pack["id"]: pack for pack in source_packs["packs"]}
+        expectations = {
+            "google_workspace": ["gws:reports:admin", "gws:gmail", "gws:alerts", "gws:users:identity"],
+            "microsoft_security": ["ms365:defender:incident", "ms:defender:eventhub", "ms:defender:ti:articles"],
+            "sysmon": ["XmlWinEventLog", "XmlWinEventLog:WEC-Sysmon"],
+            "google_gcp": [
+                "google:gcp:pubsub:message",
+                "google:gcp:pubsub:audit:admin_activity",
+                "google:gcp:pubsub:audit:data_access",
+                "google:gcp:pubsub:audit:system_event",
+                "google:gcp:pubsub:audit:policy_denied",
+            ],
+            "github_audit": [
+                "github:cloud:audit",
+                "github:enterprise:audit",
+                "github:cloud:code:scanning:alerts",
+                "github:cloud:dependabot:scanning:alerts",
+                "github:cloud:secret:scanning:alerts",
+            ],
+            "salesforce": ["sfdc:object", "sfdc:logfile", "sfdc:loginhistory"],
+            "box": ["box:events", "box:users", "box:filecontent:json"],
+            "cyberark_epm": ["cyberark:epm:raw:events", "cyberark:epm:threat:detection"],
+            "cyberark_epv_pta": ["cyberark:epv:cef", "cyberark:pta:cef"],
+            "rsa_securid_cas": ["rsa:securid:cas:adminlog:json", "rsa:securid:cas:riskuser:json"],
+            "rsa_securid_am": ["rsa:securid:syslog", "rsa:securid:admin:syslog"],
+            "apache_web": ["apache:access:combined", "apache:error"],
+            "bluecoat_proxy": ["bluecoat:proxysg:access:syslog", "bluecoat:proxysg:access:kv"],
+            "f5_bigip": ["f5:bigip:syslog", "f5:telemetry:json"],
+            "cisco_asa": ["cisco:asa"],
+            "vmware": ["vmware:events", "vmware:tasks", "vmware:inv:hierarchy", "vmware:perf:host"],
+            "amazon_kinesis_firehose": [
+                "aws:cloudtrail",
+                "aws:cloudwatchlogs:vpcflow",
+                "aws:cloudwatch:events",
+                "_json",
+                "httpevent",
+            ],
+            "mssql_database": [
+                "mssql:errorlog",
+                "mssql:agentlog",
+                "mssql:audit",
+                "mssql:execution:dm_exec_query_stats",
+            ],
+            "mysql_database": [
+                "mysql:errorLog",
+                "mysql:generalQueryLog",
+                "mysql:slowQueryLog",
+                "mysql:audit",
+            ],
+            "oracle_database": [
+                "oracle:audit:unified",
+                "oracle:listener:text",
+                "oracle:alert:text",
+                "oracle:sysPerf",
+            ],
+            "microsoft_exchange": [
+                "MSExchange:2013:MessageTracking",
+                "MSExchange:2013:MailboxAudit",
+                "MSExchange:2013:RPCClientAccess",
+                "MSExchange:Reputation",
+            ],
+            "microsoft_scom": [
+                "microsoft:scom",
+                "microsoft:scom:alert",
+                "microsoft:scom:events",
+                "microsoft:scom:performance",
+            ],
+            "netapp_ontap": [
+                "ontap:perf",
+                "ontap:volume",
+                "ontap:aggr",
+                "ontap:system",
+            ],
+            "carbon_black": ["bit9:carbonblack:json"],
+            "symantec_endpoint_protection": [
+                "symantec:ep:syslog",
+                "symantec:ep:risk:file",
+                "symantec:ep:security:syslog",
+            ],
+        }
+        for pack_id, sourcetypes in expectations.items():
+            with self.subTest(pack=pack_id):
+                self.assertIn(pack_id, catalog)
+                expected = set(catalog[pack_id]["defaults"]["expected_sourcetypes"])
+                self.assertTrue(set(sourcetypes).issubset(expected))
+        self.assertIn("cisco-asa-ta-setup", catalog["cisco_asa"]["handoffs"])
+        self.assertIn(
+            "splunk-amazon-kinesis-firehose-setup",
+            catalog["amazon_kinesis_firehose"]["handoffs"],
+        )
+        self.assertIn("splunk-database-ta-setup", catalog["mssql_database"]["handoffs"])
+        self.assertIn("splunk-microsoft-exchange-ta-setup", catalog["microsoft_exchange"]["handoffs"])
+        self.assertIn("splunk-netapp-ontap-ta-setup", catalog["netapp_ontap"]["handoffs"])
+        self.assertIn("splunk-security-appliance-ta-setup", catalog["carbon_black"]["handoffs"])
+
+    def test_source_packs_remain_limited_to_raw_telemetry_sources(self) -> None:
+        source_packs = json.loads(SOURCE_PACKS_FILE.read_text(encoding="utf-8"))
+        pack_ids = {pack["id"] for pack in source_packs["packs"]}
+        self.assertFalse(
+            {
+                "security_content_update",
+                "pci_compliance",
+                "infosec",
+                "fraud_analytics",
+                "cim",
+                "lookup_file_editing",
+            }
+            & pack_ids
         )
 
     def test_source_pack_docs_are_specific_not_generic_catalog_fallbacks(self) -> None:
@@ -334,6 +529,11 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
             "data_sources": [
                 {"name": "k8s", "source": "kubernetes", "sourcetype": "_json"},
                 {"name": "github enterprise", "source": "http:github", "sourcetype": "httpevent"},
+                {
+                    "name": "sysmon",
+                    "source": "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational",
+                    "sourcetype": "XmlWinEventLog",
+                },
             ]
         }
         normalized, _, _ = doctor.normalized_evidence(args, registry_index, source_packs)
@@ -343,6 +543,8 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
         self.assertIn('sourcetype IN ("_json", "kube:audit")', bases["k8s"])
         self.assertIn('source IN ("github", "http:github")', bases["github enterprise"])
         self.assertIn("httpevent", bases["github enterprise"])
+        self.assertIn('source="XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"', bases["sysmon"])
+        self.assertIn("XmlWinEventLog:WEC-Sysmon", bases["sysmon"])
 
     def test_collect_phase_renders_manifest_without_live_credentials(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

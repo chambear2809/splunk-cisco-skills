@@ -1,0 +1,7 @@
+# Fraud Analytics render template
+platform: auto
+es_app: SplunkEnterpriseSecuritySuite
+fraud_use_case: account-takeover
+risk_index: risk
+transaction_index: fraud
+lookup_owner_app: Splunk_Fraud_Analytics

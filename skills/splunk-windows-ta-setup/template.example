@@ -1,0 +1,20 @@
+# Splunk Add-on for Microsoft Windows intake template.
+# Copy to template.local and fill non-secret values only. No secrets here.
+
+[indexes]
+event_index = wineventlog
+perfmon_index = perfmon
+
+[inputs]
+# WinEventLog channels to enable on Windows forwarders (comma-separated).
+wineventlog_channels = Security,System,Application
+# Perfmon objects to enable.
+perfmon_objects = CPU,Memory,LogicalDisk,Network
+# WinHostMon types to enable.
+winhostmon_types = Computer,Process,Service,OperatingSystem
+
+[rollout]
+# Deployment app name used by splunk-agent-management-setup.
+deployment_app_name = Splunk_TA_windows
+# Set true to render XmlWinEventLog instead of classic WinEventLog.
+render_xml = false

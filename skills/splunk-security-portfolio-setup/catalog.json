@@ -177,47 +177,51 @@
       "key": "security-content-update",
       "name": "Splunk ES Content Update",
       "aliases": ["escu", "security content update", "es content update", "da-ess-contentupdate"],
-      "status": "install_only",
-      "route": ["splunk-enterprise-security-config"],
-      "route_command": ["bash", "skills/splunk-enterprise-security-config/scripts/setup.sh", "--spec", "skills/splunk-enterprise-security-config/templates/es-config.example.yaml", "--mode", "preview"],
+      "status": "first_class",
+      "route": ["splunk-security-content-update-setup"],
+      "route_command": ["bash", "skills/splunk-security-content-update-setup/scripts/setup.sh", "--render"],
       "splunkbase_ids": ["3449"],
-      "notes": "Handled by ES content library workflow."
+      "notes": "First-class render-first ESCU setup and content activation review; ES mutations remain delegated to Enterprise Security configuration."
     },
     {
       "key": "pci-compliance",
       "name": "Splunk App for PCI Compliance",
       "aliases": ["pci", "pci compliance"],
-      "status": "install_only",
-      "route": ["splunk-app-install"],
+      "status": "first_class",
+      "route": ["splunk-pci-compliance-setup"],
+      "route_command": ["bash", "skills/splunk-pci-compliance-setup/scripts/setup.sh", "--render"],
       "splunkbase_ids": ["1143", "2897"],
-      "notes": "Restricted compliance app, not a public product-page security skill."
+      "notes": "Render-first PCI app readiness, CDE index/macro intake, CIM prerequisites, roles, reports, and installer-selection handoffs."
     },
     {
       "key": "infosec",
       "name": "InfoSec App for Splunk",
       "aliases": ["infosec", "infosec app"],
-      "status": "install_only",
-      "route": ["splunk-app-install"],
+      "status": "first_class",
+      "route": ["splunk-infosec-app-setup"],
+      "route_command": ["bash", "skills/splunk-infosec-app-setup/scripts/setup.sh", "--render"],
       "splunkbase_ids": ["4240"],
-      "notes": "Starter security dashboards."
+      "notes": "Render-first InfoSec install readiness, source checklist, dashboard/macro/data-model checks, Cloud IDM note, and lookup handoffs."
     },
     {
       "key": "cim",
       "name": "Splunk Common Information Model",
       "aliases": ["cim", "common information model"],
-      "status": "install_only",
-      "route": ["splunk-app-install"],
+      "status": "existing_skill",
+      "route": ["splunk-cim-data-model-setup"],
+      "route_command": ["bash", "skills/splunk-cim-data-model-setup/scripts/setup.sh", "--phase", "render", "--datamodel", "Authentication", "--dry-run"],
       "splunkbase_ids": ["1621"],
-      "notes": "Shared semantic model add-on."
+      "notes": "Routes to the existing CIM data-model setup skill; do not create a duplicate CIM skill."
     },
     {
       "key": "lookup-file-editing",
       "name": "Splunk App for Lookup File Editing",
       "aliases": ["lookup editor", "lookup file editing"],
-      "status": "install_only",
-      "route": ["splunk-app-install"],
+      "status": "first_class",
+      "route": ["splunk-lookup-file-editing-setup"],
+      "route_command": ["bash", "skills/splunk-lookup-file-editing-setup/scripts/setup.sh", "--render"],
       "splunkbase_ids": ["1724"],
-      "notes": "Prerequisite for selected security apps."
+      "notes": "Render-first Lookup File Editing install readiness, CSV/KV Store inventory, SHC allowRestReplay runbook, and app health handoffs."
     },
     {
       "key": "mltk",
@@ -262,10 +266,11 @@
       "key": "fraud-analytics",
       "name": "Splunk App for Fraud Analytics",
       "aliases": ["fraud analytics", "splunk fraud analytics"],
-      "status": "manual_gap",
-      "route": ["splunk-app-install"],
+      "status": "first_class",
+      "route": ["splunk-fraud-analytics-setup"],
+      "route_command": ["bash", "skills/splunk-fraud-analytics-setup/scripts/setup.sh", "--render"],
       "splunkbase_ids": [],
-      "notes": "Official docs point to a package tarball; keep as an explicit non-product manual gap."
+      "notes": "Render-first Fraud Analytics readiness, ES/RBA prerequisites, Lookup File Editing dependency, use-case intake, and correlation-search review."
     }
   ]
 }

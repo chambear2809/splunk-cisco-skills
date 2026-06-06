@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "last_researched": "2026-05-19",
-  "description": "Splunk Supported Add-ons router catalog. The initial domain is Unix/Linux and covers the supported Splunk Add-on for Unix and Linux plus the supported Splunk Add-on for Linux CollectD/AuditD path.",
+  "last_researched": "2026-06-06",
+  "description": "Splunk Supported Add-ons router catalog. Coverage includes first-class Unix/Linux profiles plus package-verified handoffs for selected cloud, endpoint, database, Microsoft infrastructure, NetApp, web/proxy/syslog, and security appliance add-ons; unresolved products remain install-only handoffs.",
   "supported_statuses": [
     "first_class_profile",
     "handoff_profile",
@@ -10,111 +10,1328 @@
   ],
   "official_glossary": {
     "source_url": "https://help.splunk.com/en/supported-add-ons/about-the-splunk-supported-add-ons",
-    "last_researched": "2026-05-19",
+    "last_researched": "2026-06-06",
     "entries": [
-      {"key": "amazon-kinesis-firehose", "name": "Amazon Kinesis Firehose"},
-      {"key": "amazon-web-services", "name": "Amazon Web Services"},
-      {"key": "apache-web-server", "name": "Apache Web Server"},
-      {"key": "appdynamics", "name": "AppDynamics"},
-      {"key": "bmc-remedy", "name": "BMC Remedy"},
-      {"key": "asset-and-risk-intelligence", "name": "Asset and Risk Intelligence"},
-      {"key": "box", "name": "Box"},
-      {"key": "carbon-black", "name": "Carbon Black"},
-      {"key": "check-point-log-exporter", "name": "Check Point Log Exporter"},
-      {"key": "cisco-asa", "name": "Cisco ASA"},
-      {"key": "cisco-esa", "name": "Cisco ESA"},
-      {"key": "cisco-firesight", "name": "Cisco FireSIGHT"},
-      {"key": "cisco-ise", "name": "Cisco ISE"},
-      {"key": "cisco-meraki", "name": "Cisco Meraki"},
-      {"key": "cisco-ucs", "name": "Cisco UCS"},
-      {"key": "cisco-wsa", "name": "Cisco WSA"},
-      {"key": "citrix-netscaler", "name": "Citrix NetScaler"},
-      {"key": "crowdstrike-fdr", "name": "CrowdStrike FDR"},
-      {"key": "cyberark", "name": "CyberArk"},
-      {"key": "cyberark-epm", "name": "CyberArk EPM"},
-      {"key": "emc-vnx", "name": "EMC VNX"},
-      {"key": "f5-big-ip", "name": "F5 BIG-IP"},
-      {"key": "forcepoint-web-security", "name": "Forcepoint Web Security"},
-      {"key": "github", "name": "GitHub"},
-      {"key": "google-cloud-platform", "name": "Google Cloud Platform"},
-      {"key": "google-workspace", "name": "Google Workspace"},
-      {"key": "haproxy", "name": "HAProxy"},
-      {"key": "ibm-websphere-application-server", "name": "IBM WebSphere Application Server"},
-      {"key": "imperva-securesphere-waf", "name": "Imperva SecureSphere WAF"},
-      {"key": "infoblox", "name": "Infoblox"},
-      {"key": "isc-bind", "name": "ISC BIND"},
-      {"key": "isc-dhcp", "name": "ISC DHCP"},
-      {"key": "java-management-extensions", "name": "Java Management Extensions"},
-      {"key": "jboss", "name": "JBoss"},
-      {"key": "jira-cloud", "name": "Jira Cloud"},
-      {"key": "jira-data-center", "name": "Jira Data Center"},
-      {"key": "linux", "name": "Linux"},
-      {"key": "mcafee-epo-syslog", "name": "McAfee ePO Syslog"},
-      {"key": "mcafee-nsp", "name": "McAfee NSP"},
-      {"key": "mcafee-web-gateway", "name": "McAfee Web Gateway"},
-      {"key": "microsoft-cloud-services", "name": "Microsoft Cloud Services"},
-      {"key": "microsoft-exchange", "name": "Microsoft Exchange"},
-      {"key": "microsoft-iis", "name": "Microsoft IIS"},
-      {"key": "microsoft-office-365", "name": "Microsoft Office 365"},
-      {"key": "microsoft-hyper-v", "name": "Microsoft Hyper-V"},
-      {"key": "microsoft-scom", "name": "Microsoft SCOM"},
-      {"key": "microsoft-security", "name": "Microsoft Security"},
-      {"key": "microsoft-sql-server", "name": "Microsoft SQL Server"},
-      {"key": "microsoft-windows", "name": "Microsoft Windows"},
-      {"key": "mysql", "name": "MySQL"},
-      {"key": "nagios-core", "name": "Nagios Core"},
-      {"key": "netapp-data-ontap", "name": "NetApp Data ONTAP"},
-      {"key": "netapp-data-ontap-extractions", "name": "NetApp Data ONTAP Extractions"},
-      {"key": "netapp-data-ontap-indexes", "name": "NetApp Data ONTAP Indexes"},
-      {"key": "nginx", "name": "NGINX"},
-      {"key": "okta-identity-cloud", "name": "Okta Identity Cloud"},
-      {"key": "oracle-database", "name": "Oracle Database"},
-      {"key": "ossec", "name": "OSSEC"},
-      {"key": "rsa-dlp", "name": "RSA DLP"},
-      {"key": "rsa-securid", "name": "RSA SecurID"},
-      {"key": "rsa-securid-cas", "name": "RSA SecurID CAS"},
-      {"key": "salesforce", "name": "Salesforce"},
-      {"key": "servicenow", "name": "ServiceNow", "aliases": ["service now", "snow"]},
-      {"key": "sophos", "name": "Sophos"},
-      {"key": "squid-proxy", "name": "Squid Proxy"},
-      {"key": "symantec-blue-coat-proxysg", "name": "Symantec Blue Coat ProxySG"},
-      {"key": "symantec-dlp", "name": "Symantec DLP"},
-      {"key": "symantec-endpoint-protection", "name": "Symantec Endpoint Protection"},
-      {"key": "sysmon", "name": "Sysmon"},
-      {"key": "sysmon-for-linux", "name": "Sysmon for Linux"},
-      {"key": "tomcat", "name": "Tomcat"},
-      {"key": "unix-and-linux", "name": "Unix and Linux", "aliases": ["unix linux", "*nix"]},
-      {"key": "vcenter-logs", "name": "vCenter Logs"},
-      {"key": "vmware", "name": "VMware", "aliases": ["vmware", "vmware app"]},
-      {"key": "vmware-extractions", "name": "VMware Extractions"},
-      {"key": "vmware-esxi-logs", "name": "VMware ESXi Logs"},
-      {"key": "vmware-indexes", "name": "VMware Indexes"},
-      {"key": "vmware-metrics", "name": "VMware Metrics"},
-      {"key": "vmware-metrics-indexes", "name": "VMware Metrics Indexes"},
-      {"key": "websense-dlp", "name": "Websense DLP"}
+      {
+        "key": "amazon-kinesis-firehose",
+        "name": "Amazon Kinesis Firehose"
+      },
+      {
+        "key": "amazon-web-services",
+        "name": "Amazon Web Services"
+      },
+      {
+        "key": "apache-web-server",
+        "name": "Apache Web Server"
+      },
+      {
+        "key": "appdynamics",
+        "name": "AppDynamics"
+      },
+      {
+        "key": "bmc-remedy",
+        "name": "BMC Remedy"
+      },
+      {
+        "key": "asset-and-risk-intelligence",
+        "name": "Asset and Risk Intelligence"
+      },
+      {
+        "key": "box",
+        "name": "Box"
+      },
+      {
+        "key": "carbon-black",
+        "name": "Carbon Black"
+      },
+      {
+        "key": "check-point-log-exporter",
+        "name": "Check Point Log Exporter"
+      },
+      {
+        "key": "cisco-asa",
+        "name": "Cisco ASA"
+      },
+      {
+        "key": "cisco-esa",
+        "name": "Cisco ESA"
+      },
+      {
+        "key": "cisco-firesight",
+        "name": "Cisco FireSIGHT"
+      },
+      {
+        "key": "cisco-ise",
+        "name": "Cisco ISE"
+      },
+      {
+        "key": "cisco-meraki",
+        "name": "Cisco Meraki"
+      },
+      {
+        "key": "cisco-ucs",
+        "name": "Cisco UCS"
+      },
+      {
+        "key": "cisco-wsa",
+        "name": "Cisco WSA"
+      },
+      {
+        "key": "citrix-netscaler",
+        "name": "Citrix NetScaler"
+      },
+      {
+        "key": "crowdstrike-fdr",
+        "name": "CrowdStrike FDR"
+      },
+      {
+        "key": "cyberark",
+        "name": "CyberArk"
+      },
+      {
+        "key": "cyberark-epm",
+        "name": "CyberArk EPM"
+      },
+      {
+        "key": "emc-vnx",
+        "name": "EMC VNX"
+      },
+      {
+        "key": "f5-big-ip",
+        "name": "F5 BIG-IP"
+      },
+      {
+        "key": "forcepoint-web-security",
+        "name": "Forcepoint Web Security"
+      },
+      {
+        "key": "github",
+        "name": "GitHub"
+      },
+      {
+        "key": "google-cloud-platform",
+        "name": "Google Cloud Platform"
+      },
+      {
+        "key": "google-workspace",
+        "name": "Google Workspace"
+      },
+      {
+        "key": "haproxy",
+        "name": "HAProxy"
+      },
+      {
+        "key": "ibm-websphere-application-server",
+        "name": "IBM WebSphere Application Server"
+      },
+      {
+        "key": "imperva-securesphere-waf",
+        "name": "Imperva SecureSphere WAF"
+      },
+      {
+        "key": "infoblox",
+        "name": "Infoblox"
+      },
+      {
+        "key": "isc-bind",
+        "name": "ISC BIND"
+      },
+      {
+        "key": "isc-dhcp",
+        "name": "ISC DHCP"
+      },
+      {
+        "key": "java-management-extensions",
+        "name": "Java Management Extensions"
+      },
+      {
+        "key": "jboss",
+        "name": "JBoss"
+      },
+      {
+        "key": "jira-cloud",
+        "name": "Jira Cloud"
+      },
+      {
+        "key": "jira-data-center",
+        "name": "Jira Data Center"
+      },
+      {
+        "key": "linux",
+        "name": "Linux"
+      },
+      {
+        "key": "mcafee-epo-syslog",
+        "name": "McAfee ePO Syslog"
+      },
+      {
+        "key": "mcafee-nsp",
+        "name": "McAfee NSP"
+      },
+      {
+        "key": "mcafee-web-gateway",
+        "name": "McAfee Web Gateway"
+      },
+      {
+        "key": "microsoft-cloud-services",
+        "name": "Microsoft Cloud Services"
+      },
+      {
+        "key": "microsoft-exchange",
+        "name": "Microsoft Exchange"
+      },
+      {
+        "key": "microsoft-iis",
+        "name": "Microsoft IIS"
+      },
+      {
+        "key": "microsoft-office-365",
+        "name": "Microsoft Office 365"
+      },
+      {
+        "key": "microsoft-hyper-v",
+        "name": "Microsoft Hyper-V"
+      },
+      {
+        "key": "microsoft-scom",
+        "name": "Microsoft SCOM"
+      },
+      {
+        "key": "microsoft-security",
+        "name": "Microsoft Security"
+      },
+      {
+        "key": "microsoft-sql-server",
+        "name": "Microsoft SQL Server"
+      },
+      {
+        "key": "microsoft-windows",
+        "name": "Microsoft Windows"
+      },
+      {
+        "key": "mysql",
+        "name": "MySQL"
+      },
+      {
+        "key": "nagios-core",
+        "name": "Nagios Core"
+      },
+      {
+        "key": "netapp-data-ontap",
+        "name": "NetApp Data ONTAP"
+      },
+      {
+        "key": "netapp-data-ontap-extractions",
+        "name": "NetApp Data ONTAP Extractions"
+      },
+      {
+        "key": "netapp-data-ontap-indexes",
+        "name": "NetApp Data ONTAP Indexes"
+      },
+      {
+        "key": "nginx",
+        "name": "NGINX"
+      },
+      {
+        "key": "okta-identity-cloud",
+        "name": "Okta Identity Cloud"
+      },
+      {
+        "key": "oracle-database",
+        "name": "Oracle Database"
+      },
+      {
+        "key": "ossec",
+        "name": "OSSEC"
+      },
+      {
+        "key": "rsa-dlp",
+        "name": "RSA DLP"
+      },
+      {
+        "key": "rsa-securid",
+        "name": "RSA SecurID"
+      },
+      {
+        "key": "rsa-securid-cas",
+        "name": "RSA SecurID CAS"
+      },
+      {
+        "key": "salesforce",
+        "name": "Salesforce"
+      },
+      {
+        "key": "servicenow",
+        "name": "ServiceNow",
+        "aliases": [
+          "service now",
+          "snow"
+        ]
+      },
+      {
+        "key": "sophos",
+        "name": "Sophos"
+      },
+      {
+        "key": "squid-proxy",
+        "name": "Squid Proxy"
+      },
+      {
+        "key": "symantec-blue-coat-proxysg",
+        "name": "Symantec Blue Coat ProxySG"
+      },
+      {
+        "key": "symantec-dlp",
+        "name": "Symantec DLP"
+      },
+      {
+        "key": "symantec-endpoint-protection",
+        "name": "Symantec Endpoint Protection"
+      },
+      {
+        "key": "sysmon",
+        "name": "Sysmon"
+      },
+      {
+        "key": "sysmon-for-linux",
+        "name": "Sysmon for Linux"
+      },
+      {
+        "key": "tomcat",
+        "name": "Tomcat"
+      },
+      {
+        "key": "unix-and-linux",
+        "name": "Unix and Linux",
+        "aliases": [
+          "unix linux",
+          "*nix"
+        ]
+      },
+      {
+        "key": "vcenter-logs",
+        "name": "vCenter Logs"
+      },
+      {
+        "key": "vmware",
+        "name": "VMware",
+        "aliases": [
+          "vmware",
+          "vmware app"
+        ]
+      },
+      {
+        "key": "vmware-extractions",
+        "name": "VMware Extractions"
+      },
+      {
+        "key": "vmware-esxi-logs",
+        "name": "VMware ESXi Logs"
+      },
+      {
+        "key": "vmware-indexes",
+        "name": "VMware Indexes"
+      },
+      {
+        "key": "vmware-metrics",
+        "name": "VMware Metrics"
+      },
+      {
+        "key": "vmware-metrics-indexes",
+        "name": "VMware Metrics Indexes"
+      },
+      {
+        "key": "websense-dlp",
+        "name": "Websense DLP"
+      }
     ],
     "routes": {
-      "amazon-kinesis-firehose": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "aws_cloudtrail"},
-      "amazon-web-services": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "aws_cloudtrail"},
-      "appdynamics": {"status": "handoff_profile", "handoff_skill": "splunk-appdynamics-setup"},
-      "asset-and-risk-intelligence": {"status": "handoff_profile", "handoff_skill": "splunk-asset-risk-intelligence-setup"},
-      "cisco-asa": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "cisco_asa"},
-      "cisco-esa": {"status": "handoff_profile", "handoff_skill": "cisco-secure-email-web-gateway-setup"},
-      "cisco-firesight": {"status": "handoff_profile", "handoff_skill": "cisco-security-cloud-setup"},
-      "cisco-ise": {"status": "handoff_profile", "handoff_skill": "cisco-catalyst-ta-setup"},
-      "cisco-meraki": {"status": "handoff_profile", "handoff_skill": "cisco-meraki-ta-setup"},
-      "cisco-ucs": {"status": "handoff_profile", "handoff_skill": "cisco-ucs-ta-setup"},
-      "cisco-wsa": {"status": "handoff_profile", "handoff_skill": "cisco-secure-email-web-gateway-setup"},
-      "crowdstrike-fdr": {"status": "handoff_profile", "handoff_skill": "splunk-cloud-data-manager-setup"},
-      "google-cloud-platform": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install"},
-      "google-workspace": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "google_workspace"},
-      "linux": {"status": "first_class_profile", "profile": "linux-collectd-auditd"},
-      "microsoft-cloud-services": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "microsoft_entra_id"},
-      "microsoft-office-365": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "microsoft_o365_management_activity"},
-      "microsoft-windows": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "windows_security"},
-      "okta-identity-cloud": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install", "readiness_source_pack": "okta_identity_cloud"},
-      "servicenow": {"status": "install_only_handoff", "handoff_skill": "splunk-app-install"},
-      "unix-and-linux": {"status": "first_class_profile", "profile": "unix-linux-os-scripts"}
+      "amazon-kinesis-firehose": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-amazon-kinesis-firehose-setup",
+        "readiness_source_pack": "amazon_kinesis_firehose",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-amazon-kinesis-firehose-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "amazon_kinesis_firehose"
+          ]
+        }
+      },
+      "amazon-web-services": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-aws-ta-setup",
+        "readiness_source_pack": "aws_cloudtrail"
+      },
+      "appdynamics": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-appdynamics-setup",
+        "readiness_source_pack": "appdynamics",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "appdynamics"
+          ]
+        }
+      },
+      "asset-and-risk-intelligence": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-asset-risk-intelligence-setup"
+      },
+      "cisco-asa": {
+        "status": "handoff_profile",
+        "handoff_skill": "cisco-asa-ta-setup",
+        "readiness_source_pack": "cisco_asa",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/cisco-asa-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "cisco_asa"
+          ]
+        }
+      },
+      "cisco-esa": {
+        "status": "handoff_profile",
+        "handoff_skill": "cisco-secure-email-web-gateway-setup",
+        "readiness_source_pack": "cisco_email_web",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "cisco_email_web"
+          ]
+        }
+      },
+      "cisco-firesight": {
+        "status": "handoff_profile",
+        "handoff_skill": "cisco-security-cloud-setup"
+      },
+      "cisco-ise": {
+        "status": "handoff_profile",
+        "handoff_skill": "cisco-catalyst-ta-setup",
+        "readiness_source_pack": "cisco_ise",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "cisco_ise"
+          ]
+        }
+      },
+      "cisco-meraki": {
+        "status": "handoff_profile",
+        "handoff_skill": "cisco-meraki-ta-setup",
+        "readiness_source_pack": "cisco_meraki",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "cisco_meraki"
+          ]
+        }
+      },
+      "cisco-ucs": {
+        "status": "handoff_profile",
+        "handoff_skill": "cisco-ucs-ta-setup",
+        "readiness_source_pack": "cisco_ucs",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "cisco_ucs"
+          ]
+        }
+      },
+      "cisco-wsa": {
+        "status": "handoff_profile",
+        "handoff_skill": "cisco-secure-email-web-gateway-setup",
+        "readiness_source_pack": "cisco_email_web",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "cisco_email_web"
+          ]
+        }
+      },
+      "crowdstrike-fdr": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-cloud-data-manager-setup",
+        "readiness_source_pack": "crowdstrike_falcon",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "crowdstrike_falcon"
+          ]
+        }
+      },
+      "google-cloud-platform": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-gcp-ta-setup",
+        "readiness_source_pack": "google_gcp",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "google_gcp"
+          ]
+        }
+      },
+      "google-workspace": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-google-workspace-ta-setup",
+        "readiness_source_pack": "google_workspace"
+      },
+      "linux": {
+        "status": "first_class_profile",
+        "profile": "linux-collectd-auditd"
+      },
+      "microsoft-cloud-services": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-microsoft-cloud-setup",
+        "readiness_source_pack": "microsoft_entra_id"
+      },
+      "microsoft-office-365": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-microsoft-cloud-setup",
+        "readiness_source_pack": "microsoft_o365_management_activity"
+      },
+      "microsoft-windows": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-windows-ta-setup",
+        "readiness_source_pack": "windows_security"
+      },
+      "okta-identity-cloud": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-okta-ta-setup",
+        "readiness_source_pack": "okta_identity_cloud"
+      },
+      "servicenow": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-servicenow-ta-setup",
+        "readiness_source_pack": "servicenow",
+        "commands": {
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "servicenow"
+          ]
+        }
+      },
+      "unix-and-linux": {
+        "status": "first_class_profile",
+        "profile": "unix-linux-os-scripts"
+      },
+      "vcenter-logs": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-vmware-ta-setup",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-vmware-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "vmware"
+          ]
+        },
+        "readiness_source_pack": "vmware"
+      },
+      "vmware": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-vmware-ta-setup",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-vmware-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "vmware"
+          ]
+        },
+        "readiness_source_pack": "vmware"
+      },
+      "vmware-extractions": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-vmware-ta-setup",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-vmware-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "vmware"
+          ]
+        },
+        "readiness_source_pack": "vmware"
+      },
+      "vmware-esxi-logs": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-vmware-ta-setup",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-vmware-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "vmware_esxi"
+          ]
+        },
+        "readiness_source_pack": "vmware_esxi"
+      },
+      "vmware-indexes": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-vmware-ta-setup",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-vmware-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "vmware"
+          ]
+        },
+        "readiness_source_pack": "vmware"
+      },
+      "vmware-metrics": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-vmware-ta-setup",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-vmware-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "vmware_metrics"
+          ]
+        },
+        "readiness_source_pack": "vmware_metrics"
+      },
+      "vmware-metrics-indexes": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-vmware-ta-setup",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-vmware-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "vmware_metrics"
+          ]
+        },
+        "readiness_source_pack": "vmware_metrics"
+      },
+      "microsoft-security": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-microsoft-security-ta-setup",
+        "readiness_source_pack": "microsoft_security"
+      },
+      "sysmon": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-sysmon-ta-setup",
+        "readiness_source_pack": "sysmon"
+      },
+      "github": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-github-ta-setup",
+        "readiness_source_pack": "github_audit"
+      },
+      "salesforce": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-salesforce-ta-setup",
+        "readiness_source_pack": "salesforce",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-salesforce-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "salesforce"
+          ]
+        }
+      },
+      "box": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-box-ta-setup",
+        "readiness_source_pack": "box",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-box-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "box"
+          ]
+        }
+      },
+      "cyberark": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-cyberark-ta-setup",
+        "readiness_source_pack": "cyberark_epv_pta",
+        "product_selector": "epv_pta",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-cyberark-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "cyberark_epv_pta"
+          ]
+        }
+      },
+      "cyberark-epm": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-cyberark-ta-setup",
+        "readiness_source_pack": "cyberark_epm",
+        "product_selector": "epm",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-cyberark-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "cyberark_epm"
+          ]
+        }
+      },
+      "rsa-securid": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-rsa-securid-ta-setup",
+        "readiness_source_pack": "rsa_securid_am",
+        "product_selector": "am",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-rsa-securid-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "rsa_securid_am"
+          ]
+        }
+      },
+      "rsa-securid-cas": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-rsa-securid-ta-setup",
+        "readiness_source_pack": "rsa_securid_cas",
+        "product_selector": "cas",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-rsa-securid-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "rsa_securid_cas"
+          ]
+        }
+      },
+      "apache-web-server": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "apache_web",
+        "product_selector": "apache",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "apache_web"
+          ]
+        }
+      },
+      "nginx": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "nginx_web",
+        "product_selector": "nginx",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "nginx_web"
+          ]
+        }
+      },
+      "microsoft-iis": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "microsoft_iis",
+        "product_selector": "iis",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "microsoft_iis"
+          ]
+        }
+      },
+      "tomcat": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "tomcat_web",
+        "product_selector": "tomcat",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "tomcat_web"
+          ]
+        }
+      },
+      "haproxy": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "haproxy",
+        "product_selector": "haproxy",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "haproxy"
+          ]
+        }
+      },
+      "squid-proxy": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "squid_proxy",
+        "product_selector": "squid",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "squid_proxy"
+          ]
+        }
+      },
+      "symantec-blue-coat-proxysg": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "bluecoat_proxy",
+        "product_selector": "bluecoat",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "bluecoat_proxy"
+          ]
+        }
+      },
+      "forcepoint-web-security": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "forcepoint_web",
+        "product_selector": "forcepoint",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "forcepoint_web"
+          ]
+        }
+      },
+      "check-point-log-exporter": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "checkpoint_log_exporter",
+        "product_selector": "checkpoint",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "checkpoint_log_exporter"
+          ]
+        }
+      },
+      "f5-big-ip": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "f5_bigip",
+        "product_selector": "f5",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "f5_bigip"
+          ]
+        }
+      },
+      "citrix-netscaler": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "citrix_netscaler",
+        "product_selector": "citrix",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "citrix_netscaler"
+          ]
+        }
+      },
+      "infoblox": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-syslog-web-proxy-ta-setup",
+        "readiness_source_pack": "infoblox",
+        "product_selector": "infoblox",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "infoblox"
+          ]
+        }
+      },
+      "microsoft-sql-server": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-database-ta-setup",
+        "readiness_source_pack": "mssql_database",
+        "product_selector": "mssql",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-database-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "mssql_database"
+          ]
+        }
+      },
+      "mysql": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-database-ta-setup",
+        "readiness_source_pack": "mysql_database",
+        "product_selector": "mysql",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-database-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "mysql_database"
+          ]
+        }
+      },
+      "oracle-database": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-database-ta-setup",
+        "readiness_source_pack": "oracle_database",
+        "product_selector": "oracle",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-database-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "oracle_database"
+          ]
+        }
+      },
+      "microsoft-exchange": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-microsoft-exchange-ta-setup",
+        "readiness_source_pack": "microsoft_exchange",
+        "product_selector": "exchange",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-microsoft-exchange-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "microsoft_exchange"
+          ]
+        }
+      },
+      "microsoft-hyper-v": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-windows-ta-setup",
+        "readiness_source_pack": "windows_security",
+        "product_selector": "hyper_v",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-windows-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "windows_security"
+          ]
+        },
+        "notes": [
+          "No extracted standalone supported Hyper-V package was verified; route through Windows TA Perfmon/readiness until package extraction proves otherwise."
+        ]
+      },
+      "microsoft-scom": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-microsoft-scom-ta-setup",
+        "readiness_source_pack": "microsoft_scom",
+        "product_selector": "scom",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-microsoft-scom-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "microsoft_scom"
+          ]
+        }
+      },
+      "netapp-data-ontap": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-netapp-ontap-ta-setup",
+        "readiness_source_pack": "netapp_ontap",
+        "product_selector": "ontap",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-netapp-ontap-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "netapp_ontap"
+          ]
+        }
+      },
+      "netapp-data-ontap-extractions": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-netapp-ontap-ta-setup",
+        "readiness_source_pack": "netapp_ontap",
+        "product_selector": "extractions",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-netapp-ontap-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "netapp_ontap"
+          ]
+        }
+      },
+      "netapp-data-ontap-indexes": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-netapp-ontap-ta-setup",
+        "readiness_source_pack": "netapp_ontap",
+        "product_selector": "indexes",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-netapp-ontap-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "netapp_ontap"
+          ]
+        }
+      },
+      "carbon-black": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-security-appliance-ta-setup",
+        "readiness_source_pack": "carbon_black",
+        "product_selector": "carbon_black",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-security-appliance-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "carbon_black"
+          ]
+        }
+      },
+      "symantec-endpoint-protection": {
+        "status": "handoff_profile",
+        "handoff_skill": "splunk-security-appliance-ta-setup",
+        "readiness_source_pack": "symantec_endpoint_protection",
+        "product_selector": "symantec_endpoint_protection",
+        "commands": {
+          "install_help": [
+            "bash",
+            "skills/splunk-security-appliance-ta-setup/scripts/setup.sh",
+            "--help"
+          ],
+          "readiness_collect": [
+            "bash",
+            "skills/splunk-data-source-readiness-doctor/scripts/setup.sh",
+            "--phase",
+            "collect",
+            "--source-pack",
+            "symantec_endpoint_protection"
+          ]
+        }
+      }
     }
   },
   "domains": [

@@ -17,6 +17,7 @@ TCP_PORT="2104"
 JSON_OUTPUT=false
 STRICT=false
 DRY_RUN=false
+EXECUTE=false
 
 usage() {
     local exit_code="${1:-0}"
@@ -37,6 +38,7 @@ Options:
   --json
   --strict
   --dry-run
+  --execute     Execute the routed install/readiness command for the selected phase
   --help
 
 Examples:
@@ -44,6 +46,8 @@ Examples:
   $(basename "$0") --phase coverage --json
   $(basename "$0") --profile Splunk_TA_nix --phase resolve --json
   $(basename "$0") --profile linux-collectd --phase render --event-index os --metrics-index os_metrics
+  $(basename "$0") --profile Cisco ASA --execute --dry-run
+  $(basename "$0") --profile Cisco ASA --execute
 
 EOF
     exit "${exit_code}"
@@ -62,6 +66,7 @@ while [[ $# -gt 0 ]]; do
         --json) JSON_OUTPUT=true; shift ;;
         --strict) STRICT=true; shift ;;
         --dry-run) DRY_RUN=true; shift ;;
+        --execute) EXECUTE=true; shift ;;
         --help|-h) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -78,7 +83,17 @@ validate_choice() {
 }
 
 main() {
+    if [[ "${EXECUTE}" == "true" && "${PHASE}" == "render" ]]; then
+        PHASE="install-command"
+    fi
     validate_choice "${PHASE}" list coverage resolve render install-command readiness-command
+    if [[ "${EXECUTE}" == "true" ]]; then
+        validate_choice "${PHASE}" install-command readiness-command
+        if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" ]]; then
+            log "ERROR: --json with --execute is supported only with --dry-run."
+            exit 1
+        fi
+    fi
     local args=(
         --phase "${PHASE}"
         --profile "${PROFILE}"
@@ -92,6 +107,48 @@ main() {
     [[ "${JSON_OUTPUT}" == "true" ]] && args+=(--json)
     [[ "${STRICT}" == "true" ]] && args+=(--strict)
     [[ "${DRY_RUN}" == "true" ]] && args+=(--dry-run)
+
+    if [[ "${EXECUTE}" == "true" ]]; then
+        local payload
+        local command=()
+        payload="$(python3 "${RENDERER}" "${args[@]}" --json)"
+        mapfile -d '' -t command < <(
+            PAYLOAD="${payload}" python3 - <<'PY'
+import json
+import os
+import sys
+
+payload = json.loads(os.environ["PAYLOAD"])
+command = payload.get("command") or []
+if not isinstance(command, list) or not command:
+    raise SystemExit("missing command in router payload")
+for item in command:
+    sys.stdout.buffer.write(str(item).encode("utf-8") + b"\0")
+PY
+        )
+        if [[ "${DRY_RUN}" == "true" ]]; then
+            if [[ "${JSON_OUTPUT}" == "true" ]]; then
+                PAYLOAD="${payload}" python3 - <<'PY'
+import json
+import os
+import sys
+
+payload = json.loads(os.environ["PAYLOAD"])
+payload["dry_run"] = True
+payload["would_execute"] = payload.get("command", [])
+json.dump(payload, sys.stdout, indent=2, sort_keys=True)
+sys.stdout.write("\n")
+PY
+            else
+                log "DRY RUN: routed command"
+                printf '  '
+                printf '%q ' "${command[@]}"
+                printf '\n'
+            fi
+            exit 0
+        fi
+        exec "${command[@]}"
+    fi
 
     python3 "${RENDERER}" "${args[@]}"
 }

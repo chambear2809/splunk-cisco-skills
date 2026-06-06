@@ -1,0 +1,13 @@
+# Splunk Cloud DDAA Archive Worksheet
+#
+# Non-secret values only. ACS auth uses the project credentials file and stack.
+
+phase: render
+
+index: netfw
+index_type: event           # event | metric
+searchable_days: 90         # DDAS searchable retention
+archival_retention_days: 365  # total retention incl. searchable; > searchable; <= 3650
+
+# Apply requires --accept-archive-retention
+# Restore and disable are Splunk Web operations (see rendered runbooks).

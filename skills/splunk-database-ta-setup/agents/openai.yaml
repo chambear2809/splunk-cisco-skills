@@ -1,0 +1,8 @@
+interface:
+  display_name: "Database Supported Add-ons Setup"
+  short_description: "Render SQL Server, MySQL, and Oracle package-verified TA plans"
+  default_prompt: >-
+    Use $splunk-database-ta-setup to render, install, and validate the
+    package-verified Microsoft SQL Server, MySQL, and Oracle Database supported
+    add-ons; emit DB Connect handoffs, SQL Server host input overlays, source
+    type validation, and readiness-doctor collection commands.

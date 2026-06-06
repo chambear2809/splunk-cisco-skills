@@ -1,0 +1,9 @@
+name: splunk-rsa-securid-ta-setup
+description: Render RSA SecurID CAS API collection and Authentication Manager syslog handoffs.
+safe_first:
+  - bash skills/splunk-rsa-securid-ta-setup/scripts/setup.sh --help
+  - bash skills/splunk-rsa-securid-ta-setup/scripts/setup.sh --render --dry-run --json
+validation:
+  - bash skills/splunk-rsa-securid-ta-setup/scripts/validate.sh --help
+notes:
+  - RSA AM is syslog/parser based. RSA CAS uses the Cloud Administration API input.

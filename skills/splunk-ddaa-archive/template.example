@@ -1,0 +1,19 @@
+# Splunk Cloud DDAA Archive Worksheet
+#
+# Non-secret values only. Do not store the ACS token here.
+
+phase: render                # render | apply | status | restore | audit
+operation: enable            # enable | update | create | plan
+
+stack: my-stack
+index: cisco_asa
+datatype: event              # event | metric
+
+searchable_days: 90          # DDAS searchable retention
+archival_retention_days: 365 # total retention (must be > searchable_days, <= 3650)
+max_data_size_mb:            # optional
+
+acs_base: https://admin.splunk.com
+# ACS token in a local file, never the token value:
+# bash skills/shared/scripts/write_secret_file.sh /tmp/acs_token
+token_file: /tmp/acs_token

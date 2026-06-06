@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Dashboard Studio Setup"
+  short_description: "Build and apply Dashboard Studio views via data/ui/views"
+  default_prompt: >-
+    Use $splunk-dashboard-studio-setup to render a Splunk Platform Dashboard
+    Studio version 2 JSON definition and data/ui/views XML wrapper, then create
+    or update the dashboard via REST with ACL governance.

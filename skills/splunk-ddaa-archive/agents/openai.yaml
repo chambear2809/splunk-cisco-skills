@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Cloud DDAA Archive Lifecycle"
+  short_description: "Manage Dynamic Data Active Archive retention and restore"
+  default_prompt: >-
+    Use $splunk-ddaa-archive to render and validate Splunk Cloud DDAA archive
+    retention (ACS searchableDays + splunkArchivalRetentionDays), enable/update
+    payloads, archive/restore storage audits, and the UI restore handoff.

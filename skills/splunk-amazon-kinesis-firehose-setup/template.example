@@ -1,0 +1,8 @@
+# Amazon Kinesis Firehose render template
+index: aws
+hec_token_name: aws_firehose_hec
+source_profile: cloudtrail
+s3_backup_bucket: s3://example-firehose-backup
+buffer_size_mb: 5
+buffer_interval_sec: 60
+use_ack: true

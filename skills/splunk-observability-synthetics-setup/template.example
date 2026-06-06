@@ -1,0 +1,10 @@
+api_version: splunk-observability-synthetics-setup/v1
+realm: us1
+tests:
+  - name: Checkout browser journey
+    kind: browser
+    url: https://shop.example.com/checkout
+    frequency: 5
+    locations:
+      - aws-us-east-1
+    run_now: false

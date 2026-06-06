@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Cloud DDAA Archive Setup"
+  short_description: "Set Dynamic Data Active Archive retention per index"
+  default_prompt: >-
+    Use $splunk-ddaa-archive-setup to render and apply Splunk Cloud Dynamic Data
+    Active Archive retention (splunkArchivalRetentionDays) via ACS, with restore
+    and disable runbooks for the Splunk Web-only operations.

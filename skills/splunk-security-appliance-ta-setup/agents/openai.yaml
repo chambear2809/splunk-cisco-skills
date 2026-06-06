@@ -1,0 +1,8 @@
+interface:
+  display_name: "Security Appliance Supported Add-ons Setup"
+  short_description: "Render Carbon Black and Symantec EP package-verified transport plans"
+  default_prompt: >-
+    Use $splunk-security-appliance-ta-setup to render, install, and validate
+    the package-verified Carbon Black and Symantec Endpoint Protection
+    supported add-ons, including exact source types, file/syslog transport
+    ownership, and readiness-doctor handoffs.

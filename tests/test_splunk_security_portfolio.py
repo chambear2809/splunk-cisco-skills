@@ -68,13 +68,12 @@ def test_security_portfolio_router_classifies_products_and_offerings() -> None:
     entries = {entry["key"]: entry for entry in payload["entries"]}
     assert len(entries) == 27
     assert Counter(entry["status"] for entry in payload["entries"]) == {
-        "first_class": 7,
-        "existing_skill": 2,
-        "install_only": 5,
+        "first_class": 12,
+        "existing_skill": 3,
         "partial": 3,
         "bundled_es": 9,
-        "manual_gap": 1,
     }
+    assert not any(entry["status"] in {"install_only", "manual_gap"} for entry in payload["entries"])
 
     expected_products = {
         "enterprise-security": "existing_skill",
@@ -99,10 +98,12 @@ def test_security_portfolio_router_classifies_products_and_offerings() -> None:
         "splunk-cloud-connect": "bundled_es",
         "federated-analytics": "existing_skill",
         "dlx": "bundled_es",
-        "security-content-update": "install_only",
-        "pci-compliance": "install_only",
-        "infosec": "install_only",
-        "fraud-analytics": "manual_gap",
+        "security-content-update": "first_class",
+        "pci-compliance": "first_class",
+        "infosec": "first_class",
+        "fraud-analytics": "first_class",
+        "lookup-file-editing": "first_class",
+        "cim": "existing_skill",
         "automation-broker": "partial",
     }
     for key, status in associated.items():
@@ -192,11 +193,44 @@ def test_security_portfolio_router_preserves_specific_handoffs() -> None:
     assert escu["entry"]["key"] == "security-content-update"
     assert escu["route_command"] == [
         "bash",
-        "skills/splunk-enterprise-security-config/scripts/setup.sh",
-        "--spec",
-        "skills/splunk-enterprise-security-config/templates/es-config.example.yaml",
-        "--mode",
-        "preview",
+        "skills/splunk-security-content-update-setup/scripts/setup.sh",
+        "--render",
+    ]
+
+    for query, expected_skill in {
+        "fraud analytics": "splunk-fraud-analytics-setup",
+        "pci compliance": "splunk-pci-compliance-setup",
+        "infosec": "splunk-infosec-app-setup",
+        "lookup editor": "splunk-lookup-file-editing-setup",
+    }.items():
+        payload = load_json_from_bash(
+            "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+            "--product",
+            query,
+            "--json",
+        )
+        assert payload["entry"]["status"] == "first_class"
+        assert payload["route_command"] == [
+            "bash",
+            f"skills/{expected_skill}/scripts/setup.sh",
+            "--render",
+        ]
+
+    cim = load_json_from_bash(
+        "skills/splunk-security-portfolio-setup/scripts/setup.sh",
+        "--product",
+        "cim",
+        "--json",
+    )
+    assert cim["entry"]["status"] == "existing_skill"
+    assert cim["route_command"] == [
+        "bash",
+        "skills/splunk-cim-data-model-setup/scripts/setup.sh",
+        "--phase",
+        "render",
+        "--datamodel",
+        "Authentication",
+        "--dry-run",
     ]
 
 
@@ -229,7 +263,13 @@ def test_security_portfolio_registry_entries_are_complete() -> None:
         "4147": ("splunk-uba-setup", "Splunk-UBA-SA-Kafka", "9.2"),
         "6361": ("splunk-soar-setup", "splunk_app_soar", "10.0"),
         "3411": ("splunk-soar-setup", "phantom", "10.2"),
-        "3449": ("splunk-enterprise-security-config", "DA-ESS-ContentUpdate", "8.0"),
+        "3449": ("splunk-security-content-update-setup", "DA-ESS-ContentUpdate", "8.0"),
+        "1620": ("cisco-asa-ta-setup", "Splunk_TA_cisco-asa", "9.2"),
+        "1621": ("splunk-cim-data-model-setup", "Splunk_SA_CIM", "9.2"),
+        "1143": ("splunk-pci-compliance-setup", "SplunkPCIComplianceSuite", "9.3"),
+        "2897": ("splunk-pci-compliance-setup", "SplunkPCIComplianceSuite_ES", "9.3"),
+        "4240": ("splunk-infosec-app-setup", "infosec_app_for_splunk", "9.2"),
+        "1724": ("splunk-lookup-file-editing-setup", "lookup_editor", "9.2"),
     }
     for app_id, (skill, app_name, min_splunk_version) in expected_apps.items():
         app = apps_by_id[app_id]
@@ -253,6 +293,13 @@ def test_security_portfolio_registry_entries_are_complete() -> None:
         "splunk-uba-setup",
         "splunk-attack-analyzer-setup",
         "splunk-asset-risk-intelligence-setup",
+        "splunk-security-content-update-setup",
+        "splunk-fraud-analytics-setup",
+        "splunk-pci-compliance-setup",
+        "splunk-infosec-app-setup",
+        "splunk-lookup-file-editing-setup",
+        "cisco-asa-ta-setup",
+        "splunk-amazon-kinesis-firehose-setup",
     }:
         assert skill in topologies
 
@@ -266,7 +313,13 @@ def test_security_portfolio_registry_entries_are_complete() -> None:
         assert apps_by_id[app_id]["role_support"]["search-tier"] == "none"
         assert apps_by_id[app_id]["capabilities"]["uf_safe"] is True
     assert "`splunk-security-portfolio-setup`" in cloud_labels
-    assert "`splunk-enterprise-security-config` content update" in cloud_labels
+    assert "`splunk-security-content-update-setup`" in cloud_labels
+    assert "`splunk-fraud-analytics-setup`" in cloud_labels
+    assert "`splunk-pci-compliance-setup`" in cloud_labels
+    assert "`splunk-infosec-app-setup`" in cloud_labels
+    assert "`splunk-lookup-file-editing-setup`" in cloud_labels
+    assert "`cisco-asa-ta-setup`" in cloud_labels
+    assert "`splunk-amazon-kinesis-firehose-setup`" in cloud_labels
     assert "`splunk-asset-risk-intelligence-setup` Windows TA handoff" in cloud_labels
     assert "`splunk-asset-risk-intelligence-setup` Linux TA handoff" in cloud_labels
     assert "`splunk-asset-risk-intelligence-setup` macOS TA handoff" in cloud_labels
@@ -535,6 +588,11 @@ def test_new_security_validate_scripts_support_help_without_auth() -> None:
         "skills/splunk-asset-risk-intelligence-setup/scripts/validate.sh",
         "skills/splunk-soar-setup/scripts/validate.sh",
         "skills/splunk-uba-setup/scripts/validate.sh",
+        "skills/splunk-security-content-update-setup/scripts/validate.sh",
+        "skills/splunk-fraud-analytics-setup/scripts/validate.sh",
+        "skills/splunk-pci-compliance-setup/scripts/validate.sh",
+        "skills/splunk-infosec-app-setup/scripts/validate.sh",
+        "skills/splunk-lookup-file-editing-setup/scripts/validate.sh",
     ]
     for script in validate_scripts:
         result = run_bash(script, "--help")

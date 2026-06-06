@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk Add-on for Google Workspace Setup"
+  short_description: "Render Google Workspace inputs, service-account runbook, settings, and validation"
+  default_prompt: >-
+    Use $splunk-google-workspace-ta-setup to render Splunk_TA_Google_Workspace
+    activity, Gmail, identity, Alert Center, and usage inputs; emit the
+    service-account certificate runbook; install the add-on; create the
+    google_workspace index; and validate ingestion.

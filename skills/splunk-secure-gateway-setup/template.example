@@ -1,0 +1,19 @@
+# Splunk Secure Gateway Worksheet
+#
+# Non-secret values only. App enable/disable uses the project credentials file.
+
+phase: render
+app_name: splunk_secure_gateway
+action: configure          # configure | enable | disable
+
+deployment_name: prod-sh
+visible_apps:              # e.g. search,cisco-catalyst-app
+
+# Private Spacebridge (optional)
+private_spacebridge: false
+custom_endpoint_id:
+custom_endpoint_hostname:
+custom_endpoint_grpc_hostname:
+client_cert_required: true
+
+# Enabling the app requires --accept-spacebridge-egress (outbound 443 to Spacebridge).

@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk PCI Compliance Setup"
+  short_description: "Render PCI app readiness, CDE macro intake, and validation"
+  default_prompt: >-
+    Use $splunk-pci-compliance-setup to render Splunk App for PCI Compliance
+    installer selection, cardholder data environment index/macro intake,
+    CIM/data-model prerequisites, role/report readiness, and dependency
+    handoffs.

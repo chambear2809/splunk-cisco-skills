@@ -1,0 +1,9 @@
+name: splunk-syslog-web-proxy-ta-setup
+description: Render web-server monitor profiles and syslog/parser handoffs for supported add-ons.
+safe_first:
+  - bash skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh --help
+  - bash skills/splunk-syslog-web-proxy-ta-setup/scripts/setup.sh --render --dry-run --json
+validation:
+  - bash skills/splunk-syslog-web-proxy-ta-setup/scripts/validate.sh --help
+notes:
+  - Use exact package source types. Generic syslog, httpevent, _json, and access_combined are not sufficient readiness matches.

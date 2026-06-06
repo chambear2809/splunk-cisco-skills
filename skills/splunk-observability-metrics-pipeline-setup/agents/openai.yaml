@@ -1,0 +1,3 @@
+display_name: "Splunk Metrics Pipeline Setup"
+short_description: "Render Observability MPM and metric-cardinality workflow handoffs"
+default_prompt: "Use $splunk-observability-metrics-pipeline-setup to render Metrics Pipeline Management usage, cardinality, route/drop/archive/aggregate, and deep workflow handoff assets."

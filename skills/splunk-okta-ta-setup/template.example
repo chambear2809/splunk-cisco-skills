@@ -1,0 +1,21 @@
+# Splunk Add-on for Okta Identity Cloud intake template.
+# Copy to template.local and fill non-secret values only. No tokens/secrets here.
+
+[index]
+index = okta
+
+[account]
+# global_account stanza name configured in the add-on UI.
+account_name = okta_prod
+domain = yourorg.okta.com
+# auth_type: OAuth2 (recommended) or Basic
+auth_type = OAuth2
+# OAuth2: non-secret client id; write the client secret to a file for the UI.
+client_id = 0oaXXXXXXXXXXXXXXXXX
+client_secret_file = /tmp/okta_client_secret
+# Basic mode alternative: API token in a file for the UI.
+api_token_file = /tmp/okta_api_token
+
+[inputs]
+# Comma-separated metrics: log,user,group,app,groupUser,appUser
+metrics = log,user,group,app

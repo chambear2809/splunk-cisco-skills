@@ -1,0 +1,4 @@
+interface:
+  display_name: "Splunk Platform Sizing"
+  short_description: "Size Splunk: indexers, search heads, storage, and topology"
+  default_prompt: "Use $splunk-platform-sizing to size a Splunk deployment from my use case (daily ingest, retention, search load, premium apps, HA) across All-In-One, distributed clusters, Splunk on Kubernetes, and Splunk Cloud, and render a sizing report with hand-offs."

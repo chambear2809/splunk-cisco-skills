@@ -1,0 +1,9 @@
+# Splunk Google Workspace TA render template
+index: google_workspace
+account_name: gws_prod
+inputs: activity_report,gws_gmail_logs,gws_gmail_logs_migrated,gws_user_identity,gws_alert_center,gws_usage_report
+applications: admin,login,token,drive,calendar,groups_enterprise
+gcp_project: my-gcp-project
+customer_id: C01234567
+dataset_name: gmail_logs_dataset
+dataset_location: US

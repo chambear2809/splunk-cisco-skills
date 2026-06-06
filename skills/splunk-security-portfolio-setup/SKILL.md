@@ -43,6 +43,24 @@ bash skills/splunk-security-portfolio-setup/scripts/setup.sh \
   --dry-run
 ```
 
+Execute the resolved setup/install workflow:
+
+```bash
+bash skills/splunk-security-portfolio-setup/scripts/setup.sh \
+  --product "Splunk Attack Analyzer" \
+  --execute
+```
+
+Preview the exact routed action without changing Splunk:
+
+```bash
+bash skills/splunk-security-portfolio-setup/scripts/setup.sh \
+  --product "Splunk Attack Analyzer" \
+  --execute \
+  --dry-run \
+  --json
+```
+
 Emit machine-readable coverage:
 
 ```bash

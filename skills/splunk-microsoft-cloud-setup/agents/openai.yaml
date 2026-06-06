@@ -1,0 +1,8 @@
+interface:
+  display_name: "Microsoft Cloud Add-ons Setup"
+  short_description: "Render Office 365, Entra ID, and Azure audit inputs and account runbook"
+  default_prompt: >-
+    Use $splunk-microsoft-cloud-setup to render Office 365 Management Activity,
+    Microsoft Graph Entra ID, and Azure audit inputs for splunk_ta_o365 and
+    Splunk_TA_microsoft-cloudservices, emit an Entra app-registration runbook,
+    install the add-ons, create the o365 and azure indexes, and validate ingestion.

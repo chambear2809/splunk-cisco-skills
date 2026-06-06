@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk Add-on for AWS Setup"
+  short_description: "Render CloudTrail/Config/GuardDuty inputs, account runbook, and index"
+  default_prompt: >-
+    Use $splunk-aws-ta-setup to render Splunk_TA_aws inputs for CloudTrail,
+    AWS Config, and GuardDuty via the SQS-based S3 and aws_config inputs, emit
+    an IAM-role or access-key account runbook, install the add-on, create the
+    aws index, and validate ingestion. Complements splunk-cloud-data-manager-setup.

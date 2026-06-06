@@ -71,7 +71,9 @@ class DeploymentDocRegressionTests(unittest.TestCase):
                 else:
                     self.assertEqual(row["kind"], "workflow")
                     self.assertIn(row["skill"], skills)
-                    self.assertEqual(row["splunkbase_id"], "N/A")
+                    self.assertTrue(
+                        row["splunkbase_id"] in {"N/A", "Multiple"} or row["splunkbase_id"].isdigit()
+                    )
                     workflow_rows.append(row["skill"])
 
         self.assertIn("Splunk_TA_AppDynamics", app_rows)
