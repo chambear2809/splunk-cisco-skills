@@ -77,6 +77,7 @@ fi
 python3 - "${CATALOG_PATH}" "${PRODUCT_QUERY}" "${LIST_PRODUCTS}" "${DRY_RUN}" "${JSON_OUTPUT}" "${EXECUTE}" <<'PY'
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -136,6 +137,13 @@ def route_command(entry):
     return []
 
 
+def executable_route_command(entry):
+    command = list(entry.get("route_command", []))
+    if not command:
+        return []
+    return [arg for arg in command if arg != "--dry-run"]
+
+
 def setup_help(skill: str) -> str:
     setup = repo_root / "skills" / skill / "scripts" / "setup.sh"
     if not setup.is_file():
@@ -151,7 +159,14 @@ def setup_help(skill: str) -> str:
     return result.stdout
 
 
+def setup_supports_flag(help_text: str, flag: str) -> bool:
+    return re.search(rf"(^|[\s,|]){re.escape(flag)}($|[\s,|])", help_text) is not None
+
+
 def action_command(entry):
+    if "--dry-run" in entry.get("route_command", []):
+        return executable_route_command(entry)
+
     route = entry.get("route", [])
     if not route:
         return route_command(entry)
@@ -164,13 +179,13 @@ def action_command(entry):
     command = ["bash", f"skills/{skill}/scripts/setup.sh"]
     help_text = setup_help(skill)
     route_args = entry.get("route_args", [])
-    if "--all" in help_text:
+    if setup_supports_flag(help_text, "--all"):
         command.append("--all")
-    elif "--install" in help_text:
+    elif setup_supports_flag(help_text, "--install"):
         command.append("--install")
-    elif "--apply" in help_text:
+    elif setup_supports_flag(help_text, "--apply"):
         command.append("--apply")
-    elif "--phase" in help_text and "apply" in help_text:
+    elif setup_supports_flag(help_text, "--phase") and "apply" in help_text:
         command.extend(["--phase", "apply"])
     command.extend(route_args)
     return command

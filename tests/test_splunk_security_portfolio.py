@@ -232,6 +232,15 @@ def test_security_portfolio_router_preserves_specific_handoffs() -> None:
         "Authentication",
         "--dry-run",
     ]
+    assert cim["action_command"] == [
+        "bash",
+        "skills/splunk-cim-data-model-setup/scripts/setup.sh",
+        "--phase",
+        "render",
+        "--datamodel",
+        "Authentication",
+    ]
+    assert "--all" not in cim["action_command"]
 
 
 def test_security_portfolio_registry_entries_are_complete() -> None:
