@@ -1,0 +1,3 @@
+display_name: "Splunk VMware TA Setup"
+short_description: "Render and validate VMware Supported Add-on onboarding plans"
+default_prompt: "Use $splunk-vmware-ta-setup to render VMware add-on, vCenter, ESXi syslog, index, metrics, and ITSI readiness assets."

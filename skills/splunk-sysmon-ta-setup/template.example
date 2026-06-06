@@ -1,0 +1,4 @@
+# Splunk Sysmon TA render template
+index: sysmon
+mode: endpoint
+wec_host: WinEventLogForwardHost

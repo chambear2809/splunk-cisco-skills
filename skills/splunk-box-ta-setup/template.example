@@ -1,0 +1,12 @@
+# Splunk Box TA render template
+index: box
+account_name: box_prod
+inputs: historical,live,file
+rest_endpoint: api.box.com
+interface:
+  display_name: "Splunk Add-on for Box Setup"
+  short_description: "Render Box service inputs, OAuth account runbooks, and validation"
+  default_prompt: >-
+    Use $splunk-box-ta-setup to render Splunk_TA_box historical event, live
+    monitoring, and file-ingestion inputs; install the add-on; create the box
+    index; and validate package-backed box source types.

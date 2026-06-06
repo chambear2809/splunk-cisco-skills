@@ -1,0 +1,12 @@
+# CyberArk TA render template
+index: cyberark
+account_name: cyberark_epm_prod
+products: epm,epv_pta
+epm_inputs: application_events,inbox_events,admin_audit_logs,account_admin_audit_logs,policy_audit,policy_audit_events,threat_detection,policies_and_computers
+syslog_port: 514
+interface:
+  display_name: "CyberArk Splunk Add-on Setup"
+  short_description: "Render CyberArk EPM API inputs and archived EPV/PTA parser handoffs"
+  default_prompt: >-
+    Use $splunk-cyberark-ta-setup to render CyberArk EPM inputs, EPV/PTA CEF
+    syslog handoffs, install commands, indexes, and readiness validation.

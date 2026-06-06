@@ -1,0 +1,31 @@
+# Splunk KV Store Admin Worksheet
+#
+# Non-secret values only. The admin password comes from the project credentials
+# file; lifecycle operations run on the host after `splunk login`.
+
+phase: render
+operation: none
+
+splunk_home: /opt/splunk
+topology: standalone
+app_name: ZZZ_cisco_skills_kvstore
+
+# Backup / restore
+point_in_time: true
+backup_archive_name:
+
+# Migrate / upgrade
+storage_engine: wiredTiger
+migrate_dry_run: true
+target_kvstore_version:
+disable_startup_upgrade: false
+
+# Collection / lookup governance
+collection_name:
+collection_fields:
+collection_replicate: false
+lookup_definition_name:
+
+# Destructive-operation acceptance (set on the command line, not here):
+# --accept-kvstore-restore
+# --accept-kvstore-clean

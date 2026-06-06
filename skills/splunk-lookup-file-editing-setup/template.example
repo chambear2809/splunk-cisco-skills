@@ -1,0 +1,6 @@
+# Lookup File Editing render template
+platform: auto
+es_app: SplunkEnterpriseSecuritySuite
+lookup_owner_app: search
+lookup_scope: both
+shc_mode: true

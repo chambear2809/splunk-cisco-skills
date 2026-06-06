@@ -1,0 +1,21 @@
+# Splunk VMware setup worksheet.
+
+deployment:
+  search_tier_app: true
+  data_collection_owner: vmware-dcn-01
+  esxi_syslog_path: sc4s
+
+indexes:
+  event: vmware
+  esxi: vmware_esxi
+  metrics: vmware_metrics
+
+vcenter:
+  account_name: vc_prod
+  host: vcenter.example.com
+  credential_secret_file: /tmp/vcenter_password
+
+readiness:
+  validate_itsi: true
+  validate_dashboards: true
+  handoff_source_readiness_doctor: true

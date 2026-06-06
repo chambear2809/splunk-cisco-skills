@@ -1,0 +1,7 @@
+# Splunk Microsoft Security TA render template
+index: microsoft_security
+account_name: ms_security_prod
+tenant_id: 00000000-0000-0000-0000-000000000000
+feeds: incidents,atp_alerts,machines,simulations,event_hub,threat_intel
+event_hub_namespace: defender-events.servicebus.windows.net
+event_hub_name: defender-events

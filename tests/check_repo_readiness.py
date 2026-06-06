@@ -81,14 +81,22 @@ LOCAL_ARTIFACT_ROOTS = [
     "splunk-agent-management-rendered",
     "splunk-ai-ml-toolkit-rendered",
     "splunk-appdynamics-setup-rendered",
+    "cisco-asa-ta-rendered",
+    "splunk-cim-data-model-rendered",
     "splunk-cloud-acs-allowlist-rendered",
     "splunk-cloud-acs-admin-rendered",
     "splunk-cloud-data-manager-rendered",
     "splunk-connect-for-otlp-rendered",
+    "splunk-dashboard-studio-rendered",
     "splunk-data-source-readiness-doctor-rendered",
+    "splunk-database-ta-rendered",
     "splunk-db-connect-rendered",
+    "splunk-ddaa-archive-rendered",
     "splunk-deployment-server-rendered",
     "splunk-edge-processor-rendered",
+    "splunk-ingest-actions-rendered",
+    "splunk-knowledge-objects-rendered",
+    "splunk-kvstore-admin-rendered",
     "splunk-enterprise-k8s-rendered",
     "splunk-federated-search-rendered",
     "splunk-hec-service-rendered",
@@ -101,6 +109,7 @@ LOCAL_ARTIFACT_ROOTS = [
     "splunk-observability-aws-integration-rendered",
     "splunk-observability-aws-lambda-apm-rendered",
     "splunk-observability-azure-integration-rendered",
+    "splunk-observability-browser-rum-rendered",
     "splunk-observability-cisco-ai-pod-rendered",
     "splunk-observability-cisco-intersight-rendered",
     "splunk-observability-cisco-nexus-rendered",
@@ -112,19 +121,44 @@ LOCAL_ARTIFACT_ROOTS = [
     "splunk-observability-isovalent-rendered",
     "splunk-observability-k8s-auto-instrumentation-rendered",
     "splunk-observability-k8s-frontend-rum-rendered",
+    "splunk-observability-metrics-pipeline-rendered",
     "splunk-observability-native-rendered",
     "splunk-observability-nvidia-gpu-rendered",
     "splunk-observability-otel-rendered",
+    "splunk-observability-slo-rendered",
+    "splunk-observability-synthetics-rendered",
     "splunk-observability-thousandeyes-rendered",
     "splunk-oncall-rendered",
+    "splunk-amazon-kinesis-firehose-rendered",
     "splunk-platform-pki-rendered",
     "splunk-platform-restart-rendered",
+    "splunk-platform-sizing-rendered",
     "splunk-public-exposure-rendered",
     "splunk-search-head-cluster-rendered",
+    "splunk-secure-gateway-rendered",
     "splunk-smartstore-rendered",
     "splunk-soar-rendered",
+    "splunk-google-workspace-ta-rendered",
+    "splunk-microsoft-exchange-ta-rendered",
+    "splunk-microsoft-scom-ta-rendered",
+    "splunk-microsoft-security-ta-rendered",
+    "splunk-netapp-ontap-ta-rendered",
+    "splunk-sysmon-ta-rendered",
+    "splunk-github-ta-rendered",
+    "splunk-security-content-update-rendered",
+    "splunk-fraud-analytics-rendered",
+    "splunk-pci-compliance-rendered",
+    "splunk-infosec-app-rendered",
+    "splunk-lookup-file-editing-rendered",
+    "splunk-syslog-web-proxy-ta-rendered",
+    "splunk-rsa-securid-ta-rendered",
+    "splunk-cyberark-ta-rendered",
+    "splunk-box-ta-rendered",
+    "splunk-salesforce-ta-rendered",
+    "splunk-security-appliance-ta-rendered",
     "splunk-spl2-pipeline-kit-rendered",
     "splunk-universal-forwarder-rendered",
+    "splunk-vmware-ta-rendered",
     "splunk-workload-management-rendered",
     "ta-for-indexers-rendered",
 ]
@@ -243,6 +277,41 @@ def check_skill_requirements_catalog(errors: list[str]) -> None:
             "SKILL_REQUIREMENTS.md: unknown skill requirement entries: "
             + ", ".join(extra)
         )
+
+
+def check_skill_surface_completeness(errors: list[str]) -> None:
+    """Every skill should expose the common agent/operator surface.
+
+    Individual workflows can still delegate to specialized helper scripts, but
+    the stable entry points make discovery, docs, and automated validation
+    consistent across the catalog.
+    """
+    validation_name_re = re.compile(
+        r"(^validate(?:[_-].*)?\.(?:sh|py)$|.*validate.*\.(?:sh|py)$|^doctor\.sh$|^smoke_offline\.sh$)"
+    )
+    for skill in skill_names():
+        skill_dir = SKILLS_DIR / skill
+        agents_path = skill_dir / "agents" / "openai.yaml"
+        if not agents_path.is_file():
+            errors.append(f"skills/{skill}/agents/openai.yaml: missing agent metadata")
+
+        if not (skill_dir / "reference.md").is_file():
+            errors.append(f"skills/{skill}/reference.md: missing reference index")
+
+        scripts_dir = skill_dir / "scripts"
+        if not scripts_dir.is_dir():
+            errors.append(f"skills/{skill}/scripts: missing scripts directory")
+            continue
+
+        if not (scripts_dir / "setup.sh").is_file():
+            errors.append(f"skills/{skill}/scripts/setup.sh: missing setup entry point")
+
+        has_validation = any(
+            path.is_file() and validation_name_re.match(path.name)
+            for path in scripts_dir.iterdir()
+        )
+        if not has_validation:
+            errors.append(f"skills/{skill}/scripts: missing validation entry point")
 
 
 def check_cursor_and_claude_commands(errors: list[str]) -> None:
@@ -450,6 +519,7 @@ def main() -> int:
     check_required_files(errors)
     check_catalog_sync(errors)
     check_skill_requirements_catalog(errors)
+    check_skill_surface_completeness(errors)
     check_cursor_and_claude_commands(errors)
     check_no_tracked_local_artifacts(errors)
     check_gitignore_local_artifacts(errors)

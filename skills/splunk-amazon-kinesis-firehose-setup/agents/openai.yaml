@@ -1,0 +1,8 @@
+interface:
+  display_name: "Amazon Kinesis Firehose Setup"
+  short_description: "Render Firehose-to-HEC settings, IAM/S3 backup stubs, and validation"
+  default_prompt: >-
+    Use $splunk-amazon-kinesis-firehose-setup to render Amazon Kinesis Firehose
+    delivery assets for Splunk HEC, including source profile mapping, buffering,
+    retry, S3 backup, ACK guidance, CloudWatch metric checks, and readiness
+    evidence.

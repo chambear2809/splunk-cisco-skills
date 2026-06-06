@@ -1,0 +1,6 @@
+# PCI Compliance render template
+platform: auto
+es_app: SplunkEnterpriseSecuritySuite
+cde_indexes: cardholder,netfw,identity
+pci_macro: pci_indexes
+installer_profile: auto

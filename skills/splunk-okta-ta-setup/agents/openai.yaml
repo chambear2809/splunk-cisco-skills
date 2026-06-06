@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk Add-on for Okta Identity Cloud Setup"
+  short_description: "Render Okta System Log / Universal Directory inputs, account runbook, and index"
+  default_prompt: >-
+    Use $splunk-okta-ta-setup to render Splunk_TA_okta_identity_cloud inputs for
+    the log, user, group, and app metrics (OktaIM2:* source types), emit an
+    OAuth 2.0 or API-token account runbook, install the add-on, create the okta
+    index, and validate ingestion.

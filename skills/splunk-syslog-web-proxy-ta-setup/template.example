@@ -1,0 +1,14 @@
+# Syslog/Web/Proxy TA render template
+index: web
+syslog_index: netproxy
+windows_index: iis
+products: apache,nginx,iis,tomcat,haproxy,squid,bluecoat,forcepoint,checkpoint,f5,citrix,infoblox
+server_name: web01
+log_root: /var/log
+syslog_port: 514
+interface:
+  display_name: "Syslog/Web/Proxy Supported Add-on Setup"
+  short_description: "Render file monitor, Windows UF, and SC4S/syslog handoffs for parser profiles"
+  default_prompt: >-
+    Use $splunk-syslog-web-proxy-ta-setup to render package-backed source-type
+    profiles for web servers, proxies, ADCs, Check Point, F5, Citrix, and Infoblox.

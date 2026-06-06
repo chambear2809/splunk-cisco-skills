@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk CIM Data Model Setup"
+  short_description: "Accelerate, constrain, and map CIM data models"
+  default_prompt: >-
+    Use $splunk-cim-data-model-setup to render and apply CIM data model
+    acceleration, cim_<model>_indexes constraint macros, and eventtype/tag CIM
+    compliance mapping, then validate with tstats.

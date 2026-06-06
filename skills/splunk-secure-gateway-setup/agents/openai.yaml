@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Secure Gateway Setup"
+  short_description: "Enable Secure Gateway, Spacebridge egress, and mobile MDM"
+  default_prompt: >-
+    Use $splunk-secure-gateway-setup to enable or disable the Splunk Secure
+    Gateway app, validate Spacebridge outbound egress, and render deployment,
+    Private Spacebridge, MDM, and device registration runbooks.

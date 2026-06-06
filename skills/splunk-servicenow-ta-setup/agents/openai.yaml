@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk Add-on for ServiceNow Setup"
+  short_description: "Render snow:// table inputs, account runbook, and index"
+  default_prompt: >-
+    Use $splunk-servicenow-ta-setup to render Splunk_TA_snow per-table snow://
+    inputs (incident, change_request, problem, em_event, CMDB), emit a basic-auth
+    or OAuth account runbook, install the add-on, create the snow index, and
+    validate ingestion.

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Cisco ASA TA Setup"
+  short_description: "Render Cisco ASA/FTD syslog, TA placement, CIM readiness, and validation"
+  default_prompt: >-
+    Use $cisco-asa-ta-setup to render a Splunk_TA_cisco-asa onboarding plan for
+    Cisco ASA or FTD syslog, SC4S/syslog receiver ownership, cisco:asa source
+    typing, CIM readiness, and ES validation evidence.

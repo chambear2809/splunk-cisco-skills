@@ -1,0 +1,16 @@
+# Splunk Add-on for Google Cloud Platform intake template.
+# Copy to template.local and fill non-secret values only. No SA key here.
+
+[index]
+index = gcp
+
+[credential]
+# google_credentials stanza name configured in the add-on UI.
+credential_name = gcp_prod
+# Upload the service-account JSON key in the UI, or use ADC on GCE/GKE.
+service_account_key_file = /tmp/gcp_sa_key.json
+use_adc = false
+
+[pubsub_input]
+project = my-gcp-project
+subscription = splunk-export-sub

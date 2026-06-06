@@ -1,0 +1,76 @@
+# Splunk platform sizing intake template
+#
+# Copy this file to template.local and fill in non-secret planning values only.
+# No secrets are needed for sizing. All values below are configuration inputs.
+
+# -----------------------------------------------------------------------------
+# Use case
+# -----------------------------------------------------------------------------
+# Daily ingest volume in GB/day (required).
+# DAILY_INGEST_GB=500
+
+# Searchable retention in days (default: 90).
+# RETENTION_DAYS=90
+
+# Workload profile: core | es | itsi | es_itsi
+# (es and itsi lower the per-indexer ingest ceiling).
+# WORKLOAD_PROFILE=es
+
+# Search density: light | medium | dense
+# SEARCH_DENSITY=medium
+
+# Search load: set ONE of these (concurrent searches wins if both are set).
+# CONCURRENT_SEARCHES=24
+# CONCURRENT_USERS=50
+
+# -----------------------------------------------------------------------------
+# Availability and clustering
+# -----------------------------------------------------------------------------
+# Require high availability (indexer/search-head clustering).
+# HA=true
+
+# Override clustered replication/search factor (defaults: RF=3, SF=2).
+# REPLICATION_FACTOR=3
+# SEARCH_FACTOR=2
+
+# Multisite (geo-distributed) indexer cluster and site count.
+# MULTISITE=true
+# SITES=2
+
+# -----------------------------------------------------------------------------
+# Storage and growth
+# -----------------------------------------------------------------------------
+# Use SmartStore (remote object storage) for warm/cold data.
+# SMARTSTORE=true
+
+# Growth headroom percent (default: 15).
+# GROWTH_PCT=25
+
+# -----------------------------------------------------------------------------
+# Output target
+# -----------------------------------------------------------------------------
+# auto | standalone | distributed | sok | pod | cloud
+# DEPLOYMENT_TARGET=auto
+
+# Render output directory (default: ./splunk-platform-sizing-rendered).
+# OUTPUT_DIR=./splunk-platform-sizing-rendered
+
+# -----------------------------------------------------------------------------
+# Example commands
+# -----------------------------------------------------------------------------
+# bash skills/splunk-platform-sizing/scripts/size.sh \
+#   --daily-ingest-gb 500 \
+#   --retention-days 90 \
+#   --workload-profile es \
+#   --concurrent-searches 24 \
+#   --ha
+#
+# bash skills/splunk-platform-sizing/scripts/size.sh \
+#   --daily-ingest-gb 1200 \
+#   --workload-profile es_itsi \
+#   --ha \
+#   --smartstore \
+#   --deployment-target sok
+#
+# bash skills/splunk-platform-sizing/scripts/size.sh \
+#   --daily-ingest-gb 80 --retention-days 30 --deployment-target standalone

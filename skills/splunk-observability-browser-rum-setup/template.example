@@ -1,0 +1,22 @@
+# Splunk Browser RUM setup worksheet.
+
+application:
+  name: checkout-web
+  environment: prod
+  version: 1.42.0
+  framework: vite
+
+observability:
+  realm: us1
+  rum_token_reference: "${SPLUNK_RUM_TOKEN}"
+  api_token_file: "${SPLUNK_O11Y_TOKEN_FILE}"
+
+session_replay:
+  enabled: false
+  mask_all_text: true
+  sample_rate: 0.05
+
+source_maps:
+  upload_enabled: true
+  assets_dir: dist
+  url_prefix: https://shop.example.com/assets

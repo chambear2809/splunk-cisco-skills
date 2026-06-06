@@ -1,0 +1,7 @@
+interface:
+  display_name: "InfoSec App Setup"
+  short_description: "Render InfoSec app source, dashboard, macro, and CIM readiness"
+  default_prompt: >-
+    Use $splunk-infosec-app-setup to render InfoSec App for Splunk install
+    readiness, prerequisite source checklist, dashboard/macro/data-model checks,
+    Cloud IDM support-request notes, Lookup Editor handoff, and validation SPL.

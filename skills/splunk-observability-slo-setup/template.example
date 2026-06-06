@@ -1,0 +1,9 @@
+api_version: splunk-observability-slo-setup/v1
+realm: us1
+slo:
+  name: Checkout availability SLO
+  service: checkoutservice
+  environment: prod
+  target: 99.9
+  window: 30d
+  sli_source: apm_service

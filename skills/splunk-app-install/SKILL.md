@@ -87,6 +87,18 @@ All scripts are fully interactive — they prompt for every value not already
 supplied via flags. They can also be driven entirely by flags for non-interactive use.
 Credentials are read from the project-root `credentials` file (falls back to `~/.splunk/credentials`).
 
+### setup.sh
+
+Dispatches to the install, list, or uninstall helpers while preserving the
+original helper flags.
+
+```bash
+bash skills/splunk-app-install/scripts/setup.sh --help
+bash skills/splunk-app-install/scripts/setup.sh --install --source splunkbase --app-id 7421
+bash skills/splunk-app-install/scripts/setup.sh --list --filter cisco
+bash skills/splunk-app-install/scripts/setup.sh --uninstall
+```
+
 ### install_app.sh
 
 Installs a Splunk app from one of three sources.

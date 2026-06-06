@@ -1,0 +1,18 @@
+# Splunk CIM Data-Model Management Worksheet
+#
+# Non-secret values only.
+
+phase: render                # render | apply | rebuild | status | audit
+
+splunk_home: /opt/splunk
+app_name: ZZZ_cisco_skills_cim_accel
+
+# Comma-separated canonical CIM model names, or 'all'.
+models: Authentication,Network_Traffic,Web,Endpoint
+
+acceleration: true           # true | false
+earliest_time: -7d@d         # acceleration summary range (smallest your detections need)
+backfill_time:               # optional acceleration.backfill_time
+max_concurrent:              # optional acceleration.max_concurrent
+
+summary_range: -24h          # range used by the audit/population checks

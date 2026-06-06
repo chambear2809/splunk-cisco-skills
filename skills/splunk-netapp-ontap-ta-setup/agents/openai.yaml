@@ -1,0 +1,8 @@
+interface:
+  display_name: "NetApp ONTAP Supported Add-ons Setup"
+  short_description: "Render ONTAP core, extractions, indexes, and Hydra validation"
+  default_prompt: >-
+    Use $splunk-netapp-ontap-ta-setup to render, install, and validate the
+    package-verified NetApp ONTAP supported add-ons, including scheduler/worker
+    placement, ontap index readiness, Hydra troubleshooting checks, and ITSI
+    storage handoffs.

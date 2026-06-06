@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Secure Gateway / Mobile"
+  short_description: "Ready Splunk Mobile, Spacebridge, and Connected Experiences"
+  default_prompt: >-
+    Use $splunk-secure-gateway to render and validate Splunk Secure Gateway
+    readiness: Spacebridge connectivity preflight, app enablement, token-auth
+    readiness, device registration handoff, and an MDM AppConfig template.

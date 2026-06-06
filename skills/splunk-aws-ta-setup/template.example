@@ -1,0 +1,18 @@
+# Splunk Add-on for AWS intake template.
+# Copy to template.local and fill non-secret values only. No AWS secrets here.
+
+[index]
+index = aws
+
+[account]
+# Account stanza name referenced by inputs (configured in the add-on UI).
+account_name = aws_prod
+# Auth mode: iam_role (preferred, no stored secret) or access_key.
+auth_mode = iam_role
+# For access_key mode, write the secret to a file and configure it in the UI:
+secret_file = /tmp/aws_secret_key
+
+[feeds]
+# Comma-separated: cloudtrail,config,guardduty
+feeds = cloudtrail,config,guardduty
+sqs_region = us-east-1

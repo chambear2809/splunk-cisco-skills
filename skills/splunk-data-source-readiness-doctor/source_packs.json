@@ -3,6 +3,259 @@
   "description": "Source-specific readiness defaults and collection searches for the Splunk Data Source Readiness Doctor.",
   "packs": [
     {
+      "id": "amazon_kinesis_firehose",
+      "label": "Amazon Kinesis Firehose",
+      "docs": [
+        "https://help.splunk.com/en/splunk-cloud-platform/get-data-in/splunk-supported-add-ons/amazon-kinesis-firehose"
+      ],
+      "match": {
+        "products": [
+          "Amazon Kinesis Firehose"
+        ],
+        "names": [
+          "Amazon Kinesis Firehose",
+          "AWS Firehose"
+        ],
+        "source_sourcetype_pairs": [
+          {
+            "source": "aws:firehose:cloudtrail",
+            "sourcetype": "aws:cloudtrail"
+          },
+          {
+            "source": "aws:firehose:vpcflow",
+            "sourcetype": "aws:cloudwatchlogs:vpcflow"
+          },
+          {
+            "source": "aws:firehose:cloudwatch-events",
+            "sourcetype": "aws:cloudwatch:events"
+          },
+          {
+            "source": "aws:firehose:raw-json",
+            "sourcetype": "_json"
+          },
+          {
+            "source": "aws:firehose:raw",
+            "sourcetype": "httpevent"
+          }
+        ]
+      },
+      "defaults": {
+        "expected_sources": [
+          "aws:firehose:cloudtrail",
+          "aws:firehose:vpcflow",
+          "aws:firehose:cloudwatch-events",
+          "aws:firehose:raw-json",
+          "aws:firehose:raw"
+        ],
+        "expected_sourcetypes": [
+          "aws:cloudtrail",
+          "aws:cloudwatchlogs:vpcflow",
+          "aws:cloudwatch:events",
+          "_json",
+          "httpevent"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Network_Traffic"
+        ],
+        "cim.required_fields": [
+          "source",
+          "sourcetype",
+          "eventName",
+          "eventSource",
+          "srcaddr",
+          "dstaddr"
+        ],
+        "es.expected_detection_families": [
+          "aws_cloudtrail",
+          "vpc_flow_logs",
+          "cloudwatch_events"
+        ],
+        "ari.expected_processing_types": [
+          "Cloud applications",
+          "IP"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Cloud applications",
+            "IP"
+          ],
+          "key_fields": [
+            "source",
+            "sourcetype",
+            "eventName",
+            "srcaddr",
+            "dstaddr"
+          ],
+          "relevant_event_filter": "source=aws:firehose:* AND sourcetype=*"
+        }
+      },
+      "handoffs": [
+        "splunk-amazon-kinesis-firehose-setup",
+        "splunk-hec-service-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "firehose-source-sourcetype-coverage",
+          "title": "Firehose source and sourcetype coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count min(_time) as first_seen max(_time) as last_seen dc(host) as hosts by source sourcetype | convert ctime(first_seen) ctime(last_seen)"
+        },
+        {
+          "id": "firehose-aws-profile-fields",
+          "title": "Firehose AWS profile field coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count values(eventName) as event_names values(eventSource) as event_sources dc(srcaddr) as srcs dc(dstaddr) as dests by source sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "apache_web",
+      "label": "Apache Web Server",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3186"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_apache"
+        ],
+        "products": [
+          "Apache Web Server"
+        ],
+        "names": [
+          "Apache access logs"
+        ],
+        "sourcetypes": [
+          "apache:access",
+          "apache:access:combined",
+          "apache:access:json",
+          "apache:access:kv",
+          "apache:error"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "apache:access",
+          "apache:access:combined",
+          "apache:access:json",
+          "apache:access:kv",
+          "apache:error"
+        ],
+        "cim.expected_models": [
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-universal-forwarder-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "apache_web-coverage",
+          "title": "Apache Web Server coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "appdynamics",
+      "label": "AppDynamics",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3471"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_AppDynamics"
+        ],
+        "products": [
+          "AppDynamics",
+          "Cisco AppDynamics"
+        ],
+        "names": [
+          "AppDynamics"
+        ],
+        "sourcetypes": [
+          "appdynamics_events",
+          "appdynamics_analytics",
+          "appdynamics_audit",
+          "appdynamics_custom_metrics",
+          "appdynamics_databases",
+          "appdynamics_security",
+          "appdynamics_status"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "appdynamics_events",
+          "appdynamics_analytics",
+          "appdynamics_audit",
+          "appdynamics_custom_metrics",
+          "appdynamics_databases",
+          "appdynamics_security",
+          "appdynamics_status"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Application_State"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "cisco-appdynamics-setup",
+        "splunk-appdynamics-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "appdynamics-coverage",
+          "title": "AppDynamics coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
       "id": "aws_cloudtrail",
       "label": "AWS CloudTrail",
       "docs": [
@@ -10,24 +263,64 @@
         "https://help.splunk.com/en/splunk-cloud-platform/get-data-in/splunk-supported-add-ons/amazon-kinesis-firehose"
       ],
       "match": {
-        "app_names": ["Splunk_TA_aws", "splunk_app_aws"],
-        "products": ["AWS CloudTrail", "Amazon Web Services"],
-        "names": ["AWS CloudTrail"],
-        "sourcetypes": ["aws:cloudtrail"]
+        "app_names": [
+          "Splunk_TA_aws",
+          "splunk_app_aws"
+        ],
+        "products": [
+          "AWS CloudTrail",
+          "Amazon Web Services"
+        ],
+        "names": [
+          "AWS CloudTrail"
+        ],
+        "sourcetypes": [
+          "aws:cloudtrail"
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["aws:cloudtrail"],
-        "cim.expected_models": ["Authentication", "Change"],
-        "cim.required_fields": ["user", "src", "eventName", "eventSource", "aws_account_id"],
-        "es.expected_detection_families": ["aws_cloudtrail", "cloudtrail"],
-        "ari.expected_processing_types": ["Cloud applications", "Identity"],
+        "expected_sourcetypes": [
+          "aws:cloudtrail"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "user",
+          "src",
+          "eventName",
+          "eventSource",
+          "aws_account_id"
+        ],
+        "es.expected_detection_families": [
+          "aws_cloudtrail",
+          "cloudtrail"
+        ],
+        "ari.expected_processing_types": [
+          "Cloud applications",
+          "Identity"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["Cloud applications", "Identity"],
-          "key_fields": ["user", "src", "eventName", "eventSource", "aws_account_id"],
+          "processing_types": [
+            "Cloud applications",
+            "Identity"
+          ],
+          "key_fields": [
+            "user",
+            "src",
+            "eventName",
+            "eventSource",
+            "aws_account_id"
+          ],
           "relevant_event_filter": "eventName=* AND user=*"
         }
       },
-      "handoffs": ["splunk-observability-aws-integration", "splunk-app-install", "splunk-enterprise-security-config"],
+      "handoffs": [
+        "splunk-observability-aws-integration",
+        "splunk-app-install",
+        "splunk-enterprise-security-config"
+      ],
       "collection_searches": [
         {
           "id": "cloudtrail-actions",
@@ -51,25 +344,66 @@
         "https://help.splunk.com/en/splunk-cloud-platform/common-information-model/6.4/introduction/overview-of-the-ocsf-cim-add-on/configuring-ocsf-cim-add-on"
       ],
       "match": {
-        "products": ["Amazon Security Lake", "AWS Security Lake"],
-        "names": ["Amazon Security Lake", "ASL AWS CloudTrail"],
-        "sourcetypes": ["aws:asl", "ocsf:aws:asl"],
-        "sourcetype_prefixes": ["ocsf:aws:asl"]
+        "products": [
+          "Amazon Security Lake",
+          "AWS Security Lake"
+        ],
+        "names": [
+          "Amazon Security Lake",
+          "ASL AWS CloudTrail"
+        ],
+        "sourcetypes": [
+          "aws:asl",
+          "ocsf:aws:asl"
+        ],
+        "sourcetype_prefixes": [
+          "ocsf:aws:asl"
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["aws:asl", "ocsf:aws:asl"],
+        "expected_sourcetypes": [
+          "aws:asl",
+          "ocsf:aws:asl"
+        ],
         "ocsf.required": true,
-        "ocsf.expected_classes": ["API Activity", "Authentication", "Network Activity"],
-        "cim.expected_models": ["Authentication", "Change", "Network_Traffic"],
-        "cim.required_fields": ["class_name", "category_name", "activity_name", "time"],
-        "ari.expected_processing_types": ["Cloud applications", "IP"],
+        "ocsf.expected_classes": [
+          "API Activity",
+          "Authentication",
+          "Network Activity"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Network_Traffic"
+        ],
+        "cim.required_fields": [
+          "class_name",
+          "category_name",
+          "activity_name",
+          "time"
+        ],
+        "ari.expected_processing_types": [
+          "Cloud applications",
+          "IP"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["Cloud applications", "IP"],
-          "key_fields": ["class_name", "activity_name", "time"],
+          "processing_types": [
+            "Cloud applications",
+            "IP"
+          ],
+          "key_fields": [
+            "class_name",
+            "activity_name",
+            "time"
+          ],
           "relevant_event_filter": "class_name=* AND activity_name=*"
         }
       },
-      "handoffs": ["splunk-enterprise-security-config", "splunk-app-install", "splunk-federated-search-setup"],
+      "handoffs": [
+        "splunk-enterprise-security-config",
+        "splunk-app-install",
+        "splunk-federated-search-setup"
+      ],
       "collection_searches": [
         {
           "id": "ocsf-class-coverage",
@@ -86,6 +420,462 @@
       ]
     },
     {
+      "id": "aws_securityhub_guardduty",
+      "label": "AWS Security Hub and GuardDuty Findings",
+      "docs": [
+        "https://research.splunk.com/sources/b02bfbf3-294f-478e-99a1-e24b8c692d7e/",
+        "https://research.splunk.com/stories/aws_security_hub_alerts/"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_aws",
+          "splunk_app_aws"
+        ],
+        "products": [
+          "AWS Security Hub",
+          "Amazon GuardDuty"
+        ],
+        "names": [
+          "AWS Security Hub",
+          "GuardDuty"
+        ],
+        "sourcetypes": [
+          "aws:securityhub:finding",
+          "aws:cloudwatch:guardduty"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "aws:securityhub:finding",
+          "aws:cloudwatch:guardduty"
+        ],
+        "expected_macros": [
+          "aws_securityhub_finding"
+        ],
+        "cim.expected_models": [
+          "Alerts",
+          "Intrusion_Detection",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "AwsAccountId",
+          "Severity.Label",
+          "Title",
+          "ResourceId",
+          "ProductArn"
+        ],
+        "es.expected_detection_families": [
+          "aws_security_hub",
+          "guardduty"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "IP",
+          "Vulnerability"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "IP",
+            "Vulnerability"
+          ],
+          "key_fields": [
+            "AwsAccountId",
+            "ResourceId",
+            "Severity.Label",
+            "Title"
+          ],
+          "relevant_event_filter": "AwsAccountId=* AND Severity.Label=*"
+        }
+      },
+      "handoffs": [
+        "splunk-observability-aws-integration",
+        "splunk-app-install",
+        "splunk-enterprise-security-config",
+        "splunk-asset-risk-intelligence-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "aws-securityhub-severity-resource",
+          "title": "AWS Security Hub severity and resource coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count values(Severity.Label) as severities values(Title) as titles by AwsAccountId ResourceId ProductArn"
+        }
+      ]
+    },
+    {
+      "id": "aws_vpc_flow_logs",
+      "label": "AWS VPC Flow Logs",
+      "docs": [
+        "https://research.splunk.com/sources/platforms/aws/",
+        "https://research.splunk.com/sources/38a34fc4-e128-4478-a8f4-7835d51d5135/"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_aws",
+          "splunk_app_aws"
+        ],
+        "products": [
+          "AWS VPC Flow Logs",
+          "Amazon VPC Flow Logs"
+        ],
+        "names": [
+          "AWS VPC Flow Logs"
+        ],
+        "sourcetypes": [
+          "aws:cloudwatchlogs:vpcflow",
+          "aws:vpcflow"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "aws:cloudwatchlogs:vpcflow",
+          "aws:vpcflow"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic"
+        ],
+        "cim.required_fields": [
+          "src_ip",
+          "dest_ip",
+          "src_port",
+          "dest_port",
+          "action"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "src_ip",
+            "dest_ip",
+            "interface_id",
+            "action"
+          ],
+          "relevant_event_filter": "src_ip=* OR dest_ip=*"
+        }
+      },
+      "handoffs": [
+        "splunk-observability-aws-integration",
+        "splunk-app-install",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "aws-vpc-flow-actions",
+          "title": "AWS VPC flow action and peer coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(src_ip) as srcs dc(dest_ip) as dests values(action) as actions by interface_id src_port dest_port protocol"
+        }
+      ]
+    },
+    {
+      "id": "bluecoat_proxy",
+      "label": "Blue Coat ProxySG",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2758"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_bluecoat-proxysg"
+        ],
+        "products": [
+          "Blue Coat ProxySG",
+          "Symantec Blue Coat ProxySG"
+        ],
+        "names": [
+          "Blue Coat ProxySG logs"
+        ],
+        "sourcetypes": [
+          "bluecoat",
+          "bluecoat:proxysg:access:syslog",
+          "bluecoat:proxysg:access:file",
+          "bluecoat:proxysg:access:kv"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "bluecoat",
+          "bluecoat:proxysg:access:syslog",
+          "bluecoat:proxysg:access:file",
+          "bluecoat:proxysg:access:kv"
+        ],
+        "cim.expected_models": [
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "bluecoat_proxy-coverage",
+          "title": "Blue Coat ProxySG coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "box",
+      "label": "Box",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2679"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_box"
+        ],
+        "products": [
+          "Box"
+        ],
+        "names": [
+          "Box Enterprise Events"
+        ],
+        "sourcetypes": [
+          "box:events",
+          "box:users",
+          "box:groups",
+          "box:folder",
+          "box:file",
+          "box:fileComment",
+          "box:fileTask",
+          "box:folderCollaboration",
+          "box:filecontent",
+          "box:filecontent:csv",
+          "box:filecontent:json",
+          "box:filecontent:xml"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "box:events",
+          "box:users",
+          "box:groups",
+          "box:folder",
+          "box:file",
+          "box:fileComment",
+          "box:fileTask",
+          "box:folderCollaboration",
+          "box:filecontent",
+          "box:filecontent:csv",
+          "box:filecontent:json",
+          "box:filecontent:xml"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-box-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "box-coverage",
+          "title": "Box coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "carbon_black",
+      "label": "Carbon Black",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2790"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_bit9-carbonblack"
+        ],
+        "products": [
+          "Carbon Black",
+          "Bit9 Carbon Black"
+        ],
+        "names": [
+          "Carbon Black JSON"
+        ],
+        "sourcetypes": [
+          "bit9:carbonblack:json"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "bit9:carbonblack:json"
+        ],
+        "expected_eventtypes": [
+          "bit9_carbonblack_alert",
+          "bit9_carbonblack_network",
+          "carbonblack_endpoint_processes",
+          "edr_carbonblack_alert"
+        ],
+        "expected_lookups": [
+          "bit9_cbs_actions_lookup",
+          "bit9_cbs_description_lookup"
+        ],
+        "cim.expected_models": [
+          "Alerts",
+          "Endpoint",
+          "Network_Traffic"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "es.expected_detection_families": [
+          "carbon_black",
+          "endpoint"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Software"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Software"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype",
+            "process"
+          ],
+          "relevant_event_filter": "host=* OR process=*"
+        }
+      },
+      "handoffs": [
+        "splunk-security-appliance-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "carbon-black-coverage",
+          "title": "Carbon Black source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "checkpoint_log_exporter",
+      "label": "Check Point Log Exporter",
+      "docs": [
+        "https://splunkbase.splunk.com/app/5478"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_checkpoint_log_exporter"
+        ],
+        "products": [
+          "Check Point Log Exporter",
+          "Check Point"
+        ],
+        "names": [
+          "Check Point logs"
+        ],
+        "sourcetypes": [
+          "cp_log",
+          "cp_log:syslog"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "cp_log",
+          "cp_log:syslog"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic",
+          "Intrusion_Detection"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "checkpoint_log_exporter-coverage",
+          "title": "Check Point Log Exporter coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
       "id": "cisco_asa",
       "label": "Cisco ASA Syslog",
       "docs": [
@@ -93,30 +883,295 @@
         "https://research.splunk.com/sources/3f2a9b6d-1c8e-4f7b-a2d3-8b7f1c2a9d4e/"
       ],
       "match": {
-        "app_names": ["Splunk_TA_cisco-asa"],
-        "products": ["Cisco ASA"],
-        "names": ["Cisco ASA"],
-        "sourcetypes": ["cisco:asa"]
+        "app_names": [
+          "Splunk_TA_cisco-asa"
+        ],
+        "products": [
+          "Cisco ASA"
+        ],
+        "names": [
+          "Cisco ASA"
+        ],
+        "sourcetypes": [
+          "cisco:asa"
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["cisco:asa"],
-        "cim.expected_models": ["Network_Traffic", "Intrusion_Detection"],
-        "cim.required_fields": ["src", "dest", "action", "dvc", "signature"],
-        "es.expected_detection_families": ["cisco_asa"],
-        "ari.expected_processing_types": ["IP", "Asset"],
+        "expected_sourcetypes": [
+          "cisco:asa"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic",
+          "Intrusion_Detection"
+        ],
+        "cim.required_fields": [
+          "src",
+          "dest",
+          "action",
+          "dvc",
+          "signature"
+        ],
+        "es.expected_detection_families": [
+          "cisco_asa"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["IP", "Asset"],
-          "key_fields": ["src", "dest", "dvc"],
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "src",
+            "dest",
+            "dvc"
+          ],
           "relevant_event_filter": "src=* OR dest=*"
         }
       },
-      "handoffs": ["splunk-app-install", "splunk-connect-for-syslog-setup", "splunk-enterprise-security-config"],
+      "handoffs": [
+        "cisco-asa-ta-setup",
+        "splunk-connect-for-syslog-setup",
+        "splunk-enterprise-security-config"
+      ],
       "collection_searches": [
         {
           "id": "asa-traffic-actions",
           "title": "ASA traffic action and peer coverage",
           "category": "source-pack",
           "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(src) as srcs dc(dest) as dests values(action) as actions by dvc sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "cisco_email_web",
+      "label": "Cisco ESA and WSA",
+      "docs": [
+        "https://splunkbase.splunk.com/app/1761",
+        "https://splunkbase.splunk.com/app/1747"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_cisco-esa",
+          "Splunk_TA_cisco-wsa"
+        ],
+        "products": [
+          "Cisco ESA",
+          "Cisco WSA",
+          "Cisco Secure Email Gateway",
+          "Cisco Web Security Appliance"
+        ],
+        "names": [
+          "Cisco ESA",
+          "Cisco WSA"
+        ],
+        "sourcetypes": [
+          "cisco:esa:textmail",
+          "cisco:esa:cef",
+          "cisco:esa:delivery",
+          "cisco:wsa:squid",
+          "cisco:wsa:w3c:recommended",
+          "cisco:wsa:syslog"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "cisco:esa:textmail",
+          "cisco:esa:cef",
+          "cisco:esa:delivery",
+          "cisco:wsa:squid",
+          "cisco:wsa:w3c:recommended",
+          "cisco:wsa:syslog"
+        ],
+        "cim.expected_models": [
+          "Email",
+          "Web",
+          "Network_Traffic"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "IP",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "IP",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "cisco-secure-email-web-gateway-setup",
+        "splunk-connect-for-syslog-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "cisco_email_web-coverage",
+          "title": "Cisco ESA and WSA coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "cisco_ise",
+      "label": "Cisco ISE",
+      "docs": [
+        "https://splunkbase.splunk.com/app/7538"
+      ],
+      "match": {
+        "app_names": [
+          "TA_cisco_catalyst"
+        ],
+        "products": [
+          "Cisco ISE",
+          "Cisco Identity Services Engine"
+        ],
+        "names": [
+          "Cisco ISE"
+        ],
+        "sourcetypes": [
+          "cisco:ise:syslog",
+          "cisco:ise:radius:policyset",
+          "cisco:ise:tacacs:policyset",
+          "cisco:ise:securitygroups",
+          "cisco:ise:sgtbindings"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "cisco:ise:syslog",
+          "cisco:ise:radius:policyset",
+          "cisco:ise:tacacs:policyset",
+          "cisco:ise:securitygroups",
+          "cisco:ise:sgtbindings"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "cisco-catalyst-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "cisco_ise-coverage",
+          "title": "Cisco ISE coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "cisco_meraki",
+      "label": "Cisco Meraki",
+      "docs": [
+        "https://splunkbase.splunk.com/app/5580"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_cisco_meraki"
+        ],
+        "products": [
+          "Cisco Meraki",
+          "Meraki"
+        ],
+        "names": [
+          "Cisco Meraki"
+        ],
+        "sourcetypes": [
+          "meraki:audit",
+          "meraki:devices",
+          "meraki:organizations",
+          "meraki:securityappliances",
+          "meraki:webhook",
+          "meraki:wirelessdevicespacketlossbydevice"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "meraki:audit",
+          "meraki:devices",
+          "meraki:organizations",
+          "meraki:securityappliances",
+          "meraki:webhook",
+          "meraki:wirelessdevicespacketlossbydevice"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Inventory",
+          "Network_Traffic"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "IP"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "IP"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "cisco-meraki-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "cisco_meraki-coverage",
+          "title": "Cisco Meraki coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
         }
       ]
     },
@@ -128,25 +1183,64 @@
         "https://research.splunk.com/network/5e06e262-d7cd-4216-b2f8-27b437e18458/"
       ],
       "match": {
-        "skills": ["cisco-secure-access-setup"],
-        "products": ["Cisco Secure Access"],
-        "names": ["Cisco Secure Access Firewall"],
-        "sourcetypes": ["cisco:cloud_security:firewall"]
+        "skills": [
+          "cisco-secure-access-setup"
+        ],
+        "products": [
+          "Cisco Secure Access"
+        ],
+        "names": [
+          "Cisco Secure Access Firewall"
+        ],
+        "sourcetypes": [
+          "cisco:cloud_security:firewall"
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["cisco:cloud_security:firewall"],
-        "expected_macros": ["cisco_secure_access_indexes"],
-        "cim.expected_models": ["Network_Traffic", "Web"],
-        "cim.required_fields": ["src", "dest", "action", "url", "user"],
-        "es.expected_detection_families": ["cisco_secure_access"],
-        "ari.expected_processing_types": ["IP", "Identity", "Cloud applications"],
+        "expected_sourcetypes": [
+          "cisco:cloud_security:firewall"
+        ],
+        "expected_macros": [
+          "cisco_secure_access_indexes"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic",
+          "Web"
+        ],
+        "cim.required_fields": [
+          "src",
+          "dest",
+          "action",
+          "url",
+          "user"
+        ],
+        "es.expected_detection_families": [
+          "cisco_secure_access"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Identity",
+          "Cloud applications"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["IP", "Identity", "Cloud applications"],
-          "key_fields": ["src", "dest", "user", "url"],
+          "processing_types": [
+            "IP",
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "src",
+            "dest",
+            "user",
+            "url"
+          ],
           "relevant_event_filter": "src=* OR user=*"
         }
       },
-      "handoffs": ["cisco-secure-access-setup", "splunk-enterprise-security-config"],
+      "handoffs": [
+        "cisco-secure-access-setup",
+        "splunk-enterprise-security-config"
+      ],
       "collection_searches": [
         {
           "id": "secure-access-firewall-decisions",
@@ -164,26 +1258,67 @@
         "https://research.splunk.com/sources/d11b67ec-1cb2-4f6f-a2d8-a099c7e15b29/"
       ],
       "match": {
-        "skills": ["cisco-security-cloud-setup"],
-        "products": ["Cisco Secure Firewall", "Cisco Firepower", "Cisco FTD"],
-        "names": ["Cisco Secure Firewall"],
-        "sourcetypes": ["cisco:sfw:estreamer"],
-        "sourcetype_prefixes": ["cisco:sfw"]
+        "skills": [
+          "cisco-security-cloud-setup"
+        ],
+        "products": [
+          "Cisco Secure Firewall",
+          "Cisco Firepower",
+          "Cisco FTD"
+        ],
+        "names": [
+          "Cisco Secure Firewall"
+        ],
+        "sourcetypes": [
+          "cisco:sfw:estreamer"
+        ],
+        "sourcetype_prefixes": [
+          "cisco:sfw"
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["cisco:sfw:estreamer"],
-        "expected_macros": ["cisco_secure_firewall"],
-        "cim.expected_models": ["Network_Traffic", "Intrusion_Detection", "Malware"],
-        "cim.required_fields": ["src", "dest", "action", "signature", "EventType"],
-        "es.expected_detection_families": ["cisco_secure_firewall"],
-        "ari.expected_processing_types": ["IP", "Asset"],
+        "expected_sourcetypes": [
+          "cisco:sfw:estreamer"
+        ],
+        "expected_macros": [
+          "cisco_secure_firewall"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic",
+          "Intrusion_Detection",
+          "Malware"
+        ],
+        "cim.required_fields": [
+          "src",
+          "dest",
+          "action",
+          "signature",
+          "EventType"
+        ],
+        "es.expected_detection_families": [
+          "cisco_secure_firewall"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["IP", "Asset"],
-          "key_fields": ["src", "dest", "EventType"],
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "src",
+            "dest",
+            "EventType"
+          ],
           "relevant_event_filter": "src=* OR dest=*"
         }
       },
-      "handoffs": ["cisco-security-cloud-setup", "splunk-enterprise-security-config"],
+      "handoffs": [
+        "cisco-security-cloud-setup",
+        "splunk-enterprise-security-config"
+      ],
       "collection_searches": [
         {
           "id": "sfw-eventtype-coverage",
@@ -200,6 +1335,1092 @@
       ]
     },
     {
+      "id": "cisco_ucs",
+      "label": "Cisco UCS",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2731"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_cisco-ucs"
+        ],
+        "products": [
+          "Cisco UCS",
+          "Cisco Unified Computing System"
+        ],
+        "names": [
+          "Cisco UCS"
+        ],
+        "sourcetypes": [
+          "cisco:ucs"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "cisco:ucs"
+        ],
+        "cim.expected_models": [
+          "Inventory",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "cisco-ucs-ta-setup",
+        "splunk-itsi-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "cisco_ucs-coverage",
+          "title": "Cisco UCS coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "citrix_netscaler",
+      "label": "Citrix NetScaler",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2770"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_citrix-netscaler"
+        ],
+        "products": [
+          "Citrix NetScaler"
+        ],
+        "names": [
+          "Citrix NetScaler logs"
+        ],
+        "sourcetypes": [
+          "citrix:netscaler",
+          "citrix:netscaler:syslog",
+          "citrix:netscaler:ipfix",
+          "citrix:netscaler:ipfix:syslog",
+          "citrix:netscaler:nitro",
+          "citrix:netscaler:appfw",
+          "citrix:netscaler:appfw:cef"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "citrix:netscaler",
+          "citrix:netscaler:syslog",
+          "citrix:netscaler:ipfix",
+          "citrix:netscaler:ipfix:syslog",
+          "citrix:netscaler:nitro",
+          "citrix:netscaler:appfw",
+          "citrix:netscaler:appfw:cef"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic",
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "citrix_netscaler-coverage",
+          "title": "Citrix NetScaler coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "crowdstrike_falcon",
+      "label": "CrowdStrike Falcon",
+      "docs": [
+        "https://research.splunk.com/sources/52b38751-b0db-4965-a800-ebaabd1fd7d5/",
+        "https://research.splunk.com/sources/cbb06880-9dd9-4542-ac60-bd6e5d3c3e4e/"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_crowdstrike_fdr"
+        ],
+        "products": [
+          "CrowdStrike",
+          "CrowdStrike Falcon"
+        ],
+        "names": [
+          "CrowdStrike Falcon"
+        ],
+        "sourcetypes": [
+          "CrowdStrike:Event:Streams:JSON",
+          "crowdstrike:events:sensor"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "CrowdStrike:Event:Streams:JSON",
+          "crowdstrike:events:sensor"
+        ],
+        "cim.expected_models": [
+          "Endpoint",
+          "Malware",
+          "Processes"
+        ],
+        "cim.required_fields": [
+          "ComputerName",
+          "UserName",
+          "event_simpleName",
+          "ProcessId",
+          "FileName"
+        ],
+        "es.expected_detection_families": [
+          "crowdstrike"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Software",
+          "Vulnerability"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Software",
+            "Vulnerability"
+          ],
+          "key_fields": [
+            "aid",
+            "ComputerName",
+            "UserName",
+            "event_simpleName"
+          ],
+          "relevant_event_filter": "aid=* OR ComputerName=*"
+        }
+      },
+      "handoffs": [
+        "splunk-app-install",
+        "splunk-enterprise-security-config",
+        "splunk-asset-risk-intelligence-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "crowdstrike-endpoint-events",
+          "title": "CrowdStrike endpoint event coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(aid) as agents dc(ComputerName) as hosts dc(UserName) as users by event_simpleName FileName"
+        }
+      ]
+    },
+    {
+      "id": "cyberark_epm",
+      "label": "CyberArk EPM",
+      "docs": [
+        "https://splunkbase.splunk.com/app/5160"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_cyberark_epm"
+        ],
+        "products": [
+          "CyberArk EPM"
+        ],
+        "names": [
+          "CyberArk Endpoint Privilege Manager"
+        ],
+        "sourcetypes": [
+          "cyberark:epm:raw:events",
+          "cyberark:epm:raw:policy:events",
+          "cyberark:epm:admin:audit",
+          "cyberark:epm:account:admin:audit",
+          "cyberark:epm:application:events",
+          "cyberark:epm:policy:audit",
+          "cyberark:epm:threat:detection"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "cyberark:epm:raw:events",
+          "cyberark:epm:raw:policy:events",
+          "cyberark:epm:admin:audit",
+          "cyberark:epm:account:admin:audit",
+          "cyberark:epm:application:events",
+          "cyberark:epm:policy:audit",
+          "cyberark:epm:threat:detection"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Endpoint",
+          "Malware"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Software"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Software"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-cyberark-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "cyberark_epm-coverage",
+          "title": "CyberArk EPM coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "cyberark_epv_pta",
+      "label": "CyberArk EPV/PTA",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2891"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_cyberark"
+        ],
+        "products": [
+          "CyberArk EPV",
+          "CyberArk PTA"
+        ],
+        "names": [
+          "CyberArk Vault",
+          "CyberArk Privileged Threat Analytics"
+        ],
+        "sourcetypes": [
+          "cyberark:epv:cef",
+          "cyberark:pta:cef"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "cyberark:epv:cef",
+          "cyberark:pta:cef"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Intrusion_Detection"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-cyberark-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "cyberark_epv_pta-coverage",
+          "title": "CyberArk EPV/PTA coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "duo_security",
+      "label": "Cisco Duo Security",
+      "docs": [
+        "https://research.splunk.com/sources/83f727f6-8754-41f8-b9f7-8226886a659e/",
+        "https://research.splunk.com/sources/38e22de6-8b6b-449c-ae26-a640c88ff7f9/"
+      ],
+      "match": {
+        "app_names": [
+          "TA-duo_security",
+          "Splunk_TA_duo"
+        ],
+        "products": [
+          "Cisco Duo",
+          "Duo Security",
+          "Duo"
+        ],
+        "names": [
+          "Duo Security",
+          "Cisco Duo"
+        ],
+        "sourcetypes": [
+          "duo:authentication",
+          "duo:admin",
+          "cisco:duo:activity",
+          "cisco:duo:administrator"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "duo:authentication",
+          "duo:admin",
+          "cisco:duo:activity",
+          "cisco:duo:administrator"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Identity_Management"
+        ],
+        "cim.required_fields": [
+          "user",
+          "src",
+          "result",
+          "factor",
+          "reason"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "user",
+            "src",
+            "factor",
+            "result"
+          ],
+          "relevant_event_filter": "user=* AND result=*"
+        }
+      },
+      "handoffs": [
+        "cisco-security-cloud-setup",
+        "splunk-app-install",
+        "splunk-enterprise-security-config",
+        "splunk-asset-risk-intelligence-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "duo-auth-admin-outcomes",
+          "title": "Duo authentication and admin outcome coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(user) as users dc(src) as srcs values(result) as results values(factor) as factors by sourcetype reason"
+        }
+      ]
+    },
+    {
+      "id": "f5_bigip",
+      "label": "F5 BIG-IP",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2680"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_f5-bigip"
+        ],
+        "products": [
+          "F5 BIG-IP"
+        ],
+        "names": [
+          "F5 BIG-IP logs"
+        ],
+        "sourcetypes": [
+          "f5:bigip:syslog",
+          "f5:bigip:asm:syslog",
+          "f5:bigip:apm:syslog",
+          "f5:telemetry:json",
+          "f5:bigip:ltm:icontrol",
+          "f5:bigip:system:icontrol"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "f5:bigip:syslog",
+          "f5:bigip:asm:syslog",
+          "f5:bigip:apm:syslog",
+          "f5:telemetry:json",
+          "f5:bigip:ltm:icontrol",
+          "f5:bigip:system:icontrol"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic",
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "f5_bigip-coverage",
+          "title": "F5 BIG-IP coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "forcepoint_web",
+      "label": "Forcepoint Web Security",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2966"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_websense-cg"
+        ],
+        "products": [
+          "Forcepoint Web Security"
+        ],
+        "names": [
+          "Forcepoint Web Security logs"
+        ],
+        "sourcetypes": [
+          "websense",
+          "websense:cg:kv"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "websense",
+          "websense:cg:kv"
+        ],
+        "cim.expected_models": [
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "forcepoint_web-coverage",
+          "title": "Forcepoint Web Security coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "fortinet_fortigate",
+      "label": "Fortinet FortiGate",
+      "docs": [
+        "https://splunk.github.io/splunk-connect-for-syslog/2.9.0/sources/vendor/Fortinet/fortios/",
+        "https://lantern.splunk.com/Data_Sources/Fortinet"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_fortinet_fortigate",
+          "TA-fortinet"
+        ],
+        "products": [
+          "Fortinet FortiGate",
+          "FortiGate",
+          "Fortinet"
+        ],
+        "names": [
+          "Fortinet FortiGate"
+        ],
+        "sourcetypes": [
+          "fgt_traffic",
+          "fgt_event",
+          "fgt_utm"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "fgt_traffic",
+          "fgt_event",
+          "fgt_utm"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic",
+          "Web",
+          "Intrusion_Detection",
+          "Malware"
+        ],
+        "cim.required_fields": [
+          "src",
+          "dest",
+          "action",
+          "app",
+          "dvc"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "src",
+            "dest",
+            "dvc",
+            "action"
+          ],
+          "relevant_event_filter": "src=* OR dest=*"
+        }
+      },
+      "handoffs": [
+        "splunk-app-install",
+        "splunk-connect-for-syslog-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "fortigate-traffic-utm-actions",
+          "title": "FortiGate traffic and UTM action coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(src) as srcs dc(dest) as dests values(action) as actions values(app) as apps by sourcetype dvc"
+        }
+      ]
+    },
+    {
+      "id": "github_audit",
+      "label": "GitHub Audit Logs And Security Alerts",
+      "docs": [
+        "https://splunk.github.io/splunk-add-on-for-github-audit-log-monitoring/",
+        "https://splunkbase.splunk.com/app/6254"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_github"
+        ],
+        "products": [
+          "GitHub",
+          "GitHub Enterprise",
+          "GitHub Enterprise Cloud",
+          "GitHub Enterprise Server"
+        ],
+        "names": [
+          "GitHub Audit",
+          "GitHub Organizations Audit Logs",
+          "GitHub Security Alerts"
+        ],
+        "sourcetypes": [
+          "github:cloud:audit",
+          "github:enterprise:audit",
+          "github:cloud:user",
+          "github:cloud:code:scanning:alerts",
+          "github:cloud:dependabot:scanning:alerts",
+          "github:cloud:secret:scanning:alerts"
+        ],
+        "source_sourcetype_pairs": [
+          {
+            "source": "http:github",
+            "sourcetype": "httpevent"
+          }
+        ]
+      },
+      "defaults": {
+        "expected_sources": [
+          "github",
+          "http:github"
+        ],
+        "expected_sourcetypes": [
+          "github:cloud:audit",
+          "github:enterprise:audit",
+          "github:cloud:user",
+          "github:cloud:code:scanning:alerts",
+          "github:cloud:dependabot:scanning:alerts",
+          "github:cloud:secret:scanning:alerts",
+          "httpevent"
+        ],
+        "expected_macros": [
+          "github_organizations"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Authentication"
+        ],
+        "cim.required_fields": [
+          "action",
+          "actor",
+          "org",
+          "repo",
+          "created_at"
+        ],
+        "es.expected_detection_families": [
+          "github"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "actor",
+            "org",
+            "repo",
+            "created_at"
+          ],
+          "relevant_event_filter": "actor=* AND action=*"
+        }
+      },
+      "handoffs": [
+        "splunk-github-ta-setup",
+        "splunk-hec-service-setup",
+        "splunk-enterprise-security-config",
+        "splunk-asset-risk-intelligence-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "github-audit-actions",
+          "title": "GitHub audit action and repository coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(actor) as actors dc(repo) as repos values(operation_type) as operations by sourcetype action org"
+        },
+        {
+          "id": "github-alert-coverage",
+          "title": "GitHub security scanning alert coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now sourcetype IN (\"github:cloud:code:scanning:alerts\",\"github:cloud:dependabot:scanning:alerts\",\"github:cloud:secret:scanning:alerts\") | stats count by sourcetype state severity"
+        }
+      ]
+    },
+    {
+      "id": "google_gcp",
+      "label": "Google Cloud Platform",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3088"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_google-cloudplatform",
+          "Splunk_TA_google_cloud_platform"
+        ],
+        "products": [
+          "Google Cloud Platform",
+          "GCP"
+        ],
+        "names": [
+          "Google Cloud Platform",
+          "GCP Cloud Logging"
+        ],
+        "sourcetypes": [
+          "google:gcp:pubsub:message",
+          "google:gcp:pubsub:audit:admin_activity",
+          "google:gcp:pubsub:audit:data_access",
+          "google:gcp:pubsub:audit:system_event",
+          "google:gcp:pubsub:audit:policy_denied"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "google:gcp:pubsub:message",
+          "google:gcp:pubsub:audit:admin_activity",
+          "google:gcp:pubsub:audit:data_access",
+          "google:gcp:pubsub:audit:system_event",
+          "google:gcp:pubsub:audit:policy_denied"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Authentication"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-gcp-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "google_gcp-coverage",
+          "title": "Google Cloud Platform coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "google_workspace",
+      "label": "Google Workspace",
+      "docs": [
+        "https://splunk.github.io/splunk-add-on-for-google-workspace/",
+        "https://splunkbase.splunk.com/app/5556"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_Google_Workspace",
+          "Splunk_TA_google-workspace",
+          "Splunk_TA_gsuite"
+        ],
+        "products": [
+          "Google Workspace",
+          "G Suite"
+        ],
+        "names": [
+          "Google Workspace",
+          "G Suite",
+          "Google Workspace Admin Reports"
+        ],
+        "sourcetypes": [
+          "gws:reports:admin",
+          "gws:reports:login",
+          "gws:reports:token",
+          "gws:reports:drive",
+          "gws:reports:calendar",
+          "gws:reports:groups_enterprise",
+          "gws:reports:chrome",
+          "gws:reports:mobile",
+          "gws:reports:chat",
+          "gws:reports:gcp",
+          "gws:reports:saml",
+          "gws:reports:context_aware_access",
+          "gws:reports:data_studio",
+          "gws:reports:gemini_in_workspace_apps",
+          "gws:reports:access_transparency",
+          "gws:gmail",
+          "gws:alerts",
+          "gws:users:identity",
+          "gws:usage_reports:user",
+          "gws:usage_reports:customer",
+          "gws:usage_reports:entity"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "gws:reports:admin",
+          "gws:reports:login",
+          "gws:reports:token",
+          "gws:reports:drive",
+          "gws:reports:calendar",
+          "gws:reports:groups_enterprise",
+          "gws:reports:chrome",
+          "gws:reports:mobile",
+          "gws:reports:chat",
+          "gws:reports:gcp",
+          "gws:reports:saml",
+          "gws:reports:context_aware_access",
+          "gws:reports:data_studio",
+          "gws:reports:gemini_in_workspace_apps",
+          "gws:reports:access_transparency",
+          "gws:gmail",
+          "gws:alerts",
+          "gws:users:identity",
+          "gws:usage_reports:user",
+          "gws:usage_reports:customer",
+          "gws:usage_reports:entity"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Email"
+        ],
+        "cim.required_fields": [
+          "actor.email",
+          "ipAddress",
+          "events.name",
+          "events.type",
+          "app"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "actor.email",
+            "ipAddress",
+            "app"
+          ],
+          "relevant_event_filter": "actor.email=* AND app=*"
+        }
+      },
+      "handoffs": [
+        "splunk-google-workspace-ta-setup",
+        "splunk-enterprise-security-config",
+        "splunk-asset-risk-intelligence-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "google-workspace-sourcetype-coverage",
+          "title": "Google Workspace source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(actor.email) as users dc(ipAddress) as srcs values(events.name) as event_names by sourcetype app events.type"
+        }
+      ]
+    },
+    {
+      "id": "haproxy",
+      "label": "HAProxy",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3135"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_haproxy"
+        ],
+        "products": [
+          "HAProxy"
+        ],
+        "names": [
+          "HAProxy logs"
+        ],
+        "sourcetypes": [
+          "haproxy:default",
+          "haproxy:http",
+          "haproxy:tcp",
+          "haproxy:clf:http",
+          "haproxy:splunk:http"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "haproxy:default",
+          "haproxy:http",
+          "haproxy:tcp",
+          "haproxy:clf:http",
+          "haproxy:splunk:http"
+        ],
+        "cim.expected_models": [
+          "Web",
+          "Network_Traffic"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-universal-forwarder-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "haproxy-coverage",
+          "title": "HAProxy coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "infoblox",
+      "label": "Infoblox",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2934"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_infoblox"
+        ],
+        "products": [
+          "Infoblox"
+        ],
+        "names": [
+          "Infoblox DNS DHCP logs"
+        ],
+        "sourcetypes": [
+          "infoblox:dns",
+          "infoblox:dhcp",
+          "infoblox:audit",
+          "infoblox:threatprotect",
+          "infoblox:file",
+          "infoblox:port"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "infoblox:dns",
+          "infoblox:dhcp",
+          "infoblox:audit",
+          "infoblox:threatprotect",
+          "infoblox:file",
+          "infoblox:port"
+        ],
+        "cim.expected_models": [
+          "Network_Resolution",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "infoblox-coverage",
+          "title": "Infoblox coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
       "id": "kubernetes_audit",
       "label": "Kubernetes Audit",
       "docs": [
@@ -207,25 +2428,69 @@
         "https://research.splunk.com/sources/platforms/kubernetes/"
       ],
       "match": {
-        "products": ["Kubernetes Audit", "Kubernetes"],
-        "names": ["Kubernetes Audit"],
-        "sourcetypes": ["kube:audit"],
-        "source_sourcetype_pairs": [{"source": "kubernetes", "sourcetype": "_json"}]
+        "products": [
+          "Kubernetes Audit",
+          "Kubernetes"
+        ],
+        "names": [
+          "Kubernetes Audit"
+        ],
+        "sourcetypes": [
+          "kube:audit"
+        ],
+        "source_sourcetype_pairs": [
+          {
+            "source": "kubernetes",
+            "sourcetype": "_json"
+          }
+        ]
       },
       "defaults": {
-        "expected_sources": ["kubernetes"],
-        "expected_sourcetypes": ["_json", "kube:audit"],
-        "cim.expected_models": ["Change", "Authentication"],
-        "cim.required_fields": ["verb", "user.username", "objectRef.resource", "responseStatus.code", "annotations.authorization.k8s.io/decision"],
-        "es.expected_detection_families": ["kubernetes"],
-        "itsi.expected_content_packs": ["Kubernetes"],
+        "expected_sources": [
+          "kubernetes"
+        ],
+        "expected_sourcetypes": [
+          "_json",
+          "kube:audit"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Authentication"
+        ],
+        "cim.required_fields": [
+          "verb",
+          "user.username",
+          "objectRef.resource",
+          "responseStatus.code",
+          "annotations.authorization.k8s.io/decision"
+        ],
+        "es.expected_detection_families": [
+          "kubernetes"
+        ],
+        "itsi.expected_content_packs": [
+          "Kubernetes"
+        ],
         "itsi.content_pack_profile": {
-          "content_packs": ["Kubernetes"],
-          "entity_types": ["cluster", "namespace", "pod", "node"],
-          "kpi_split_fields": ["objectRef.namespace", "objectRef.name", "user.username"]
+          "content_packs": [
+            "Kubernetes"
+          ],
+          "entity_types": [
+            "cluster",
+            "namespace",
+            "pod",
+            "node"
+          ],
+          "kpi_split_fields": [
+            "objectRef.namespace",
+            "objectRef.name",
+            "user.username"
+          ]
         }
       },
-      "handoffs": ["splunk-observability-otel-collector-setup", "splunk-enterprise-security-config"],
+      "handoffs": [
+        "splunk-observability-otel-collector-setup",
+        "splunk-enterprise-security-config"
+      ],
       "collection_searches": [
         {
           "id": "k8s-audit-verbs",
@@ -244,35 +2509,362 @@
         "https://research.splunk.com/sources/platforms/linux/"
       ],
       "match": {
-        "app_names": ["Splunk_TA_nix", "Splunk_TA_Linux"],
-        "products": ["Unix and Linux", "Linux"],
-        "names": ["Linux Secure", "Linux Auditd"],
-        "sourcetypes": ["linux_secure", "auditd", "linux_audit", "linux:audit"]
+        "app_names": [
+          "Splunk_TA_nix",
+          "Splunk_TA_Linux"
+        ],
+        "products": [
+          "Unix and Linux",
+          "Linux"
+        ],
+        "names": [
+          "Linux Secure",
+          "Linux Auditd"
+        ],
+        "sourcetypes": [
+          "linux_secure",
+          "auditd",
+          "linux_audit",
+          "linux:audit"
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["linux_secure", "auditd", "linux_audit", "linux:audit"],
-        "cim.expected_models": ["Authentication", "Change", "Endpoint"],
-        "cim.required_fields": ["action", "user", "src", "dest", "process"],
-        "itsi.expected_content_packs": ["Unix and Linux"],
+        "expected_sourcetypes": [
+          "linux_secure",
+          "auditd",
+          "linux_audit",
+          "linux:audit"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Endpoint"
+        ],
+        "cim.required_fields": [
+          "action",
+          "user",
+          "src",
+          "dest",
+          "process"
+        ],
+        "itsi.expected_content_packs": [
+          "Unix and Linux"
+        ],
         "itsi.content_pack_profile": {
-          "content_packs": ["Monitoring Unix and Linux", "Unix Dashboards and Reports"],
-          "entity_types": ["host"],
-          "kpi_split_fields": ["host", "dest"]
+          "content_packs": [
+            "Monitoring Unix and Linux",
+            "Unix Dashboards and Reports"
+          ],
+          "entity_types": [
+            "host"
+          ],
+          "kpi_split_fields": [
+            "host",
+            "dest"
+          ]
         },
-        "ari.expected_processing_types": ["Asset", "Identity", "Software"],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Identity",
+          "Software"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["Asset", "Identity", "Software"],
-          "key_fields": ["host", "dest", "user", "process"],
+          "processing_types": [
+            "Asset",
+            "Identity",
+            "Software"
+          ],
+          "key_fields": [
+            "host",
+            "dest",
+            "user",
+            "process"
+          ],
           "relevant_event_filter": "host=* OR user=*"
         }
       },
-      "handoffs": ["splunk-supported-addons-setup", "splunk-universal-forwarder-setup", "splunk-enterprise-security-config", "splunk-itsi-config"],
+      "handoffs": [
+        "splunk-supported-addons-setup",
+        "splunk-universal-forwarder-setup",
+        "splunk-enterprise-security-config",
+        "splunk-itsi-config"
+      ],
       "collection_searches": [
         {
           "id": "linux-auth-activity",
           "title": "Linux authentication and privilege activity",
           "category": "source-pack",
           "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count values(action) as actions values(app) as apps dc(user) as users by host sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "microsoft_entra_id",
+      "label": "Microsoft Entra ID and Azure AD",
+      "docs": [
+        "https://research.splunk.com/sources/51ca21e5-bda2-4652-bb29-27c7bc18a81c/",
+        "https://help.splunk.com/en/data-management/integrate-data-with-add-ons/splunk-supported-add-ons/microsoft-cloud-services"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_microsoft-cloudservices",
+          "Splunk_TA_microsoft_aad"
+        ],
+        "products": [
+          "Microsoft Entra ID",
+          "Azure Active Directory",
+          "Azure AD"
+        ],
+        "names": [
+          "Entra ID",
+          "Azure Active Directory"
+        ],
+        "sourcetypes": [
+          "azure:monitor:aad",
+          "azure:aad:signin",
+          "ms:aad:signin"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "azure:monitor:aad",
+          "azure:aad:signin",
+          "ms:aad:signin"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Identity_Management"
+        ],
+        "cim.required_fields": [
+          "user",
+          "src",
+          "appDisplayName",
+          "result",
+          "OperationName"
+        ],
+        "itsi.expected_content_packs": [
+          "Microsoft 365"
+        ],
+        "itsi.content_pack_profile": {
+          "content_packs": [
+            "Microsoft 365"
+          ],
+          "entity_types": [
+            "user",
+            "tenant",
+            "cloud_service"
+          ],
+          "kpi_split_fields": [
+            "user",
+            "appDisplayName"
+          ]
+        },
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "user",
+            "src",
+            "appDisplayName"
+          ],
+          "relevant_event_filter": "user=* OR UserPrincipalName=*"
+        }
+      },
+      "handoffs": [
+        "splunk-app-install",
+        "splunk-enterprise-security-config",
+        "splunk-itsi-config",
+        "splunk-asset-risk-intelligence-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "entra-signin-app-coverage",
+          "title": "Entra sign-in and application coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(user) as users dc(src) as srcs values(result) as results by appDisplayName OperationName"
+        }
+      ]
+    },
+    {
+      "id": "microsoft_exchange",
+      "label": "Microsoft Exchange",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3225",
+        "https://splunkbase.splunk.com/app/5663"
+      ],
+      "match": {
+        "app_names": [
+          "TA-Exchange-ClientAccess",
+          "TA-Exchange-Mailbox",
+          "TA-SMTP-Reputation",
+          "TA-Windows-Exchange-IIS",
+          "SA-ExchangeIndex"
+        ],
+        "products": [
+          "Microsoft Exchange",
+          "Exchange Server"
+        ],
+        "names": [
+          "Exchange Message Tracking",
+          "Exchange Mailbox Audit"
+        ],
+        "sourcetypes": [
+          "MSExchange:2013:MessageTracking",
+          "MSExchange:2013:MailboxAudit",
+          "MSExchange:2013:AdminAudit",
+          "MSExchange:2013:RPCClientAccess",
+          "MSExchange:2013:Topology",
+          "MSExchange:Reputation",
+          "WinEventLog:Exchange",
+          "MSWindows:2013EWS:IIS"
+        ]
+      },
+      "defaults": {
+        "expected_indexes": [
+          "msexchange",
+          "perfmon",
+          "windows",
+          "wineventlog",
+          "msad"
+        ],
+        "expected_sourcetypes": [
+          "MSExchange:2013:MessageTracking",
+          "MSExchange:2013:MailboxAudit",
+          "MSExchange:2013:AdminAudit",
+          "MSExchange:2013:RPCClientAccess",
+          "MSExchange:2013:Topology",
+          "MSExchange:Reputation",
+          "WinEventLog:Exchange",
+          "MSWindows:2013EWS:IIS"
+        ],
+        "expected_lookups": [
+          "event_id_to_action_lookup"
+        ],
+        "cim.expected_models": [
+          "Email",
+          "Authentication",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "itsi.expected_content_packs": [
+          "Microsoft Exchange"
+        ],
+        "itsi.content_pack_profile": {
+          "content_packs": [
+            "Microsoft Exchange"
+          ],
+          "entity_types": [
+            "host"
+          ]
+        },
+        "ari.expected_processing_types": [
+          "Asset",
+          "Identity"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Identity"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype",
+            "user"
+          ],
+          "relevant_event_filter": "host=* OR user=*"
+        }
+      },
+      "handoffs": [
+        "splunk-microsoft-exchange-ta-setup",
+        "splunk-windows-ta-setup",
+        "splunk-itsi-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "microsoft-exchange-coverage",
+          "title": "Microsoft Exchange source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by index sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "microsoft_iis",
+      "label": "Microsoft IIS",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3185"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_microsoft-iis"
+        ],
+        "products": [
+          "Microsoft IIS"
+        ],
+        "names": [
+          "IIS logs"
+        ],
+        "sourcetypes": [
+          "ms:iis:auto",
+          "ms:iis:default",
+          "ms:iis:default:85",
+          "ms:iis:splunk",
+          "ms:iis:webglobalmodule"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "ms:iis:auto",
+          "ms:iis:default",
+          "ms:iis:default:85",
+          "ms:iis:splunk",
+          "ms:iis:webglobalmodule"
+        ],
+        "cim.expected_models": [
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-windows-ta-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "microsoft_iis-coverage",
+          "title": "Microsoft IIS coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
         }
       ]
     },
@@ -285,36 +2877,1712 @@
         "https://research.splunk.com/sources/6099b33d-d581-43ed-8401-911862590361/"
       ],
       "match": {
-        "app_names": ["Splunk_TA_microsoft_o365", "Splunk_TA_microsoft-cloudservices"],
-        "products": ["Microsoft Office 365", "Microsoft 365", "Office 365"],
-        "names": ["O365", "Office 365 Management Activity"],
-        "sourcetypes": ["o365:management:activity"]
+        "app_names": [
+          "Splunk_TA_microsoft_o365",
+          "Splunk_TA_microsoft-cloudservices"
+        ],
+        "products": [
+          "Microsoft Office 365",
+          "Microsoft 365",
+          "Office 365"
+        ],
+        "names": [
+          "O365",
+          "Office 365 Management Activity"
+        ],
+        "sourcetypes": [
+          "o365:management:activity"
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["o365:management:activity"],
-        "cim.expected_models": ["Authentication", "Change", "Email"],
-        "cim.required_fields": ["Operation", "UserId", "Workload", "ClientIP", "ResultStatus"],
-        "itsi.expected_content_packs": ["Microsoft 365"],
-        "es.expected_detection_families": ["o365"],
+        "expected_sourcetypes": [
+          "o365:management:activity"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Email"
+        ],
+        "cim.required_fields": [
+          "Operation",
+          "UserId",
+          "Workload",
+          "ClientIP",
+          "ResultStatus"
+        ],
+        "itsi.expected_content_packs": [
+          "Microsoft 365"
+        ],
+        "es.expected_detection_families": [
+          "o365"
+        ],
         "itsi.content_pack_profile": {
-          "content_packs": ["Microsoft 365"],
-          "entity_types": ["user", "tenant", "service"],
-          "kpi_split_fields": ["UserId", "Workload"]
+          "content_packs": [
+            "Microsoft 365"
+          ],
+          "entity_types": [
+            "user",
+            "tenant",
+            "service"
+          ],
+          "kpi_split_fields": [
+            "UserId",
+            "Workload"
+          ]
         },
-        "ari.expected_processing_types": ["Identity", "Cloud applications"],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["Identity", "Cloud applications"],
-          "key_fields": ["UserId", "ClientIP", "Workload"],
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "UserId",
+            "ClientIP",
+            "Workload"
+          ],
           "relevant_event_filter": "UserId=* AND Workload=*"
         }
       },
-      "handoffs": ["splunk-app-install", "splunk-enterprise-security-config", "splunk-itsi-config"],
+      "handoffs": [
+        "splunk-app-install",
+        "splunk-enterprise-security-config",
+        "splunk-itsi-config"
+      ],
       "collection_searches": [
         {
           "id": "o365-workload-operation",
           "title": "O365 workload and operation coverage",
           "category": "source-pack",
           "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(UserId) as users values(ResultStatus) as result_status by Workload Operation ClientIP"
+        }
+      ]
+    },
+    {
+      "id": "microsoft_scom",
+      "label": "Microsoft SCOM",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2729"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_microsoft-scom"
+        ],
+        "products": [
+          "Microsoft SCOM",
+          "System Center Operations Manager"
+        ],
+        "names": [
+          "SCOM Alerts",
+          "SCOM Performance"
+        ],
+        "sourcetypes": [
+          "microsoft:scom",
+          "microsoft:scom:alert",
+          "microsoft:scom:events",
+          "microsoft:scom:performance",
+          "microsoft:scom:cmd"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "microsoft:scom",
+          "microsoft:scom:alert",
+          "microsoft:scom:events",
+          "microsoft:scom:performance",
+          "microsoft:scom:cmd"
+        ],
+        "expected_eventtypes": [
+          "ms_scom_alert",
+          "ms_scom_event",
+          "ms_scom_inventory",
+          "ms_scom_perf",
+          "ms_scom_task"
+        ],
+        "expected_lookups": [
+          "ms_scom_countername_to_datamodel_lookup",
+          "ms_scom_monitor_to_datamodel_lookup",
+          "ms_scom_type_lookup",
+          "ms_scom_vendor_severity_lookup"
+        ],
+        "cim.expected_models": [
+          "Alerts",
+          "Inventory",
+          "Performance"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "itsi.expected_content_packs": [
+          "Microsoft SCOM"
+        ],
+        "itsi.content_pack_profile": {
+          "content_packs": [
+            "Microsoft SCOM"
+          ],
+          "entity_types": [
+            "host"
+          ]
+        },
+        "ari.expected_processing_types": [
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-microsoft-scom-ta-setup",
+        "splunk-itsi-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "microsoft-scom-coverage",
+          "title": "Microsoft SCOM source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "microsoft_security",
+      "label": "Microsoft Security / Defender",
+      "docs": [
+        "https://splunk.github.io/splunk-add-on-for-microsoft-365-defender/",
+        "https://splunkbase.splunk.com/app/6207"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_MS_Security"
+        ],
+        "products": [
+          "Microsoft Security",
+          "Microsoft 365 Defender",
+          "Microsoft Defender for Endpoint"
+        ],
+        "names": [
+          "Microsoft Security",
+          "Microsoft Defender",
+          "Microsoft 365 Defender",
+          "Defender for Endpoint"
+        ],
+        "sourcetypes": [
+          "ms365:defender:incident",
+          "ms:defender:atp:alerts",
+          "ms:defender:machines",
+          "ms:defender:simulations",
+          "ms:defender:eventhub",
+          "ms:defender:ti:articles",
+          "m365:defender:incident:advanced_hunting",
+          "ms365:defender:incident:alerts"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "ms365:defender:incident",
+          "ms:defender:atp:alerts",
+          "ms:defender:machines",
+          "ms:defender:simulations",
+          "ms:defender:eventhub",
+          "ms:defender:ti:articles",
+          "m365:defender:incident:advanced_hunting",
+          "ms365:defender:incident:alerts"
+        ],
+        "cim.expected_models": [
+          "Alerts",
+          "Endpoint",
+          "Change",
+          "Inventory"
+        ],
+        "cim.required_fields": [
+          "severity",
+          "status",
+          "DeviceName",
+          "AccountName",
+          "ActionType"
+        ],
+        "es.expected_detection_families": [
+          "microsoft_defender",
+          "endpoint"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "DeviceName",
+            "AccountName",
+            "AlertId",
+            "IncidentId"
+          ],
+          "relevant_event_filter": "DeviceName=* OR AccountName=* OR IncidentId=*"
+        }
+      },
+      "handoffs": [
+        "splunk-microsoft-security-ta-setup",
+        "splunk-enterprise-security-config",
+        "splunk-asset-risk-intelligence-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "microsoft-security-sourcetype-coverage",
+          "title": "Microsoft Security source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(DeviceName) as devices dc(AccountName) as accounts values(ActionType) as action_types by sourcetype severity status"
+        }
+      ]
+    },
+    {
+      "id": "mssql_database",
+      "label": "Microsoft SQL Server",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2648"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_microsoft-sqlserver"
+        ],
+        "products": [
+          "Microsoft SQL Server",
+          "SQL Server",
+          "MSSQL"
+        ],
+        "names": [
+          "Microsoft SQL Server Database"
+        ],
+        "sourcetypes": [
+          "mssql:errorlog",
+          "mssql:agentlog",
+          "mssql:audit",
+          "mssql:instance",
+          "mssql:os:dm_os_sys_info",
+          "mssql:execution:dm_exec_sessions",
+          "mssql:execution:dm_exec_query_stats",
+          "mssql:transaction:dm_tran_locks"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "mssql:errorlog",
+          "mssql:agentlog",
+          "mssql:audit",
+          "mssql:instance",
+          "mssql:os:dm_os_sys_info",
+          "mssql:execution:dm_exec_sessions",
+          "mssql:execution:dm_exec_query_stats",
+          "mssql:transaction:dm_tran_locks"
+        ],
+        "expected_eventtypes": [
+          "microsoft_sqlserver_instance",
+          "microsoft_sqlserver_error_auth",
+          "microsoft_sqlserver_audit_login",
+          "microsoft_sqlserver_query"
+        ],
+        "expected_lookups": [
+          "sqlserver_host_dbserver_lookup"
+        ],
+        "cim.expected_models": [
+          "Databases",
+          "Authentication",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Identity"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Identity"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype",
+            "user"
+          ],
+          "relevant_event_filter": "host=* OR user=*"
+        }
+      },
+      "handoffs": [
+        "splunk-database-ta-setup",
+        "splunk-db-connect-setup",
+        "splunk-data-source-readiness-doctor"
+      ],
+      "collection_searches": [
+        {
+          "id": "mssql-database-coverage",
+          "title": "Microsoft SQL Server source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "mysql_database",
+      "label": "MySQL Database",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2848"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_mysql"
+        ],
+        "products": [
+          "MySQL"
+        ],
+        "names": [
+          "MySQL Database"
+        ],
+        "sourcetypes": [
+          "mysql:errorLog",
+          "mysql:generalQueryLog",
+          "mysql:slowQueryLog",
+          "mysql:audit",
+          "mysql:status",
+          "mysql:variables",
+          "mysql:instance:stats",
+          "mysql:connection:stats"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "mysql:errorLog",
+          "mysql:generalQueryLog",
+          "mysql:slowQueryLog",
+          "mysql:audit",
+          "mysql:status",
+          "mysql:variables",
+          "mysql:instance:stats",
+          "mysql:connection:stats"
+        ],
+        "expected_eventtypes": [
+          "mysql_errorLog",
+          "mysql_generalQueryLog",
+          "mysql_slowQueryLog",
+          "mysql_audit_connection"
+        ],
+        "expected_lookups": [
+          "mysql_audit_error_lookup"
+        ],
+        "cim.expected_models": [
+          "Databases",
+          "Authentication",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Identity"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Identity"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype",
+            "user"
+          ],
+          "relevant_event_filter": "host=* OR user=*"
+        }
+      },
+      "handoffs": [
+        "splunk-database-ta-setup",
+        "splunk-db-connect-setup",
+        "splunk-data-source-readiness-doctor"
+      ],
+      "collection_searches": [
+        {
+          "id": "mysql-database-coverage",
+          "title": "MySQL source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "netapp_ontap",
+      "label": "NetApp ONTAP",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3418",
+        "https://splunkbase.splunk.com/app/5615",
+        "https://splunkbase.splunk.com/app/5616"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_ontap",
+          "TA-ONTAP-FieldExtractions",
+          "SA-ONTAPIndex"
+        ],
+        "products": [
+          "NetApp Data ONTAP",
+          "NetApp ONTAP",
+          "ONTAP"
+        ],
+        "names": [
+          "NetApp ONTAP"
+        ],
+        "sourcetypes": [
+          "ontap:perf",
+          "ontap:volume",
+          "ontap:aggr",
+          "ontap:disk",
+          "ontap:system",
+          "ontap:lun",
+          "ontap:ems",
+          "ontap:syslog"
+        ]
+      },
+      "defaults": {
+        "expected_indexes": [
+          "ontap"
+        ],
+        "expected_sourcetypes": [
+          "ontap:perf",
+          "ontap:volume",
+          "ontap:aggr",
+          "ontap:disk",
+          "ontap:system",
+          "ontap:lun",
+          "ontap:ems",
+          "ontap:syslog"
+        ],
+        "expected_eventtypes": [
+          "ontap_aggr",
+          "ontap_disk",
+          "ontap_lun",
+          "ontap_system_cluster",
+          "ontap_volume",
+          "ontap_vserver"
+        ],
+        "cim.expected_models": [
+          "Inventory",
+          "Performance"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "itsi.expected_content_packs": [
+          "NetApp ONTAP"
+        ],
+        "itsi.content_pack_profile": {
+          "content_packs": [
+            "NetApp ONTAP"
+          ],
+          "entity_types": [
+            "host"
+          ]
+        },
+        "ari.expected_processing_types": [
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-netapp-ontap-ta-setup",
+        "splunk-itsi-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "netapp-ontap-coverage",
+          "title": "NetApp ONTAP source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "nginx_web",
+      "label": "NGINX",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3258"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_nginx"
+        ],
+        "products": [
+          "NGINX"
+        ],
+        "names": [
+          "NGINX access logs"
+        ],
+        "sourcetypes": [
+          "nginx:plus:access",
+          "nginx:plus:kv",
+          "nginx:plus:error",
+          "nginx:plus:api",
+          "nginx:app:protect"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "nginx:plus:access",
+          "nginx:plus:kv",
+          "nginx:plus:error",
+          "nginx:plus:api",
+          "nginx:app:protect"
+        ],
+        "cim.expected_models": [
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-universal-forwarder-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "nginx_web-coverage",
+          "title": "NGINX coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "okta_identity_cloud",
+      "label": "Okta Identity Cloud",
+      "docs": [
+        "https://research.splunk.com/sources/ec26febe-e760-4981-bbee-72e107c7b9d2/",
+        "https://research.splunk.com/stories/okta_account_takeover/"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_okta"
+        ],
+        "products": [
+          "Okta",
+          "Okta Identity Cloud"
+        ],
+        "names": [
+          "Okta"
+        ],
+        "sourcetypes": [
+          "OktaIM2:log"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "OktaIM2:log"
+        ],
+        "expected_macros": [
+          "okta"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Identity_Management"
+        ],
+        "cim.required_fields": [
+          "user",
+          "src",
+          "dest",
+          "action",
+          "outcome.result"
+        ],
+        "es.expected_detection_families": [
+          "okta"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "user",
+            "src",
+            "actor.alternateId",
+            "target"
+          ],
+          "relevant_event_filter": "eventType=* AND actor.alternateId=*"
+        }
+      },
+      "handoffs": [
+        "splunk-app-install",
+        "splunk-enterprise-security-config",
+        "splunk-asset-risk-intelligence-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "okta-eventtype-outcomes",
+          "title": "Okta event type and outcome coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(user) as users dc(src) as srcs values(outcome.result) as outcomes by eventType actor.alternateId"
+        }
+      ]
+    },
+    {
+      "id": "oracle_database",
+      "label": "Oracle Database",
+      "docs": [
+        "https://splunkbase.splunk.com/app/1910"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_oracle"
+        ],
+        "products": [
+          "Oracle Database",
+          "Oracle"
+        ],
+        "names": [
+          "Oracle Database"
+        ],
+        "sourcetypes": [
+          "oracle:audit:unified",
+          "oracle:audit:text",
+          "oracle:audit:xml",
+          "oracle:listener:text",
+          "oracle:alert:text",
+          "oracle:database",
+          "oracle:instance",
+          "oracle:session",
+          "oracle:sysPerf",
+          "oracle:query"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "oracle:audit:unified",
+          "oracle:audit:text",
+          "oracle:audit:xml",
+          "oracle:listener:text",
+          "oracle:alert:text",
+          "oracle:database",
+          "oracle:instance",
+          "oracle:session",
+          "oracle:sysPerf",
+          "oracle:query"
+        ],
+        "expected_eventtypes": [
+          "oracle:audit:xml",
+          "oracle:auth",
+          "oracle:database",
+          "oracle:instance",
+          "oracle:session"
+        ],
+        "expected_lookups": [
+          "oracle_action_lookup",
+          "oracle_audit_type_lookup",
+          "oracle_returncode_lookup"
+        ],
+        "cim.expected_models": [
+          "Databases",
+          "Authentication",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Identity"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Identity"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype",
+            "user"
+          ],
+          "relevant_event_filter": "host=* OR user=*"
+        }
+      },
+      "handoffs": [
+        "splunk-database-ta-setup",
+        "splunk-db-connect-setup",
+        "splunk-data-source-readiness-doctor"
+      ],
+      "collection_searches": [
+        {
+          "id": "oracle-database-coverage",
+          "title": "Oracle Database source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "palo_alto_networks",
+      "label": "Palo Alto Networks",
+      "docs": [
+        "https://research.splunk.com/sources/182a83bc-c31a-4817-8c7a-263744cec52a/",
+        "https://research.splunk.com/sources/platforms/network/"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_paloalto",
+          "SplunkforPaloAltoNetworks"
+        ],
+        "products": [
+          "Palo Alto Networks",
+          "PAN-OS"
+        ],
+        "names": [
+          "Palo Alto Networks"
+        ],
+        "sourcetypes": [
+          "pan:traffic",
+          "pan:threat"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "pan:traffic",
+          "pan:threat"
+        ],
+        "cim.expected_models": [
+          "Network_Traffic",
+          "Intrusion_Detection",
+          "Malware",
+          "Web"
+        ],
+        "cim.required_fields": [
+          "src",
+          "dest",
+          "action",
+          "app",
+          "rule"
+        ],
+        "es.expected_detection_families": [
+          "palo_alto_networks"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "src",
+            "dest",
+            "app",
+            "rule"
+          ],
+          "relevant_event_filter": "src=* OR dest=*"
+        }
+      },
+      "handoffs": [
+        "splunk-app-install",
+        "splunk-connect-for-syslog-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "palo-alto-traffic-threat",
+          "title": "Palo Alto traffic and threat coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(src) as srcs dc(dest) as dests values(action) as actions values(app) as apps by sourcetype rule threatid"
+        }
+      ]
+    },
+    {
+      "id": "rsa_securid_am",
+      "label": "RSA SecurID Authentication Manager",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2958"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_rsa-securid"
+        ],
+        "products": [
+          "RSA SecurID",
+          "RSA Authentication Manager"
+        ],
+        "names": [
+          "RSA SecurID AM"
+        ],
+        "sourcetypes": [
+          "rsa:securid:syslog",
+          "rsa:securid:admin:syslog",
+          "rsa:securid:runtime:syslog",
+          "rsa:securid:system:syslog"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "rsa:securid:syslog",
+          "rsa:securid:admin:syslog",
+          "rsa:securid:runtime:syslog",
+          "rsa:securid:system:syslog"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Identity"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-rsa-securid-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "rsa_securid_am-coverage",
+          "title": "RSA SecurID Authentication Manager coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "rsa_securid_cas",
+      "label": "RSA SecurID CAS",
+      "docs": [
+        "https://splunkbase.splunk.com/app/5210"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_rsa_securid_cas"
+        ],
+        "products": [
+          "RSA SecurID CAS",
+          "RSA SecurID Cloud Authentication Service"
+        ],
+        "names": [
+          "RSA SecurID CAS"
+        ],
+        "sourcetypes": [
+          "rsa:securid:cas:adminlog:json",
+          "rsa:securid:cas:usereventlog:json",
+          "rsa:securid:cas:riskuser:json"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "rsa:securid:cas:adminlog:json",
+          "rsa:securid:cas:usereventlog:json",
+          "rsa:securid:cas:riskuser:json"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-rsa-securid-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "rsa_securid_cas-coverage",
+          "title": "RSA SecurID CAS coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "salesforce",
+      "label": "Salesforce",
+      "docs": [
+        "https://splunkbase.splunk.com/app/3549"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_salesforce"
+        ],
+        "products": [
+          "Salesforce"
+        ],
+        "names": [
+          "Salesforce",
+          "Salesforce Event Log"
+        ],
+        "sourcetypes": [
+          "sfdc:object",
+          "sfdc:logfile",
+          "sfdc:user",
+          "sfdc:loginhistory",
+          "sfdc:account",
+          "sfdc:opportunity",
+          "sfdc:dashboard",
+          "sfdc:report",
+          "sfdc:contentversion"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "sfdc:object",
+          "sfdc:logfile",
+          "sfdc:user",
+          "sfdc:loginhistory",
+          "sfdc:account",
+          "sfdc:opportunity",
+          "sfdc:dashboard",
+          "sfdc:report",
+          "sfdc:contentversion"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Identity",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-salesforce-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "salesforce-coverage",
+          "title": "Salesforce coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "servicenow",
+      "label": "ServiceNow",
+      "docs": [
+        "https://splunkbase.splunk.com/app/1928"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_snow"
+        ],
+        "products": [
+          "ServiceNow"
+        ],
+        "names": [
+          "ServiceNow ITSM",
+          "ServiceNow CMDB"
+        ],
+        "sourcetypes": [
+          "snow:incident",
+          "snow:change_request",
+          "snow:problem",
+          "snow:em_event",
+          "snow:cmdb_ci",
+          "snow:sys_user",
+          "snow:sys_user_group"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "snow:incident",
+          "snow:change_request",
+          "snow:problem",
+          "snow:em_event",
+          "snow:cmdb_ci",
+          "snow:sys_user",
+          "snow:sys_user_group"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Ticket_Management"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Identity"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Identity"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-servicenow-ta-setup",
+        "splunk-itsi-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "servicenow-coverage",
+          "title": "ServiceNow coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "squid_proxy",
+      "label": "Squid Proxy",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2965"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_squid"
+        ],
+        "products": [
+          "Squid Proxy"
+        ],
+        "names": [
+          "Squid proxy logs"
+        ],
+        "sourcetypes": [
+          "squid:access",
+          "squid:access:recommended"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "squid:access",
+          "squid:access:recommended"
+        ],
+        "cim.expected_models": [
+          "Web"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Cloud applications"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "squid_proxy-coverage",
+          "title": "Squid Proxy coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "symantec_endpoint_protection",
+      "label": "Symantec Endpoint Protection",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2772"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_symantec-ep"
+        ],
+        "products": [
+          "Symantec Endpoint Protection",
+          "Symantec EP"
+        ],
+        "names": [
+          "Symantec Endpoint Protection"
+        ],
+        "sourcetypes": [
+          "symantec:ep:syslog",
+          "symantec:ep:admin:file",
+          "symantec:ep:admin:syslog",
+          "symantec:ep:risk:file",
+          "symantec:ep:risk:syslog",
+          "symantec:ep:security:file",
+          "symantec:ep:security:syslog",
+          "symantec:ep:traffic:file",
+          "symantec:ep:traffic:syslog"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "symantec:ep:syslog",
+          "symantec:ep:admin:file",
+          "symantec:ep:admin:syslog",
+          "symantec:ep:risk:file",
+          "symantec:ep:risk:syslog",
+          "symantec:ep:security:file",
+          "symantec:ep:security:syslog",
+          "symantec:ep:traffic:file",
+          "symantec:ep:traffic:syslog"
+        ],
+        "expected_eventtypes": [
+          "symantec_ep_admin_authentication",
+          "symantec_ep_risk",
+          "symantec_ep_security_alert",
+          "symantec_ep_traffic"
+        ],
+        "expected_lookups": [
+          "symantec_ep_action_lookup",
+          "symantec_ep_data_model_lookup",
+          "symantec_ep_severity_lookup"
+        ],
+        "cim.expected_models": [
+          "Alerts",
+          "Endpoint",
+          "Network_Traffic",
+          "Authentication"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "es.expected_detection_families": [
+          "symantec_ep",
+          "endpoint"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Software"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Software"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype",
+            "process"
+          ],
+          "relevant_event_filter": "host=* OR process=*"
+        }
+      },
+      "handoffs": [
+        "splunk-security-appliance-ta-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "symantec-ep-coverage",
+          "title": "Symantec Endpoint Protection source type coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "sysmon",
+      "label": "Microsoft Sysmon",
+      "docs": [
+        "https://splunk.github.io/splunk-add-on-for-microsoft-sysmon/",
+        "https://splunkbase.splunk.com/app/5709"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_microsoft_sysmon"
+        ],
+        "products": [
+          "Microsoft Sysmon",
+          "Sysmon"
+        ],
+        "names": [
+          "Microsoft Sysmon",
+          "Sysmon Operational",
+          "WEC Sysmon"
+        ],
+        "source_sourcetype_pairs": [
+          {
+            "source": "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational",
+            "sourcetype": "XmlWinEventLog"
+          },
+          {
+            "source": "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational",
+            "sourcetype": "XmlWinEventLog:WEC-Sysmon"
+          },
+          {
+            "source": "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational",
+            "sourcetype": "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+          }
+        ]
+      },
+      "defaults": {
+        "expected_sources": [
+          "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        ],
+        "expected_sourcetypes": [
+          "XmlWinEventLog",
+          "XmlWinEventLog:WEC-Sysmon",
+          "XmlWinEventLog:Microsoft-Windows-Sysmon/Operational"
+        ],
+        "cim.expected_models": [
+          "Endpoint",
+          "Network",
+          "Change"
+        ],
+        "cim.required_fields": [
+          "EventCode",
+          "EventID",
+          "Image",
+          "ProcessId",
+          "Computer"
+        ],
+        "es.expected_detection_families": [
+          "sysmon",
+          "windows_endpoint"
+        ],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Software"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset",
+            "Software"
+          ],
+          "key_fields": [
+            "Computer",
+            "Image",
+            "ProcessGuid",
+            "EventCode"
+          ],
+          "relevant_event_filter": "Computer=* AND (Image=* OR EventCode=*)"
+        }
+      },
+      "handoffs": [
+        "splunk-sysmon-ta-setup",
+        "splunk-universal-forwarder-setup",
+        "splunk-agent-management-setup",
+        "splunk-enterprise-security-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "sysmon-eventcode-coverage",
+          "title": "Sysmon EventCode coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now source=\"XmlWinEventLog:Microsoft-Windows-Sysmon/Operational\" | stats count dc(Computer) as hosts values(Image) as images by EventCode EventID sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "tomcat_web",
+      "label": "Tomcat",
+      "docs": [
+        "https://splunkbase.splunk.com/app/2911"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_tomcat"
+        ],
+        "products": [
+          "Tomcat"
+        ],
+        "names": [
+          "Tomcat access logs"
+        ],
+        "sourcetypes": [
+          "tomcat:access:log",
+          "tomcat:access:log:splunk",
+          "tomcat:runtime:log",
+          "tomcat:jmx"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "tomcat:access:log",
+          "tomcat:access:log:splunk",
+          "tomcat:runtime:log",
+          "tomcat:jmx"
+        ],
+        "cim.expected_models": [
+          "Web",
+          "Application_State"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "IP",
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-syslog-web-proxy-ta-setup",
+        "splunk-universal-forwarder-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "tomcat_web-coverage",
+          "title": "Tomcat coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "vmware",
+      "label": "VMware vCenter",
+      "docs": [
+        "https://splunkbase.splunk.com/app/7257"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_vmware",
+          "Splunk_TA_vmware_inframon",
+          "SA-VMNetAppUtils"
+        ],
+        "products": [
+          "VMware",
+          "vCenter"
+        ],
+        "names": [
+          "VMware vCenter",
+          "VMware Events"
+        ],
+        "sourcetypes": [
+          "vmware:events",
+          "vmware:tasks",
+          "vmware:inv:hierarchy",
+          "vmware:perf:host"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "vmware:events",
+          "vmware:tasks",
+          "vmware:inv:hierarchy",
+          "vmware:perf:host"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Inventory"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        },
+        "itsi.expected_content_packs": [
+          "Content Pack for VMware"
+        ],
+        "itsi.content_pack_profile": {
+          "content_packs": [
+            "Content Pack for VMware"
+          ]
+        }
+      },
+      "handoffs": [
+        "splunk-vmware-ta-setup",
+        "splunk-itsi-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "vmware-coverage",
+          "title": "VMware vCenter coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "vmware_esxi",
+      "label": "VMware ESXi Logs",
+      "docs": [
+        "https://splunkbase.splunk.com/app/833"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_esxilogs",
+          "Splunk_TA_vmware"
+        ],
+        "products": [
+          "VMware ESXi",
+          "ESXi"
+        ],
+        "names": [
+          "VMware ESXi Logs"
+        ],
+        "sourcetypes": [
+          "vmw-syslog",
+          "vmware:esxlog",
+          "vmware:esxlog:vmkernel"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "vmw-syslog",
+          "vmware:esxlog",
+          "vmware:esxlog:vmkernel"
+        ],
+        "cim.expected_models": [
+          "Change",
+          "Endpoint"
+        ],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        }
+      },
+      "handoffs": [
+        "splunk-vmware-ta-setup",
+        "splunk-connect-for-syslog-setup"
+      ],
+      "collection_searches": [
+        {
+          "id": "vmware_esxi-coverage",
+          "title": "VMware ESXi Logs coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
+        }
+      ]
+    },
+    {
+      "id": "vmware_metrics",
+      "label": "VMware Metrics",
+      "docs": [
+        "https://splunkbase.splunk.com/app/7257"
+      ],
+      "match": {
+        "app_names": [
+          "Splunk_TA_vmware",
+          "Splunk_TA_vmware_inframon"
+        ],
+        "products": [
+          "VMware Metrics"
+        ],
+        "names": [
+          "VMware metrics index"
+        ],
+        "sourcetypes": [
+          "vmware:perf:metrics",
+          "vmware:metrics"
+        ]
+      },
+      "defaults": {
+        "expected_sourcetypes": [
+          "vmware:perf:metrics",
+          "vmware:metrics"
+        ],
+        "cim.expected_models": [],
+        "cim.required_fields": [
+          "host",
+          "source",
+          "sourcetype"
+        ],
+        "ari.expected_processing_types": [
+          "Asset"
+        ],
+        "ari.processing_profile": {
+          "processing_types": [
+            "Asset"
+          ],
+          "key_fields": [
+            "host",
+            "source",
+            "sourcetype"
+          ],
+          "relevant_event_filter": "host=* OR source=*"
+        },
+        "metrics.required": true,
+        "itsi.expected_content_packs": [
+          "Content Pack for VMware"
+        ],
+        "itsi.content_pack_profile": {
+          "content_packs": [
+            "Content Pack for VMware"
+          ]
+        }
+      },
+      "handoffs": [
+        "splunk-vmware-ta-setup",
+        "splunk-itsi-config"
+      ],
+      "collection_searches": [
+        {
+          "id": "vmware_metrics-coverage",
+          "title": "VMware Metrics coverage",
+          "category": "source-pack",
+          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(host) as hosts dc(source) as sources by sourcetype"
         }
       ]
     },
@@ -327,31 +4595,96 @@
         "https://research.splunk.com/sources/08682968-0366-4882-9559-fe4fe018a846/"
       ],
       "match": {
-        "app_names": ["Splunk_TA_windows"],
-        "products": ["Microsoft Windows", "Windows Security"],
-        "names": ["Windows Security", "Windows Event Log Security"],
-        "sourcetypes": ["XmlWinEventLog", "WinEventLog"],
-        "sourcetype_prefixes": ["XmlWinEventLog", "WinEventLog"]
+        "app_names": [
+          "Splunk_TA_windows"
+        ],
+        "products": [
+          "Microsoft Windows",
+          "Windows Security"
+        ],
+        "names": [
+          "Windows Security",
+          "Windows Event Log Security"
+        ],
+        "source_sourcetype_pairs": [
+          {
+            "source": "XmlWinEventLog:Security",
+            "sourcetype": "XmlWinEventLog"
+          },
+          {
+            "source": "WinEventLog:Security",
+            "sourcetype": "WinEventLog"
+          },
+          {
+            "source": "WinEventLog:Security",
+            "sourcetype": "WinEventLog:Security"
+          }
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["XmlWinEventLog", "WinEventLog"],
-        "cim.expected_models": ["Authentication", "Change", "Endpoint"],
-        "cim.required_fields": ["EventCode", "EventID", "user", "dest", "action"],
-        "itsi.expected_content_packs": ["Windows"],
-        "es.expected_detection_families": ["windows"],
+        "expected_sourcetypes": [
+          "XmlWinEventLog",
+          "WinEventLog",
+          "WinEventLog:Security"
+        ],
+        "cim.expected_models": [
+          "Authentication",
+          "Change",
+          "Endpoint"
+        ],
+        "cim.required_fields": [
+          "EventCode",
+          "EventID",
+          "user",
+          "dest",
+          "action"
+        ],
+        "itsi.expected_content_packs": [
+          "Windows"
+        ],
+        "es.expected_detection_families": [
+          "windows"
+        ],
         "itsi.content_pack_profile": {
-          "content_packs": ["Windows Dashboards and Reports"],
-          "entity_types": ["host"],
-          "kpi_split_fields": ["host", "dest"]
+          "content_packs": [
+            "Windows Dashboards and Reports"
+          ],
+          "entity_types": [
+            "host"
+          ],
+          "kpi_split_fields": [
+            "host",
+            "dest"
+          ]
         },
-        "ari.expected_processing_types": ["Asset", "Identity", "Software"],
+        "ari.expected_processing_types": [
+          "Asset",
+          "Identity",
+          "Software"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["Asset", "Identity", "Software"],
-          "key_fields": ["dest", "user", "EventCode"],
+          "processing_types": [
+            "Asset",
+            "Identity",
+            "Software"
+          ],
+          "key_fields": [
+            "dest",
+            "user",
+            "EventCode"
+          ],
           "relevant_event_filter": "dest=* OR user=*"
-        }
+        },
+        "expected_sources": [
+          "XmlWinEventLog:Security",
+          "WinEventLog:Security"
+        ]
       },
-      "handoffs": ["splunk-universal-forwarder-setup", "splunk-enterprise-security-config", "splunk-itsi-config"],
+      "handoffs": [
+        "splunk-universal-forwarder-setup",
+        "splunk-enterprise-security-config",
+        "splunk-itsi-config"
+      ],
       "collection_searches": [
         {
           "id": "windows-eventcode-coverage",
@@ -368,187 +4701,6 @@
       ]
     },
     {
-      "id": "okta_identity_cloud",
-      "label": "Okta Identity Cloud",
-      "docs": [
-        "https://research.splunk.com/sources/ec26febe-e760-4981-bbee-72e107c7b9d2/",
-        "https://research.splunk.com/stories/okta_account_takeover/"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_okta"],
-        "products": ["Okta", "Okta Identity Cloud"],
-        "names": ["Okta"],
-        "sourcetypes": ["OktaIM2:log"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["OktaIM2:log"],
-        "expected_macros": ["okta"],
-        "cim.expected_models": ["Authentication", "Change", "Identity_Management"],
-        "cim.required_fields": ["user", "src", "dest", "action", "outcome.result"],
-        "es.expected_detection_families": ["okta"],
-        "ari.expected_processing_types": ["Identity", "Cloud applications"],
-        "ari.processing_profile": {
-          "processing_types": ["Identity", "Cloud applications"],
-          "key_fields": ["user", "src", "actor.alternateId", "target"],
-          "relevant_event_filter": "eventType=* AND actor.alternateId=*"
-        }
-      },
-      "handoffs": ["splunk-app-install", "splunk-enterprise-security-config", "splunk-asset-risk-intelligence-setup"],
-      "collection_searches": [
-        {
-          "id": "okta-eventtype-outcomes",
-          "title": "Okta event type and outcome coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(user) as users dc(src) as srcs values(outcome.result) as outcomes by eventType actor.alternateId"
-        }
-      ]
-    },
-    {
-      "id": "microsoft_entra_id",
-      "label": "Microsoft Entra ID and Azure AD",
-      "docs": [
-        "https://research.splunk.com/sources/51ca21e5-bda2-4652-bb29-27c7bc18a81c/",
-        "https://help.splunk.com/en/data-management/integrate-data-with-add-ons/splunk-supported-add-ons/microsoft-cloud-services"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_microsoft-cloudservices", "Splunk_TA_microsoft_aad"],
-        "products": ["Microsoft Entra ID", "Azure Active Directory", "Azure AD"],
-        "names": ["Entra ID", "Azure Active Directory"],
-        "sourcetypes": ["azure:monitor:aad", "azure:aad:signin", "ms:aad:signin"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["azure:monitor:aad", "azure:aad:signin", "ms:aad:signin"],
-        "cim.expected_models": ["Authentication", "Change", "Identity_Management"],
-        "cim.required_fields": ["user", "src", "appDisplayName", "result", "OperationName"],
-        "itsi.expected_content_packs": ["Microsoft 365"],
-        "itsi.content_pack_profile": {
-          "content_packs": ["Microsoft 365"],
-          "entity_types": ["user", "tenant", "cloud_service"],
-          "kpi_split_fields": ["user", "appDisplayName"]
-        },
-        "ari.expected_processing_types": ["Identity", "Cloud applications"],
-        "ari.processing_profile": {
-          "processing_types": ["Identity", "Cloud applications"],
-          "key_fields": ["user", "src", "appDisplayName"],
-          "relevant_event_filter": "user=* OR UserPrincipalName=*"
-        }
-      },
-      "handoffs": ["splunk-app-install", "splunk-enterprise-security-config", "splunk-itsi-config", "splunk-asset-risk-intelligence-setup"],
-      "collection_searches": [
-        {
-          "id": "entra-signin-app-coverage",
-          "title": "Entra sign-in and application coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(user) as users dc(src) as srcs values(result) as results by appDisplayName OperationName"
-        }
-      ]
-    },
-    {
-      "id": "google_workspace",
-      "label": "Google Workspace",
-      "docs": [
-        "https://research.splunk.com/sources/f1a044e3-113a-4e4d-84f2-b153ade83087/",
-        "https://research.splunk.com/sources/cabec7cf-4008-4899-b47e-39c34a9a1255/",
-        "https://research.splunk.com/sources/bffe8013-9cdf-4fe6-9c1b-6784391a4951/"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_google-workspace", "Splunk_TA_gsuite"],
-        "products": ["Google Workspace", "G Suite"],
-        "names": ["Google Workspace", "G Suite"],
-        "sourcetypes": ["gws:reports:login", "gws:reports:admin"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["gws:reports:login", "gws:reports:admin"],
-        "cim.expected_models": ["Authentication", "Change", "Email"],
-        "cim.required_fields": ["actor.email", "ipAddress", "events.name", "events.type", "app"],
-        "ari.expected_processing_types": ["Identity", "Cloud applications"],
-        "ari.processing_profile": {
-          "processing_types": ["Identity", "Cloud applications"],
-          "key_fields": ["actor.email", "ipAddress", "app"],
-          "relevant_event_filter": "actor.email=* AND app=*"
-        }
-      },
-      "handoffs": ["splunk-app-install", "splunk-enterprise-security-config", "splunk-asset-risk-intelligence-setup"],
-      "collection_searches": [
-        {
-          "id": "google-workspace-app-actions",
-          "title": "Google Workspace application and action coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(actor.email) as users dc(ipAddress) as srcs values(events.name) as event_names by app events.type"
-        }
-      ]
-    },
-    {
-      "id": "crowdstrike_falcon",
-      "label": "CrowdStrike Falcon",
-      "docs": [
-        "https://research.splunk.com/sources/52b38751-b0db-4965-a800-ebaabd1fd7d5/",
-        "https://research.splunk.com/sources/cbb06880-9dd9-4542-ac60-bd6e5d3c3e4e/"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_crowdstrike_fdr"],
-        "products": ["CrowdStrike", "CrowdStrike Falcon"],
-        "names": ["CrowdStrike Falcon"],
-        "sourcetypes": ["CrowdStrike:Event:Streams:JSON", "crowdstrike:events:sensor"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["CrowdStrike:Event:Streams:JSON", "crowdstrike:events:sensor"],
-        "cim.expected_models": ["Endpoint", "Malware", "Processes"],
-        "cim.required_fields": ["ComputerName", "UserName", "event_simpleName", "ProcessId", "FileName"],
-        "es.expected_detection_families": ["crowdstrike"],
-        "ari.expected_processing_types": ["Asset", "Software", "Vulnerability"],
-        "ari.processing_profile": {
-          "processing_types": ["Asset", "Software", "Vulnerability"],
-          "key_fields": ["aid", "ComputerName", "UserName", "event_simpleName"],
-          "relevant_event_filter": "aid=* OR ComputerName=*"
-        }
-      },
-      "handoffs": ["splunk-app-install", "splunk-enterprise-security-config", "splunk-asset-risk-intelligence-setup"],
-      "collection_searches": [
-        {
-          "id": "crowdstrike-endpoint-events",
-          "title": "CrowdStrike endpoint event coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(aid) as agents dc(ComputerName) as hosts dc(UserName) as users by event_simpleName FileName"
-        }
-      ]
-    },
-    {
-      "id": "palo_alto_networks",
-      "label": "Palo Alto Networks",
-      "docs": [
-        "https://research.splunk.com/sources/182a83bc-c31a-4817-8c7a-263744cec52a/",
-        "https://research.splunk.com/sources/platforms/network/"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_paloalto", "SplunkforPaloAltoNetworks"],
-        "products": ["Palo Alto Networks", "PAN-OS"],
-        "names": ["Palo Alto Networks"],
-        "sourcetypes": ["pan:traffic", "pan:threat"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["pan:traffic", "pan:threat"],
-        "cim.expected_models": ["Network_Traffic", "Intrusion_Detection", "Malware", "Web"],
-        "cim.required_fields": ["src", "dest", "action", "app", "rule"],
-        "es.expected_detection_families": ["palo_alto_networks"],
-        "ari.expected_processing_types": ["IP", "Asset"],
-        "ari.processing_profile": {
-          "processing_types": ["IP", "Asset"],
-          "key_fields": ["src", "dest", "app", "rule"],
-          "relevant_event_filter": "src=* OR dest=*"
-        }
-      },
-      "handoffs": ["splunk-app-install", "splunk-connect-for-syslog-setup", "splunk-enterprise-security-config"],
-      "collection_searches": [
-        {
-          "id": "palo-alto-traffic-threat",
-          "title": "Palo Alto traffic and threat coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(src) as srcs dc(dest) as dests values(action) as actions values(app) as apps by sourcetype rule threatid"
-        }
-      ]
-    },
-    {
       "id": "zscaler_internet_access",
       "label": "Zscaler Internet Access",
       "docs": [
@@ -556,205 +4708,71 @@
         "https://research.splunk.com/web/ae874ad8-e353-40a7-87d4-420cdfb27d1a/"
       ],
       "match": {
-        "app_names": ["Splunk_TA_zscaler"],
-        "products": ["Zscaler", "Zscaler Internet Access", "ZIA"],
-        "names": ["Zscaler Internet Access", "Zscaler"],
-        "sourcetypes": ["zscalernss-web", "zscalernss-fw"]
+        "app_names": [
+          "Splunk_TA_zscaler"
+        ],
+        "products": [
+          "Zscaler",
+          "Zscaler Internet Access",
+          "ZIA"
+        ],
+        "names": [
+          "Zscaler Internet Access",
+          "Zscaler"
+        ],
+        "sourcetypes": [
+          "zscalernss-web",
+          "zscalernss-fw"
+        ]
       },
       "defaults": {
-        "expected_sourcetypes": ["zscalernss-web", "zscalernss-fw"],
-        "cim.expected_models": ["Web", "Network_Traffic", "Malware"],
-        "cim.required_fields": ["user", "src", "url", "dest", "action"],
-        "ari.expected_processing_types": ["IP", "Identity", "Cloud applications"],
+        "expected_sourcetypes": [
+          "zscalernss-web",
+          "zscalernss-fw"
+        ],
+        "cim.expected_models": [
+          "Web",
+          "Network_Traffic",
+          "Malware"
+        ],
+        "cim.required_fields": [
+          "user",
+          "src",
+          "url",
+          "dest",
+          "action"
+        ],
+        "ari.expected_processing_types": [
+          "IP",
+          "Identity",
+          "Cloud applications"
+        ],
         "ari.processing_profile": {
-          "processing_types": ["IP", "Identity", "Cloud applications"],
-          "key_fields": ["user", "src", "url", "dest"],
+          "processing_types": [
+            "IP",
+            "Identity",
+            "Cloud applications"
+          ],
+          "key_fields": [
+            "user",
+            "src",
+            "url",
+            "dest"
+          ],
           "relevant_event_filter": "user=* OR src=*"
         }
       },
-      "handoffs": ["splunk-app-install", "splunk-connect-for-syslog-setup", "splunk-enterprise-security-config"],
+      "handoffs": [
+        "splunk-app-install",
+        "splunk-connect-for-syslog-setup",
+        "splunk-enterprise-security-config"
+      ],
       "collection_searches": [
         {
           "id": "zscaler-web-fw-actions",
           "title": "Zscaler web and firewall action coverage",
           "category": "source-pack",
           "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(user) as users dc(src) as srcs dc(dest) as dests values(action) as actions by sourcetype urlcategory threatname"
-        }
-      ]
-    },
-    {
-      "id": "aws_vpc_flow_logs",
-      "label": "AWS VPC Flow Logs",
-      "docs": [
-        "https://research.splunk.com/sources/platforms/aws/",
-        "https://research.splunk.com/sources/38a34fc4-e128-4478-a8f4-7835d51d5135/"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_aws", "splunk_app_aws"],
-        "products": ["AWS VPC Flow Logs", "Amazon VPC Flow Logs"],
-        "names": ["AWS VPC Flow Logs"],
-        "sourcetypes": ["aws:cloudwatchlogs:vpcflow", "aws:vpcflow"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["aws:cloudwatchlogs:vpcflow", "aws:vpcflow"],
-        "cim.expected_models": ["Network_Traffic"],
-        "cim.required_fields": ["src_ip", "dest_ip", "src_port", "dest_port", "action"],
-        "ari.expected_processing_types": ["IP", "Asset"],
-        "ari.processing_profile": {
-          "processing_types": ["IP", "Asset"],
-          "key_fields": ["src_ip", "dest_ip", "interface_id", "action"],
-          "relevant_event_filter": "src_ip=* OR dest_ip=*"
-        }
-      },
-      "handoffs": ["splunk-observability-aws-integration", "splunk-app-install", "splunk-enterprise-security-config"],
-      "collection_searches": [
-        {
-          "id": "aws-vpc-flow-actions",
-          "title": "AWS VPC flow action and peer coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(src_ip) as srcs dc(dest_ip) as dests values(action) as actions by interface_id src_port dest_port protocol"
-        }
-      ]
-    },
-    {
-      "id": "aws_securityhub_guardduty",
-      "label": "AWS Security Hub and GuardDuty Findings",
-      "docs": [
-        "https://research.splunk.com/sources/b02bfbf3-294f-478e-99a1-e24b8c692d7e/",
-        "https://research.splunk.com/stories/aws_security_hub_alerts/"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_aws", "splunk_app_aws"],
-        "products": ["AWS Security Hub", "Amazon GuardDuty"],
-        "names": ["AWS Security Hub", "GuardDuty"],
-        "sourcetypes": ["aws:securityhub:finding", "aws:cloudwatch:guardduty"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["aws:securityhub:finding", "aws:cloudwatch:guardduty"],
-        "expected_macros": ["aws_securityhub_finding"],
-        "cim.expected_models": ["Alerts", "Intrusion_Detection", "Change"],
-        "cim.required_fields": ["AwsAccountId", "Severity.Label", "Title", "ResourceId", "ProductArn"],
-        "es.expected_detection_families": ["aws_security_hub", "guardduty"],
-        "ari.expected_processing_types": ["Asset", "IP", "Vulnerability"],
-        "ari.processing_profile": {
-          "processing_types": ["Asset", "IP", "Vulnerability"],
-          "key_fields": ["AwsAccountId", "ResourceId", "Severity.Label", "Title"],
-          "relevant_event_filter": "AwsAccountId=* AND Severity.Label=*"
-        }
-      },
-      "handoffs": ["splunk-observability-aws-integration", "splunk-app-install", "splunk-enterprise-security-config", "splunk-asset-risk-intelligence-setup"],
-      "collection_searches": [
-        {
-          "id": "aws-securityhub-severity-resource",
-          "title": "AWS Security Hub severity and resource coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count values(Severity.Label) as severities values(Title) as titles by AwsAccountId ResourceId ProductArn"
-        }
-      ]
-    },
-    {
-      "id": "duo_security",
-      "label": "Cisco Duo Security",
-      "docs": [
-        "https://research.splunk.com/sources/83f727f6-8754-41f8-b9f7-8226886a659e/",
-        "https://research.splunk.com/sources/38e22de6-8b6b-449c-ae26-a640c88ff7f9/"
-      ],
-      "match": {
-        "app_names": ["TA-duo_security", "Splunk_TA_duo"],
-        "products": ["Cisco Duo", "Duo Security", "Duo"],
-        "names": ["Duo Security", "Cisco Duo"],
-        "sourcetypes": ["duo:authentication", "duo:admin", "cisco:duo:activity", "cisco:duo:administrator"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["duo:authentication", "duo:admin", "cisco:duo:activity", "cisco:duo:administrator"],
-        "cim.expected_models": ["Authentication", "Change", "Identity_Management"],
-        "cim.required_fields": ["user", "src", "result", "factor", "reason"],
-        "ari.expected_processing_types": ["Identity", "Cloud applications"],
-        "ari.processing_profile": {
-          "processing_types": ["Identity", "Cloud applications"],
-          "key_fields": ["user", "src", "factor", "result"],
-          "relevant_event_filter": "user=* AND result=*"
-        }
-      },
-      "handoffs": ["cisco-security-cloud-setup", "splunk-app-install", "splunk-enterprise-security-config", "splunk-asset-risk-intelligence-setup"],
-      "collection_searches": [
-        {
-          "id": "duo-auth-admin-outcomes",
-          "title": "Duo authentication and admin outcome coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(user) as users dc(src) as srcs values(result) as results values(factor) as factors by sourcetype reason"
-        }
-      ]
-    },
-    {
-      "id": "github_audit",
-      "label": "GitHub Audit Logs",
-      "docs": [
-        "https://research.splunk.com/sources/ce520b1c-79fe-48ef-a0f9-71fbbd4837b0/",
-        "https://research.splunk.com/sources/8a4d656f-8801-4a2c-ae10-553d2696a59f/"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_github"],
-        "products": ["GitHub", "GitHub Enterprise"],
-        "names": ["GitHub Audit", "GitHub Organizations Audit Logs"],
-        "sourcetypes": ["github:cloud:audit", "github:audit"],
-        "source_sourcetype_pairs": [{"source": "http:github", "sourcetype": "httpevent"}]
-      },
-      "defaults": {
-        "expected_sources": ["github", "http:github"],
-        "expected_sourcetypes": ["github:cloud:audit", "github:audit", "httpevent"],
-        "expected_macros": ["github_organizations"],
-        "cim.expected_models": ["Change", "Authentication"],
-        "cim.required_fields": ["action", "actor", "org", "repo", "created_at"],
-        "es.expected_detection_families": ["github"],
-        "ari.expected_processing_types": ["Identity", "Cloud applications"],
-        "ari.processing_profile": {
-          "processing_types": ["Identity", "Cloud applications"],
-          "key_fields": ["actor", "org", "repo", "created_at"],
-          "relevant_event_filter": "actor=* AND action=*"
-        }
-      },
-      "handoffs": ["splunk-app-install", "splunk-enterprise-security-config", "splunk-asset-risk-intelligence-setup"],
-      "collection_searches": [
-        {
-          "id": "github-audit-actions",
-          "title": "GitHub audit action and repository coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(actor) as actors dc(repo) as repos values(operation_type) as operations by action org"
-        }
-      ]
-    },
-    {
-      "id": "fortinet_fortigate",
-      "label": "Fortinet FortiGate",
-      "docs": [
-        "https://splunk.github.io/splunk-connect-for-syslog/2.9.0/sources/vendor/Fortinet/fortios/",
-        "https://lantern.splunk.com/Data_Sources/Fortinet"
-      ],
-      "match": {
-        "app_names": ["Splunk_TA_fortinet_fortigate", "TA-fortinet"],
-        "products": ["Fortinet FortiGate", "FortiGate", "Fortinet"],
-        "names": ["Fortinet FortiGate"],
-        "sourcetypes": ["fgt_traffic", "fgt_event", "fgt_utm"]
-      },
-      "defaults": {
-        "expected_sourcetypes": ["fgt_traffic", "fgt_event", "fgt_utm"],
-        "cim.expected_models": ["Network_Traffic", "Web", "Intrusion_Detection", "Malware"],
-        "cim.required_fields": ["src", "dest", "action", "app", "dvc"],
-        "ari.expected_processing_types": ["IP", "Asset"],
-        "ari.processing_profile": {
-          "processing_types": ["IP", "Asset"],
-          "key_fields": ["src", "dest", "dvc", "action"],
-          "relevant_event_filter": "src=* OR dest=*"
-        }
-      },
-      "handoffs": ["splunk-app-install", "splunk-connect-for-syslog-setup", "splunk-enterprise-security-config"],
-      "collection_searches": [
-        {
-          "id": "fortigate-traffic-utm-actions",
-          "title": "FortiGate traffic and UTM action coverage",
-          "category": "source-pack",
-          "spl": "%BASE_SEARCH% earliest=-24h latest=now | stats count dc(src) as srcs dc(dest) as dests values(action) as actions values(app) as apps by sourcetype dvc"
         }
       ]
     }

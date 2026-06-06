@@ -1,0 +1,6 @@
+# Cisco ASA render template
+index: cisco_asa
+sourcetype: cisco:asa
+syslog_owner: sc4s
+sc4s_vendor_product: cisco_asa
+include_ftd: true

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk Knowledge Objects Setup"
+  short_description: "Govern saved searches, macros, lookups, eventtypes, tags, ACLs"
+  default_prompt: >-
+    Use $splunk-knowledge-objects-setup to render and apply Splunk saved
+    searches, macros, CSV/KV Store lookups, eventtypes, tags, and field
+    knowledge, then set sharing and ownership on each object via its ACL.

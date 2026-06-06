@@ -1,6 +1,6 @@
 # Splunk Supported Add-ons Reference
 
-Research date: 2026-05-19.
+Research date: 2026-06-06.
 
 ## Unix/Linux Domain Coverage
 
@@ -19,12 +19,15 @@ AuditD workflows.
 
 The router tracks all 80 entries currently listed in the official Splunk
 Supported Add-ons glossary. Only the Unix/Linux domain is implemented as a
-first-class renderer in this skill:
+first-class renderer inside this skill:
 
 - `first_class_profile`: `Linux`, `Unix and Linux`
 - `handoff_profile`: official entries with an existing local skill that owns the
   domain workflow, such as AppDynamics, selected Cisco add-ons, CrowdStrike FDR,
-  and Asset and Risk Intelligence
+  VMware, SaaS/security add-ons, shared web/proxy/parser add-ons,
+  package-verified database add-ons, Microsoft Exchange, Microsoft SCOM, NetApp
+  ONTAP, Carbon Black, Symantec Endpoint Protection, and Asset and Risk
+  Intelligence
 - `install_only_handoff`: official entries that can safely route package
   delivery to `splunk-app-install` while configuration remains documentation- or
   product-specific. Entries without a more specific local skill use this generic
@@ -35,6 +38,29 @@ Use `bash skills/splunk-supported-addons-setup/scripts/setup.sh --phase coverage
 Use `--phase render --profile "<official add-on name>"` to emit either a
 first-class Unix/Linux profile packet or a generic official-add-on handoff
 packet.
+
+## Expanded Handoff Families
+
+The router now delegates package-verified SaaS, security, and parser profiles
+to first-class setup skills when the workflow is larger than package delivery:
+
+| Supported add-on entries | Owning skill | Readiness packs |
+| --- | --- | --- |
+| Salesforce | `splunk-salesforce-ta-setup` | `salesforce` |
+| Box | `splunk-box-ta-setup` | `box` |
+| CyberArk, CyberArk EPM | `splunk-cyberark-ta-setup` | `cyberark_epv_pta`, `cyberark_epm` |
+| RSA SecurID, RSA SecurID CAS | `splunk-rsa-securid-ta-setup` | `rsa_securid_am`, `rsa_securid_cas` |
+| Apache, NGINX, IIS, Tomcat, HAProxy, Squid, Blue Coat ProxySG, Forcepoint Web Security, Check Point Log Exporter, F5 BIG-IP, Citrix NetScaler, Infoblox | `splunk-syslog-web-proxy-ta-setup` | product-specific web/proxy/parser packs |
+| SQL Server, MySQL, Oracle Database | `splunk-database-ta-setup` | `mssql_database`, `mysql_database`, `oracle_database` |
+| Microsoft Exchange, Microsoft SCOM | `splunk-microsoft-exchange-ta-setup`, `splunk-microsoft-scom-ta-setup` | `microsoft_exchange`, `microsoft_scom` |
+| NetApp Data ONTAP, ONTAP Extractions, ONTAP Indexes | `splunk-netapp-ontap-ta-setup` | `netapp_ontap` |
+| Carbon Black, Symantec Endpoint Protection | `splunk-security-appliance-ta-setup` | `carbon_black`, `symantec_endpoint_protection` |
+
+CyberArk EPV/PTA remains explicitly archived/not-supported and parser-only. RSA
+DLP remains a generic install-only handoff because it is not covered by the
+verified RSA SecurID package set. Imperva, McAfee/Trellix, Sophos, DLP,
+Websense DLP, and OSSEC remain generic install-only until exact packages are
+extracted and verified.
 
 ## Current Research Notes
 

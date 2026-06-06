@@ -1,0 +1,8 @@
+interface:
+  display_name: "Microsoft Exchange Supported Add-on Setup"
+  short_description: "Render Exchange bundle and Exchange Indexes package plans"
+  default_prompt: >-
+    Use $splunk-microsoft-exchange-ta-setup to render, install, and validate
+    the package-verified Microsoft Exchange supported add-on bundle, Exchange
+    Indexes package, Windows collection placement, source type validation, and
+    readiness-doctor handoffs.

@@ -213,6 +213,47 @@
       },
       {
         "kind": "app",
+        "app_name": "DA-ESS-ContentUpdate",
+        "label": "`splunk-security-content-update-setup`",
+        "cloud_install_path": "ACS Splunkbase or ES Cloud managed content workflow",
+        "cloud_config_path": "Rendered ESCU install/upgrade plan, analytic-story inventory checks, and correlation-search activation review; ES changes delegate to splunk-enterprise-security-config",
+        "notes": "Search-tier ES content app. This renderer does not enable or disable correlation searches."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-fraud-analytics-setup",
+        "splunkbase_id": "N/A",
+        "label": "`splunk-fraud-analytics-setup`",
+        "cloud_install_path": "Local package or Cloud app request based on entitlement",
+        "cloud_config_path": "Rendered ES/RBA prerequisites, Lookup File Editing dependency, fraud use-case intake, risk index checks, and correlation-search review",
+        "notes": "Consumer/content app. It is not a raw data-source source pack."
+      },
+      {
+        "kind": "app",
+        "app_name": "SplunkPCIComplianceSuite",
+        "label": "`splunk-pci-compliance-setup`",
+        "cloud_install_path": "ACS Splunkbase or Cloud app request for PCI app package",
+        "cloud_config_path": "Rendered CDE index/macro intake, CIM prerequisites, role/report readiness, and dashboard validation SPL",
+        "notes": "Compliance app with separate standalone and ES installer profiles."
+      },
+      {
+        "kind": "app",
+        "app_name": "infosec_app_for_splunk",
+        "label": "`splunk-infosec-app-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Rendered prerequisite source checklist, dashboard/macro/data-model checks, Cloud IDM support note, and lookup handoffs",
+        "notes": "Starter security dashboards; depends on CIM-compatible data and lookup governance."
+      },
+      {
+        "kind": "app",
+        "app_name": "lookup_editor",
+        "label": "`splunk-lookup-file-editing-setup`",
+        "cloud_install_path": "ACS Splunkbase",
+        "cloud_config_path": "Rendered CSV/KV Store lookup inventory, SHC allowRestReplay backup-replication runbook, app health checks, and knowledge-object/KV Store handoffs",
+        "notes": "Search-tier utility app used by several security workflows."
+      },
+      {
+        "kind": "app",
         "app_name": "Splunk_Security_Essentials",
         "label": "`splunk-security-essentials-setup`",
         "cloud_install_path": "ACS Splunkbase",
@@ -290,14 +331,6 @@
         "cloud_install_path": "ACS Splunkbase or local package when still required by an existing UBA deployment",
         "cloud_config_path": "Readiness validation only; standalone UBA server lifecycle remains a manual/professional-services handoff",
         "notes": "Optional legacy UBA Kafka ingestion app. New UEBA work should route to Enterprise Security Premier UEBA."
-      },
-      {
-        "kind": "app",
-        "app_name": "DA-ESS-ContentUpdate",
-        "label": "`splunk-enterprise-security-config` content update",
-        "cloud_install_path": "ACS Splunkbase or ES Cloud managed content workflow",
-        "cloud_config_path": "Configured through the ES content library workflow for ESCU subscription, story/detection enablement, and content-pack toggles",
-        "notes": "Splunk ES Content Update is registered under ES configuration, not as a separate security product skill."
       },
       {
         "kind": "app",
@@ -539,6 +572,40 @@
         "cloud_install_path": "ACS Splunkbase for supported Cloud search-tier knowledge; customer-managed CollectD, HEC, TCP, or AuditD collection path",
         "cloud_config_path": "Rendered CollectD write_http/write_graphite skeletons, AuditD input overlay, HEC handoff, metrics-index props.conf template, and validation SPL",
         "notes": "Splunk Supported Add-on for Linux, Splunkbase 3412. This is the CollectD/AuditD package, distinct from Splunk_TA_nix."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_salesforce",
+        "label": "`splunk-salesforce-ta-setup`",
+        "cloud_install_path": "ACS Splunkbase for search-tier knowledge; customer-managed heavy forwarder when API collection cannot run on the search tier",
+        "cloud_config_path": "Rendered Salesforce account/input runbook, index readiness, and validation SPL",
+        "notes": "Splunk Add-on for Salesforce. API collection should run on exactly one collector node for a given org/input set."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-syslog-web-proxy-ta-setup",
+        "label": "`splunk-syslog-web-proxy-ta-setup`",
+        "splunkbase_id": "Multiple",
+        "cloud_install_path": "ACS Splunkbase for selected parser/search-tier apps; customer-managed syslog, file, or forwarder collection paths",
+        "cloud_config_path": "Rendered product-specific parser placement, syslog/file/UF handoffs, index/source-type readiness, and validation SPL",
+        "notes": "Shared workflow for web, proxy, load-balancer, and syslog parser add-ons such as Apache, Blue Coat, and F5."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_cisco-asa",
+        "label": "`cisco-asa-ta-setup`",
+        "cloud_install_path": "ACS Splunkbase for search-tier/parser placement; customer-managed syslog receiver for data collection",
+        "cloud_config_path": "Rendered ASA/FTD syslog placement, SC4S/syslog receiver handoff, cisco:asa index plan, CIM readiness, and validation SPL",
+        "notes": "Cisco ASA/FTD syslog source. External receiver ownership remains outside the TA."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-amazon-kinesis-firehose-setup",
+        "label": "`splunk-amazon-kinesis-firehose-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "No Splunk app install; Firehose sends to an existing Splunk HEC endpoint",
+        "cloud_config_path": "Rendered HEC token handoff, Firehose destination settings, IAM/S3 backup stubs, CloudWatch metrics, and source/sourcetype readiness evidence",
+        "notes": "Transport-aware supported-addons workflow for AWS Firehose to HEC."
       },
       {
         "kind": "workflow",
@@ -822,6 +889,229 @@
         "cloud_install_path": "ACS Splunkbase (id 5247); install on search heads + Inputs Data Manager",
         "cloud_config_path": "REST via UCC custom account + modular-input handlers under /servicesNS/nobody/Splunk_TA_sim",
         "notes": "Splunk Infrastructure Monitoring Add-on. Provides the sim SPL command and the splunk_infrastructure_monitoring_data_streams modular input. Hard cap: 250,000 MTS per modular input. Splunk Synthetic Monitoring Add-on (Splunkbase 5608) is archived (deprecated) and replaced by SIM streams."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-windows-ta-setup",
+        "label": "`splunk-windows-ta-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "ACS Splunkbase (search tier); Windows forwarders via deployment server",
+        "cloud_config_path": "Render inputs.conf overlay + REST/ACS index creation; forwarder rollout via splunk-agent-management-setup",
+        "notes": "Splunk Add-on for Microsoft Windows. Inputs (WinEventLog/Perfmon/WinHostMon) run on Windows Universal Forwarders; search tier owns parsing and CIM."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-aws-ta-setup",
+        "label": "`splunk-aws-ta-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "ACS Splunkbase (search tier) or heavy forwarder you control",
+        "cloud_config_path": "Render aws_sqs_based_s3/aws_config inputs + account runbook; REST/ACS index creation",
+        "notes": "Splunk Add-on for AWS manual TA path for CloudTrail/Config/GuardDuty. Complements splunk-cloud-data-manager-setup (automated CloudFormation onboarding)."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-microsoft-cloud-setup",
+        "label": "`splunk-microsoft-cloud-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "ACS Splunkbase (search tier) or heavy forwarder you control",
+        "cloud_config_path": "Render Office 365 / Entra / Azure audit inputs + Entra app-registration runbook; REST/ACS index creation",
+        "notes": "Office 365 (splunk_ta_o365, 4055) and Microsoft Cloud Services (Splunk_TA_microsoft-cloudservices, 3110) add-ons for Entra/Azure AD, Exchange, SharePoint, and Azure audit data."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-okta-ta-setup",
+        "label": "`splunk-okta-ta-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "ACS Splunkbase (search tier) or heavy forwarder you control",
+        "cloud_config_path": "Render okta_identity_cloud inputs + OAuth/API-token account runbook; REST/ACS index creation",
+        "notes": "Splunk Add-on for Okta Identity Cloud (6553). OktaIM2 System Log + Universal Directory; OAuth 2.0 client credentials recommended."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-gcp-ta-setup",
+        "label": "`splunk-gcp-ta-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "ACS Splunkbase (search tier) or heavy forwarder you control",
+        "cloud_config_path": "Render google_cloud_pubsub log input + service-account/Pub/Sub export runbook; REST/ACS index creation",
+        "notes": "Splunk Add-on for Google Cloud Platform (3088), Cloud Logging -> Pub/Sub log path. Metrics path is splunk-observability-gcp-integration."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-servicenow-ta-setup",
+        "label": "`splunk-servicenow-ta-setup`",
+        "splunkbase_id": "N/A",
+        "cloud_install_path": "ACS Splunkbase (search tier) or heavy forwarder you control",
+        "cloud_config_path": "Render per-table snow:// inputs + basic/OAuth account runbook; REST/ACS index creation",
+        "notes": "Splunk Add-on for ServiceNow (1928). Per-table snow:<table> source types; hands ITSI service/KPI modeling to splunk-itsi-config."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-google-workspace-ta-setup",
+        "label": "`splunk-google-workspace-ta-setup`",
+        "splunkbase_id": "5556",
+        "cloud_install_path": "ACS Splunkbase (search tier) or heavy forwarder you control",
+        "cloud_config_path": "Render Workspace API inputs + service-account certificate runbook; REST/ACS index creation",
+        "notes": "Splunk Add-on for Google Workspace (5556). Admin Reports, Gmail BigQuery logs, identity, Alert Center, and usage reports."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-microsoft-security-ta-setup",
+        "label": "`splunk-microsoft-security-ta-setup`",
+        "splunkbase_id": "6207",
+        "cloud_install_path": "ACS Splunkbase (search tier) or heavy forwarder you control",
+        "cloud_config_path": "Render Defender inputs + Entra app account runbook + package macros; REST/ACS index creation",
+        "notes": "Splunk Add-on for Microsoft Security (6207). Defender incidents, alerts, machines, simulations, Event Hub, and threat intelligence."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-sysmon-ta-setup",
+        "label": "`splunk-sysmon-ta-setup`",
+        "splunkbase_id": "5709",
+        "cloud_install_path": "ACS Splunkbase for search tier knowledge; UF/WEC deployment app rollout",
+        "cloud_config_path": "Render endpoint or WEC Sysmon WinEventLog overlays and sysmon index creation",
+        "notes": "Splunk Add-on for Microsoft Sysmon (5709). Source-constrained XmlWinEventLog Sysmon normalization; prevents duplicate direct plus WEC collection."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-github-ta-setup",
+        "label": "`splunk-github-ta-setup`",
+        "splunkbase_id": "6254",
+        "cloud_install_path": "ACS Splunkbase (search tier) or heavy forwarder you control",
+        "cloud_config_path": "Render GitHub audit/user/alert inputs + PAT and HEC/GHES handoffs; REST/ACS index creation",
+        "notes": "Splunk Add-on for GitHub (6254). Cloud audit, user metadata, code/dependabot/secret scanning alerts, plus source-constrained HEC audit streaming."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-database-ta-setup",
+        "label": "`splunk-database-ta-setup`",
+        "splunkbase_id": "Multiple",
+        "cloud_install_path": "ACS Splunkbase for package-verified database add-ons where supported; DB Connect/JDBC collection runs on search tier or customer-managed heavy forwarder",
+        "cloud_config_path": "Rendered SQL Server, MySQL, and Oracle package plans, SQL Server host input overlays, DB Connect handoffs, source-pack validation, and readiness evidence",
+        "notes": "Shared database Supported Add-ons workflow for Splunk_TA_microsoft-sqlserver, Splunk_TA_mysql, and Splunk_TA_oracle. Database credentials stay in DB Connect identities or add-on encrypted storage."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-microsoft-exchange-ta-setup",
+        "label": "`splunk-microsoft-exchange-ta-setup`",
+        "splunkbase_id": "Multiple",
+        "cloud_install_path": "ACS Splunkbase for Exchange bundle/search-tier knowledge and SA-ExchangeIndex where supported; collection remains on customer-managed Windows owners",
+        "cloud_config_path": "Rendered Exchange component placement, indexes, Windows collection overlays, validation SPL, and readiness evidence",
+        "notes": "Microsoft Exchange bundle workflow covering TA-Exchange-ClientAccess, TA-Exchange-Mailbox, TA-SMTP-Reputation, TA-Windows-Exchange-IIS, and SA-ExchangeIndex."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-microsoft-scom-ta-setup",
+        "label": "`splunk-microsoft-scom-ta-setup`",
+        "splunkbase_id": "2729",
+        "cloud_install_path": "ACS Splunkbase for search-tier knowledge where supported; PowerShell collection runs on one approved search tier or customer-managed heavy forwarder",
+        "cloud_config_path": "Rendered SCOM PowerShell inputs, account handoff, microsoft:scom source-type validation, and readiness evidence",
+        "notes": "Microsoft SCOM Supported Add-on workflow for Splunk_TA_microsoft-scom."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-netapp-ontap-ta-setup",
+        "label": "`splunk-netapp-ontap-ta-setup`",
+        "splunkbase_id": "Multiple",
+        "cloud_install_path": "ACS Splunkbase for search-tier knowledge and index definitions where supported; ONTAP scheduler/worker collection runs on approved collection tier",
+        "cloud_config_path": "Rendered ONTAP scheduler/worker placement, ontap index readiness, Hydra troubleshooting checks, validation SPL, and ITSI handoffs",
+        "notes": "NetApp ONTAP umbrella workflow for Splunk_TA_ontap, TA-ONTAP-FieldExtractions, and SA-ONTAPIndex."
+      },
+      {
+        "kind": "workflow",
+        "skill": "splunk-security-appliance-ta-setup",
+        "label": "`splunk-security-appliance-ta-setup`",
+        "splunkbase_id": "Multiple",
+        "cloud_install_path": "ACS Splunkbase for package-verified security appliance parser/search-tier apps where supported; file/syslog transport remains customer-managed",
+        "cloud_config_path": "Rendered Carbon Black JSON file-monitor and Symantec EP file/syslog transport handoffs, source-type validation, and readiness evidence",
+        "notes": "First-pass package-verified security appliance workflow for Carbon Black and Symantec Endpoint Protection only; unresolved security products remain install-only."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_microsoft-sqlserver",
+        "label": "`splunk-database-ta-setup` SQL Server",
+        "cloud_install_path": "ACS Splunkbase for supported Cloud search-tier/parser placement; Windows host collection remains customer-managed",
+        "cloud_config_path": "SQL Server add-on knowledge, host file/perfmon overlay, DB Connect handoff, and source-type readiness",
+        "notes": "Package-verified SQL Server supported add-on, Splunkbase 2648."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_mysql",
+        "label": "`splunk-database-ta-setup` MySQL",
+        "cloud_install_path": "ACS Splunkbase for supported Cloud search-tier/parser placement; JDBC collection delegated to DB Connect",
+        "cloud_config_path": "MySQL package knowledge, DB Connect handoff, and source-type readiness",
+        "notes": "Package-verified MySQL supported add-on, Splunkbase 2848."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_oracle",
+        "label": "`splunk-database-ta-setup` Oracle",
+        "cloud_install_path": "ACS Splunkbase for supported Cloud search-tier/parser placement; JDBC/file collection remains customer-managed",
+        "cloud_config_path": "Oracle package knowledge, DB Connect handoff, and source-type readiness",
+        "notes": "Package-verified Oracle Database supported add-on, Splunkbase 1910."
+      },
+      {
+        "kind": "app",
+        "app_name": "TA-Exchange-ClientAccess",
+        "label": "`splunk-microsoft-exchange-ta-setup` Exchange bundle",
+        "cloud_install_path": "ACS Splunkbase for supported Cloud search-tier/parser placement; Windows collection remains customer-managed",
+        "cloud_config_path": "Exchange component bundle placement, Windows collection overlays, and source-type readiness",
+        "notes": "Multi-app Exchange bundle, Splunkbase 3225."
+      },
+      {
+        "kind": "app",
+        "app_name": "SA-ExchangeIndex",
+        "label": "`splunk-microsoft-exchange-ta-setup` Exchange Indexes",
+        "cloud_install_path": "ACS Splunkbase or Enterprise cluster-bundle index definition placement",
+        "cloud_config_path": "Exchange index definitions for msexchange, perfmon, windows, wineventlog, and msad",
+        "notes": "Exchange Indexes package, Splunkbase 5663."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_microsoft-scom",
+        "label": "`splunk-microsoft-scom-ta-setup`",
+        "cloud_install_path": "ACS Splunkbase for supported search-tier knowledge; collection runs on search tier or customer-managed heavy forwarder",
+        "cloud_config_path": "SCOM account handoff, PowerShell input overlays, and source-type readiness",
+        "notes": "Package-verified Microsoft SCOM supported add-on, Splunkbase 2729."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_ontap",
+        "label": "`splunk-netapp-ontap-ta-setup` ONTAP core",
+        "cloud_install_path": "ACS Splunkbase for supported search-tier knowledge; scheduler/worker collection on approved collection tier",
+        "cloud_config_path": "ONTAP scheduler/worker placement, Hydra troubleshooting, and source-type readiness",
+        "notes": "Package-verified ONTAP core app, Splunkbase 3418."
+      },
+      {
+        "kind": "app",
+        "app_name": "TA-ONTAP-FieldExtractions",
+        "label": "`splunk-netapp-ontap-ta-setup` ONTAP Extractions",
+        "cloud_install_path": "ACS Splunkbase for supported search-tier/parser placement",
+        "cloud_config_path": "ONTAP field extractions and eventtypes",
+        "notes": "Package-verified ONTAP field extractions, Splunkbase 5615."
+      },
+      {
+        "kind": "app",
+        "app_name": "SA-ONTAPIndex",
+        "label": "`splunk-netapp-ontap-ta-setup` ONTAP Indexes",
+        "cloud_install_path": "ACS Splunkbase or Enterprise cluster-bundle index definition placement",
+        "cloud_config_path": "ONTAP index definition",
+        "notes": "Package-verified ONTAP index package, Splunkbase 5616."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_bit9-carbonblack",
+        "label": "`splunk-security-appliance-ta-setup` Carbon Black",
+        "cloud_install_path": "ACS Splunkbase for supported search-tier/parser placement; JSON file delivery remains customer-managed",
+        "cloud_config_path": "Carbon Black JSON file monitor handoff and source-type readiness",
+        "notes": "Package-verified Carbon Black supported add-on, Splunkbase 2790."
+      },
+      {
+        "kind": "app",
+        "app_name": "Splunk_TA_symantec-ep",
+        "label": "`splunk-security-appliance-ta-setup` Symantec EP",
+        "cloud_install_path": "ACS Splunkbase for supported search-tier/parser placement; file/syslog transport remains customer-managed",
+        "cloud_config_path": "Symantec EP file/syslog transport handoff and source-type readiness",
+        "notes": "Package-verified Symantec Endpoint Protection supported add-on, Splunkbase 2772."
       }
     ]
   },
@@ -1143,6 +1433,18 @@
       "notes": "Overlay on splunk-observability-otel-collector-setup. Renders per-language OpenTelemetry Operator Instrumentation CRs, workload annotation strategic-merge patches with backup/restore, OBI eBPF DaemonSet + OpenShift SCC, AlwaysOn Profiling + runtime metrics, propagator/sampler, multi-CR, Fargate gateway endpoint, vendor-coexistence detection, --discover-workloads inventory, selective --target apply/uninstall, and --gitops-mode. Never takes tokens; inherits ingest-token handling from the base collector."
     },
     {
+      "skill": "splunk-observability-browser-rum-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Generic source/build-pipeline Splunk Browser RUM workflow for non-Kubernetes web apps. Renders CDN/npm/framework snippets, source-map upload helpers, CSP, Session Replay privacy plan, and RUM-to-APM Server-Timing validation."
+    },
+    {
       "skill": "splunk-observability-k8s-frontend-rum-setup",
       "role_support": {
         "search-tier": "none",
@@ -1203,6 +1505,42 @@
       },
       "cloud_pairing": [],
       "notes": "Splunk Observability Cloud native operations render/apply workflow; no Splunk Platform runtime placement."
+    },
+    {
+      "skill": "splunk-observability-synthetics-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Focused Splunk Synthetic Monitoring wrapper that renders native-ops specs for browser, API, HTTP, SSL, and port tests plus waterfall artifact handoffs."
+    },
+    {
+      "skill": "splunk-observability-slo-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Focused Splunk Observability SLO wrapper that renders SLI source decisions, SLO payload intents, and deep-native workflow specs."
+    },
+    {
+      "skill": "splunk-observability-metrics-pipeline-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Focused Metrics Pipeline Management wrapper for Observability Cloud metric usage, MTS/cardinality, aggregation, route/drop/archive intent, and deep-native workflow handoffs."
     },
     {
       "skill": "splunk-observability-cloud-integration-setup",
@@ -1301,6 +1639,18 @@
         "search-tier"
       ],
       "notes": "Splunk Platform restart and reload orchestration workflow. Covers Cloud ACS restart checks, Enterprise systemd/CLI/REST fallback decisions, deployment-server reloads, SHC/IDXC handoffs, and repo-wide restart audit reports."
+    },
+    {
+      "skill": "splunk-platform-sizing",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Offline advisory sizing workflow for Splunk Platform, Splunk on Kubernetes, and Splunk Cloud planning. Renders reports and handoffs but does not install or configure a Splunk runtime role."
     },
     {
       "skill": "splunk-admin-doctor",
@@ -2185,6 +2535,606 @@
       },
       "cloud_pairing": [],
       "notes": "External AppDynamics SAP Agent workflow covering SAP Agent, ABAP Agent, HTTP SDK, SNP CrystalBridge, BiQ Collector, NetWeaver transports, authorization, release-note, compatibility, and validation runbooks; SAP changes are rendered as runbooks."
+    },
+    {
+      "skill": "splunk-windows-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "universal-forwarder"
+      ],
+      "notes": "Splunk_TA_windows: search-tier/indexers parse and own CIM; Windows Universal Forwarders run the WinEventLog/Perfmon/WinHostMon inputs."
+    },
+    {
+      "skill": "splunk-aws-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk_TA_aws modular-input collector; run on the search tier or a heavy forwarder. Manual TA path that complements splunk-cloud-data-manager-setup."
+    },
+    {
+      "skill": "splunk-microsoft-cloud-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "splunk_ta_o365 + Splunk_TA_microsoft-cloudservices modular-input collectors; run on the search tier or a heavy forwarder."
+    },
+    {
+      "skill": "splunk-kvstore-admin-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier / SHC KV Store administration: backup, restore, clean, storage-engine migration, server-version upgrade, maintenance mode, and collections/lookup-definition governance."
+    },
+    {
+      "skill": "splunk-kvstore-admin",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier / SHC KV Store administration workflow. Mirrors splunk-kvstore-admin-setup for backup, restore, clean, storage-engine migration, maintenance mode, and collection governance."
+    },
+    {
+      "skill": "splunk-cim-data-model-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "CIM data model governance authored on the search tier (acceleration, cim_<model>_indexes constraints, eventtype/tag mapping); acceleration summaries build on indexers."
+    },
+    {
+      "skill": "splunk-cim-data-model",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "CIM data model acceleration and compliance workflow authored on the search tier; acceleration summaries build on indexers. Mirrors the setup skill topology."
+    },
+    {
+      "skill": "splunk-knowledge-objects-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier knowledge object governance: saved searches, macros, lookups, eventtypes, tags, and sharing/ownership ACLs."
+    },
+    {
+      "skill": "splunk-knowledge-objects",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier knowledge object governance workflow for saved searches, macros, lookups, eventtypes, tags, and sharing/ownership ACLs. Mirrors the setup skill topology."
+    },
+    {
+      "skill": "splunk-ingest-actions-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "heavy-forwarder"
+      ],
+      "notes": "Ingest-time rulesets (filter/mask/drop/route) and RFS S3 destinations applied on indexers, heavy forwarders, or authored from the cluster manager / search head."
+    },
+    {
+      "skill": "splunk-ingest-actions",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "heavy-forwarder"
+      ],
+      "notes": "Ingest Actions workflow for filter, mask, drop, route, and RFS destination assets. Mirrors the setup skill topology for indexers, heavy forwarders, and authoring tiers."
+    },
+    {
+      "skill": "splunk-ddaa-archive-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Splunk Cloud ACS control-plane workflow for Dynamic Data Active Archive retention; restore and disable are Splunk Web-only. No Splunk Enterprise role placement."
+    },
+    {
+      "skill": "splunk-ddaa-archive",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Splunk Cloud Dynamic Data Active Archive workflow. Control-plane retention changes are via ACS; restore and disable are Splunk Web-only. No Splunk Enterprise role placement."
+    },
+    {
+      "skill": "splunk-secure-gateway-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier Splunk Secure Gateway / Spacebridge enablement, egress preflight, MDM/instance-ID configuration, and device-registration runbooks."
+    },
+    {
+      "skill": "splunk-secure-gateway",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier Splunk Secure Gateway / Spacebridge workflow. Mirrors the setup skill topology for enablement, egress preflight, MDM, and device-registration runbooks."
+    },
+    {
+      "skill": "splunk-dashboard-studio-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier Dashboard Studio dashboards created and updated through the data/ui/views REST endpoint with ACL governance."
+    },
+    {
+      "skill": "splunk-dashboard-studio",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Search-tier Dashboard Studio workflow for version=2 dashboard JSON and data/ui/views REST publishing. Mirrors the setup skill topology."
+    },
+    {
+      "skill": "splunk-okta-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk_TA_okta_identity_cloud modular-input collector; run inputs on the search tier or one heavy forwarder. OktaIM2:* source types, CIM Authentication."
+    },
+    {
+      "skill": "splunk-gcp-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk_TA_google-cloudplatform Cloud Logging -> Pub/Sub log path; run a given subscription on a single node. Splunk Platform logs (metrics path is splunk-observability-gcp-integration)."
+    },
+    {
+      "skill": "splunk-servicenow-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk_TA_snow per-table snow:// collector; run each table input on a single node. ITSM data; hands service/KPI modeling to splunk-itsi-config."
+    },
+    {
+      "skill": "splunk-vmware-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "indexer",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "VMware Supported Add-on family workflow for app/add-on placement, vCenter collection ownership, ESXi syslog handoff, event and metric indexes, dashboards, and ITSI readiness."
+    },
+    {
+      "skill": "splunk-google-workspace-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk_TA_Google_Workspace modular-input collector for Admin Reports, Gmail logs, identity, Alert Center, and usage reports; run each input on one node."
+    },
+    {
+      "skill": "splunk-microsoft-security-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk_TA_MS_Security modular-input collector for Defender incidents, alerts, machines, simulations, Event Hub, and threat intelligence; Event Hub requires egress planning."
+    },
+    {
+      "skill": "splunk-sysmon-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder"
+      ],
+      "notes": "Splunk_TA_microsoft_sysmon endpoint or WEC collection; deploy exactly one mode per host population and validate by Sysmon source."
+    },
+    {
+      "skill": "splunk-github-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "Splunk_TA_github API collector plus GitHub Cloud HEC/GHES syslog handoffs; source-constrain generic httpevent audit streaming."
+    },
+    {
+      "skill": "cisco-asa-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "Splunk_TA_cisco-asa parser/search-time package plus ASA/FTD syslog receiver handoffs; readiness is source-constrained to cisco:asa."
+    },
+    {
+      "skill": "splunk-amazon-kinesis-firehose-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "required"
+      },
+      "cloud_pairing": [
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "Amazon Kinesis Firehose to Splunk HEC render workflow. Emits HEC, Firehose, IAM, S3 backup, CloudWatch metric, and strict source/sourcetype readiness evidence without creating AWS or Splunk resources."
+    },
+    {
+      "skill": "splunk-security-content-update-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Render-first ESCU install/upgrade and content activation review; package install and ES content changes are delegated."
+    },
+    {
+      "skill": "splunk-fraud-analytics-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Render-first Fraud Analytics readiness, ES/RBA prerequisites, Lookup File Editing dependency, use-case intake, and correlation-search review."
+    },
+    {
+      "skill": "splunk-pci-compliance-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Render-first PCI Compliance app readiness, CDE index/macro intake, CIM prerequisites, roles, reports, and installer-selection handoffs."
+    },
+    {
+      "skill": "splunk-infosec-app-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Render-first InfoSec app readiness, prerequisite source checklist, dashboard/macro/data-model checks, Cloud IDM support note, and lookup handoffs."
+    },
+    {
+      "skill": "splunk-lookup-file-editing-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier"
+      ],
+      "notes": "Render-first Lookup File Editing install readiness, CSV/KV Store lookup inventory, SHC allowRestReplay runbook, and knowledge-object/KV Store handoffs."
+    },
+    {
+      "skill": "splunk-salesforce-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk_TA_salesforce object and event-log API collector; run a given org/input set on one node."
+    },
+    {
+      "skill": "splunk-box-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk_TA_box historical/live/file API collector; keep file ingestion scope reviewed."
+    },
+    {
+      "skill": "splunk-cyberark-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "CyberArk EPM API collector plus archived EPV/PTA parser/syslog handoff."
+    },
+    {
+      "skill": "splunk-rsa-securid-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "RSA SecurID CAS API collector plus AM syslog/parser handoff."
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder",
+        "external-collector"
+      ],
+      "notes": "Shared web/proxy/parser workflow: local file/UF for web servers, Windows UF for IIS, SC4S/syslog for appliances."
+    },
+    {
+      "skill": "splunk-database-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder"
+      ],
+      "notes": "Database Supported Add-ons renderer. SQL Server file/perfmon can run on Windows collection owners; MySQL/Oracle/JDBC collection is delegated to DB Connect on search tier or heavy forwarder."
+    },
+    {
+      "skill": "splunk-microsoft-exchange-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder"
+      ],
+      "notes": "Exchange bundle and index workflow. Search/index knowledge can install on Splunk tiers; enabled collection belongs on reviewed Windows Exchange owners."
+    },
+    {
+      "skill": "splunk-microsoft-scom-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "SCOM PowerShell modular input workflow; run collection on one approved search tier or heavy forwarder per SCOM environment."
+    },
+    {
+      "skill": "splunk-netapp-ontap-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder"
+      ],
+      "notes": "ONTAP core/extractions/index workflow with centralized scheduler/worker collection and Hydra troubleshooting."
+    },
+    {
+      "skill": "splunk-security-appliance-ta-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "universal-forwarder",
+        "external-collector"
+      ],
+      "notes": "Carbon Black JSON file-monitor and Symantec EP file/syslog workflow; unresolved security appliances remain install-only."
     }
   ],
   "apps": [
@@ -3190,7 +4140,7 @@
       "latest_verified_date": "March 18, 2025"
     },
     {
-      "skill": "splunk-enterprise-security-config",
+      "skill": "splunk-security-content-update-setup",
       "app_name": "DA-ESS-ContentUpdate",
       "splunkbase_id": "3449",
       "label": "Splunk ES Content Update",
@@ -3219,6 +4169,185 @@
       },
       "latest_verified_version": "5.26.0",
       "latest_verified_date": "April 22, 2026"
+    },
+    {
+      "skill": "cisco-asa-ta-setup",
+      "app_name": "Splunk_TA_cisco-asa",
+      "splunkbase_id": "1620",
+      "label": "Splunk Add-on for Cisco ASA",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-cisco-asa_*"
+      ],
+      "min_splunk_version": "9.2",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "6.0.1",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-cim-data-model-setup",
+      "app_name": "Splunk_SA_CIM",
+      "splunkbase_id": "1621",
+      "label": "Splunk Common Information Model",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-common-information-model-cim_*"
+      ],
+      "min_splunk_version": "9.2",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "6.2.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-pci-compliance-setup",
+      "app_name": "SplunkPCIComplianceSuite",
+      "splunkbase_id": "1143",
+      "label": "Splunk App for PCI Compliance",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-app-for-pci-compliance_*"
+      ],
+      "install_requires": [
+        "1621"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "8.5.1",
+      "latest_verified_date": "April 16, 2026"
+    },
+    {
+      "skill": "splunk-pci-compliance-setup",
+      "app_name": "SplunkPCIComplianceSuite_ES",
+      "splunkbase_id": "2897",
+      "label": "Splunk App for PCI Compliance Enterprise Security installer",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-app-for-pci-compliance-enterprise-security_*"
+      ],
+      "install_requires": [
+        "263",
+        "1621"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "8.5.1",
+      "latest_verified_date": "April 16, 2026"
+    },
+    {
+      "skill": "splunk-infosec-app-setup",
+      "app_name": "infosec_app_for_splunk",
+      "splunkbase_id": "4240",
+      "label": "InfoSec App for Splunk",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "infosec-app-for-splunk_*"
+      ],
+      "install_requires": [
+        "1621",
+        "1724"
+      ],
+      "min_splunk_version": "9.2",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.7.1",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-lookup-file-editing-setup",
+      "app_name": "lookup_editor",
+      "splunkbase_id": "1724",
+      "label": "Splunk App for Lookup File Editing",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-app-for-lookup-file-editing_*"
+      ],
+      "min_splunk_version": "9.2",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "4.0.0",
+      "latest_verified_date": "June 6, 2026"
     },
     {
       "skill": "splunk-ai-assistant-setup",
@@ -3903,6 +5032,926 @@
       "notes": "GCP log ingestion TA (Pub/Sub, Cloud Storage, Cloud Audit Logs). GCP metrics go through the Splunk Observability GCP integration; logs go through this TA. Hand-off from splunk-observability-gcp-integration.",
       "latest_verified_version": "5.0.2",
       "latest_verified_date": "April 22, 2026"
+    },
+    {
+      "skill": "splunk-google-workspace-ta-setup",
+      "app_name": "Splunk_TA_Google_Workspace",
+      "splunkbase_id": "5556",
+      "label": "Splunk Add-on for Google Workspace",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-google-workspace_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "4.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-microsoft-security-ta-setup",
+      "app_name": "Splunk_TA_MS_Security",
+      "splunkbase_id": "6207",
+      "label": "Splunk Add-on for Microsoft Security",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-security_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "3.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-sysmon-ta-setup",
+      "app_name": "Splunk_TA_microsoft_sysmon",
+      "splunkbase_id": "5709",
+      "label": "Splunk Add-on for Microsoft Sysmon",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-sysmon_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "5.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-github-ta-setup",
+      "app_name": "Splunk_TA_github",
+      "splunkbase_id": "6254",
+      "label": "Splunk Add-on for GitHub",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-github_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "3.3.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-salesforce-ta-setup",
+      "app_name": "Splunk_TA_salesforce",
+      "splunkbase_id": "3549",
+      "label": "Splunk Add-on for Salesforce",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-salesforce_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "Salesforce object and event-log modular inputs; run each org input set on one search tier or heavy forwarder.",
+      "latest_verified_version": "6.0.2",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-box-ta-setup",
+      "app_name": "Splunk_TA_box",
+      "splunkbase_id": "2679",
+      "label": "Splunk Add-on for Box",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-box_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "Box historical, live monitoring, and file-ingestion modular inputs; run each enterprise input set on one collection node.",
+      "latest_verified_version": "4.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-cyberark-ta-setup",
+      "app_name": "Splunk_TA_cyberark_epm",
+      "splunkbase_id": "5160",
+      "label": "Splunk Add-on for CyberArk EPM",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-cyberark-epm_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "Supported CyberArk EPM API collection path.",
+      "latest_verified_version": "4.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-cyberark-ta-setup",
+      "app_name": "Splunk_TA_cyberark",
+      "splunkbase_id": "2891",
+      "label": "Splunk Add-on for CyberArk",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-cyberark_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Archived/not-supported CyberArk EPV/PTA parser-only package; use explicit SC4S/syslog transport ownership.",
+      "latest_verified_version": "1.2.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-rsa-securid-ta-setup",
+      "app_name": "Splunk_TA_rsa_securid_cas",
+      "splunkbase_id": "5210",
+      "label": "Splunk Add-on for RSA SecurID CAS",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-rsa-securid-cloud-authentication-service_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "notes": "RSA SecurID CAS Cloud Administration API modular input.",
+      "latest_verified_version": "1.2.2",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-rsa-securid-ta-setup",
+      "app_name": "Splunk_TA_rsa-securid",
+      "splunkbase_id": "2958",
+      "label": "Splunk Add-on for RSA SecurID",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-rsa-securid_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "RSA Authentication Manager syslog/parser package.",
+      "latest_verified_version": "1.5.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_apache",
+      "splunkbase_id": "3186",
+      "label": "Splunk Add-on for Apache Web Server",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-apache-web-server_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "3.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_nginx",
+      "splunkbase_id": "3258",
+      "label": "Splunk Add-on for NGINX",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-nginx_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "3.3.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_microsoft-iis",
+      "splunkbase_id": "3185",
+      "label": "Splunk Add-on for Microsoft IIS",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-iis_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "2.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_tomcat",
+      "splunkbase_id": "2911",
+      "label": "Splunk Add-on for Tomcat",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-tomcat_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "4.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_haproxy",
+      "splunkbase_id": "3135",
+      "label": "Splunk Add-on for HAProxy",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-haproxy_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "2.0.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_squid",
+      "splunkbase_id": "2965",
+      "label": "Splunk Add-on for Squid Proxy",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-squid-proxy_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "2.1.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_bluecoat-proxysg",
+      "splunkbase_id": "2758",
+      "label": "Splunk Add-on for Symantec Blue Coat ProxySG",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-symantec-blue-coat-proxysg_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "3.9.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_websense-cg",
+      "splunkbase_id": "2966",
+      "label": "Splunk Add-on for Forcepoint Web Security",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-forcepoint-web-security_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "1.1.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_checkpoint_log_exporter",
+      "splunkbase_id": "5478",
+      "label": "Splunk Add-on for Check Point Log Exporter",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-check-point-log-exporter_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "1.2.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_f5-bigip",
+      "splunkbase_id": "2680",
+      "label": "Splunk Add-on for F5 BIG-IP",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-f5-big-ip_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "6.5.1",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_citrix-netscaler",
+      "splunkbase_id": "2770",
+      "label": "Splunk Add-on for Citrix NetScaler",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-citrix-netscaler_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "8.2.3",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-syslog-web-proxy-ta-setup",
+      "app_name": "Splunk_TA_infoblox",
+      "splunkbase_id": "2934",
+      "label": "Splunk Add-on for Infoblox",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-infoblox_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "latest_verified_version": "2.2.0",
+      "latest_verified_date": "June 6, 2026"
+    },
+    {
+      "skill": "splunk-database-ta-setup",
+      "app_name": "Splunk_TA_microsoft-sqlserver",
+      "splunkbase_id": "2648",
+      "label": "Splunk Add-on for Microsoft SQL Server",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-sql-server_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "3.1.0",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "SQL Server package includes search-time knowledge, ERRORLOG/SQLAGENT file monitors, Perfmon stanzas, and DB Connect templates."
+    },
+    {
+      "skill": "splunk-database-ta-setup",
+      "app_name": "Splunk_TA_mysql",
+      "splunkbase_id": "2848",
+      "label": "Splunk Add-on for MySQL",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-mysql_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "3.2.0",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "MySQL package knowledge and DB Connect templates; JDBC collection delegated to splunk-db-connect-setup."
+    },
+    {
+      "skill": "splunk-database-ta-setup",
+      "app_name": "Splunk_TA_oracle",
+      "splunkbase_id": "1910",
+      "label": "Splunk Add-on for Oracle Database",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-oracle-database_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "4.2.0",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "Oracle package knowledge, alert/listener/audit source types, and DB Connect templates; JDBC collection delegated to splunk-db-connect-setup."
+    },
+    {
+      "skill": "splunk-microsoft-exchange-ta-setup",
+      "app_name": "TA-Exchange-ClientAccess",
+      "splunkbase_id": "3225",
+      "label": "Splunk Add-on for Microsoft Exchange bundle",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-exchange_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "4.1.0",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "Multi-app Exchange bundle containing ClientAccess, Mailbox, SMTP Reputation, and Windows Exchange IIS component apps."
+    },
+    {
+      "skill": "splunk-microsoft-exchange-ta-setup",
+      "app_name": "SA-ExchangeIndex",
+      "splunkbase_id": "5663",
+      "label": "Splunk Add-on for Microsoft Exchange Indexes",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-exchange-indexes_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "required",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "4.0.4",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "Exchange index definitions for msexchange, perfmon, windows, wineventlog, and msad."
+    },
+    {
+      "skill": "splunk-microsoft-scom-ta-setup",
+      "app_name": "Splunk_TA_microsoft-scom",
+      "splunkbase_id": "2729",
+      "label": "Splunk Add-on for Microsoft SCOM",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-scom_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "4.5.0",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "SCOM PowerShell modular inputs and microsoft:scom source types; run collection on one approved search tier or heavy forwarder."
+    },
+    {
+      "skill": "splunk-netapp-ontap-ta-setup",
+      "app_name": "Splunk_TA_ontap",
+      "splunkbase_id": "3418",
+      "label": "Splunk Add-on for NetApp Data ONTAP",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-netapp-data-ontap_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "3.2.0",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "ONTAP scheduler/worker collection package using SA-Hydra runtime components."
+    },
+    {
+      "skill": "splunk-netapp-ontap-ta-setup",
+      "app_name": "TA-ONTAP-FieldExtractions",
+      "splunkbase_id": "5615",
+      "label": "Splunk Add-on for NetApp Data ONTAP Field Extractions",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-netapp-data-ontap-field-extractions_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "3.0.3",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "ONTAP field extractions, eventtypes, and Hydra troubleshooting source types."
+    },
+    {
+      "skill": "splunk-netapp-ontap-ta-setup",
+      "app_name": "SA-ONTAPIndex",
+      "splunkbase_id": "5616",
+      "label": "Splunk Add-on for NetApp Data ONTAP Indexes",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-netapp-data-ontap-indexes_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "required",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "3.0.3",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "ONTAP index definition package."
+    },
+    {
+      "skill": "splunk-security-appliance-ta-setup",
+      "app_name": "Splunk_TA_bit9-carbonblack",
+      "splunkbase_id": "2790",
+      "label": "Splunk Add-on for Carbon Black",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-carbon-black_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "3.0.0",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "Carbon Black JSON file monitor parser package; upstream export or bridge owns file delivery."
+    },
+    {
+      "skill": "splunk-security-appliance-ta-setup",
+      "app_name": "Splunk_TA_symantec-ep",
+      "splunkbase_id": "2772",
+      "label": "Splunk Add-on for Symantec Endpoint Protection",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-symantec-endpoint-protection_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "4.0.0",
+      "latest_verified_date": "June 6, 2026",
+      "notes": "Symantec EP file and syslog parser package; SC4S/syslog or file monitor owns transport."
     }
   ]
 }

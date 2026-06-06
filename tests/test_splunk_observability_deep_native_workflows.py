@@ -15,6 +15,20 @@ SCRIPT_DIR = REPO_ROOT / "skills/splunk-observability-deep-native-workflows/scri
 TEMPLATE = REPO_ROOT / "skills/splunk-observability-deep-native-workflows/template.example"
 
 
+def test_deep_native_validate_help_exits_before_offline_validation() -> None:
+    result = subprocess.run(
+        ["bash", str(SCRIPT_DIR / "validate.sh"), "--help"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Usage:" in result.stdout
+    assert "offline validation passed" not in result.stdout
+
+
 def test_deep_native_template_renders_coverage_packet(tmp_path: Path) -> None:
     result = subprocess.run(
         [

@@ -1,0 +1,19 @@
+# Splunk Knowledge-Object Governance Worksheet
+#
+# Non-secret values only.
+
+phase: render                # render | inventory | audit | apply | reassign
+
+splunk_home: /opt/splunk
+app_name: ZZZ_cisco_skills_governance
+app_context: search
+
+# Object types to inventory/audit (comma-separated) or 'all'.
+object_types: savedsearches,macros,lookups,eventtypes,tags,fieldextractions
+
+reassign_owner: admin        # owner to set when reassigning orphaned/private objects
+share_level: app             # app | global (sharing for governed objects)
+
+# For --phase reassign, supply the object's ACL endpoint, for example:
+# acl_endpoint: servicesNS/nobody/search/saved/searches/My%20Report/acl
+acl_endpoint:

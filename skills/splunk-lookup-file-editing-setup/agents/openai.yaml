@@ -1,0 +1,7 @@
+interface:
+  display_name: "Lookup File Editing Setup"
+  short_description: "Render Lookup Editor install, inventory, SHC, and health checks"
+  default_prompt: >-
+    Use $splunk-lookup-file-editing-setup to render Lookup File Editing install
+    readiness, CSV/KV Store lookup inventory checks, SHC allowRestReplay backup
+    replication notes, app health checks, and knowledge-object/KV Store handoffs.

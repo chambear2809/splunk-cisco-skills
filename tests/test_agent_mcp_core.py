@@ -42,9 +42,14 @@ class AgentMCPCoreTests(unittest.TestCase):
         self.assertTrue(dashboard_skill["has_reference"])
         self.assertEqual(
             dashboard_skill["reference_files"],
-            ["references/classic-api.md", "references/coverage.md"],
+            [
+                "reference.md",
+                "references/classic-api.md",
+                "references/coverage.md",
+            ],
         )
         reference_text = core.read_skill_file("splunk-observability-dashboard-builder", "reference")
+        self.assertIn("# reference.md", reference_text)
         self.assertIn("# references/classic-api.md", reference_text)
         self.assertIn("# references/coverage.md", reference_text)
 

@@ -1,0 +1,14 @@
+# Splunk Secure Gateway / Mobile Worksheet
+#
+# Non-secret values only.
+
+phase: render                # render | preflight | enable | register | status
+
+splunk_home: /opt/splunk
+platform: enterprise         # cloud | enterprise
+
+# Spacebridge region for the regional health check (default = global relay only).
+region: default              # default | us-east-1 | eu-central-1 | eu-west-1 | eu-west-2 | ap-southeast-2
+
+deployment_name: Splunk Secure Gateway
+mdm: false                   # true to render an MDM AppConfig template

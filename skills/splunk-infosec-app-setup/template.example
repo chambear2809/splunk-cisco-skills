@@ -1,0 +1,6 @@
+# InfoSec App render template
+platform: auto
+es_app: SplunkEnterpriseSecuritySuite
+security_indexes: security,endpoint,network
+cloud_idm_required: false
+lookup_owner_app: infosec_app_for_splunk

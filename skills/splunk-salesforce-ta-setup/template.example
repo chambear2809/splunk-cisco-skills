@@ -1,0 +1,12 @@
+# Splunk Salesforce TA render template
+index: salesforce
+account_name: salesforce_prod
+objects: user,loginhistory,account,opportunity,dashboard,report,contentversion
+include_event_log: true
+interface:
+  display_name: "Splunk Add-on for Salesforce Setup"
+  short_description: "Render Salesforce object/event-log inputs, account runbooks, and validation"
+  default_prompt: >-
+    Use $splunk-salesforce-ta-setup to render Splunk_TA_salesforce object and
+    event-log inputs, install the add-on, create the salesforce index, and
+    validate package-backed sfdc source types.

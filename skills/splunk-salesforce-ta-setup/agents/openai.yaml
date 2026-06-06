@@ -1,0 +1,9 @@
+name: splunk-salesforce-ta-setup
+description: Render, install, and validate Splunk_TA_salesforce with safe account handoffs.
+safe_first:
+  - bash skills/splunk-salesforce-ta-setup/scripts/setup.sh --help
+  - bash skills/splunk-salesforce-ta-setup/scripts/setup.sh --render --dry-run --json
+validation:
+  - bash skills/splunk-salesforce-ta-setup/scripts/validate.sh --help
+notes:
+  - Do not pass Salesforce credentials on the command line. Use the rendered account setup runbook.

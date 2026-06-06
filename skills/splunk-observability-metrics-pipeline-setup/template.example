@@ -1,0 +1,11 @@
+api_version: splunk-observability-metrics-pipeline-setup/v1
+realm: us1
+metric_pipeline:
+  name: Checkout metric cardinality review
+  metric: service.request.duration
+  action: aggregate
+  dimensions:
+    - service.name
+    - deployment.environment
+  exceptions:
+    - service.name=checkoutservice
