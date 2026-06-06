@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import stat
+import sys
 from pathlib import Path
 
 GENERATED_FILES = {
@@ -47,8 +48,26 @@ CIM_MODELS = {
     "Web",
 }
 
+SPLUNK_TIME_OPTIONS = {"--earliest-time", "--backfill-time"}
 
-def parse_args() -> argparse.Namespace:
+
+def normalize_splunk_time_args(argv: list[str]) -> list[str]:
+    normalized: list[str] = []
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in SPLUNK_TIME_OPTIONS and i + 1 < len(argv):
+            value = argv[i + 1]
+            if value.startswith("-") and not value.startswith("--"):
+                normalized.append(f"{arg}={value}")
+                i += 2
+                continue
+        normalized.append(arg)
+        i += 1
+    return normalized
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Render Splunk CIM data model governance assets.")
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--app-name", default="Splunk_SA_CIM")
@@ -66,7 +85,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tags", default="")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
-    return parser.parse_args()
+    raw_argv = sys.argv[1:] if argv is None else list(argv)
+    return parser.parse_args(normalize_splunk_time_args(raw_argv))
 
 
 def die(message: str) -> None:
