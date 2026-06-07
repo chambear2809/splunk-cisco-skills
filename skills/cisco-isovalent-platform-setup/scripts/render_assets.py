@@ -123,6 +123,7 @@ DISTRIBUTION_ALIASES = {
     "vsphere": "vmware-vsphere",
     "ack": "alibaba-ack",
 }
+MANAGED_CILIUM_DISTRIBUTIONS = {"aks-managed-cilium", "gke-dataplane-v2"}
 DISRUPTIVE_SECTIONS = {
     "cilium",
     "clustermesh",
@@ -686,7 +687,9 @@ def apply_plan(
         else:
             namespace = cilium_ns
             command = ["bash", str(output_dir / f"scripts/apply-{section}.sh")]
-        if (
+        if section == "cilium" and distribution in MANAGED_CILIUM_DISTRIBUTIONS:
+            command_class = "discover_only"
+        elif (
             section == "load-balancer"
             or (section == "dnsproxy" and edition != "enterprise")
             or (section in {"hubble", "timescape"} and (edition != "enterprise" or not private_chart_access_verified))
@@ -696,13 +699,18 @@ def apply_plan(
             command_class = "cli_apply"
         else:
             command_class = "mutating"
+        automation = "cli" if command_class == "cli_apply" else "helm_or_kubectl"
+        if command_class == "discover_only":
+            automation = "none"
         steps.append(
             {
                 "section": section,
-                "automation": "cli" if command_class == "cli_apply" else "helm_or_kubectl",
+                "automation": automation,
                 "command_class": command_class,
                 "requires_accept_k8s_apply": command_class in {"mutating", "cli_apply"},
-                "requires_accept_isovalent_disruptive_change": section in DISRUPTIVE_SECTIONS,
+                "requires_accept_isovalent_disruptive_change": (
+                    command_class in {"mutating", "cli_apply"} and section in DISRUPTIVE_SECTIONS
+                ),
                 "requires_isovalent_license_file": (
                     edition == "enterprise"
                     and command_class == "mutating"
@@ -862,10 +870,12 @@ def enterprise_secret_args_body(chart: str, license_pattern: str = "license|ente
         'fi\n'
         'if [[ -n "${ISOVALENT_PULL_SECRET_FILE:-}" ]]; then\n'
         '    if [[ "${K8S_APPLY_DRY_RUN:-false}" == "true" ]]; then\n'
+        '        "${KUBECTL[@]}" create namespace "${NAMESPACE}" --dry-run=client -o yaml >/dev/null\n'
         '        "${KUBECTL[@]}" -n "${NAMESPACE}" create secret generic isovalent-pull-secret \\\n'
         '            --from-file=.dockerconfigjson="${ISOVALENT_PULL_SECRET_FILE}" \\\n'
         '            --type=kubernetes.io/dockerconfigjson --dry-run=client -o yaml >/dev/null\n'
         '    else\n'
+        '        "${KUBECTL[@]}" create namespace "${NAMESPACE}" --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f -\n'
         '        "${KUBECTL[@]}" -n "${NAMESPACE}" create secret generic isovalent-pull-secret \\\n'
         '            --from-file=.dockerconfigjson="${ISOVALENT_PULL_SECRET_FILE}" \\\n'
         '            --type=kubernetes.io/dockerconfigjson --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f -\n'
@@ -875,7 +885,14 @@ def enterprise_secret_args_body(chart: str, license_pattern: str = "license|ente
     )
 
 
-def cilium_install_body(edition: str, eks_mirror: bool, namespace: str) -> str:
+def cilium_install_body(edition: str, eks_mirror: bool, namespace: str, distribution: str = "generic") -> str:
+    if distribution in MANAGED_CILIUM_DISTRIBUTIONS:
+        return (
+            f'NAMESPACE="${{1:-{namespace}}}"\n'
+            f'echo "ERROR: {distribution} uses a provider-managed Cilium dataplane." >&2\n'
+            'echo "This skill will not Helm-replace provider-owned Cilium. Use --discover, --preflight, --validate, or a provider-supported BYOCNI migration path." >&2\n'
+            'exit 1\n'
+        )
     chart = OSS_CILIUM_CHART
     repo_setup = (
         f'"${{HELM[@]}}" repo add {OSS_REPO_NAME} {OSS_REPO_URL}\n'
@@ -1038,7 +1055,7 @@ def preflight_body(spec: dict[str, Any], edition: str, distribution: str, catalo
         )
         body.append('    echo "WARN: OpenShift profile selected but SCC API was not found."')
         body.append("fi")
-    if distribution in {"aks-managed-cilium", "gke-dataplane-v2"}:
+    if distribution in MANAGED_CILIUM_DISTRIBUTIONS:
         body.append(
             f'echo "WARN: {distribution} owns the managed Cilium dataplane; CNI replacement is discover-only unless the provider-supported path explicitly allows it."'
         )
@@ -1516,7 +1533,10 @@ def main() -> int:
 
     write_text(
         out / "scripts/install-cilium.sh",
-        install_script(name="install-cilium.sh", body=cilium_install_body(edition, eks_mirror, cilium_ns)),
+        install_script(
+            name="install-cilium.sh",
+            body=cilium_install_body(edition, eks_mirror, cilium_ns, distribution),
+        ),
         executable=True,
     )
     write_text(

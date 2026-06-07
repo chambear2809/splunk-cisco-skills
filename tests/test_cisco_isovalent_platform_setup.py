@@ -406,6 +406,59 @@ def test_disruptive_apply_requires_second_gate(tmp_path: Path) -> None:
     assert "--accept-isovalent-disruptive-change" in combined_output(result)
 
 
+@pytest.mark.parametrize("distribution", ["aks-managed-cilium", "gke-dataplane-v2"])
+def test_managed_cilium_profiles_make_cilium_discover_only(tmp_path: Path, distribution: str) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        distribution=distribution,
+        apply={"sections": "cilium,tetragon"},
+    )
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+    plan = json.loads((output / "apply-plan.json").read_text(encoding="utf-8"))
+    steps = {step["section"]: step for step in plan["steps"]}
+    assert steps["cilium"]["command_class"] == "discover_only"
+    assert steps["cilium"]["automation"] == "none"
+    assert steps["cilium"]["requires_accept_k8s_apply"] is False
+    assert steps["cilium"]["requires_accept_isovalent_disruptive_change"] is False
+    assert steps["tetragon"]["command_class"] == "mutating"
+
+    install_cilium = (output / "scripts/install-cilium.sh").read_text(encoding="utf-8")
+    assert f"ERROR: {distribution} uses a provider-managed Cilium dataplane." in install_cilium
+    assert "Helm-replace provider-owned Cilium" in install_cilium
+    assert "upgrade --install cilium" not in install_cilium
+
+
+@pytest.mark.parametrize("distribution", ["aks-managed-cilium", "gke-dataplane-v2"])
+def test_managed_cilium_apply_fails_closed_before_helm_upgrade(tmp_path: Path, distribution: str) -> None:
+    fake_bin = tmp_path / "bin"
+    log_path = tmp_path / "commands.log"
+    write_fake_k8s_tools(fake_bin, log_path)
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        distribution=distribution,
+        apply={"sections": "cilium"},
+    )
+    result = run_setup(
+        "--apply",
+        "cilium",
+        "--dry-run",
+        "--kube-context",
+        "unit-test",
+        "--spec",
+        str(spec),
+        "--output-dir",
+        str(output),
+        env={"PATH": f"{fake_bin}:{os.environ['PATH']}"},
+    )
+    assert result.returncode != 0
+    assert "provider-managed Cilium dataplane" in combined_output(result)
+    command_log = log_path.read_text(encoding="utf-8") if log_path.exists() else ""
+    assert "upgrade --install cilium" not in command_log
+
+
 def test_unavailable_apply_step_fails_instead_of_silent_skip(tmp_path: Path) -> None:
     spec = write_spec(tmp_path / "spec.json")
     result = run_setup(
@@ -550,6 +603,7 @@ def test_enterprise_scoped_cilium_apply_scripts_include_repo_and_secret_file_gua
     assert "isovalent/cilium-enterprise" in script
     assert 'SET_FILE_ARGS+=(--set-file "enterprise.license=${ISOVALENT_LICENSE_FILE}")' in script
     assert 'imagePullSecrets[0].name=isovalent-pull-secret' in script
+    assert script.index('create namespace "${NAMESPACE}"') < script.index("create secret generic isovalent-pull-secret")
     assert '$(cat "${ISOVALENT_LICENSE_FILE}")' not in script
 
 
