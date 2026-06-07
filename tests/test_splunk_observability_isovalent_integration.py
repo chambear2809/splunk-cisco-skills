@@ -97,7 +97,11 @@ def test_render_produces_overlay_and_handoffs(tmp_path: Path) -> None:
     assert "prometheus/isovalent_cilium" in overlay
     assert "prometheus/isovalent_hubble" in overlay
     assert "prometheus/isovalent_tetragon" in overlay
+    assert "${__meta_kubernetes_pod_ip}" not in overlay
+    assert "replacement: $1:" in overlay
     assert "filter/includemetrics" in overlay
+    assert "\ngateway:" not in f"\n{overlay}"
+    assert "\noperator:" not in f"\n{overlay}"
 
 
 def test_default_file_path_renders_extra_file_logs_aligned_with_hostpath(tmp_path: Path) -> None:
@@ -110,6 +114,7 @@ def test_default_file_path_renders_extra_file_logs_aligned_with_hostpath(tmp_pat
     assert "extraVolumes" in overlay
     assert "/var/run/cilium/tetragon" in overlay
     assert "filelog/tetragon" in overlay
+    assert "receivers:" in overlay
     assert "com.splunk.sourcetype: cisco:isovalent" in overlay
     assert "com.splunk.index: cisco_isovalent" in overlay
 
@@ -186,6 +191,65 @@ def test_handoff_to_cisco_security_cloud(tmp_path: Path) -> None:
     # Negative: confirm we do NOT emit the legacy/wrong --product flag that was
     # never a valid cisco-security-cloud-setup CLI argument.
     assert "--product isovalent" not in handoff
+
+
+def test_apply_helper_auto_discovers_collector_namespace_and_uses_set_file(tmp_path: Path) -> None:
+    """The apply helper must work with non-default collector namespaces.
+
+    Live EKS clusters commonly install the Splunk OTel Collector outside the
+    chart's example `splunk-otel` namespace. The helper should discover the
+    release namespace when the spec does not pin one, and it must not expand
+    the O11y token into the Helm process argv.
+    """
+    output = tmp_path / "rendered"
+    spec = write_spec(tmp_path / "spec.json")
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+    helper = (output / "scripts/apply-isovalent-overlay.sh").read_text(encoding="utf-8")
+    assert 'helm list --all-namespaces --filter "^${RELEASE}$" -o json' in helper
+    assert 'CHART_VERSION="${INSTALLED_CHART#${CHART_NAME}-}"' in helper
+    assert '"${VERSION_FLAG[@]}"' in helper
+    assert 'NAMESPACE="splunk-otel"' in helper
+    assert 'get configmap "${RELEASE}-obi"' in helper
+    assert ".obi.config.data = load(strenv(OBI_CONFIG_FILE))" in helper
+    assert 'get configmap "${RELEASE}-otel-collector"' in helper
+    assert ".gateway.config = load(strenv(GATEWAY_CONFIG_FILE))" in helper
+    assert "claim_configmap_for_helm" in helper
+    assert "claim_configmap_for_helm \"${RELEASE}-obi\"" in helper
+    assert "claim_configmap_for_helm \"${RELEASE}-otel-collector\"" in helper
+    assert 'if TOKEN_MODE="$(stat -f' in helper
+    assert 'elif TOKEN_MODE="$(stat -c' in helper
+    assert '|| stat -c' not in helper
+    assert 'NORMALIZE_OTLPHTTP="auto"' in helper
+    assert 'sub("^otlphttp"; "otlp_http")' in helper
+    assert "--force-conflicts" in helper
+    assert "--set-file \"splunkObservability.accessToken=${O11Y_TOKEN_FILE}\"" in helper
+    assert "deployment/${RELEASE}-k8s-cluster-receiver" in helper
+    assert "deployment/${RELEASE}-cluster-receiver" not in helper
+    assert '--set "splunkObservability.accessToken=$(cat "${O11Y_TOKEN_FILE}")"' not in helper
+
+
+def test_apply_helper_honors_explicit_collector_namespace(tmp_path: Path) -> None:
+    output = tmp_path / "rendered"
+    spec = write_spec(
+        tmp_path / "spec.json",
+        collector={
+            "release": "custom-collector",
+            "namespace": "otel-splunk",
+            "chart_version": "0.148.0",
+        },
+    )
+    result = run_setup("--render", "--spec", str(spec), "--output-dir", str(output))
+    assert result.returncode == 0, combined_output(result)
+    helper = (output / "scripts/apply-isovalent-overlay.sh").read_text(encoding="utf-8")
+    assert 'RELEASE="custom-collector"' in helper
+    assert 'NAMESPACE="otel-splunk"' in helper
+    assert 'CHART_VERSION="0.148.0"' in helper
+
+
+def test_apply_dry_run_still_renders_fresh_assets() -> None:
+    setup = SETUP.read_text(encoding="utf-8")
+    assert '[[ "${DRY_RUN}" == "true" && "${MODE_APPLY}" != "true" ]]' in setup
 
 
 @pytest.mark.parametrize(

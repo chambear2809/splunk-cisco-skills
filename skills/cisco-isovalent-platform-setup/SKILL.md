@@ -55,6 +55,7 @@ export:
   mode: file
   exportDirectory: /var/run/cilium/tetragon
   exportFilename: tetragon.log
+  exportFilePerm: "644"
 ```
 
 This is the **production-validated path** that coordinates with `splunk-observability-isovalent-integration`'s `agent.extraVolumes` hostPath mount and `logsCollection.extraFileLogs.filelog/tetragon` block. Override with `--export-mode stdout|fluentd` for users whose SCC/PSP policies block hostPath mounts (`stdout`) or who insist on the legacy fluentd `splunk_hec` output (`fluentd` — flagged DEPRECATED, the upstream `fluent-plugin-splunk-hec` was archived 2025-06-24).

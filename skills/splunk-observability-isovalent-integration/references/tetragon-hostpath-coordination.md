@@ -64,7 +64,7 @@ ERROR: extraFileLogs include (/var/log/tetragon/*.log) is not under hostPath (/v
 The Splunk OTel collector ServiceAccount needs read permission on the hostPath. This is usually fine because:
 
 - The collector agent runs as root by default in the Splunk OTel chart (root inside the container; node hostPath access governed by kernel).
-- Tetragon writes log files with mode 0644 by default.
+- `cisco-isovalent-platform-setup` renders `tetragon.exportFilePerm: "644"` for file mode. The upstream Tetragon chart default is stricter (`600`), which blocks a separate OTel collector process from reading the hostPath files.
 - OpenShift's `anyuid` SCC is required for the collector to read the hostPath as root (the platform-setup skill renders the SCC helper if `distribution: openshift`).
 
 If the collector runs as non-root (chart override), Tetragon's log file mode + ownership must be adjusted. This is an edge case and the skill does not currently render guidance for it; see `references/troubleshooting.md` if you hit it.

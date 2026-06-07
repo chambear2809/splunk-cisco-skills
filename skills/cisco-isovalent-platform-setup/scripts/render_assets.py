@@ -149,6 +149,7 @@ def tetragon_values(spec: dict[str, Any], edition: str, export_mode_override: st
         )
     export_directory = export_block.get("directory", "/var/run/cilium/tetragon")
     export_filename = export_block.get("filename", "tetragon.log")
+    export_file_perm = str(export_block.get("file_perm", "644"))
     enable_events = (overrides.get("enable_events") or {})
     base: dict[str, Any] = {
         "tetragon": {
@@ -158,6 +159,7 @@ def tetragon_values(spec: dict[str, Any], edition: str, export_mode_override: st
             },
             "exportDirectory": export_directory,
             "exportFilename": export_filename,
+            "exportFilePerm": export_file_perm,
         }
     }
     if export_mode == "file":

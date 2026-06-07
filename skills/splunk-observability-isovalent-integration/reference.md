@@ -76,6 +76,8 @@ Alternatives:
 
 Rejected direct flags: `--access-token`, `--token`, `--bearer-token`, `--api-token`, `--o11y-token`, `--sf-token`, `--platform-hec-token`, `--hec-token`. Each error message points at the matching `--*-file` flag.
 
+`--apply` updates an existing Splunk OTel Collector Helm release. The rendered helper discovers the release namespace from Helm when `collector.namespace` is blank, pins the currently installed chart version when `collector.chart_version` is blank, preserves existing gateway/operator topology unless explicitly disabled in the spec, passes the O11y token with `--set-file`, preserves live OBI eBPF ConfigMap data when OBI is installed, reclaims known Helm ConfigMap fields that were previously patched with `kubectl`, normalizes legacy `otlphttp/...` component names in merged release values to the chart's `otlp_http/...` spelling when chart compatibility requires it, and runs Helm with `--force-conflicts` for server-side apply conflict recovery.
+
 ## Hand-offs
 
 - Splunk OTel Collector base install: [splunk-observability-otel-collector-setup](../splunk-observability-otel-collector-setup/SKILL.md) (rendered command in `handoff-base-collector.sh`).

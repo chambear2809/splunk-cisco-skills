@@ -91,6 +91,7 @@ def test_tetragon_default_export_mode_file(tmp_path: Path) -> None:
     tetragon = (output / "helm/tetragon-values.yaml").read_text(encoding="utf-8")
     assert "exportDirectory: /var/run/cilium/tetragon" in tetragon
     assert "exportFilename: tetragon.log" in tetragon
+    assert "exportFilePerm: '644'" in tetragon
 
 
 def test_legacy_fluentd_emits_deprecation_warning(tmp_path: Path) -> None:
