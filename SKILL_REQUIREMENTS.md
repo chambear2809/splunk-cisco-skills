@@ -42,6 +42,7 @@ Environment-specific notes:
 | `cisco-appdynamics-setup` | Shared baseline. | Splunk app workflow access; AppDynamics controller and analytics endpoint details; controller credentials/client secrets in files. |
 | `cisco-catalyst-enhanced-netflow-setup` | Shared baseline; Splunk Stream placement awareness. | Splunk app workflow access; existing Stream/IPFIX/HSL collection path and Catalyst data prerequisites. |
 | `cisco-catalyst-ta-setup` | Shared baseline. | Splunk app workflow access; Catalyst Center, ISE, SD-WAN, or Cyber Vision host/account details; device/API secrets in files. |
+| `cisco-cloud-control-setup` | Shared baseline; `PyYAML` for YAML intake specs. | Cisco Cloud Control entitlement/readiness context; Cloud Control Studio and AI Canvas access for UI handoffs; Splunk child-skill access inherits from Data Fabric, MCP, Observability, and Cisco domain workflows. |
 | `cisco-dc-networking-setup` | Shared baseline. | Splunk app workflow access; ACI/APIC, Nexus Dashboard, or Nexus 9K account details; device/API secrets in files. |
 | `cisco-enterprise-networking-setup` | Shared baseline. | Splunk app workflow access; Cisco Enterprise Networking app installed; macro/index values for Catalyst/ISE dashboard searches. |
 | `cisco-intersight-setup` | Shared baseline. | Splunk app workflow access; Cisco Intersight account/API material stored in files. |

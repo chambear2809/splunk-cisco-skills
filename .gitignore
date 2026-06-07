@@ -55,6 +55,7 @@ projects/tmp-*
 
 # --- Local rendered deployment assets ---
 /cisco-isovalent-platform-rendered/
+/cisco-cloud-control-rendered/
 /cisco-thousandeyes-mcp-rendered/
 /galileo-agent-control-rendered/
 /galileo-platform-rendered/

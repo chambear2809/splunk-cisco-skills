@@ -98,6 +98,20 @@ class CiscoProductSetupTests(unittest.TestCase):
                 self.assertEqual(payload["status"], "resolved")
                 self.assertEqual(payload["matches"][0]["id"], "cisco_ai_defense")
 
+    def test_resolve_cisco_cloud_control_synthetic_product(self) -> None:
+        for query in ("Cisco Cloud Control", "Cloud Control"):
+            with self.subTest(query=query):
+                result, payload = self.run_resolver_json(query)
+                self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+                self.assertEqual(payload["status"], "resolved")
+                self.assertEqual(payload["matches"][0]["id"], "cisco_cloud_control")
+
+    def test_security_cloud_control_remains_distinct_from_cloud_control(self) -> None:
+        result, payload = self.run_resolver_json("Cisco Security Cloud Control")
+        self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+        self.assertEqual(payload["status"], "resolved")
+        self.assertEqual(payload["matches"][0]["id"], "cisco_security_cloud_control")
+
     def test_resolve_cisco_is_ambiguous(self) -> None:
         result = self.run_command(
             "bash",

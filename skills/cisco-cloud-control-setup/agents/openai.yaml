@@ -1,0 +1,9 @@
+interface:
+  display_name: "Cisco Cloud Control Setup"
+  short_description: "Render Cisco Cloud Control adoption, Studio, AI Canvas, MCP, Data Fabric, and Splunk observability handoffs."
+  default_prompt: >-
+    Use $cisco-cloud-control-setup to render, validate, doctor, and optionally
+    execute delegated Cisco Cloud Control readiness plans. Keep Cisco Cloud
+    Control Studio and AI Canvas as handoffs, and delegate supported work to
+    Splunk Data Fabric, MCP, AI Agent Monitoring, Observability content, and
+    Cisco domain setup skills.

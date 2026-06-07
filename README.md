@@ -78,6 +78,7 @@ Run commands from the repository root.
 | Goal | Start with | First useful command |
 |------|------------|----------------------|
 | I know a Cisco product but not the Splunk app or TA | [`cisco-product-setup`](skills/cisco-product-setup/) | `bash skills/cisco-product-setup/scripts/setup.sh --product "Cisco ACI" --dry-run` |
+| I need Cisco Cloud Control, AgenticOps, AI Canvas, or Cloud Control Studio readiness | [`cisco-cloud-control-setup`](skills/cisco-cloud-control-setup/) | `bash skills/cisco-cloud-control-setup/scripts/setup.sh --render --validate --spec skills/cisco-cloud-control-setup/template.example` |
 | I already know the Splunkbase app or local package | [`splunk-app-install`](skills/splunk-app-install/) | `bash skills/splunk-app-install/scripts/setup.sh --help` |
 | I need Enterprise Security, ES native SOAR, Security AI Assistant, Federated Analytics, SOAR, ARI, Attack Analyzer, UBA, or security routing | [`splunk-security-portfolio-setup`](skills/splunk-security-portfolio-setup/) | `bash skills/splunk-security-portfolio-setup/scripts/setup.sh --help` |
 | I need Splunk Cloud ACS admin, app installs, indexes, HEC tokens, restarts, or allowlists | [`splunk-app-install`](skills/splunk-app-install/), [`splunk-hec-service-setup`](skills/splunk-hec-service-setup/), [`splunk-cloud-acs-admin-setup`](skills/splunk-cloud-acs-admin-setup/) | `bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh --help` |

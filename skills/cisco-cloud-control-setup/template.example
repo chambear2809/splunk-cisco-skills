@@ -1,0 +1,66 @@
+api_version: cisco-cloud-control-setup/v1
+organization:
+  name: example-enterprise
+  environment: production
+  owner: platform-operations
+cloud_control:
+  adoption_goal: governed-agentic-operations
+  studio_region: us
+  ai_canvas_enabled: true
+api:
+  workflows_api_enabled: true
+data_fabric:
+  enabled: true
+  child_specs:
+    federated_search: ""
+    edge_processor: ""
+    ingest_processor: ""
+    ai_ml_toolkit: ""
+mcp:
+  enabled: true
+  clients: codex
+  splunk_mcp_enabled: true
+  splunk_mcp_url: ""
+  thousandeyes_mcp_enabled: true
+agent_observability:
+  enabled: true
+  spec: skills/splunk-observability-ai-agent-monitoring-setup/template.example
+observability_content:
+  enabled: true
+  realm: us0
+  dashboards_spec: ""
+  detectors_spec: ""
+domain_readiness:
+  enabled: true
+  domains:
+    - intersight
+    - nexus
+    - nexus-hyperfabric
+    - thousandeyes
+    - meraki
+    - catalyst
+    - catalyst-sdwan
+    - security-cloud-control
+    - secure-access
+    - duo
+    - ise
+    - secure-firewall
+    - splunk-cloud
+    - collaboration-control-hub
+    - cisco-iq
+studio:
+  agent_blueprints:
+    - name: Network Incident Triage
+      domain: networking
+      objective: Summarize incident context, affected sites, recent changes, and next actions.
+    - name: Security Posture Review
+      domain: security
+      objective: Correlate policy changes, user risk, threat detections, and exposure findings.
+  app_builder_briefs:
+    - name: Operations Console
+      audience: NOC and SecOps leads
+      objective: Shared Cloud Control view over network, security, and observability readiness.
+ai_canvas:
+  boards:
+    - name: Agentic Operations Readiness
+      objective: Track data, connector, guardrail, and observability prerequisites.
