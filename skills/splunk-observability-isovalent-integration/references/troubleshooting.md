@@ -96,7 +96,7 @@ Fix: grant the `anyuid` SCC to the collector ServiceAccount:
 oc adm policy add-scc-to-user anyuid -z splunk-otel-collector -n splunk-otel
 ```
 
-The `cisco-isovalent-platform-setup` skill renders an SCC helper script when `distribution: openshift`. Run it before installing the collector.
+The `cisco-isovalent-platform-setup` skill renders `k8s/openshift-scc.yaml` when `distribution: openshift`. Review and apply that manifest before installing the collector.
 
 ## Dashboards show "no data" after import
 
