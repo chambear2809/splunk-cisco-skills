@@ -27,13 +27,13 @@ It prints one line per node with kernel version and OK/WARN. Any WARN means that
 
 Some Cilium features require newer kernels even when the base requirement is met:
 
-- `kubeProxyReplacement: strict` — kernel >= 5.7 for full feature parity.
+- `kubeProxyReplacement: true` — kernel >= 5.7 for full feature parity.
 - BPF-based load balancer with DSR (direct server return) — kernel >= 5.10.
 - BPF host routing (`bpf.hostRouting=true`) — kernel >= 5.10.
 - IPv6 BIG TCP — kernel >= 5.19 (mostly experimental in 1.18.x).
 - Egress gateway with BPF mode — kernel >= 5.10.
 
-The skill's `helm/cilium-values.yaml` defaults to `kubeProxyReplacement: strict`. If the operator is running on an older kernel, they should override to `partial` or `disabled` in the spec's `cilium` block.
+The skill's `helm/cilium-values.yaml` defaults to `kubeProxyReplacement: true`. If the operator is running on an older kernel, they should override to `false` in the spec's `cilium` block and explicitly plan the kube-proxy operating mode.
 
 ## Tetragon kernel requirements
 

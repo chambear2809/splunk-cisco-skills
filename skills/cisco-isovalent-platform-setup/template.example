@@ -7,12 +7,19 @@
 api_version: cisco-isovalent-platform-setup/v1
 
 # Edition: oss (cilium/cilium + cilium/tetragon from helm.cilium.io, public)
-# or enterprise (isovalent/* from helm.isovalent.com, license required).
+# or enterprise (isovalent/* from helm.isovalent.com; license file required
+# for mutating Enterprise apply steps).
 edition: oss
 
 # Optional EKS-AWS mirror for Cilium (oci://public.ecr.aws/eks/cilium/cilium).
 # Use this on EKS Hybrid Nodes where AWS-supported builds are preferred.
 eks_mirror: false
+
+# Distribution profile. Supported values include generic, kubeadm, kind,
+# minikube, kops, eks, eks-byocni, eks-hybrid, aks-byocni,
+# aks-managed-cilium, gke, gke-dataplane-v2, openshift, rke2, rancher,
+# k3s, k0s, talos, vmware-vsphere, and alibaba-ack.
+distribution: generic
 
 # Cluster identity. cluster_name lands in Tetragon export attributes so
 # Splunk searches can scope by cluster.
@@ -48,6 +55,11 @@ cilium:
       enableOpenMetrics: true
       serviceMonitor:
         enabled: false  # set true if you also run a Prometheus operator stack
+    tls:
+      # Default renderer path uses certgen Job/CronJob with CA secret reuse,
+      # avoiding Helm ownership conflicts with existing cilium-ca secrets.
+      auto:
+        method: cronJob
 
 # Tetragon values overrides. The skill defaults configure file-based export
 # at /var/run/cilium/tetragon/tetragon.log so the OTel collector overlay in
@@ -70,11 +82,22 @@ tracing_policy:
   name: network-monitoring
 
 # Enterprise-only optional add-ons. Setting any of these to true requires
-# --edition enterprise and (for hubble_enterprise) the private chart access.
+# --edition enterprise. Hubble Enterprise and Timescape fail closed unless
+# the operator also passes --private-chart-access-verified at runtime.
 enterprise_addons:
   hubble_enterprise: false
   cilium_dnsproxy: false
   hubble_timescape: false
+
+# Optional scoped apply list used for apply-plan.json. CLI --apply overrides
+# this list. Supported sections: cilium, tetragon, hubble, dnsproxy,
+# timescape, load-balancer, network-policy, gateway-api, ingress,
+# service-mesh, clustermesh, egress-gateway, bgp, lb-ipam,
+# l2-announcements, encryption, host-firewall, runtime-policies.
+# Scoped Cilium feature sections render helm/cilium-section-<section>-values.yaml
+# overlays; clustermesh is applied with the Cilium CLI.
+apply:
+  sections: cilium,tetragon
 
 # EKS BYOCNI preflight. When true, the rendered preflight script checks for
 # the AWS VPC CNI and warns if found. Renders an eksctl example when

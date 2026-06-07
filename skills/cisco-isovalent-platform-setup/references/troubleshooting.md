@@ -23,7 +23,7 @@ curl -I https://helm.isovalent.com/index.yaml
 
 ## `helm install isovalent/hubble-enterprise` fails with `chart not found`
 
-Hubble Enterprise is a private chart. The skill's `install-hubble-enterprise.sh` does NOT attempt to pull it; it prints the contact link instead. To get chart access, contact the Splunk + Isovalent team via `https://isovalent.com/splunk-contact-us/`.
+Hubble Enterprise is a private chart. Without `--private-chart-access-verified`, the skill's `install-hubble-enterprise.sh` fails closed and prints the access runbook. To get chart access, contact the Splunk + Isovalent team via `https://isovalent.com/splunk-contact-us/`.
 
 Once you have access, you typically need:
 
@@ -34,9 +34,13 @@ Once you have access, you typically need:
 After access, run:
 
 ```bash
-helm upgrade --install hubble-enterprise isovalent/hubble-enterprise \
-  -n kube-system --create-namespace --wait \
-  -f cisco-isovalent-platform-rendered/helm/hubble-enterprise-values.yaml
+bash skills/cisco-isovalent-platform-setup/scripts/setup.sh \
+  --apply hubble \
+  --edition enterprise \
+  --kube-context prod-use1 \
+  --isovalent-license-file /path/to/isovalent_license \
+  --private-chart-access-verified \
+  --accept-k8s-apply
 ```
 
 ## Cilium pods crash-loop on Ubuntu 20.04 / RHEL 8

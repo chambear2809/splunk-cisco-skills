@@ -10,6 +10,7 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 OUTPUT_DIR="${PROJECT_ROOT}/cisco-isovalent-platform-rendered"
 LIVE=false
 KUBE_CONTEXT=""
+ALLOW_CURRENT_CONTEXT=false
 CILIUM_NAMESPACE="kube-system"
 TETRAGON_NAMESPACE="tetragon"
 
@@ -23,6 +24,8 @@ Usage:
 Options:
   --output-dir DIR   Rendered output directory
   --kube-context CTX Kubernetes context for live checks
+  --allow-current-context
+                   Permit --live to use kubectl's active context
   --cilium-namespace NS
                      Namespace for Cilium services (default: kube-system)
   --tetragon-namespace NS
@@ -36,6 +39,7 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; shift 2 ;;
+        --allow-current-context) ALLOW_CURRENT_CONTEXT=true; shift ;;
         --cilium-namespace) require_arg "$1" "$#" || exit 1; CILIUM_NAMESPACE="$2"; shift 2 ;;
         --tetragon-namespace) require_arg "$1" "$#" || exit 1; TETRAGON_NAMESPACE="$2"; shift 2 ;;
         --live) LIVE=true; shift ;;
@@ -60,6 +64,13 @@ check_file "${OUTPUT_DIR}/helm/tetragon-values.yaml"
 check_file "${OUTPUT_DIR}/scripts/install-cilium.sh"
 check_file "${OUTPUT_DIR}/scripts/install-tetragon.sh"
 check_file "${OUTPUT_DIR}/scripts/preflight.sh"
+check_file "${OUTPUT_DIR}/feature-catalog.json"
+check_file "${OUTPUT_DIR}/feature-matrix.md"
+check_file "${OUTPUT_DIR}/coverage-report.json"
+check_file "${OUTPUT_DIR}/environment-profiles.json"
+check_file "${OUTPUT_DIR}/environment-profiles.md"
+check_file "${OUTPUT_DIR}/apply-plan.json"
+check_file "${OUTPUT_DIR}/doctor-report.md"
 
 # Token-scrub: ensure no real licence material got into rendered files. The
 # license is supplied via a token file at apply time; if the values file
@@ -69,6 +80,24 @@ if grep -rEq -- '"(license|licenseKey|license_key)"[[:space:]]*:[[:space:]]*"[A-
     log "ERROR: A rendered file appears to contain an inline license value."
     exit 1
 fi
+
+python3 - "${OUTPUT_DIR}/coverage-report.json" "${OUTPUT_DIR}/feature-catalog.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+coverage = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+catalog = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+allowed = set(catalog["allowed_statuses"])
+if coverage.get("missing_features"):
+    raise SystemExit("ERROR: coverage-report.json has missing_features: " + ", ".join(coverage["missing_features"]))
+for feature in coverage.get("features", []):
+    status = feature.get("status")
+    if status not in allowed:
+        raise SystemExit(f"ERROR: invalid feature status {status!r} for {feature.get('id')}")
+    if status in {"unsupported_with_reason", "not_applicable", "gated_private"} and not feature.get("reason"):
+        raise SystemExit(f"ERROR: {feature.get('id')} has status {status} without reason")
+PY
 
 # Tetragon export mode sanity. The default is file-based; validate that
 # the tetragon-values.yaml contains the expected exportDirectory + exportFilename
@@ -87,6 +116,10 @@ fi
 log "Cisco Isovalent Platform Setup rendered assets passed static validation."
 
 if [[ "${LIVE}" == "true" ]]; then
+    if [[ -z "${KUBE_CONTEXT}" && "${ALLOW_CURRENT_CONTEXT}" != "true" ]]; then
+        log "  ERROR: --live requires --kube-context CTX, or --allow-current-context to use kubectl's active context."
+        exit 1
+    fi
     log "  --live: probing cluster..."
     if ! command -v helm >/dev/null 2>&1; then
         log "  ERROR: helm not on PATH."
