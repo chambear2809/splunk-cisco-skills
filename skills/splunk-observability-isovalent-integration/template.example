@@ -16,6 +16,18 @@ realm: us0
 cluster_name: "lab-cluster"
 distribution: openshift  # openshift | kubernetes | eks | gke
 
+# Existing Splunk OTel Collector Helm release to update during --apply.
+# Leave namespace/chart_version blank to auto-discover from the installed
+# release and avoid an accidental chart upgrade.
+collector:
+  release: splunk-otel-collector
+  namespace: ""
+  chart_ref: splunk-otel-collector-chart/splunk-otel-collector
+  chart_version: ""
+  normalize_legacy_otlphttp: auto  # auto | true | false; auto enables for chart >= 0.150
+  disable_gateway: false
+  disable_operator: false
+
 # Splunk Platform target identity for the Tetragon log path.
 splunk_platform:
   enabled: true

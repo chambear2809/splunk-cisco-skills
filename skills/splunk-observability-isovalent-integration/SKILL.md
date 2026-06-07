@@ -64,10 +64,16 @@ This skill wires an installed Isovalent stack to Splunk Observability Cloud and 
 
 4. Apply the overlay onto the existing Splunk OTel collector helm release
    (recommended one-shot path). Merges this overlay onto current release
-   values via `yq`, runs `helm upgrade --atomic`, and rolls the agent +
-   cluster-receiver. Refuses without `--accept-k8s-apply`, refuses if no
-   Cilium/Tetragon install is detected, and prints the active kube-context
-   first:
+   values via `yq`, normalizes legacy `otlphttp` exporter names to
+   `otlp_http`, preserves the live OBI eBPF ConfigMap data when OBI is
+   installed, runs `helm upgrade --atomic --force-conflicts`, and rolls the agent +
+   cluster-receiver. The helper preserves existing gateway/operator topology
+   unless `collector.disable_gateway` or `collector.disable_operator` is set,
+   auto-discovers the collector namespace, and pins the installed chart version
+   unless `collector.namespace` or `collector.chart_version` is set in the spec.
+   Refuses without
+   `--accept-k8s-apply`, refuses if no Cilium/Tetragon install is detected,
+   and prints the active kube-context first:
 
    ```bash
    bash skills/splunk-observability-isovalent-integration/scripts/setup.sh \

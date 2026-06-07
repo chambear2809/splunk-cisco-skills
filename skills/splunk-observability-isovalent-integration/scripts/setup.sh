@@ -189,7 +189,9 @@ RENDER_ARGS=(
     --o11y-token-file "${O11Y_TOKEN_FILE}"
     --dashboards-source "${DASHBOARDS_SOURCE}"
 )
-if [[ "${DRY_RUN}" == "true" ]]; then RENDER_ARGS+=(--dry-run); fi
+# A render-only dry-run should not write files. An apply dry-run still needs
+# fresh rendered assets; only the Kubernetes/Helm mutation is dry-run.
+if [[ "${DRY_RUN}" == "true" && "${MODE_APPLY}" != "true" ]]; then RENDER_ARGS+=(--dry-run); fi
 if [[ "${JSON_OUTPUT}" == "true" ]]; then RENDER_ARGS+=(--json); fi
 
 if [[ "${MODE_RENDER}" == "true" ]]; then

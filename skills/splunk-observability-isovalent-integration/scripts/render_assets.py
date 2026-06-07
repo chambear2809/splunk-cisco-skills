@@ -155,6 +155,7 @@ def overlay_values(
     legacy_fluentd: bool,
     platform_hec_url: str,
 ) -> dict[str, Any]:
+    collector = spec.get("collector") or {}
     scrape = spec.get("scrape") or {}
     metric_allowlist = list(DEFAULT_METRIC_ALLOWLIST)
     extras = (spec.get("metric_allowlist") or {}).get("extra") or []
@@ -203,12 +204,6 @@ def overlay_values(
     overlay: dict[str, Any] = {
         "clusterName": cluster_name or "lab-cluster",
         "distribution": distribution or "kubernetes",
-        # Subtractive overrides for the Isovalent profile: we typically want
-        # the gateway off (collector pushes direct to O11y) and operator off
-        # (Isovalent uses its own CRDs; the OTel operator would conflict).
-        "operator": {"enabled": False},
-        "operatorcrds": {"installed": False},
-        "gateway": {"enabled": False},
         # OpenShift requires kubeletstats to skip TLS verify (self-signed kubelet
         # certs). Other distributions accept this default safely.
         "agent": {
@@ -248,6 +243,11 @@ def overlay_values(
             }
         },
     }
+    if collector.get("disable_gateway", False):
+        overlay["gateway"] = {"enabled": False}
+    if collector.get("disable_operator", False):
+        overlay["operator"] = {"enabled": False}
+        overlay["operatorcrds"] = {"installed": False}
 
     splunk_block = spec.get("splunk_platform") or {}
     if splunk_block.get("enabled", True) and export_mode == "file" and not legacy_fluentd:
@@ -259,6 +259,18 @@ def overlay_values(
         # production-validated path (see references/tetragon-hostpath-coordination.md).
         overlay["agent"]["extraVolumes"] = [{"name": "tetragon", "hostPath": {"path": host_path}}]
         overlay["agent"]["extraVolumeMounts"] = [{"name": "tetragon", "mountPath": host_path}]
+        overlay["agent"]["config"]["receivers"]["filelog/tetragon"] = {
+            "include": [f"{host_path}/{filename_pattern}"],
+            "start_at": "beginning",
+            "include_file_path": True,
+            "include_file_name": False,
+            "resource": {
+                "com.splunk.index": index,
+                "com.splunk.source": f"{host_path}/",
+                "host.name": 'EXPR(env("K8S_NODE_NAME"))',
+                "com.splunk.sourcetype": sourcetype,
+            },
+        }
         overlay["splunkPlatform"] = {
             "logsEnabled": True,
         }
@@ -319,7 +331,8 @@ def _scrape_job(name: str, app_label: str, port: int, label_key: str) -> dict[st
                         {
                             "source_labels": ["__meta_kubernetes_pod_ip"],
                             "target_label": "__address__",
-                            "replacement": "${__meta_kubernetes_pod_ip}:" + str(port),
+                            "regex": "(.+)",
+                            "replacement": "$1:" + str(port),
                         },
                         {"target_label": "job", "replacement": name},
                     ],
@@ -353,7 +366,8 @@ def _scrape_job_operator(name: str, port: int) -> dict[str, Any]:
                         {
                             "source_labels": ["__meta_kubernetes_pod_ip"],
                             "target_label": "__address__",
-                            "replacement": "${__meta_kubernetes_pod_ip}:" + str(port),
+                            "regex": "(.+)",
+                            "replacement": "$1:" + str(port),
                         },
                         {"target_label": "job", "replacement": name},
                     ],
@@ -382,7 +396,8 @@ def _scrape_job_tetragon(name: str, port: int) -> dict[str, Any]:
                         {
                             "source_labels": ["__meta_kubernetes_pod_ip"],
                             "target_label": "__address__",
-                            "replacement": "${__meta_kubernetes_pod_ip}:" + str(port),
+                            "regex": "(.+)",
+                            "replacement": "$1:" + str(port),
                         },
                         {"target_label": "job", "replacement": name},
                     ],
@@ -411,7 +426,8 @@ def _scrape_job_tetragon_operator(name: str, port: int) -> dict[str, Any]:
                         {
                             "source_labels": ["__meta_kubernetes_pod_ip"],
                             "target_label": "__address__",
-                            "replacement": "${__meta_kubernetes_pod_ip}:" + str(port),
+                            "regex": "(.+)",
+                            "replacement": "$1:" + str(port),
                         },
                         {"target_label": "job", "replacement": name},
                     ],
@@ -485,8 +501,10 @@ if __name__ == "__main__":
 def render_apply_overlay_script(spec: dict[str, Any]) -> str:
     collector = spec.get("collector") or {}
     release = collector.get("release", "splunk-otel-collector")
-    namespace = collector.get("namespace", "splunk-otel")
+    namespace = collector.get("namespace", "")
     chart_ref = collector.get("chart_ref", "splunk-otel-collector-chart/splunk-otel-collector")
+    chart_version = collector.get("chart_version", "")
+    normalize_legacy_otlphttp = str(collector.get("normalize_legacy_otlphttp", "auto")).lower()
     return (
         f"""#!/usr/bin/env bash
 set -euo pipefail
@@ -507,6 +525,16 @@ if [[ -z "${{O11Y_TOKEN_FILE:-}}" || ! -r "${{O11Y_TOKEN_FILE}}" ]]; then
     echo 'ERROR: O11Y_TOKEN_FILE must point to a readable token file (chmod 600).' >&2
     exit 1
 fi
+TOKEN_MODE=""
+if TOKEN_MODE="$(stat -f '%A' "${{O11Y_TOKEN_FILE}}" 2>/dev/null)"; then
+    :
+elif TOKEN_MODE="$(stat -c '%a' "${{O11Y_TOKEN_FILE}}" 2>/dev/null)"; then
+    :
+fi
+if [[ "${{TOKEN_MODE}}" != "600" && "${{TOKEN_MODE}}" != "0600" ]]; then
+    echo "ERROR: O11Y_TOKEN_FILE must be mode 600; got ${{TOKEN_MODE:-unknown}}." >&2
+    exit 1
+fi
 
 # Confirm Cilium / Tetragon presence; refuse to proceed if neither is found.
 if ! kubectl get ns cilium >/dev/null 2>&1 \\
@@ -523,29 +551,90 @@ OVERLAY="${{DIR}}/splunk-otel-overlay/values.overlay.yaml"
 RELEASE="{release}"
 NAMESPACE="{namespace}"
 CHART_REF="{chart_ref}"
+CHART_VERSION="{chart_version}"
+NORMALIZE_OTLPHTTP="{normalize_legacy_otlphttp}"
+export RELEASE
+if [[ -z "${{NAMESPACE}}" ]]; then
+    NAMESPACE="$(helm list --all-namespaces --filter "^${{RELEASE}}$" -o json 2>/dev/null | yq -r '.[] | select(.name == env(RELEASE)) | .namespace' - | head -1)"
+fi
+if [[ -z "${{NAMESPACE}}" ]]; then
+    NAMESPACE="splunk-otel"
+fi
+if [[ -z "${{CHART_VERSION}}" ]]; then
+    CHART_NAME="${{CHART_REF##*/}}"
+    INSTALLED_CHART="$(helm list --namespace "${{NAMESPACE}}" --filter "^${{RELEASE}}$" -o json 2>/dev/null | yq -r '.[] | select(.name == env(RELEASE)) | .chart' - | head -1)"
+    if [[ "${{INSTALLED_CHART}}" == "${{CHART_NAME}}-"* ]]; then
+        CHART_VERSION="${{INSTALLED_CHART#${{CHART_NAME}}-}}"
+    fi
+fi
 
 TMPDIR_LOCAL="$(mktemp -d)"
 trap 'rm -rf "${{TMPDIR_LOCAL}}"' EXIT
 helm get values "${{RELEASE}}" -n "${{NAMESPACE}}" -o yaml > "${{TMPDIR_LOCAL}}/current-values.yaml"
 yq eval-all '. as $i ireduce ({{}}; . * $i)' "${{TMPDIR_LOCAL}}/current-values.yaml" "${{OVERLAY}}" > "${{TMPDIR_LOCAL}}/merged.yaml"
+if kubectl -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-obi" >/dev/null 2>&1; then
+    kubectl -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-obi" -o jsonpath='{{.data.ebpf-instrument-config\\.yml}}' > "${{TMPDIR_LOCAL}}/obi-config.yaml"
+    if [[ -s "${{TMPDIR_LOCAL}}/obi-config.yaml" ]]; then
+        OBI_CONFIG_FILE="${{TMPDIR_LOCAL}}/obi-config.yaml" yq eval '.obi.config.data = load(strenv(OBI_CONFIG_FILE))' -i "${{TMPDIR_LOCAL}}/merged.yaml"
+    fi
+fi
+if kubectl -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-otel-collector" >/dev/null 2>&1; then
+    kubectl -n "${{NAMESPACE}}" get configmap "${{RELEASE}}-otel-collector" -o jsonpath='{{.data.relay}}' > "${{TMPDIR_LOCAL}}/gateway-relay.yaml"
+    if [[ -s "${{TMPDIR_LOCAL}}/gateway-relay.yaml" ]]; then
+        GATEWAY_CONFIG_FILE="${{TMPDIR_LOCAL}}/gateway-relay.yaml" yq eval '.gateway.config = load(strenv(GATEWAY_CONFIG_FILE))' -i "${{TMPDIR_LOCAL}}/merged.yaml"
+    fi
+fi
+if [[ "${{NORMALIZE_OTLPHTTP}}" == "auto" ]]; then
+    case "${{CHART_VERSION}}" in
+        0.150.*|0.15[1-9].*|0.[2-9]*|[1-9]*) NORMALIZE_OTLPHTTP="true" ;;
+        *) NORMALIZE_OTLPHTTP="false" ;;
+    esac
+fi
+if [[ "${{NORMALIZE_OTLPHTTP}}" == "true" ]]; then
+    yq eval '
+      (.. | select(tag == "!!map")) |= with_entries(.key |= sub("^otlphttp"; "otlp_http")) |
+      (.. | select(tag == "!!str")) |= sub("^otlphttp"; "otlp_http")
+    ' "${{TMPDIR_LOCAL}}/merged.yaml" > "${{TMPDIR_LOCAL}}/merged.normalized.yaml"
+    mv "${{TMPDIR_LOCAL}}/merged.normalized.yaml" "${{TMPDIR_LOCAL}}/merged.yaml"
+fi
+
+claim_configmap_for_helm() {{
+    local name="${{1:?configmap name required}}" manifest
+    if ! kubectl -n "${{NAMESPACE}}" get configmap "${{name}}" >/dev/null 2>&1; then
+        return 0
+    fi
+    manifest="${{TMPDIR_LOCAL}}/${{name}}.claim.yaml"
+    kubectl -n "${{NAMESPACE}}" get configmap "${{name}}" -o yaml | yq eval 'del(.metadata.managedFields, .metadata.resourceVersion, .metadata.uid, .metadata.creationTimestamp, .metadata.generation, .metadata.selfLink, .status)' - > "${{manifest}}"
+    kubectl apply --server-side --force-conflicts --field-manager=helm -f "${{manifest}}" >/dev/null
+}}
 
 DRY_RUN_FLAG=()
 if [[ "${{K8S_APPLY_DRY_RUN:-false}}" == "true" ]]; then
     DRY_RUN_FLAG=(--dry-run)
     echo "DRY-RUN MODE: passing --dry-run to helm"
 fi
+if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
+    claim_configmap_for_helm "${{RELEASE}}-obi"
+    claim_configmap_for_helm "${{RELEASE}}-otel-collector"
+fi
+VERSION_FLAG=()
+if [[ -n "${{CHART_VERSION}}" ]]; then
+    VERSION_FLAG=(--version "${{CHART_VERSION}}")
+fi
 
 helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
     --namespace "${{NAMESPACE}}" \\
+    "${{VERSION_FLAG[@]}}" \\
     --values "${{TMPDIR_LOCAL}}/merged.yaml" \\
-    --set "splunkObservability.accessToken=$(cat "${{O11Y_TOKEN_FILE}}")" \\
+    --set-file "splunkObservability.accessToken=${{O11Y_TOKEN_FILE}}" \\
+    --force-conflicts \\
     --atomic \\
     --timeout 5m \\
     "${{DRY_RUN_FLAG[@]}}"
 
 if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
     kubectl -n "${{NAMESPACE}}" rollout status daemonset/${{RELEASE}}-agent --timeout=180s || true
-    kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-cluster-receiver --timeout=180s || true
+    kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-k8s-cluster-receiver --timeout=180s || true
 fi
 """
     )

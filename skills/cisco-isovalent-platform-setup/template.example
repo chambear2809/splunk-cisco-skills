@@ -61,6 +61,7 @@ tetragon:
     mode: file              # file (default) | stdout | fluentd
     directory: /var/run/cilium/tetragon
     filename: tetragon.log
+    file_perm: "644"        # allow the OTel collector hostPath reader to read exported files
 
 # Optional Tetragon TracingPolicy starter. The skill renders a basic
 # network-monitoring policy by default.
