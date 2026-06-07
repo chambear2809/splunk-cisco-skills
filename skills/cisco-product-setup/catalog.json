@@ -1,6 +1,6 @@
 {
-  "description": "Generated from the packaged SCAN catalog plus skills/cisco-product-setup/catalog_overrides.json.",
-  "product_count": 83,
+  "description": "Generated from the packaged SCAN catalog plus skills/cisco-product-setup/catalog_overrides.json local overrides and synthetic products.",
+  "product_count": 84,
   "products": [
     {
       "accepted_non_secret_keys": [
@@ -1662,6 +1662,98 @@
         "skills/cisco-catalyst-ta-setup/template.example"
       ],
       "value_proposition": "Correlate Catalyst switch syslog, interface stats, and spanning-tree events in Splunk for campus network assurance."
+    },
+    {
+      "accepted_non_secret_keys": [],
+      "addon": "",
+      "addon_label": "",
+      "addon_uid": "",
+      "aliases": [
+        "Cloud Control",
+        "Cisco Cloud Control"
+      ],
+      "app_viz": "",
+      "app_viz_2": "",
+      "app_viz_label": "",
+      "app_viz_uid": "",
+      "automation_state": "partial",
+      "category": "agentic_ops",
+      "companion_skills": [],
+      "conditional_required_secret_rules": [],
+      "dashboards": [],
+      "description": "Cisco Cloud Control AgenticOps platform readiness workflow for Cloud Control Studio, AI Canvas, Cisco Data Fabric, MCP connectors, domain telemetry, and governed agent observability.",
+      "display_name": "Cisco Cloud Control",
+      "id": "cisco_cloud_control",
+      "install_apps": [],
+      "keywords": [
+        "agenticops",
+        "agentic operations",
+        "ai canvas",
+        "cloud control studio",
+        "agent builder",
+        "app builder",
+        "data fabric",
+        "mcp",
+        "ai defense",
+        "splunk ai agent monitoring"
+      ],
+      "learn_more_url": "https://www.cisco.com/site/us/en/solutions/artificial-intelligence/agentic-ops/cisco-cloud-control/index.html",
+      "manual_gap_reason": "",
+      "normalized_search_terms": [
+        "cisco cloud control",
+        "cloud control",
+        "agenticops",
+        "agentic operations",
+        "ai canvas",
+        "cloud control studio",
+        "agent builder",
+        "app builder",
+        "data fabric",
+        "mcp",
+        "ai defense",
+        "splunk ai agent monitoring"
+      ],
+      "notes": "Synthetic local workflow product. Distinct from Cisco Security Cloud Control / CDO, which remains cisco_security_cloud_control.",
+      "optional_non_secret_keys": [],
+      "prereq_apps": [],
+      "prereq_labels": [],
+      "primary_skill": "cisco-cloud-control-setup",
+      "required_non_secret_keys": [],
+      "required_secret_keys": [],
+      "route": {
+        "handoff": "Render Cisco Cloud Control adoption, AI Canvas, Cloud Control Studio, Cisco Data Fabric, MCP, agent observability, Observability content, and domain-readiness handoffs with cisco-cloud-control-setup. Cloud Control Studio and AI Canvas remain UI/CA handoffs until stable public APIs are available.",
+        "sourcetypes": [],
+        "workflow_scripts": [
+          "skills/cisco-cloud-control-setup/scripts/setup.sh",
+          "skills/cisco-cloud-control-setup/scripts/validate.sh"
+        ]
+      },
+      "route_type": "workflow_handoff",
+      "search_terms": [
+        "cisco_cloud_control",
+        "cisco cloud control",
+        "Cisco Cloud Control",
+        "Cloud Control",
+        "agenticops",
+        "agentic operations",
+        "ai canvas",
+        "cloud control studio",
+        "agent builder",
+        "app builder",
+        "data fabric",
+        "mcp",
+        "ai defense",
+        "splunk ai agent monitoring"
+      ],
+      "secret_keys": [],
+      "sourcetypes": [],
+      "status": "active",
+      "subcategory": "cloud_control",
+      "template_checks": {},
+      "template_paths": [
+        "skills/cisco-cloud-control-setup/template.example"
+      ],
+      "value_proposition": "Route Cloud Control adoption through reviewable Splunk and Cisco child-skill handoffs without treating the platform as a Splunkbase app or confusing it with Cisco Security Cloud Control."
     },
     {
       "accepted_non_secret_keys": [],

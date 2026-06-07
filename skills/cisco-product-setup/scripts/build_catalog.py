@@ -79,7 +79,8 @@ CATALYST_DEFAULT_INDEX = {
 
 GENERATED_BANNER = (
     "Generated from the packaged SCAN catalog plus "
-    "skills/cisco-product-setup/catalog_overrides.json."
+    "skills/cisco-product-setup/catalog_overrides.json local overrides and "
+    "synthetic products."
 )
 
 
@@ -271,6 +272,68 @@ def load_scan_products(scan_package: Path) -> list[dict]:
             }
         )
 
+    return products
+
+
+def synthetic_product_entry(raw: dict) -> dict:
+    product_id = str(raw["id"]).strip()
+    display_name = str(raw.get("display_name", product_id)).strip()
+    aliases = [str(item).strip() for item in raw.get("aliases", []) if str(item).strip()]
+    keywords = [str(item).strip() for item in raw.get("keywords", []) if str(item).strip()]
+    addon = str(raw.get("addon", "")).strip()
+    addon_label = str(raw.get("addon_label", "")).strip()
+    app_viz = str(raw.get("app_viz", "")).strip()
+    app_viz_label = str(raw.get("app_viz_label", "")).strip()
+    app_viz_2 = str(raw.get("app_viz_2", "")).strip()
+    search_terms = unique_ordered(
+        [
+            product_id,
+            product_id.replace("_", " "),
+            *extract_display_aliases(display_name),
+            *aliases,
+            *keywords,
+            addon,
+            addon.replace("_", " ").replace("-", " "),
+            addon_label,
+            app_viz,
+            app_viz.replace("_", " ").replace("-", " "),
+            app_viz_label,
+            app_viz_2,
+            app_viz_2.replace("_", " ").replace("-", " "),
+        ]
+    )
+    return {
+        "id": product_id,
+        "display_name": display_name,
+        "status": str(raw.get("status", "active")).strip(),
+        "category": str(raw.get("category", "")).strip(),
+        "subcategory": str(raw.get("subcategory", "")).strip(),
+        "description": str(raw.get("description", "")).strip(),
+        "value_proposition": str(raw.get("value_proposition", "")).strip(),
+        "addon": addon,
+        "addon_uid": str(raw.get("addon_uid", "")).strip(),
+        "addon_label": addon_label,
+        "app_viz": app_viz,
+        "app_viz_uid": str(raw.get("app_viz_uid", "")).strip(),
+        "app_viz_label": app_viz_label,
+        "app_viz_2": app_viz_2,
+        "prereq_apps": list(raw.get("prereq_apps", [])),
+        "prereq_labels": list(raw.get("prereq_labels", [])),
+        "dashboards": list(raw.get("dashboards", [])),
+        "sourcetypes": list(raw.get("sourcetypes", [])),
+        "aliases": aliases,
+        "keywords": keywords,
+        "learn_more_url": str(raw.get("learn_more_url", "")).strip(),
+        "search_terms": search_terms,
+    }
+
+
+def load_synthetic_products(overrides_doc: dict) -> list[dict]:
+    products = []
+    for raw in overrides_doc.get("synthetic_products", []) or []:
+        if not isinstance(raw, dict) or not raw.get("id"):
+            raise ValueError("Synthetic products must be objects with an id.")
+        products.append(synthetic_product_entry(raw))
     return products
 
 
@@ -1001,14 +1064,16 @@ def generic_manual_gap_reason(product: dict) -> str:
 
 
 def build_catalog(scan_package: Path) -> dict:
-    overrides = load_json(OVERRIDES_PATH).get("products", {})
+    overrides_doc = load_json(OVERRIDES_PATH)
+    overrides = overrides_doc.get("products", {})
     security_products = load_json(SECURITY_CLOUD_PRODUCTS_PATH)
     registry = load_json(REGISTRY_PATH)
     known_skills = {entry["skill"] for entry in registry["skill_topologies"]}
     known_apps = {entry["app_name"] for entry in registry["apps"]}
 
     products = []
-    for product in load_scan_products(scan_package):
+    source_products = load_scan_products(scan_package) + load_synthetic_products(overrides_doc)
+    for product in source_products:
         override = overrides.get(product["id"], {})
         state_override = override.get("automation_state", "")
 

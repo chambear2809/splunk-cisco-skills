@@ -1,5 +1,47 @@
 {
+  "synthetic_products": [
+    {
+      "id": "cisco_cloud_control",
+      "display_name": "Cisco Cloud Control",
+      "status": "active",
+      "category": "agentic_ops",
+      "subcategory": "cloud_control",
+      "description": "Cisco Cloud Control AgenticOps platform readiness workflow for Cloud Control Studio, AI Canvas, Cisco Data Fabric, MCP connectors, domain telemetry, and governed agent observability.",
+      "value_proposition": "Route Cloud Control adoption through reviewable Splunk and Cisco child-skill handoffs without treating the platform as a Splunkbase app or confusing it with Cisco Security Cloud Control.",
+      "aliases": [
+        "Cloud Control",
+        "Cisco Cloud Control"
+      ],
+      "keywords": [
+        "agenticops",
+        "agentic operations",
+        "ai canvas",
+        "cloud control studio",
+        "agent builder",
+        "app builder",
+        "data fabric",
+        "mcp",
+        "ai defense",
+        "splunk ai agent monitoring"
+      ],
+      "learn_more_url": "https://www.cisco.com/site/us/en/solutions/artificial-intelligence/agentic-ops/cisco-cloud-control/index.html"
+    }
+  ],
   "products": {
+    "cisco_cloud_control": {
+      "automation_state": "partial",
+      "route_type": "workflow_handoff",
+      "primary_skill": "cisco-cloud-control-setup",
+      "workflow_scripts": [
+        "skills/cisco-cloud-control-setup/scripts/setup.sh",
+        "skills/cisco-cloud-control-setup/scripts/validate.sh"
+      ],
+      "template_paths": [
+        "skills/cisco-cloud-control-setup/template.example"
+      ],
+      "handoff": "Render Cisco Cloud Control adoption, AI Canvas, Cloud Control Studio, Cisco Data Fabric, MCP, agent observability, Observability content, and domain-readiness handoffs with cisco-cloud-control-setup. Cloud Control Studio and AI Canvas remain UI/CA handoffs until stable public APIs are available.",
+      "notes": "Synthetic local workflow product. Distinct from Cisco Security Cloud Control / CDO, which remains cisco_security_cloud_control."
+    },
     "cisco_ai_defense": {
       "route_type": "security_cloud_product",
       "product_key": "ai_defense"

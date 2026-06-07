@@ -71,6 +71,7 @@ AGENT_SKILLS_CALLOUTS = {
 
 LOCAL_ARTIFACT_ROOTS = [
     "cisco-isovalent-platform-rendered",
+    "cisco-cloud-control-rendered",
     "cisco-secure-email-web-gateway-rendered",
     "cisco-thousandeyes-mcp-rendered",
     "galileo-agent-control-rendered",

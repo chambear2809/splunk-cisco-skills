@@ -31,6 +31,7 @@ The user can also invoke skills directly as slash commands (e.g. `/cisco-catalys
 | Skill | Target | Main purpose |
 |-------|--------|--------------|
 | `cisco-product-setup` | Cisco product catalog workflow | Resolve a Cisco product name from SCAN, classify gaps, and delegate install/configure/validate to the matching Cisco setup skill |
+| `cisco-cloud-control-setup` | Cisco Cloud Control / AgenticOps readiness | Render Cisco Cloud Control adoption, AI Canvas, Cloud Control Studio, Cisco Data Fabric, MCP, AI Agent Monitoring, Observability content, and domain-readiness handoffs |
 | `cisco-scan-setup` | `splunk-cisco-app-navigator` | Install and validate the Splunk Cisco App Navigator (SCAN) catalog app; trigger catalog sync from S3 |
 | `cisco-catalyst-ta-setup` | `TA_cisco_catalyst` | Configure Catalyst Center, ISE, SD-WAN, and Cyber Vision inputs |
 | `cisco-catalyst-enhanced-netflow-setup` | `splunk_app_stream_ipfix_cisco_hsl` | Install and validate optional Enhanced Netflow mappings for extra dashboards |

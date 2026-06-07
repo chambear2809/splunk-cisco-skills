@@ -1292,6 +1292,22 @@
       "notes": "Product-name router that resolves a Cisco product from the SCAN catalog and delegates to the matching setup skill or explicit gap classification."
     },
     {
+      "skill": "cisco-cloud-control-setup",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "search-tier",
+        "heavy-forwarder",
+        "external-collector"
+      ],
+      "notes": "Render-first Cisco Cloud Control parent workflow for AgenticOps adoption, Cloud Control Studio, AI Canvas, Cisco Data Fabric, MCP, AI Agent Monitoring, Observability content, and Cisco domain-readiness handoffs. Direct Cisco Cloud Control mutation is intentionally not implemented."
+    },
+    {
       "skill": "cisco-thousandeyes-setup",
       "role_support": {
         "search-tier": "supported",
