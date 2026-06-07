@@ -1,25 +1,14 @@
 ---
 name: cisco-isovalent-platform-setup
 description: >-
-  Install and operate the Cisco Isovalent platform on Kubernetes: Cilium (CNI,
-  policy, Gateway API/Ingress/service mesh, Cluster Mesh, BGP/LB IPAM/L2,
-  encryption, host firewall), Tetragon (eBPF runtime security), Isovalent
-  Enterprise add-ons, and the gated Isovalent Load Balancer product pack.
-  NOT a Splunk TA skill -- the `-platform-setup` suffix explicitly
-  disambiguates from cisco-*-setup skills that install Splunk Platform TAs.
-  Edition split via --edition oss|enterprise: OSS uses cilium/cilium and
-  cilium/tetragon from helm.cilium.io (public, no license); Enterprise uses
-  isovalent/* charts from helm.isovalent.com (license required for mutating
-  Enterprise apply paths, optional imagePullSecret). Renders kernel + distribution + CNI-conflict preflights,
-  feature catalog, coverage report, apply plan, doctor report, OpenShift SCC
-  assets when requested, and day-2 discover/backup/upgrade/rollback/uninstall
-  plans.
-  Tetragon export defaults to mode=file with exportDirectory=/var/run/cilium/tetragon
-  so the file-based Splunk Platform integration in
-  splunk-observability-isovalent-integration works out of the box. Use when
-  the user asks to install Cilium / Tetragon / Hubble on K8s, set up the
-  Isovalent platform, or prepare a cluster for Splunk Observability Cloud
-  Isovalent integration.
+  Install and operate Cisco Isovalent on Kubernetes: Cilium, Tetragon,
+  Enterprise add-ons, and gated private Isovalent product packs. Renders
+  OSS or Enterprise Helm assets, distribution and CNI-conflict preflights,
+  feature coverage, apply plans, doctor reports, live validation, and day-2
+  discover/backup/upgrade/rollback/uninstall runbooks. NOT a Splunk TA skill;
+  Splunk telemetry wiring is delegated to splunk-observability-isovalent-integration.
+  Use when installing or validating Cilium, Tetragon, Hubble, or Isovalent
+  platform workflows on Kubernetes.
 ---
 
 # Cisco Isovalent Platform Setup
