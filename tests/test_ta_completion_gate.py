@@ -23,9 +23,43 @@ TA_COMPANION_SKILLS = {
     "cisco-webex-setup",
     "splunk-attack-analyzer-setup",
     "splunk-microsoft-cloud-setup",
+    "splunk-observability-cloud-integration-setup",
+    "splunk-observability-otel-collector-setup",
     "splunk-stream-setup",
     "splunk-supported-addons-setup",
 }
+
+TA_MENTION_EXCLUDED_SKILLS = {
+    "cisco-isovalent-platform-setup",
+    "cisco-thousandeyes-mcp-setup",
+    "splunk-ai-ml-toolkit-setup",
+    "splunk-app-install",
+    "splunk-appdynamics-setup",
+    "splunk-asset-risk-intelligence-setup",
+    "splunk-cim-data-model-setup",
+    "splunk-connect-for-otlp-setup",
+    "splunk-db-connect-setup",
+    "splunk-enterprise-security-config",
+    "splunk-enterprise-security-install",
+    "splunk-federated-search-setup",
+    "splunk-license-manager-setup",
+    "splunk-observability-aws-integration",
+    "splunk-observability-azure-integration",
+    "splunk-observability-cisco-intersight-integration",
+    "splunk-observability-deep-native-workflows",
+    "splunk-observability-gcp-integration",
+    "splunk-observability-native-ops",
+    "splunk-observability-thousandeyes-integration",
+    "splunk-oncall-setup",
+}
+
+TA_OWNER_MARKERS = (
+    "Splunk Add-on",
+    "Splunk Add-On",
+    "Splunk_TA_",
+    "Technology Add-on",
+    "Splunk-side companion",
+)
 
 SKILL_REQUIRED_PHRASES = (
     "## TA Completion Gate",
@@ -41,6 +75,24 @@ SKILL_REQUIRED_PHRASES = (
 def ta_skill_names() -> list[str]:
     suffix_skills = {path.name for path in SKILLS.glob("*-ta-setup") if path.is_dir()}
     return sorted(suffix_skills | TA_COMPANION_SKILLS)
+
+
+def test_non_suffix_addon_mentions_are_classified() -> None:
+    suffix_skills = {path.name for path in SKILLS.glob("*-ta-setup") if path.is_dir()}
+    suspected = {
+        path.parent.name
+        for path in SKILLS.glob("*/SKILL.md")
+        if path.parent.name not in suffix_skills
+        and any(marker in path.read_text(encoding="utf-8") for marker in TA_OWNER_MARKERS)
+    }
+
+    unclassified = suspected - TA_COMPANION_SKILLS - TA_MENTION_EXCLUDED_SKILLS
+
+    assert not unclassified, (
+        "Classify non-suffix add-on mentions as TA_COMPANION_SKILLS when the "
+        "skill owns ingest/setup, or TA_MENTION_EXCLUDED_SKILLS when it is a "
+        f"handoff/governance-only mention: {sorted(unclassified)}"
+    )
 
 
 def test_shared_ta_completion_gate_defines_ingest_and_dashboard_evidence() -> None:
