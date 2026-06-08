@@ -14,6 +14,17 @@ description: >-
 
 # Splunk Add-on for Microsoft Security Setup
 
+## TA Completion Gate
+
+For every TA/add-on or dashboard companion run, satisfy the shared
+[TA completion gate](../shared/ta_completion_gate.md): configure and enable the
+data ingest path owned by this skill or its required companion, validate events
+or metrics in the target indexes/source types, and verify any
+pre-built/package-shipped dashboards are visible, macro-aligned, and returning
+data. If the package ships no dashboards, record that evidence explicitly and
+hand off dashboard use to the consuming app, ES/ITSI/ARI content, or readiness
+doctor.
+
 Render-first automation for `Splunk_TA_MS_Security` (Splunkbase `6207`,
 verified `3.0.0`). The renderer emits reviewable inputs, macro overlays for
 package-shipped searches, an Entra app/client-secret account runbook, and

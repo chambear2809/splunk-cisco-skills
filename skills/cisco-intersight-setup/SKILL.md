@@ -11,6 +11,17 @@ description: >-
 
 # Cisco Intersight TA Setup Automation
 
+## TA Completion Gate
+
+For every TA/add-on or dashboard companion run, satisfy the shared
+[TA completion gate](../shared/ta_completion_gate.md): configure and enable the
+data ingest path owned by this skill or its required companion, validate events
+or metrics in the target indexes/source types, and verify any
+pre-built/package-shipped dashboards are visible, macro-aligned, and returning
+data. If the package ships no dashboards, record that evidence explicitly and
+hand off dashboard use to the consuming app, ES/ITSI/ARI content, or readiness
+doctor.
+
 Automates the **Cisco Intersight Add-On for Splunk** (`Splunk_TA_Cisco_Intersight`).
 
 ## Package Model
