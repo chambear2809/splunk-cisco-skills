@@ -34,6 +34,10 @@ Environment-specific notes:
 - Kubernetes apply/validate paths require the right `kubectl` or `oc` context.
 - Cloud and Observability tokens must be referenced by file path, never pasted
   into shell arguments or chat.
+- Splunk TA, add-on, and dashboard companion setup skills must satisfy the
+  shared `skills/shared/ta_completion_gate.md`: data ingest must be configured
+  and validated, and any pre-built dashboards must be visible, macro-aligned,
+  and returning data, or explicitly documented as not shipped by the package.
 
 ## Cisco Product And App Setup
 

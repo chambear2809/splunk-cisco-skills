@@ -26,6 +26,12 @@ instructions. If more detail is needed, also read `skills/<skill-name>/reference
 
 The user can also invoke skills directly as slash commands (e.g. `/cisco-catalyst-ta-setup`).
 
+For any Splunk TA, add-on, or dashboard companion workflow, do not treat
+package install alone as successful setup. Follow
+`skills/shared/ta_completion_gate.md`: configure and validate data ingest, then
+verify shipped dashboards are visible, macro-aligned, and returning data, or
+record explicit evidence that the package ships no pre-built dashboards.
+
 ## Skill Catalog
 
 | Skill | Target | Main purpose |
