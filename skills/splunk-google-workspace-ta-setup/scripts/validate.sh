@@ -71,7 +71,7 @@ if [[ -n "${SK:-}" ]]; then
 
     if ${index_present}; then
         count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
-            "| tstats count where index=${INDEX} sourcetype=gws:reports:admin OR sourcetype=gws:reports:login" "count")
+            "| tstats count where index=${INDEX} (sourcetype=gws:reports:admin OR sourcetype=gws:reports:login)" "count")
         if [[ "${count}" -gt 0 ]]; then
             pass "Google Workspace report events in ${INDEX}: ${count}"
         else

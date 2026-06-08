@@ -71,7 +71,7 @@ if [[ -n "${SK:-}" ]]; then
 
     if ${index_present}; then
         count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
-            "| tstats count where index=${INDEX} sourcetype=ms365:defender:incident OR sourcetype=ms:defender:eventhub" "count")
+            "| tstats count where index=${INDEX} (sourcetype=ms365:defender:incident OR sourcetype=ms:defender:eventhub)" "count")
         if [[ "${count}" -gt 0 ]]; then
             pass "Microsoft Security events in ${INDEX}: ${count}"
         else

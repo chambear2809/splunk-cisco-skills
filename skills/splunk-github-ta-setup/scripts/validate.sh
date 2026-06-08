@@ -71,7 +71,7 @@ if [[ -n "${SK:-}" ]]; then
 
     if ${index_present}; then
         count=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" \
-            "| tstats count where index=${INDEX} sourcetype=github:cloud:audit OR sourcetype=github:enterprise:audit" "count")
+            "| tstats count where index=${INDEX} (sourcetype=github:cloud:audit OR sourcetype=github:enterprise:audit)" "count")
         if [[ "${count}" -gt 0 ]]; then
             pass "GitHub audit events in ${INDEX}: ${count}"
         else
