@@ -147,7 +147,7 @@ def test_ai_ml_toolkit_registry_metadata_tracks_current_apps() -> None:
     }
 
     assert apps["2890"]["app_name"] == "Splunk_ML_Toolkit"
-    assert apps["2890"]["latest_verified_version"] == "5.7.3"
+    assert apps["2890"]["latest_verified_version"] == "5.7.4"
     assert apps["2882"]["app_name"] == "Splunk_SA_Scientific_Python_linux_x86_64"
     assert apps["2883"]["app_name"] == "Splunk_SA_Scientific_Python_windows_x86_64"
     assert apps["2881"]["app_name"] == "Splunk_SA_Scientific_Python_darwin_x86_64"

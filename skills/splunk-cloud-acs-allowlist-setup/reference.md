@@ -141,3 +141,12 @@ Other skills emit allowlist plan stubs that this skill consumes:
 Stubs are appended to `splunk-cloud-acs-allowlist-rendered/allowlist/plan.json`
 under a `proposed_subnets` block; the operator promotes them into the active
 plan before the next apply.
+
+## Splunk 10.4 enterprise deployment notes
+
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+read this skill alongside
+[`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
+the prose companion to the
+[`../shared/references/splunk_platform_versions.json`](../shared/references/splunk_platform_versions.json)
+version contract.

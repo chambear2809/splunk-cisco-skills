@@ -346,7 +346,7 @@
         "label": "`splunk-ai-ml-toolkit-setup` AI Toolkit",
         "cloud_install_path": "ACS Splunkbase after installing the matching Python for Scientific Computing add-on",
         "cloud_config_path": "Search-tier validation plus UI handoffs for ML-SPL, Smart Assistants, anomaly workflows, LLM `ai` command providers, Connections, Container Management, ONNX, alerts, safeguards, and model inventory",
-        "notes": "Splunk AI Toolkit / MLTK (Splunkbase 2890). Latest audited release is 5.7.3 with Cisco Deep Time Series anomaly detection; live installs intentionally pull the latest compatible Splunkbase release and do not pin --app-version."
+        "notes": "Splunk AI Toolkit / MLTK (Splunkbase 2890). Latest audited release is 5.7.4 with Cisco Deep Time Series anomaly detection; live installs intentionally pull the latest compatible Splunkbase release and do not pin --app-version."
       },
       {
         "kind": "app",
@@ -354,7 +354,7 @@
         "label": "`splunk-ai-ml-toolkit-setup` PSC Linux 64-bit",
         "cloud_install_path": "ACS Splunkbase for Linux search heads; default PSC target for Splunk Cloud",
         "cloud_config_path": "No app-local config; validates AI Toolkit Python runtime dependency",
-        "notes": "Python for Scientific Computing add-on for Linux 64-bit search heads, Splunkbase 2882, latest audited 4.3.1."
+        "notes": "Python for Scientific Computing add-on for Linux 64-bit search heads, Splunkbase 2882, latest audited 4.3.2."
       },
       {
         "kind": "app",
@@ -362,7 +362,7 @@
         "label": "`splunk-ai-ml-toolkit-setup` PSC Windows 64-bit",
         "cloud_install_path": "Splunkbase install on Windows search heads you control",
         "cloud_config_path": "No app-local config; validates AI Toolkit Python runtime dependency",
-        "notes": "Python for Scientific Computing add-on for Windows 64-bit search heads, Splunkbase 2883, latest audited 4.3.1."
+        "notes": "Python for Scientific Computing add-on for Windows 64-bit search heads, Splunkbase 2883, latest audited 4.3.2."
       },
       {
         "kind": "app",
@@ -370,7 +370,7 @@
         "label": "`splunk-ai-ml-toolkit-setup` PSC Mac Intel",
         "cloud_install_path": "Splunkbase install on Mac Intel search heads you control",
         "cloud_config_path": "No app-local config; validates AI Toolkit Python runtime dependency",
-        "notes": "Python for Scientific Computing add-on for Mac Intel search heads, Splunkbase 2881, latest audited 4.3.1."
+        "notes": "Python for Scientific Computing add-on for Mac Intel search heads, Splunkbase 2881, latest audited 4.3.2."
       },
       {
         "kind": "app",
@@ -378,7 +378,7 @@
         "label": "`splunk-ai-ml-toolkit-setup` PSC Mac Apple Silicon",
         "cloud_install_path": "Splunkbase install on Mac Apple Silicon search heads you control",
         "cloud_config_path": "No app-local config; validates AI Toolkit Python runtime dependency",
-        "notes": "Python for Scientific Computing add-on for Mac Apple Silicon search heads, Splunkbase 6785, latest audited 4.3.1."
+        "notes": "Python for Scientific Computing add-on for Mac Apple Silicon search heads, Splunkbase 6785, latest audited 4.3.2."
       },
       {
         "kind": "app",
@@ -394,7 +394,7 @@
         "label": "`splunk-db-connect-setup`",
         "cloud_install_path": "ACS Splunkbase for supported Victoria search-tier deployments; Classic routes to IDM, customer-managed heavy forwarder, or Splunk Support",
         "cloud_config_path": "Render-first DBX settings, Java, driver, identity, connection, input, output, lookup, and validation handoffs; v1 does not mutate live DBX objects",
-        "notes": "Splunk DB Connect (Splunkbase 2686), audited at 4.2.4 on April 20, 2026. Requires Java 17 or 21 on Enterprise/customer-managed runtimes, Splunk-managed JRE validation on Cloud Victoria search heads, KV Store, JDBC drivers on every DBX runtime host, SHC deployer workflow for SHC, and explicit Cloud Victoria outbound database allowlist planning."
+        "notes": "Splunk DB Connect (Splunkbase 2686), audited at 4.3.0 on May 11, 2026. Requires Java 17 or 21 on Enterprise/customer-managed runtimes, Splunk-managed JRE validation on Cloud Victoria search heads, KV Store, JDBC drivers on every DBX runtime host, SHC deployer workflow for SHC, and explicit Cloud Victoria outbound database allowlist planning."
       },
       {
         "kind": "app",
@@ -640,8 +640,8 @@
         "label": "`splunk-federated-search-setup`",
         "splunkbase_id": "N/A",
         "cloud_install_path": "No Splunk Cloud app install; Federated Search is native platform configuration on the Federated Search Head",
-        "cloud_config_path": "REST apply path (`apply-rest.sh`) targets Splunk Cloud `/services/data/federated/{provider,index,settings/general}` directly; Splunk Cloud cannot edit federated.conf, so `aws_s3` providers are rendered as REST payloads with AWS Glue/S3/KMS prerequisites docs; admin user must hold `admin_all_objects`",
-        "notes": "Complete Federated Search product surface: FSS2S (`type=splunk`) standard or transparent mode with multi-provider/multi-index render, FSS3 (`type=aws_s3`, Splunk Cloud only) REST payloads, file-based and REST apply paths, global federated-search enable/disable, SHC `conf_replication_include.indexes` deployer asset, and live `connectivityStatus` probe."
+        "cloud_config_path": "REST apply path (`apply-rest.sh`) targets Splunk Cloud `/services/data/federated/{provider,index,settings/general}` for FSS2S only; Splunk Cloud 10.4.2604+ Amazon S3 federated search renders Data Management app connection/dataset handoffs under `data-management-datasets/`; legacy `aws_s3` REST payloads require explicit `--fss3-mode legacy` for older Cloud stacks.",
+        "notes": "Complete Federated Search product surface: FSS2S (`type=splunk`) standard or transparent mode with multi-provider/multi-index render, Splunk Cloud 10.4.2604+ Amazon S3 Data Management dataset handoffs, explicit legacy FSS3 (`type=aws_s3`) REST payload mode, file-based and REST apply paths, global federated-search enable/disable, SHC `conf_replication_include.indexes` deployer asset, and live `connectivityStatus` probe."
       },
       {
         "kind": "workflow",
@@ -807,7 +807,7 @@
         "skill": "splunk-oncall-setup",
         "label": "`splunk-oncall-setup`",
         "splunkbase_id": "N/A",
-        "cloud_install_path": "Splunk-side companion apps install through ACS or REST: Splunkbase 3546 (victorops_app, alert action) on a search head or SHC deployer; Splunkbase 4886 (TA-splunk-add-on-for-victorops, public-API ingest) on a heavy forwarder; Splunkbase 5863 (splunkoncall, SOAR connector) installs through Splunk SOAR rather than splunk-app-install",
+        "cloud_install_path": "Splunk-side companion apps install through ACS or REST: Splunkbase 3546 (victorops_app, alert action) on a search head or SHC deployer; Splunkbase 4886 (TA-splunk-add-on-for-victorops, public-API ingest) on a heavy forwarder. Splunkbase 5863 (splunkoncall, SOAR connector) is a Splunk SOAR asset-readiness handoff, not a Splunk Platform app install.",
         "cloud_config_path": "Render and apply the full Splunk On-Call lifecycle through the public API at api.victorops.com (X-VO-Api-Id + X-VO-Api-Key file-based auth) with per-endpoint rate-limit governors; send REST endpoint and generic email alerts; pre-create the four indexes the Add-on macros expect (victorops_users / victorops_teams / victorops_oncall / victorops_incidents); seed the alert-action mycollection KV-store; toggle the recovery_polling saved search; render ITSI NEAP, ES Adaptive Response, and Observability detector-recipient handoff stubs",
         "notes": "Render-first lifecycle for Splunk On-Call (formerly VictorOps). Splunkbase apps: 3546 (victorops_app), 4886 (TA-splunk-add-on-for-victorops), 5863 (splunkoncall SOAR connector). Supersedes the partial on_call block in splunk-observability-native-ops which now defers via deeplink-only handoff."
       },
@@ -1402,7 +1402,7 @@
       "cloud_pairing": [
         "external-collector"
       ],
-      "notes": "External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup. Splunk Add-on for OpenTelemetry (Splunkbase 7125, Splunk_TA_otel) release 0.153.0 lists Splunk platform 10.4 (default target) through 9.1."
+      "notes": "External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup."
     },
     {
       "skill": "splunk-observability-ai-agent-monitoring-setup",
@@ -1773,7 +1773,7 @@
       "cloud_pairing": [
         "search-tier"
       ],
-      "notes": "Federated Search Head workflow covering Federated Search for Splunk (FSS2S, type=splunk) in standard or transparent mode and Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud only). Renders multi-provider/multi-index assets, file-based apply for Enterprise SHs and SHC deployers, REST apply for both Enterprise and Splunk Cloud, the global federated-search enable/disable switch, and a connectivityStatus probe."
+      "notes": "Federated Search Head workflow covering Federated Search for Splunk (FSS2S, type=splunk) in standard or transparent mode and Splunk Cloud 10.4.2604+ Amazon S3 federated dataset handoffs through the Data Management app. Legacy FSS3 (`type=aws_s3`) REST provider payloads remain available only through explicit legacy mode. Renders multi-provider/multi-index assets, file-based apply for Enterprise SHs and SHC deployers, REST apply for FSS2S, the global federated-search enable/disable switch, and a connectivityStatus probe."
     },
     {
       "skill": "splunk-index-lifecycle-smartstore-setup",
@@ -3180,7 +3180,20 @@
         "uf_safe": true
       },
       "latest_verified_version": "10.2.0",
-      "latest_verified_date": "October 8, 2025"
+      "latest_verified_date": "October 8, 2025",
+      "latest_release_date": "October 8, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-supported-addons-setup",
@@ -3208,7 +3221,19 @@
         "uf_safe": true
       },
       "latest_verified_version": "2.1.1",
-      "latest_verified_date": "March 30, 2026"
+      "latest_verified_date": "March 30, 2026",
+      "latest_release_date": "March 30, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-scan-setup",
@@ -3234,8 +3259,23 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "1.0.25",
-      "latest_verified_date": "April 14, 2026"
+      "latest_verified_version": "1.0.27",
+      "latest_verified_date": "May 9, 2026",
+      "latest_release_date": "May 9, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-catalyst-ta-setup",
@@ -3262,7 +3302,20 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.1.0",
-      "latest_verified_date": "March 3, 2026"
+      "latest_verified_date": "March 3, 2026",
+      "latest_release_date": "March 3, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-dc-networking-setup",
@@ -3288,8 +3341,21 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "1.2.0",
-      "latest_verified_date": "February 5, 2026"
+      "latest_verified_version": "1.2.1",
+      "latest_verified_date": "May 20, 2026",
+      "latest_release_date": "May 20, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-enterprise-networking-setup",
@@ -3319,7 +3385,20 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.1.0",
-      "latest_verified_date": "March 3, 2026"
+      "latest_verified_date": "March 3, 2026",
+      "latest_release_date": "March 3, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-catalyst-enhanced-netflow-setup",
@@ -3346,7 +3425,20 @@
         "uf_safe": true
       },
       "latest_verified_version": "2.1.0",
-      "latest_verified_date": "September 10, 2024"
+      "latest_verified_date": "September 10, 2024",
+      "latest_release_date": "September 10, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-security-cloud-setup",
@@ -3372,8 +3464,22 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "3.6.4",
-      "latest_verified_date": "March 30, 2026"
+      "latest_verified_version": "3.6.6",
+      "latest_verified_date": "June 2, 2026",
+      "latest_release_date": "June 2, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -3400,7 +3506,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.55",
-      "latest_verified_date": "April 6, 2026"
+      "latest_verified_date": "April 6, 2026",
+      "latest_release_date": "April 6, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-secure-access-setup",
@@ -3427,7 +3545,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.50",
-      "latest_verified_date": "April 6, 2026"
+      "latest_verified_date": "April 6, 2026",
+      "latest_release_date": "April 6, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-intersight-setup",
@@ -3454,7 +3584,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.1.1",
-      "latest_verified_date": "March 27, 2026"
+      "latest_verified_date": "March 27, 2026",
+      "latest_release_date": "March 27, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-appdynamics-setup",
@@ -3481,7 +3623,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.2.1",
-      "latest_verified_date": "May 1, 2026"
+      "latest_verified_date": "May 1, 2026",
+      "latest_release_date": "May 1, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-meraki-ta-setup",
@@ -3508,7 +3665,20 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.3.0",
-      "latest_verified_date": "March 18, 2026"
+      "latest_verified_date": "March 18, 2026",
+      "latest_release_date": "March 18, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-webex-setup",
@@ -3534,8 +3704,23 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "1.4.0",
-      "latest_verified_date": "April 8, 2026"
+      "latest_verified_version": "1.4.2",
+      "latest_verified_date": "May 28, 2026",
+      "latest_release_date": "May 28, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-webex-setup",
@@ -3562,7 +3747,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "2.0.0",
-      "latest_verified_date": "April 30, 2026"
+      "latest_verified_date": "April 30, 2026",
+      "latest_release_date": "April 30, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-ucs-ta-setup",
@@ -3589,7 +3789,21 @@
         "uf_safe": false
       },
       "latest_verified_version": "4.3.1",
-      "latest_verified_date": "April 25, 2025"
+      "latest_verified_date": "April 25, 2025",
+      "latest_release_date": "April 25, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-secure-email-web-gateway-setup",
@@ -3616,7 +3830,21 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.7.0",
-      "latest_verified_date": "July 30, 2024"
+      "latest_verified_date": "July 30, 2024",
+      "latest_release_date": "July 30, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-secure-email-web-gateway-setup",
@@ -3643,7 +3871,21 @@
         "uf_safe": false
       },
       "latest_verified_version": "5.0.0",
-      "latest_verified_date": "December 13, 2024"
+      "latest_verified_date": "December 13, 2024",
+      "latest_release_date": "December 13, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-talos-intelligence-setup",
@@ -3670,7 +3912,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.1",
-      "latest_verified_date": "September 16, 2025"
+      "latest_verified_date": "September 16, 2025",
+      "latest_release_date": "September 16, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-stream-setup",
@@ -3697,7 +3954,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.1.6",
-      "latest_verified_date": "March 3, 2026"
+      "latest_verified_date": "March 3, 2026",
+      "latest_release_date": "March 3, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-stream-setup",
@@ -3724,7 +3993,19 @@
         "uf_safe": true
       },
       "latest_verified_version": "8.1.6",
-      "latest_verified_date": "March 3, 2026"
+      "latest_verified_date": "March 3, 2026",
+      "latest_release_date": "March 3, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-stream-setup",
@@ -3751,7 +4032,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.1.6",
-      "latest_verified_date": "March 3, 2026"
+      "latest_verified_date": "March 3, 2026",
+      "latest_release_date": "March 3, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-thousandeyes-setup",
@@ -3777,8 +4073,22 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "0.6.0",
-      "latest_verified_date": "March 10, 2026"
+      "latest_verified_version": "0.8.0",
+      "latest_verified_date": "June 9, 2026",
+      "latest_release_date": "June 9, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-itsi-setup",
@@ -3807,7 +4117,20 @@
         "uf_safe": false
       },
       "latest_verified_version": "4.21.2",
-      "latest_verified_date": "March 18, 2026"
+      "latest_verified_date": "March 18, 2026",
+      "latest_release_date": "March 18, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-itsi-config",
@@ -3837,7 +4160,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "2.5.0",
-      "latest_verified_date": "February 10, 2026"
+      "latest_verified_date": "February 10, 2026",
+      "latest_release_date": "February 10, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-enterprise-security-install",
@@ -3866,7 +4201,18 @@
       },
       "latest_verified_version": "8.5.1",
       "latest_verified_date": "April 16, 2026",
-      "notes": "Splunkbase lists Splunk Enterprise / Splunk Cloud platform 10.4 (default target), 10.3, 10.2, 10.0, 9.4, and 9.3 for ES 8.5.1."
+      "latest_release_date": "April 16, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-security-essentials-setup",
@@ -3894,7 +4240,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.8.3",
-      "latest_verified_date": "January 21, 2026"
+      "latest_verified_date": "January 21, 2026",
+      "latest_release_date": "January 21, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-asset-risk-intelligence-setup",
@@ -3921,9 +4282,23 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "1.2.2",
-      "latest_verified_date": "June 10, 2026",
-      "notes": "Splunkbase lists Splunk Enterprise / Splunk Cloud platform 10.4 (default target), 10.3, 10.2, and older trains for ARI 1.2.2. Docs signal 9.1.3+."
+      "latest_verified_version": "1.2.1",
+      "latest_verified_date": "October 9, 2025",
+      "latest_release_date": "October 9, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-asset-risk-intelligence-setup",
@@ -3951,7 +4326,22 @@
         "uf_safe": true
       },
       "latest_verified_version": "1.2.0",
-      "latest_verified_date": "September 17, 2025"
+      "latest_verified_date": "September 17, 2025",
+      "latest_release_date": "September 17, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-asset-risk-intelligence-setup",
@@ -3979,7 +4369,22 @@
         "uf_safe": true
       },
       "latest_verified_version": "1.2.0",
-      "latest_verified_date": "September 17, 2025"
+      "latest_verified_date": "September 17, 2025",
+      "latest_release_date": "September 17, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-asset-risk-intelligence-setup",
@@ -4008,7 +4413,22 @@
         "uf_safe": true
       },
       "latest_verified_version": "1.2.0",
-      "latest_verified_date": "September 17, 2025"
+      "latest_verified_date": "September 17, 2025",
+      "latest_release_date": "September 17, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-attack-analyzer-setup",
@@ -4036,7 +4456,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.2.1",
-      "latest_verified_date": "May 26, 2025"
+      "latest_verified_date": "May 26, 2025",
+      "latest_release_date": "May 26, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-attack-analyzer-setup",
@@ -4067,7 +4502,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.2.1",
-      "latest_verified_date": "June 3, 2025"
+      "latest_verified_date": "June 3, 2025",
+      "latest_release_date": "June 3, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-soar-setup",
@@ -4095,7 +4545,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.77",
-      "latest_verified_date": "March 18, 2026"
+      "latest_verified_date": "March 18, 2026",
+      "latest_release_date": "March 18, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-soar-setup",
@@ -4126,7 +4588,15 @@
         "uf_safe": false
       },
       "latest_verified_version": "4.5.1",
-      "latest_verified_date": "April 6, 2026"
+      "latest_verified_date": "April 6, 2026",
+      "latest_release_date": "April 6, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-uba-setup",
@@ -4155,7 +4625,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.4.6",
-      "latest_verified_date": "March 18, 2025"
+      "latest_verified_date": "March 18, 2025",
+      "latest_release_date": "March 18, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-security-content-update-setup",
@@ -4185,8 +4667,26 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "5.26.0",
-      "latest_verified_date": "April 22, 2026"
+      "latest_verified_version": "6.0.0",
+      "latest_verified_date": "June 1, 2026",
+      "latest_release_date": "June 1, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "cisco-asa-ta-setup",
@@ -4214,7 +4714,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "6.0.1",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "May 6, 2026",
+      "latest_release_date": "May 6, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-cim-data-model-setup",
@@ -4241,8 +4756,20 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "6.2.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_version": "8.5.0",
+      "latest_verified_date": "April 2, 2026",
+      "latest_release_date": "April 2, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-pci-compliance-setup",
@@ -4273,7 +4800,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.5.1",
-      "latest_verified_date": "April 16, 2026"
+      "latest_verified_date": "April 16, 2026",
+      "latest_release_date": "April 16, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-pci-compliance-setup",
@@ -4305,7 +4844,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.5.1",
-      "latest_verified_date": "April 16, 2026"
+      "latest_verified_date": "April 16, 2026",
+      "latest_release_date": "April 16, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-infosec-app-setup",
@@ -4337,7 +4888,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.7.1",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "August 1, 2025",
+      "latest_release_date": "August 1, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-lookup-file-editing-setup",
@@ -4364,8 +4927,20 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "4.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_version": "4.0.7",
+      "latest_verified_date": "April 28, 2026",
+      "latest_release_date": "April 28, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-ai-assistant-setup",
@@ -4393,7 +4968,19 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_date": "April 9, 2026"
+      "latest_verified_date": "April 9, 2026",
+      "latest_release_date": "April 9, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-ai-ml-toolkit-setup",
@@ -4405,7 +4992,7 @@
         "python-for-scientific-computing-for-linux-64-bit_*"
       ],
       "min_splunk_version": "9.3",
-      "latest_verified_version": "4.3.1",
+      "latest_verified_version": "4.3.2",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -4422,7 +5009,19 @@
         "uf_safe": false
       },
       "notes": "PSC target for Linux 64-bit search heads and the default Splunk Cloud AI Toolkit runtime dependency.",
-      "latest_verified_date": "February 27, 2026"
+      "latest_verified_date": "May 20, 2026",
+      "latest_release_date": "May 20, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-ai-ml-toolkit-setup",
@@ -4434,7 +5033,7 @@
         "python-for-scientific-computing-for-windows-64-bit_*"
       ],
       "min_splunk_version": "9.3",
-      "latest_verified_version": "4.3.1",
+      "latest_verified_version": "4.3.2",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -4451,7 +5050,19 @@
         "uf_safe": false
       },
       "notes": "PSC target for Windows 64-bit search heads.",
-      "latest_verified_date": "February 27, 2026"
+      "latest_verified_date": "May 20, 2026",
+      "latest_release_date": "May 20, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-ai-ml-toolkit-setup",
@@ -4463,7 +5074,7 @@
         "python-for-scientific-computing-for-mac-intel_*"
       ],
       "min_splunk_version": "9.3",
-      "latest_verified_version": "4.3.1",
+      "latest_verified_version": "4.3.2",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -4480,7 +5091,19 @@
         "uf_safe": false
       },
       "notes": "PSC target for Mac Intel search heads.",
-      "latest_verified_date": "February 27, 2026"
+      "latest_verified_date": "May 20, 2026",
+      "latest_release_date": "May 20, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-ai-ml-toolkit-setup",
@@ -4492,7 +5115,7 @@
         "python-for-scientific-computing-for-mac-apple-silicon_*"
       ],
       "min_splunk_version": "9.3",
-      "latest_verified_version": "4.3.1",
+      "latest_verified_version": "4.3.2",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -4509,7 +5132,19 @@
         "uf_safe": false
       },
       "notes": "PSC target for Mac Apple Silicon search heads.",
-      "latest_verified_date": "February 27, 2026"
+      "latest_verified_date": "May 20, 2026",
+      "latest_release_date": "May 20, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-ai-ml-toolkit-setup",
@@ -4521,7 +5156,7 @@
         "splunk-ai-toolkit_*"
       ],
       "min_splunk_version": "9.3",
-      "latest_verified_version": "5.7.3",
+      "latest_verified_version": "5.7.4",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -4538,7 +5173,19 @@
         "uf_safe": false
       },
       "notes": "Splunk AI Toolkit / MLTK app. Requires the PSC add-on matching the search-head OS; supports ML-SPL, Smart Assistants, anomaly workflows, LLM ai command provider handoffs, ONNX, alerts, and model inventory.",
-      "latest_verified_date": "April 19, 2026"
+      "latest_verified_date": "May 20, 2026",
+      "latest_release_date": "May 20, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-ai-ml-toolkit-setup",
@@ -4553,7 +5200,7 @@
         "2890"
       ],
       "min_splunk_version": "8.0",
-      "latest_verified_version": "5.2.3",
+      "latest_verified_version": "5.2.4",
       "role_support": {
         "search-tier": "required",
         "indexer": "none",
@@ -4570,7 +5217,25 @@
         "uf_safe": false
       },
       "notes": "DSDL extends AI Toolkit with external Docker, Kubernetes, OpenShift, HPC, GPU, air-gapped image, Jupyter notebook, RAG/LLM, and model governance workflows. Runtime setup is rendered as a handoff by default.",
-      "latest_verified_date": "February 5, 2026"
+      "latest_verified_date": "May 22, 2026",
+      "latest_release_date": "May 22, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-mcp-server-setup",
@@ -4622,7 +5287,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.7",
-      "latest_verified_date": "February 18, 2026"
+      "latest_verified_date": "February 18, 2026",
+      "latest_release_date": "February 18, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-connect-for-otlp-setup",
@@ -4649,9 +5329,20 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only. Splunkbase lists platform 10.4 (default target) through 9.4 for release 0.4.1.",
+      "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only.",
       "latest_verified_version": "0.4.1",
-      "latest_verified_date": "May 6, 2026"
+      "latest_verified_date": "May 1, 2026",
+      "latest_release_date": "May 1, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4679,8 +5370,23 @@
         "uf_safe": false
       },
       "notes": "Splunk DB Connect JDBC ingestion, lookup, enrichment, and export app. Requires Java 17 or 21 on Enterprise/customer-managed runtimes, Splunk-managed JRE validation on Cloud Victoria search heads, KV Store, JDBC drivers on every DBX runtime host, and topology-specific placement guardrails. Live DBX object mutation is intentionally out of splunk-db-connect-setup/v1.",
-      "latest_verified_version": "4.2.4",
-      "latest_verified_date": "April 20, 2026"
+      "latest_verified_version": "4.3.0",
+      "latest_verified_date": "May 11, 2026",
+      "latest_release_date": "May 11, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4709,7 +5415,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.2.2",
-      "latest_verified_date": "September 3, 2025"
+      "latest_verified_date": "September 3, 2025",
+      "latest_release_date": "September 3, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4738,7 +5456,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.3.2",
-      "latest_verified_date": "August 8, 2025"
+      "latest_verified_date": "August 8, 2025",
+      "latest_release_date": "August 8, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4767,7 +5500,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "2.2.2",
-      "latest_verified_date": "September 3, 2025"
+      "latest_verified_date": "September 3, 2025",
+      "latest_release_date": "September 3, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4796,7 +5544,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.2.2",
-      "latest_verified_date": "September 3, 2025"
+      "latest_verified_date": "September 3, 2025",
+      "latest_release_date": "September 3, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4825,7 +5585,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.2.4",
-      "latest_verified_date": "March 19, 2026"
+      "latest_verified_date": "March 19, 2026",
+      "latest_release_date": "March 19, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4854,7 +5629,21 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.1.3",
-      "latest_verified_date": "September 3, 2025"
+      "latest_verified_date": "September 3, 2025",
+      "latest_release_date": "September 3, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4883,7 +5672,19 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.1.1",
-      "latest_verified_date": "September 22, 2025"
+      "latest_verified_date": "September 22, 2025",
+      "latest_release_date": "September 22, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4912,7 +5713,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.3.0",
-      "latest_verified_date": "September 3, 2025"
+      "latest_verified_date": "September 3, 2025",
+      "latest_release_date": "September 3, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-db-connect-setup",
@@ -4941,7 +5757,24 @@
         "uf_safe": false
       },
       "latest_verified_version": "1.0.1",
-      "latest_verified_date": "December 16, 2025"
+      "latest_verified_date": "December 16, 2025",
+      "latest_release_date": "December 16, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-observability-cloud-integration-setup",
@@ -4968,7 +5801,19 @@
       },
       "notes": "Provides the sim SPL command + splunk_infrastructure_monitoring_data_streams modular input. Splunk Synthetic Monitoring Add-on (Splunkbase 5608) is archived and replaced by SIM streams; treat that legacy app as deprecated and do not install it.",
       "latest_verified_version": "1.3.0",
-      "latest_verified_date": "February 6, 2026"
+      "latest_verified_date": "February 6, 2026",
+      "latest_release_date": "February 6, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-observability-azure-integration",
@@ -4994,8 +5839,20 @@
         "uf_safe": false
       },
       "notes": "Azure log ingestion TA (Activity Logs, Audit Logs, Azure AD Sign-in Logs, Azure Monitor Logs). Azure Monitor metrics go through the Splunk Observability Azure integration; logs go through this TA. Hand-off from splunk-observability-azure-integration.",
-      "latest_verified_version": "6.1.1",
-      "latest_verified_date": "April 8, 2026"
+      "latest_verified_version": "6.1.3",
+      "latest_verified_date": "May 28, 2026",
+      "latest_release_date": "May 28, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-observability-azure-integration",
@@ -5022,7 +5879,21 @@
       },
       "notes": "Azure dashboards for Splunk Platform. Hand-off from splunk-observability-azure-integration (handoffs.microsoft_azure_app=true).",
       "latest_verified_version": "2.1.1",
-      "latest_verified_date": "December 11, 2024"
+      "latest_verified_date": "December 11, 2024",
+      "latest_release_date": "December 11, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-observability-gcp-integration",
@@ -5049,7 +5920,19 @@
       },
       "notes": "GCP log ingestion TA (Pub/Sub, Cloud Storage, Cloud Audit Logs). GCP metrics go through the Splunk Observability GCP integration; logs go through this TA. Hand-off from splunk-observability-gcp-integration.",
       "latest_verified_version": "5.0.2",
-      "latest_verified_date": "April 22, 2026"
+      "latest_verified_date": "April 22, 2026",
+      "latest_release_date": "April 22, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-google-workspace-ta-setup",
@@ -5076,7 +5959,20 @@
         "uf_safe": false
       },
       "latest_verified_version": "4.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "May 27, 2026",
+      "latest_release_date": "May 27, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-microsoft-security-ta-setup",
@@ -5103,7 +5999,20 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "November 7, 2025",
+      "latest_release_date": "November 7, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-sysmon-ta-setup",
@@ -5130,7 +6039,20 @@
         "uf_safe": true
       },
       "latest_verified_version": "5.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "July 30, 2025",
+      "latest_release_date": "July 30, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-github-ta-setup",
@@ -5157,7 +6079,21 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.3.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "May 29, 2026",
+      "latest_release_date": "May 29, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-salesforce-ta-setup",
@@ -5185,7 +6121,19 @@
       },
       "notes": "Salesforce object and event-log modular inputs; run each org input set on one search tier or heavy forwarder.",
       "latest_verified_version": "6.0.2",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "April 8, 2026",
+      "latest_release_date": "April 8, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-box-ta-setup",
@@ -5213,7 +6161,21 @@
       },
       "notes": "Box historical, live monitoring, and file-ingestion modular inputs; run each enterprise input set on one collection node.",
       "latest_verified_version": "4.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "July 8, 2025",
+      "latest_release_date": "July 8, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-cyberark-ta-setup",
@@ -5241,7 +6203,22 @@
       },
       "notes": "Supported CyberArk EPM API collection path.",
       "latest_verified_version": "4.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "May 22, 2026",
+      "latest_release_date": "May 22, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-cyberark-ta-setup",
@@ -5269,7 +6246,25 @@
       },
       "notes": "Archived/not-supported CyberArk EPV/PTA parser-only package; use explicit SC4S/syslog transport ownership.",
       "latest_verified_version": "1.2.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "December 2, 2021",
+      "latest_release_date": "December 2, 2021",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-rsa-securid-ta-setup",
@@ -5297,7 +6292,22 @@
       },
       "notes": "RSA SecurID CAS Cloud Administration API modular input.",
       "latest_verified_version": "1.2.2",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "July 16, 2024",
+      "latest_release_date": "July 16, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-rsa-securid-ta-setup",
@@ -5325,7 +6335,20 @@
       },
       "notes": "RSA Authentication Manager syslog/parser package.",
       "latest_verified_version": "1.5.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "November 6, 2025",
+      "latest_release_date": "November 6, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5353,7 +6376,19 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "3.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "April 9, 2026",
+      "latest_release_date": "April 9, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5381,7 +6416,22 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "3.3.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "September 9, 2024",
+      "latest_release_date": "September 9, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5409,7 +6459,21 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "2.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "April 9, 2025",
+      "latest_release_date": "April 9, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5435,9 +6499,23 @@
         "needs_packet_capture": false,
         "uf_safe": true
       },
-      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
+      "notes": "Shared parser/web/proxy profile; transport ownership rendered per product. Splunkbase app 2911 latest release 4.0.0 advertises Splunk 10.4 support.",
       "latest_verified_version": "4.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "May 27, 2026",
+      "latest_release_date": "May 27, 2026",
+      "last_verified_date": "June 10, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5465,7 +6543,27 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "2.0.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "November 23, 2020",
+      "latest_release_date": "November 23, 2020",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0",
+        "7.3",
+        "7.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5493,7 +6591,22 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "2.1.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "December 1, 2023",
+      "latest_release_date": "December 1, 2023",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5521,7 +6634,20 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "3.9.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "August 31, 2025",
+      "latest_release_date": "August 31, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5549,7 +6675,29 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "1.1.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "December 11, 2018",
+      "latest_release_date": "December 11, 2018",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0",
+        "7.3",
+        "7.2",
+        "7.1",
+        "7.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5577,7 +6725,21 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "1.2.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "February 15, 2024",
+      "latest_release_date": "February 15, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5605,7 +6767,22 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "6.5.1",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "April 17, 2026",
+      "latest_release_date": "April 17, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5633,7 +6810,22 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "8.2.3",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "July 22, 2024",
+      "latest_release_date": "July 22, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-syslog-web-proxy-ta-setup",
@@ -5661,7 +6853,24 @@
       },
       "notes": "Shared parser/web/proxy profile; transport ownership rendered per product.",
       "latest_verified_version": "2.2.0",
-      "latest_verified_date": "June 6, 2026"
+      "latest_verified_date": "October 6, 2022",
+      "latest_release_date": "October 6, 2022",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-database-ta-setup",
@@ -5688,8 +6897,22 @@
         "uf_safe": true
       },
       "latest_verified_version": "3.1.0",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "SQL Server package includes search-time knowledge, ERRORLOG/SQLAGENT file monitors, Perfmon stanzas, and DB Connect templates."
+      "latest_verified_date": "August 22, 2024",
+      "notes": "SQL Server package includes search-time knowledge, ERRORLOG/SQLAGENT file monitors, Perfmon stanzas, and DB Connect templates.",
+      "latest_release_date": "August 22, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-database-ta-setup",
@@ -5716,8 +6939,22 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.2.0",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "MySQL package knowledge and DB Connect templates; JDBC collection delegated to splunk-db-connect-setup."
+      "latest_verified_date": "April 18, 2025",
+      "notes": "MySQL package knowledge and DB Connect templates; JDBC collection delegated to splunk-db-connect-setup.",
+      "latest_release_date": "April 18, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-database-ta-setup",
@@ -5744,8 +6981,22 @@
         "uf_safe": true
       },
       "latest_verified_version": "4.2.0",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "Oracle package knowledge, alert/listener/audit source types, and DB Connect templates; JDBC collection delegated to splunk-db-connect-setup."
+      "latest_verified_date": "August 27, 2025",
+      "notes": "Oracle package knowledge, alert/listener/audit source types, and DB Connect templates; JDBC collection delegated to splunk-db-connect-setup.",
+      "latest_release_date": "August 27, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-microsoft-exchange-ta-setup",
@@ -5772,8 +7023,20 @@
         "uf_safe": true
       },
       "latest_verified_version": "4.1.0",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "Multi-app Exchange bundle containing ClientAccess, Mailbox, SMTP Reputation, and Windows Exchange IIS component apps."
+      "latest_verified_date": "February 6, 2026",
+      "notes": "Multi-app Exchange bundle containing ClientAccess, Mailbox, SMTP Reputation, and Windows Exchange IIS component apps.",
+      "latest_release_date": "February 6, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-microsoft-exchange-ta-setup",
@@ -5800,8 +7063,26 @@
         "uf_safe": false
       },
       "latest_verified_version": "4.0.4",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "Exchange index definitions for msexchange, perfmon, windows, wineventlog, and msad."
+      "latest_verified_date": "August 8, 2025",
+      "notes": "Exchange index definitions for msexchange, perfmon, windows, wineventlog, and msad.",
+      "latest_release_date": "August 8, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-microsoft-scom-ta-setup",
@@ -5828,8 +7109,23 @@
         "uf_safe": false
       },
       "latest_verified_version": "4.5.0",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "SCOM PowerShell modular inputs and microsoft:scom source types; run collection on one approved search tier or heavy forwarder."
+      "latest_verified_date": "August 26, 2024",
+      "notes": "SCOM PowerShell modular inputs and microsoft:scom source types; run collection on one approved search tier or heavy forwarder.",
+      "latest_release_date": "August 26, 2024",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-netapp-ontap-ta-setup",
@@ -5856,8 +7152,20 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.2.0",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "ONTAP scheduler/worker collection package using SA-Hydra runtime components."
+      "latest_verified_date": "February 6, 2026",
+      "notes": "ONTAP scheduler/worker collection package using SA-Hydra runtime components.",
+      "latest_release_date": "February 6, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-netapp-ontap-ta-setup",
@@ -5884,8 +7192,26 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.0.3",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "ONTAP field extractions, eventtypes, and Hydra troubleshooting source types."
+      "latest_verified_date": "August 8, 2025",
+      "notes": "ONTAP field extractions, eventtypes, and Hydra troubleshooting source types.",
+      "latest_release_date": "August 8, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-netapp-ontap-ta-setup",
@@ -5912,8 +7238,26 @@
         "uf_safe": false
       },
       "latest_verified_version": "3.0.3",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "ONTAP index definition package."
+      "latest_verified_date": "August 8, 2025",
+      "notes": "ONTAP index definition package.",
+      "latest_release_date": "August 8, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-security-appliance-ta-setup",
@@ -5940,8 +7284,21 @@
         "uf_safe": true
       },
       "latest_verified_version": "3.0.0",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "Carbon Black JSON file monitor parser package; upstream export or bridge owns file delivery."
+      "latest_verified_date": "August 27, 2025",
+      "notes": "Carbon Black JSON file monitor parser package; upstream export or bridge owns file delivery.",
+      "latest_release_date": "August 27, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
     },
     {
       "skill": "splunk-security-appliance-ta-setup",
@@ -5968,8 +7325,791 @@
         "uf_safe": true
       },
       "latest_verified_version": "4.0.0",
-      "latest_verified_date": "June 6, 2026",
-      "notes": "Symantec EP file and syslog parser package; SC4S/syslog or file monitor owns transport."
+      "latest_verified_date": "September 30, 2025",
+      "notes": "Symantec EP file and syslog parser package; SC4S/syslog or file monitor owns transport.",
+      "latest_release_date": "September 30, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2"
+      ],
+      "compatibility_status": "supported"
+    },
+    {
+      "skill": "splunk-windows-ta-setup",
+      "app_name": "Splunk_TA_windows",
+      "splunkbase_id": "742",
+      "label": "Splunk Add-on for Microsoft Windows",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-windows_*"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "supported",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "10.0.1",
+      "latest_verified_date": "April 21, 2026",
+      "latest_release_date": "April 21, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Windows endpoint collection TA for WinEventLog, Perfmon, WinHostMon, registry, network, print, AD, and scripted inputs. Deploy through splunk-windows-ta-setup and forwarder fleet management."
+    },
+    {
+      "skill": "splunk-aws-ta-setup",
+      "app_name": "Splunk_TA_aws",
+      "splunkbase_id": "1876",
+      "label": "Splunk Add-on for Amazon Web Services",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-amazon-web-services_*",
+        "splunk-add-on-for-aws_*"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "8.1.2",
+      "latest_verified_date": "May 21, 2026",
+      "latest_release_date": "May 21, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Manual AWS log ingestion TA. Data Manager remains the preferred fully managed cloud onboarding path; this entry covers self-managed TA installs and heavy-forwarder collection."
+    },
+    {
+      "skill": "splunk-servicenow-ta-setup",
+      "app_name": "Splunk_TA_snow",
+      "splunkbase_id": "1928",
+      "label": "Splunk Add-on for ServiceNow",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-servicenow_*"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "10.0.1",
+      "latest_verified_date": "June 5, 2026",
+      "latest_release_date": "June 5, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "notes": "ServiceNow table modular inputs and CIM knowledge objects. Use a search tier or dedicated heavy forwarder, not Universal Forwarders."
+    },
+    {
+      "skill": "splunk-platform-pki-setup",
+      "app_name": "ssl_certificate_checker",
+      "splunkbase_id": "3172",
+      "label": "SSL Certificate Checker",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "ssl-certificate-checker_*",
+        "ssl_certificate_checker_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "4.2.0",
+      "latest_verified_date": "November 27, 2023",
+      "latest_release_date": "November 27, 2023",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0",
+        "7.3",
+        "7.2",
+        "7.1",
+        "7.0"
+      ],
+      "compatibility_status": "unsupported",
+      "notes": "Archived certificate-monitoring helper referenced only as an optional PKI post-install monitoring handoff. Splunkbase does not advertise Splunk 10.4 support."
+    },
+    {
+      "skill": "splunk-oncall-setup",
+      "app_name": "victorops_app",
+      "splunkbase_id": "3546",
+      "label": "Splunk On-Call (VictorOps)",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-on-call-victorops_*",
+        "victorops_app_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.0.42",
+      "latest_verified_date": "January 28, 2026",
+      "latest_release_date": "January 28, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Splunk On-Call alert action app. Install on a search head or SHC deployer; the package folder remains victorops_app."
+    },
+    {
+      "skill": "splunk-microsoft-cloud-setup",
+      "app_name": "splunk_ta_o365",
+      "splunkbase_id": "4055",
+      "label": "Splunk Add-on for Microsoft Office 365",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-microsoft-office-365_*"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "required",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "6.0.2",
+      "latest_verified_date": "May 7, 2026",
+      "latest_release_date": "May 7, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Office 365 Management Activity, Entra metadata, service status, and related Microsoft 365 modular inputs. Paired with Splunk_TA_microsoft-cloudservices for Azure cloud services coverage."
+    },
+    {
+      "skill": "splunk-oncall-setup",
+      "app_name": "TA-splunk-add-on-for-victorops",
+      "splunkbase_id": "4886",
+      "label": "Splunk Add-on for On-Call (VictorOps)",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-on-call-victorops_*",
+        "ta-splunk-add-on-for-victorops_*"
+      ],
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "required",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "2.0.0",
+      "latest_verified_date": "February 10, 2026",
+      "latest_release_date": "February 10, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Splunk On-Call public API ingestion add-on. Install on a heavy forwarder and pre-create the victorops_* indexes expected by its dashboards and macros."
+    },
+    {
+      "skill": "splunk-observability-cloud-integration-setup",
+      "app_name": "splunk_synthetic_monitoring",
+      "splunkbase_id": "5608",
+      "label": "Splunk Synthetic Monitoring Add-on",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-synthetic-monitoring-add-on_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.1.0",
+      "latest_verified_date": "May 18, 2022",
+      "latest_release_date": "May 18, 2022",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1"
+      ],
+      "compatibility_status": "unsupported",
+      "notes": "Archived legacy Synthetic Monitoring add-on. Modern Observability workflows use SIM streams and native Synthetics workflows instead; do not install for Splunk 10.4."
+    },
+    {
+      "skill": "splunk-oncall-setup",
+      "app_name": "splunkoncall",
+      "splunkbase_id": "5863",
+      "label": "Splunk On-Call SOAR connector",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "phantom_splunkoncall_*",
+        "splunk-on-call_*"
+      ],
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "2.2.4",
+      "latest_verified_date": "August 1, 2025",
+      "latest_release_date": "August 1, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "8.5",
+        "8.4",
+        "8.0",
+        "7.2",
+        "7.1",
+        "7.0",
+        "6.4",
+        "6.3",
+        "6.2",
+        "6.1",
+        "6.0",
+        "5.5",
+        "5.4",
+        "5.3",
+        "5.2",
+        "5.1"
+      ],
+      "compatibility_status": "unsupported",
+      "notes": "Splunk SOAR connector, not a Splunk Enterprise app. It is listed here so the On-Call skill's Splunkbase references have explicit audit coverage; 10.4 is not a SOAR platform version."
+    },
+    {
+      "skill": "splunk-okta-ta-setup",
+      "app_name": "Splunk_TA_okta_identity_cloud",
+      "splunkbase_id": "6553",
+      "label": "Splunk Add-on for Okta Identity Cloud",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-okta-identity-cloud_*"
+      ],
+      "min_splunk_version": "9.0",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "5.0.2",
+      "latest_verified_date": "April 21, 2026",
+      "latest_release_date": "April 21, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Okta Identity Cloud modular inputs and CIM Authentication mapping. Run collection on a search tier or dedicated heavy forwarder."
+    },
+    {
+      "skill": "splunk-data-source-readiness-doctor",
+      "app_name": "ocsf_cim_addon_for_splunk",
+      "splunkbase_id": "6841",
+      "label": "OCSF-CIM Add-On for Splunk",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "ocsf-cim-add-on-for-splunk_*",
+        "ocsf_cim_addon_for_splunk_*"
+      ],
+      "min_splunk_version": "9.1",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.0.0",
+      "latest_verified_date": "November 19, 2025",
+      "latest_release_date": "November 19, 2025",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Search-time OCSF-to-CIM bridge used by data source readiness checks and Enterprise Security OCSF handoffs."
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "Splunk_App_for_Anomaly_Detection",
+      "splunkbase_id": "6843",
+      "label": "Splunk App for Anomaly Detection",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-app-for-anomaly-detection_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.1.2",
+      "latest_verified_date": "November 15, 2023",
+      "latest_release_date": "November 15, 2023",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "unsupported",
+      "notes": "Archived legacy Anomaly Detection app. The AI/ML Toolkit skill treats it as migration-only and does not recommend new Splunk 10.4 installs."
+    },
+    {
+      "skill": "splunk-observability-otel-collector-setup",
+      "app_name": "Splunk_TA_otel",
+      "splunkbase_id": "7125",
+      "label": "Splunk Add-On for OpenTelemetry Collector",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-opentelemetry-collector_*",
+        "splunk-ta-otel_*"
+      ],
+      "min_splunk_version": "8.0",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "required",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": true
+      },
+      "latest_verified_version": "0.153.0",
+      "latest_verified_date": "May 27, 2026",
+      "latest_release_date": "May 27, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2",
+        "8.1",
+        "8.0"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Splunk Add-On for OpenTelemetry Collector on Universal Forwarder fleets. The OTel skill owns render/apply, package audit, secret handling, and FIPS/FedRAMP guardrails."
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "Splunk_SA_Scientific_Python_linux_x86",
+      "splunkbase_id": "2884",
+      "label": "Python for Scientific Computing for Linux 32-bit",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "python-for-scientific-computing-for-linux-32-bit_*",
+        "splunk-sa-scientific-python-linux-x86_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": false,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "1.3",
+      "latest_verified_date": "July 27, 2018",
+      "latest_release_date": "July 27, 2018",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "7.2",
+        "7.1",
+        "7.0"
+      ],
+      "compatibility_status": "unsupported",
+      "notes": "Legacy PSC Linux 32-bit runtime tracked for migration/blocking coverage only. Modern Splunk 10.4 deployments must use supported 64-bit PSC packages."
+    },
+    {
+      "skill": "splunk-vmware-ta-setup",
+      "app_name": "Splunk_TA_vmware",
+      "splunkbase_id": "3215",
+      "label": "Splunk Add-on for VMware",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-vmware_*"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "4.2.0",
+      "latest_verified_date": "February 6, 2026",
+      "latest_release_date": "February 6, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "notes": "VMware vCenter inventory, task, event, and log collection add-on. Use splunk-vmware-ta-setup for rendered indexes, collection runbooks, and ITSI readiness."
+    },
+    {
+      "skill": "splunk-platform-pki-setup",
+      "app_name": "splunk_health_assistant_addon",
+      "splunkbase_id": "4603",
+      "label": "Splunk Health Assistant Add-on",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-health-assistant-add-on_*"
+      ],
+      "min_splunk_version": "9.4",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "2026.5.23",
+      "latest_verified_date": "May 21, 2026",
+      "latest_release_date": "May 21, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4"
+      ],
+      "compatibility_status": "supported",
+      "notes": "Monitoring Console health-check update add-on used by upgrade and FIPS/TLS readiness runbooks."
+    },
+    {
+      "skill": "splunk-vmware-ta-setup",
+      "app_name": "Splunk_TA_vmware_inframon",
+      "splunkbase_id": "5089",
+      "label": "Splunk Add-on for VMware Metrics",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "splunk-add-on-for-vmware-metrics_*"
+      ],
+      "min_splunk_version": "9.3",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "capabilities": {
+        "needs_custom_rest": true,
+        "needs_search_time_objects": true,
+        "needs_kvstore": false,
+        "needs_python_runtime": true,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "5.0.0",
+      "latest_verified_date": "April 21, 2026",
+      "latest_release_date": "April 21, 2026",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "10.4",
+        "10.3",
+        "10.2",
+        "10.1",
+        "10.0",
+        "9.4",
+        "9.3"
+      ],
+      "compatibility_status": "supported",
+      "notes": "VMware performance, inventory, tasks, and events metrics add-on. Use with VMware metrics indexes and the splunk-vmware-ta-setup readiness handoff."
+    },
+    {
+      "skill": "splunk-ai-ml-toolkit-setup",
+      "app_name": "Smart_Alerts_Assistant",
+      "splunkbase_id": "6415",
+      "label": "Smart Alerts Assistant for Splunk",
+      "license_ack_url": "https://www.splunk.com/en_us/legal/splunk-general-terms.html",
+      "package_patterns": [
+        "smart-alerts-assistant-for-splunk_*"
+      ],
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "capabilities": {
+        "needs_custom_rest": false,
+        "needs_search_time_objects": true,
+        "needs_kvstore": true,
+        "needs_python_runtime": false,
+        "needs_packet_capture": false,
+        "uf_safe": false
+      },
+      "latest_verified_version": "0.1.20",
+      "latest_verified_date": "June 14, 2022",
+      "latest_release_date": "June 14, 2022",
+      "last_verified_date": "June 9, 2026",
+      "platform_versions": [
+        "9.4",
+        "9.3",
+        "9.2",
+        "9.1",
+        "9.0",
+        "8.2"
+      ],
+      "compatibility_status": "unsupported",
+      "notes": "Archived/beta Smart Alerts Assistant tracked for migration-only AI/ML Toolkit coverage. Do not install for Splunk 10.4."
     }
   ]
 }

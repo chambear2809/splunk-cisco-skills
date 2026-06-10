@@ -137,3 +137,12 @@ is rarely changed).
 - Commercial entitlement procurement / renewal (vendor process).
 - License upgrade across major Splunk Enterprise releases (run after Splunk
   upgrade via [`skills/splunk-enterprise-host-setup`](../splunk-enterprise-host-setup/SKILL.md)).
+
+## Splunk 10.4 enterprise deployment notes
+
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+read this skill alongside
+[`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
+the prose companion to the
+[`../shared/references/splunk_platform_versions.json`](../shared/references/splunk_platform_versions.json)
+version contract.

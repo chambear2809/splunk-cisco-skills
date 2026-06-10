@@ -13,6 +13,24 @@ SKILL_TOPOLOGY_EXEMPTIONS: set[str] = set()
 
 SPLUNKBASE_APP_COVERAGE_IDS = {
     "263",
+    "742",
+    "1876",
+    "1928",
+    "2884",
+    "3172",
+    "3215",
+    "3546",
+    "4055",
+    "4603",
+    "4886",
+    "5089",
+    "5608",
+    "5863",
+    "6415",
+    "6553",
+    "6841",
+    "6843",
+    "7125",
     "833",
     "1143",
     "1620",
@@ -460,8 +478,8 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(dbx["role_support"]["search-tier"], "supported")
         self.assertEqual(dbx["role_support"]["heavy-forwarder"], "supported")
         self.assertEqual(dbx["role_support"]["indexer"], "none")
-        self.assertEqual(dbx["latest_verified_version"], "4.2.4")
-        self.assertEqual(dbx["latest_verified_date"], "April 20, 2026")
+        self.assertEqual(dbx["latest_verified_version"], "4.3.0")
+        self.assertEqual(dbx["latest_verified_date"], "May 11, 2026")
 
         driver_expectations = {
             "6149": ("Amazon Redshift JDBC Driver Add-on for Splunk DB Connect", "1.2.2", "September 3, 2025"),
