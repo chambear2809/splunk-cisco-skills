@@ -193,7 +193,8 @@ To access them: **Apps → Splunk Add-on for Cisco Intersight**
 
 **Prerequisites for dashboards to show data:**
 
-1. The `cisco_intersight` index must exist and inputs must be enabled.
+1. The `intersight` index must exist (queried by dashboards through the
+   `cisco_intersight_index` macro) and inputs must be enabled.
 2. The Intersight account must be configured and actively polling.
 3. The `setup.sh` macro update step must have run to wire the correct index.
 

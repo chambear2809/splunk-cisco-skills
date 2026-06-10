@@ -127,7 +127,8 @@ enable_catalyst_center_inputs() {
             cisco_dna_center_account "${account}" \
             index "${index}" \
             interval "3600" \
-            logging_level "INFO")
+            logging_level "INFO" \
+            disabled "0")
         if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_types[$i]}" "${input_names[$i]}" "$body"; then
             log "  ERROR: Failed to enable ${input_types[$i]}://${input_names[$i]}"
             failures=$((failures + 1))
@@ -154,7 +155,8 @@ enable_ise_inputs() {
         data_type "security_group_tags,authz_policy_hit,ise_tacacs_rule_hit" \
         index "${index}" \
         interval "3600" \
-        logging_level "INFO")
+        logging_level "INFO" \
+        disabled "0")
     if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_ise_administrative_input" "ISE_Inputs" "$body"; then
         log "  ERROR: Failed to enable cisco_catalyst_ise_administrative_input://ISE_Inputs"
         return 1
@@ -173,7 +175,8 @@ enable_sdwan_inputs() {
         sdwan_account "${account}" \
         index "${index}" \
         interval "3600" \
-        logging_level "INFO")
+        logging_level "INFO" \
+        disabled "0")
     if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "cisco_catalyst_sdwan_health" "SDWAN_Health" "$body"; then
         log "  ERROR: Failed to enable cisco_catalyst_sdwan_health://SDWAN_Health"
         return 1
@@ -213,7 +216,8 @@ enable_cybervision_inputs() {
         cyber_vision_account "${account}" \
         index "${index}" \
         logging_level "INFO" \
-        page_size "100")
+        page_size "100" \
+        disabled "0")
     local failures=0
     for i in "${!input_types[@]}"; do
         if ! rest_create_input "$SK" "$SPLUNK_URI" "$APP_NAME" "${input_types[$i]}" "${input_names[$i]}" "$body"; then
