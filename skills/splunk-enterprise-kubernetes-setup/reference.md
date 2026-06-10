@@ -10,7 +10,7 @@ running an apply phase.
 |------|---------|
 | Splunk Operator for Kubernetes | `3.1.0` |
 | Splunk Helm chart version | follows `--operator-version` |
-| Splunk Enterprise image | `splunk/splunk:10.2.0` |
+| Splunk Enterprise image | `splunk/splunk:10.4.0` |
 | Kubernetes compatibility from SOK 3.1.0 notes | `1.27` through `1.33` |
 | Render directory | `./splunk-enterprise-k8s-rendered/` |
 

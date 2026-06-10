@@ -29,8 +29,9 @@ setup-plus-handoff coverage, not ARI config-as-code.
 - For SHC deployments, run the install/setup against the deployer/captain
   (the search-tier role placement is `required`); this skill does not split
   per-member work.
-- Treat Splunk platform compatibility carefully: Splunkbase lists ARI `1.2.1`
-  for Splunk `9.0` through `10.3`, while ARI docs signal `9.1.3+` for current
+- Treat Splunk platform compatibility carefully: Splunkbase lists ARI `1.2.2`
+  for Splunk `9.0` through `10.4` (default `10.4`; also `10.3` Cloud / `10.2` /
+  older Enterprise trains), while ARI docs signal `9.1.3+` for current
   ARI releases. Warn below `9.1.3`; do not hard-fail only on that conflict.
 
 ## Primary Commands

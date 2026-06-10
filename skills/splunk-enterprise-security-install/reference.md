@@ -13,8 +13,8 @@ local package `splunk-ta/splunk-enterprise-security_851.spl`.
 - Local package: `SplunkEnterpriseSecuritySuite` version `8.5.1`, build
   `263675`
 - Splunkbase compatibility shown for the public listing: Splunk Enterprise and
-  Splunk Cloud, platform versions `10.3`, `10.2`, `10.1`, `10.0`, `9.4`, `9.3`,
-  CIM `6.x`
+  Splunk Cloud, platform versions `10.4` (default), `10.3`, `10.2`, `10.1`,
+  `10.0`, `9.4`, `9.3`, CIM `6.x`
 
 ## Official Sources
 

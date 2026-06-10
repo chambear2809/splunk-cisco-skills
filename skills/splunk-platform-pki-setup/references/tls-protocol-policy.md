@@ -5,7 +5,15 @@ default, and how the dual `sslVersions` / `sslVersionsForClient`
 knobs work.
 
 > Anchor:
-> [Configure TLS protocol version support for secure connections between Splunk platform instances](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances).
+> [Configure TLS protocol version support for secure connections between Splunk platform instances](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.4/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances).
+> Older Enterprise trains: substitute `/10.2/` or `/10.0/` in the path.
+
+## Splunk Enterprise 10.4 TLS floor
+
+Enterprise **10.4** no longer negotiates **TLS 1.0** or **TLS 1.1** between
+Splunk platform components. This skill already defaults to TLS **1.2** only and
+refuses deprecated lower protocols; operators upgrading legacy deployments must
+eliminate TLS 1.0/1.1 clients and intermediaries before moving to **10.4**.
 
 ## Splunk's documented supported protocols
 

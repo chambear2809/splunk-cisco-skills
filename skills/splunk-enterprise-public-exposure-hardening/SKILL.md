@@ -10,7 +10,7 @@ description: >-
   head against internet exposure, configure TLS / HSTS / CSP / mTLS /
   per-IP rate limit / DMZ heavy forwarder, lock down splunkd or the KV
   store, fix splunk.secret / pass4SymmKey defaults, evaluate against the
-  latest SVD floor (10.2.2 / 10.0.5 / 9.4.10 / 9.3.11), or render nginx /
+  latest SVD floor (10.4.0 / 10.2.2 / 10.0.5 / 9.4.10 / 9.3.11), or render nginx /
   HAProxy / WAF reference configs in front of Splunk.
 ---
 
@@ -203,6 +203,7 @@ Under the project root in `splunk-public-exposure-rendered/`:
 
 | Series | Required version | Source |
 |---|---|---|
+| 10.4.x | 10.4.0 | Not affected by SVD-2026-0304/0303 at GA; use latest 10.4.x maintenance |
 | 10.2.x | 10.2.2 | SVD-2026-0304, SVD-2026-0303 |
 | 10.0.x | 10.0.5 | SVD-2026-0303, SVD-2025-1006 |
 | 9.4.x  | 9.4.10 | SVD-2025-1006, SVD-2025-1203 |

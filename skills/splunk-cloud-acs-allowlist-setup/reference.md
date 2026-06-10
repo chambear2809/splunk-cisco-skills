@@ -28,16 +28,19 @@ This skill follows current Splunk Cloud ACS documentation:
   allow list operations and can be used as an alternative or alongside this
   skill.
 
-Official references:
+Official references (Cloud doc train `10.4.2603` by default; stacks still on
+`10.3.2512` can substitute that train in the URL path):
 
 - IP allow list configuration:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.3.2512/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-ip-allow-lists-for-splunk-cloud-platform>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2603/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-ip-allow-lists-for-splunk-cloud-platform>
+  (alternate train: `10.3.2512`)
 - ACS API endpoint reference:
   <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.0.2503/admin-config-service-acs-api-endpoint-reference/admin-config-service-acs-api-endpoint-reference>
 - ACS CLI:
   <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSCLI>
 - Manage ACS API access with capabilities:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.3.2512/using-the-admin-config-service-acs--api/manage-acs-api-access-with-capabilities>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2603/using-the-admin-config-service-acs--api/manage-acs-api-access-with-capabilities>
+  (alternate train: `10.3.2512`)
 - Splunk Cloud Platform Terraform Provider (`splunk/scp`):
   <https://registry.terraform.io/providers/splunk/scp/latest>
 

@@ -28,6 +28,21 @@ destructive and refuse to run without their acceptance flag.
 Read `reference.md` before any restore, migrate, or upgrade. Always take a
 point-in-time backup first.
 
+## Splunk Enterprise 10.4 guardrails
+
+Enterprise **10.4** removes legacy MongoDB 4–6 binaries bundled with older KV
+Store releases. Do **not** upgrade directly from Splunk **9.x** to **10.4**;
+route through **10.0** or **10.2** first so KV Store reaches MongoDB 7+.
+
+On **10.x → 10.4**, MongoDB **8** is applied automatically during the Splunk
+upgrade. After upgrade, run `status.sh` or `splunk show kvstore-status --verbose`
+and confirm `serverVersion` reflects the expected MongoDB 8 train before
+collection governance or restore work.
+
+Cloud stacks on doc train **10.4.2603** inherit the same KV Store behavior on
+the Splunk-managed side; Enterprise operators still own the upgrade ladder on
+self-managed hosts.
+
 ## Quick Start
 
 Render the lifecycle assets:

@@ -53,7 +53,7 @@ def make_ta_package(
     tmp_path: Path,
     *,
     root: str = "Splunk_TA_otel",
-    version: str = "0.152.0",
+    version: str = "0.153.0",
     token_style: str = "current",
     token_default: str = "",
     linux: bool = True,
@@ -606,7 +606,7 @@ def test_ta_current_package_render_inspects_package_and_modular_stanza(tmp_path:
     assert "'two words'" in template
 
     audit = (output_dir / "ta/package-audit.md").read_text(encoding="utf-8")
-    assert "Latest audited release: `0.152.0`" in audit
+    assert "Latest audited release: `0.153.0`" in audit
     assert "Published" not in audit
     assert "Package flavor: `multi-os`" in audit
     assert "Token field style: `current`" in audit
@@ -616,7 +616,7 @@ def test_ta_current_package_render_inspects_package_and_modular_stanza(tmp_path:
 
     metadata = json.loads((output_dir / "ta/metadata.json").read_text(encoding="utf-8"))
     assert metadata["splunkbase"]["splunkbase_app_id"] == "7125"
-    assert metadata["splunkbase"]["latest_version"] == "0.152.0"
+    assert metadata["splunkbase"]["latest_version"] == "0.153.0"
     assert metadata["splunkbase"]["fips_compatible"] is False
     assert metadata["splunkbase"]["fedramp_validated"] is False
     assert metadata["packages"][0]["package_flavor"] == "multi-os"
@@ -1018,6 +1018,33 @@ def test_ta_universal_forwarder_target_and_metadata_rejections(tmp_path: Path) -
         str(output_dir),
     )
     assert version_patch_accepted.returncode == 0, version_patch_accepted.stdout
+
+    version_104_accepted = run_setup(
+        "--render-ta",
+        "--realm",
+        "us0",
+        "--ta-package-path",
+        str(package),
+        "--splunk-version",
+        "10.4.0",
+        "--output-dir",
+        str(output_dir),
+    )
+    assert version_104_accepted.returncode == 0, version_104_accepted.stdout
+
+    version_post_ceiling = run_setup(
+        "--render-ta",
+        "--realm",
+        "us0",
+        "--ta-package-path",
+        str(package),
+        "--splunk-version",
+        "11.0",
+        "--output-dir",
+        str(output_dir),
+    )
+    assert version_post_ceiling.returncode != 0
+    assert "outside app 7125 compatibility range" in version_post_ceiling.stdout
 
     applied = run_setup(
         "--apply-ta",

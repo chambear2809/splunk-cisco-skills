@@ -216,6 +216,7 @@ See [references/dmz-heavy-forwarder-pattern.md](references/dmz-heavy-forwarder-p
 
 The skill refuses to apply on a Splunk version below the floor:
 
+- 10.4.x → 10.4.0
 - 10.2.x → 10.2.2
 - 10.0.x → 10.0.5
 - 9.4.x  → 9.4.10

@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 DEFAULT_RENDER_DIR_NAME="splunk-platform-pki-rendered"
@@ -72,7 +74,7 @@ FIPS_MODE="none"
 
 # Splunk runtime
 SPLUNK_HOME_VALUE="/opt/splunk"
-SPLUNK_VERSION="10.2.2"
+SPLUNK_VERSION="$(spv_enterprise_default)"
 CERT_INSTALL_SUBDIR="myssl"
 
 # Secret file paths
@@ -159,7 +161,7 @@ FIPS:
 
 Splunk runtime:
   --splunk-home PATH                                             (default: /opt/splunk)
-  --splunk-version X.Y.Z                                         (default: 10.2.2)
+  --splunk-version X.Y.Z                                         (default: 10.4.0)
   --cert-install-subdir NAME                                     (default: myssl)
 
 Secrets (file paths only, never values on argv):

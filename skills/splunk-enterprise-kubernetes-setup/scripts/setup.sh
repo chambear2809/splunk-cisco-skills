@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 DEFAULT_RENDER_DIR_NAME="splunk-enterprise-k8s-rendered"
@@ -21,7 +23,7 @@ RELEASE_NAME="splunk-enterprise"
 OPERATOR_RELEASE_NAME="splunk-operator"
 OPERATOR_VERSION="3.1.0"
 CHART_VERSION=""
-SPLUNK_VERSION="10.2.0"
+SPLUNK_VERSION="$(spv_enterprise_default)"
 SPLUNK_IMAGE=""
 STORAGE_CLASS=""
 ETC_STORAGE="10Gi"
@@ -73,7 +75,7 @@ SOK options:
   --operator-release-name NAME             Operator Helm release (default: splunk-operator)
   --operator-version VERSION               Splunk Operator version (default: 3.1.0)
   --chart-version VERSION                  Helm chart version (default: follows --operator-version)
-  --splunk-version VERSION                 Splunk Enterprise version (default: 10.2.0)
+  --splunk-version VERSION                 Splunk Enterprise version (default: 10.4.0)
   --splunk-image IMAGE                     Override Splunk Enterprise image
   --storage-class NAME                     Kubernetes StorageClass override
   --etc-storage SIZE                       /opt/splunk/etc PVC size (default: 10Gi)

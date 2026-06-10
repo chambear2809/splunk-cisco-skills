@@ -96,6 +96,11 @@ A passing score requires:
 - ALPN h2 negotiated.
 - Certificate chain validates against a public root.
 
+Enterprise **10.4** enforces the TLS 1.0/1.1 removal at the platform layer;
+legacy clients or upstream proxies that still offer only TLS 1.0/1.1 will fail
+handshake after upgrade even if Splunk-side `sslVersions` already targeted TLS
+1.2.
+
 ## Post-quantum / hybrid
 
 Splunk Enterprise does NOT support PQC / hybrid TLS as of 10.2. Do not

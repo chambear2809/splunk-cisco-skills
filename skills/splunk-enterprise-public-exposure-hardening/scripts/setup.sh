@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/../../shared/lib/platform_version_helpers.sh"
 
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 DEFAULT_RENDER_DIR_NAME="splunk-public-exposure-rendered"
@@ -27,7 +29,7 @@ S2S_MTLS="true"
 FORWARDER_MTLS="true"
 SPLUNK_HOME_VALUE="/opt/splunk"
 SERVICE_USER="splunk"
-SPLUNK_VERSION="10.2.2"
+SPLUNK_VERSION="$(spv_enterprise_default)"
 TLS_POLICY="tls12"
 ENABLE_TLS13="false"
 CA_BUNDLE_PATH="/opt/splunk/etc/auth/cabundle.pem"
@@ -125,7 +127,7 @@ Surface enables:
 Splunk runtime:
   --splunk-home PATH            (default: /opt/splunk)
   --service-user NAME           (default: splunk)
-  --splunk-version X.Y.Z        (default: 10.2.2; SVD floor enforced)
+  --splunk-version X.Y.Z        (default: 10.4.0; SVD floor enforced)
 
 Crypto:
   --tls-policy tls12|tls12_13   (default: tls12)

@@ -54,6 +54,16 @@ on the older engine must migrate with `splunk migrate migrate-kvstore`:
 - KV Store and the bundled MongoDB are version-coupled to the Splunk release.
   Validate version compatibility before and after a Splunk upgrade.
 
+### Splunk Enterprise 10.4
+
+- Enterprise **10.4** removes MongoDB 4–6 binaries. A direct **9.x → 10.4**
+  upgrade path is invalid; upgrade through **10.0** or **10.2** first.
+- On **10.x → 10.4**, MongoDB **8** is applied automatically during upgrade.
+- After upgrade, read `splunk show kvstore-status --verbose` and confirm
+  `serverVersion` before restore, migrate, resync, or collection changes.
+- There is no Splunk Enterprise **10.3** release train; Cloud **10.3.x** stacks
+  are Cloud-only doc trains.
+
 The optional rendered `server.conf` sets `[kvstore] storageEngine = wiredTiger`
 for documentation/intent; the actual conversion is performed by the migrate
 verb, not by the conf alone.
