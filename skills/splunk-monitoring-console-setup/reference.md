@@ -3,21 +3,21 @@
 ## Research Sources
 
 - Splunk Monitoring Console setup overview:
-  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.2/configure-the-monitoring-console/multi-instance-monitoring-console-setup-steps
+  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.4/configure-the-monitoring-console/multi-instance-monitoring-console-setup-steps
 - Distributed mode and automatic configuration:
-  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.2/configure-the-monitoring-console/configure-the-monitoring-console-in-distributed-mode
+  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.4/configure-the-monitoring-console/configure-the-monitoring-console-in-distributed-mode
 - Standalone mode:
-  https://help.splunk.com/en/data-management/monitor-and-troubleshoot/monitor-data-in-splunk-enterprise/10.2/configure-the-monitoring-console/configure-monitoring-console-in-standalone-mode
+  https://help.splunk.com/en/data-management/monitor-and-troubleshoot/monitor-data-in-splunk-enterprise/10.4/configure-the-monitoring-console/configure-monitoring-console-in-standalone-mode
 - Monitoring Console modified files:
-  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.2/about-the-monitoring-console/how-the-monitoring-console-works
+  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.4/about-the-monitoring-console/how-the-monitoring-console-works
 - Forwarder monitoring:
-  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.2/configure-the-monitoring-console/configure-forwarder-monitoring-for-the-monitoring-console
+  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.4/configure-the-monitoring-console/configure-forwarder-monitoring-for-the-monitoring-console
 - Platform alerts:
-  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.2/configure-the-monitoring-console/enable-and-configure-platform-alerts
+  https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.4/configure-the-monitoring-console/enable-and-configure-platform-alerts
 - Search peer CLI behavior:
-  https://help.splunk.com/en/splunk-enterprise/administer/distributed-search/10.2/deploy-distributed-search/add-search-peers-to-the-search-head
+  https://help.splunk.com/en/splunk-enterprise/administer/distributed-search/10.4/deploy-distributed-search/add-search-peers-to-the-search-head
 - Distributed search groups:
-  https://help.splunk.com/en/splunk-enterprise/administer/distributed-search/10.2/manage-distributed-search/create-distributed-search-groups
+  https://help.splunk.com/en/splunk-enterprise/administer/distributed-search/10.4/manage-distributed-search/create-distributed-search-groups
 
 ## Coverage
 
@@ -71,3 +71,9 @@ The official Splunk CLI command for adding peers uses `-remotePassword`. This
 skill does not generate automation that passes that value. Use Splunk Web or an
 operator-controlled secure method to add peers, then run `status.sh` and the
 Monitoring Console general setup page to verify roles.
+
+For Splunk 10.4 distributed deployments, review
+`../shared/splunk_10_4_enterprise_deployment_notes.md` before promotion. The
+Monitoring Console should track separate search-tier, indexer, license manager,
+deployment server, and cluster-manager roles rather than assuming a single-host
+Mac or all-in-one runtime.

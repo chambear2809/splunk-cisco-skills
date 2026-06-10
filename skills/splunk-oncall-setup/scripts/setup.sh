@@ -32,8 +32,8 @@ Modes (default: --render):
   --validate            Validate a spec and/or rendered output.
   --apply               Render, validate, then execute API actions against api.victorops.com.
   --send-alert          Send a single alert through the REST endpoint integration.
-  --install-splunk-app  Install/configure the Splunk-side companion apps (3546, 4886, 5863).
-  --uninstall           Uninstall the Splunk-side companion apps.
+  --install-splunk-app  Install/configure Splunk-side apps 3546 and 4886; render SOAR connector 5863 readiness.
+  --uninstall           Uninstall Splunk-side apps and render SOAR connector uninstall handoff.
   --dry-run             With --apply or --install-splunk-app, show actions without mutating.
   --json                Emit JSON output where supported.
 

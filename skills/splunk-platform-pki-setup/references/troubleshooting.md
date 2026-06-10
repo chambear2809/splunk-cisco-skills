@@ -210,6 +210,6 @@ If the operator never intended splunkd mTLS, set
 | Web TLS | `$SPLUNK_HOME/var/log/splunk/web_service.log` |
 | KV Store | `$SPLUNK_HOME/var/log/splunk/mongod.log` |
 | Health | `/services/server/health/splunkd` REST + `$SPLUNK_HOME/var/log/health.log` |
-| Cert inventory | SSL Certificate Checker (Splunkbase 3172) → `index=ssl_certificate_checker` |
+| Cert inventory | `pki/rotate/expire-watch.sh`, enterprise certificate inventory, or legacy `index=ssl_certificate_checker` data if 3172 already existed before 10.4 |
 | Cluster status | `$SPLUNK_HOME/bin/splunk show cluster-status --verbose` |
 | SHC status | `$SPLUNK_HOME/bin/splunk show shcluster-status --verbose` |

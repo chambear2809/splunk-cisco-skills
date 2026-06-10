@@ -2,7 +2,7 @@
 
 ## Research Basis
 
-This skill follows current Splunk Enterprise license documentation (10.0+):
+This skill follows current Splunk Enterprise license documentation (10.4):
 
 - A license manager is a central license repository; remote instances become
   license peers. The "license master" terminology was renamed to "license
@@ -30,17 +30,17 @@ This skill follows current Splunk Enterprise license documentation (10.0+):
 Official references:
 
 - Configure a license manager:
-  <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.0/configure-splunk-licenses/configure-a-license-manager>
+  <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/configure-splunk-licenses/configure-a-license-manager>
 - Configure a license peer:
-  <https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.0/configure-splunk-licenses/configure-a-license-peer>
+  <https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.4/configure-splunk-licenses/configure-a-license-peer>
 - Types of Splunk Enterprise licenses:
   <https://docs.splunk.com/Documentation/Splunk/latest/Admin/TypesofSplunklicenses>
 - License endpoint descriptions (REST):
-  <https://help.splunk.com/en/splunk-enterprise/rest-api-reference/10.2/license-endpoints>
+  <https://help.splunk.com/en/splunk-enterprise/rest-api-reference/10.4/license-endpoints>
 - Manage licenses from the CLI:
-  <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.2/manage-splunk-licenses/manage-licenses-from-the-cli>
+  <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/manage-splunk-licenses/manage-licenses-from-the-cli>
 - License usage report view:
-  <https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.0/license-usage-report-view/about-the-splunk-enterprise-license-usage-report-view>
+  <https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.4/license-usage-report-view/about-the-splunk-enterprise-license-usage-report-view>
 
 ## License Type Matrix
 
@@ -63,6 +63,11 @@ Official references:
 
 This skill renders `manager_uri` by default. When peers report Splunk < 9.x,
 the rendered `configure-peer.sh` falls back to `master_uri` automatically.
+
+For Splunk 10.4 distributed deployments, review
+`../shared/splunk_10_4_enterprise_deployment_notes.md`. License manager plans
+must account for separate license-manager, search-tier, indexer, SHC, and
+Monitoring Console roles rather than assuming a single local Mac runtime.
 
 ## License Groups
 

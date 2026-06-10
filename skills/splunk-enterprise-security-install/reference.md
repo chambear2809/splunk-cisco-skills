@@ -7,14 +7,14 @@ local package `splunk-ta/splunk-enterprise-security_851.spl`.
 
 - Splunkbase app ID: `263`
 - Splunk ES 8.5.1 release notes state that 8.5.1 was released April 16, 2026.
-- Public Splunkbase app `263` checked on May 2, 2026 displayed latest version
-  `8.4.0` from February 18, 2026, so this skill prefers the local ES package
-  when present.
+- Public Splunkbase app `263` checked on June 9, 2026 displayed latest version
+  `8.5.1` from April 16, 2026. This skill still prefers the local ES package
+  when present so Enterprise installers can use entitled, pre-staged packages.
 - Local package: `SplunkEnterpriseSecuritySuite` version `8.5.1`, build
   `263675`
 - Splunkbase compatibility shown for the public listing: Splunk Enterprise and
-  Splunk Cloud, platform versions `10.3`, `10.2`, `10.1`, `10.0`, `9.4`, `9.3`,
-  CIM `6.x`
+  Splunk Cloud, platform versions `10.4`, `10.3`, `10.2`, `10.1`, `10.0`,
+  `9.4`, `9.3`, CIM `8.x`
 
 ## Official Sources
 

@@ -11,7 +11,7 @@ python3 "${SCRIPT_DIR}/render_assets.py" \
   --stack-url https://smoke-prod.scs.splunk.com \
   --subscription-tier premier \
   --source-types "aws:cloudtrail,crowdstrike:fdr,json_app" \
-  --destinations "splunk_indexer=type=splunk_cloud;default=true,metrics=type=metrics_index;index=metrics,s3_archive=type=s3;format=parquet;bucket=example-bucket" \
+  --destinations "splunk_indexer=type=splunk_cloud;default=true,metrics=type=metrics_index;index=metrics,s3_archive=type=s3_dataset;format=parquet;bucket=example-bucket;region=us-east-1" \
   --pipelines "redact_auth=template=redact;sourcetype=json_app;destination=splunk_indexer,http_metrics=template=metrics;destination=metrics,cloudtrail_ocsf=template=ocsf;sourcetype=aws:cloudtrail;destination=splunk_indexer" \
   --output-dir "${TMP_OUT}" \
   --json

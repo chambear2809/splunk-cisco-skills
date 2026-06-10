@@ -13,25 +13,24 @@ visibility into:
 - Drift from the rendered configuration (someone edits
   `server.conf` by hand).
 
-## SSL Certificate Checker (Splunkbase 3172)
+## Certificate Expiry Monitoring
 
-Splunk publishes the
-[SSL Certificate Checker Add-on](https://splunkbase.splunk.com/app/3172).
-It walks the filesystem, finds PEM files, and indexes their
-expiry dates + subjects to `index=ssl_certificate_checker`.
+Use the rendered `pki/rotate/expire-watch.sh` helper or your enterprise
+certificate-inventory system to monitor Splunk certificate expiry. The helper
+walks PEM/CRT files, reports certificates expiring inside the configured
+threshold, and does not require a Splunkbase app install.
 
 ```bash
-# Install
-bash skills/splunk-app-install/scripts/setup.sh \
-    --app splunk_ssl_certificate_checker \
-    --splunkbase-id 3172
-
-# Configure on each Splunk host (the add-on auto-discovers most
-# Splunk paths). Add custom paths if the renderer placed certs
-# outside /opt/splunk/etc/auth/.
+# Report certs under $SPLUNK_HOME/etc/auth expiring within 30 days.
+bash pki/rotate/expire-watch.sh "$SPLUNK_HOME/etc/auth" 30
 ```
 
-Sample monitoring search:
+Legacy note: Splunkbase app 3172, SSL Certificate Checker, is archived and does
+not advertise Splunk 10.4 support. Do not use it as the default 10.4 monitoring
+path. If an older deployment already uses `index=ssl_certificate_checker`, treat
+that as legacy evidence only and plan a supported replacement.
+
+Sample legacy monitoring search when historical 3172 data already exists:
 
 ```spl
 index=ssl_certificate_checker
@@ -48,7 +47,7 @@ days before expiry.
 ## `/services/server/health/splunkd` REST endpoint
 
 Per
-[About proactive Splunk component monitoring](https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.2/proactive-splunk-component-monitoring-with-the-splunkd-health-report/about-proactive-splunk-component-monitoring),
+[About proactive Splunk component monitoring](https://help.splunk.com/en/splunk-enterprise/administer/monitor/10.4/proactive-splunk-component-monitoring-with-the-splunkd-health-report/about-proactive-splunk-component-monitoring),
 splunkd exposes a structured health report at
 `/services/server/health/splunkd`. It includes feature health for
 `SearchHeadConnectivity`, `KVStoreReplication`, `IndexerCluster`,
@@ -75,13 +74,14 @@ provides standardized fields for cert lifecycle events:
 `cert_validity_start`, `cert_validity_end`, plus tags `certificate`
 and `key`.
 
-The SSL Certificate Checker output is CIM-compliant. ES /
-Mission Control / ITSI dashboards can hang off the data model.
+Certificate-inventory output should be normalized to CIM-compatible
+certificate fields so ES / Mission Control / ITSI dashboards can hang off the
+data model without depending on archived add-ons.
 
 ## Splunk Health Assistant Add-on
 
 For FIPS migrations and major version upgrades, install the
-[Splunk Health Assistant Add-on](https://splunkbase.splunk.com/app/6589)
+[Splunk Health Assistant Add-on](https://splunkbase.splunk.com/app/4603)
 to discover SSL / TLS issues that would block the upgrade. Run it
 in Monitoring Console with the **Security** category and the
 `ssl` / `upgrades` tags.

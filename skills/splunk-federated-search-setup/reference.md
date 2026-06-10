@@ -3,21 +3,25 @@
 ## Research Basis
 
 This skill follows current Splunk Federated Search documentation and
-configuration references for Splunk Enterprise 10.2 and Splunk Cloud Platform
-10.0.2503:
+configuration references for Splunk Enterprise 10.4 and Splunk Cloud Platform
+10.4.2604:
 
 - `federated.conf` provider stanza: `provider://<name>` with `type`,
   `hostPort`, `serviceAccount`, `password`, `mode`, `appContext`,
-  `useFSHKnowledgeObjects`, `disabled`.
+  `useFSHKnowledgeObjects`, `allowIndexBasedProviderFiltering`,
+  `fedSrchIndexesAllowed`, `useAppContextFromSearch`, `disabled`.
 - `[general]` stanza: `max_preview_generation_duration` and
   `max_preview_generation_inputcount`.
 - Federated index stanza: `federated:<index_name>` with `federated.provider`,
   `federated.dataset` (`<type>:<dataset_name>`), `disabled`.
-- REST endpoints:
+- REST endpoints for FSS2S:
   - `/services/data/federated/settings/general` — global enable/disable.
-  - `/services/data/federated/provider` — provider CRUD (FSS2S **and** FSS3).
+  - `/services/data/federated/provider` — FSS2S provider CRUD.
   - `/services/data/federated/index` — federated index CRUD.
   - Each provider entity supports `/_reload`, `/enable`, and `/disable`.
+- Splunk Cloud Platform 10.4.2604+ Amazon S3 federated search uses Data
+  Management app connections and datasets. The legacy FSS3 REST provider path
+  is not the default 10.4 workflow.
 
 ## Provider Types
 
@@ -26,13 +30,14 @@ Splunk Federated Search ships two provider types:
 | `type` | Product | Available on | Configuration surface |
 |---|---|---|---|
 | `splunk` | Federated Search for Splunk (FSS2S) | Splunk Enterprise + Splunk Cloud | `federated.conf` and REST |
-| `aws_s3` | Federated Search for Amazon S3 (FSS3) | Splunk Cloud Platform only | REST + Splunk Web only |
+| `aws_s3` | Amazon S3 federated dataset handoff | Splunk Cloud Platform 10.4.2604+ | Data Management app |
+| `aws_s3` with `fss3_mode=legacy` | Legacy FSS3 | Older Splunk Cloud Platform stacks only | REST + Splunk Web only |
 
-FSS3 cannot be configured through `federated.conf`. Splunk Cloud admins must
-POST FSS3 provider definitions to `/services/data/federated/provider` (the
-admin user must hold `admin_all_objects`). This skill renders one JSON payload
-per FSS3 provider under `aws-s3-providers/<name>.json` plus an AWS
-prerequisites README.
+For Cloud 10.4.2604 and newer, this skill renders one JSON handoff per Amazon
+S3 provider under `data-management-datasets/<name>.json`. Operators create the
+connection and dataset in the Data Management app; this skill does not claim
+private Data Management API CRUD. Legacy REST payloads under
+`aws-s3-providers/<name>.json` render only when `fss3_mode=legacy`.
 
 ## FSS2S Settings (`type = splunk`)
 
@@ -45,9 +50,12 @@ prerequisites README.
 | `mode` | yes | `standard` or `transparent`. |
 | `app_context` | standard only | Defaults to `search`. Multiple standard providers can target the same remote host with different `app_context`. Transparent providers ignore this field. |
 | `useFSHKnowledgeObjects` | derived | Splunk forces `0` for standard, `1` for transparent regardless of operator input. The renderer emits the documented value. |
+| `allowIndexBasedProviderFiltering` | optional | Enables transparent-mode provider filtering by federated index. |
+| `fedSrchIndexesAllowed` | optional | Semicolon-separated allowlist rendered for Splunk; CLI input may be comma- or semicolon-delimited. |
+| `useAppContextFromSearch` | optional | For standard mode, lets Splunk derive provider app context from the local search's app context; use only when those app contexts exist remotely. |
 | `disabled` | optional | Defaults to false. |
 
-## FSS3 Settings (`type = aws_s3`)
+## Amazon S3 Data Management Settings (`type = aws_s3`)
 
 | Setting | Required | Notes |
 |---|---|---|
@@ -61,10 +69,10 @@ prerequisites README.
 | `aws_kms_keys_arn_allowlist` | optional | Required only when S3 buckets or Glue metadata are encrypted with customer-managed KMS keys. |
 | `disabled` | optional | Defaults to false. |
 
-The renderer's AWS prerequisites README documents the Splunk Web "Generate
-policy" workflow that produces the Glue Data Catalog resource policy, S3
-bucket policies, and KMS key policies the AWS administrator must attach
-before the FSS3 provider works.
+The renderer's Data Management handoff documents the Glue Data Catalog, S3
+paths, KMS keys, and federated-index hints that operators need when creating
+the Data Management connection and dataset. Legacy Splunk Web "Generate
+policy" notes are rendered only in `fss3_mode=legacy`.
 
 ## Mode Selection
 
@@ -132,14 +140,15 @@ The service-account role on each remote deployment must:
   every IP/CIDR that runs `apply-rest.sh`, `status.sh`, or the global
   toggle scripts.
 - **No file edits**: Splunk Cloud customers cannot edit `federated.conf`
-  directly. Use `--apply-target rest` for FSS2S, and POST FSS3 providers
-  through `apply-rest.sh` (which reads the rendered
-  `aws-s3-providers/<name>.json` payloads).
+  directly. Use `--apply-target rest` for FSS2S. For Amazon S3 federated
+  datasets on 10.4.2604+, create Data Management connections and datasets from
+  `data-management-datasets/<name>.json`.
 - **Region support**: Federated Search supports Splunk Cloud Platform on
   AWS, Google Cloud, and Microsoft Azure. Cross-region restrictions vary;
   see the Splunk Cloud Service Description.
-- **FSS3 region binding**: AWS Glue database, S3 buckets, and KMS keys must
-  be in the same region as the Splunk Cloud deployment.
+- **Amazon S3 region binding**: AWS Glue database, S3 buckets, and KMS keys
+  must be compatible with the Splunk Cloud deployment and Data Management
+  dataset region constraints.
 
 ## Search Head Cluster (FSS2S)
 
@@ -161,12 +170,12 @@ files. The renderer writes a stable per-provider placeholder (e.g.
 local-only `password_file` declared per provider in the spec, then write
 `federated.conf` with mode `0600`.
 
-The REST apply path reads each provider's `password_file` at apply time and
-includes the password value in the form-encoded POST body to
-`/services/data/federated/provider` (Splunk's own endpoint encrypts the value
-to `splunk.secret` on disk). The Splunk admin password used to authenticate
-the REST apply itself comes from `SPLUNK_REST_PASSWORD_FILE` and is never
-placed on argv.
+The REST apply path reads each FSS2S provider's `password_file` at apply time
+and includes the password value in the form-encoded POST body to Splunk's FSS2S
+provider endpoint. Splunk encrypts the value on disk. The Splunk admin password
+used to authenticate the REST apply itself comes from
+`SPLUNK_REST_PASSWORD_FILE` and is never placed on argv. Amazon S3 Data
+Management dataset handoffs are not POSTed by this script.
 
 ## Validation
 
@@ -175,8 +184,11 @@ Static validation (`validate.sh`) checks:
 - All required rendered files exist.
 - `federated.conf.template` has a per-provider password placeholder for every
   `[provider://X]` stanza.
-- Each `aws-s3-providers/*.json` payload is valid JSON, has `type=aws_s3`,
-  and includes the required FSS3 keys.
+- Each `data-management-datasets/*.json` payload is valid JSON, has
+  `type=data_management_dataset`, and includes the required Cloud 10.4.2604
+  Data Management dataset handoff keys.
+- Each legacy `aws-s3-providers/*.json` payload is valid JSON, has
+  `type=aws_s3`, and includes the required legacy FSS3 keys.
 
 Live validation (`validate.sh --live`) additionally runs `status.sh`, which
 GETs `/services/data/federated/provider`, `/services/data/federated/index`,
@@ -193,7 +205,7 @@ authentication:
 | Variable | Purpose |
 |---|---|
 | `SPLUNK_REST_URI` | `https://<search-head>:<management-port>` |
-| `SPLUNK_REST_USER` | Admin user with `admin_all_objects` (FSS3 requires this). |
+| `SPLUNK_REST_USER` | Admin user with `admin_all_objects` for REST apply; legacy FSS3 mode also requires this. |
 | `SPLUNK_REST_PASSWORD_FILE` | Local-only file containing the admin password. |
 | `SPLUNK_VERIFY_SSL` | `true` (default) or `false` for self-signed dev clusters. Canonical name shared with the rest of the skill suite. |
 | `SPLUNK_REST_VERIFY_SSL` | Legacy alias for `SPLUNK_VERIFY_SSL`. Honored as a fallback when the canonical variable is unset. Prefer `SPLUNK_VERIFY_SSL` in new automation. |

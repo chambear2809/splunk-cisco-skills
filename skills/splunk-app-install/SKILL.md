@@ -94,7 +94,7 @@ original helper flags.
 
 ```bash
 bash skills/splunk-app-install/scripts/setup.sh --help
-bash skills/splunk-app-install/scripts/setup.sh --install --source splunkbase --app-id 7421
+bash skills/splunk-app-install/scripts/setup.sh --install --source splunkbase --app-id 1621
 bash skills/splunk-app-install/scripts/setup.sh --list --filter cisco
 bash skills/splunk-app-install/scripts/setup.sh --uninstall
 ```

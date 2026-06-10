@@ -107,6 +107,19 @@ def test_full_yaml_spec_emits_all_documented_resource_types(tmp_path: Path) -> N
     assert not missing, f"missing object types: {missing}"
 
 
+def test_soar_connector_5863_is_handoff_not_splunk_app_install(tmp_path: Path) -> None:
+    output_dir = tmp_path / "rendered"
+    result = run_setup("--render", "--spec", str(EXAMPLE_YAML_SPEC), "--output-dir", str(output_dir))
+    assert result.returncode == 0, combined_output(result)
+    coverage = json.loads((output_dir / "coverage-report.json").read_text(encoding="utf-8"))
+
+    soar_entries = [item for item in coverage["objects"] if item["object_type"] == "splunk_side_soar_connector"]
+    assert len(soar_entries) == 1
+    assert soar_entries[0]["coverage"] == "handoff"
+    assert soar_entries[0]["splunkbase_id"] == 5863
+    assert "not a Splunk Enterprise/Cloud app" in soar_entries[0]["notes"]
+
+
 def test_apply_plan_lists_documented_rate_buckets(tmp_path: Path) -> None:
     output_dir = tmp_path / "rendered"
     result = run_setup("--render", "--spec", str(EXAMPLE_YAML_SPEC), "--output-dir", str(output_dir))

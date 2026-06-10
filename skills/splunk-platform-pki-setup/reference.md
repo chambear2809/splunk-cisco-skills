@@ -146,14 +146,18 @@ cipherSuite            = <from --tls-policy>
 
 ### KV Store
 
-KV Store consumes the splunkd `[sslConfig]` certs. Per
-[Preparing custom certificates for use with KV store](https://docs.splunk.com/Documentation/Splunk/9.4.2/Admin/CustomCertsKVstore),
-KV Store 7.0+ enforces a CA verification check at startup. The
-renderer:
+KV Store commonly consumes the splunkd `[sslConfig]` certs, but Splunk 10.4
+also evaluates KV-specific TLS settings under `[kvstore]` per field and adds
+`[kvstoreSslClientConfig]` for separate client-side KV Store TLS settings. Per
+the 10.4 `server.conf` reference and KV Store custom-certificate guidance,
+KV Store 7.0+ enforces a CA verification check at startup. The renderer:
 
 1. Mints leaves with **dual EKU** (`serverAuth` + `clientAuth`)
    so KV Store accepts them.
-2. Runs the documented check before declaring a host ready:
+2. Btools `[kvstore]`, `[sslConfig]`, and `[kvstoreSslClientConfig]` before
+   declaring a host ready, warning when `[kvstore]` contains TLS overrides that
+   must be reviewed for 10.4 per-field behavior.
+3. Runs the documented check before declaring a host ready:
 
 ```bash
 $SPLUNK_HOME/bin/splunk cmd openssl verify -verbose -x509_strict \
@@ -295,7 +299,7 @@ Aligned with the new trust anchor; handed off to
 ### Splunk Edge Processor
 
 EP TLS / mTLS uses a separate file naming convention per
-[Edge Processor: Obtain TLS certificates](https://help.splunk.com/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/10.0.2503/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors):
+[Edge Processor: Obtain TLS certificates](https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors):
 
 | File | Role |
 |---|---|
@@ -358,15 +362,15 @@ Coexists with the public-exposure skill's `--ldap-ssl-enabled`.
 
 | Preset | Cipher set summary | TLS versions | Key algos | Sig algos | Source |
 |---|---|---|---|---|---|
-| `splunk-modern` (default) | ECDHE-(EC)DSA/RSA-AES{128,256}-GCM-SHA{256,384} + ECDHE-AES{128,256}-SHA{256,384} fallbacks; ECDH curves prime256v1, secp384r1, secp521r1 | tls1.2 | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [About TLS encryption and cipher suites](https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites) |
-| `fips-140-3` | NIST AEAD only (no CBC, no SHA-1, no RSA-1024, no anonymous DH) | tls1.2 | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips) |
-| `stig` | DISA-STIG-aligned subset of `splunk-modern` | tls1.2 | RSA-2048+, ECDSA P-256+ | RSA-SHA256+ | `splunk-enterprise-public-exposure-hardening/references/disa-stig-cross-reference.md` |
+| `splunk-modern` (default) | ECDHE-(EC)DSA/RSA-AES{128,256}-GCM-SHA{256,384} + ECDHE-AES{128,256}-SHA{256,384} fallbacks; ECDH curves prime256v1, secp384r1, secp521r1 | tls1.2,tls1.3 for 10.4+ auto mode | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [About TLS encryption and cipher suites](https://docs.splunk.com/Documentation/Splunk/latest/Security/AboutTLSencryptionandciphersuites) |
+| `fips-140-3` | NIST AEAD only (no CBC, no SHA-1, no RSA-1024, no anonymous DH) | tls1.2,tls1.3 for 10.4+ auto mode | RSA-2048+, ECDSA P-256+ | RSA-SHA256+, ECDSA-SHA256+ | [Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips) |
+| `stig` | DISA-STIG-aligned subset of `splunk-modern` | tls1.2,tls1.3 for 10.4+ auto mode | RSA-2048+, ECDSA P-256+ | RSA-SHA256+ | `splunk-enterprise-public-exposure-hardening/references/disa-stig-cross-reference.md` |
 
-Splunk's [TLS-protocol-version doc](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
-lists the supported set as `SSLv3` (deprecated), `TLS1.0`
-(deprecated, 9.4+), `TLS1.1` (deprecated, 9.4+), `TLS1.2`. **TLS 1.3
-is not yet a documented Splunk-supported TLS version.** Pass
-`--allow-deprecated-tls` to relax the floor (not recommended).
+Splunk's [TLS-protocol-version doc](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.4/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
+documents the 10.4 `sslVersions` / `sslVersionsForClient` surface. This
+renderer defaults to `--enable-tls13 auto`, rendering `tls1.2,tls1.3` for
+Splunk 10.4+ and `tls1.2` below 10.4. Deprecated protocol names are not
+accepted for 10.4 renders; FIPS/STIG modes keep the same refusal.
 
 ### FIPS lifecycle
 
@@ -378,7 +382,7 @@ SPLUNK_FIPS_VERSION = 140-3
 
 Splunk 10.0+ ships both modules. Phase 1 (upgrade to 10.0 in
 140-2) and Phase 2 (flip to 140-3) per the
-[Splunk FIPS upgrade doc](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.2/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments).
+[Splunk FIPS upgrade doc](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.4/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments).
 The PKI skill consumes the public-exposure-hardening skill's
 `--enable-fips` / `--fips-version` rather than re-defining; refuses
 to apply when the cluster is mid-Phase-1 (some peers still on

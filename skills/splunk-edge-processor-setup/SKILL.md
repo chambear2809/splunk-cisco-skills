@@ -37,6 +37,10 @@ log/event pipelines, forwarder routing, or edge transformation.
 - **Default destination is critical** — without one, unprocessed data is
   silently dropped. The renderer refuses to render a plan with destinations
   but no default destination, and `validate.sh` re-checks at runtime.
+- **Cloud 10.4.2604 dataset destinations** — Amazon S3 and Microsoft Azure
+  routing for Splunk Cloud 10.4.2604+ uses Data Management app connections and
+  datasets. Render `type=s3_dataset` or `type=azure_dataset` for those handoffs;
+  Cloud `type=s3` is accepted only as a compatibility alias.
 - **EP instance install command is operator-supplied** — Splunk's Manage
   instances UI generates a one-shot install command containing a join token.
   Stage it via `write_secret_file.sh` and reference it through
@@ -124,7 +128,8 @@ Under `splunk-edge-processor-rendered/`:
 - `control-plane/edge-processors/<name>.json` — EP control-plane object
   (TLS settings).
 - `control-plane/source-types/<name>.json`.
-- `control-plane/destinations/<name>.json`.
+- `control-plane/destinations/<name>.json` — direct EP destination payloads or
+  Cloud 10.4.2604+ Data Management dataset handoffs.
 - `control-plane/pipelines/<name>.spl2` (SPL2 source-of-truth) and
   `pipelines/<name>.json` (API payload).
 - `control-plane/apply-objects.sh` — orchestrates POST/PUT/DELETE in
@@ -146,7 +151,8 @@ Under `splunk-edge-processor-rendered/`:
   renders compatibility lint and review guidance only).
 - Multi-tenant org management on Splunk Cloud.
 - Destinations not yet documented in Splunk's public EP destination catalog
-  (Kafka, Azure Event Hubs).
+  (Kafka, Azure Event Hubs). Microsoft Azure Blob/ADLS dataset routing is
+  covered for Splunk Cloud 10.4.2604+ as `type=azure_dataset`.
 - RBAC management on the EP control plane.
 - Automatic resolution of the EP control-plane REST API base — the operator
   supplies `EP_API_BASE` when applying via REST.

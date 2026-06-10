@@ -30,6 +30,17 @@
 | Deployment server config | `splunk reload deploy-server` |
 | Workload management pools/rules | Workload `_reload` endpoints |
 
+## Splunk 10.4 Notes
+
+Review `../shared/splunk_10_4_enterprise_deployment_notes.md` for Splunk
+Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2604`. Linux systemd
+restarts should respect the dedicated Splunk service user posture, Windows
+Enterprise restart handoffs are render-only here and must honor the
+installer-managed local service account (`NT SERVICE\Splunkd`) or dedicated
+non-admin DUA service accounts, Cloud restarts must use ACS
+10.4.2604-supported APIs, and SHC/indexer-cluster paths must remain
+cluster-aware.
+
 ## Partial Shutdown Detection
 
 Report a partial shutdown when the restart request was accepted but:

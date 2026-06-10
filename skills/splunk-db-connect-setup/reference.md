@@ -1,6 +1,6 @@
 # Splunk DB Connect Setup Reference
 
-This skill covers Splunk DB Connect 4.2 planning and validation for JDBC
+This skill covers Splunk DB Connect 4.3 planning and validation for JDBC
 ingestion, enrichment, lookup, and export use cases. It is intentionally
 render-first: the scripts produce reviewed assets and helper commands, then
 delegate package installation to `splunk-app-install`.
@@ -9,7 +9,7 @@ delegate package installation to `splunk-app-install`.
 
 | Package | Splunkbase ID | App ID | Latest audited version | Latest audited date |
 | --- | --- | --- | --- | --- |
-| Splunk DB Connect | `2686` | `splunk_app_db_connect` | `4.2.4` | April 20, 2026 |
+| Splunk DB Connect | `2686` | `splunk_app_db_connect` | `4.3.0` | May 11, 2026 |
 
 ## Supported JDBC Add-Ons
 
@@ -47,11 +47,13 @@ For Splunk Cloud, custom drivers are packaged as a separate app skeleton under
 `default/db_connection_types.conf`; the operator must add the reviewed JAR and
 submit through the supported Cloud app workflow.
 
-## Splunk DB Connect 4.2 Feature Coverage
+## Splunk DB Connect 4.3 Feature Coverage
 
-The rendered packet explicitly covers the 4.2 line's HA and driver changes:
+The rendered packet explicitly covers the current 4.3 line and the 4.2 HA and
+driver changes it inherits:
 
-- DB Connect `4.2.4` is tracked as the latest audited maintenance release.
+- DB Connect `4.3.0` is tracked as the latest audited maintenance release and
+  is verified in the shared registry for Splunk 10.4 compatibility.
 - DB Connect `4.2.0` added Databricks as a data source, Java diagnostics,
   multi-line JVM options, better HA checkpoint synchronization, prevention of
   parallel input execution in HA clusters, automatic HA leader re-election,

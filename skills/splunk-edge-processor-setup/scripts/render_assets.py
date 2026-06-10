@@ -16,14 +16,16 @@ from pathlib import Path
 VALID_CONTROL_PLANES = ("cloud", "enterprise")
 VALID_TLS_MODES = ("none", "tls", "mtls")
 VALID_INSTANCE_MODES = ("systemd", "nosystemd", "docker")
-VALID_DEST_TYPES = ("s2s", "hec", "s3", "syslog")
+VALID_DEST_TYPES = ("s2s", "hec", "s3", "s3_dataset", "azure_dataset", "syslog")
 VALID_FIPS_MODES = ("disabled", "enabled")
+DEFAULT_CLOUD_VERSION = "10.4.2604"
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Render Splunk Edge Processor assets.")
     p.add_argument("--output-dir", required=True)
     p.add_argument("--ep-control-plane", choices=VALID_CONTROL_PLANES, default="cloud")
+    p.add_argument("--cloud-version", default=DEFAULT_CLOUD_VERSION)
     p.add_argument("--ep-tenant-url", required=True)
     p.add_argument("--ep-name", default="prod-ep")
     p.add_argument("--ep-tls-mode", choices=VALID_TLS_MODES, default="none")
@@ -123,6 +125,21 @@ def parse_instances(value: str) -> list[dict]:
     return items
 
 
+def normalized_destination_type(spec: dict, control_plane: str = "cloud") -> str:
+    raw = spec.get("type", "")
+    if raw == "s3" and control_plane == "cloud":
+        return "s3_dataset"
+    return raw
+
+
+def data_management_family(dest_type: str) -> str:
+    if dest_type == "s3_dataset":
+        return "amazon_s3"
+    if dest_type == "azure_dataset":
+        return "microsoft_azure"
+    return ""
+
+
 def parse_destinations(value: str) -> list[dict]:
     """Parse `name=key=value;key=value,name2=key=value;...` strings."""
     if not value.strip():
@@ -203,12 +220,29 @@ def render_source_type(name: str) -> str:
     ) + "\n"
 
 
-def render_destination(spec: dict) -> str:
-    payload = {"name": spec["name"], "type": spec["type"]}
+def render_destination(spec: dict, args: argparse.Namespace) -> str:
+    raw_type = spec["type"]
+    dest_type = normalized_destination_type(spec, args.ep_control_plane)
+    payload = {"name": spec["name"], "type": dest_type}
+    if raw_type != dest_type:
+        payload["original_type"] = raw_type
+        payload["compatibility_note"] = "`type=s3` is treated as `type=s3_dataset` for Splunk Cloud 10.4.2604+ Edge Processor workflows."
     for k, v in spec.items():
         if k in ("name", "type"):
             continue
         payload[k] = v
+    family = data_management_family(dest_type)
+    if family:
+        payload["status"] = "data_management_handoff"
+        payload["cloud_version"] = args.cloud_version
+        payload["dataset_family"] = family
+        payload["apply_surface"] = "Splunk Cloud Platform Data Management app"
+        payload["api_crud"] = "not_claimed"
+        payload["connection_handoff"] = {
+            k: v
+            for k, v in sorted(spec.items())
+            if k not in {"name", "type"}
+        }
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
@@ -548,6 +582,11 @@ def render_apply_objects(args: argparse.Namespace, source_types: list[str], dest
             'shopt -s nullglob\n'
             'for dest in "${CONTROL_DIR}"/destinations/*.json; do\n'
             '  name=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))[\\"name\\"])" "${dest}")\n'
+            '  status=$(python3 -c "import json,sys; print((json.load(open(sys.argv[1])).get(\\"status\\") or \\"\\"))" "${dest}")\n'
+            '  if [[ "${status}" == "data_management_handoff" ]]; then\n'
+            '    echo "INFO: destination ${name} is a Splunk Cloud Data Management dataset handoff; create it in Data Management before applying pipelines."\n'
+            '    continue\n'
+            '  fi\n'
             '  ep_api_call "${EP_API_BASE}" "${TOKEN_FILE}" PUT \\\n'
             '    "/destinations/${name}" --data-binary @"${dest}" >/dev/null\n'
             '  echo "OK: destination ${name} applied"\n'
@@ -694,6 +733,7 @@ def render_metadata(args: argparse.Namespace, instances: list[dict], destination
         {
             "skill": "splunk-edge-processor-setup",
             "ep_control_plane": args.ep_control_plane,
+            "cloud_version": args.cloud_version,
             "ep_tenant_url": args.ep_tenant_url,
             "ep_name": args.ep_name,
             "ep_tls_mode": args.ep_tls_mode,
@@ -701,6 +741,10 @@ def render_metadata(args: argparse.Namespace, instances: list[dict], destination
             "instance_count": len(instances),
             "instance_modes": sorted({i["mode"] for i in instances}),
             "destination_names": sorted(d["name"] for d in destinations),
+            "destination_types": {
+                d["name"]: normalized_destination_type(d, args.ep_control_plane)
+                for d in destinations
+            },
             "default_destination": args.ep_default_destination,
             "pipeline_names": sorted(p["name"] for p in pipelines),
             "source_type_names": sorted(source_types),
@@ -718,6 +762,7 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
     return (
         "# Splunk Edge Processor Rendered Assets\n\n"
         f"Control plane: `{args.ep_control_plane}`\n"
+        f"Cloud version: `{args.cloud_version}`\n"
         f"Tenant URL: `{args.ep_tenant_url}`\n"
         f"EP name: `{args.ep_name}`\n"
         f"TLS mode: `{args.ep_tls_mode}`\n"
@@ -744,7 +789,8 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
         "- Use `export_destination_errors_total`; older `exporter_error_count` references were renamed.\n"
         "- Source type sync coverage is documented up to 4000 source types.\n"
         "- S2S destinations can use bulk indexer configuration in the UI.\n"
-        "- S3 destinations should review Parquet and gzip compression settings.\n\n"
+        "- For Cloud 10.4.2604+, Amazon S3 and Microsoft Azure destinations are Data Management app connection/dataset handoffs; this skill does not claim private Data Management API CRUD.\n"
+        "- Enterprise control-plane `type=s3` destinations remain direct EP destination payloads and should review Parquet and gzip compression settings.\n\n"
         "## Default-destination guard\n\n"
         "Without a default destination, unprocessed data is silently dropped. The\n"
         "renderer requires `--ep-default-destination` to match a destination name.\n"
@@ -793,7 +839,7 @@ def render_all(args: argparse.Namespace) -> dict:
     # Destinations.
     dest_by_name = {d["name"]: d for d in destinations}
     for dest in destinations:
-        write_file(output_dir / f"control-plane/destinations/{dest['name']}.json", render_destination(dest))
+        write_file(output_dir / f"control-plane/destinations/{dest['name']}.json", render_destination(dest, args))
         files.append(f"control-plane/destinations/{dest['name']}.json")
 
     # Pipelines.

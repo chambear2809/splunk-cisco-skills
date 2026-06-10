@@ -9,7 +9,7 @@ version: splunk-db-connect-setup/v1
 
 platform:
   type: enterprise
-  splunk_version: "10.0"
+  splunk_version: "10.4"
   stack: ""
 
 topology:

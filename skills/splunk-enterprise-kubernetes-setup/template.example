@@ -24,9 +24,10 @@
 # RELEASE_NAME=splunk-enterprise
 # OPERATOR_RELEASE_NAME=splunk-operator
 # OPERATOR_VERSION=3.1.0
+# KUBERNETES_VERSION=1.34
 # CHART_VERSION=3.1.0
-# SPLUNK_VERSION=10.2.0
-# SPLUNK_IMAGE=splunk/splunk:10.2.0
+# SPLUNK_VERSION=10.4.0
+# SPLUNK_IMAGE=splunk/splunk:10.4.0
 # STORAGE_CLASS=gp3
 # ETC_STORAGE=10Gi
 # VAR_STORAGE=100Gi
@@ -61,11 +62,17 @@
 # POD_PROFILE=pod-small
 # POD_PROFILE=pod-medium
 # POD_PROFILE=pod-large
+# POD_PROFILE=pod-xlarge
 # ES aliases render the same official profile plus premium app stanzas.
 # POD_PROFILE=pod-small-es
 # POD_PROFILE=pod-medium-es
 # POD_PROFILE=pod-large-es
-# Default worker counts are 8/11/15 without ES and 9/14/18 with ES.
+# POD_PROFILE=pod-xlarge-es
+# Official 10.4 ingest ceilings: small 500 GB/day, medium 1000 GB/day,
+# large 2500 GB/day, xlarge 10000 GB/day. Above 10000 GB/day requires a
+# manual Splunk sizing handoff.
+# DAILY_INGEST_GB=1000
+# Default worker counts are 8/11/15/30 without ES and 9/14/18/33 with ES.
 # POD preflight/apply/all runs require concrete controller IPs, worker IPs,
 # LICENSE_FILE, and SSH_PRIVATE_KEY_FILE; render-only can leave placeholders.
 # CONTROLLER_IPS=10.10.10.1,10.10.10.2,10.10.10.3

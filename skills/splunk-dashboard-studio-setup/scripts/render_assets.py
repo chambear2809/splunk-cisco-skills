@@ -42,6 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--datasource-name", default="Search_1")
     parser.add_argument("--layout", choices=("grid", "absolute", "freeform"), default="grid")
     parser.add_argument("--definition-file", default="")
+    parser.add_argument("--requires-auto-refresh", choices=("true", "false"), default="false")
     parser.add_argument("--owner", default="nobody")
     parser.add_argument("--sharing", choices=("user", "app", "global"), default="app")
     parser.add_argument("--json", action="store_true")
@@ -161,6 +162,15 @@ def render_view_xml(args: argparse.Namespace, definition: dict) -> str:
 
 
 def render_readme(args: argparse.Namespace) -> str:
+    auto_refresh_guidance = ""
+    if args.requires_auto_refresh == "true":
+        auto_refresh_guidance = """
+## Capability Guidance
+
+This dashboard requires automatic refresh. Ensure target users or roles have
+the `auto_refresh_dashboards` capability before promotion, especially in
+shared app/global deployments.
+"""
     return f"""# Splunk Dashboard Studio Rendered Assets
 
 Dashboard: `{args.dashboard_name}`
@@ -168,6 +178,7 @@ App: `{args.app_name}`
 Theme: `{args.theme}`
 Layout: `{args.layout}`
 Sharing: `{args.sharing}` (owner `{args.owner}`)
+Requires auto-refresh: `{args.requires_auto_refresh}`
 
 Files:
 
@@ -178,6 +189,7 @@ Apply posts `name=<dashboard>` and `eai:data=<view.xml>` to
 `/servicesNS/<owner>/<app>/data/ui/views`. Updating an existing dashboard
 requires `--accept-overwrite`. This is Splunk Platform Dashboard Studio and is
 distinct from the Splunk Observability Cloud dashboard builder.
+{auto_refresh_guidance}
 """
 
 
@@ -195,6 +207,10 @@ def render(args: argparse.Namespace, definition: dict) -> dict:
                     "app_name": args.app_name,
                     "theme": args.theme,
                     "layout": args.layout,
+                    "requires_auto_refresh": args.requires_auto_refresh == "true",
+                    "capability_guidance": (
+                        ["auto_refresh_dashboards"] if args.requires_auto_refresh == "true" else []
+                    ),
                     "owner": args.owner,
                     "sharing": args.sharing,
                 },

@@ -18,8 +18,13 @@
   - **Splunk platform S2S** — host:port + index routing rules
     (Default / Specify-for-no-index / Specify-for-all).
   - **Splunk platform HEC** — HEC URL + token (file-based).
-  - **Amazon S3** — bucket + prefix + auth (IAM role for EC2-hosted EP, or
-    access-key/secret pair via file-based secret).
+  - **Splunk Cloud 10.4.2604+ dataset destinations** — Amazon S3
+    (`type=s3_dataset`) and Microsoft Azure Blob/ADLS (`type=azure_dataset`)
+    are Data Management app connection/dataset handoffs. For Cloud plans,
+    legacy `type=s3` is treated as an `s3_dataset` compatibility alias.
+  - **Splunk Enterprise direct Amazon S3** — Enterprise control-plane
+    `type=s3` remains a direct EP destination payload with bucket + prefix +
+    auth.
   - **syslog** — TCP/UDP target + framing.
 - Default destination is REQUIRED — without one, unprocessed data is dropped.
 - TLS / mTLS for data sources requires PEM certs (server cert/key/CA, plus
@@ -33,25 +38,31 @@
 Official references:
 
 - Set up an Edge Processor (Cloud):
-  <https://docs.splunk.com/Documentation/SplunkCloud/9.3.2408/EdgeProcessor/CreateNode>
+  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/administer-edge-processors/set-up-an-edge-processor>
 - Set up an Edge Processor (Enterprise):
-  <https://help.splunk.com/en/splunk-enterprise/process-data-at-the-edge/use-edge-processors-for-splunk-enterprise/10.2/administer-edge-processors/set-up-an-edge-processor>
+  <https://help.splunk.com/en/splunk-enterprise/process-data-at-the-edge/use-edge-processors-for-splunk-enterprise/10.4/administer-edge-processors/set-up-an-edge-processor>
 - Set up an Edge Processor in a Docker container:
   <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/administer-edge-processors/set-up-an-edge-processor-in-a-docker-container>
 - Create pipelines for Edge Processors:
-  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/9.2.2406/working-with-pipelines/create-pipelines-for-edge-processors>
+  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/working-with-pipelines/create-pipelines-for-edge-processors>
 - Edge Processor pipeline syntax:
-  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/9.2.2406/working-with-pipelines/edge-processor-pipeline-syntax>
+  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/working-with-pipelines>
 - Add or manage destinations:
   <https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/administer-edge-processors>
-- Send data from Edge Processors to Amazon S3:
-  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-enterprise/10.2/send-data-out-from-edge-processors/send-data-from-edge-processors-to-amazon-s3>
+- How the destination for Edge Processor works:
+  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/send-data-out-from-edge-processors/how-the-destination-for-edge-processor-works>
+- Send data from Edge Processors to Amazon S3 on Splunk Cloud:
+  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/send-data-out-from-edge-processors/send-data-from-edge-processors-to-amazon-s3>
+- Send data from Edge Processors to Microsoft Azure on Splunk Cloud:
+  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/send-data-out-from-edge-processors/send-data-from-edge-processors-to-microsoft-azure>
+- Send data from Edge Processors to Amazon S3 on Splunk Enterprise:
+  <https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-enterprise/10.4/send-data-out-from-edge-processors/send-data-from-edge-processors-to-amazon-s3>
 - Get syslog data into an Edge Processor:
   <https://docs.splunk.com/Documentation/SplunkCloud/latest/EdgeProcessor/SyslogSource>
 - Configure HEC token authentication in the Edge Processor service:
   <https://help.splunk.com/en/data-management/collect-http-event-data/send-hec-data-to-and-from-edge-processor/send-data-to-edge-processor-with-hec/configure-hec-token-authentication-in-the-edge-processor-service>
 - Verify your Edge Processor and pipeline configurations:
-  <https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/10.2.2510/monitor-system-health-and-activity/verify-your-edge-processor-and-pipeline-configurations>
+  <https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/10.4.2604/monitor-system-health-and-activity/verify-your-edge-processor-and-pipeline-configurations>
 
 ## Pipeline Templates
 
@@ -81,7 +92,11 @@ newer EP versions add state-window behavior that operators must review.
   increased the sync limit from 1000 to 4000.
 - S2S destinations: use bulk indexer configuration for large indexer lists
   where available.
-- S3 destinations: review Parquet and gzip compression settings.
+- Cloud S3/Azure dataset destinations: create and verify the Data Management
+  connection/dataset before applying pipelines; the renderer does not claim
+  private Data Management API CRUD.
+- Enterprise direct S3 destinations: review Parquet and gzip compression
+  settings.
 
 ## systemd Unit
 
@@ -139,5 +154,7 @@ applies it before the destination becomes reachable.
   shared kit renders static review warnings only).
 - Multi-tenant org management on Splunk Cloud.
 - Kafka and Azure Event Hubs destinations (not yet in the public EP catalog).
+  Azure Blob/ADLS dataset routing is covered for Splunk Cloud 10.4.2604+ as
+  `type=azure_dataset`.
 - EP control-plane RBAC management.
 - Containerized FIPS mode.

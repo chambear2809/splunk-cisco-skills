@@ -28,11 +28,13 @@ ep_target_daily_gb: 50
 ep_source_types: syslog_router
 
 # Destinations. Comma-separated <name>=key=value pairs (semicolon-separated values inside a destination).
-# Required keys: type (s2s|hec|s3|syslog), name (auto-set from key)
+# Required keys: type (s2s|hec|s3_dataset|azure_dataset|s3|syslog), name (auto-set from key)
+# Cloud 10.4.2604+ uses Data Management datasets for s3_dataset and azure_dataset.
+# Enterprise control-plane type=s3 remains a direct S3 destination; Cloud type=s3 is a compatibility alias for s3_dataset.
 # Common keys: host, port, token_file, bucket, prefix, region, index_routing
 # Example:
 #   primary=type=s2s;host=idx-cluster.example.com;port=9997;index_routing=specify_for_no_index:summary
-#   archive=type=s3;bucket=splunk-archive;prefix=ep-overflow/;region=us-east-1
+#   archive=type=s3_dataset;bucket=splunk-archive;prefix=ep-overflow/;region=us-east-1
 ep_destinations: primary=type=s2s;host=idx-cluster.example.com;port=9997
 
 # Default destination (must match a destination name above).

@@ -47,7 +47,7 @@ validate_choice() {
 default_arch_for_os() {
     case "$1" in
         linux) printf '%s' "amd64" ;;
-        macos) printf '%s' "universal2" ;;
+        macos) printf '%s' "arm64" ;;
         windows) printf '%s' "x64" ;;
         freebsd) printf '%s' "freebsd14-amd64" ;;
         solaris) printf '%s' "amd64" ;;

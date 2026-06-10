@@ -88,10 +88,11 @@ GENERATED_FILES: set[str] = {
 # ---------------------------------------------------------------------------
 
 EMBEDDED_SVD_FLOOR: dict[str, str] = {
+    "10.4": "10.4.0",
     "10.2": "10.2.2",
     "10.0": "10.0.5",
-    "9.4": "9.4.10",
-    "9.3": "9.3.11",
+    "9.4": "9.4.11",
+    "9.3": "9.3.12",
 }
 
 # Splunk Secure Gateway app SVD floor (per-branch). Source:
@@ -219,9 +220,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--forwarder-mtls", choices=("true", "false"), default="true")
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--service-user", default="splunk")
-    parser.add_argument("--splunk-version", default="10.2.2")
-    parser.add_argument("--tls-policy", choices=("tls12", "tls12_13"), default="tls12")
-    parser.add_argument("--enable-tls13", choices=("true", "false"), default="false")
+    parser.add_argument("--splunk-version", default="10.4.0")
+    parser.add_argument("--tls-policy", choices=("tls12", "tls12_13"), default="tls12_13")
+    parser.add_argument("--enable-tls13", choices=("auto", "true", "false"), default="auto")
     parser.add_argument("--ca-bundle-path", default="/opt/splunk/etc/auth/cabundle.pem")
     parser.add_argument(
         "--server-cert-path",
@@ -390,8 +391,10 @@ def validate(args: argparse.Namespace) -> None:
         die("--saml-idp-metadata-path is required when --auth-mode=saml.")
     if args.auth_mode == "reverse-proxy-sso" and not args.proxy_sso_trusted_ip:
         die("--proxy-sso-trusted-ip is required when --auth-mode=reverse-proxy-sso.")
-    if args.tls_policy == "tls12_13" and args.enable_tls13 != "true":
-        die("--tls-policy=tls12_13 requires --enable-tls13=true.")
+    if args.enable_tls13 == "true" and args.tls_policy != "tls12_13":
+        die("--enable-tls13=true requires --tls-policy=tls12_13.")
+    if args.enable_tls13 == "true" and parse_version(args.splunk_version) < (10, 4, 0):
+        die("--enable-tls13=true requires --splunk-version 10.4.0 or newer.")
     if args.auth_mode == "ldap":
         validate_ldap_args(args)
 
@@ -452,6 +455,14 @@ def parse_version(value: str) -> tuple[int, int, int]:
     while len(nums) < 3:
         nums.append(0)
     return (nums[0], nums[1], nums[2])
+
+
+def tls13_enabled(args: argparse.Namespace) -> bool:
+    if args.enable_tls13 == "true":
+        return True
+    if args.enable_tls13 == "false":
+        return False
+    return args.tls_policy == "tls12_13" and parse_version(args.splunk_version) >= (10, 4, 0)
 
 
 def _floor_from_json_payload(data: dict) -> dict[str, str]:
@@ -543,8 +554,8 @@ def shared_scripts_path() -> Path:
 # ---------------------------------------------------------------------------
 
 def tls_versions(args: argparse.Namespace) -> str:
-    if args.tls_policy == "tls12_13" and args.enable_tls13 == "true":
-        return "tls1.2, tls1.3"
+    if tls13_enabled(args):
+        return "tls1.2,tls1.3"
     return "tls1.2"
 
 
@@ -3080,6 +3091,8 @@ def render_metadata(args: argparse.Namespace, floor: dict[str, str]) -> dict:
         "splunk_home": args.splunk_home,
         "splunk_version": args.splunk_version,
         "tls_policy": args.tls_policy,
+        "enable_tls13": args.enable_tls13,
+        "effective_ssl_versions": tls_versions(args),
         "auth_mode": args.auth_mode,
         "min_password_length": args.min_password_length,
         "lockout_attempts": args.lockout_attempts,

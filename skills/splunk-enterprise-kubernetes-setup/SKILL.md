@@ -59,6 +59,7 @@ bash skills/splunk-enterprise-kubernetes-setup/scripts/setup.sh \
   --architecture c3 \
   --namespace splunk \
   --operator-namespace splunk-operator \
+  --kubernetes-version 1.34 \
   --storage-class gp3 \
   --accept-splunk-general-terms
 ```
@@ -156,10 +157,15 @@ The rendered POD directory includes:
 - `get-creds.sh`
 - `web-docs.sh`
 
-For `pod-small-es`, `pod-medium-es`, and `pod-large-es`, the ES suffix is a setup
-alias only. The rendered static cluster configuration keeps the official Splunk
-POD profile name and adds the recommended premium app stanzas for Enterprise
-Security.
+For `pod-small-es`, `pod-medium-es`, `pod-large-es`, and `pod-xlarge-es`, the ES
+suffix is a setup alias only. The rendered static cluster configuration keeps
+the official Splunk POD profile name and adds the recommended premium app
+stanzas for Enterprise Security.
+
+Official Splunk POD 10.4 daily-ingest ceilings are: small 500 GB/day, medium 1
+TB/day, large 2.5 TB/day, and xlarge 10 TB/day. Use `--daily-ingest-gb` to have
+the renderer block undersized profile selections; above 10 TB/day, hand off to
+manual Splunk sizing.
 
 ## Validation
 

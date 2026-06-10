@@ -54,12 +54,18 @@ for dir in "${TMP_YAML}" "${TMP_JSON}"; do
     done
 done
 
-# YAML render must include the documented Splunkbase IDs in coverage notes.
-for app_id in 3546 4886 5863; do
+# YAML render must include the Splunk Enterprise/Cloud app IDs in coverage notes.
+for app_id in 3546 4886; do
     grep -q "splunkbase_id\".*${app_id}" "${TMP_YAML}/coverage-report.json" \
         || grep -q "${app_id}" "${TMP_YAML}/coverage-report.json" \
         || { echo "FAIL: coverage-report.json missing Splunkbase ${app_id}" >&2; exit 1; }
 done
+
+# Splunkbase 5863 is a SOAR connector handoff, not a Splunk app install.
+grep -q '"object_type": "splunk_side_soar_connector"' "${TMP_YAML}/coverage-report.json" \
+    || { echo "FAIL: coverage-report.json missing SOAR connector handoff" >&2; exit 1; }
+grep -q '"coverage": "handoff"' "${TMP_YAML}/coverage-report.json" \
+    || { echo "FAIL: SOAR connector coverage is not handoff" >&2; exit 1; }
 
 # YAML render must include the four indexes the Add-on macros expect.
 for idx in victorops_users victorops_teams victorops_oncall victorops_incidents; do

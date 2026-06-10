@@ -147,13 +147,19 @@ def test_ai_ml_toolkit_registry_metadata_tracks_current_apps() -> None:
     }
 
     assert apps["2890"]["app_name"] == "Splunk_ML_Toolkit"
-    assert apps["2890"]["latest_verified_version"] == "5.7.3"
+    assert apps["2890"]["latest_verified_version"] == "5.7.4"
     assert apps["2882"]["app_name"] == "Splunk_SA_Scientific_Python_linux_x86_64"
     assert apps["2883"]["app_name"] == "Splunk_SA_Scientific_Python_windows_x86_64"
     assert apps["2881"]["app_name"] == "Splunk_SA_Scientific_Python_darwin_x86_64"
     assert apps["6785"]["app_name"] == "Splunk_SA_Scientific_Python_darwin_arm64"
     assert apps["4607"]["app_name"] == "mltk-container"
     assert apps["4607"]["install_requires"] == ["2890"]
+
+
+def test_ai_ml_toolkit_example_template_defaults_to_splunk_10_4() -> None:
+    text = (REPO_ROOT / "skills/splunk-ai-ml-toolkit-setup/template.example").read_text()
+    assert 'splunk_version: "10.4"' in text
+    assert 'splunk_version: "9.4"' not in text
 
 
 def test_security_portfolio_routes_mltk_dsdl_and_anomaly_to_ai_ml_skill() -> None:

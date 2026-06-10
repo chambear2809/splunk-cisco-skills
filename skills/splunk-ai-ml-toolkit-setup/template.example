@@ -1,6 +1,6 @@
 api_version: splunk-ai-ml-toolkit-setup/v1
 platform: enterprise
-splunk_version: "9.4"
+splunk_version: "10.4"
 psc_target: linux64
 include_ai_toolkit: true
 include_dsdl: true

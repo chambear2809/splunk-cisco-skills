@@ -15,6 +15,8 @@ OUTPUT_DIR=""
 PROFILE="balanced"
 SPLUNK_HOME_VALUE="/opt/splunk"
 APP_NAME="ZZZ_cisco_skills_workload_management"
+DEPLOYMENT_RUNTIME="linux"
+WORKLOAD_MODE="auto"
 ENABLE_WORKLOAD_MANAGEMENT=false
 ENABLE_ADMISSION_RULES=false
 SEARCH_CPU=""
@@ -46,6 +48,8 @@ Options:
   --profile balanced|search-priority|ingest-protect|custom
   --splunk-home PATH
   --app-name NAME
+  --deployment-runtime linux|kubernetes
+  --workload-mode auto|advanced|basic
   --enable-workload-management
   --enable-admission-rules
   --search-cpu N
@@ -76,6 +80,8 @@ while [[ $# -gt 0 ]]; do
         --profile) require_arg "$1" $# || exit 1; PROFILE="$2"; shift 2 ;;
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME_VALUE="$2"; shift 2 ;;
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
+        --deployment-runtime) require_arg "$1" $# || exit 1; DEPLOYMENT_RUNTIME="$2"; shift 2 ;;
+        --workload-mode) require_arg "$1" $# || exit 1; WORKLOAD_MODE="$2"; shift 2 ;;
         --enable-workload-management) ENABLE_WORKLOAD_MANAGEMENT=true; shift ;;
         --enable-admission-rules) ENABLE_ADMISSION_RULES=true; shift ;;
         --search-cpu) require_arg "$1" $# || exit 1; SEARCH_CPU="$2"; shift 2 ;;
@@ -116,6 +122,8 @@ PY
 validate_args() {
     validate_choice "${PHASE}" render preflight apply status all
     validate_choice "${PROFILE}" balanced search-priority ingest-protect custom
+    validate_choice "${DEPLOYMENT_RUNTIME}" linux kubernetes
+    validate_choice "${WORKLOAD_MODE}" auto advanced basic
     validate_choice "${LONG_RUNNING_ACTION}" none alert abort move
     validate_choice "${ADMISSION_ALLTIME_ACTION}" disabled filter
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
@@ -135,6 +143,8 @@ build_renderer_args() {
         --output-dir "${OUTPUT_DIR}"
         --splunk-home "${SPLUNK_HOME_VALUE}"
         --app-name "${APP_NAME}"
+        --deployment-runtime "${DEPLOYMENT_RUNTIME}"
+        --workload-mode "${WORKLOAD_MODE}"
         --search-cpu "${SEARCH_CPU}"
         --ingest-cpu "${INGEST_CPU}"
         --misc-cpu "${MISC_CPU}"

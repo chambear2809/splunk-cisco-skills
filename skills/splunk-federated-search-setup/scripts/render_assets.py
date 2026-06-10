@@ -6,9 +6,9 @@ Supports the full Splunk Federated Search product surface:
 - Federated Search for Splunk (FSS2S, type=splunk) in standard or transparent
   mode, with multiple providers per render and one or more federated indexes
   per provider.
-- Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud Platform
-  only), rendered as a REST payload because FSS3 cannot be configured through
-  federated.conf and is created by POSTing to /services/data/federated/provider.
+- Federated Search for Amazon S3 datasets on Splunk Cloud Platform 10.4.2604+,
+  rendered as a Data Management app connection/dataset handoff. The older
+  FSS3 REST provider path is retained only behind --fss3-mode legacy.
 - File-based apply for Splunk Enterprise standalone search heads and SHC
   deployer bundles, plus a REST apply path that works on both Splunk
   Enterprise and Splunk Cloud Platform.
@@ -54,6 +54,8 @@ GENERATED_FILES = {
 S2S_DATASET_TYPES = ("index", "metricindex", "savedsearch", "lastjob", "datamodel")
 FSS3_DATASET_TYPES = ("glue_table",)
 ALL_DATASET_TYPES = S2S_DATASET_TYPES + FSS3_DATASET_TYPES
+FSS3_MODES = ("data-management", "legacy")
+DEFAULT_CLOUD_VERSION = "10.4.2604"
 
 PASSWORD_PLACEHOLDER_PREFIX = "__FEDERATED_PASSWORD_FILE_BASE64__"
 
@@ -78,6 +80,9 @@ class S2SProvider:
     password_file: str
     mode: str = "standard"
     app_context: str = "search"
+    allow_index_based_provider_filtering: bool = False
+    fed_srch_indexes_allowed: list[str] = field(default_factory=list)
+    use_app_context_from_search: bool = False
     disabled: bool = False
 
     @property
@@ -114,6 +119,8 @@ class FederatedIndex:
 class Spec:
     splunk_home: str
     app_name: str
+    cloud_version: str
+    fss3_mode: str
     federated_search_enabled: bool
     max_preview_generation_duration: int
     max_preview_generation_inputcount: int
@@ -154,6 +161,11 @@ def clean_render_dir(render_dir: Path) -> None:
         for child in aws_dir.iterdir():
             if child.is_file():
                 child.unlink()
+    data_mgmt_dir = render_dir / "data-management-datasets"
+    if data_mgmt_dir.is_dir():
+        for child in data_mgmt_dir.iterdir():
+            if child.is_file():
+                child.unlink()
 
 
 def boolish(value: Any, *, default: bool = False) -> bool:
@@ -183,8 +195,9 @@ def list_of_str(value: Any, *, label: str) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
-        # Allow comma-separated CLI usage: "a,b,c".
-        return [item.strip() for item in value.split(",") if item.strip()]
+        # Accept legacy comma-separated CLI usage while also accepting the
+        # semicolon list syntax Splunk documents for fedSrchIndexesAllowed.
+        return [item.strip() for item in re.split(r"[;,]", value) if item.strip()]
     if not isinstance(value, list):
         raise SpecError(f"{label} must be a list (got {type(value).__name__}).")
     out: list[str] = []
@@ -215,6 +228,13 @@ def validate_index_name(name: str, *, label: str) -> None:
         )
     if "kvstore" in name:
         raise SpecError(f"{label} must not contain 'kvstore'.")
+
+
+def validate_allowlist_index_token(name: str, *, label: str) -> None:
+    if not re.fullmatch(r"[A-Za-z0-9_.*:-]+", name or ""):
+        raise SpecError(
+            f"{label} '{name}' must contain only letters, numbers, underscore, dot, star, colon, or hyphen."
+        )
 
 
 def validate_host_port(host_port: str, *, label: str) -> None:
@@ -333,6 +353,12 @@ def _normalize_s2s(raw: dict[str, Any], known_provider_names: set[str]) -> S2SPr
     app_context = str(raw.get("app_context") or raw.get("appContext") or "search").strip()
     if not re.fullmatch(r"[A-Za-z0-9_.:-]+", app_context):
         raise SpecError(f"S2S provider {name} app_context contains unsupported characters.")
+    fed_srch_indexes_allowed = list_of_str(
+        raw.get("fed_srch_indexes_allowed") or raw.get("fedSrchIndexesAllowed"),
+        label=f"S2S provider {name} fed_srch_indexes_allowed",
+    )
+    for allowed in fed_srch_indexes_allowed:
+        validate_allowlist_index_token(allowed, label=f"S2S provider {name} fed_srch_indexes_allowed entry")
     return S2SProvider(
         name=name,
         host_port=host_port,
@@ -340,6 +366,19 @@ def _normalize_s2s(raw: dict[str, Any], known_provider_names: set[str]) -> S2SPr
         password_file=password_file,
         mode=mode,
         app_context=app_context,
+        allow_index_based_provider_filtering=boolish(
+            raw.get("allow_index_based_provider_filtering")
+            if "allow_index_based_provider_filtering" in raw
+            else raw.get("allowIndexBasedProviderFiltering"),
+            default=False,
+        ),
+        fed_srch_indexes_allowed=fed_srch_indexes_allowed,
+        use_app_context_from_search=boolish(
+            raw.get("use_app_context_from_search")
+            if "use_app_context_from_search" in raw
+            else raw.get("useAppContextFromSearch"),
+            default=False,
+        ),
         disabled=boolish(raw.get("disabled"), default=False),
     )
 
@@ -468,6 +507,12 @@ def normalize_spec(raw: dict[str, Any]) -> Spec:
     app_name = str(raw.get("app_name") or "ZZZ_cisco_skills_federated_search").strip()
     if not re.fullmatch(r"[A-Za-z0-9_.:-]+", app_name):
         raise SpecError("app_name must contain only letters, numbers, underscore, dot, colon, or hyphen.")
+    cloud_version = str(raw.get("cloud_version") or DEFAULT_CLOUD_VERSION).strip()
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+){1,3}", cloud_version):
+        raise SpecError(f"cloud_version must look like 10.4.2604 (got {cloud_version!r}).")
+    fss3_mode = str(raw.get("fss3_mode") or "data-management").strip().lower().replace("_", "-")
+    if fss3_mode not in FSS3_MODES:
+        raise SpecError(f"fss3_mode must be one of {FSS3_MODES} (got {fss3_mode!r}).")
     federated_search_enabled = boolish(raw.get("federated_search_enabled"), default=True)
     max_dur = parse_int(
         raw.get("max_preview_generation_duration", 0),
@@ -567,6 +612,8 @@ def normalize_spec(raw: dict[str, Any]) -> Spec:
     return Spec(
         splunk_home=splunk_home,
         app_name=app_name,
+        cloud_version=cloud_version,
+        fss3_mode=fss3_mode,
         federated_search_enabled=federated_search_enabled,
         max_preview_generation_duration=max_dur,
         max_preview_generation_inputcount=max_inp,
@@ -596,10 +643,17 @@ def password_token_for(provider: S2SProvider) -> str:
 
 def render_federated_template(spec: Spec) -> str:
     if not spec.s2s_providers:
+        fss3_note = (
+            "# Amazon S3 federated datasets for Cloud 10.4.2604+ are created in\n"
+            "# the Data Management app; see data-management-datasets/.\n"
+            if spec.fss3_providers and spec.fss3_mode == "data-management"
+            else "# Legacy FSS3 (type=aws_s3) is created via REST; see aws-s3-providers/.\n"
+            if spec.fss3_providers
+            else ""
+        )
         return (
             "# No FSS2S (type=splunk) providers were declared in the spec.\n"
-            "# Federated Search for Amazon S3 (type=aws_s3) is created via REST,\n"
-            "# not federated.conf; see aws-s3-providers/ and apply-rest.sh.\n"
+            + fss3_note
         )
     lines = [
         "# Rendered by splunk-federated-search-setup. Review before applying.",
@@ -620,6 +674,12 @@ def render_federated_template(spec: Spec) -> str:
             lines.append("useFSHKnowledgeObjects = 0")
         else:
             lines.append("useFSHKnowledgeObjects = 1")
+        lines.append(
+            f"allowIndexBasedProviderFiltering = {1 if provider.allow_index_based_provider_filtering else 0}"
+        )
+        if provider.fed_srch_indexes_allowed:
+            lines.append(f"fedSrchIndexesAllowed = {';'.join(provider.fed_srch_indexes_allowed)}")
+        lines.append(f"useAppContextFromSearch = {1 if provider.use_app_context_from_search else 0}")
         if provider.disabled:
             lines.append("disabled = 1")
         else:
@@ -635,10 +695,18 @@ def render_indexes(spec: Spec) -> str:
     s2s_provider_names = {p.name for p in spec.s2s_providers}
     relevant = [idx for idx in spec.federated_indexes if idx.provider in s2s_provider_names]
     if not relevant:
+        fss3_note = (
+            "# Amazon S3 federated datasets for Cloud 10.4.2604+ are mapped in\n"
+            "# the Data Management app; see data-management-datasets/.\n"
+            if spec.fss3_providers and spec.fss3_mode == "data-management"
+            else "# Legacy FSS3 federated indexes are created via REST; see apply-rest.sh.\n"
+            if spec.fss3_providers
+            else ""
+        )
         return (
             "# No FSS2S federated indexes were declared in the spec.\n"
             "# Transparent-mode providers do not use federated indexes.\n"
-            "# FSS3 federated indexes are created via REST; see apply-rest.sh.\n"
+            + fss3_note
         )
     lines = [
         "# Rendered by splunk-federated-search-setup. Review before applying.",
@@ -693,11 +761,85 @@ def render_aws_s3_payload(provider: FSS3Provider) -> str:
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
 
+def render_data_management_dataset(provider: FSS3Provider, spec: Spec) -> str:
+    mapped_indexes = [
+        {
+            "name": idx.name,
+            "dataset_type": idx.dataset_type,
+            "dataset_name": idx.dataset_name,
+            "disabled": idx.disabled,
+        }
+        for idx in spec.federated_indexes
+        if idx.provider == provider.name
+    ]
+    payload = {
+        "name": provider.name,
+        "type": "data_management_dataset",
+        "dataset_family": "amazon_s3",
+        "cloud_version": spec.cloud_version,
+        "apply_surface": "Splunk Cloud Platform Data Management app",
+        "api_crud": "not_claimed",
+        "legacy_fss3_rest_provider": False,
+        "provider_name": provider.name,
+        "aws_account_id": provider.aws_account_id,
+        "aws_region": provider.aws_region,
+        "connection": {
+            "glue_database": provider.database,
+            "glue_data_catalog": provider.data_catalog,
+            "s3_paths": provider.aws_s3_paths_allowlist,
+            "kms_key_arns": provider.aws_kms_keys_arn_allowlist,
+        },
+        "federated_index_hints": mapped_indexes,
+        "disabled": provider.disabled,
+    }
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def render_data_management_readme(spec: Spec) -> str:
+    if not spec.fss3_providers:
+        return ""
+    lines = [
+        "# Amazon S3 Federated Dataset Handoff",
+        "",
+        f"Target Splunk Cloud Platform version: `{spec.cloud_version}`.",
+        "",
+        "For Splunk Cloud Platform 10.4.2604 and newer, Amazon S3 federated",
+        "search uses Data Management app connections and datasets. The legacy",
+        "FSS3 REST provider path is obsolete for new 10.4.2604 workflows.",
+        "",
+        "This renderer does not claim private Data Management API CRUD. It writes",
+        "one reviewable dataset handoff JSON per provider under this directory.",
+        "",
+        "## Operator Steps",
+        "",
+        "1. Open Splunk Cloud Platform -> Data Management.",
+        "2. Create or select the Amazon S3 connection for the target AWS account,",
+        "   region, Glue catalog, Glue database, S3 paths, and optional KMS keys.",
+        "3. Create datasets for the listed Glue tables or source paths.",
+        "4. Use the dataset names shown in the JSON handoffs when configuring",
+        "   searches, data lake indexes, ASL/Federated Analytics, or downstream",
+        "   readiness checks.",
+        "5. Run the rendered `status.sh` for FSS2S providers only; Data Management",
+        "   dataset health must be validated in the Data Management app and search",
+        "   experience.",
+        "",
+        "## Dataset Handoffs",
+        "",
+    ]
+    for provider in spec.fss3_providers:
+        lines.append(f"- `data-management-datasets/{provider.name}.json`")
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def render_aws_s3_readme(spec: Spec) -> str:
     if not spec.fss3_providers:
         return ""
     lines = [
-        "# Federated Search for Amazon S3 — Apply Notes",
+        "# Legacy Federated Search for Amazon S3 Apply Notes",
+        "",
+        "This legacy path is for Splunk Cloud Platform releases before 10.4.2604",
+        "or for an explicitly accepted legacy migration. Do not use it as the",
+        "default 10.4.2604 workflow.",
         "",
         "Splunk Cloud Platform creates FSS3 providers through REST or Splunk Web,",
         "**not** through `federated.conf`. The renderer therefore writes one JSON",
@@ -754,8 +896,9 @@ def render_readme(spec: Spec) -> str:
         "# Splunk Federated Search Rendered Assets",
         "",
         f"FSS2S providers: {s2s_count} ({standard_count} standard, {transparent_count} transparent)  ",
-        f"FSS3 providers:  {fss3_count}  ",
+        f"Amazon S3 federated dataset handoffs: {fss3_count} (`{spec.fss3_mode}` mode)  ",
         f"Federated indexes: {idx_count}  ",
+        f"Cloud version: `{spec.cloud_version}`  ",
         f"App: `{spec.app_name}`  ",
         "",
         "## Files",
@@ -767,9 +910,10 @@ def render_readme(spec: Spec) -> str:
         "- `apply-search-head.sh` — file-based apply on a standalone Splunk Enterprise SH",
         "- `apply-shc-deployer.sh` — file-based apply through the SHC deployer bundle",
         "- `apply-rest.sh` — REST-based apply for both Splunk Enterprise and Splunk Cloud Platform",
-        "- `status.sh` — REST GET /services/data/federated/provider; reports connectivityStatus per provider",
+        "- `status.sh` — REST GET /services/data/federated/provider for FSS2S provider connectivity",
         "- `global-enable.sh` / `global-disable.sh` — toggle the global federated-search switch",
-        "- `aws-s3-providers/<name>.json` — REST payload for each FSS3 provider (Splunk Cloud only)",
+        "- `data-management-datasets/<name>.json` — Data Management handoff for Amazon S3 datasets on Cloud 10.4.2604+",
+        "- `aws-s3-providers/<name>.json` — legacy FSS3 REST payloads only when `fss3_mode=legacy`",
         "- `metadata.json` — machine-readable summary of the rendered plan",
         "",
         "Service-account passwords are never embedded. Apply scripts read them from",
@@ -779,7 +923,7 @@ def render_readme(spec: Spec) -> str:
         "## What's NOT created",
         "",
         "- Splunk Cloud IP allow-lists (use Splunk Web → Settings → Server settings → IP allow list).",
-        "- AWS Glue tables, S3 bucket policies, or KMS key policies (operator/AWS admin task).",
+        "- Data Management connections/datasets, AWS Glue tables, S3 bucket policies, or KMS key policies (operator/Admin task).",
         "- Service accounts on remote Splunk deployments. Standard mode requires the",
         "  service account role on the remote SH to read the mapped datasets;",
         "  transparent mode against an SHC additionally requires the",
@@ -867,7 +1011,9 @@ def render_apply_local(spec: Spec, *, shc: bool) -> str:
         else 'echo "Review rendered changes and restart or push the bundle as appropriate."\n'
     )
     fss3_note = (
-        'echo "INFO: FSS3 providers are not file-managed; run apply-rest.sh against Splunk Cloud."\n'
+        'echo "INFO: Amazon S3 federated datasets are managed in Splunk Cloud Data Management; review data-management-datasets/."\n'
+        if spec.fss3_providers and spec.fss3_mode == "data-management"
+        else 'echo "INFO: Legacy FSS3 providers are not file-managed; run apply-rest.sh against Splunk Cloud."\n'
         if spec.fss3_providers
         else ""
     )
@@ -894,11 +1040,35 @@ def _rest_provider_payload_block(spec: Spec) -> str:
     env so passwords stay off argv.
     """
     fss3_payloads_lines: list[str] = []
-    for provider in spec.fss3_providers:
-        fss3_payloads_lines.append(
-            f"  ({json.dumps(provider.name)}, Path('aws-s3-providers') / {json.dumps(provider.name + '.json')}),"
-        )
+    if spec.fss3_mode == "legacy":
+        for provider in spec.fss3_providers:
+            fss3_payloads_lines.append(
+                f"  ({json.dumps(provider.name)}, Path('aws-s3-providers') / {json.dumps(provider.name + '.json')}),"
+            )
     fss3_block = "\n".join(fss3_payloads_lines) if fss3_payloads_lines else ""
+    data_mgmt_note = (
+        "print('INFO: Amazon S3 federated datasets are managed in Splunk Cloud Data Management; review data-management-datasets/.')\n"
+        if spec.fss3_providers and spec.fss3_mode == "data-management"
+        else ""
+    )
+    if spec.fss3_mode == "legacy":
+        fss3_apply_block = (
+            "# Step 2: legacy FSS3 providers (Splunk Cloud Platform <=10.3.2512 or explicit legacy migration)\n"
+            "fss3_payload_paths = [\n"
+            f"{fss3_block}\n"
+            "]\n"
+            "for name, payload_path in fss3_payload_paths:\n"
+            "    payload = json.loads(Path(payload_path).read_text(encoding='utf-8'))\n"
+            "    print(f'Provider {name} (FSS3): POST /services/data/federated/provider')\n"
+            "    post_or_update('/services/data/federated/provider', name, payload)\n"
+        )
+    elif data_mgmt_note:
+        fss3_apply_block = (
+            "# Step 2: Amazon S3 federated datasets are a Data Management app handoff on Cloud 10.4.2604+\n"
+            f"{data_mgmt_note}"
+        )
+    else:
+        fss3_apply_block = "# Step 2: no Amazon S3 federated datasets declared\n"
 
     s2s_payloads_lines: list[str] = []
     for provider in spec.s2s_providers:
@@ -911,6 +1081,9 @@ def _rest_provider_payload_block(spec: Spec) -> str:
                 f"'mode': {json.dumps(provider.mode)}, "
                 f"'appContext': {json.dumps(provider.app_context if provider.mode == 'standard' else '')}, "
                 f"'useFSHKnowledgeObjects': {json.dumps(provider.use_fsh_knowledge_objects)}, "
+                f"'allowIndexBasedProviderFiltering': {json.dumps('1' if provider.allow_index_based_provider_filtering else '0')}, "
+                f"'fedSrchIndexesAllowed': {json.dumps(';'.join(provider.fed_srch_indexes_allowed))}, "
+                f"'useAppContextFromSearch': {json.dumps('1' if provider.use_app_context_from_search else '0')}, "
                 f"'disabled': {json.dumps('1' if provider.disabled else '0')}, "
                 f"'_password_file': {json.dumps(provider.password_file)}"
             )
@@ -919,7 +1092,12 @@ def _rest_provider_payload_block(spec: Spec) -> str:
     s2s_block = "\n".join(s2s_payloads_lines) if s2s_payloads_lines else ""
 
     indexes_payloads_lines: list[str] = []
+    rest_index_provider_names = {p.name for p in spec.s2s_providers}
+    if spec.fss3_mode == "legacy":
+        rest_index_provider_names.update(p.name for p in spec.fss3_providers)
     for idx in spec.federated_indexes:
+        if idx.provider not in rest_index_provider_names:
+            continue
         indexes_payloads_lines.append(
             "  {"
             + (
@@ -1007,16 +1185,9 @@ def _rest_provider_payload_block(spec: Spec) -> str:
         "    print(f\"Provider {entry['name']} (FSS2S, {entry['mode']}): POST /services/data/federated/provider\")\n"
         "    post_or_update('/services/data/federated/provider', entry['name'], entry)\n"
         "\n"
-        "# Step 2: FSS3 providers (Splunk Cloud Platform only)\n"
-        "fss3_payload_paths = [\n"
-        f"{fss3_block}\n"
-        "]\n"
-        "for name, payload_path in fss3_payload_paths:\n"
-        "    payload = json.loads(Path(payload_path).read_text(encoding='utf-8'))\n"
-        "    print(f'Provider {name} (FSS3): POST /services/data/federated/provider')\n"
-        "    post_or_update('/services/data/federated/provider', name, payload)\n"
+        f"{fss3_apply_block}"
         "\n"
-        "# Step 3: federated indexes (FSS2S standard mode + FSS3)\n"
+        "# Step 3: federated indexes (FSS2S standard mode plus legacy FSS3 only when enabled)\n"
         "index_payloads = [\n"
         f"{indexes_block}\n"
         "]\n"
@@ -1137,6 +1308,8 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
     payload = {
         "app_name": spec.app_name,
         "splunk_home": spec.splunk_home,
+        "cloud_version": spec.cloud_version,
+        "fss3_mode": spec.fss3_mode,
         "federated_search_enabled": spec.federated_search_enabled,
         "max_preview_generation_duration": spec.max_preview_generation_duration,
         "max_preview_generation_inputcount": spec.max_preview_generation_inputcount,
@@ -1150,6 +1323,9 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
                     "host_port": p.host_port,
                     "service_account": p.service_account,
                     "app_context": p.app_context if p.mode == "standard" else "",
+                    "allow_index_based_provider_filtering": p.allow_index_based_provider_filtering,
+                    "fed_srch_indexes_allowed": p.fed_srch_indexes_allowed,
+                    "use_app_context_from_search": p.use_app_context_from_search,
                     "disabled": p.disabled,
                     "password_file": p.password_file,
                 }
@@ -1158,6 +1334,7 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
             "amazon_s3": [
                 {
                     "name": p.name,
+                    "mode": spec.fss3_mode,
                     "aws_account_id": p.aws_account_id,
                     "aws_region": p.aws_region,
                     "database": p.database,
@@ -1166,6 +1343,11 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
                     "aws_s3_paths_allowlist": p.aws_s3_paths_allowlist,
                     "aws_kms_keys_arn_allowlist": p.aws_kms_keys_arn_allowlist,
                     "disabled": p.disabled,
+                    "artifact": (
+                        f"data-management-datasets/{p.name}.json"
+                        if spec.fss3_mode == "data-management"
+                        else f"aws-s3-providers/{p.name}.json"
+                    ),
                 }
                 for p in spec.fss3_providers
             ],
@@ -1208,12 +1390,22 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--mode", choices=("standard", "transparent"), default="standard")
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--app-name", default="ZZZ_cisco_skills_federated_search")
+    parser.add_argument("--cloud-version", default=DEFAULT_CLOUD_VERSION)
+    parser.add_argument(
+        "--fss3-mode",
+        choices=FSS3_MODES,
+        default="data-management",
+        help="Amazon S3 federated-search workflow: data-management for Cloud 10.4.2604+ or legacy for older FSS3 provider REST.",
+    )
     parser.add_argument("--provider-name", default="remote_provider")
     parser.add_argument("--remote-host-port", default="")
     parser.add_argument("--service-account", default="")
     parser.add_argument("--password-file", default="")
     parser.add_argument("--app-context", default="search")
     parser.add_argument("--use-fsh-knowledge-objects", choices=("true", "false"), default="false")
+    parser.add_argument("--allow-index-based-provider-filtering", choices=("true", "false"), default="false")
+    parser.add_argument("--fed-srch-indexes-allowed", default="")
+    parser.add_argument("--use-app-context-from-search", choices=("true", "false"), default="false")
     parser.add_argument("--federated-index-name", default="remote_main")
     parser.add_argument(
         "--dataset-type",
@@ -1264,6 +1456,8 @@ def spec_from_cli(args: argparse.Namespace) -> Spec:
     raw: dict[str, Any] = {
         "splunk_home": args.splunk_home,
         "app_name": args.app_name,
+        "cloud_version": args.cloud_version,
+        "fss3_mode": args.fss3_mode,
         "federated_search_enabled": args.federated_search_enabled,
         "max_preview_generation_duration": args.max_preview_generation_duration,
         "max_preview_generation_inputcount": args.max_preview_generation_inputcount,
@@ -1292,6 +1486,9 @@ def spec_from_cli(args: argparse.Namespace) -> Spec:
                 "service_account": args.service_account,
                 "password_file": args.password_file,
                 "app_context": args.app_context,
+                "allow_index_based_provider_filtering": args.allow_index_based_provider_filtering,
+                "fed_srch_indexes_allowed": args.fed_srch_indexes_allowed,
+                "use_app_context_from_search": args.use_app_context_from_search,
             }
         )
     if not raw["federated_indexes"] and args.mode == "standard" and raw["providers"]:
@@ -1332,16 +1529,27 @@ def render(spec: Spec, *, output_dir: Path, dry_run: bool) -> dict[str, Any]:
         for rel, content in files.items():
             write_file(render_dir / rel, content, executable=rel.endswith(".sh"))
             assets.append(rel)
-        # FSS3 REST payloads + AWS prerequisites README.
+        # Amazon S3 federated search handoffs. Cloud 10.4.2604+ uses Data
+        # Management datasets; legacy FSS3 REST payloads require explicit mode.
         if spec.fss3_providers:
-            aws_dir = render_dir / "aws-s3-providers"
-            aws_dir.mkdir(parents=True, exist_ok=True)
-            for provider in spec.fss3_providers:
-                rel_path = f"aws-s3-providers/{provider.name}.json"
-                write_file(render_dir / rel_path, render_aws_s3_payload(provider))
-                assets.append(rel_path)
-            write_file(render_dir / "aws-s3-providers/README.md", render_aws_s3_readme(spec))
-            assets.append("aws-s3-providers/README.md")
+            if spec.fss3_mode == "data-management":
+                data_mgmt_dir = render_dir / "data-management-datasets"
+                data_mgmt_dir.mkdir(parents=True, exist_ok=True)
+                for provider in spec.fss3_providers:
+                    rel_path = f"data-management-datasets/{provider.name}.json"
+                    write_file(render_dir / rel_path, render_data_management_dataset(provider, spec))
+                    assets.append(rel_path)
+                write_file(render_dir / "data-management-datasets/README.md", render_data_management_readme(spec))
+                assets.append("data-management-datasets/README.md")
+            else:
+                aws_dir = render_dir / "aws-s3-providers"
+                aws_dir.mkdir(parents=True, exist_ok=True)
+                for provider in spec.fss3_providers:
+                    rel_path = f"aws-s3-providers/{provider.name}.json"
+                    write_file(render_dir / rel_path, render_aws_s3_payload(provider))
+                    assets.append(rel_path)
+                write_file(render_dir / "aws-s3-providers/README.md", render_aws_s3_readme(spec))
+                assets.append("aws-s3-providers/README.md")
     return {
         "target": "federated-search",
         "output_dir": str(output_dir),
@@ -1351,6 +1559,7 @@ def render(spec: Spec, *, output_dir: Path, dry_run: bool) -> dict[str, Any]:
         "providers": {
             "splunk_to_splunk_count": len(spec.s2s_providers),
             "amazon_s3_count": len(spec.fss3_providers),
+            "amazon_s3_mode": spec.fss3_mode,
         },
         "federated_index_count": len(spec.federated_indexes),
         "commands": {

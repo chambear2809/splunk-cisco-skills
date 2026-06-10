@@ -6,6 +6,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import unittest
+import json
 from pathlib import Path
 
 from tests.regression_helpers import REPO_ROOT
@@ -149,10 +150,8 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             indexes_conf = (Path(tmpdir) / "federated-search" / "indexes.conf").read_text(encoding="utf-8")
             federated_conf = (Path(tmpdir) / "federated-search" / "federated.conf.template").read_text(encoding="utf-8")
 
-            # Renderer's wording was tightened in the multi-provider rewrite:
-            # transparent providers explicitly do not use federated indexes, and
-            # FSS3 federated indexes are created via REST. Both notes appear in
-            # the rendered indexes.conf placeholder file.
+            # Transparent providers explicitly do not use federated indexes; the
+            # placeholder file should not render any federated index stanzas.
             self.assertIn("Transparent-mode providers do not use federated indexes.", indexes_conf)
             self.assertNotIn("[federated:", indexes_conf)
             self.assertIn("useFSHKnowledgeObjects = 1", federated_conf)
@@ -247,6 +246,102 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             self.assertIn("bucket_localize_max_timeout_sec = 600", limits_conf)
             self.assertNotIn("AKIA_TEST_SECRET", all_assets)
             self.assertNotIn("VERY_SECRET_S3_KEY", all_assets)
+
+    def test_smartstore_10_4_indexing_replication_separation_is_gated(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--deployment",
+                "cluster",
+                "--splunk-version",
+                "10.4.0",
+                "--remote-provider",
+                "s3",
+                "--remote-path",
+                "s3://splunk-smartstore/cluster-a",
+                "--indexes",
+                "main,summary",
+                "--enable-indexing-replication-separation",
+                "true",
+                "--replication-factor",
+                "3",
+                "--search-factor",
+                "2",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "smartstore"
+            indexes_conf = (render_dir / "indexes.conf.template").read_text(encoding="utf-8")
+            metadata = json.loads((render_dir / "metadata.json").read_text(encoding="utf-8"))
+            self.assertEqual(indexes_conf.count("hotBucketStreaming.sendSlices = true"), 2)
+            self.assertTrue(metadata["enable_indexing_replication_separation"])
+
+            old_version = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                str(Path(tmpdir) / "old"),
+                "--deployment",
+                "cluster",
+                "--splunk-version",
+                "10.3.0",
+                "--remote-path",
+                "s3://splunk-smartstore/cluster-a",
+                "--enable-indexing-replication-separation",
+                "true",
+                "--replication-factor",
+                "3",
+                "--search-factor",
+                "2",
+            )
+            self.assertNotEqual(old_version.returncode, 0)
+            self.assertIn("10.4.0", old_version.stderr)
+
+            standalone = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                str(Path(tmpdir) / "standalone"),
+                "--deployment",
+                "standalone",
+                "--remote-path",
+                "s3://splunk-smartstore/standalone",
+                "--enable-indexing-replication-separation",
+                "true",
+                "--replication-factor",
+                "1",
+                "--search-factor",
+                "1",
+            )
+            self.assertNotEqual(standalone.returncode, 0)
+            self.assertIn("--deployment cluster", standalone.stderr)
+
+    def test_smartstore_azure_10_4_preflight_checks_encrypt_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--deployment",
+                "cluster",
+                "--splunk-version",
+                "10.4.0",
+                "--remote-provider",
+                "azure",
+                "--remote-path",
+                "azure://splunk-smartstore/cluster-a",
+                "--azure-endpoint",
+                "https://storage.example.blob.core.windows.net",
+                "--azure-container-name",
+                "splunk-smartstore",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "smartstore"
+            preflight = (render_dir / "preflight.sh").read_text(encoding="utf-8")
+            readme = (render_dir / "README.md").read_text(encoding="utf-8")
+            self.assertIn("remote.azure.tenant_id", preflight)
+            self.assertIn("remote.azure.client_id", preflight)
+            self.assertIn("encrypt_fields", preflight)
+            self.assertIn("Azure SmartStore 10.4 upgrade note", readme)
 
     def test_smartstore_rejects_mismatched_remote_path_scheme(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

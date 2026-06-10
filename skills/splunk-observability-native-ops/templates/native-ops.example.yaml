@@ -107,8 +107,9 @@ logs:
 on_call:
   # The full Splunk On-Call lifecycle (teams, users, rotations, escalation
   # policies, routing keys, paging policies, alert rules, maintenance mode,
-  # incidents, REST endpoint alerts, and Splunk-side companion app installs)
-  # lives in the dedicated splunk-oncall-setup skill. Entries here are
-  # rendered as deeplink-only handoffs that point operators there.
+  # incidents, REST endpoint alerts, Splunk-side companion app installs for
+  # 3546/4886, and SOAR connector 5863 readiness) lives in the dedicated
+  # splunk-oncall-setup skill. Entries here are rendered as deeplink-only
+  # handoffs that point operators there.
   - name: Checkout SRE handoff
     note: "Run the splunk-oncall-setup skill for full Splunk On-Call coverage."

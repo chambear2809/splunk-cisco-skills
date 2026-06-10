@@ -1,6 +1,6 @@
 # Cisco Webex Package Reference
 
-Sources: Webex Add-on for Splunk `1.4.0` and Webex App for Splunk `2.0.0`
+Sources: Webex Add-on for Splunk `1.4.2` and Webex App for Splunk `2.0.0`
 package inspection, plus the upstream README.
 
 ## Apps

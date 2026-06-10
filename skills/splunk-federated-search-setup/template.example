@@ -1,19 +1,22 @@
 # Splunk Federated Search Setup Worksheet
 #
-# Multi-provider, multi-federated-index spec covering both Federated Search
-# for Splunk (FSS2S, type=splunk) and Federated Search for Amazon S3
-# (FSS3, type=aws_s3, Splunk Cloud Platform only).
+# Multi-provider, multi-federated-index spec covering Federated Search
+# for Splunk (FSS2S, type=splunk) and Amazon S3 federated dataset handoffs
+# for Splunk Cloud Platform 10.4.2604+.
 #
 # Non-secret values only. Service-account passwords for FSS2S providers
 # go in local-only password files referenced by `password_file`.
 # Create them without shell-history exposure with:
 #   bash skills/shared/scripts/write_secret_file.sh /tmp/federated_provider_password
 #
-# Splunk Cloud admins must POST aws_s3 providers via REST or the Web UI;
-# FSS3 cannot be configured by editing federated.conf in Cloud.
+# Splunk Cloud 10.4.2604+ admins create Amazon S3 connections and datasets in
+# the Data Management app. Use fss3_mode: legacy only for older Cloud stacks or
+# explicitly accepted migrations.
 
 phase: render
 apply_target: search-head            # search-head | shc-deployer | rest
+cloud_version: 10.4.2604
+fss3_mode: data-management           # data-management | legacy
 
 splunk_home: /opt/splunk
 app_name: ZZZ_cisco_skills_federated_search
@@ -77,11 +80,10 @@ providers:
   #   password_file: /tmp/hybrid_provider_password
   #   disabled: false
 
-  # Federated Search for Amazon S3 (FSS3). Splunk Cloud Platform ONLY.
-  # The renderer emits a REST payload (aws-s3-providers/<name>.json) and an
-  # AWS prerequisites README; it does not write federated.conf for aws_s3
-  # because FSS3 must be created through REST or Splunk Web. The Splunk
-  # admin user must hold admin_all_objects.
+  # Amazon S3 federated dataset handoff. Splunk Cloud Platform 10.4.2604+ ONLY.
+  # The renderer emits a Data Management handoff
+  # (data-management-datasets/<name>.json). Set fss3_mode: legacy only when
+  # you intentionally need the old FSS3 REST payload path.
   # - name: aws_logs
   #   type: aws_s3
   #   aws_account_id: "123456789012"   # 12-digit AWS account, quoted to keep YAML from coercing
@@ -98,13 +100,13 @@ providers:
   #     - arn:aws:kms:us-west-2:123456789012:key/abc-1234
   #   disabled: false
 
-# Federated indexes (standard mode FSS2S, plus FSS3 Glue-table mappings).
+# Federated indexes (standard mode FSS2S, plus Amazon S3 dataset hints).
 # Transparent mode providers do NOT use federated indexes; entries that
 # reference a transparent-mode provider are rejected.
 #
 # dataset_type values:
 # - FSS2S: index | metricindex | savedsearch | lastjob | datamodel
-# - FSS3:  glue_table  (dataset_name is the Glue table name)
+# - Amazon S3 Data Management handoff: glue_table (dataset_name is the Glue table name)
 federated_indexes:
   - name: remote_main
     provider: remote_prod

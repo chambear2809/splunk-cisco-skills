@@ -15,6 +15,8 @@ APPLY=false
 OUTPUT_DIR=""
 FEATURES="search-api,s2s,hec"
 CLOUD_PROVIDER="aws"
+CLOUD_EXPERIENCE="unknown"
+ACCEPT_UNKNOWN_CLOUD_EXPERIENCE="false"
 TARGET_SH=""
 ALLOW_ACS_LOCKOUT="false"
 STRICT_DRIFT="true"
@@ -58,6 +60,8 @@ Options:
   --output-dir PATH
   --features CSV (subset of: acs,search-api,hec,s2s,search-ui,idm-api,idm-ui)
   --cloud-provider aws|gcp
+  --cloud-experience classic|victoria|unknown
+  --accept-unknown-cloud-experience
   --target-search-head NAME
   --allow-acs-lockout true|false
   --strict-drift true|false
@@ -99,6 +103,8 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --features) require_arg "$1" $# || exit 1; FEATURES="$2"; shift 2 ;;
         --cloud-provider) require_arg "$1" $# || exit 1; CLOUD_PROVIDER="$2"; shift 2 ;;
+        --cloud-experience) require_arg "$1" $# || exit 1; CLOUD_EXPERIENCE="$2"; shift 2 ;;
+        --accept-unknown-cloud-experience) ACCEPT_UNKNOWN_CLOUD_EXPERIENCE="true"; shift ;;
         --target-search-head) require_arg "$1" $# || exit 1; TARGET_SH="$2"; shift 2 ;;
         --allow-acs-lockout) require_arg "$1" $# || exit 1; ALLOW_ACS_LOCKOUT="$2"; shift 2 ;;
         --strict-drift) require_arg "$1" $# || exit 1; STRICT_DRIFT="$2"; shift 2 ;;
@@ -146,6 +152,8 @@ PY
 validate_args() {
     validate_choice "${PHASE}" render preflight apply status audit validate all
     validate_choice "${CLOUD_PROVIDER}" aws gcp
+    validate_choice "${CLOUD_EXPERIENCE}" classic victoria unknown
+    validate_choice "${ACCEPT_UNKNOWN_CLOUD_EXPERIENCE}" true false
     validate_choice "${ALLOW_ACS_LOCKOUT}" true false
     validate_choice "${STRICT_DRIFT}" true false
     validate_choice "${EMIT_TERRAFORM}" true false
@@ -161,6 +169,7 @@ build_renderer_args() {
         --output-dir "${OUTPUT_DIR}"
         --features "${FEATURES}"
         --cloud-provider "${CLOUD_PROVIDER}"
+        --cloud-experience "${CLOUD_EXPERIENCE}"
         --target-search-head "${TARGET_SH}"
         --allow-acs-lockout "${ALLOW_ACS_LOCKOUT}"
         --strict-drift "${STRICT_DRIFT}"
@@ -183,6 +192,9 @@ build_renderer_args() {
         --operator-ips "${OPERATOR_IPS}"
         --operator-ips-v6 "${OPERATOR_IPS_V6}"
     )
+    if [[ "${ACCEPT_UNKNOWN_CLOUD_EXPERIENCE}" == "true" ]]; then
+        RENDER_ARGS+=(--accept-unknown-cloud-experience)
+    fi
 }
 
 render_dir() {

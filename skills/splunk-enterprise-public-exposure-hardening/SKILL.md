@@ -10,8 +10,8 @@ description: >-
   head against internet exposure, configure TLS / HSTS / CSP / mTLS /
   per-IP rate limit / DMZ heavy forwarder, lock down splunkd or the KV
   store, fix splunk.secret / pass4SymmKey defaults, evaluate against the
-  latest SVD floor (10.2.2 / 10.0.5 / 9.4.10 / 9.3.11), or render nginx /
-  HAProxy / WAF reference configs in front of Splunk.
+  latest SVD floor (10.4.0 / 10.2.2 / 10.0.5 / 9.4.11 / 9.3.12), or render
+  nginx / HAProxy / WAF reference configs in front of Splunk.
 ---
 
 # Splunk Enterprise Public Internet Exposure Hardening
@@ -203,10 +203,11 @@ Under the project root in `splunk-public-exposure-rendered/`:
 
 | Series | Required version | Source |
 |---|---|---|
+| 10.4.x | 10.4.0 | 10.4 branch not affected by SVD-2026-0504; explicit current branch floor |
 | 10.2.x | 10.2.2 | SVD-2026-0304, SVD-2026-0303 |
 | 10.0.x | 10.0.5 | SVD-2026-0303, SVD-2025-1006 |
-| 9.4.x  | 9.4.10 | SVD-2025-1006, SVD-2025-1203 |
-| 9.3.x  | 9.3.11 | SVD-2025-1006, SVD-2025-1203 |
+| 9.4.x  | 9.4.11 | SVD-2026-0504, SVD-2025-1006, SVD-2025-1203 |
+| 9.3.x  | 9.3.12 | SVD-2026-0504, SVD-2025-1006, SVD-2025-1203 |
 
 Floor lives in
 [references/cve-svd-floor.json](references/cve-svd-floor.json) and

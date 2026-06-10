@@ -34,6 +34,33 @@ The manifest covers:
 - Backup, DR, support evidence
 - Premium product handoffs
 
+## Splunk 10.4 Coverage Notes
+
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2604`, the
+doctor should be read alongside
+`../shared/splunk_10_4_enterprise_deployment_notes.md`. Evidence reviews should
+look for:
+
+- non-root Linux runtime posture and render-only Windows service-account
+  posture (installer-managed `NT SERVICE\Splunkd` or dedicated non-admin DUA)
+- supported 10.4 upgrade paths for Enterprise and Universal Forwarder fleets
+- KV Store/Mongo 7.x+ readiness before 10.4 binary upgrades, plus `[kvstore]`,
+  `[sslConfig]`, and `[kvstoreSslClientConfig]` TLS review
+- Azure SmartStore `remote.azure.tenant_id` / `remote.azure.client_id`
+  `encrypt_fields` readiness
+- Python 3.13 default / Python 3.9 fallback exposure, Node.js removal exposure,
+  and Dashboard Studio `auto_refresh_dashboards` capability needs
+- SHA-1 certificate/signature dependencies before PKI or FIPS/STIG promotion
+- custom app dependencies on the removed jQuery 2 compatibility surface
+- deployment server/Agent Management serverclass plans that still rely on
+  removed/deprecated parameters or implicit app-level `filterType`
+- Cloud ACS operations aligned to the 10.4.2604 ACS API surface for allowlists,
+  HEC tokens, restarts, and ACS capabilities
+- Cloud Victoria versus Classic experience, including no IDM on Victoria,
+  Classic-to-Victoria IDM allowlist migration, and Hybrid Search exclusion
+- topology-aware handoffs for SHC, indexer cluster, deployment server, license
+  manager, Monitoring Console, HEC, and restart workflows
+
 ## Evidence Shape
 
 Evidence is JSON and may come from live local Enterprise probes, external

@@ -135,9 +135,9 @@ class CiscoProductSetupTests(unittest.TestCase):
     def test_scan_package_sort_key_uses_embedded_app_version(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             old_package = Path(tmpdir) / "splunk-cisco-app-navigator-1.0.12.tar.gz"
-            latest_package = Path(tmpdir) / "splunk-cisco-app-navigator-scan_1025.tar.gz"
+            latest_package = Path(tmpdir) / "splunk-cisco-app-navigator-scan_1027.tar.gz"
             self.write_scan_package(old_package, "1.0.12")
-            self.write_scan_package(latest_package, "1.0.25")
+            self.write_scan_package(latest_package, "1.0.27")
 
             ordered = sorted(
                 [latest_package, old_package],

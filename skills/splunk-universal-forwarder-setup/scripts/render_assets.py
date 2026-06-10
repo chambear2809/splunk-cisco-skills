@@ -133,7 +133,7 @@ def normalized_arch(value: str, target_os: str) -> str:
     if raw in {"", "auto"}:
         return {
             "linux": "amd64",
-            "macos": "universal2",
+            "macos": "arm64",
             "windows": "x64",
             "freebsd": "freebsd14-amd64",
             "solaris": "amd64",
@@ -141,7 +141,16 @@ def normalized_arch(value: str, target_os: str) -> str:
         }.get(target_os, "amd64")
     aliases = {
         "linux": {"x64": "amd64", "x86-64": "amd64", "aarch64": "arm64"},
-        "macos": {"x64": "intel", "x86-64": "intel", "amd64": "intel", "arm64": "universal2", "aarch64": "universal2", "universal": "universal2"},
+        "macos": {
+            "x64": "intel",
+            "x86-64": "intel",
+            "amd64": "intel",
+            "aarch64": "arm64",
+            "m1": "arm64",
+            "m2": "arm64",
+            "m3": "arm64",
+            "universal": "universal2",
+        },
         "windows": {"amd64": "x64", "x86-64": "x64", "i386": "x86", "i686": "x86", "386": "x86"},
         "freebsd": {"amd64": "freebsd14-amd64", "x64": "freebsd14-amd64", "x86-64": "freebsd14-amd64"},
         "solaris": {"x64": "amd64", "x86-64": "amd64"},
@@ -154,7 +163,7 @@ def validate_arch_for_target(value: str, target_os: str) -> None:
     arch = normalized_arch(value, target_os)
     allowed = {
         "linux": {"amd64", "arm64", "ppc64le", "s390x"},
-        "macos": {"intel", "universal2"},
+        "macos": {"arm64", "intel", "universal2"},
         "windows": {"x64", "x86"},
         "freebsd": {"freebsd13-amd64", "freebsd14-amd64"},
         "solaris": {"amd64", "sparc"},

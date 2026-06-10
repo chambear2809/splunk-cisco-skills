@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--app-name", default="ZZZ_cisco_skills_smartstore")
+    parser.add_argument("--splunk-version", default="10.4.0")
     parser.add_argument("--remote-provider", choices=("s3", "gcs", "azure"), default="s3")
     parser.add_argument("--volume-name", default="remote_store")
     parser.add_argument("--remote-path", required=True)
@@ -64,6 +65,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bucket-localize-connect-timeout-max-retries", default="")
     parser.add_argument("--bucket-localize-max-timeout-sec", default="")
     parser.add_argument("--clean-remote-storage-by-default", choices=("true", "false"), default="false")
+    parser.add_argument("--enable-indexing-replication-separation", choices=("true", "false"), default="false")
+    parser.add_argument("--replication-factor", default="")
+    parser.add_argument("--search-factor", default="")
     parser.add_argument("--apply-cluster-bundle", choices=("true", "false"), default="false")
     parser.add_argument("--restart-splunk", choices=("true", "false"), default="true")
     parser.add_argument("--json", action="store_true")
@@ -81,6 +85,20 @@ def shell_quote(value: object) -> str:
 
 def bool_value(value: str) -> bool:
     return value.lower() == "true"
+
+
+def parse_version(value: str, option: str) -> tuple[int, int, int]:
+    parts = value.split("-", 1)[0].split(".")
+    if len(parts) < 2:
+        die(f"{option} must look like 10.4.0.")
+    nums: list[int] = []
+    for part in parts:
+        if not part.isdigit():
+            die(f"{option} must look like 10.4.0.")
+        nums.append(int(part))
+    while len(nums) < 3:
+        nums.append(0)
+    return (nums[0], nums[1], nums[2])
 
 
 def no_newline(value: str, option: str) -> None:
@@ -124,11 +142,22 @@ def validate_nonnegative_int(value: str, option: str, allow_empty: bool = True) 
         die(f"{option} must be a nonnegative integer.")
 
 
+def validate_positive_int(value: str, option: str) -> int:
+    if not re.fullmatch(r"[0-9]+", value or "") or int(value) < 1:
+        die(f"{option} must be a positive integer.")
+    return int(value)
+
+
+def indexing_replication_separation_enabled(args: argparse.Namespace) -> bool:
+    return bool_value(args.enable_indexing_replication_separation)
+
+
 def validate(args: argparse.Namespace) -> None:
     if not re.fullmatch(r"[A-Za-z0-9_.:-]+", args.app_name or ""):
         die("--app-name must contain only letters, numbers, underscore, dot, colon, or hyphen.")
     if not re.fullmatch(r"[A-Za-z0-9_]+", args.volume_name or ""):
         die("--volume-name must contain only letters, numbers, and underscores.")
+    parse_version(args.splunk_version, "--splunk-version")
     scheme = args.remote_path.split(":", 1)[0]
     expected_scheme = {"s3": "s3", "gcs": "gs", "azure": "azure"}[args.remote_provider]
     if scheme != expected_scheme:
@@ -170,6 +199,11 @@ def validate(args: argparse.Namespace) -> None:
         (args.bucket_localize_max_timeout_sec, "--bucket-localize-max-timeout-sec"),
     ):
         validate_nonnegative_int(value, option)
+    rf = sf = None
+    if args.replication_factor:
+        rf = validate_positive_int(args.replication_factor, "--replication-factor")
+    if args.search_factor:
+        sf = validate_positive_int(args.search_factor, "--search-factor")
     if args.eviction_policy and not re.fullmatch(r"[A-Za-z0-9_-]+", args.eviction_policy):
         die("--eviction-policy must contain only letters, numbers, underscores, and hyphens.")
     if (args.s3_access_key_file and not args.s3_secret_key_file) or (args.s3_secret_key_file and not args.s3_access_key_file):
@@ -195,6 +229,15 @@ def validate(args: argparse.Namespace) -> None:
         die("--gcs-credential-file can only be used with --remote-provider gcs.")
     if args.remote_provider != "azure" and (args.azure_endpoint or args.azure_container_name):
         die("remote.azure settings can only be used with --remote-provider azure.")
+    if indexing_replication_separation_enabled(args):
+        if args.deployment != "cluster":
+            die("--enable-indexing-replication-separation requires --deployment cluster.")
+        if parse_version(args.splunk_version, "--splunk-version") < (10, 4, 0):
+            die("--enable-indexing-replication-separation requires --splunk-version 10.4.0 or newer.")
+        if rf is None or sf is None:
+            die("--enable-indexing-replication-separation requires --replication-factor and --search-factor preflight values.")
+        if rf < sf:
+            die("--replication-factor must be greater than or equal to --search-factor.")
 
 
 def retention_lines(args: argparse.Namespace) -> list[str]:
@@ -283,6 +326,8 @@ def render_indexes(args: argparse.Namespace) -> str:
             lines.append(f"hotlist_recency_secs = {args.index_hotlist_recency_secs}")
         if args.index_hotlist_bloom_filter_recency_hours:
             lines.append(f"hotlist_bloom_filter_recency_hours = {args.index_hotlist_bloom_filter_recency_hours}")
+        if indexing_replication_separation_enabled(args):
+            lines.append("hotBucketStreaming.sendSlices = true")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -339,10 +384,20 @@ def render_limits(args: argparse.Namespace) -> str:
 
 
 def render_readme(args: argparse.Namespace) -> str:
+    azure_note = ""
+    if args.remote_provider == "azure" and parse_version(args.splunk_version, "--splunk-version") >= (10, 4, 0):
+        azure_note = """
+Azure SmartStore 10.4 upgrade note: if existing indexes.conf uses
+`remote.azure.tenant_id` or `remote.azure.client_id`, those field names must be
+present in `server.conf [general] encrypt_fields` before upgrading to Splunk
+10.4, or the values must be emptied after credential migration. The generated
+preflight checks live btool output for this condition.
+"""
     return f"""# Splunk SmartStore Rendered Assets
 
 Deployment: `{args.deployment}`
 Scope: `{args.scope}`
+Splunk version: `{args.splunk_version}`
 Remote provider: `{args.remote_provider}`
 Volume: `{args.volume_name}`
 Remote path: `{args.remote_path}`
@@ -363,17 +418,41 @@ all peers.
 
 If S3 access-key files were supplied, the rendered `indexes.conf.template`
 contains placeholders and the apply scripts substitute values locally.
+Indexing/replication separation is opt-in. When enabled, this renderer adds
+`hotBucketStreaming.sendSlices = true` per index only for Splunk 10.4+
+clustered SmartStore plans with RF/SF preflight values supplied.
+{azure_note}
 """
 
 
 def render_preflight(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
+    azure_upgrade_check = ""
+    if args.remote_provider == "azure" and parse_version(args.splunk_version, "--splunk-version") >= (10, 4, 0):
+        azure_upgrade_check = r"""
+indexes_btool="$("${splunk_home}/bin/splunk" btool indexes list --debug 2>/dev/null || true)"
+server_general="$("${splunk_home}/bin/splunk" btool server list general --debug 2>/dev/null || true)"
+encrypt_fields="$(awk -F= '/^[[:space:]]*encrypt_fields[[:space:]]*=/ {print $2}' <<<"${server_general}" | tail -1)"
+missing=()
+for field in remote.azure.tenant_id remote.azure.client_id; do
+  if awk -F= -v key="${field}" '{candidate=$1; gsub(/^[[:space:]]+|[[:space:]]+$/, "", candidate); if (candidate == key) found=1} END {exit found ? 0 : 1}' <<<"${indexes_btool}"; then
+    if ! tr ',' '\n' <<<"${encrypt_fields}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -Fxq "${field}"; then
+      missing+=("${field}")
+    fi
+  fi
+done
+if (( ${#missing[@]} > 0 )); then
+  printf 'ERROR: Splunk 10.4 Azure SmartStore upgrade requires [general] encrypt_fields to include: %s\n' "${missing[*]}" >&2
+  exit 1
+fi
+"""
     return make_script(
         f"""splunk_home={splunk_home}
 test -x "${{splunk_home}}/bin/splunk"
 "${{splunk_home}}/bin/splunk" btool indexes list --debug >/dev/null || true
 "${{splunk_home}}/bin/splunk" btool server list cachemanager --debug >/dev/null || true
 "${{splunk_home}}/bin/splunk" btool limits list remote_storage --debug >/dev/null || true
+{azure_upgrade_check}
 """
     )
 
@@ -463,6 +542,7 @@ def render(args: argparse.Namespace) -> dict:
                 {
                     "deployment": args.deployment,
                     "scope": args.scope,
+                    "splunk_version": args.splunk_version,
                     "remote_provider": args.remote_provider,
                     "volume_name": args.volume_name,
                     "remote_path": args.remote_path,
@@ -470,6 +550,9 @@ def render(args: argparse.Namespace) -> dict:
                     "s3_encryption": args.s3_encryption,
                     "s3_access_key_file": args.s3_access_key_file,
                     "s3_secret_key_file": args.s3_secret_key_file,
+                    "enable_indexing_replication_separation": indexing_replication_separation_enabled(args),
+                    "replication_factor": args.replication_factor,
+                    "search_factor": args.search_factor,
                 },
                 indent=2,
                 sort_keys=True,

@@ -20,11 +20,11 @@
 Official references:
 
 - Configure multisite indexer clusters with server.conf:
-  <https://help.splunk.com/en/data-management/manage-splunk-enterprise-indexers/10.2/deploy-and-configure-a-multisite-indexer-cluster/configure-multisite-indexer-clusters-with-server.conf>
+  <https://help.splunk.com/en/data-management/manage-splunk-enterprise-indexers/10.4/deploy-and-configure-a-multisite-indexer-cluster/configure-multisite-indexer-clusters-with-server.conf>
 - Configure multisite indexer clusters with the CLI:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.2/deploy-and-configure-a-multisite-indexer-cluster/configure-multisite-indexer-clusters-with-the-cli>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.4/deploy-and-configure-a-multisite-indexer-cluster/configure-multisite-indexer-clusters-with-the-cli>
 - Configure the site replication factor:
-  <https://help.splunk.com/en/data-management/manage-splunk-enterprise-indexers/10.2/deploy-and-configure-a-multisite-indexer-cluster/configure-the-site-replication-factor>
+  <https://help.splunk.com/en/data-management/manage-splunk-enterprise-indexers/10.4/deploy-and-configure-a-multisite-indexer-cluster/configure-the-site-replication-factor>
 - Migrate an indexer cluster from single-site to multisite:
   <https://docs.splunk.com/Documentation/Splunk/latest/Indexer/Migratetomultisite>
 - Decommission a site in a multisite indexer cluster:
@@ -34,7 +34,7 @@ Official references:
 - Migrate non-clustered indexers to a clustered environment:
   <https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.0/deploy-the-indexer-cluster/migrate-non-clustered-indexers-to-a-clustered-environment>
 - Implement cluster manager redundancy:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.2/configure-the-manager-node/implement-cluster-manager-redundancy>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.4/configure-the-manager-node/implement-cluster-manager-redundancy>
 - Update common peer configurations and apps (cluster bundle):
   <https://docs.splunk.com/Documentation/Splunk/9.4.1/Indexer/Updatepeerconfigurations>
 - Perform a rolling restart of an indexer cluster:
@@ -42,7 +42,7 @@ Official references:
 - Take a peer offline:
   <https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.0/manage-the-indexer-cluster/take-a-peer-offline>
 - Replace the manager node on the indexer cluster:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.2/configure-the-manager-node/replace-the-manager-node-on-the-indexer-cluster>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/10.4/configure-the-manager-node/replace-the-manager-node-on-the-indexer-cluster>
 
 ## Bundle Best Practices
 

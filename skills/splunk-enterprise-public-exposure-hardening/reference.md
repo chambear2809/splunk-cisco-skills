@@ -32,10 +32,11 @@ indexer-cluster hardening, leave `mgmtHostPort = 0.0.0.0:8089` and rely on
 
 ## 3. TLS / cipher policy
 
-Splunk Enterprise's documented baseline (still current in 10.2):
+Splunk Enterprise 10.4 supports a TLS 1.2 baseline and TLS 1.3-capable
+deployments:
 
 ```
-sslVersions = tls1.2
+sslVersions = tls1.2,tls1.3
 cipherSuite = ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:\
               ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:\
               ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:\
@@ -43,9 +44,11 @@ cipherSuite = ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:\
 ecdhCurves  = prime256v1, secp384r1, secp521r1
 ```
 
-The renderer emits `tls1.2` by default. Pass `--enable-tls13 true` to
-emit `tls1.2,tls1.3`; only safe when target Splunk version is 10.x and
-the platform OpenSSL supports it.
+The renderer defaults to `--enable-tls13 auto`, which emits `tls1.2,tls1.3`
+for Splunk 10.4+ and falls back to `tls1.2` below 10.4. Use
+`--enable-tls13 false` to opt out. The rendered `cipherSuite` remains the TLS
+1.2 cipher policy; TLS 1.3 suites are negotiated by the platform OpenSSL TLS
+1.3 support and are not selected through Splunk's TLS 1.2 `cipherSuite` value.
 
 Defense-in-depth toggles:
 
@@ -216,10 +219,11 @@ See [references/dmz-heavy-forwarder-pattern.md](references/dmz-heavy-forwarder-p
 
 The skill refuses to apply on a Splunk version below the floor:
 
-- 10.2.x → 10.2.2
-- 10.0.x → 10.0.5
-- 9.4.x  → 9.4.10
-- 9.3.x  → 9.3.11
+- 10.4.x -> 10.4.0
+- 10.2.x -> 10.2.2
+- 10.0.x -> 10.0.5
+- 9.4.x  -> 9.4.11
+- 9.3.x  -> 9.3.12
 
 A public Metasploit module for CVE-2024-36985 (`splunk_archiver` RCE)
 was merged 2026-01-20. Recent Shodan checks find ~133 publicly exposed

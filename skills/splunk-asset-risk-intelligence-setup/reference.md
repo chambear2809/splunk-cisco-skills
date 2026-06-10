@@ -11,7 +11,7 @@
 - Package pattern: `splunk-asset-and-risk-intelligence_*`
 - Access: restricted downloaders only
 - Splunkbase compatibility researched: Splunk Enterprise / Cloud Platform
-  `9.0` through `10.3`
+  `9.0` through `10.4`
 - Documentation compatibility signal: ARI `1.2.x` / `1.1.3` on `9.1.3+`
   including `10.x`; warn below `9.1.3`, do not hard-fail solely because the
   two official signals differ.

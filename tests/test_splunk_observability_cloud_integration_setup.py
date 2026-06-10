@@ -174,6 +174,12 @@ def test_unknown_modinput_template_rejected() -> None:
         renderer.validate_spec(_spec(sim_addon={"modular_inputs": ["not_a_template"]}))
 
 
+def test_oncall_handoff_does_not_treat_5863_as_splunk_side_app() -> None:
+    coverage = (SKILL_DIR / "references/coverage.md").read_text(encoding="utf-8")
+    assert "Splunk-side Splunkbase 3546 / 4886 / 5863 apps" not in coverage
+    assert "Splunk-side Splunkbase 3546 / 4886 apps plus SOAR connector 5863 readiness" in coverage
+
+
 def test_mts_sizing_preflight_fails_oversized(tmp_path: Path) -> None:
     """Spec that would exceed 250k MTS per modular input FAILs render."""
     renderer = _load_renderer()

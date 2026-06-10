@@ -1637,8 +1637,8 @@ def render_splunk_side(spec: dict[str, Any], output_dir: Path) -> tuple[list[dic
         coverage.append(coverage_entry(
             object_type="splunk_side_soar_connector",
             name="splunkoncall",
-            coverage="install_apply",
-            notes="Splunkbase 5863 SOAR connector; FIPS-compliant.",
+            coverage="handoff",
+            notes="Splunkbase 5863 is a Splunk SOAR connector, not a Splunk Enterprise/Cloud app; render SOAR asset readiness only.",
             extra={"splunkbase_id": 5863},
         ))
     if splunk_side.get("itsi", {}).get("enabled"):

@@ -21,6 +21,7 @@ FEATURES = (
     "idm-api",
     "idm-ui",
 )
+IDM_FEATURES = ("idm-api", "idm-ui")
 
 ADMIN_MODULES = (
     "allowlists",
@@ -149,6 +150,17 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--features", default="search-api,s2s,hec")
     parser.add_argument("--cloud-provider", choices=("aws", "gcp"), default="aws")
+    parser.add_argument(
+        "--cloud-experience",
+        choices=("classic", "victoria", "unknown"),
+        default="unknown",
+        help="Splunk Cloud experience. Required as 'classic' for IDM allowlists; Victoria has no IDM.",
+    )
+    parser.add_argument(
+        "--accept-unknown-cloud-experience",
+        action="store_true",
+        help="Allow legacy IDM planning without declaring Classic after an explicit operator review.",
+    )
     parser.add_argument("--target-search-head", default="")
     parser.add_argument("--allow-acs-lockout", choices=("true", "false"), default="false")
     parser.add_argument("--strict-drift", choices=("true", "false"), default="true")
@@ -312,6 +324,37 @@ def validate_features(features: list[str]) -> None:
     invalid = [f for f in features if f not in FEATURES]
     if invalid:
         die(f"Unknown ACS feature(s): {', '.join(invalid)}. Allowed: {', '.join(FEATURES)}")
+
+
+def validate_cloud_experience(args: argparse.Namespace, features: list[str]) -> None:
+    selected_idm_features = [feature for feature in features if feature in IDM_FEATURES]
+    idm_subnet_flags = []
+    for feature in IDM_FEATURES:
+        attr_base = feature.replace("-", "_")
+        if csv_list(getattr(args, f"{attr_base}_subnets")):
+            idm_subnet_flags.append(f"--{feature}-subnets")
+        if csv_list(getattr(args, f"{attr_base}_subnets_v6")):
+            idm_subnet_flags.append(f"--{feature}-subnets-v6")
+
+    if not selected_idm_features and not idm_subnet_flags:
+        return
+
+    requested = ", ".join(sorted(set(selected_idm_features + idm_subnet_flags)))
+    if args.cloud_experience == "classic":
+        return
+    if args.cloud_experience == "victoria":
+        die(
+            "Splunk Cloud Victoria stacks have no IDM and do not support Hybrid Search; "
+            "migrate IDM-era allowlists to search head or SHC member IPs and remove "
+            f"IDM features/subnets from this plan. Requested: {requested}."
+        )
+    if not args.accept_unknown_cloud_experience:
+        die(
+            "IDM allowlist planning requires --cloud-experience classic for legacy Classic stacks. "
+            "Specify --cloud-experience classic, remove IDM features/subnets for Victoria, or pass "
+            "--accept-unknown-cloud-experience only after confirming a legacy Classic IDM stack. "
+            f"Requested: {requested}."
+        )
 
 
 def validate_modules(modules: list[str]) -> None:
@@ -620,6 +663,7 @@ def validate_admin_operations(raw: dict) -> dict:
 def build_plan(args: argparse.Namespace) -> dict:
     features = csv_list(args.features)
     validate_features(features)
+    validate_cloud_experience(args, features)
     modules = csv_list(args.modules)
     validate_modules(modules)
     raw_admin_plan = load_admin_plan(args.admin_plan_file)
@@ -640,6 +684,8 @@ def build_plan(args: argparse.Namespace) -> dict:
         "skill": "splunk-cloud-acs-admin-setup",
         "modules": modules,
         "cloud_provider": args.cloud_provider,
+        "cloud_experience": args.cloud_experience,
+        "unknown_cloud_experience_accepted": args.accept_unknown_cloud_experience,
         "target_search_head": args.target_search_head or None,
         "allow_acs_lockout": args.allow_acs_lockout == "true",
         "strict_drift": args.strict_drift == "true",
@@ -649,7 +695,13 @@ def build_plan(args: argparse.Namespace) -> dict:
         "operations": operations,
         "operator_ips": {"ipv4": operator_ips_v4, "ipv6": operator_ips_v6},
         "default_state_notes": {
-            f: ("open by default" if f in DEFAULT_OPEN_FEATURES else "closed by default")
+            f: (
+                "not present on Victoria"
+                if args.cloud_experience == "victoria" and f in IDM_FEATURES
+                else "open by default"
+                if f in DEFAULT_OPEN_FEATURES
+                else "closed by default"
+            )
             for f in FEATURES
         },
     }
@@ -683,6 +735,8 @@ def render_metadata(args: argparse.Namespace, plan: dict) -> str:
             "skill": "splunk-cloud-acs-admin-setup",
             "modules": plan["modules"],
             "cloud_provider": plan["cloud_provider"],
+            "cloud_experience": plan["cloud_experience"],
+            "unknown_cloud_experience_accepted": plan["unknown_cloud_experience_accepted"],
             "features_in_plan": sorted(plan["features"].keys()),
             "ipv4_subnet_count": sum(len(v["ipv4"]) for v in plan["features"].values()),
             "ipv6_subnet_count": sum(len(v["ipv6"]) for v in plan["features"].values()),
@@ -726,6 +780,7 @@ def render_readme(plan: dict) -> str:
     return f"""# Splunk Cloud ACS Admin Rendered Assets
 
 Cloud provider: `{plan['cloud_provider']}`
+Cloud experience: `{plan['cloud_experience']}`
 Enabled modules: `{', '.join(plan['modules'])}`
 Strict allowlist drift: `{plan['strict_drift']}`
 Allow ACS lock-out: `{plan['allow_acs_lockout']}`
@@ -774,6 +829,13 @@ your current public IP is in the planned subnet list, or
 The broader admin plan intentionally blocks user password operations and custom
 HEC token values because those would put secret material into process argv.
 Use generated review notes plus file-backed local handoff for those cases.
+
+For Splunk Cloud Platform 10.4.2604, `--cloud-experience classic` is required
+for IDM-era operations. Victoria stacks have no IDM, do not support Hybrid
+Search, and Classic-to-Victoria migrations move IDM apps/configuration to the
+search tier; migrate IDM allowlists to search head or SHC member IPs. If the
+experience is unknown, IDM features fail closed unless
+`--accept-unknown-cloud-experience` is passed after explicit operator review.
 
 ## AWS / GCP subnet limit math
 
@@ -1303,6 +1365,12 @@ def hec_token_flags(record: dict, *, for_create: bool) -> list[object]:
 def render_inventory(plan: dict) -> str:
     helper = shell_quote(helper_path())
     modules = " ".join(shell_quote(m) for m in plan["modules"])
+    inventory_features = [
+        feature
+        for feature in FEATURES
+        if not (plan.get("cloud_experience") == "victoria" and feature in IDM_FEATURES)
+    ]
+    allowlist_inventory_features = " ".join(shell_quote(feature) for feature in inventory_features)
     return make_script(
         f"""# shellcheck disable=SC1091
 source {helper}
@@ -1311,6 +1379,7 @@ acs_prepare_context
 SNAPSHOT_DIR="$(dirname "$0")/inventory/$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "${{SNAPSHOT_DIR}}"
 MODULES=({modules})
+ALLOWLIST_INVENTORY_FEATURES=({allowlist_inventory_features})
 
 capture() {{
   local name="$1"
@@ -1328,7 +1397,7 @@ capture status-current-stack acs_command status current-stack
 for module in "${{MODULES[@]}}"; do
   case "${{module}}" in
     allowlists)
-      for feature in acs search-api hec s2s search-ui idm-api idm-ui; do
+      for feature in "${{ALLOWLIST_INVENTORY_FEATURES[@]}}"; do
         capture "allowlist-${{feature}}-ipv4" acs_command ip-allowlist describe "${{feature}}"
         capture "allowlist-${{feature}}-ipv6" acs_command ip-allowlist-v6 describe "${{feature}}"
       done

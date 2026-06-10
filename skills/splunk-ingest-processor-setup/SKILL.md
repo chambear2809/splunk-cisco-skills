@@ -4,7 +4,8 @@ description: >-
   Render Cisco Data Fabric ingest-time routing workflows and Splunk Cloud
   Platform Ingest Processor setup plans with SPL2 pipelines, source types,
   destinations, lifecycle handoffs, queue and monitoring searches, metrics,
-  OCSF, decrypt, S3 archive, custom pipeline templates, and downstream readiness checks. Use
+  OCSF, decrypt, Amazon S3 and Microsoft Azure Data Management dataset
+  destinations, custom pipeline templates, and downstream readiness checks. Use
   when the user asks to configure Ingest Processor, author Ingest Processor
   pipelines, route or transform data at ingest time, validate Ingest Processor
   readiness, or compare Ingest Processor with Edge Processor and Data Manager,
@@ -48,7 +49,7 @@ bash skills/splunk-ingest-processor-setup/scripts/setup.sh \
   --tenant-name acme-prod \
   --stack-url https://acme-prod.scs.splunk.com \
   --source-types "aws:cloudtrail,crowdstrike:fdr,json_app" \
-  --destinations "splunk_indexer=type=splunk_cloud;default=true,metrics=type=metrics_index;index=metrics,s3_archive=type=s3;format=parquet;bucket=example-bucket" \
+  --destinations "splunk_indexer=type=splunk_cloud;default=true,metrics=type=metrics_index;index=metrics,s3_archive=type=s3_dataset;format=parquet;bucket=example-bucket;region=us-east-1" \
   --pipelines "redact_auth=template=redact;sourcetype=json_app;destination=splunk_indexer,http_metrics=template=metrics;destination=metrics"
 ```
 
@@ -88,3 +89,6 @@ The default output directory is `splunk-ingest-processor-rendered/`:
   delivery guarantees under high back pressure or destination outages,
   single-browser-session editing, forwarder `useACK=false`, HEC indexer
   acknowledgement off, and CIDR lookup matching unsupported.
+- Treat `type=s3` as a compatibility alias for the 10.4.2604
+  `type=s3_dataset` Data Management workflow; use `type=azure_dataset` for
+  Microsoft Azure Blob/ADLS dataset destinations.

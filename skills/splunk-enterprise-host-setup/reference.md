@@ -3,6 +3,13 @@
 This skill bootstraps **self-managed Splunk Enterprise** hosts. It does not
 provision Splunk Cloud stacks.
 
+For Splunk Enterprise `10.4.0`, review
+`../shared/splunk_10_4_enterprise_deployment_notes.md`. Linux remains the
+production apply-capable target in this repo; Windows Enterprise is render-only
+with installer-managed local service account (`NT SERVICE\Splunkd`) or
+dedicated non-admin DUA service-account guardrails; and macOS Enterprise is
+non-production/out of scope.
+
 ## Role Model
 
 | Role | Meaning | Typical package |

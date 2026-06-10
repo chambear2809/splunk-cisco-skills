@@ -142,7 +142,8 @@ VALID_TARGETS = (
 VALID_KEY_ALGORITHMS = ("rsa-2048", "rsa-3072", "rsa-4096", "ecdsa-p256", "ecdsa-p384", "ecdsa-p521")
 VALID_KEY_FORMATS = ("pkcs1", "pkcs8")
 VALID_TLS_POLICIES = ("splunk-modern", "fips-140-3", "stig")
-VALID_TLS_FLOORS = ("tls1.2",)
+VALID_TLS_FLOORS = ("tls1.2", "tls1.3")
+VALID_TLS13_MODES = ("auto", "true", "false")
 VALID_MTLS = ("none", "s2s", "hec", "splunkd", "all")
 VALID_FIPS_MODES = ("none", "140-2", "140-3")
 VALID_PUBLIC_CAS = ("vault", "acme", "adcs", "ejbca", "other")
@@ -202,6 +203,7 @@ def parse_args() -> argparse.Namespace:
     # Algorithm policy
     p.add_argument("--tls-policy", choices=VALID_TLS_POLICIES, default="splunk-modern")
     p.add_argument("--tls-version-floor", choices=VALID_TLS_FLOORS, default="tls1.2")
+    p.add_argument("--enable-tls13", choices=VALID_TLS13_MODES, default="auto")
     p.add_argument("--allow-deprecated-tls", action="store_true")
     p.add_argument("--key-algorithm", choices=VALID_KEY_ALGORITHMS, default="rsa-2048")
     p.add_argument("--key-format", choices=VALID_KEY_FORMATS, default="pkcs1")
@@ -221,7 +223,7 @@ def parse_args() -> argparse.Namespace:
 
     # Splunk runtime
     p.add_argument("--splunk-home", default="/opt/splunk")
-    p.add_argument("--splunk-version", default="10.2.2")
+    p.add_argument("--splunk-version", default="10.4.0")
     p.add_argument("--cert-install-subdir", default="myssl")
 
     # Secret file paths (file paths only, never values)
@@ -290,6 +292,48 @@ def _load_algorithm_policy(args: argparse.Namespace) -> dict:
         return json.load(f)
 
 
+def _parse_version(value: str) -> tuple[int, int, int]:
+    parts = value.split("-", 1)[0].split(".")
+    if len(parts) < 2:
+        sys.exit(f"ERROR: unparseable Splunk version: {value!r}")
+    nums: list[int] = []
+    for part in parts:
+        if not part.isdigit():
+            sys.exit(f"ERROR: unparseable Splunk version: {value!r}")
+        nums.append(int(part))
+    while len(nums) < 3:
+        nums.append(0)
+    return (nums[0], nums[1], nums[2])
+
+
+def _is_splunk_104_or_newer(args: argparse.Namespace) -> bool:
+    return _parse_version(args.splunk_version) >= (10, 4, 0)
+
+
+def _tls13_enabled(args: argparse.Namespace) -> bool:
+    if args.enable_tls13 == "true":
+        return True
+    if args.enable_tls13 == "false":
+        return False
+    return _is_splunk_104_or_newer(args)
+
+
+def _effective_ssl_versions(args: argparse.Namespace) -> str:
+    if args.tls_version_floor == "tls1.3":
+        return "tls1.3"
+    if _tls13_enabled(args):
+        return "tls1.2,tls1.3"
+    return "tls1.2"
+
+
+def _effective_preset(args: argparse.Namespace, policy: dict) -> dict:
+    preset = dict(policy["presets"][args.tls_policy])
+    ssl_versions = _effective_ssl_versions(args)
+    preset["ssl_versions"] = ssl_versions
+    preset["ssl_versions_for_client"] = ssl_versions
+    return preset
+
+
 def _key_bits_or_curve(key_algorithm: str) -> dict:
     if key_algorithm.startswith("rsa-"):
         return {"family": "rsa", "bits": int(key_algorithm.split("-")[1])}
@@ -305,23 +349,22 @@ def _validate_args(args: argparse.Namespace, policy: dict) -> None:
     targets = _expand_targets(args.target)
     _expand_mtls(args.enable_mtls)
 
-    # TLS version floor.
-    # `--allow-deprecated-tls` does NOT raise the upper bound (Splunk docs
-    # don't yet support TLS 1.3); it only relaxes the lower bound so the
-    # operator can include ssl3 / tls1.0 / tls1.1 in `sslVersions` for
-    # legacy clients. Even with the relax, the rendered conf still
-    # defaults to `sslVersions = tls1.2` — the relax just stops the
-    # renderer from refusing.
+    # TLS version floor. Deprecated protocol names are intentionally not
+    # accepted as CLI choices for 10.4-era renders. TLS 1.3 is Splunk 10.4+
+    # behavior and is controlled separately by --enable-tls13.
     allowed_floors = list(policy["tls_version_supported"])
     if args.allow_deprecated_tls:
         allowed_floors.extend(policy["tls_version_forbidden"])
     if args.tls_version_floor not in allowed_floors:
         sys.exit(
             f"ERROR: tls_version_floor={args.tls_version_floor} not in supported set "
-            f"{policy['tls_version_supported']}. Splunk's docs do not yet list TLS 1.3 "
-            f"as a supported sslVersions value; see references/tls-protocol-policy.md. "
+            f"{policy['tls_version_supported']}. "
             f"Pass --allow-deprecated-tls to relax (still not recommended)."
         )
+    if args.tls_version_floor == "tls1.3" and not _is_splunk_104_or_newer(args):
+        sys.exit("ERROR: --tls-version-floor=tls1.3 requires --splunk-version 10.4.0 or newer.")
+    if args.enable_tls13 == "true" and not _is_splunk_104_or_newer(args):
+        sys.exit("ERROR: --enable-tls13=true requires --splunk-version 10.4.0 or newer.")
 
     # Validity day caps
     if args.leaf_days > policy["validity_days"]["leaf_cap_private"] and args.mode == "private":
@@ -436,6 +479,8 @@ explicitly run an apply phase.
 | Targets | `{', '.join(sorted(targets))}` |
 | TLS policy | `{args.tls_policy}` |
 | TLS version floor | `{args.tls_version_floor}` |
+| TLS 1.3 mode | `{args.enable_tls13}` |
+| Effective sslVersions | `{_effective_ssl_versions(args)}` |
 | Key algorithm | `{args.key_algorithm}` |
 | Key format | `{args.key_format}` |
 | mTLS surfaces | `{', '.join(sorted(mtls)) if mtls else 'none'}` |
@@ -488,6 +533,8 @@ def render_metadata(out: Path, args: argparse.Namespace, targets: set[str], mtls
         "targets": sorted(targets),
         "tls_policy": args.tls_policy,
         "tls_version_floor": args.tls_version_floor,
+        "enable_tls13": args.enable_tls13,
+        "effective_ssl_versions": _effective_ssl_versions(args),
         "key_algorithm": args.key_algorithm,
         "key_format": args.key_format,
         "enable_mtls": sorted(mtls),
@@ -2074,7 +2121,7 @@ def _ep_readme(args: argparse.Namespace) -> str:
 
 This directory holds the five-file cert pair Splunk Edge Processor
 expects per
-[Obtain TLS certificates for data sources and Edge Processors](https://help.splunk.com/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/10.0.2503/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors):
+[Obtain TLS certificates for data sources and Edge Processors](https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors):
 
 | File | Role |
 |---|---|
@@ -2404,8 +2451,11 @@ echo "    Push the bundle and run a full searchable rolling restart."
 
 def _expire_watch_sh(args: argparse.Namespace) -> str:
     return _sh(f"""# Walk a directory of PEM files and report any cert expiring within
-# THRESHOLD days. Wraps `openssl x509 -enddate`. Pair with the SSL
-# Certificate Checker add-on (Splunkbase 3172) for ongoing monitoring.
+# THRESHOLD days. Wraps `openssl x509 -enddate`.
+#
+# Splunkbase 3172 (SSL Certificate Checker) is archived and does not
+# advertise Splunk 10.4 support. For 10.4 deployments, schedule this helper
+# or equivalent enterprise monitoring instead of installing 3172.
 
 DIR="${{1:-{args.splunk_home}/etc/auth}}"
 THRESHOLD="${{2:-30}}"
@@ -2492,7 +2542,10 @@ Run-mode summary:
 ## Post-apply
 
 - [ ] `bash validate.sh` returns OK on every targeted role.
-- [ ] SSL Certificate Checker (Splunkbase 3172) installed and reporting.
+- [ ] `pki/rotate/expire-watch.sh` or enterprise certificate monitoring is
+      scheduled for all rendered certificate paths.
+- [ ] Splunk Health Assistant Add-on (Splunkbase 4603) reviewed in Monitoring
+      Console for 10.4-compatible upgrade and TLS checks.
 - [ ] `/services/server/health/splunkd` returns `green` on every host.
 - [ ] Rotation calendar entry created at leaf-validity - 30 days.
 """
@@ -2617,7 +2670,7 @@ def _handoff_fips(args: argparse.Namespace) -> str:
 
 This skill renders the cert side. The FIPS module flip is a separate
 two-phase operation per
-[Upgrade and migrate your FIPS-mode deployments](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.2/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments).
+[Upgrade and migrate your FIPS-mode deployments](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.4/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments).
 
 Current run: `--fips-mode {args.fips_mode}`
 
@@ -2625,8 +2678,9 @@ Current run: `--fips-mode {args.fips_mode}`
 
 - Splunk 10 ships both modules. Upgrading from 9.x in FIPS 140-2 leaves
   you in 140-2 by default.
-- Confirm: AVX CPU, FIPS-supported OS, MongoDB 4.2+, Python 3.9 apps,
-  TLS 1.2 everywhere.
+- Confirm: AVX CPU, FIPS-supported OS, MongoDB 4.2+, Python 3.13-compatible
+  apps (or an explicit Python 3.9 fallback plan), and TLS 1.2/TLS 1.3 posture
+  aligned with your `--enable-tls13 auto|true|false` policy.
 
 ## Phase 2 — flip to FIPS 140-3
 
@@ -2682,7 +2736,10 @@ def _handoff_post_install_monitoring(args: argparse.Namespace) -> str:
 See references/post-install-monitoring.md for the full set. Quick
 checklist:
 
-- [ ] SSL Certificate Checker (Splunkbase 3172) installed.
+- [ ] `pki/rotate/expire-watch.sh` or an enterprise cert-inventory monitor
+      scheduled across all Splunk roles.
+- [ ] Splunk Health Assistant Add-on (Splunkbase 4603) checked from Monitoring
+      Console for 10.4-compatible TLS and upgrade findings.
 - [ ] Saved search alerts at 30 / 14 / 7 days before expiry.
 - [ ] `/services/server/health/splunkd` polled every 5 min.
 - [ ] CIM Certificates data model populated.
@@ -2704,6 +2761,7 @@ ADMIN_PASSWORD_FILE="${{SPLUNK_ADMIN_PASSWORD_FILE:-}}"
 failed=0
 fail() {{ echo "FAIL: $1" >&2; failed=$((failed + 1)); }}
 ok()   {{ echo "OK:   $1"; }}
+warn() {{ echo "WARN: $1" >&2; }}
 
 # 1. cabundle.pem present
 if [[ -f "$SPLUNK_HOME/etc/auth/{args.cert_install_subdir}/cabundle.pem" ]]; then
@@ -2724,15 +2782,26 @@ fi
 
 # 3. TLS version floor
 sslv="$("$SPLUNK_HOME/bin/splunk" cmd btool server list sslConfig 2>/dev/null | awk '/^sslVersions/ {{print $3}}' | head -1)"
-if [[ -n "$sslv" ]] && [[ "$sslv" != "tls1.2" ]] && [[ "$sslv" != "*"*"-tls1.0,-tls1.1"* ]]; then
-    fail "sslVersions = $sslv (expected tls1.2; Splunk docs do not yet support TLS 1.3)"
+if [[ -n "$sslv" ]] && [[ "$sslv" != "tls1.2" ]] && [[ "$sslv" != "tls1.2,tls1.3" ]] && [[ "$sslv" != "tls1.3" ]] && [[ "$sslv" != "*"*"-tls1.0,-tls1.1"* ]]; then
+    fail "sslVersions = $sslv (expected tls1.2 or tls1.2,tls1.3 for Splunk 10.4+)"
 else
     ok "sslVersions floor satisfied"
 fi
 
-# 4. KV Store EKU verify (run the documented openssl verify -x509_strict)
+# 4. KV Store 10.4 TLS surface and EKU verify
 if [[ -f "$SPLUNK_HOME/etc/auth/{args.cert_install_subdir}/cabundle.pem" ]]; then
-    cert_path="$("$SPLUNK_HOME/bin/splunk" cmd btool server list sslConfig 2>/dev/null | awk '/^serverCert/ {{print $3}}' | head -1)"
+    kvstore_btool="$("$SPLUNK_HOME/bin/splunk" cmd btool server list kvstore 2>/dev/null || true)"
+    "$SPLUNK_HOME/bin/splunk" cmd btool server list kvstoreSslClientConfig --debug >/dev/null 2>&1 || true
+    kvstore_tls_fields="$(awk -F= '/^[[:space:]]*(serverCert|sslRootCAPath|caCertFile|sslPassword|cipherSuite|sslVersions)[[:space:]]*=/ {{print $1}}' <<<"${{kvstore_btool}}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sort -u | tr '\n' ' ')"
+    if [[ -n "${{kvstore_tls_fields//[[:space:]]/}}" ]]; then
+        warn "Splunk 10.4 evaluates [kvstore] TLS settings per field; review these [kvstore] overrides before promotion: $kvstore_tls_fields"
+    else
+        ok "no KV Store-specific TLS overrides detected under [kvstore]"
+    fi
+    cert_path="$(awk -F= '/^[[:space:]]*serverCert[[:space:]]*=/ {{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}}' <<<"${{kvstore_btool}}")"
+    if [[ -z "$cert_path" ]]; then
+        cert_path="$("$SPLUNK_HOME/bin/splunk" cmd btool server list sslConfig 2>/dev/null | awk '/^serverCert/ {{print $3}}' | head -1)"
+    fi
     if [[ -n "$cert_path" ]] && [[ -f "$cert_path" ]]; then
         if "$SPLUNK_HOME/bin/splunk" cmd openssl verify -verbose -x509_strict \\
             -CAfile "$SPLUNK_HOME/etc/auth/{args.cert_install_subdir}/cabundle.pem" \\
@@ -2900,7 +2969,7 @@ def render(args: argparse.Namespace) -> tuple[Path, set[str]]:
     _validate_args(args, policy)
     targets = _expand_targets(args.target)
     mtls = _expand_mtls(args.enable_mtls)
-    preset = policy["presets"][args.tls_policy]
+    preset = _effective_preset(args, policy)
 
     emitted: set[str] = set()
 
@@ -3111,6 +3180,8 @@ def main() -> int:
             "targets": sorted(targets),
             "tls_policy": args.tls_policy,
             "tls_version_floor": args.tls_version_floor,
+            "enable_tls13": args.enable_tls13,
+            "effective_ssl_versions": _effective_ssl_versions(args),
             "key_algorithm": args.key_algorithm,
             "key_format": args.key_format,
             "enable_mtls": sorted(mtls),

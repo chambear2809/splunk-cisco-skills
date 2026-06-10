@@ -53,9 +53,10 @@ apply changes until the operator passes `--accept-pki-rotation`.
   headers. Splunk Web has no `customHttpHeaders`; those headers
   come from the reverse proxy and are owned by
   [`skills/splunk-enterprise-public-exposure-hardening`](../splunk-enterprise-public-exposure-hardening/SKILL.md).
-- It does not force TLS 1.3. Splunk's TLS-protocol-version doc
-  lists `tls1.2` as the maximum supported version; the skill
-  defaults to and refuses anything below `tls1.2`.
+- It does not force TLS 1.3 on pre-10.4 deployments. The skill
+  defaults to `sslVersions = tls1.2,tls1.3` for Splunk 10.4+,
+  falls back to `tls1.2` below 10.4, and refuses anything below
+  `tls1.2`.
 - It does not build the FIPS-validated OpenSSL module. The
   operator owns the FIPS module; the skill flips
   `SPLUNK_FIPS_VERSION` in `splunk-launch.conf`.
@@ -298,9 +299,10 @@ Under the project root in `splunk-platform-pki-rendered/`:
   rolling-restart runbook.
 - `handoff/` — Markdown checklists for Vault PKI, ACME / cert-manager,
   Microsoft AD CS, EJBCA, Splunk Cloud UFCP / BYOC, FIPS migration,
-  Edge Processor upload, post-install monitoring (SSL Cert Checker
-  Splunkbase 3172, `/server/health/splunkd` REST endpoint, CIM
-  Certificates data model), and the operator checklist.
+  Edge Processor upload, post-install monitoring (`expire-watch.sh`,
+  Splunk Health Assistant Add-on 4603, `/server/health/splunkd` REST endpoint,
+  CIM Certificates data model), and the operator checklist. Splunkbase 3172 is
+  archived and is not recommended for Splunk 10.4 deployments.
 - `preflight.sh`, `validate.sh`, `inventory.sh`, `README.md`,
   `metadata.json`.
 
@@ -314,7 +316,8 @@ Under the project root in `splunk-platform-pki-rendered/`:
   must return `OK`), `splunk.secret` SHA-256 parity across cluster
   members, FIPS posture (refuses mid-Phase-1 / Phase-2 migration),
   hostname-validation gating, TLS protocol floor check
-  (`sslVersions = tls1.2`), per-host
+  (`sslVersions = tls1.2,tls1.3` for 10.4+ or `tls1.2` when
+  TLS 1.3 is disabled), per-host
   `splunk btool server list sslConfig` snapshot, replication-port
   mode (cleartext vs SSL), `[shclustering]` `pass4SymmKey`
   presence reminder. Refuses to mark the deployment ready when any
@@ -419,7 +422,8 @@ the renderer also consumes
 
 ## TLS protocol floor
 
-Defaults to `sslVersions = tls1.2` and `sslVersionsForClient = tls1.2`.
+Defaults to `sslVersions = tls1.2,tls1.3` and
+`sslVersionsForClient = tls1.2,tls1.3` for Splunk 10.4+.
 Read [references/tls-protocol-policy.md](references/tls-protocol-policy.md)
 for the upstream support table and the guarded
 `--allow-deprecated-tls` path.

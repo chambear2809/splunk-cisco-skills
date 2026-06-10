@@ -322,13 +322,21 @@ def test_svd_floor_refusal_below_94_floor(tmp_path: Path) -> None:
     result = run_render(*base_render_args(out, **{"--splunk-version": "9.4.5"}))
     assert result.returncode != 0
     assert "SVD floor" in (result.stderr + result.stdout)
-    assert "9.4.10" in (result.stderr + result.stdout)
+    assert "9.4.11" in (result.stderr + result.stdout)
 
 
 def test_svd_floor_accepts_at_or_above_floor(tmp_path: Path) -> None:
     out = tmp_path / "out"
     result = run_render(*base_render_args(out, **{"--splunk-version": "10.2.2"}))
     assert result.returncode == 0, result.stderr
+
+
+def test_svd_floor_accepts_explicit_10_4_branch(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    result = run_render(*base_render_args(out, **{"--splunk-version": "10.4.0"}))
+    assert result.returncode == 0, result.stderr
+    metadata = json.loads((render_dir(out) / "metadata.json").read_text(encoding="utf-8"))
+    assert metadata["svd_floor"]["10.4"] == "10.4.0"
 
 
 def test_svd_floor_unknown_series_does_not_refuse(tmp_path: Path) -> None:
@@ -598,16 +606,33 @@ def test_render_rejects_invalid_cidr(tmp_path: Path) -> None:
     assert "cidr" in (result.stderr + result.stdout).lower()
 
 
-def test_render_rejects_tls13_without_enable_flag(tmp_path: Path) -> None:
+def test_render_allows_tls13_auto_and_rejects_forced_tls13_below_10_4(tmp_path: Path) -> None:
     out = tmp_path / "out"
-    result = run_render(
+    opt_out = run_render(
         "--output-dir", str(out),
         "--public-fqdn", "splunk.example.com",
         "--proxy-cidr", "10.0.10.0/24",
         "--tls-policy", "tls12_13",
         "--enable-tls13", "false",
     )
+    assert opt_out.returncode == 0, opt_out.stderr
+    web_conf = (
+        render_dir(out)
+        / "splunk/apps/000_public_exposure_hardening/default/web.conf"
+    ).read_text(encoding="utf-8")
+    assert "sslVersions = tls1.2" in web_conf
+    assert "tls1.3" not in web_conf
+
+    result = run_render(
+        "--output-dir", str(out / "old"),
+        "--public-fqdn", "splunk.example.com",
+        "--proxy-cidr", "10.0.10.0/24",
+        "--tls-policy", "tls12_13",
+        "--enable-tls13", "true",
+        "--splunk-version", "10.3.0",
+    )
     assert result.returncode != 0
+    assert "10.4.0" in (result.stderr + result.stdout)
 
 
 # ---------------------------------------------------------------------------
@@ -636,7 +661,7 @@ def test_web_conf_has_critical_hardening_settings(tmp_path: Path) -> None:
         "x_frame_options_sameorigin = true",
         "tools.proxy.on = true",
         "tools.proxy.base = https://splunk.example.com",
-        "sslVersions = tls1.2",
+        "sslVersions = tls1.2,tls1.3",
     )
     for line in expected_lines:
         assert line in web_conf, f"web.conf is missing critical line: {line}"
@@ -870,6 +895,9 @@ def test_cve_svd_floor_json_is_valid() -> None:
     assert isinstance(data, dict)
     # v2 structured shape: top-level splunk_enterprise dict.
     assert "splunk_enterprise" in data, "cve-svd-floor.json missing splunk_enterprise key"
+    assert data["splunk_enterprise"]["10.4"] == "10.4.0"
+    assert data["splunk_enterprise"]["9.4"] == "9.4.11"
+    assert data["splunk_enterprise"]["9.3"] == "9.3.12"
     for series, version in data["splunk_enterprise"].items():
         if str(series).startswith("_"):
             continue

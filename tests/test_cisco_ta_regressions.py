@@ -2274,10 +2274,10 @@ EOF
             credentials_file = tmp_path / "credentials"
             curl_log = tmp_path / "curl.log"
             mock_state_file = tmp_path / "mock-curl-state.json"
-            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.tgz"
-            old_package_name = "splunk-10.1.0-abcdef123456-linux-amd64.tgz"
-            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
-            old_package_url = f"https://download.splunk.com/products/splunk/releases/10.1.0/linux/{old_package_name}"
+            package_name = "splunk-10.4.0-f798d4d49089-linux-amd64.tgz"
+            old_package_name = "splunk-10.2.2-abcdef123456-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.4.0/linux/{package_name}"
+            old_package_url = f"https://download.splunk.com/products/splunk/releases/10.2.2/linux/{old_package_name}"
             sha_url = f"{package_url}.sha512"
             old_sha_url = f"{old_package_url}.sha512"
             package_content = "tgz-package"
@@ -2295,7 +2295,7 @@ EOF
                         "text": {
                             "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
                                 f"""\
-                                Splunk Enterprise 10.2.1
+                                Splunk Enterprise 10.4.0
                                 wget -O {old_package_name} "{old_package_url}"
                                 {old_package_url}
                                 {old_sha_url}
@@ -2334,13 +2334,13 @@ EOF
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Resolved latest Splunk Enterprise 10.2.1 package", result.stdout)
+            self.assertIn("Resolved latest Splunk Enterprise 10.4.0 package", result.stdout)
             self.assertIn("Verifying", result.stdout)
             self.assertTrue(package_path.exists())
             self.assertTrue(metadata_path.exists())
 
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            self.assertEqual(metadata["version"], "10.2.1")
+            self.assertEqual(metadata["version"], "10.4.0")
             self.assertEqual(metadata["package_url"], package_url)
             self.assertEqual(metadata["sha512"], sha512_hex(package_content))
 
@@ -2359,8 +2359,8 @@ EOF
             credentials_file = tmp_path / "credentials"
             curl_log = tmp_path / "curl.log"
             mock_state_file = tmp_path / "mock-curl-state.json"
-            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.deb"
-            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            package_name = "splunk-10.4.0-f798d4d49089-linux-amd64.deb"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.4.0/linux/{package_name}"
             sha_url = f"{package_url}.sha512"
             package_content = "deb-package"
             package_path = REPO_ROOT / "splunk-ta" / package_name
@@ -2377,7 +2377,7 @@ EOF
                         "text": {
                             "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
                                 f"""\
-                                Splunk Enterprise 10.2.1
+                                Splunk Enterprise 10.4.0
                                 wget -O {package_name} "{package_url}"
                                 {package_url}
                                 {sha_url}
@@ -2412,7 +2412,7 @@ EOF
                 env=env,
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
-            self.assertIn("Resolved latest Splunk Enterprise 10.2.1 package", result.stdout)
+            self.assertIn("Resolved latest Splunk Enterprise 10.4.0 package", result.stdout)
             self.assertTrue(package_path.exists())
             self.assertTrue(metadata_path.exists())
 
@@ -2430,8 +2430,8 @@ EOF
             credentials_file = tmp_path / "credentials"
             curl_log = tmp_path / "curl.log"
             mock_state_file = tmp_path / "mock-curl-state.json"
-            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.deb"
-            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            package_name = "splunk-10.4.0-f798d4d49089-linux-amd64.deb"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.4.0/linux/{package_name}"
             sha_url = f"{package_url}.sha512"
             package_path = REPO_ROOT / "splunk-ta" / package_name
             metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-deb.json"
@@ -2462,7 +2462,7 @@ EOF
                         "text": {
                             "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
                                 f"""\
-                                Splunk Enterprise 10.2.1
+                                Splunk Enterprise 10.4.0
                                 wget -O {package_name} "{package_url}"
                                 {package_url}
                                 {sha_url}
@@ -2501,7 +2501,7 @@ EOF
             )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             self.assertIn("Auto-selected deb", result.stdout)
-            self.assertIn("Resolved latest Splunk Enterprise 10.2.1 package", result.stdout)
+            self.assertIn("Resolved latest Splunk Enterprise 10.4.0 package", result.stdout)
             self.assertTrue(package_path.exists())
 
 
@@ -2524,7 +2524,7 @@ EOF
                         "text": {
                             "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
                                 f"""\
-                                Splunk Enterprise 10.2.1
+                                Splunk Enterprise 10.4.0
                                 wget -O {package_name} "{package_url}"
                                 {package_url}
                                 {sha_url}
@@ -2569,8 +2569,8 @@ EOF
             credentials_file = tmp_path / "credentials"
             curl_log = tmp_path / "curl.log"
             mock_state_file = tmp_path / "mock-curl-state.json"
-            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.tgz"
-            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            package_name = "splunk-10.4.0-f798d4d49089-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.4.0/linux/{package_name}"
             sha_url = f"{package_url}.sha512"
             package_content = "stale-tgz-package"
             package_path = REPO_ROOT / "splunk-ta" / package_name
@@ -2590,7 +2590,7 @@ EOF
                         "sha512": sha512_hex(package_content),
                         "sha512_url": sha_url,
                         "source_page_url": "https://www.splunk.com/en_us/download/splunk-enterprise.html",
-                        "version": "10.2.1",
+                        "version": "10.4.0",
                     },
                     indent=2,
                     sort_keys=True,
@@ -2690,8 +2690,8 @@ EOF
             bin_dir.mkdir()
             credentials_file = tmp_path / "credentials"
             mock_state_file = tmp_path / "mock-curl-state.json"
-            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.tgz"
-            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            package_name = "splunk-10.4.0-f798d4d49089-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.4.0/linux/{package_name}"
             metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-tgz.json"
 
             self.addCleanup(lambda: metadata_path.unlink(missing_ok=True))
@@ -2707,7 +2707,7 @@ EOF
                         "sha512": sha512_hex("stale-package"),
                         "sha512_url": f"{package_url}.sha512",
                         "source_page_url": "https://www.splunk.com/en_us/download/splunk-enterprise.html",
-                        "version": "10.2.1",
+                        "version": "10.4.0",
                     },
                     indent=2,
                     sort_keys=True,
@@ -2757,8 +2757,8 @@ EOF
             credentials_file = tmp_path / "credentials"
             curl_log = tmp_path / "curl.log"
             mock_state_file = tmp_path / "mock-curl-state.json"
-            package_name = "splunk-10.2.1-c892b66d163d-linux-amd64.tgz"
-            package_url = f"https://download.splunk.com/products/splunk/releases/10.2.1/linux/{package_name}"
+            package_name = "splunk-10.4.0-f798d4d49089-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/splunk/releases/10.4.0/linux/{package_name}"
             sha_url = f"{package_url}.sha512"
             package_path = REPO_ROOT / "splunk-ta" / package_name
             metadata_path = REPO_ROOT / "splunk-ta" / ".latest-splunk-enterprise-tgz.json"
@@ -2776,8 +2776,8 @@ EOF
                         "text": {
                             "https://www.splunk.com/en_us/download/splunk-enterprise.html": textwrap.dedent(
                                 f"""\
-                                <h1>Splunk Enterprise 10.2.1</h1>
-                                <a data-link="{package_url}" data-wget='wget -O {package_name} &#34;{package_url}&#34;' data-sha512="{sha_url}" data-version="10.2.1" href="#">
+                                <h1>Splunk Enterprise 10.4.0</h1>
+                                <a data-link="{package_url}" data-wget='wget -O {package_name} &#34;{package_url}&#34;' data-sha512="{sha_url}" data-version="10.4.0" href="#">
                                   Download Now
                                 </a>
                                 """
@@ -2815,6 +2815,158 @@ EOF
             self.assertIn("https://www.splunk.com/en_us/download/splunk-enterprise.html", curl_requests)
             self.assertIn(sha_url, curl_requests)
             self.assertNotIn(package_url + "\n", curl_requests)
+
+    def test_host_bootstrap_blocks_direct_9x_to_10_4_upgrade_before_stop(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            splunk_home = tmp_path / "splunk"
+            bin_dir = splunk_home / "bin"
+            bin_dir.mkdir(parents=True)
+            invoke_log = tmp_path / "splunk.log"
+            package = tmp_path / "splunk-10.4.0-f798d4d49089-linux-amd64.tgz"
+            package.write_text("not-a-real-package", encoding="utf-8")
+            write_executable(
+                bin_dir / "splunk",
+                f"""\
+                #!/usr/bin/env bash
+                echo "$*" >> {invoke_log}
+                if [[ "$1" == "version" ]]; then
+                    echo "Splunk 9.4.11"
+                    exit 0
+                fi
+                exit 0
+                """,
+            )
+
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--execution", "local",
+                "--source", "local",
+                "--file", str(package),
+                "--package-type", "tgz",
+                "--splunk-home", str(splunk_home),
+                "--service-user", getpass.getuser(),
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--no-boot-start",
+                env=os.environ.copy(),
+            )
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unsupported direct Splunk Enterprise upgrade", output)
+            self.assertIn("10.0.x or 10.2.x", output)
+            self.assertNotIn("stop", invoke_log.read_text(encoding="utf-8"))
+
+    def test_uf_blocks_direct_pre_10_to_10_4_upgrade_before_stop(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            splunk_home = tmp_path / "splunkforwarder"
+            bin_dir = splunk_home / "bin"
+            etc_dir = splunk_home / "etc"
+            bin_dir.mkdir(parents=True)
+            etc_dir.mkdir(parents=True)
+            (etc_dir / "splunk.version").write_text("splunkforwarder 9.4.11\n", encoding="utf-8")
+            invoke_log = tmp_path / "uf.log"
+            package = tmp_path / "splunkforwarder-10.4.0-f798d4d49089-linux-amd64.tgz"
+            package.write_text("not-a-real-package", encoding="utf-8")
+            write_executable(
+                bin_dir / "splunk",
+                f"""\
+                #!/usr/bin/env bash
+                echo "$*" >> {invoke_log}
+                if [[ "$1" == "version" ]]; then
+                    echo "Splunk Universal Forwarder 9.4.11"
+                    exit 0
+                fi
+                exit 0
+                """,
+            )
+
+            result = self.run_script(
+                "skills/splunk-universal-forwarder-setup/scripts/setup.sh",
+                "--phase", "install",
+                "--target-os", "linux",
+                "--execution", "local",
+                "--source", "local",
+                "--file", str(package),
+                "--package-type", "tgz",
+                "--splunk-home", str(splunk_home),
+                "--service-user", getpass.getuser(),
+                "--no-boot-start",
+                env=os.environ.copy(),
+            )
+            output = result.stdout + result.stderr
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Unsupported direct Universal Forwarder upgrade", output)
+            self.assertIn("UF 10.0.x or newer", output)
+            self.assertNotIn("stop", invoke_log.read_text(encoding="utf-8"))
+
+    def test_enterprise_host_windows_render_only_emits_10_4_guardrails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "rendered"
+            result = self.run_script(
+                "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+                "--phase", "render",
+                "--target-os", "windows",
+                "--host-bootstrap-role", "standalone-search-tier",
+                "--package-type", "msi",
+                "--file", r"C:\Temp\splunk-10.4.0-x64.msi",
+                "--windows-service-mode", "dua",
+                "--windows-service-user", r"EXAMPLE\splunk_svc",
+                "--windows-service-password-file", r"C:\Secrets\splunk_svc.txt",
+                "--admin-password-file", r"C:\Secrets\splunk_admin.txt",
+                "--output-dir", str(output_dir),
+                env=os.environ.copy(),
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            self.assertNotIn("command not found", result.stderr)
+
+            render_dir = output_dir / "splunk-enterprise-host/windows"
+            script = (render_dir / "install-splunk-enterprise.ps1").read_text(encoding="utf-8")
+            readme = (render_dir / "README.md").read_text(encoding="utf-8")
+            metadata = json.loads((render_dir / "metadata.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(metadata["target_os"], "windows")
+            self.assertEqual(metadata["v1_apply"], "render-only")
+            self.assertEqual(metadata["package_type"], "msi")
+            self.assertEqual(metadata["package_version"], "10.4.0")
+            self.assertEqual(metadata["windows_service_mode"], "dua")
+            self.assertIn("DUA service user must be a dedicated non-admin account", script)
+            self.assertIn("Get-LocalGroupMember -Group \"Administrators\"", script)
+            self.assertIn("LOGON_USERNAME=$ServiceUser", script)
+            self.assertIn("LOGON_PASSWORD=$servicePassword", script)
+            self.assertNotIn("SERVICE_USERNAME", script)
+            self.assertNotIn("SERVICE_PASSWORD", script)
+            self.assertIn("Splunk Enterprise Windows 10.4 Render-Only Handoff", readme)
+            self.assertIn("`-ServiceMode lsa`", readme)
+            self.assertIn("`-ServiceMode dua`", readme)
+            self.assertIn("`NT SERVICE\\Splunkd`", readme)
+            self.assertNotIn("LocalSystem", readme)
+            self.assertIn("`server.conf`", readme)
+            self.assertNotIn("splunk_admin.txt\nPASSWORD", script)
+
+    def test_enterprise_host_rejects_windows_apply_and_macos_enterprise(self):
+        windows_apply = self.run_script(
+            "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+            "--phase", "install",
+            "--target-os", "windows",
+            "--host-bootstrap-role", "standalone-search-tier",
+            "--package-type", "msi",
+            "--file", r"C:\Temp\splunk-10.4.0-x64.msi",
+            env=os.environ.copy(),
+        )
+        self.assertNotEqual(windows_apply.returncode, 0)
+        self.assertIn("Windows Enterprise host setup is render-only", windows_apply.stdout + windows_apply.stderr)
+
+        macos = self.run_script(
+            "skills/splunk-enterprise-host-setup/scripts/setup.sh",
+            "--phase", "render",
+            "--target-os", "macos",
+            "--host-bootstrap-role", "standalone-search-tier",
+            env=os.environ.copy(),
+        )
+        self.assertNotEqual(macos.returncode, 0)
+        self.assertIn("macOS Splunk Enterprise host bootstrap is non-production/out of scope", macos.stdout + macos.stderr)
 
 
 if __name__ == "__main__":

@@ -78,6 +78,19 @@ class KvstoreAdminTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("Field type", result.stderr)
 
+    def test_blocks_direct_9x_to_10_4_upgrade_with_old_kvstore(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                "--output-dir", tmpdir,
+                "--topology", "shc",
+                "--current-splunk-version", "9.4.11",
+                "--target-splunk-version", "10.4.0",
+                "--current-kvstore-version", "6.0",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("direct upgrade", result.stderr.lower())
+            self.assertIn("below 7.x", result.stderr)
+
     def test_rejects_lookup_without_collection(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_renderer(

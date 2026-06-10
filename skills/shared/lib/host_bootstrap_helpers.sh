@@ -180,6 +180,55 @@ sys.exit(0 if normalize(sys.argv[1]) == normalize(sys.argv[2]) else 1)
 PY
 }
 
+hbs_version_compare() {
+    local left="${1:-}"
+    local right="${2:-}"
+
+    [[ -n "${left}" && -n "${right}" ]] || return 2
+
+    python3 - "${left}" "${right}" <<'PY'
+import re
+import sys
+
+
+def normalize(raw):
+    match = re.search(r"\d+(?:\.\d+)*", raw or "")
+    if not match:
+        raise ValueError(raw)
+    tokens = [int(token) for token in match.group(0).split(".")]
+    while tokens and tokens[-1] == 0:
+        tokens.pop()
+    return tokens
+
+
+try:
+    left = normalize(sys.argv[1])
+    right = normalize(sys.argv[2])
+except ValueError:
+    sys.exit(2)
+
+width = max(len(left), len(right))
+left.extend([0] * (width - len(left)))
+right.extend([0] * (width - len(right)))
+if left < right:
+    print("-1", end="")
+elif left > right:
+    print("1", end="")
+else:
+    print("0", end="")
+PY
+}
+
+hbs_version_lt() {
+    [[ "$(hbs_version_compare "${1:-}" "${2:-}")" == "-1" ]]
+}
+
+hbs_version_ge() {
+    local result
+    result="$(hbs_version_compare "${1:-}" "${2:-}")" || return 1
+    [[ "${result}" == "0" || "${result}" == "1" ]]
+}
+
 hbs_require_enterprise_package_for_role() {
     local package_path="${1:-}"
     local role="${2:-}"
@@ -952,11 +1001,11 @@ def normalize_arch(value, target_os):
             "x86_64": "intel",
             "amd64": "intel",
             "intel": "intel",
-            "arm64": "universal2",
-            "aarch64": "universal2",
-            "m1": "universal2",
-            "m2": "universal2",
-            "m3": "universal2",
+            "arm64": "arm64",
+            "aarch64": "arm64",
+            "m1": "arm64",
+            "m2": "arm64",
+            "m3": "arm64",
             "universal": "universal2",
             "universal2": "universal2",
         }.get(value, value)
@@ -977,7 +1026,7 @@ def default_arch(target_os):
     return {
         "windows": "x64",
         "linux": "amd64",
-        "macos": "universal2",
+        "macos": "arm64",
         "freebsd": "freebsd14-amd64",
         "solaris": "amd64",
         "aix": "powerpc",
@@ -1027,6 +1076,8 @@ def infer_arch(filename, target_os, package_type, data_arch=""):
             return "amd64"
         return normalize_arch(data_arch, target_os)
     if target_os == "macos":
+        if "arm64" in lower or "aarch64" in lower:
+            return "arm64"
         if "universal2" in lower:
             return "universal2"
         if "intel" in lower:

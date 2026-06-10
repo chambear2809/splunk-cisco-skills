@@ -521,6 +521,26 @@ class SplunkDataSourceReadinessDoctorTests(unittest.TestCase):
         self.assertNotIn(" token", hec_specs[0]["spl"])
         self.assertIn("useACK", hec_specs[0]["spl"])
 
+    def test_cloud_10_4_data_management_docs_and_collection_handoff_are_current(self) -> None:
+        stale_fragments = ("9.2.2406", "9.3.2408", "9.3.2411")
+        docs_blob = "\n".join(doctor.SOURCE_DOCS.values())
+        reference = (REPO_ROOT / "skills/splunk-data-source-readiness-doctor/reference.md").read_text(
+            encoding="utf-8"
+        )
+        collection_searches = doctor.render_collection_searches(
+            {"data_sources": [{"name": "aws_s3_dataset", "expected_indexes": ["main"]}]}
+        )
+
+        for fragment in stale_fragments:
+            with self.subTest(fragment=fragment):
+                self.assertNotIn(fragment, docs_blob)
+                self.assertNotIn(fragment, reference)
+        self.assertIn("10.4.2604", doctor.SOURCE_DOCS["data_management_s3_dataset"])
+        self.assertIn("10.4.2604", doctor.SOURCE_DOCS["data_management_azure_dataset"])
+        self.assertIn("Data Management dataset readiness", collection_searches)
+        self.assertIn("edit_datasets", collection_searches)
+        self.assertIn("does not claim private Data Management API CRUD", collection_searches)
+
     def test_generic_sourcetype_source_pairs_constrain_generated_base_search(self) -> None:
         registry_index = doctor.build_registry_index({})
         source_packs = json.loads(SOURCE_PACKS_FILE.read_text(encoding="utf-8"))

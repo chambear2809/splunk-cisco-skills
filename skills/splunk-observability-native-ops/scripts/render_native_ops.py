@@ -844,11 +844,11 @@ def render_on_call(ctx: RenderContext, entries: list[Any]) -> None:
 
     The full Splunk On-Call lifecycle (teams, users, rotations, escalation
     policies, routing keys, scheduled overrides, paging policies, alert
-    rules, maintenance mode, incidents, REST endpoint alerts, and
-    Splunk-side companion app installs) lives in the dedicated
-    ``splunk-oncall-setup`` skill. This skill only emits a handoff
-    pointing operators there; it no longer performs On-Call API requests
-    or accepts On-Call credentials.
+    rules, maintenance mode, incidents, REST endpoint alerts, Splunk-side
+    companion app installs for 3546/4886, and SOAR connector 5863 readiness)
+    lives in the dedicated ``splunk-oncall-setup`` skill. This skill only emits
+    a handoff pointing operators there; it no longer performs On-Call API
+    requests or accepts On-Call credentials.
     """
     if not entries:
         return
@@ -865,7 +865,8 @@ def render_on_call(ctx: RenderContext, entries: list[Any]) -> None:
                 f"Use rendered handoff object: {rel}",
                 "Run the splunk-oncall-setup skill for teams, users, rotations, escalation policies, "
                 "routing keys, paging policies, alert rules, maintenance mode, incidents, REST endpoint "
-                "alerts, and Splunk-side companion app installs (Splunkbase 3546, 4886, 5863).",
+                "alerts, Splunk-side companion app installs (Splunkbase 3546 and 4886), and SOAR "
+                "connector 5863 readiness.",
                 "See: skills/splunk-oncall-setup/SKILL.md.",
             ],
             DOC_SOURCES["on_call"],

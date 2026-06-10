@@ -4374,7 +4374,7 @@
       "id": "vmware",
       "label": "VMware vCenter",
       "docs": [
-        "https://splunkbase.splunk.com/app/7257"
+        "https://splunkbase.splunk.com/app/3215"
       ],
       "match": {
         "app_names": [
@@ -4520,7 +4520,7 @@
       "id": "vmware_metrics",
       "label": "VMware Metrics",
       "docs": [
-        "https://splunkbase.splunk.com/app/7257"
+        "https://splunkbase.splunk.com/app/5089"
       ],
       "match": {
         "app_names": [

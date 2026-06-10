@@ -60,7 +60,7 @@
     },
     "Splunk_TA_ueba": {
       "verified_version": "latest",
-      "source_url": "https://splunkbase.splunk.com/app/4923",
+      "source_url": "https://help.splunk.com/security-offerings/splunk-user-behavior-analytics/send-and-receive-data-from-the-splunk-platform/5.4.1/introduction/about-the-splunk-add-on-for-splunk-uba",
       "must_not_remove": [],
       "capabilities_to_disable_on_public_reader": [
         {"name": "edit_uba_settings", "default_role": "admin", "risk": "admin-only", "removal_breaks": false}

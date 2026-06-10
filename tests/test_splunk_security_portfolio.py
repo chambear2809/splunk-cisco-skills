@@ -157,6 +157,10 @@ def test_security_portfolio_router_resolves_current_es_capability_names() -> Non
     assert federated_analytics["route_command"] == [
         "bash",
         "skills/splunk-federated-search-setup/scripts/setup.sh",
+        "--cloud-version",
+        "10.4.2604",
+        "--fss3-mode",
+        "data-management",
         "--provider",
         "type=aws_s3,name=asl_security_lake,aws_account_id=123456789012,aws_region=us-east-1,database=amazon_security_lake,data_catalog=arn:aws:glue:us-east-1:123456789012:catalog,aws_glue_tables_allowlist=ocsf_findings,aws_s3_paths_allowlist=s3://example-security-lake/AWSLogs/",
         "--federated-index",

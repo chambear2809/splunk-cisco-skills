@@ -6,15 +6,15 @@ classes, deployment apps, and input app delivery remain the responsibility of
 
 ## Research Basis
 
-The v1 surface follows the current Splunk Universal Forwarder 10.2 manual and
+The v1 surface follows the current Splunk Universal Forwarder 10.4 manual and
 download page:
 
 - <https://www.splunk.com/en_us/download/universal-forwarder.html>
-- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.2/deploy-the-universal-forwarder/installation-overview>
-- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.2/install-the-universal-forwarder/install-a-nix-universal-forwarder>
-- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.2/install-the-universal-forwarder/install-a-windows-universal-forwarder>
-- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.2/configure-the-universal-forwarder/configure-the-universal-forwarder-using-configuration-files>
-- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.2/configure-the-universal-forwarder/enable-a-receiver-for-the-splunk-cloud-platform>
+- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.4/deploy-the-universal-forwarder/installation-overview>
+- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.4/install-the-universal-forwarder/install-a-nix-universal-forwarder>
+- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.4/install-the-universal-forwarder/install-a-windows-universal-forwarder>
+- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.4/configure-the-universal-forwarder/configure-the-universal-forwarder-using-configuration-files>
+- <https://help.splunk.com/en/data-management/forward-data/universal-forwarder-manual/10.4/configure-the-universal-forwarder/enable-a-receiver-for-the-splunk-cloud-platform>
 
 ## Package Matrix
 
@@ -24,7 +24,7 @@ full current UF matrix:
 | OS family | Architectures / variants | Package types | v1 apply |
 |-----------|--------------------------|---------------|----------|
 | Linux | `amd64`, `arm64`, `ppc64le`, `s390x` | `.tgz`, `.rpm`, `.deb` where published | local/SSH |
-| macOS | `intel`, `universal2` | `.tgz`, `.dmg`, `.pkg` | `.tgz` local/SSH; `.dmg` and `.pkg` download/verify only (operator runs the package installer manually) |
+| macOS | `arm64` default, `intel`, `universal2` legacy alias | `.tgz`, `.dmg`, `.pkg` | `.tgz` local/SSH; `.dmg` and `.pkg` download/verify only (operator runs the package installer manually) |
 | Windows | `x64`, `x86` | `.msi` | rendered PowerShell only |
 | FreeBSD | `freebsd14-amd64`, `freebsd13-amd64` | `.tgz`, `.txz` | unsupported in v1 |
 | Solaris | `amd64`, `sparc` | `.tar.Z`, `.p5p` | unsupported in v1 |

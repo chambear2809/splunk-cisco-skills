@@ -12,8 +12,8 @@ Splunk's documented modern set per
 
 | Knob | Value |
 |---|---|
-| `sslVersions` | `tls1.2` |
-| `sslVersionsForClient` | `tls1.2` |
+| Effective `sslVersions` | `tls1.2,tls1.3` for Splunk 10.4+ with `--enable-tls13 auto`; `tls1.2` when TLS 1.3 is disabled or the target is below 10.4 |
+| Effective `sslVersionsForClient` | Same as effective `sslVersions` |
 | `cipherSuite` | `ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256` |
 | `ecdhCurves` | `prime256v1, secp384r1, secp521r1` |
 | Allowed key algos | RSA-2048+, ECDSA P-256/P-384/P-521 |
@@ -23,16 +23,18 @@ Splunk's documented modern set per
 This matches the `cipher_suite` and `ecdh_curves` constants in
 [`splunk-enterprise-public-exposure-hardening/scripts/render_assets.py`](../../splunk-enterprise-public-exposure-hardening/scripts/render_assets.py)
 so the two skills agree on the on-the-wire crypto.
+For TLS 1.3, Splunk's TLS 1.2 `cipherSuite` setting does not choose the TLS 1.3
+cipher suites; the renderer keeps `cipherSuite` for TLS 1.2 compatibility.
 
 ## `fips-140-3`
 
 NIST-approved AEAD only per
-[Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips).
+[Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips).
 
 | Knob | Value |
 |---|---|
-| `sslVersions` | `tls1.2` |
-| `sslVersionsForClient` | `tls1.2` |
+| Effective `sslVersions` | `tls1.2,tls1.3` for Splunk 10.4+ with `--enable-tls13 auto`; `tls1.2` when TLS 1.3 is disabled or the target is below 10.4 |
+| Effective `sslVersionsForClient` | Same as effective `sslVersions` |
 | `cipherSuite` | AEAD-only: `ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256` (no CBC, no SHA-1, no anonymous DH) |
 | `ecdhCurves` | `prime256v1, secp384r1, secp521r1` |
 | Allowed key algos | RSA-2048+, ECDSA P-256/P-384/P-521 |
@@ -53,8 +55,8 @@ DISA STIG-aligned subset, cross-referenced by
 
 | Knob | Value |
 |---|---|
-| `sslVersions` | `tls1.2` |
-| `sslVersionsForClient` | `tls1.2` |
+| Effective `sslVersions` | `tls1.2,tls1.3` for Splunk 10.4+ with `--enable-tls13 auto`; `tls1.2` when TLS 1.3 is disabled or the target is below 10.4 |
+| Effective `sslVersionsForClient` | Same as effective `sslVersions` |
 | `cipherSuite` | AEAD-only with explicit forbid list aligned to STIG: `ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256` |
 | `ecdhCurves` | `secp384r1, secp521r1` (no `prime256v1` for STIG-high) |
 | Allowed key algos | RSA-3072+, ECDSA P-384/P-521 |
@@ -77,15 +79,15 @@ The renderer always refuses to emit:
   for TLS — Splunk doesn't yet wire it through OpenSSL FIPS for
   TLS use)
 
-Pass `--allow-deprecated-tls` to relax the SSLv3 / TLS 1.0 / TLS
-1.1 floor (still refuses everything else).
+The legacy `--allow-deprecated-tls` flag is retained for old templates, but
+10.4 renders do not accept SSLv3 / TLS 1.0 / TLS 1.1 as supported protocol
+floors.
 
-## Why no TLS 1.3
+## TLS 1.3
 
-Splunk's [TLS-protocol-version doc](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
-lists the supported set as `SSLv3` / `TLS1.0` / `TLS1.1` / `TLS1.2`
-only. **TLS 1.3 is not yet a documented Splunk-supported TLS
-version**, so the renderer refuses it. When Splunk eventually adds
-TLS 1.3 support, the `--tls-version-floor` flag will accept
-`tls1.3` and the algorithm presets will gain TLS 1.3 cipher
-suites.
+Splunk's [TLS-protocol-version doc](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.4/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances)
+documents `sslVersions` / `sslVersionsForClient` for 10.4. The renderer keeps
+`--tls-version-floor=tls1.2` as the compatibility floor and adds
+`--enable-tls13 auto|true|false`. Auto renders `tls1.2,tls1.3` for Splunk
+10.4+ and `tls1.2` below 10.4. TLS 1.3 AEAD suites are negotiated by OpenSSL
+and are not enumerated in the TLS 1.2 cipher string.

@@ -18,6 +18,7 @@ HEC_RENDERER = REPO_ROOT / "skills/splunk-hec-service-setup/scripts/render_asset
 AGENT_SETUP = REPO_ROOT / "skills/splunk-agent-management-setup/scripts/setup.sh"
 WORKLOAD_SETUP = REPO_ROOT / "skills/splunk-workload-management-setup/scripts/setup.sh"
 HEC_SETUP = REPO_ROOT / "skills/splunk-hec-service-setup/scripts/setup.sh"
+ACS_ALLOWLIST_REFERENCE = REPO_ROOT / "skills/splunk-cloud-acs-allowlist-setup/reference.md"
 
 
 class SplunkPlatformServiceRendererTests(unittest.TestCase):
@@ -49,6 +50,11 @@ class SplunkPlatformServiceRendererTests(unittest.TestCase):
                 )
                 self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                 self.assertTrue((Path(tmpdir) / expected_asset).exists())
+
+    def test_cloud_acs_allowlist_reference_uses_10_4_endpoint_docs(self) -> None:
+        text = ACS_ALLOWLIST_REFERENCE.read_text(encoding="utf-8")
+        self.assertIn("10.4.2604/admin-config-service-acs-api-endpoint-reference", text)
+        self.assertNotIn("10.0.2503/admin-config-service-acs-api-endpoint-reference", text)
 
     def test_agent_management_renders_serverclass_and_deployment_client(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -137,6 +143,45 @@ class SplunkPlatformServiceRendererTests(unittest.TestCase):
 
             self.assertIn("action = move", guardrail_stanza)
             self.assertIn("workload_pool = search_standard", guardrail_stanza)
+
+    def test_workload_management_kubernetes_basic_renders_admission_only(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                WORKLOAD_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--deployment-runtime",
+                "kubernetes",
+                "--enable-admission-rules",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "workload-management"
+            pools = (render_dir / "workload_pools.conf").read_text(encoding="utf-8")
+            rules = (render_dir / "workload_rules.conf").read_text(encoding="utf-8")
+            policy = (render_dir / "workload_policy.conf").read_text(encoding="utf-8")
+            metadata = json.loads((render_dir / "metadata.json").read_text(encoding="utf-8"))
+
+            self.assertEqual(metadata["effective_workload_mode"], "basic")
+            self.assertIn("Kubernetes/basic mode renders admission rules only", pools)
+            self.assertNotIn("[workload_pool:", pools)
+            self.assertIn("[search_filter_rule:block_alltime_searches]", rules)
+            self.assertNotIn("[workload_rule:", rules)
+            self.assertIn("admission_rules_enabled = 1", policy)
+
+    def test_workload_management_kubernetes_basic_rejects_move(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                WORKLOAD_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--deployment-runtime",
+                "kubernetes",
+                "--long-running-action",
+                "move",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Kubernetes/basic", result.stderr)
+            self.assertIn("move", result.stderr)
 
     def test_workload_management_rejects_invalid_alltime_queue_action(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -34,6 +34,8 @@ Validates that:
 - aws-s3-providers/<name>.json files are valid JSON and include the required
   FSS3 keys (aws_account_id, aws_region, database, data_catalog,
   aws_glue_tables_allowlist, aws_s3_paths_allowlist).
+- data-management-datasets/<name>.json files are valid JSON and include the
+  required Cloud 10.4.2604 Data Management dataset handoff keys.
 EOF
     exit "${exit_code}"
 }
@@ -139,6 +141,48 @@ if data.get("type") != "aws_s3":
 PY
         then
             missing+=("aws-s3-providers/$(basename "${payload}") schema check")
+            ok=false
+        fi
+    done
+fi
+
+# Inspect rendered Splunk Cloud 10.4.2604 Data Management dataset handoffs.
+if [[ -d "${render_dir}/data-management-datasets" ]]; then
+    for payload in "${render_dir}"/data-management-datasets/*.json; do
+        [[ -f "${payload}" ]] || continue
+        if ! python3 - "${payload}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+required = {
+    "name",
+    "type",
+    "dataset_family",
+    "cloud_version",
+    "apply_surface",
+    "api_crud",
+    "legacy_fss3_rest_provider",
+    "aws_account_id",
+    "aws_region",
+    "connection",
+}
+data = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+missing = sorted(required - set(data))
+if missing:
+    sys.exit(f"missing Data Management dataset keys: {missing}")
+if data.get("type") != "data_management_dataset":
+    sys.exit("Data Management handoff type must be 'data_management_dataset'")
+if data.get("dataset_family") != "amazon_s3":
+    sys.exit("Data Management handoff dataset_family must be 'amazon_s3'")
+if data.get("legacy_fss3_rest_provider") is not False:
+    sys.exit("Data Management handoff must not mark legacy_fss3_rest_provider true")
+connection = data.get("connection") or {}
+if not connection.get("glue_database") or not connection.get("glue_data_catalog") or not connection.get("s3_paths"):
+    sys.exit("Data Management handoff connection must include glue_database, glue_data_catalog, and s3_paths")
+PY
+        then
+            missing+=("data-management-datasets/$(basename "${payload}") schema check")
             ok=false
         fi
     done

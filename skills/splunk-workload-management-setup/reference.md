@@ -45,14 +45,14 @@ this skill does not render that specialized queue rule in v1.
 ## Official References
 
 - Workload Management overview:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.2/workload-management-overview/about-workload-management>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.4/workload-management-overview/about-workload-management>
 - Set up Linux for Workload Management:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.2/set-up-linux-for-workload-management/set-up-linux-for-workload-management>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.4/set-up-linux-for-workload-management/set-up-linux-for-workload-management>
 - Configure cgroups v2:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.2/set-up-linux-for-workload-management/configure-cgroups-v2-in-splunk-enterprise>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.4/set-up-linux-for-workload-management/configure-cgroups-v2-in-splunk-enterprise>
 - Configure workload pools:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.2/configure-workload-management/configure-workload-pools>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.4/configure-workload-management/configure-workload-pools>
 - Configure workload rules:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.2/configure-workload-management/configure-workload-rules>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.4/configure-workload-management/configure-workload-rules>
 - Configure admission rules:
-  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.2/configure-workload-management/configure-admission-rules-to-prefilter-searches>
+  <https://help.splunk.com/en/splunk-enterprise/administer/manage-workloads/10.4/configure-workload-management/configure-admission-rules-to-prefilter-searches>

@@ -2,8 +2,8 @@
 
 Anchored to:
 
-- [Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips)
-- [Upgrade and migrate your FIPS-mode deployments](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.2/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments)
+- [Secure Splunk Enterprise with FIPS](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/establish-and-maintain-compliance-with-fips-and-common-criteria-in-splunk-enterprise/secure-splunk-enterprise-with-fips)
+- [Upgrade and migrate your FIPS-mode deployments](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.4/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments)
 
 ## NIST 2026-09-21 FIPS 140-2 deprecation
 
@@ -22,13 +22,14 @@ deployments. For regulated deployments:
 
 ## Phase 1 — upgrade to Splunk 10 in FIPS 140-2
 
-Per the [FIPS upgrade doc](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.2/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments),
+Per the [FIPS upgrade doc](https://help.splunk.com/en/splunk-enterprise/administer/install-and-upgrade/10.4/upgrade-or-migrate-splunk-enterprise/upgrade-and-migrate-your-fips-mode-deployments),
 Phase 1 prerequisites:
 
 - Splunk Enterprise must already run in FIPS mode pre-upgrade.
 - OS must be on the [FIPS 140-2 supported OS list](https://help.splunk.com/?resourceId=Splunk_FIPS_supported_OS).
 - KV Store must be on MongoDB 4.2+.
-- All apps must work with Python 3.9.
+- All apps must work with Splunk 10.4's Python 3.13 default, or have an
+  explicit Python 3.9 fallback plan during the upgrade window.
 - All instances must use TLS 1.2.
 - CPU must support AVX (Splunk 10 uses AVX instructions).
 
@@ -54,7 +55,8 @@ when `--fips-mode 140-3` is set.
 Phase 2 prerequisites (additional to Phase 1):
 
 - KV Store must run MongoDB 7.0.17+ with OpenSSL 3.0.
-- All apps must work with Python 3.9 and OpenSSL 3.0.
+- All apps must work with Splunk 10.4's Python 3.13 default or an explicitly
+  pinned Python 3.9 fallback, plus OpenSSL 3.0.
 - Forwarders must be on Splunk 10.
 - Duo (if used) must be on Universal Prompt.
 

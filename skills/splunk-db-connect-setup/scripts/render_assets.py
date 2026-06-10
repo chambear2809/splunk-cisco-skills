@@ -23,8 +23,8 @@ from yaml_compat import dump_yaml, load_yaml_or_json  # noqa: E402
 SPEC_VERSION = "splunk-db-connect-setup/v1"
 APP_ID = "2686"
 APP_NAME = "splunk_app_db_connect"
-APP_VERSION = "4.2.4"
-APP_DATE = "April 20, 2026"
+APP_VERSION = "4.3.0"
+APP_DATE = "May 11, 2026"
 OUTPUT_SUBDIR = "splunk-db-connect"
 
 SUPPORTED_SECTIONS = {

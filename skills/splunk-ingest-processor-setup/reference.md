@@ -9,7 +9,8 @@ This skill covers the Splunk Cloud Platform Ingest Processor solution:
 - source types, event breaking/merging, sample data, and preview workflow
 - partitions by host, source, sourcetype, and index where supported
 - destination setup for paired Splunk Cloud indexes, Observability Cloud,
-  metrics indexes, and Amazon S3
+  metrics indexes, and Splunk Cloud 10.4.2604+ Data Management datasets for
+  Amazon S3 and Microsoft Azure
 - SPL2 pipelines with route, branch, thru, redact, hash, sample, lookup,
   extract, timestamp, JSON/XML, metrics, OCSF, decrypt, stats, and S3 patterns
 - custom pipeline templates under `default/data/spl2`
@@ -40,7 +41,11 @@ Supported Ingest Processor destination families in this skill:
 - `splunk_cloud` - paired Splunk Cloud index destinations.
 - `observability` - Splunk Observability Cloud deployment destination.
 - `metrics_index` - Splunk platform metrics index destination.
-- `s3` - Amazon S3 JSON or Parquet archive destination.
+- `s3_dataset` - Amazon S3 JSON or Parquet dataset destination through the
+  Splunk Cloud 10.4.2604+ Data Management app.
+- `azure_dataset` - Microsoft Azure Blob or ADLS dataset destination through
+  the Splunk Cloud 10.4.2604+ Data Management app.
+- `s3` - Compatibility alias for `s3_dataset` on 10.4.2604+.
 
 Unsupported destination families render a finding and a handoff. The most
 important unsupported family is `splunk_enterprise`, which belongs to
@@ -59,8 +64,9 @@ important unsupported family is `splunk_enterprise`, which belongs to
   `avg()`.
 - `logs_to_metrics` requires the documented import command and metric type
   review.
-- S3 archives should include downstream Federated Search for Amazon S3 review
-  where operators need search access to archived IP output.
+- S3 or Azure dataset destinations should include downstream Data Management
+  and federated-search readiness review where operators need search access to
+  archived IP output.
 
 ## Source Anchors
 

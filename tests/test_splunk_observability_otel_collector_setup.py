@@ -53,7 +53,7 @@ def make_ta_package(
     tmp_path: Path,
     *,
     root: str = "Splunk_TA_otel",
-    version: str = "0.152.0",
+    version: str = "0.153.0",
     token_style: str = "current",
     token_default: str = "",
     linux: bool = True,
@@ -589,7 +589,7 @@ def test_ta_current_package_render_inspects_package_and_modular_stanza(tmp_path:
         "two words",
         "--ta-enable-opamp",
         "--splunk-version",
-        "10.3",
+        "10.4",
         "--output-dir",
         str(output_dir),
     )
@@ -606,7 +606,7 @@ def test_ta_current_package_render_inspects_package_and_modular_stanza(tmp_path:
     assert "'two words'" in template
 
     audit = (output_dir / "ta/package-audit.md").read_text(encoding="utf-8")
-    assert "Latest audited release: `0.152.0`" in audit
+    assert "Latest audited release: `0.153.0`" in audit
     assert "Published" not in audit
     assert "Package flavor: `multi-os`" in audit
     assert "Token field style: `current`" in audit
@@ -616,7 +616,7 @@ def test_ta_current_package_render_inspects_package_and_modular_stanza(tmp_path:
 
     metadata = json.loads((output_dir / "ta/metadata.json").read_text(encoding="utf-8"))
     assert metadata["splunkbase"]["splunkbase_app_id"] == "7125"
-    assert metadata["splunkbase"]["latest_version"] == "0.152.0"
+    assert metadata["splunkbase"]["latest_version"] == "0.153.0"
     assert metadata["splunkbase"]["fips_compatible"] is False
     assert metadata["splunkbase"]["fedramp_validated"] is False
     assert metadata["packages"][0]["package_flavor"] == "multi-os"

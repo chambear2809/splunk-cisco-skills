@@ -20,8 +20,9 @@ OPERATOR_NAMESPACE="splunk-operator"
 RELEASE_NAME="splunk-enterprise"
 OPERATOR_RELEASE_NAME="splunk-operator"
 OPERATOR_VERSION="3.1.0"
+KUBERNETES_VERSION=""
 CHART_VERSION=""
-SPLUNK_VERSION="10.2.0"
+SPLUNK_VERSION="10.4.0"
 SPLUNK_IMAGE=""
 STORAGE_CLASS=""
 ETC_STORAGE="10Gi"
@@ -47,6 +48,7 @@ INDEXER_APPS=""
 SEARCH_APPS=""
 STANDALONE_APPS=""
 PREMIUM_APPS=""
+DAILY_INGEST_GB=""
 ACCEPT_SPLUNK_GENERAL_TERMS=false
 
 usage() {
@@ -59,7 +61,7 @@ Usage: $(basename "$0") [OPTIONS]
 Core options:
   --target sok|pod                         Setup target (default: sok)
   --architecture s1|c3|m4                  SOK SVA architecture (default: s1)
-  --pod-profile PROFILE                    POD profile: pod-small|pod-medium|pod-large and -es variants
+  --pod-profile PROFILE                    POD profile: pod-small|pod-medium|pod-large|pod-xlarge and -es variants
   --phase render|preflight|apply|status|all
   --apply                                  Apply after rendering when phase is render
   --dry-run                                Show planned work without rendering or executing
@@ -72,8 +74,9 @@ SOK options:
   --release-name NAME                      Enterprise Helm release (default: splunk-enterprise)
   --operator-release-name NAME             Operator Helm release (default: splunk-operator)
   --operator-version VERSION               Splunk Operator version (default: 3.1.0)
+  --kubernetes-version VERSION             Kubernetes version for Operator 3.1.0 support checks (1.25-1.34)
   --chart-version VERSION                  Helm chart version (default: follows --operator-version)
-  --splunk-version VERSION                 Splunk Enterprise version (default: 10.2.0)
+  --splunk-version VERSION                 Splunk Enterprise version (default: 10.4.0)
   --splunk-image IMAGE                     Override Splunk Enterprise image
   --storage-class NAME                     Kubernetes StorageClass override
   --etc-storage SIZE                       /opt/splunk/etc PVC size (default: 10Gi)
@@ -102,6 +105,7 @@ POD options:
   --search-apps CSV                        App packages for SHC cluster scope
   --standalone-apps CSV                    App packages for pod-small standalone local scope
   --premium-apps CSV                       Premium app packages for POD ES profiles
+  --daily-ingest-gb N                      Expected daily ingest; blocks above selected POD profile ceiling
 
 Examples:
   $(basename "$0") --target sok --architecture c3 --accept-splunk-general-terms
@@ -127,6 +131,7 @@ while [[ $# -gt 0 ]]; do
         --release-name) require_arg "$1" $# || exit 1; RELEASE_NAME="$2"; shift 2 ;;
         --operator-release-name) require_arg "$1" $# || exit 1; OPERATOR_RELEASE_NAME="$2"; shift 2 ;;
         --operator-version) require_arg "$1" $# || exit 1; OPERATOR_VERSION="$2"; shift 2 ;;
+        --kubernetes-version) require_arg "$1" $# || exit 1; KUBERNETES_VERSION="$2"; shift 2 ;;
         --chart-version) require_arg "$1" $# || exit 1; CHART_VERSION="$2"; shift 2 ;;
         --splunk-version) require_arg "$1" $# || exit 1; SPLUNK_VERSION="$2"; shift 2 ;;
         --splunk-image) require_arg "$1" $# || exit 1; SPLUNK_IMAGE="$2"; shift 2 ;;
@@ -154,6 +159,7 @@ while [[ $# -gt 0 ]]; do
         --search-apps) require_arg "$1" $# || exit 1; SEARCH_APPS="$2"; shift 2 ;;
         --standalone-apps) require_arg "$1" $# || exit 1; STANDALONE_APPS="$2"; shift 2 ;;
         --premium-apps) require_arg "$1" $# || exit 1; PREMIUM_APPS="$2"; shift 2 ;;
+        --daily-ingest-gb) require_arg "$1" $# || exit 1; DAILY_INGEST_GB="$2"; shift 2 ;;
         --accept-splunk-general-terms) ACCEPT_SPLUNK_GENERAL_TERMS=true; shift ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
@@ -201,7 +207,7 @@ validate_args() {
     validate_choice "${ARCHITECTURE}" s1 c3 m4
     validate_choice "${PHASE}" render preflight apply status all
     if [[ -n "${POD_PROFILE}" ]]; then
-        validate_choice "${POD_PROFILE}" pod-small pod-medium pod-large pod-small-es pod-medium-es pod-large-es
+        validate_choice "${POD_PROFILE}" pod-small pod-medium pod-large pod-xlarge pod-small-es pod-medium-es pod-large-es pod-xlarge-es
     fi
     validate_positive_int "${STANDALONE_REPLICAS}" "--standalone-replicas"
     validate_positive_int "${INDEXER_REPLICAS}" "--indexer-replicas"
@@ -274,6 +280,7 @@ build_renderer_args() {
         --release-name "${RELEASE_NAME}"
         --operator-release-name "${OPERATOR_RELEASE_NAME}"
         --operator-version "${OPERATOR_VERSION}"
+        --kubernetes-version "${KUBERNETES_VERSION}"
         --chart-version "${CHART_VERSION}"
         --splunk-version "${SPLUNK_VERSION}"
         --storage-class "${STORAGE_CLASS}"
@@ -300,6 +307,7 @@ build_renderer_args() {
         --search-apps "${SEARCH_APPS}"
         --standalone-apps "${STANDALONE_APPS}"
         --premium-apps "${PREMIUM_APPS}"
+        --daily-ingest-gb "${DAILY_INGEST_GB}"
     )
     if [[ -n "${POD_PROFILE}" ]]; then
         RENDER_ARGS+=(--pod-profile "${POD_PROFILE}")

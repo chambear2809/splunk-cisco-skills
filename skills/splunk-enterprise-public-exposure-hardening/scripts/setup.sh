@@ -27,9 +27,9 @@ S2S_MTLS="true"
 FORWARDER_MTLS="true"
 SPLUNK_HOME_VALUE="/opt/splunk"
 SERVICE_USER="splunk"
-SPLUNK_VERSION="10.2.2"
-TLS_POLICY="tls12"
-ENABLE_TLS13="false"
+SPLUNK_VERSION="10.4.0"
+TLS_POLICY="tls12_13"
+ENABLE_TLS13="auto"
 CA_BUNDLE_PATH="/opt/splunk/etc/auth/cabundle.pem"
 SERVER_CERT_PATH="/opt/splunk/etc/auth/splunkweb/cert.pem"
 SERVER_KEY_PATH="/opt/splunk/etc/auth/splunkweb/privkey.pem"
@@ -125,11 +125,11 @@ Surface enables:
 Splunk runtime:
   --splunk-home PATH            (default: /opt/splunk)
   --service-user NAME           (default: splunk)
-  --splunk-version X.Y.Z        (default: 10.2.2; SVD floor enforced)
+  --splunk-version X.Y.Z        (default: 10.4.0; SVD floor enforced)
 
 Crypto:
-  --tls-policy tls12|tls12_13   (default: tls12)
-  --enable-tls13 true|false     (default: false)
+  --tls-policy tls12|tls12_13   (default: tls12_13)
+  --enable-tls13 auto|true|false (default: auto; auto enables for 10.4+)
   --ca-bundle-path PATH
   --server-cert-path PATH
   --server-key-path PATH
@@ -349,7 +349,7 @@ validate_args() {
     validate_choice "${S2S_MTLS}" true false
     validate_choice "${FORWARDER_MTLS}" true false
     validate_choice "${TLS_POLICY}" tls12 tls12_13
-    validate_choice "${ENABLE_TLS13}" true false
+    validate_choice "${ENABLE_TLS13}" auto true false
     validate_choice "${AUTH_MODE}" native saml reverse-proxy-sso ldap
     validate_choice "${ENABLE_FIPS}" true false
     validate_choice "${FIPS_VERSION}" 140-2 140-3

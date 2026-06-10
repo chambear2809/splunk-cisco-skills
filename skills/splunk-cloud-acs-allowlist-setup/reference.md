@@ -8,8 +8,15 @@ This skill follows current Splunk Cloud ACS documentation:
   `access/{feature}/ipallowlists` (IPv4) and
   `access/{feature}/ipallowlists-v6` (IPv6) endpoints with GET / POST / DELETE
   verbs.
-- Seven feature types are supported: `acs`, `search-api`, `hec`, `s2s`,
-  `search-ui`, `idm-api`, `idm-ui`.
+- Seven feature types can appear in ACS allowlist documentation and Classic
+  stacks: `acs`, `search-api`, `hec`, `s2s`, `search-ui`, `idm-api`, `idm-ui`.
+  Splunk Cloud Victoria stacks do not have IDM; Classic-to-Victoria migrations
+  move IDM apps/configuration to the search tier, so migrate IDM-era allowlists
+  to search head or SHC member IPs instead of preserving IDM assumptions.
+  The renderer requires `--cloud-experience classic` for IDM features/subnets,
+  rejects them for `--cloud-experience victoria`, and fails closed when the
+  experience is `unknown` unless `--accept-unknown-cloud-experience` is passed
+  after explicit operator review.
 - AWS subnet limits are 200 per individual feature and 230 per allow-list
   group (search-head, indexer, IDM, single-instance).
 - GCP subnet limits are 200 per individual feature.
@@ -31,13 +38,13 @@ This skill follows current Splunk Cloud ACS documentation:
 Official references:
 
 - IP allow list configuration:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.3.2512/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-ip-allow-lists-for-splunk-cloud-platform>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-ip-allow-lists-for-splunk-cloud-platform>
 - ACS API endpoint reference:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.0.2503/admin-config-service-acs-api-endpoint-reference/admin-config-service-acs-api-endpoint-reference>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/admin-config-service-acs-api-endpoint-reference/admin-config-service-acs-api-endpoint-reference>
 - ACS CLI:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSCLI>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/administer-splunk-cloud-platform-using-the-admin-config-service-acs-cli/administer-splunk-cloud-platform-using-the-acs-cli>
 - Manage ACS API access with capabilities:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.3.2512/using-the-admin-config-service-acs--api/manage-acs-api-access-with-capabilities>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/using-the-admin-config-service-acs--api/manage-acs-api-access-with-capabilities>
 - Splunk Cloud Platform Terraform Provider (`splunk/scp`):
   <https://registry.terraform.io/providers/splunk/scp/latest>
 
@@ -50,8 +57,8 @@ Official references:
 | `hec`        | 443       | open              | HTTP Event Collector data ingestion.                                        |
 | `s2s`        | 9997      | open              | Splunk-to-Splunk forwarder traffic.                                         |
 | `search-ui`  | 80/443    | open (closed on PCI/HIPAA) | Search head Web UI access. PCI and HIPAA stacks ship with this closed by default. |
-| `idm-api`    | 8089      | open              | Inputs Data Manager API. Only present on stacks with IDM.                   |
-| `idm-ui`     | 443       | open              | Inputs Data Manager UI. Only present on stacks with IDM.                    |
+| `idm-api`    | 8089      | open              | Inputs Data Manager API. Classic/legacy IDM stacks only; not present on Victoria. |
+| `idm-ui`     | 443       | open              | Inputs Data Manager UI. Classic/legacy IDM stacks only; not present on Victoria. |
 
 The default state is invisible to GET until a subnet is explicitly added to
 the feature; the skill displays this as `(default open)` or `(default closed)`
@@ -71,6 +78,14 @@ AWS deployments enforce per-group limits in addition to per-feature limits:
 Per-feature cap on AWS is 200. GCP enforces 200 per feature with no group cap.
 Preflight rejects plans that exceed either bound up front so apply never
 returns 4xx.
+
+For Splunk Cloud Platform 10.4.2604, also review
+`../shared/splunk_10_4_enterprise_deployment_notes.md`: Cloud workflows must
+stay on ACS-supported paths and must not claim filesystem, restart, HEC, or
+allowlist mutations outside ACS/Splunk-supported APIs. Determine whether the
+stack is Classic or Victoria before planning IDM allowlists. Victoria does not
+support Hybrid Search and has no IDM allowlist target. Pass
+`--cloud-experience classic` only for legacy Classic stacks that still have IDM.
 
 ## Lock-out Protection
 

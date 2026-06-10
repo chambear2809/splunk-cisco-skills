@@ -19,3 +19,6 @@ which preserves the allowlist safety model and adds broader ACS administration.
 The scripts in this directory still render and apply the original allowlist
 workflow for all seven ACS allowlist features (`acs`, `search-api`, `hec`,
 `s2s`, `search-ui`, `idm-api`, `idm-ui`) with IPv4 and IPv6 coverage.
+IDM features require `--cloud-experience classic`; Victoria stacks have no IDM,
+and unknown cloud experience fails closed for IDM unless
+`--accept-unknown-cloud-experience` is passed after explicit operator review.

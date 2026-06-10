@@ -5,8 +5,9 @@ description: >-
   Federated Search. Render, preflight, apply, and validate the full product
   surface: Federated Search for Splunk (FSS2S, type=splunk) in standard or
   transparent mode with multiple providers and federated indexes per render,
-  Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud Platform only)
-  via REST payloads with AWS prerequisites, file-based apply for Splunk
+  Amazon S3 federated dataset handoffs for Splunk Cloud 10.4.2604+ through
+  the Data Management app, explicit legacy FSS3 REST payloads for older Cloud
+  stacks, file-based apply for Splunk
   Enterprise standalone search heads or SHC deployers, REST-based apply that
   works on Splunk Enterprise and Splunk Cloud, the global federated-search
   enable/disable switch, and a status helper that reports per-provider
@@ -33,9 +34,10 @@ Covered:
   standard or transparent mode, with multiple providers per render and one
   or more federated indexes per provider. Supports all four documented
   deployment combinations (SE↔SE, SC↔SC, SE↔SC, SC↔SE).
-- **Federated Search for Amazon S3 (FSS3)** — `type = aws_s3` providers
-  rendered as REST payloads (Splunk Cloud Platform only; FSS3 cannot be
-  configured via `federated.conf`).
+- **Amazon S3 federated datasets on Splunk Cloud 10.4.2604+** — `type = aws_s3`
+  specs render Data Management app connection/dataset handoffs by default.
+- **Legacy FSS3** — explicit `--fss3-mode legacy` renders `type = aws_s3`
+  REST payloads for older Cloud stacks or accepted migrations.
 - **Global federated-search switch** — enable or disable Federated Search
   for the entire deployment via
   `/services/data/federated/settings/general`.
@@ -118,9 +120,9 @@ bash skills/splunk-federated-search-setup/scripts/setup.sh \
   --apply-target rest
 ```
 
-The REST apply POSTs each FSS2S provider, each FSS3 provider, and each
-federated index. On HTTP 409 (already exists) it re-POSTs to the keyed
-endpoint to update the existing entity in place.
+The REST apply POSTs FSS2S providers and federated indexes. Amazon S3 datasets
+on Cloud 10.4.2604+ are Data Management app handoffs and are not POSTed by this
+script. Legacy FSS3 REST POSTs are generated only with `--fss3-mode legacy`.
 
 ### Global federated-search toggle
 
@@ -147,7 +149,8 @@ bash skills/splunk-federated-search-setup/scripts/validate.sh --live
 | `federated.conf.template` | One `[provider://X]` stanza per FSS2S provider, with per-provider password placeholder |
 | `indexes.conf` | One `[federated:X]` stanza per FSS2S federated index |
 | `server.conf` | `[shclustering] conf_replication_include.indexes = true` for SHC deployer use |
-| `aws-s3-providers/<name>.json` | REST payload per FSS3 provider, plus an AWS prerequisites README |
+| `data-management-datasets/<name>.json` | Cloud 10.4.2604+ Data Management handoff for Amazon S3 federated datasets |
+| `aws-s3-providers/<name>.json` | Legacy FSS3 REST payloads only with `--fss3-mode legacy` |
 | `apply-search-head.sh` | File-based apply on a standalone Enterprise SH |
 | `apply-shc-deployer.sh` | File-based apply through the SHC deployer bundle |
 | `apply-rest.sh` | REST apply for Splunk Enterprise OR Splunk Cloud |

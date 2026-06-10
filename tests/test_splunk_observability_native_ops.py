@@ -391,6 +391,10 @@ def test_on_call_section_is_deeplink_only_handoff_pointing_to_oncall_skill(tmp_p
     assert not any(action.get("service") == "on_call" for action in plan["actions"]), (
         "native-ops apply-plan must never emit on_call API actions"
     )
+    handoff = (output_dir / "handoff.md").read_text(encoding="utf-8")
+    assert "Splunkbase 3546, 4886, 5863" not in handoff
+    assert "Splunkbase 3546 and 4886" in handoff
+    assert "SOAR connector 5863 readiness" in handoff
 
 
 def test_oncall_secret_flags_are_rejected_with_redirect_to_oncall_skill(tmp_path: Path) -> None:

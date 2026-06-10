@@ -37,13 +37,19 @@ Render a full ACS admin packet and allowlist plan:
 
 ```bash
 bash skills/splunk-cloud-acs-admin-setup/scripts/setup.sh \
-  --phase render \
-  --admin-plan-file acs-admin-plan.json \
-  --features search-api,s2s,hec \
-  --search-api-subnets 198.51.100.0/24 \
+	  --phase render \
+	  --admin-plan-file acs-admin-plan.json \
+	  --cloud-experience victoria \
+	  --features search-api,s2s,hec \
+	  --search-api-subnets 198.51.100.0/24 \
   --s2s-subnets 198.51.100.0/24,203.0.113.0/24 \
   --hec-subnets 203.0.113.0/24
 ```
+
+Use `--cloud-experience classic` only when planning legacy IDM allowlist
+features (`idm-api`, `idm-ui`). Victoria stacks have no IDM, and unknown
+experience fails closed for IDM unless `--accept-unknown-cloud-experience` is
+passed after operator review.
 
 Render an inventory-only packet for the broader ACS surface:
 

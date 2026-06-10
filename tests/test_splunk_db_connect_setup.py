@@ -57,6 +57,11 @@ class SplunkDbConnectSetupTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("DB Connect", result.stdout)
 
+    def test_template_defaults_to_splunk_10_4(self) -> None:
+        text = TEMPLATE.read_text(encoding="utf-8")
+        self.assertIn('splunk_version: "10.4"', text)
+        self.assertNotIn('splunk_version: "10.0"', text)
+
     def test_template_renders_and_validates(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "rendered"
@@ -85,7 +90,7 @@ class SplunkDbConnectSetupTests(unittest.TestCase):
             self.assertEqual(metadata["app"]["splunkbase_id"], "2686")
             self.assertIn("6150", metadata["install_ids"])
             self.assertIn("6152", metadata["install_ids"])
-            self.assertEqual(inventory["db_connect"]["latest_verified_version"], "4.2.4")
+            self.assertEqual(inventory["db_connect"]["latest_verified_version"], "4.3.0")
             self.assertIn("skills/splunk-app-install/scripts/install_app.sh", install_script)
             self.assertIn("--app-id 2686", install_script)
             self.assertIn("--app-id 6150", install_script)
@@ -490,7 +495,7 @@ class SplunkDbConnectSetupTests(unittest.TestCase):
         registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
         apps_by_id = {app["splunkbase_id"]: app for app in registry["apps"]}
         self.assertEqual(apps_by_id["2686"]["app_name"], "splunk_app_db_connect")
-        self.assertEqual(apps_by_id["2686"]["latest_verified_version"], "4.2.4")
+        self.assertEqual(apps_by_id["2686"]["latest_verified_version"], "4.3.0")
         self.assertNotIn("6759", apps_by_id)
 
         topology = next(item for item in registry["skill_topologies"] if item["skill"] == "splunk-db-connect-setup")

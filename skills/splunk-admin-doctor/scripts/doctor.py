@@ -54,10 +54,12 @@ SOURCE_DOCS = {
     "cloud_rest": "https://help.splunk.com/en?resourceId=Splunk_RESTTUT_RESTandCloud&version=splunk-9_0",
     "cloud_cmc": "https://help.splunk.com/?resourceId=SplunkCloud_Admin_MonitoringIntro",
     "splunkd_health": "https://help.splunk.com/en/splunk-enterprise/administer/monitor/9.3/proactive-splunk-component-monitoring-with-the-splunkd-health-report/about-proactive-splunk-component-monitoring",
-    "btool": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/10.2/first-steps/use-btool-to-troubleshoot-configurations",
+    "btool": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/10.4/first-steps/use-btool-to-troubleshoot-configurations",
     "kvstore": "https://help.splunk.com/en?resourceId=Splunk_Admin_TroubleshootKVstore",
     "diag": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/9.1/contact-splunk-support/generate-a-diagnostic-file",
-    "backup": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.2/administer-splunk-enterprise-with-configuration-files/back-up-configuration-information",
+    "backup": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/administer-splunk-enterprise-with-configuration-files/back-up-configuration-information",
+    "upgrade_104": "https://help.splunk.com/en/splunk-enterprise/get-started/install-and-upgrade/10.4/upgrade-or-migrate-splunk-enterprise/about-upgrading-to-10.4-read-this-first",
+    "cloud_104": "https://help.splunk.com/en/splunk-cloud-platform/administer/admin-manual/10.4.2604/get-started-managing-splunk-cloud-platform/determine-your-splunk-cloud-platform-experience",
 }
 
 
@@ -212,6 +214,28 @@ def rule(
 
 RULE_CATALOG = [
     rule(
+        rule_id="SAD-APPS-104-RUNTIME-GAP",
+        domain="Apps and add-ons",
+        platform="both",
+        severity="high",
+        evidence="apps.python_313_gaps, apps.python_39_fallbacks, apps.nodejs_gaps, apps.jquery2_gaps, or apps.sha1_gaps is populated.",
+        source_doc=SOURCE_DOCS["upgrade_104"],
+        fix_kind="delegated_fix",
+        preview_command="Review app compatibility evidence and route unsupported packages through splunk-app-install or the owning setup skill.",
+        apply_command="Render app compatibility handoffs only; no app is upgraded or removed by doctor.",
+        handoff_skill="splunk-app-install",
+        rollback_or_validation="Rerun doctor after custom app remediation and verify 10.4 runtime gaps are cleared or explicitly accepted.",
+        trigger={
+            "any": [
+                {"path": "apps.python_313_gaps", "truthy": True},
+                {"path": "apps.python_39_fallbacks", "truthy": True},
+                {"path": "apps.nodejs_gaps", "truthy": True},
+                {"path": "apps.jquery2_gaps", "truthy": True},
+                {"path": "apps.sha1_gaps", "truthy": True},
+            ]
+        },
+    ),
+    rule(
         rule_id="SAD-APPS-RESTART-REQUIRED",
         domain="Apps and add-ons",
         platform="both",
@@ -288,6 +312,27 @@ RULE_CATALOG = [
             "any": [
                 {"path": "backup.last_config_backup_stale", "equals": True},
                 {"path": "backup.last_config_backup_age_days", "gt": 30},
+            ]
+        },
+    ),
+    rule(
+        rule_id="SAD-CLOUD-104-EXPERIENCE-GAP",
+        domain="Cloud ACS control plane",
+        platform="cloud",
+        severity="high",
+        evidence="cloud.experience_gap, cloud.victoria_idm_migration_required, cloud.hybrid_search_on_victoria, or cloud.idm_allowlist_migration_gaps is populated.",
+        source_doc=SOURCE_DOCS["cloud_104"],
+        fix_kind="manual_support",
+        preview_command="Review Splunk Cloud 10.4.2604 Classic/Victoria experience evidence and ACS allowlist handoffs.",
+        apply_command="Render Cloud experience handoff only; Classic-to-Victoria migration and support-only changes stay with Splunk-supported paths.",
+        handoff_skill="splunk-cloud-acs-admin-setup,splunk-cloud-acs-allowlist-setup",
+        rollback_or_validation="Rerun Cloud ACS audit and verify IDM-era allowlists, HEC paths, and Hybrid Search posture match the stack experience.",
+        trigger={
+            "any": [
+                {"path": "cloud.experience_gap", "truthy": True},
+                {"path": "cloud.victoria_idm_migration_required", "equals": True},
+                {"path": "cloud.hybrid_search_on_victoria", "equals": True},
+                {"path": "cloud.idm_allowlist_migration_gaps", "truthy": True},
             ]
         },
     ),
@@ -428,6 +473,26 @@ RULE_CATALOG = [
         },
     ),
     rule(
+        rule_id="SAD-ENT-104-UPGRADE-PATH",
+        domain="Enterprise health",
+        platform="enterprise",
+        severity="critical",
+        evidence="upgrade.unsupported_10_4_path, upgrade.direct_9x_to_104, or forwarders.unsupported_10_4_upgrade_path is true/populated.",
+        source_doc=SOURCE_DOCS["upgrade_104"],
+        fix_kind="delegated_fix",
+        preview_command="Review Splunk 10.4 upgrade-path evidence before running host or UF bootstrap.",
+        apply_command="Render host/UF upgrade handoffs only; no binary upgrade is performed by doctor.",
+        handoff_skill="splunk-enterprise-host-setup,splunk-universal-forwarder-setup",
+        rollback_or_validation="Rerun doctor after staging supported intermediate upgrades and verify unsupported 10.4 path evidence is clear.",
+        trigger={
+            "any": [
+                {"path": "upgrade.unsupported_10_4_path", "equals": True},
+                {"path": "upgrade.direct_9x_to_104", "equals": True},
+                {"path": "forwarders.unsupported_10_4_upgrade_path", "truthy": True},
+            ]
+        },
+    ),
+    rule(
         rule_id="SAD-ENT-BTOOL-ERRORS",
         domain="Enterprise health",
         platform="enterprise",
@@ -498,6 +563,26 @@ RULE_CATALOG = [
                 {"path": "indexer_cluster.issues", "truthy": True},
                 {"path": "indexer_cluster.rf_met", "equals": False},
                 {"path": "indexer_cluster.sf_met", "equals": False},
+            ]
+        },
+    ),
+    rule(
+        rule_id="SAD-INDEX-104-AZURE-SMARTSTORE",
+        domain="Indexes and storage",
+        platform="enterprise",
+        severity="high",
+        evidence="smartstore.azure_encrypt_fields_missing, smartstore.azure_104_upgrade_blockers, or smartstore.azure_remote_identity_fields is populated.",
+        source_doc=SOURCE_DOCS["upgrade_104"],
+        fix_kind="delegated_fix",
+        preview_command="bash skills/splunk-index-lifecycle-smartstore-setup/scripts/setup.sh --phase render --remote-provider azure --dry-run",
+        apply_command="Render SmartStore Azure 10.4 handoff; no indexer-cluster bundle is applied by doctor.",
+        handoff_skill="splunk-index-lifecycle-smartstore-setup",
+        rollback_or_validation="Rerun doctor and SmartStore preflight after [general] encrypt_fields covers Azure remote identity fields or values are emptied.",
+        trigger={
+            "any": [
+                {"path": "smartstore.azure_encrypt_fields_missing", "truthy": True},
+                {"path": "smartstore.azure_104_upgrade_blockers", "truthy": True},
+                {"path": "smartstore.azure_remote_identity_fields", "truthy": True},
             ]
         },
     ),
@@ -594,6 +679,27 @@ RULE_CATALOG = [
                 {"path": "knowledge_objects.acceleration_issues", "truthy": True},
                 {"path": "knowledge_objects.lookup_issues", "truthy": True},
                 {"path": "knowledge_objects.collection_size_risks", "truthy": True},
+            ]
+        },
+    ),
+    rule(
+        rule_id="SAD-KVSTORE-104-UPGRADE-BLOCKER",
+        domain="KV Store and knowledge objects",
+        platform="enterprise",
+        severity="critical",
+        evidence="kvstore.mongo_below_7_for_104, kvstore.upgrade_blocker, kvstore.tls_override_review, or kvstore.kvstoreSslClientConfig_gaps is true/populated.",
+        source_doc=SOURCE_DOCS["upgrade_104"],
+        fix_kind="delegated_fix",
+        preview_command="bash skills/splunk-kvstore-admin-setup/scripts/setup.sh --phase render --dry-run",
+        apply_command="Render KV Store upgrade/TLS review handoff; no KV Store repair or migration is performed by doctor.",
+        handoff_skill="splunk-kvstore-admin-setup,splunk-platform-pki-setup",
+        rollback_or_validation="Rerun doctor after KV Store/Mongo and KV TLS evidence is 10.4-ready.",
+        trigger={
+            "any": [
+                {"path": "kvstore.mongo_below_7_for_104", "equals": True},
+                {"path": "kvstore.upgrade_blocker", "truthy": True},
+                {"path": "kvstore.tls_override_review", "truthy": True},
+                {"path": "kvstore.kvstoreSslClientConfig_gaps", "truthy": True},
             ]
         },
     ),

@@ -5,18 +5,24 @@
 This skill follows current Splunk Cloud ACS documentation and the local
 `acs` CLI help output from ACS CLI 2.22.0.
 
+For Splunk Cloud Platform `10.4.2604`, review
+`../shared/splunk_10_4_enterprise_deployment_notes.md`. ACS admin plans must
+stay within ACS-supported APIs for allowlists, HEC tokens, indexes, roles,
+limits, outbound ports, maintenance windows, and restarts; filesystem or
+host-level Enterprise assumptions do not apply to Cloud stacks.
+
 Official references:
 
 - ACS overview:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSIntro>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/using-the-admin-config-service-acs--api/admin-config-service-acs-requirements-and-compatibility-matrix>
 - ACS API endpoint reference:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSREF>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/admin-config-service-acs-api-endpoint-reference/admin-config-service-acs-api-endpoint-reference>
 - ACS CLI:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ACSCLI>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/administer-splunk-cloud-platform-using-the-admin-config-service-acs-cli/administer-splunk-cloud-platform-using-the-acs-cli>
 - IP allow lists:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ConfigureIPAllowList>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-ip-allow-lists-for-splunk-cloud-platform>
 - Outbound ports:
-  <https://docs.splunk.com/Documentation/SplunkCloud/latest/Config/ConfigureOutboundPorts>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/configure-outbound-ports-for-splunk-cloud-platform>
 - Private connectivity:
   <https://docs.splunk.com/Documentation/SplunkCloud/latest/Security/Privateconnectivityenable>
 - Limits:
@@ -144,12 +150,22 @@ values out of it. Supported top-level keys:
 | `hec` | 443 | open | HTTP Event Collector data ingestion |
 | `s2s` | 9997 | open | Splunk-to-Splunk forwarder traffic |
 | `search-ui` | 80/443 | open, except regulated stacks can be closed | Search head web UI |
-| `idm-api` | 8089 | open | Inputs Data Manager API |
-| `idm-ui` | 443 | open | Inputs Data Manager UI |
+| `idm-api` | 8089 | open | Inputs Data Manager API on Classic/legacy IDM stacks only; not present on Victoria |
+| `idm-ui` | 443 | open | Inputs Data Manager UI on Classic/legacy IDM stacks only; not present on Victoria |
 
 AWS deployments enforce 200 subnets per feature and a 230-subnet cap for each
 allowlist group. GCP deployments enforce 200 subnets per feature. The renderer
 counts IPv4 and IPv6 together for these guards.
+
+For Splunk Cloud Platform 10.4.2604, determine the stack experience before
+planning allowlists and HEC/IDM handoffs. Victoria stacks have no IDM, do not
+support Hybrid Search, and Classic-to-Victoria migrations move IDM apps and
+configuration to the search tier; IDM-era allowlists must be reviewed against
+search head or SHC member IPs. The renderer requires
+`--cloud-experience classic` for IDM features/subnets, rejects them for
+`--cloud-experience victoria`, and fails closed when the experience is
+`unknown` unless `--accept-unknown-cloud-experience` is passed after explicit
+operator review.
 
 ## Private Connectivity Notes
 

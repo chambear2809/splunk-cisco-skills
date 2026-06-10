@@ -6,7 +6,7 @@ EP-to-destination channels both support TLS / mTLS but the file
 naming convention, key format, and distribution method differ.
 
 > Anchor:
-> [Edge Processor: Obtain TLS certificates for data sources and Edge Processors](https://help.splunk.com/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/10.0.2503/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors).
+> [Edge Processor: Obtain TLS certificates for data sources and Edge Processors](https://help.splunk.com/en/data-management/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/get-data-into-edge-processors/obtain-tls-certificates-for-data-sources-and-edge-processors).
 
 ## Trigger
 

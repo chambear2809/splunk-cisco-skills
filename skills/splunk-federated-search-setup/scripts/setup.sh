@@ -16,12 +16,17 @@ APPLY_TARGET="search-head"
 OUTPUT_DIR=""
 SPLUNK_HOME_VALUE="/opt/splunk"
 APP_NAME="ZZZ_cisco_skills_federated_search"
+CLOUD_VERSION="10.4.2604"
+FSS3_MODE="data-management"
 PROVIDER_NAME="remote_provider"
 REMOTE_HOST_PORT=""
 SERVICE_ACCOUNT=""
 PASSWORD_FILE=""
 APP_CONTEXT="search"
 USE_FSH_KNOWLEDGE_OBJECTS="false"
+ALLOW_INDEX_BASED_PROVIDER_FILTERING="false"
+FED_SRCH_INDEXES_ALLOWED=""
+USE_APP_CONTEXT_FROM_SEARCH="false"
 FEDERATED_INDEX_NAME="remote_main"
 DATASET_TYPE="index"
 DATASET_NAME="main"
@@ -58,6 +63,9 @@ Single-provider back-compat flags:
   --provider-name NAME
   --app-context APP
   --use-fsh-knowledge-objects true|false
+  --allow-index-based-provider-filtering true|false
+  --fed-srch-indexes-allowed LIST
+  --use-app-context-from-search true|false
   --federated-index-name NAME
   --dataset-type index|metricindex|savedsearch|lastjob|datamodel|glue_table
   --dataset-name NAME
@@ -70,10 +78,14 @@ Workflow:
                               For --phase global-toggle, choose direction.
   --dry-run
   --json
-  --output-dir PATH
-  --splunk-home PATH
-  --app-name NAME
-  --shc-replication true|false
+	  --output-dir PATH
+	  --splunk-home PATH
+	  --app-name NAME
+	  --cloud-version VERSION
+	  --fss3-mode data-management|legacy
+	                              Amazon S3 federated-search mode. Default
+	                              data-management is required for Cloud 10.4.2604+.
+	  --shc-replication true|false
   --max-preview-generation-duration SECONDS
   --max-preview-generation-inputcount ROWS
   --restart-splunk true|false
@@ -103,12 +115,17 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME_VALUE="$2"; shift 2 ;;
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
+        --cloud-version) require_arg "$1" $# || exit 1; CLOUD_VERSION="$2"; shift 2 ;;
+        --fss3-mode) require_arg "$1" $# || exit 1; FSS3_MODE="$2"; shift 2 ;;
         --provider-name) require_arg "$1" $# || exit 1; PROVIDER_NAME="$2"; shift 2 ;;
         --remote-host-port) require_arg "$1" $# || exit 1; REMOTE_HOST_PORT="$2"; shift 2 ;;
         --service-account) require_arg "$1" $# || exit 1; SERVICE_ACCOUNT="$2"; shift 2 ;;
         --password-file) require_arg "$1" $# || exit 1; PASSWORD_FILE="$2"; shift 2 ;;
         --app-context) require_arg "$1" $# || exit 1; APP_CONTEXT="$2"; shift 2 ;;
         --use-fsh-knowledge-objects) require_arg "$1" $# || exit 1; USE_FSH_KNOWLEDGE_OBJECTS="$2"; shift 2 ;;
+        --allow-index-based-provider-filtering) require_arg "$1" $# || exit 1; ALLOW_INDEX_BASED_PROVIDER_FILTERING="$2"; shift 2 ;;
+        --fed-srch-indexes-allowed) require_arg "$1" $# || exit 1; FED_SRCH_INDEXES_ALLOWED="$2"; shift 2 ;;
+        --use-app-context-from-search) require_arg "$1" $# || exit 1; USE_APP_CONTEXT_FROM_SEARCH="$2"; shift 2 ;;
         --federated-index-name) require_arg "$1" $# || exit 1; FEDERATED_INDEX_NAME="$2"; shift 2 ;;
         --dataset-type) require_arg "$1" $# || exit 1; DATASET_TYPE="$2"; shift 2 ;;
         --dataset-name) require_arg "$1" $# || exit 1; DATASET_NAME="$2"; shift 2 ;;
@@ -148,7 +165,10 @@ validate_args() {
     validate_choice "${MODE}" standard transparent
     validate_choice "${PHASE}" render preflight apply status all global-toggle
     validate_choice "${APPLY_TARGET}" search-head shc-deployer rest
+    validate_choice "${FSS3_MODE}" data-management legacy
     validate_choice "${USE_FSH_KNOWLEDGE_OBJECTS}" true false
+    validate_choice "${ALLOW_INDEX_BASED_PROVIDER_FILTERING}" true false
+    validate_choice "${USE_APP_CONTEXT_FROM_SEARCH}" true false
     validate_choice "${DATASET_TYPE}" index metricindex savedsearch lastjob datamodel glue_table
     validate_choice "${SHC_REPLICATION}" true false
     validate_choice "${RESTART_SPLUNK}" true false
@@ -186,6 +206,8 @@ build_renderer_args() {
         --output-dir "${OUTPUT_DIR}"
         --splunk-home "${SPLUNK_HOME_VALUE}"
         --app-name "${APP_NAME}"
+        --cloud-version "${CLOUD_VERSION}"
+        --fss3-mode "${FSS3_MODE}"
         --mode "${MODE}"
         --provider-name "${PROVIDER_NAME}"
         --remote-host-port "${REMOTE_HOST_PORT}"
@@ -193,6 +215,9 @@ build_renderer_args() {
         --password-file "${PASSWORD_FILE}"
         --app-context "${APP_CONTEXT}"
         --use-fsh-knowledge-objects "${USE_FSH_KNOWLEDGE_OBJECTS}"
+        --allow-index-based-provider-filtering "${ALLOW_INDEX_BASED_PROVIDER_FILTERING}"
+        --fed-srch-indexes-allowed "${FED_SRCH_INDEXES_ALLOWED}"
+        --use-app-context-from-search "${USE_APP_CONTEXT_FROM_SEARCH}"
         --federated-index-name "${FEDERATED_INDEX_NAME}"
         --dataset-type "${DATASET_TYPE}"
         --dataset-name "${DATASET_NAME}"

@@ -17,7 +17,8 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILL_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "splunk-ingest-processor-rendered"
 KIT_SCRIPT = REPO_ROOT / "skills/splunk-spl2-pipeline-kit/scripts/spl2_pipeline_kit.py"
-VALID_DESTINATION_TYPES = {"splunk_cloud", "observability", "metrics_index", "s3"}
+DEFAULT_CLOUD_VERSION = "10.4.2604"
+VALID_DESTINATION_TYPES = {"splunk_cloud", "observability", "metrics_index", "s3", "s3_dataset", "azure_dataset"}
 REFUSED_DESTINATION_TYPES = {"splunk_enterprise", "enterprise", "indexer_cluster", "hec"}
 AFE_SUPPORTED_REGIONS = [
     "us-east-1",
@@ -59,7 +60,7 @@ DEFAULT_SOURCE_TYPES = ["aws:cloudtrail", "crowdstrike:fdr", "json_app"]
 DEFAULT_DESTINATIONS = (
     "splunk_indexer=type=splunk_cloud;default=true,"
     "metrics=type=metrics_index;index=metrics,"
-    "s3_archive=type=s3;format=parquet;bucket=example-bucket"
+    "s3_archive=type=s3_dataset;format=parquet;bucket=example-bucket;region=us-east-1"
 )
 DEFAULT_PIPELINES = (
     "redact_auth=template=redact;sourcetype=json_app;destination=splunk_indexer,"
@@ -77,7 +78,8 @@ FEATURE_COVERAGE = [
     ("Splunk Cloud destination", "rendered"),
     ("Observability destination", "rendered"),
     ("Metrics index destination", "rendered"),
-    ("Amazon S3 JSON Parquet destination", "rendered"),
+    ("Amazon S3 Data Management dataset destination", "data_management_handoff"),
+    ("Microsoft Azure Data Management dataset destination", "data_management_handoff"),
     ("Default destination verification", "ui_handoff"),
     ("Route branch thru copy templates", "rendered"),
     ("Redact hash sample lookup extract timestamp JSON XML templates", "rendered"),
@@ -104,6 +106,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--tenant-name", default="example-prod")
     parser.add_argument("--stack-url", default="https://example-prod.scs.splunk.com")
+    parser.add_argument("--cloud-version", default=DEFAULT_CLOUD_VERSION)
     parser.add_argument("--subscription-tier", choices=("unknown", "essentials", "premier"), default="unknown")
     parser.add_argument("--source-types", default=",".join(DEFAULT_SOURCE_TYPES))
     parser.add_argument("--destinations", default=DEFAULT_DESTINATIONS)
@@ -167,6 +170,19 @@ def safe_name(value: str) -> str:
     return cleaned or "unnamed"
 
 
+def normalized_destination_type(dest: dict[str, str]) -> str:
+    raw = dest.get("type", "splunk_cloud")
+    return "s3_dataset" if raw == "s3" else raw
+
+
+def data_management_family(dest_type: str) -> str:
+    if dest_type == "s3_dataset":
+        return "amazon_s3"
+    if dest_type == "azure_dataset":
+        return "microsoft_azure"
+    return ""
+
+
 def render_source_type(name: str) -> str:
     payload = {
         "name": name,
@@ -186,15 +202,31 @@ def render_source_type(name: str) -> str:
     return json.dumps(payload, indent=2) + "\n"
 
 
-def render_destination(dest: dict[str, str]) -> str:
-    dest_type = dest.get("type", "splunk_cloud")
+def render_destination(dest: dict[str, str], cloud_version: str) -> str:
+    raw_type = dest.get("type", "splunk_cloud")
+    dest_type = normalized_destination_type(dest)
     payload = {
         "name": dest["name"],
         "type": dest_type,
         "status": "rendered" if dest_type in VALID_DESTINATION_TYPES else "refused_handoff",
         "settings": {key: value for key, value in sorted(dest.items()) if key not in {"name", "type"}},
     }
-    if dest_type == "s3" and payload["settings"].get("object_lock", "").lower() == "true":
+    if raw_type != dest_type:
+        payload["original_type"] = raw_type
+        payload["compatibility_note"] = "`type=s3` is treated as `type=s3_dataset` for Splunk Cloud 10.4.2604+."
+    family = data_management_family(dest_type)
+    if family:
+        payload["status"] = "data_management_handoff"
+        payload["cloud_version"] = cloud_version
+        payload["dataset_family"] = family
+        payload["api_crud"] = "not_claimed"
+        payload["apply_surface"] = "Splunk Cloud Platform Data Management app"
+        payload["connection_handoff"] = {
+            key: value
+            for key, value in sorted(dest.items())
+            if key not in {"name", "type", "default"}
+        }
+    if dest_type == "s3_dataset" and payload["settings"].get("object_lock", "").lower() == "true":
         payload["status"] = "refused_handoff"
         payload["finding"] = "S3 Object Lock requires manual review and is not rendered by this skill."
     if dest_type in REFUSED_DESTINATION_TYPES:
@@ -267,7 +299,16 @@ def collect_findings(destinations: list[dict[str, str]], pipelines: list[dict[st
             }
         )
     for dest in destinations:
-        dest_type = dest.get("type", "splunk_cloud")
+        raw_type = dest.get("type", "splunk_cloud")
+        dest_type = normalized_destination_type(dest)
+        if raw_type == "s3":
+            findings.append(
+                {
+                    "severity": "info",
+                    "code": "IP-S3-DATASET-ALIAS",
+                    "message": "Destination type `s3` is treated as the 10.4.2604 Data Management `s3_dataset` workflow.",
+                }
+            )
         if dest_type in REFUSED_DESTINATION_TYPES:
             findings.append(
                 {
@@ -276,12 +317,28 @@ def collect_findings(destinations: list[dict[str, str]], pipelines: list[dict[st
                     "message": f"Destination `{dest['name']}` uses `{dest_type}`; route this workflow to splunk-edge-processor-setup.",
                 }
             )
-        if dest_type == "s3" and dest.get("object_lock", "").lower() == "true":
+        if dest_type == "s3_dataset" and dest.get("object_lock", "").lower() == "true":
             findings.append(
                 {
                     "severity": "error",
                     "code": "IP-S3-OBJECT-LOCK",
                     "message": "S3 Object Lock destination settings require manual review and are refused by this renderer.",
+                }
+            )
+        if dest_type == "s3_dataset":
+            findings.append(
+                {
+                    "severity": "info",
+                    "code": "IP-S3-DATA-MANAGEMENT",
+                    "message": "For Splunk Cloud 10.4.2604+, create the Amazon S3 connection and dataset in the Data Management app before applying pipelines.",
+                }
+            )
+        if dest_type == "azure_dataset":
+            findings.append(
+                {
+                    "severity": "info",
+                    "code": "IP-AZURE-DATA-MANAGEMENT",
+                    "message": "For Splunk Cloud 10.4.2604+, create the Microsoft Azure Blob/ADLS connection and dataset in the Data Management app before applying pipelines.",
                 }
             )
     if any(pipe.get("template") == "metrics" for pipe in pipelines):
@@ -309,6 +366,7 @@ def render_readiness(args: argparse.Namespace, findings: list[dict[str, str]]) -
         "",
         f"- Tenant: `{args.tenant_name}`",
         f"- Stack URL: `{args.stack_url}`",
+        f"- Cloud version: `{args.cloud_version}`",
         f"- Subscription tier: `{args.subscription_tier}`",
         "- Experience: verify Splunk Cloud Platform Victoria Experience.",
         "- Provisioning: verify Ingest Processor is enabled or open a Splunk Support case.",
@@ -341,6 +399,7 @@ def render_apply_plan(args: argparse.Namespace, source_types: list[str], destina
     plan = {
         "workflow": "splunk-ingest-processor-setup",
         "tenant": args.tenant_name,
+        "cloud_version": args.cloud_version,
         "api_crud": "not_claimed",
         "actions": [
             {"order": 1, "type": "ui_handoff", "object": "provisioning", "description": "Confirm Ingest Processor is provisioned for the tenant."},
@@ -370,7 +429,7 @@ def render_ui_handoff(source_types: list[str], destinations: list[dict[str, str]
         "1. Open Splunk Cloud Platform Data Management -> Ingest Processor.",
         "2. Confirm provisioning, roles, service account access, indexes, and lookups.",
         "3. Create or review source types with the rendered JSON notes.",
-        "4. Create destinations in this order: Splunk Cloud, metrics, Observability, S3.",
+        "4. Create destinations in this order: Splunk Cloud, metrics, Observability, Data Management datasets (Amazon S3 or Microsoft Azure).",
         "5. Create pipelines from `pipelines/*.spl2` or the custom template app.",
         "6. Preview every pipeline with representative sample data.",
         "7. Confirm index routing and default destination behavior.",
@@ -382,7 +441,7 @@ def render_ui_handoff(source_types: list[str], destinations: list[dict[str, str]
     ]
     lines.extend(f"- `{source_type}`" for source_type in source_types)
     lines.extend(["", "## Destinations", ""])
-    lines.extend(f"- `{dest['name']}` (`{dest.get('type', 'splunk_cloud')}`)" for dest in destinations)
+    lines.extend(f"- `{dest['name']}` (`{normalized_destination_type(dest)}`)" for dest in destinations)
     lines.extend(["", "## Pipelines", ""])
     lines.extend(f"- `{pipe['name']}` -> `{pipe.get('destination', 'review')}`" for pipe in pipelines)
     return "\n".join(lines) + "\n"
@@ -460,7 +519,8 @@ def render_handoffs() -> dict[str, str]:
     return {
         "splunk-hec-service-setup.md": "# HEC Handoff\n\nUse `splunk-hec-service-setup` for HEC token/index readiness. Keep `useACK=false` for Ingest Processor source paths that do not support indexer acknowledgement.\n",
         "splunk-edge-processor-setup.md": "# Edge Processor Handoff\n\nUse `splunk-edge-processor-setup` for Splunk Enterprise destinations, customer-managed runtime routing, syslog/HEC/S2S edge collection, or EP-specific destination catalogs.\n",
-        "splunk-federated-search-s3.md": "# S3 Federated Search Handoff\n\nWhen IP writes archive data to S3 and operators need search access, hand off to `splunk-federated-search-setup` for Federated Search for Amazon S3 readiness.\n",
+        "splunk-federated-search-s3.md": "# S3 Federated Search Handoff\n\nWhen IP writes archive data to S3 and operators need search access on Splunk Cloud 10.4.2604+, create the Amazon S3 connection and dataset in Data Management first, then hand off to `splunk-federated-search-setup` in `data-management` mode for search/readiness guidance.\n",
+        "splunk-cloud-data-management-datasets.md": "# Data Management Dataset Handoff\n\nFor Splunk Cloud 10.4.2604+, Amazon S3 and Microsoft Azure IP destinations are Data Management app connection/dataset workflows. Review `destinations/*.json` for non-secret connection values; this skill does not claim private Data Management API CRUD.\n",
         "splunk-data-source-readiness-doctor.md": "# Data Source Readiness Handoff\n\nAfter applying IP pipelines, run `splunk-data-source-readiness-doctor` with expected indexes, sourcetypes, macros, CIM/OCSF expectations, and sample-event evidence.\n",
     }
 
@@ -487,7 +547,7 @@ def render_assets(args: argparse.Namespace) -> Path:
     for source_type in source_types:
         write_file(output_dir / f"source-types/{safe_name(source_type)}.json", render_source_type(source_type))
     for dest in destinations:
-        write_file(output_dir / f"destinations/{safe_name(dest['name'])}.json", render_destination(dest))
+        write_file(output_dir / f"destinations/{safe_name(dest['name'])}.json", render_destination(dest, args.cloud_version))
     for pipe in pipelines:
         write_file(output_dir / f"pipelines/{safe_name(pipe['name'])}.spl2", render_pipeline(pipe, kit_out))
     for lifecycle in ("apply", "edit", "remove", "refresh", "delete", "rollback"):
@@ -509,6 +569,7 @@ def validate_output(output_dir: Path) -> list[str]:
         "control-plane-handoffs/known-issues.md",
         "monitoring/searches.spl",
         "monitoring/usage-summary-handoff.md",
+        "handoffs/splunk-cloud-data-management-datasets.md",
         "spl2-pipeline-kit/lint-report.json",
     ]
     missing = [rel for rel in required if not (output_dir / rel).is_file()]

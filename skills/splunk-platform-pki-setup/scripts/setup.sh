@@ -54,6 +54,7 @@ LEAF_DAYS="825"
 # Algorithm policy
 TLS_POLICY="splunk-modern"
 TLS_VERSION_FLOOR="tls1.2"
+ENABLE_TLS13="auto"
 ALLOW_DEPRECATED_TLS=false
 KEY_ALGORITHM="rsa-2048"
 KEY_FORMAT="pkcs1"
@@ -72,7 +73,7 @@ FIPS_MODE="none"
 
 # Splunk runtime
 SPLUNK_HOME_VALUE="/opt/splunk"
-SPLUNK_VERSION="10.2.2"
+SPLUNK_VERSION="10.4.0"
 CERT_INSTALL_SUBDIR="myssl"
 
 # Secret file paths
@@ -139,7 +140,8 @@ CA distinguished name (Private mode):
 
 Algorithm policy:
   --tls-policy splunk-modern|fips-140-3|stig                     (default: splunk-modern)
-  --tls-version-floor tls1.2                                     (only valid value)
+  --tls-version-floor tls1.2|tls1.3                              (default: tls1.2)
+  --enable-tls13 auto|true|false                                 (default: auto; auto enables for 10.4+)
   --allow-deprecated-tls                                         (relax lower bound; not recommended)
   --key-algorithm rsa-2048|rsa-3072|rsa-4096|ecdsa-p256|ecdsa-p384|ecdsa-p521  (default: rsa-2048)
   --key-format pkcs1|pkcs8                                       (default: pkcs1; pkcs8 for EP/DBX)
@@ -159,7 +161,7 @@ FIPS:
 
 Splunk runtime:
   --splunk-home PATH                                             (default: /opt/splunk)
-  --splunk-version X.Y.Z                                         (default: 10.2.2)
+  --splunk-version X.Y.Z                                         (default: 10.4.0)
   --cert-install-subdir NAME                                     (default: myssl)
 
 Secrets (file paths only, never values on argv):
@@ -243,6 +245,7 @@ while [[ $# -gt 0 ]]; do
         --leaf-days) require_arg "$1" $# || exit 1; LEAF_DAYS="$2"; shift 2 ;;
         --tls-policy) require_arg "$1" $# || exit 1; TLS_POLICY="$2"; shift 2 ;;
         --tls-version-floor) require_arg "$1" $# || exit 1; TLS_VERSION_FLOOR="$2"; shift 2 ;;
+        --enable-tls13) require_arg "$1" $# || exit 1; ENABLE_TLS13="$2"; shift 2 ;;
         --allow-deprecated-tls) ALLOW_DEPRECATED_TLS=true; shift ;;
         --key-algorithm) require_arg "$1" $# || exit 1; KEY_ALGORITHM="$2"; shift 2 ;;
         --key-format) require_arg "$1" $# || exit 1; KEY_FORMAT="$2"; shift 2 ;;
@@ -292,7 +295,8 @@ validate_args() {
     validate_choice "${MODE}" private public
     validate_choice "${PUBLIC_CA_NAME}" vault acme adcs ejbca other
     validate_choice "${TLS_POLICY}" splunk-modern fips-140-3 stig
-    validate_choice "${TLS_VERSION_FLOOR}" tls1.2
+    validate_choice "${TLS_VERSION_FLOOR}" tls1.2 tls1.3
+    validate_choice "${ENABLE_TLS13}" auto true false
     validate_choice "${KEY_ALGORITHM}" rsa-2048 rsa-3072 rsa-4096 ecdsa-p256 ecdsa-p384 ecdsa-p521
     validate_choice "${KEY_FORMAT}" pkcs1 pkcs8
     validate_choice "${ENCRYPT_REPLICATION_PORT}" true false
@@ -354,6 +358,7 @@ build_renderer_args() {
         --leaf-days "${LEAF_DAYS}"
         --tls-policy "${TLS_POLICY}"
         --tls-version-floor "${TLS_VERSION_FLOOR}"
+        --enable-tls13 "${ENABLE_TLS13}"
         --key-algorithm "${KEY_ALGORITHM}"
         --key-format "${KEY_FORMAT}"
         --enable-mtls "${ENABLE_MTLS}"

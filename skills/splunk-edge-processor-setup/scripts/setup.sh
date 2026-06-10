@@ -15,6 +15,7 @@ APPLY=false
 OUTPUT_DIR=""
 
 EP_CONTROL_PLANE="cloud"
+CLOUD_VERSION="10.4.2604"
 EP_TENANT_URL=""
 EP_NAME="prod-ep"
 EP_TLS_MODE="none"
@@ -46,9 +47,10 @@ Phases:
   status | validate | all
 
 Options:
-  --output-dir PATH
-  --ep-control-plane cloud|enterprise
-  --ep-tenant-url URL
+	  --output-dir PATH
+	  --ep-control-plane cloud|enterprise
+	  --cloud-version VERSION
+	  --ep-tenant-url URL
   --ep-name NAME
   --ep-tls-mode none|tls|mtls
   --ep-tls-server-cert PATH
@@ -58,7 +60,7 @@ Options:
   --ep-instances "host=mode,..."   (mode: systemd|nosystemd|docker)
   --ep-target-daily-gb N
   --ep-source-types CSV
-  --ep-destinations "name=type=s2s;host=...;port=...,name2=..."
+	  --ep-destinations "name=type=s2s|hec|s3_dataset|azure_dataset|s3|syslog;..."
   --ep-default-destination NAME
   --ep-pipelines "name=partition=Keep;sourcetype=val;spl2_file=path;destination=name,..."
   --ep-install-dir PATH
@@ -83,6 +85,7 @@ while [[ $# -gt 0 ]]; do
         --json) JSON_OUTPUT=true; shift ;;
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --ep-control-plane) require_arg "$1" $# || exit 1; EP_CONTROL_PLANE="$2"; shift 2 ;;
+        --cloud-version) require_arg "$1" $# || exit 1; CLOUD_VERSION="$2"; shift 2 ;;
         --ep-tenant-url) require_arg "$1" $# || exit 1; EP_TENANT_URL="$2"; shift 2 ;;
         --ep-name) require_arg "$1" $# || exit 1; EP_NAME="$2"; shift 2 ;;
         --ep-tls-mode) require_arg "$1" $# || exit 1; EP_TLS_MODE="$2"; shift 2 ;;
@@ -135,6 +138,7 @@ fi
 RENDER_ARGS=(
     --output-dir "${OUTPUT_DIR}"
     --ep-control-plane "${EP_CONTROL_PLANE}"
+    --cloud-version "${CLOUD_VERSION}"
     --ep-tenant-url "${EP_TENANT_URL}"
     --ep-name "${EP_NAME}"
     --ep-tls-mode "${EP_TLS_MODE}"

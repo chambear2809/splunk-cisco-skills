@@ -18,16 +18,24 @@ from typing import Iterable
 
 
 DEFAULT_OPERATOR_VERSION = "3.1.0"
-DEFAULT_SPLUNK_VERSION = "10.2.0"
+DEFAULT_SPLUNK_VERSION = "10.4.0"
 SGT_ACCEPTANCE = "--accept-sgt-current-at-splunk-com"
 SOK_ARCHITECTURES = {"s1", "c3", "m4"}
 POD_PROFILES = {
     "pod-small",
     "pod-medium",
     "pod-large",
+    "pod-xlarge",
     "pod-small-es",
     "pod-medium-es",
     "pod-large-es",
+    "pod-xlarge-es",
+}
+POD_INGEST_CEILINGS_GB = {
+    "pod-small": 500,
+    "pod-medium": 1000,
+    "pod-large": 2500,
+    "pod-xlarge": 10000,
 }
 SOK_GENERATED_FILES = {
     "README.md",
@@ -69,6 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--release-name", default="splunk-enterprise")
     parser.add_argument("--operator-release-name", default="splunk-operator")
     parser.add_argument("--operator-version", default=DEFAULT_OPERATOR_VERSION)
+    parser.add_argument("--kubernetes-version", default="")
     parser.add_argument("--chart-version", default="")
     parser.add_argument("--splunk-version", default=DEFAULT_SPLUNK_VERSION)
     parser.add_argument("--splunk-image", default="")
@@ -96,6 +105,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--search-apps", default="")
     parser.add_argument("--standalone-apps", default="")
     parser.add_argument("--premium-apps", default="")
+    parser.add_argument("--daily-ingest-gb", default="")
     parser.add_argument("--accept-splunk-general-terms", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")
@@ -131,6 +141,41 @@ def ensure_positive_int(value: str, option: str) -> int:
     if parsed < 1:
         die(f"{option} must be a positive integer.")
     return parsed
+
+
+def version_tuple(raw: str, parts: int = 3) -> tuple[int, ...]:
+    tokens = [int(token) for token in re.findall(r"\d+", raw or "")]
+    tokens = tokens[:parts]
+    return tuple(tokens + [0] * (parts - len(tokens)))
+
+
+def validate_kubernetes_version(args: argparse.Namespace) -> None:
+    if not args.kubernetes_version:
+        return
+    kube = version_tuple(args.kubernetes_version, 2)
+    if kube < (1, 25) or kube > (1, 34):
+        die("Splunk Operator 3.1.0 supports Kubernetes 1.25 through 1.34.")
+    if kube == (1, 34) and version_tuple(args.splunk_version) < (10, 4, 0):
+        die("Kubernetes 1.34 deployments require Splunk Enterprise 10.4+ in this renderer.")
+
+
+def pod_ingest_ceiling_gb(profile: str) -> int:
+    return POD_INGEST_CEILINGS_GB[pod_base_profile(profile)]
+
+
+def validate_pod_ingest(args: argparse.Namespace) -> None:
+    if args.target != "pod" or not args.daily_ingest_gb:
+        return
+    requested = ensure_positive_int(args.daily_ingest_gb, "--daily-ingest-gb")
+    if requested > POD_INGEST_CEILINGS_GB["pod-xlarge"]:
+        die("POD sizing above 10000 GB/day requires a manual Splunk sizing handoff.")
+    profile = pod_profile(args)
+    ceiling = pod_ingest_ceiling_gb(profile)
+    if requested > ceiling:
+        die(
+            f"{profile} supports up to {ceiling} GB/day. Select a larger POD profile "
+            "or request a manual Splunk sizing handoff."
+        )
 
 
 def splunk_image(args: argparse.Namespace) -> str:
@@ -179,6 +224,7 @@ def validate_nonempty_path_list(value: str, option: str) -> None:
 
 
 def validate_common(args: argparse.Namespace) -> None:
+    validate_kubernetes_version(args)
     ensure_positive_int(args.standalone_replicas, "--standalone-replicas")
     indexer_replicas = ensure_positive_int(args.indexer_replicas, "--indexer-replicas")
     search_head_replicas = ensure_positive_int(
@@ -213,6 +259,7 @@ def validate_common(args: argparse.Namespace) -> None:
         if profile not in POD_PROFILES:
             die(f"Unsupported POD profile: {profile}")
         validate_nonempty_path_list(args.premium_apps, "--premium-apps")
+        validate_pod_ingest(args)
 
 
 def write_file(path: Path, content: str, executable: bool = False) -> None:
@@ -548,6 +595,7 @@ Target: Splunk Operator for Kubernetes
 
 - SVA architecture: `{args.architecture.upper()}`
 - Splunk Operator: `{args.operator_version}`
+- Kubernetes version: `{args.kubernetes_version or "operator-supported 1.25-1.34"}`
 - Splunk Enterprise image: `{splunk_image(args)}`
 - Namespace: `{args.namespace}`
 - StorageClass: `{args.storage_class or "cluster default"}`
@@ -556,6 +604,8 @@ Target: Splunk Operator for Kubernetes
 For Splunk Enterprise 10.x images, the operator container must receive
 `SPLUNK_GENERAL_TERMS={SGT_ACCEPTANCE}`. This directory renders that only when
 the setup command included `--accept-splunk-general-terms`.
+Splunk Operator 3.1.0 supports Kubernetes 1.25 through 1.34. This renderer
+blocks Kubernetes 1.34 with Splunk versions below 10.4.
 """
 
 
@@ -574,6 +624,8 @@ def render_sok_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
                 "target": "sok",
                 "architecture": args.architecture,
                 "chart_version": chart_version(args),
+                "kubernetes_version": args.kubernetes_version or None,
+                "kubernetes_supported_range": "1.25-1.34",
                 "operator_version": args.operator_version,
                 "splunk_version": args.splunk_version,
                 "namespace": args.namespace,
@@ -691,7 +743,9 @@ def pod_counts(profile: str) -> tuple[int, int]:
         return 3, 9 if es_profile else 8
     if base_profile == "pod-medium":
         return 3, 14 if es_profile else 11
-    return 3, 18 if es_profile else 15
+    if base_profile == "pod-large":
+        return 3, 18 if es_profile else 15
+    return 3, 33 if es_profile else 30
 
 
 def pod_role_comment(profile: str, index: int) -> str:
@@ -711,6 +765,14 @@ def pod_role_comment(profile: str, index: int) -> str:
         if es and index <= 5:
             return "Enterprise Security search head C225"
         if index <= (9 if es else 6):
+            return "Indexer C245"
+        return "Volume C245"
+    if base_profile == "pod-xlarge":
+        if index <= 2:
+            return "Search head C225"
+        if es and index <= 5:
+            return "Enterprise Security search head C225"
+        if index <= (22 if es else 19):
             return "Indexer C245"
         return "Volume C245"
     if index <= 2:
@@ -741,12 +803,14 @@ def render_pod_config(args: argparse.Namespace) -> str:
     premium_apps = split_csv(args.premium_apps) or ["./apps/splunk_app_es.tgz"]
     base_profile = pod_base_profile(profile)
     es_profile = pod_is_es(profile)
+    ingest_ceiling = pod_ingest_ceiling_gb(profile)
 
     lines = [
         "---",
         "apiVersion: enterprise.splunk.com/v1beta1",
         "kind: KubernetesCluster",
         f"profile: {base_profile}",
+        f"# Official Splunk POD 10.4 ingest ceiling: {ingest_ceiling} GB/day",
         "licenses:",
         *render_yaml_path_list(license_files, "  "),
         "ssh:",
@@ -835,6 +899,8 @@ deployment. If the installer writes `termsConditionsAccepted: true` back into
 
 Requested profile: `{profile}`.
 Installer profile rendered in `cluster-config.yaml`: `{base_profile}`.
+Official 10.4 daily ingest ceiling for this profile: `{pod_ingest_ceiling_gb(profile)} GB/day`.
+If expected ingest is above `10000 GB/day`, use a manual Splunk sizing handoff.
 """
 
 
@@ -859,6 +925,8 @@ def render_pod_assets(args: argparse.Namespace, render_dir: Path) -> list[str]:
                 "architecture": args.architecture,
                 "controller_count": pod_counts(profile)[0],
                 "worker_count": pod_counts(profile)[1],
+                "daily_ingest_ceiling_gb": pod_ingest_ceiling_gb(profile),
+                "requested_daily_ingest_gb": int(args.daily_ingest_gb) if args.daily_ingest_gb else None,
             },
             indent=2,
             sort_keys=True,
@@ -952,6 +1020,7 @@ def render(args: argparse.Namespace) -> dict:
         "dry_run": args.dry_run,
         "versions": {
             "chart": chart_version(args) if args.target == "sok" else None,
+            "kubernetes": args.kubernetes_version or None,
             "splunk_operator": args.operator_version,
             "splunk_enterprise": args.splunk_version,
             "splunk_image": splunk_image(args),

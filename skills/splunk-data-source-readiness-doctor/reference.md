@@ -141,7 +141,7 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
   supported sourcetype/event-type conversion behavior:
   `https://help.splunk.com/en/data-management/common-information-model/6.3/introduction/overview-of-the-ocsf-cim-add-on/configuring-ocsf-cim-add-on`
   and
-  `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/9.3.2411/process-data-using-pipelines/convert-data-to-ocsf-format-using-an-edge-processor/working-with-ocsf-formatted-data-in-the-splunk-platform-and-splunk-enterprise-security`
+  `https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/process-data-using-pipelines/convert-data-to-ocsf-format-using-an-edge-processor/working-with-ocsf-formatted-data-in-the-splunk-platform-and-splunk-enterprise-security`
 - Splunk ES ships most correlation searches disabled and requires operators to
   enable relevant content and response actions; SSE data inventory introspection
   and content mapping are separate readiness inputs for security content
@@ -178,22 +178,30 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
   names, dimensions, default metrics-index access, and `mstats` visibility:
   `https://help.splunk.com/en/splunk-enterprise/get-data-in/metrics/10.0/work-with-metrics/search-and-monitor-metrics`
   and
-  `https://help.splunk.com/en/splunk-enterprise/search/spl-search-reference/10.2/search-commands/mstats`
+  `https://help.splunk.com/en/splunk-enterprise/search/spl-search-reference/10.4/search-commands/mstats`
 - Splunk Ingest Monitoring exposes ingest latency and related ingest health;
   Edge Processor and Ingest Processor documentation expose pipeline, processor,
   and destination metrics that determine whether expected events reach searchable
   indexes and sourcetypes:
   `https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.0/about-ingest-monitoring`
   `https://help.splunk.com/en/data-management/monitor-and-troubleshoot/ingest-monitoring/1.0/metrics/review-data-ingest-latency-metrics`
-  `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform/9.3.2411/monitor-edge-processors/metrics-for-edge-processors`
+  `https://help.splunk.com/en/data-management/transform-and-route-data/use-edge-processors-for-splunk-cloud-platform/monitor-system-health-and-activity/set-up-alerts-for-edge-processor-metrics`
   and
-  `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-ingest-time/use-ingest-processors-for-splunk-cloud-platform/9.3.2411/monitor-ingest-processors/monitor-data-destinations-pipeline-metrics`
+  `https://help.splunk.com/en/splunk-cloud-platform/process-data-at-ingest-time/use-ingest-processors/monitor-system-health-and-activity/verify-your-ingest-processor-and-pipeline-configurations`
+- Splunk Cloud Platform 10.4.2604+ uses the Data Management app for Amazon S3
+  and Microsoft Azure connections/datasets that can serve Edge Processor,
+  Ingest Processor, and federated-search workflows. Readiness evidence must
+  include connection health, dataset family, routing/search mode, and required
+  role capabilities instead of assuming legacy private destination APIs:
+  `https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.4.2604/run-federated-searches-over-amazon-s3-datasets/define-an-amazon-s3-dataset/create-an-amazon-s3-dataset-for-data-routing-and-federated-search`
+  and
+  `https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.4.2604/run-federated-searches-over-microsoft-azure-datasets/define-a-microsoft-azure-dataset`
 - Splunk indexes age through buckets and can move data out of searchable
   retention; `frozenTimePeriodInSecs` defines a minimum availability window.
   Data model acceleration summaries and ITSI backfill also depend on historical
   raw data and summary range/backfill settings:
   `https://help.splunk.com/en/splunk-enterprise/administer/manage-indexers-and-indexer-clusters/9.0/indexing-overview/manage-index-storage/how-the-indexer-stores-indexes`
-  `https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.2/troubleshooting/troubleshoot-performance-issues/change-the-index-retention-period`
+  `https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.4/troubleshooting/troubleshoot-performance-issues/change-the-index-retention-period`
   `https://help.splunk.com/splunk-enterprise/manage-knowledge-objects/knowledge-management-manual/9.0/use-data-summaries-to-accelerate-searches/accelerate-data-models`
   and
   `https://help.splunk.com/en/splunk-it-service-intelligence/splunk-it-service-intelligence/visualize-and-assess-service-health/4.19/create-kpis/enable-backfill-for-a-kpi-in-itsi`
@@ -218,10 +226,10 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
   `https://help.splunk.com/splunk-enterprise-security-7/administer/7.2/correlation-searches/configure-correlation-searches-in-splunk-enterprise-security`
   `https://help.splunk.com/en/splunk-enterprise/search/search-manual/10.0/save-and-schedule-searches/scheduling-searches`
   and
-  `https://help.splunk.com/en/splunk-cloud-platform/create-dashboards-and-reports/dashboard-studio/9.2.2406/use-data-sources/use-reports-and-saved-searches-with-ds.savedsearch`
+  `https://help.splunk.com/?resourceId=SplunkCloud_DashStudio_dsSavedS`
 - The REST collector uses Splunk's documented search export endpoint, including
   `search/v2/jobs/export`, POST-only v2 behavior, and `output_mode=json`:
-  `https://help.splunk.com/en/splunk-cloud-platform/rest-api-reference/9.3.2408/search-endpoints/search-endpoint-descriptions`
+  `https://help.splunk.com/en/splunk-cloud-platform/rest-api-reference/10.4.2604/search-endpoints`
   and
   `https://help.splunk.com/en/splunk-enterprise/search/search-manual/9.0/export-search-results/export-data-using-the-splunk-rest-api`
 - HEC readiness needs both token inventory and live health/error signal.
@@ -259,7 +267,7 @@ Splunk OTel Collector, and Data Manager into non-mutating evidence.
   emitted fields; saved-search dashboards depend on report app/permissions,
   schedule/concurrency, and token substitution:
   `https://help.splunk.com/en/splunk-enterprise/create-dashboards-and-reports/dashboard-studio/9.2/use-data-sources/chain-searches-together-with-a-base-search-and-chain-searches`
-  `https://help.splunk.com/splunk-cloud-platform/create-dashboards-and-reports/dashboard-studio/9.2.2406/use-data-sources/use-reports-and-saved-searches-with-ds.savedsearch`
+  `https://help.splunk.com/?resourceId=SplunkCloud_DashStudio_dsSavedS`
   and
   `https://help.splunk.com/splunk-enterprise/create-dashboards-and-reports/dashboard-studio/9.3/use-data-sources/create-search-based-visualizations-with-ds.search`
 - Source-pack anchors:

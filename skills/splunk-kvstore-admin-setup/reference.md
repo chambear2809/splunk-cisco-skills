@@ -19,9 +19,11 @@ Current Splunk Enterprise KV Store documentation (verified 2026):
   `splunk start-shcluster-migration kvstore -storageEngine wiredTiger`, using
   `-isDryRun true` first to verify readiness.
 - KV Store server-version upgrade: Splunk Enterprise 9.4+ no longer supports
-  server version 4.2; it auto-upgrades to 7.0, and 10.2+ auto-upgrades to 8.0
-  about 60 seconds after the first start once all SHC members run the same
-  Splunk version. Disable the automatic upgrade with
+  server version 4.2; it auto-upgrades to 7.0, and 10.2+ (including 10.4)
+  auto-upgrades to 8.0 about 60 seconds after the first start once all SHC
+  members run the same Splunk version. Direct 9.x-or-below to 10.4 upgrades
+  must first verify the current KV/Mongo engine is already 7.x or higher; this
+  skill blocks the rendered upgrade handoff otherwise. Disable the automatic upgrade with
   `kvstoreUpgradeOnStartupEnabled = false` in the `[kvstore]` stanza of
   `server.conf` and upgrade manually with
   `splunk start-shcluster-upgrade kvstore -version 7.0` (or `8.0`). If a manual

@@ -187,15 +187,17 @@ rules-engine variable expansion (e.g. `${{fieldName}}`) in transformations.
 - `calendars` — iCal feed export for team and personal calendars.
 - `mobile` — per-user mobile-app setup checklist.
 
-## Splunk-side install paths (`install_apply`)
+## Splunk-Side Installs And SOAR Handoff
 
 See `splunk-side-apps.md` for the full conf-file shapes verified by
-extracting each Splunkbase package:
+extracting the Splunk-side packages and the SOAR connector schema:
 
 - Splunkbase **3546** alert-action app (`victorops_app`).
 - Splunkbase **4886** Splunk Add-on for On-Call
   (`TA-splunk-add-on-for-victorops`).
-- Splunkbase **5863** SOAR connector (`splunkoncall`).
+- Splunkbase **5863** SOAR connector (`splunkoncall`) is rendered as a SOAR
+  asset-readiness handoff. It is not installed into Splunk Enterprise or
+  Splunk Cloud.
 
 ## Source anchors
 

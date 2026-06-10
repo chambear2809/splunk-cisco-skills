@@ -76,6 +76,37 @@ def test_single_provider_back_compat_renders_standard_mode_assets(tmp_path: Path
     assert "federated.dataset = index:main" in (render_dir / "indexes.conf").read_text()
 
 
+def test_single_provider_renders_10_4_provider_filtering_fields(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    result = run_render(
+        "--output-dir", str(out),
+        "--mode", "standard",
+        "--remote-host-port", "remote-sh.example.com:8089",
+        "--service-account", "federated_svc",
+        "--password-file", str(tmp_path / "pw"),
+        "--provider-name", "remote_prod",
+        "--allow-index-based-provider-filtering", "true",
+        "--fed-srch-indexes-allowed", "main,summary:federated",
+        "--use-app-context-from-search", "true",
+    )
+    assert result.returncode == 0, result.stderr
+    render_dir = out / "federated-search"
+    fed = (render_dir / "federated.conf.template").read_text()
+    metadata = json.loads((render_dir / "metadata.json").read_text())
+    rest = (render_dir / "apply-rest.sh").read_text()
+
+    assert "allowIndexBasedProviderFiltering = 1" in fed
+    assert "fedSrchIndexesAllowed = main;summary:federated" in fed
+    assert "useAppContextFromSearch = 1" in fed
+    provider = metadata["providers"]["splunk_to_splunk"][0]
+    assert provider["allow_index_based_provider_filtering"] is True
+    assert provider["fed_srch_indexes_allowed"] == ["main", "summary:federated"]
+    assert provider["use_app_context_from_search"] is True
+    assert "'allowIndexBasedProviderFiltering': \"1\"" in rest
+    assert "'fedSrchIndexesAllowed': \"main;summary:federated\"" in rest
+    assert "'useAppContextFromSearch': \"1\"" in rest
+
+
 def test_back_compat_transparent_skips_federated_index(tmp_path: Path) -> None:
     out = tmp_path / "out"
     result = run_render(
@@ -186,9 +217,42 @@ def _fss3_provider_spec(tmp_path: Path) -> dict:
     }
 
 
-def test_fss3_provider_renders_rest_payload_and_aws_readme(tmp_path: Path) -> None:
+def test_fss3_provider_defaults_to_data_management_dataset_handoff(tmp_path: Path) -> None:
     spec = _fss3_provider_spec(tmp_path)
     spec_path = write_spec(tmp_path, "fss3.json", spec)
+    out = tmp_path / "out"
+    result = run_render("--output-dir", str(out), "--spec", str(spec_path))
+    assert result.returncode == 0, result.stderr
+    payload_path = out / "federated-search/data-management-datasets/aws_logs.json"
+    assert payload_path.is_file()
+    payload = json.loads(payload_path.read_text(encoding="utf-8"))
+    assert payload["type"] == "data_management_dataset"
+    assert payload["dataset_family"] == "amazon_s3"
+    assert payload["cloud_version"] == "10.4.2604"
+    assert payload["legacy_fss3_rest_provider"] is False
+    assert payload["api_crud"] == "not_claimed"
+    assert payload["aws_account_id"] == "123456789012"
+    assert payload["aws_region"] == "us-west-2"
+    assert payload["connection"]["glue_database"] == "my_glue_db"
+    assert payload["connection"]["glue_data_catalog"] == "arn:aws:glue:us-west-2:123456789012:catalog"
+    assert payload["connection"]["s3_paths"] == ["s3://my-bucket/access/", "s3://my-bucket/app/"]
+    assert payload["federated_index_hints"][0]["dataset_name"] == "access_logs"
+    readme = (out / "federated-search/data-management-datasets/README.md").read_text()
+    assert "Data Management" in readme
+    assert "/services/data/federated/provider" not in readme
+    assert "data-management-datasets/aws_logs.json" in readme
+    assert not (out / "federated-search/aws-s3-providers").exists()
+    rest = (out / "federated-search/apply-rest.sh").read_text()
+    assert "Provider {name} (FSS3): POST /services/data/federated/provider" not in rest
+    # FSS2S federated.conf.template should NOT contain the FSS3 provider name
+    fed = (out / "federated-search/federated.conf.template").read_text()
+    assert "aws_logs" not in fed
+
+
+def test_fss3_legacy_mode_renders_rest_payload_and_aws_readme(tmp_path: Path) -> None:
+    spec = _fss3_provider_spec(tmp_path)
+    spec["fss3_mode"] = "legacy"
+    spec_path = write_spec(tmp_path, "fss3_legacy.json", spec)
     out = tmp_path / "out"
     result = run_render("--output-dir", str(out), "--spec", str(spec_path))
     assert result.returncode == 0, result.stderr
@@ -204,22 +268,20 @@ def test_fss3_provider_renders_rest_payload_and_aws_readme(tmp_path: Path) -> No
     assert payload["aws_s3_paths_allowlist"] == "s3://my-bucket/access/,s3://my-bucket/app/"
     assert "aws_kms_keys_arn_allowlist" in payload
     readme = (out / "federated-search/aws-s3-providers/README.md").read_text()
-    assert "FSS3" in readme or "Federated Search for Amazon S3" in readme
+    assert "Legacy Federated Search for Amazon S3" in readme
     assert "aws-s3-providers/aws_logs.json" in readme
-    # FSS2S federated.conf.template should NOT contain the FSS3 provider name
-    fed = (out / "federated-search/federated.conf.template").read_text()
-    assert "aws_logs" not in fed
+    assert "/services/data/federated/provider" in readme
 
 
-def test_fss3_payload_omits_kms_when_not_provided(tmp_path: Path) -> None:
+def test_fss3_data_management_handoff_omits_kms_when_not_provided(tmp_path: Path) -> None:
     spec = _fss3_provider_spec(tmp_path)
     spec["providers"][0].pop("aws_kms_keys_arn_allowlist")
     spec_path = write_spec(tmp_path, "fss3_nokms.json", spec)
     out = tmp_path / "out"
     result = run_render("--output-dir", str(out), "--spec", str(spec_path))
     assert result.returncode == 0, result.stderr
-    payload = json.loads((out / "federated-search/aws-s3-providers/aws_logs.json").read_text())
-    assert "aws_kms_keys_arn_allowlist" not in payload
+    payload = json.loads((out / "federated-search/data-management-datasets/aws_logs.json").read_text())
+    assert payload["connection"]["kms_key_arns"] == []
 
 
 def test_fss3_glue_table_must_be_in_allowlist(tmp_path: Path) -> None:
@@ -541,6 +603,8 @@ def test_setup_help_documents_new_flags() -> None:
         "--provider",
         "--federated-index",
         "--apply-target search-head|shc-deployer|rest",
+        "--cloud-version",
+        "--fss3-mode data-management|legacy",
         "--global-toggle",
         "SPLUNK_REST_URI",
         "SPLUNK_REST_PASSWORD_FILE",
@@ -611,6 +675,7 @@ def test_validate_detects_missing_password_placeholder(tmp_path: Path) -> None:
 
 def test_validate_detects_corrupt_fss3_payload(tmp_path: Path) -> None:
     spec = _fss3_provider_spec(tmp_path)
+    spec["fss3_mode"] = "legacy"
     spec_path = write_spec(tmp_path, "spec.json", spec)
     out = tmp_path / "out"
     run_render("--output-dir", str(out), "--spec", str(spec_path))
@@ -623,6 +688,21 @@ def test_validate_detects_corrupt_fss3_payload(tmp_path: Path) -> None:
     assert validate.returncode != 0
     combined = validate.stderr + validate.stdout
     assert "FSS3 keys" in combined or "schema check" in combined
+
+
+def test_validate_detects_corrupt_data_management_dataset_handoff(tmp_path: Path) -> None:
+    spec = _fss3_provider_spec(tmp_path)
+    spec_path = write_spec(tmp_path, "spec.json", spec)
+    out = tmp_path / "out"
+    run_render("--output-dir", str(out), "--spec", str(spec_path))
+    payload = out / "federated-search/data-management-datasets/aws_logs.json"
+    data = json.loads(payload.read_text())
+    data.pop("connection")
+    payload.write_text(json.dumps(data), encoding="utf-8")
+    validate = run_validate("--output-dir", str(out))
+    assert validate.returncode != 0
+    combined = validate.stderr + validate.stdout
+    assert "Data Management dataset" in combined or "schema check" in combined
 
 
 # ---------------------------------------------------------------------------

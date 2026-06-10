@@ -134,6 +134,8 @@ def _catalog_profile(
     macro_checks: list[dict[str, Any]] | None = None,
     required_inputs: list[dict[str, Any]] | None = None,
     post_install_steps: list[str] | None = None,
+    automation_scope: str = "catalog_install_validate_with_guided_followup",
+    deprecated_reason: str = "",
 ) -> dict[str, Any]:
     return {
         "title": title,
@@ -145,8 +147,9 @@ def _catalog_profile(
         "macro_checks": macro_checks or [],
         "required_inputs": required_inputs or [],
         "post_install_steps": post_install_steps or GENERIC_CONTENT_PACK_STEPS,
-        "automation_scope": "catalog_install_validate_with_guided_followup",
+        "automation_scope": automation_scope,
         "generic_catalog_profile": True,
+        "deprecated_reason": deprecated_reason,
     }
 
 
@@ -528,20 +531,20 @@ PACK_PROFILES: dict[str, dict[str, Any]] = {
     "splunk_synthetic_monitoring": _catalog_profile(
         "Splunk Synthetic Monitoring",
         pack_app_candidates=["DA-ITSI-CP-splunk-synthetic-monitoring", "DA-ITSI-CP-synthetic-monitoring"],
-        required_apps=[
-            {
-                "label": "Splunk Synthetic Monitoring Add-on",
-                "candidates": ["Splunk_TA_synthetic_monitoring", "splunk_ta_synthetic_monitoring", "Splunk_TA_synthetics"],
-            }
-        ],
+        required_apps=[],
         macro_checks=[
             {"macro": "itsi-cp-synthetic-monitoring-indexes", "static_indexes_key": "metrics_indexes", "optional": True},
         ],
         post_install_steps=[
-            "Confirm the Splunk Synthetic Monitoring Add-on is collecting synthetic checks.",
-            "Align metrics indexes and macros with the Synthetic Monitoring ingestion path.",
-            "Review service templates, entity links, and KPI thresholds before enabling services.",
+            "Legacy profile only: Splunk Synthetic Monitoring Add-on 5608 is archived and not a Splunk 10.4 install target.",
+            "For 10.4, route synthetic checks through Splunk Observability Cloud native Synthetics and SIM streams.",
+            "Use the `splunk_observability_cloud` profile for ITSI content-pack validation whenever possible.",
         ],
+        automation_scope="legacy_handoff_only",
+        deprecated_reason=(
+            "Splunk Synthetic Monitoring Add-on 5608 is archived and does not advertise Splunk 10.4 support; "
+            "modern deployments use Splunk Observability Cloud native Synthetics and SIM streams."
+        ),
     ),
     "third_party_apm": _catalog_profile(
         "Third-Party APM",
@@ -1971,6 +1974,8 @@ def validate_profile(
                 "Using catalog-generic content-pack validation. Install/visibility checks are automated; pack-specific data, macro, module, and dashboard checks are reported as follow-up steps.",
             )
         )
+    if profile_meta.get("deprecated_reason"):
+        findings.append(_finding("warn", "profile", str(profile_meta["deprecated_reason"])))
     installed_apps = _check_required_apps(client, findings, profile_meta)
     missing_requirements = _check_required_inputs(client, findings, profile_meta)
     if profile_name == "cisco_data_center":

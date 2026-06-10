@@ -37,9 +37,9 @@ Do not mark UI-only workflows as `api_apply`.
   and `--sf-token`.
 
 Splunk On-Call API actions, the REST endpoint integration, the generic email
-endpoint, and the Splunk-side companion apps (Splunkbase 3546, 4886, 5863) all
-live in the dedicated `splunk-oncall-setup` skill. This skill renders only a
-deeplink-only handoff for the `on_call` section.
+endpoint, Splunk-side companion apps (Splunkbase 3546 and 4886), and SOAR
+connector 5863 readiness all live in the dedicated `splunk-oncall-setup` skill.
+This skill renders only a deeplink-only handoff for the `on_call` section.
 
 ## Primary Workflow
 
@@ -95,7 +95,7 @@ Specs use `api_version: splunk-observability-native-ops/v1` and can include:
   `splunk-oncall-setup` skill. Use that skill for teams, users, rotations,
   escalation policies, routing keys, paging policies, alert rules, maintenance
   mode, incidents, REST endpoint alerts, and Splunk-side companion app
-  installs (Splunkbase 3546, 4886, 5863).
+  installs (Splunkbase 3546 and 4886), plus SOAR connector 5863 readiness.
 
 For API endpoint details and current support boundaries, read
 `references/coverage.md` when the request touches a new or ambiguous surface.

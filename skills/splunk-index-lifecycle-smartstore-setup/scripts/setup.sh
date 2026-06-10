@@ -16,6 +16,7 @@ APPLY=false
 OUTPUT_DIR=""
 SPLUNK_HOME_VALUE="/opt/splunk"
 APP_NAME="ZZZ_cisco_skills_smartstore"
+SPLUNK_VERSION="10.4.0"
 REMOTE_PROVIDER="s3"
 VOLUME_NAME="remote_store"
 REMOTE_PATH=""
@@ -49,6 +50,9 @@ BUCKET_LOCALIZE_ACQUIRE_LOCK_TIMEOUT_SEC=""
 BUCKET_LOCALIZE_CONNECT_TIMEOUT_MAX_RETRIES=""
 BUCKET_LOCALIZE_MAX_TIMEOUT_SEC=""
 CLEAN_REMOTE_STORAGE_BY_DEFAULT="false"
+ENABLE_INDEXING_REPLICATION_SEPARATION="false"
+REPLICATION_FACTOR=""
+SEARCH_FACTOR=""
 APPLY_CLUSTER_BUNDLE="false"
 RESTART_SPLUNK="true"
 
@@ -69,6 +73,7 @@ Options:
   --output-dir PATH
   --splunk-home PATH
   --app-name NAME
+  --splunk-version VERSION
   --remote-provider s3|gcs|azure
   --volume-name NAME
   --remote-path URI
@@ -102,6 +107,9 @@ Options:
   --bucket-localize-connect-timeout-max-retries N
   --bucket-localize-max-timeout-sec N
   --clean-remote-storage-by-default true|false
+  --enable-indexing-replication-separation true|false
+  --replication-factor N
+  --search-factor N
   --apply-cluster-bundle true|false
   --restart-splunk true|false
   --help
@@ -121,6 +129,7 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME_VALUE="$2"; shift 2 ;;
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
+        --splunk-version) require_arg "$1" $# || exit 1; SPLUNK_VERSION="$2"; shift 2 ;;
         --remote-provider) require_arg "$1" $# || exit 1; REMOTE_PROVIDER="$2"; shift 2 ;;
         --volume-name) require_arg "$1" $# || exit 1; VOLUME_NAME="$2"; shift 2 ;;
         --remote-path) require_arg "$1" $# || exit 1; REMOTE_PATH="$2"; shift 2 ;;
@@ -154,6 +163,9 @@ while [[ $# -gt 0 ]]; do
         --bucket-localize-connect-timeout-max-retries) require_arg "$1" $# || exit 1; BUCKET_LOCALIZE_CONNECT_TIMEOUT_MAX_RETRIES="$2"; shift 2 ;;
         --bucket-localize-max-timeout-sec) require_arg "$1" $# || exit 1; BUCKET_LOCALIZE_MAX_TIMEOUT_SEC="$2"; shift 2 ;;
         --clean-remote-storage-by-default) require_arg "$1" $# || exit 1; CLEAN_REMOTE_STORAGE_BY_DEFAULT="$2"; shift 2 ;;
+        --enable-indexing-replication-separation) require_arg "$1" $# || exit 1; ENABLE_INDEXING_REPLICATION_SEPARATION="$2"; shift 2 ;;
+        --replication-factor) require_arg "$1" $# || exit 1; REPLICATION_FACTOR="$2"; shift 2 ;;
+        --search-factor) require_arg "$1" $# || exit 1; SEARCH_FACTOR="$2"; shift 2 ;;
         --apply-cluster-bundle) require_arg "$1" $# || exit 1; APPLY_CLUSTER_BUNDLE="$2"; shift 2 ;;
         --restart-splunk) require_arg "$1" $# || exit 1; RESTART_SPLUNK="$2"; shift 2 ;;
         --help) usage 0 ;;
@@ -189,6 +201,7 @@ validate_args() {
     validate_choice "${S3_ENCRYPTION}" unset none sse-s3 sse-kms sse-c
     validate_choice "${S3_SSL_VERIFY_SERVER_CERT}" true false unset
     validate_choice "${CLEAN_REMOTE_STORAGE_BY_DEFAULT}" true false
+    validate_choice "${ENABLE_INDEXING_REPLICATION_SEPARATION}" true false
     validate_choice "${APPLY_CLUSTER_BUNDLE}" true false
     validate_choice "${RESTART_SPLUNK}" true false
     if [[ -z "${REMOTE_PATH}" ]]; then
@@ -213,6 +226,7 @@ build_renderer_args() {
         --output-dir "${OUTPUT_DIR}"
         --splunk-home "${SPLUNK_HOME_VALUE}"
         --app-name "${APP_NAME}"
+        --splunk-version "${SPLUNK_VERSION}"
         --remote-provider "${REMOTE_PROVIDER}"
         --volume-name "${VOLUME_NAME}"
         --remote-path "${REMOTE_PATH}"
@@ -246,6 +260,9 @@ build_renderer_args() {
         --bucket-localize-connect-timeout-max-retries "${BUCKET_LOCALIZE_CONNECT_TIMEOUT_MAX_RETRIES}"
         --bucket-localize-max-timeout-sec "${BUCKET_LOCALIZE_MAX_TIMEOUT_SEC}"
         --clean-remote-storage-by-default "${CLEAN_REMOTE_STORAGE_BY_DEFAULT}"
+        --enable-indexing-replication-separation "${ENABLE_INDEXING_REPLICATION_SEPARATION}"
+        --replication-factor "${REPLICATION_FACTOR}"
+        --search-factor "${SEARCH_FACTOR}"
         --apply-cluster-bundle "${APPLY_CLUSTER_BUNDLE}"
         --restart-splunk "${RESTART_SPLUNK}"
     )

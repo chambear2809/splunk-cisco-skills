@@ -8,7 +8,7 @@ GENERATED_FILES manifest:
    file (no surprise files; no stale entries).
 2. Splunk Web emits enableSplunkWebSSL = true.
 3. splunkd server.conf [sslConfig] emits enableSplunkdSSL = true.
-4. sslVersions = tls1.2 (NOT tls1.3) at the floor; sslVersionsForClient
+4. sslVersions = tls1.2,tls1.3 by default for 10.4+; sslVersionsForClient
    the same.
 5. requireClientCert = true only when --enable-mtls covers the surface.
 6. sslVerifyServerName = true on every cluster bundle / SHC drop-in.
@@ -162,33 +162,68 @@ def test_splunkd_enables_ssl_and_floor_is_tls12(tmp_path: Path) -> None:
     assert run_render(*_full_cluster_args(out)).returncode == 0
     server = (render_dir(out) / "pki/distribute/cluster-bundle/master-apps/000_pki_trust/local/server.conf").read_text()
     assert "enableSplunkdSSL     = true" in server
+    assert "sslVersions          = tls1.2,tls1.3" in server
+    assert "sslVersionsForClient = tls1.2,tls1.3" in server
+
+
+def test_tls13_can_be_disabled_or_forced_only_on_10_4(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    disabled = run_render(*_full_cluster_args(out / "disabled", **{"--enable-tls13": "false"}))
+    assert disabled.returncode == 0, disabled.stderr
+    server = (render_dir(out / "disabled") / "pki/distribute/cluster-bundle/master-apps/000_pki_trust/local/server.conf").read_text()
     assert "sslVersions          = tls1.2" in server
-    assert "sslVersionsForClient = tls1.2" in server
     assert "tls1.3" not in server
 
+    forced = run_render(*_core5_args(out / "forced", **{"--tls-version-floor": "tls1.3"}))
+    assert forced.returncode == 0, forced.stderr
 
-def test_tls13_is_refused(tmp_path: Path) -> None:
-    out = tmp_path / "out"
-    result = run_render(*_core5_args(out, **{"--tls-version-floor": "tls1.3"}))
+    result = run_render(*_core5_args(out / "old", **{"--tls-version-floor": "tls1.3", "--splunk-version": "10.3.0"}))
     assert result.returncode != 0
-    # argparse rejects the choice with the value enumeration in the message.
     combined = (result.stderr + result.stdout).lower()
-    assert "tls1.3" in combined or "tls1.2" in combined
+    assert "10.4.0" in combined
 
 
-def test_allow_deprecated_tls_relaxes_lower_bound(tmp_path: Path) -> None:
-    """--allow-deprecated-tls must actually be enforced. Without the flag,
-    --tls-version-floor=tls1.0 must be refused. With the flag, it must
-    be accepted (operator escape hatch for legacy clients)."""
-    # argparse only allows tls1.2 at the CLI level; the deprecated-relax
-    # path is exercised inside _validate_args. Confirm both paths.
+def test_deprecated_tls_names_are_not_10_4_cli_choices(tmp_path: Path) -> None:
+    """10.4 renders must not advertise ssl3/tls1.0/tls1.1 as usable floors."""
+    args = _core5_args(tmp_path / "old_tls", **{"--tls-version-floor": "tls1.0"})
+    args.append("--allow-deprecated-tls")
+    result = run_render(*args)
+    assert result.returncode != 0
+    assert "invalid choice" in (result.stderr + result.stdout)
     src = (SKILL_ROOT / "scripts/render_assets.py").read_text()
-    assert "args.allow_deprecated_tls" in src, (
-        "--allow-deprecated-tls flag must be acted on; the renderer used to "
-        "accept the flag silently and never apply it."
-    )
-    # The flag is registered; just confirm the policy-aware branch exists.
-    assert "tls_version_forbidden" in src
+    assert 'VALID_TLS_FLOORS = ("tls1.2", "tls1.3")' in src
+
+
+def test_10_4_post_install_monitoring_does_not_install_archived_3172(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    result = run_render(*_core5_args(out))
+    assert result.returncode == 0, result.stderr
+
+    rendered = render_dir(out)
+    post_install = (rendered / "handoff/post-install-monitoring.md").read_text()
+    checklist = (rendered / "handoff/operator-checklist.md").read_text()
+    expire_watch = (rendered / "pki/rotate/expire-watch.sh").read_text()
+
+    combined = "\n".join([post_install, checklist, expire_watch])
+    assert "Splunkbase 3172" in combined
+    assert "archived" in combined
+    assert "does not" in combined
+    assert "advertise" in combined
+    assert "Splunk 10.4 support" in combined
+    assert "Splunk Health Assistant Add-on (Splunkbase 4603)" in combined
+    assert "pki/rotate/expire-watch.sh" in combined
+    assert "splunk_ssl_certificate_checker" not in combined
+    assert "SSL Certificate Checker (Splunkbase 3172) installed" not in combined
+    assert "--splunkbase-id 3172" not in combined
+
+
+def test_kvstore_10_4_preflight_covers_client_config_stanza(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    assert run_render(*_full_cluster_args(out)).returncode == 0
+    preflight = (render_dir(out) / "preflight.sh").read_text()
+    assert "kvstoreSslClientConfig" in preflight
+    assert "server list kvstore" in preflight
+    assert "Splunk 10.4 evaluates [kvstore] TLS settings per field" in preflight
 
 
 # ---------------------------------------------------------------------------
@@ -383,6 +418,9 @@ def test_edge_processor_renders_documented_5_file_pair(tmp_path: Path) -> None:
         "README.md",
     ):
         assert (ep_dir / fname).exists(), f"EP file missing: {fname}"
+    readme = (ep_dir / "README.md").read_text(encoding="utf-8")
+    assert "10.0.2503/get-data-into-edge-processors" not in readme
+    assert "process-data-at-the-edge/use-edge-processors-for-splunk-cloud-platform" in readme
 
 
 def test_edge_processor_pkcs8_path_in_sign_script(tmp_path: Path) -> None:
@@ -418,6 +456,15 @@ def test_fips_install_script_only_when_fips_mode_set(tmp_path: Path) -> None:
     assert run_render(*_full_cluster_args(out_fips, **{"--fips-mode": "140-3"})).returncode == 0
     fips = (render_dir(out_fips) / "pki/install/install-fips-launch-conf.sh").read_text()
     assert "SPLUNK_FIPS_VERSION" in fips
+
+
+def test_fips_handoff_tracks_tls13_policy_for_10_4(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    assert run_render(*_full_cluster_args(out, **{"--fips-mode": "140-3"})).returncode == 0
+    handoff = (render_dir(out) / "handoff/fips-migration.md").read_text(encoding="utf-8")
+    assert "TLS 1.2 everywhere" not in handoff
+    assert "TLS 1.2/TLS 1.3 posture" in handoff
+    assert "--enable-tls13 auto|true|false" in handoff
 
 
 # ---------------------------------------------------------------------------
@@ -589,7 +636,8 @@ def test_stig_accepts_rsa_3072(tmp_path: Path) -> None:
 def test_algorithm_policy_json_validates() -> None:
     data = json.loads(ALGO_JSON.read_text())
     assert data["tls_version_floor"] == "tls1.2"
-    assert "tls1.3" in data["tls_version_not_yet_supported"]
+    assert "tls1.3" in data["tls_version_supported"]
+    assert data["tls_version_not_yet_supported"] == []
     assert data["kv_store_required_eku"] == ["serverAuth", "clientAuth"]
     for preset in ("splunk-modern", "fips-140-3", "stig"):
         assert preset in data["presets"]
@@ -692,6 +740,26 @@ def test_authoritative_sources_md_cites_key_urls() -> None:
         "EnableTLSCertHostnameValidation",
     ):
         assert keyword in src, f"authoritative-sources.md missing reference: {keyword}"
+    assert "10.0.2503/get-data-into-edge-processors" not in src
+    assert "10.1.2507/administer-splunk-cloud-platform" not in src
+    assert "10.4.2604/administer-splunk-cloud-platform" in src
+
+
+def test_platform_pki_references_do_not_pin_stale_cloud_doc_versions() -> None:
+    stale_tokens: list[str] = []
+    for rel in (
+        "reference.md",
+        "references/edge-processor-pki.md",
+        "references/splunk-cloud-ufcp-handoff.md",
+    ):
+        text = (SKILL_ROOT / rel).read_text(encoding="utf-8")
+        for token in (
+            "10.0.2503/get-data-into-edge-processors",
+            "10.1.2507/administer-splunk-cloud-platform",
+        ):
+            if token in text:
+                stale_tokens.append(f"{rel}: {token}")
+    assert not stale_tokens, "stale Cloud documentation links found:\n" + "\n".join(stale_tokens)
 
 
 # ---------------------------------------------------------------------------

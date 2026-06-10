@@ -76,9 +76,9 @@ def uf_link(version: str, platform: str, filename: str, arch: str) -> str:
     )
 
 
-def download_fixture_html(version: str = "10.2.3") -> str:
-    build = "4d61cf8a5c0c"
-    legacy = "6360f015cdfb"
+def download_fixture_html(version: str = "10.4.0") -> str:
+    build = "f798d4d49089"
+    legacy = "652ec96167cf"
     rows = [
         uf_link(version, "linux", f"splunkforwarder-{version}-{build}-linux-amd64.tgz", "x86_64"),
         uf_link(version, "linux", f"splunkforwarder-{version}-{build}-linux-amd64.deb", "x86_64"),
@@ -94,6 +94,8 @@ def download_fixture_html(version: str = "10.2.3") -> str:
         uf_link(version, "windows", f"splunkforwarder-{version}-{build}-windows-x64.msi", "x86_64"),
         uf_link(version, "osx", f"splunkforwarder-{version}-{build}-darwin-intel.tgz", "x86_64"),
         uf_link(version, "osx", f"splunkforwarder-{version}-{build}-darwin-intel.dmg", "x86_64"),
+        uf_link(version, "osx", f"splunkforwarder-{version}-{build}-darwin-arm64.tgz", "arm64"),
+        uf_link(version, "osx", f"splunkforwarder-{version}-{build}-darwin-arm64.dmg", "arm64"),
         uf_link(version, "osx", f"splunkforwarder-{version}-{build}-darwin-universal2.tgz", "universal2"),
         uf_link(version, "osx", f"splunkforwarder-{version}-{build}-darwin-universal2.dmg", "universal2"),
         uf_link(version, "freebsd", f"splunkforwarder-{version}-{legacy}-freebsd14-amd64.tgz", "x86_64"),
@@ -105,7 +107,7 @@ def download_fixture_html(version: str = "10.2.3") -> str:
         uf_link(version, "solaris", f"splunkforwarder-{version}-{legacy}-solaris-sparc.p5p", "sparc"),
         uf_link(version, "aix", f"splunkforwarder-{version}-{legacy}-aix-powerpc.tgz", "powerpc"),
     ]
-    return "<h1>Splunk Universal Forwarder 10.2.3</h1>\n" + "\n".join(rows)
+    return f"<h1>Splunk Universal Forwarder {version}</h1>\n" + "\n".join(rows)
 
 
 class UniversalForwarderSetupTests(unittest.TestCase):
@@ -145,6 +147,8 @@ class UniversalForwarderSetupTests(unittest.TestCase):
                 ("windows", "x86", "msi", "windows-x86.msi", "render-only"),
                 ("windows", "x64", "msi", "windows-x64.msi", "render-only"),
                 ("macos", "intel", "tgz", "darwin-intel.tgz", "local-ssh"),
+                ("macos", "arm64", "tgz", "darwin-arm64.tgz", "local-ssh"),
+                ("macos", "arm64", "dmg", "darwin-arm64.dmg", "download-only"),
                 ("macos", "universal2", "dmg", "darwin-universal2.dmg", "download-only"),
                 ("freebsd", "amd64", "txz", "freebsd14-amd64.txz", "unsupported-v1"),
                 ("solaris", "sparc", "tar-z", "solaris-sparc.tar.Z", "unsupported-v1"),
@@ -166,7 +170,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
                     metadata = json.loads(result.stdout)
                     self.assertIn(filename_part, metadata["filename"])
                     self.assertEqual(metadata["v1_apply"], apply_state)
-                    self.assertEqual(metadata["version"], "10.2.3")
+                    self.assertEqual(metadata["version"], "10.4.0")
 
     def test_latest_resolver_auto_defaults_cover_non_core_platforms(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -187,11 +191,12 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             )
 
             cases = [
-                ("freebsd", "auto", "freebsd14-amd64.tgz"),
-                ("solaris", "auto", "solaris-amd64.tar.Z"),
-                ("aix", "auto", "aix-powerpc.tgz"),
+                ("macos", "auto", "darwin-arm64.tgz", "local-ssh"),
+                ("freebsd", "auto", "freebsd14-amd64.tgz", "unsupported-v1"),
+                ("solaris", "auto", "solaris-amd64.tar.Z", "unsupported-v1"),
+                ("aix", "auto", "aix-powerpc.tgz", "unsupported-v1"),
             ]
-            for target_os, package_type, filename_part in cases:
+            for target_os, package_type, filename_part, apply_state in cases:
                 with self.subTest(target_os=target_os):
                     result = self.run_script(
                         "bash",
@@ -206,7 +211,7 @@ class UniversalForwarderSetupTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
                     metadata = json.loads(result.stdout)
                     self.assertIn(filename_part, metadata["filename"])
-                    self.assertEqual(metadata["v1_apply"], "unsupported-v1")
+                    self.assertEqual(metadata["v1_apply"], apply_state)
 
     def test_windows_renderer_keeps_secret_values_out_of_scripts_and_metadata(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -489,8 +494,8 @@ class UniversalForwarderSetupTests(unittest.TestCase):
             curl_log = tmp_path / "curl.log"
             credentials_file.write_text("", encoding="utf-8")
             write_mock_curl(bin_dir / "curl")
-            package_name = "splunkforwarder-10.2.3-4d61cf8a5c0c-linux-amd64.tgz"
-            package_url = f"https://download.splunk.com/products/universalforwarder/releases/10.2.3/linux/{package_name}"
+            package_name = "splunkforwarder-10.4.0-f798d4d49089-linux-amd64.tgz"
+            package_url = f"https://download.splunk.com/products/universalforwarder/releases/10.4.0/linux/{package_name}"
             sha_url = f"{package_url}.sha512"
             package_path = REPO_ROOT / "splunk-ta" / package_name
             metadata_path = REPO_ROOT / "splunk-ta/.latest-splunk-universal-forwarder-linux-amd64-tgz.json"

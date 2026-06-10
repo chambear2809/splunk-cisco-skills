@@ -1,6 +1,6 @@
 # KV Store EKU Requirements
 
-Anchored to
+Anchored to the Splunk 10.4 `server.conf` reference and
 [Preparing custom certificates for use with KV store](https://docs.splunk.com/Documentation/Splunk/9.4.2/Admin/CustomCertsKVstore).
 
 ## What KV Store 7.0+ requires
@@ -69,11 +69,15 @@ trust bundle and re-runs the check until `OK`.
 ```bash
 $SPLUNK_HOME/bin/splunk cmd btool server list kvstore
 $SPLUNK_HOME/bin/splunk cmd btool server list sslConfig
+$SPLUNK_HOME/bin/splunk cmd btool server list kvstoreSslClientConfig
 ```
 
-then runs the same `openssl verify -x509_strict` against the
-discovered `serverCert` and `sslRootCAPath`. Refuses to mark the
-host ready unless every check returns `OK`.
+For Splunk 10.4+, review any TLS fields under `[kvstore]` because Splunk now
+evaluates them per field instead of treating incomplete KV Store TLS settings as
+fully ignored. The preflight prefers a `[kvstore] serverCert` when present,
+falls back to `[sslConfig] serverCert`, and then runs the same
+`openssl verify -x509_strict` against the discovered certificate and rendered
+trust chain. Refuses to mark the host ready unless every check returns `OK`.
 
 ## Common failure modes
 

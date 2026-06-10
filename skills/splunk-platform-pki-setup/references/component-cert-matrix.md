@@ -8,7 +8,7 @@ the renderer writes. Each row anchors to a doc in
 |---|---|---|---|---|---|
 | Splunk Web | `web.conf` | `[settings]` | `enableSplunkWebSSL`, `serverCert`, `privKeyPath`, `caCertPath`, `sslPassword`, `cipherSuite`, `sslVersions`, `ecdhCurves` | n/a (browser TLS only) | 8000 |
 | splunkd REST | `server.conf` | `[sslConfig]` | `enableSplunkdSSL`, `serverCert`, `sslRootCAPath`, `sslPassword`, `cipherSuite`, `sslVersions`, `sslVersionsForClient`, `ecdhCurves`, `caTrustStore`, `caTrustStorePath` | `requireClientCert`, `sslCommonNameToCheck`, `sslAltNameToCheck` | 8089 |
-| KV Store | `server.conf` | `[sslConfig]` (shared with splunkd) | dual-EKU `serverAuth`+`clientAuth` requirement, validated by `splunk cmd openssl verify -x509_strict` | inherits from splunkd | KV uses splunkd's TLS |
+| KV Store | `server.conf` | `[sslConfig]`, `[kvstore]`, `[kvstoreSslClientConfig]` | dual-EKU `serverAuth`+`clientAuth` requirement; 10.4 per-field `[kvstore]` TLS overrides; optional separate KV client TLS settings | inherits by default; review KV-specific overrides | KV uses splunkd's TLS unless KV-specific settings override fields |
 | S2S receiver | `inputs.conf` | `[splunktcp-ssl:9997]` + `[SSL]` | `serverCert`, `sslPassword`, `cipherSuite`, `sslVersions` | `requireClientCert`, name checks | 9997 |
 | S2S forwarder | `outputs.conf` | `[tcpout:<group>]` + `[tcpout-server://host:port]` | `clientCert`, `sslPassword`, `useClientSSLCompression`, `sslVerifyServerCert`, `sslVerifyServerName`, `sslCommonNameToCheck`, `sslAltNameToCheck` | n/a (always presents client cert when configured) | 9997 (out) |
 | HEC | `inputs.conf` | `[http]` + per-token | `enableSSL`, `serverCert`, `sslPassword`, `allowSslRenegotiation`, `allowSslCompression` | `requireClientCert` | 8088 |

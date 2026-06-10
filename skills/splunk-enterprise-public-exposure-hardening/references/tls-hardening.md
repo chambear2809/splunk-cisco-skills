@@ -1,9 +1,10 @@
 # TLS Hardening Reference
 
-Splunk Enterprise's documented baseline (still current in 10.2):
+Splunk Enterprise 10.4 supports a TLS 1.2 baseline and TLS 1.3-capable
+deployments:
 
 ```
-sslVersions = tls1.2
+sslVersions = tls1.2,tls1.3
 cipherSuite = ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:\
               ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:\
               ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:\
@@ -24,18 +25,20 @@ of truth in `scripts/render_assets.py`:
 
 ## TLS 1.3
 
-`--enable-tls13 true --tls-policy tls12_13` emits `sslVersions = tls1.2,
-tls1.3`. Use only when:
+`--enable-tls13 auto --tls-policy tls12_13` emits `sslVersions =
+tls1.2,tls1.3` for Splunk 10.4+ and falls back to `tls1.2` below 10.4.
+Use `--enable-tls13 true` only when:
 
-- Target Splunk Enterprise is 10.x (older versions have inconsistent
-  TLS 1.3 ALPN and compatibility issues).
+- Target Splunk Enterprise is 10.4+.
 - The platform OpenSSL has TLS 1.3 support.
 - All inter-Splunk peers are on the same baseline (mixed-version
   clusters can fail to negotiate).
 
-If unsure, leave at `tls12`. The Splunk-published cipher list above is
-TLS 1.2-only — with TLS 1.3 the AEAD suites are added automatically by
-OpenSSL and do not require enumeration.
+If unsure, leave `--enable-tls13 auto` or opt out with `false`. With TLS 1.3,
+the AEAD suites are added automatically by
+OpenSSL and do not require enumeration. Splunk's TLS 1.2 `cipherSuite` setting
+does not select TLS 1.3 cipher suites; the renderer keeps `cipherSuite` for TLS
+1.2 peers while `sslVersions = tls1.2,tls1.3` enables 10.4 TLS 1.3 negotiation.
 
 ## Defense-in-depth toggles
 
@@ -98,5 +101,5 @@ A passing score requires:
 
 ## Post-quantum / hybrid
 
-Splunk Enterprise does NOT support PQC / hybrid TLS as of 10.2. Do not
+Splunk Enterprise does NOT support PQC / hybrid TLS as of 10.4. Do not
 configure SNTRUP / ML-KEM. Track Splunk release notes for support.

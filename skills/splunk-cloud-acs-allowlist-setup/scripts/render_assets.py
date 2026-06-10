@@ -20,6 +20,7 @@ FEATURES = (
     "idm-api",
     "idm-ui",
 )
+IDM_FEATURES = ("idm-api", "idm-ui")
 
 # Per Splunk doc: AWS groups share a 230-subnet cap across the features below.
 AWS_GROUPS = {
@@ -66,6 +67,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--features", default="search-api,s2s,hec")
     parser.add_argument("--cloud-provider", choices=("aws", "gcp"), default="aws")
+    parser.add_argument(
+        "--cloud-experience",
+        choices=("classic", "victoria", "unknown"),
+        default="unknown",
+        help="Splunk Cloud experience. Required as 'classic' for IDM allowlists; Victoria has no IDM.",
+    )
+    parser.add_argument(
+        "--accept-unknown-cloud-experience",
+        action="store_true",
+        help="Allow legacy IDM planning without declaring Classic after an explicit operator review.",
+    )
     parser.add_argument("--target-search-head", default="")
     parser.add_argument("--allow-acs-lockout", choices=("true", "false"), default="false")
     parser.add_argument("--strict-drift", choices=("true", "false"), default="true")
@@ -139,6 +151,37 @@ def validate_features(features: list[str]) -> None:
         die(f"Unknown ACS feature(s): {', '.join(invalid)}. Allowed: {', '.join(FEATURES)}")
 
 
+def validate_cloud_experience(args: argparse.Namespace, features: list[str]) -> None:
+    selected_idm_features = [feature for feature in features if feature in IDM_FEATURES]
+    idm_subnet_flags = []
+    for feature in IDM_FEATURES:
+        attr_base = feature.replace("-", "_")
+        if csv_list(getattr(args, f"{attr_base}_subnets")):
+            idm_subnet_flags.append(f"--{feature}-subnets")
+        if csv_list(getattr(args, f"{attr_base}_subnets_v6")):
+            idm_subnet_flags.append(f"--{feature}-subnets-v6")
+
+    if not selected_idm_features and not idm_subnet_flags:
+        return
+
+    requested = ", ".join(sorted(set(selected_idm_features + idm_subnet_flags)))
+    if args.cloud_experience == "classic":
+        return
+    if args.cloud_experience == "victoria":
+        die(
+            "Splunk Cloud Victoria stacks have no IDM and do not support Hybrid Search; "
+            "migrate IDM-era allowlists to search head or SHC member IPs and remove "
+            f"IDM features/subnets from this plan. Requested: {requested}."
+        )
+    if not args.accept_unknown_cloud_experience:
+        die(
+            "IDM allowlist planning requires --cloud-experience classic for legacy Classic stacks. "
+            "Specify --cloud-experience classic, remove IDM features/subnets for Victoria, or pass "
+            "--accept-unknown-cloud-experience only after confirming a legacy Classic IDM stack. "
+            f"Requested: {requested}."
+        )
+
+
 def validate_subnet_caps(plan: dict, cloud_provider: str) -> None:
     """Enforce AWS / GCP subnet limits up-front so apply never gets a 4xx."""
     per_feature_cap = AWS_PER_FEATURE_CAP if cloud_provider == "aws" else GCP_PER_FEATURE_CAP
@@ -170,6 +213,7 @@ def validate_subnet_caps(plan: dict, cloud_provider: str) -> None:
 def build_plan(args: argparse.Namespace) -> dict:
     features = csv_list(args.features)
     validate_features(features)
+    validate_cloud_experience(args, features)
 
     operator_ips_v4 = sorted({
         validate_subnet_ipv4(ip if "/" in ip else f"{ip}/32", "operator-ips")
@@ -183,6 +227,8 @@ def build_plan(args: argparse.Namespace) -> dict:
     plan = {
         "version": 1,
         "cloud_provider": args.cloud_provider,
+        "cloud_experience": args.cloud_experience,
+        "unknown_cloud_experience_accepted": args.accept_unknown_cloud_experience,
         "target_search_head": args.target_search_head or None,
         "allow_acs_lockout": args.allow_acs_lockout == "true",
         "strict_drift": args.strict_drift == "true",
@@ -191,7 +237,13 @@ def build_plan(args: argparse.Namespace) -> dict:
         "proposed_subnets": {},
         "operator_ips": {"ipv4": operator_ips_v4, "ipv6": operator_ips_v6},
         "default_state_notes": {
-            f: ("open by default" if f in DEFAULT_OPEN_FEATURES else "closed by default")
+            f: (
+                "not present on Victoria"
+                if args.cloud_experience == "victoria" and f in IDM_FEATURES
+                else "open by default"
+                if f in DEFAULT_OPEN_FEATURES
+                else "closed by default"
+            )
             for f in FEATURES
         },
     }
@@ -216,6 +268,8 @@ def render_metadata(args: argparse.Namespace, plan: dict) -> str:
         {
             "skill": "splunk-cloud-acs-allowlist-setup",
             "cloud_provider": plan["cloud_provider"],
+            "cloud_experience": plan["cloud_experience"],
+            "unknown_cloud_experience_accepted": plan["unknown_cloud_experience_accepted"],
             "features_in_plan": sorted(plan["features"].keys()),
             "ipv4_subnet_count": sum(len(v["ipv4"]) for v in plan["features"].values()),
             "ipv6_subnet_count": sum(len(v["ipv6"]) for v in plan["features"].values()),
@@ -244,6 +298,7 @@ def render_readme(plan: dict) -> str:
     return f"""# Splunk Cloud ACS Allowlist Rendered Assets
 
 Cloud provider: `{plan['cloud_provider']}`
+Cloud experience: `{plan['cloud_experience']}`
 Strict drift: `{plan['strict_drift']}`
 Allow ACS lock-out: `{plan['allow_acs_lockout']}`
 Target search head: `{plan.get('target_search_head') or '(stack default)'}`
@@ -276,6 +331,13 @@ Splunk Web features that depend on ACS:
 
 `preflight.sh` refuses to apply the `acs` feature unless your current public IP
 is in the planned subnet list, or `allow_acs_lockout=true`.
+
+For Splunk Cloud Platform 10.4.2604, `--cloud-experience classic` is required
+for IDM allowlist planning. Victoria stacks have no IDM, do not support Hybrid
+Search, and Classic-to-Victoria migrations move IDM apps/configuration to the
+search tier; migrate IDM allowlists to search head or SHC member IPs. If the
+experience is unknown, IDM features fail closed unless
+`--accept-unknown-cloud-experience` is passed after explicit operator review.
 
 ## AWS / GCP subnet limit math
 

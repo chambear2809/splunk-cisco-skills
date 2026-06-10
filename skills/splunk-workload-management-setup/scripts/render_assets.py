@@ -29,6 +29,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--app-name", default="ZZZ_cisco_skills_workload_management")
+    parser.add_argument("--deployment-runtime", choices=("linux", "kubernetes"), default="linux")
+    parser.add_argument("--workload-mode", choices=("auto", "advanced", "basic"), default="auto")
     parser.add_argument("--enable-workload-management", action="store_true")
     parser.add_argument("--enable-admission-rules", action="store_true")
     parser.add_argument("--search-cpu", default="")
@@ -103,6 +105,12 @@ def default_weights(profile: str) -> tuple[int, int, int]:
     return 70, 20, 10
 
 
+def effective_workload_mode(args: argparse.Namespace) -> str:
+    if args.workload_mode != "auto":
+        return args.workload_mode
+    return "basic" if args.deployment_runtime == "kubernetes" else "advanced"
+
+
 def weights(args: argparse.Namespace) -> tuple[int, int, int]:
     default_search, default_ingest, default_misc = default_weights(args.profile)
     search = positive_int(args.search_cpu or str(default_search), "--search-cpu")
@@ -125,10 +133,20 @@ def validate(args: argparse.Namespace) -> None:
     runtime_value(args.long_running_runtime, "--long-running-runtime")
     predicate_value(args.critical_role, "--critical-role")
     predicate_value(args.admission_exempt_role, "--admission-exempt-role")
+    if args.deployment_runtime == "kubernetes" and effective_workload_mode(args) == "basic":
+        if args.long_running_action == "move":
+            die("Kubernetes/basic workload mode renders admission rules only and does not support action=move.")
     weights(args)
 
 
 def render_workload_pools(args: argparse.Namespace) -> str:
+    if args.deployment_runtime == "kubernetes" and effective_workload_mode(args) == "basic":
+        return """# Rendered by splunk-workload-management-setup.
+# Kubernetes/basic mode renders admission rules only; no Linux cgroup workload
+# pools are emitted for Splunk Enterprise on Kubernetes.
+[general]
+enabled = false
+"""
     search_cpu, ingest_cpu, misc_cpu = weights(args)
     return f"""# Rendered by splunk-workload-management-setup. Review before applying.
 [general]
@@ -176,6 +194,23 @@ default_category_pool = 1
 
 
 def render_workload_rules(args: argparse.Namespace) -> str:
+    if args.deployment_runtime == "kubernetes" and effective_workload_mode(args) == "basic":
+        lines = [
+            "# Rendered by splunk-workload-management-setup.",
+            "# Kubernetes/basic mode emits admission rules only.",
+        ]
+        if args.admission_alltime_action != "disabled":
+            lines.extend(
+                [
+                    "[search_filter_rule:block_alltime_searches]",
+                    f"predicate = search_time_range=alltime AND (NOT role={args.admission_exempt_role})",
+                    f"action = {args.admission_alltime_action}",
+                    "user_message = All-time searches are restricted by admission control.",
+                    "disabled = 0",
+                    "",
+                ]
+            )
+        return "\n".join(lines).rstrip() + "\n"
     rule_names = ["critical_role_to_" + args.critical_search_pool]
     if args.long_running_action != "none":
         rule_names.append("long_running_search_guardrail")
@@ -233,6 +268,8 @@ def render_readme(args: argparse.Namespace) -> str:
     return f"""# Splunk Workload Management Rendered Assets
 
 Profile: `{args.profile}`
+Deployment runtime: `{args.deployment_runtime}`
+Workload mode: `{effective_workload_mode(args)}`
 
 Files:
 
@@ -246,6 +283,8 @@ Files:
 Workload management remains disabled unless rendered with
 `--enable-workload-management`. Admission rules remain globally disabled unless
 rendered with `--enable-admission-rules`.
+Kubernetes/basic mode renders admission rules only and rejects `move` actions;
+Linux or Kubernetes/advanced mode renders workload pools and workload rules.
 """
 
 
@@ -299,6 +338,9 @@ def render(args: argparse.Namespace) -> dict:
                 {
                     "profile": args.profile,
                     "app_name": args.app_name,
+                    "deployment_runtime": args.deployment_runtime,
+                    "workload_mode": args.workload_mode,
+                    "effective_workload_mode": effective_workload_mode(args),
                     "enable_workload_management": args.enable_workload_management,
                     "enable_admission_rules": args.enable_admission_rules,
                 },

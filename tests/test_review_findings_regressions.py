@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import subprocess
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 ACS_RENDERER = REPO_ROOT / "skills/splunk-cloud-acs-admin-setup/scripts/render_assets.py"
+ACS_ALLOWLIST_RENDERER = REPO_ROOT / "skills/splunk-cloud-acs-allowlist-setup/scripts/render_assets.py"
+ACS_ALLOWLIST_SETUP = REPO_ROOT / "skills/splunk-cloud-acs-allowlist-setup/scripts/setup.sh"
 IDXC_SETUP = REPO_ROOT / "skills/splunk-indexer-cluster-setup/scripts/setup.sh"
 SOAR_SETUP = REPO_ROOT / "skills/splunk-soar-setup/scripts/setup.sh"
 
@@ -196,6 +199,130 @@ def test_acs_admin_renderer_rejects_direct_hec_token_secret(tmp_path: Path) -> N
 
     assert result.returncode != 0
     assert "must not contain token or tokenFile" in result.stderr
+
+
+def test_acs_renderers_reject_victoria_idm_allowlists(tmp_path: Path) -> None:
+    for renderer in (ACS_RENDERER, ACS_ALLOWLIST_RENDERER):
+        result = subprocess.run(
+            [
+                "python3",
+                str(renderer),
+                "--output-dir",
+                str(tmp_path / renderer.parent.parent.name),
+                "--cloud-experience",
+                "victoria",
+                "--features",
+                "idm-api",
+                "--idm-api-subnets",
+                "198.51.100.0/24",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        assert result.returncode != 0
+        assert "Victoria stacks have no IDM" in result.stderr
+        assert "do not support Hybrid Search" in result.stderr
+        assert "search head or SHC member IPs" in result.stderr
+
+
+def test_acs_idm_allowlists_fail_closed_for_unknown_cloud_experience(tmp_path: Path) -> None:
+    blocked = subprocess.run(
+        [
+            "python3",
+            str(ACS_RENDERER),
+            "--output-dir",
+            str(tmp_path / "blocked"),
+            "--features",
+            "idm-ui",
+            "--idm-ui-subnets-v6",
+            "2001:db8::/64",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert blocked.returncode != 0
+    assert "--cloud-experience classic" in blocked.stderr
+    assert "--accept-unknown-cloud-experience" in blocked.stderr
+
+    accepted = subprocess.run(
+        [
+            "python3",
+            str(ACS_RENDERER),
+            "--output-dir",
+            str(tmp_path / "accepted"),
+            "--features",
+            "idm-ui",
+            "--idm-ui-subnets-v6",
+            "2001:db8::/64",
+            "--accept-unknown-cloud-experience",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert accepted.returncode == 0, accepted.stdout + accepted.stderr
+    plan = json.loads((tmp_path / "accepted" / "acs-admin" / "plan.json").read_text(encoding="utf-8"))
+    assert plan["cloud_experience"] == "unknown"
+    assert plan["unknown_cloud_experience_accepted"] is True
+
+
+def test_acs_allowlist_setup_passes_classic_cloud_experience_for_idm(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "bash",
+            str(ACS_ALLOWLIST_SETUP),
+            "--output-dir",
+            str(tmp_path),
+            "--cloud-experience",
+            "classic",
+            "--features",
+            "idm-api",
+            "--idm-api-subnets",
+            "198.51.100.0/24",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    plan = json.loads((tmp_path / "allowlist" / "plan.json").read_text(encoding="utf-8"))
+    assert plan["cloud_experience"] == "classic"
+    assert plan["features"]["idm-api"]["ipv4"] == ["198.51.100.0/24"]
+
+
+def test_acs_admin_victoria_inventory_skips_idm_allowlist_probes(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [
+            "python3",
+            str(ACS_RENDERER),
+            "--output-dir",
+            str(tmp_path / "victoria"),
+            "--cloud-experience",
+            "victoria",
+            "--features",
+            "search-api",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    inventory = (tmp_path / "victoria" / "acs-admin" / "inventory.sh").read_text(encoding="utf-8")
+    assert "ALLOWLIST_INVENTORY_FEATURES=(acs search-api hec s2s search-ui)" in inventory
+    assert "idm-api" not in inventory
+    assert "idm-ui" not in inventory
 
 
 def test_indexer_cluster_migration_phases_require_wrapper_inputs(tmp_path: Path) -> None:

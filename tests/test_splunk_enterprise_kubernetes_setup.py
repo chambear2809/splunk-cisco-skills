@@ -328,7 +328,7 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn(
-                'image:\n  repository: "splunk/splunk:10.2.0"\n  imagePullPolicy: "IfNotPresent"',
+                'image:\n  repository: "splunk/splunk:10.4.0"\n  imagePullPolicy: "IfNotPresent"',
                 enterprise_values,
             )
             self.assertNotIn('\nimagePullPolicy: "IfNotPresent"', enterprise_values)
@@ -346,6 +346,7 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                 "pod-small": 8,
                 "pod-medium": 11,
                 "pod-large": 15,
+                "pod-xlarge": 30,
             }
             for profile, workers in expected_workers.items():
                 output_dir = Path(tmpdir) / profile
@@ -370,6 +371,7 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                 )
                 self.assertEqual(metadata["pod_base_profile"], profile)
                 self.assertEqual(metadata["worker_count"], workers)
+                self.assertIn("daily_ingest_ceiling_gb", metadata)
 
     def test_pod_web_docs_helper_starts_local_docs_server(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -436,6 +438,7 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
             expected = {
                 "pod-medium-es": ("pod-medium", 14),
                 "pod-large-es": ("pod-large", 18),
+                "pod-xlarge-es": ("pod-xlarge", 33),
             }
             for profile, (base_profile, workers) in expected.items():
                 output_dir = Path(tmpdir) / profile
@@ -460,6 +463,69 @@ class SplunkEnterpriseKubernetesRendererTests(unittest.TestCase):
                 self.assertEqual(metadata["pod_profile"], profile)
                 self.assertEqual(metadata["pod_base_profile"], base_profile)
                 self.assertEqual(metadata["worker_count"], workers)
+
+    def test_sok_kubernetes_version_metadata_and_1_34_guardrail(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_dir = Path(tmpdir) / "rendered"
+            result = self.run_renderer(
+                "--target",
+                "sok",
+                "--architecture",
+                "s1",
+                "--output-dir",
+                str(output_dir),
+                "--kubernetes-version",
+                "1.34",
+                "--accept-splunk-general-terms",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            metadata = json.loads((output_dir / "sok" / "metadata.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["kubernetes_version"], "1.34")
+            self.assertEqual(metadata["kubernetes_supported_range"], "1.25-1.34")
+
+            rejected = self.run_renderer(
+                "--target",
+                "sok",
+                "--architecture",
+                "s1",
+                "--output-dir",
+                str(Path(tmpdir) / "rejected"),
+                "--kubernetes-version",
+                "1.34",
+                "--splunk-version",
+                "10.2.0",
+                "--accept-splunk-general-terms",
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("Kubernetes 1.34 deployments require Splunk Enterprise 10.4+", rejected.stderr)
+
+    def test_pod_daily_ingest_ceiling_blocks_oversized_profiles(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            oversized_small = self.run_renderer(
+                "--target",
+                "pod",
+                "--pod-profile",
+                "pod-small",
+                "--daily-ingest-gb",
+                "1000",
+                "--output-dir",
+                str(Path(tmpdir) / "small"),
+            )
+            self.assertNotEqual(oversized_small.returncode, 0)
+            self.assertIn("pod-small supports up to 500 GB/day", oversized_small.stderr)
+
+            manual = self.run_renderer(
+                "--target",
+                "pod",
+                "--pod-profile",
+                "pod-xlarge",
+                "--daily-ingest-gb",
+                "10001",
+                "--output-dir",
+                str(Path(tmpdir) / "manual"),
+            )
+            self.assertNotEqual(manual.returncode, 0)
+            self.assertIn("manual Splunk sizing handoff", manual.stderr)
 
 
 if __name__ == "__main__":

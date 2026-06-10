@@ -2,6 +2,9 @@
 """Regression tests for app_registry.json and deployment role matrices."""
 
 import json
+import re
+import subprocess
+import sys
 from collections import Counter
 
 from tests.regression_helpers import REPO_ROOT, ShellScriptRegressionBase
@@ -13,6 +16,7 @@ SKILL_TOPOLOGY_EXEMPTIONS: set[str] = set()
 
 SPLUNKBASE_APP_COVERAGE_IDS = {
     "263",
+    "742",
     "833",
     "1143",
     "1620",
@@ -22,7 +26,9 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "1761",
     "1809",
     "1841",
+    "1876",
     "1910",
+    "1928",
     "2648",
     "2679",
     "2680",
@@ -37,6 +43,7 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "2881",
     "2882",
     "2883",
+    "2884",
     "2890",
     "2891",
     "2897",
@@ -48,8 +55,10 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "3088",
     "3110",
     "3135",
+    "3172",
     "3185",
     "3186",
+    "3215",
     "3225",
     "3258",
     "3411",
@@ -58,12 +67,17 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "3435",
     "3449",
     "3471",
+    "3546",
     "3549",
+    "4055",
     "4147",
     "4240",
+    "4603",
     "4607",
     "4882",
+    "4886",
     "4992",
+    "5089",
     "5160",
     "5210",
     "5234",
@@ -74,10 +88,12 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "5556",
     "5558",
     "5580",
+    "5608",
     "5615",
     "5616",
     "5663",
     "5709",
+    "5863",
     "6149",
     "6150",
     "6151",
@@ -88,11 +104,16 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "6254",
     "6332",
     "6361",
+    "6415",
+    "6553",
     "6785",
+    "6841",
+    "6843",
     "6872",
     "6999",
     "7000",
     "7095",
+    "7125",
     "7180",
     "7214",
     "7245",
@@ -113,6 +134,21 @@ SPLUNKBASE_APP_COVERAGE_IDS = {
     "8704",
 }
 
+SPLUNKBASE_ID_SCAN_EXEMPTIONS = {
+    # Archived DB Connect driver kept as a negative fixture. The DB Connect tests
+    # assert it remains outside the normal install registry.
+    "6759",
+}
+
+SPLUNKBASE_ID_PATTERNS = (
+    re.compile(r"(?i)\bsplunkbase(?:\s+app|\s+id)?\s+[`*]*(\d{3,5})[`*]*"),
+    re.compile(r"(?i)\bsplunkbase_ids?[\"']?\s*[:=]\s*\[?[^\n]*?[\"'](\d{3,5})[\"']"),
+    re.compile(r"(?i)\bsplunkbase_id[\"']?\s*[:=]\s*[\"']?(\d{3,5})\b"),
+    re.compile(r"https://splunkbase\.splunk\.com/app/(\d{3,5})\b"),
+    re.compile(r"--app-id\s+(\d{3,5})\b"),
+    re.compile(r"\b(?:APP_ID|ADDON_APP_ID|VIS_APP_ID|TA_APP_ID|ITSI_APP_ID|KAFKA_APP_ID)\s*=\s*[\"'](\d{3,5})[\"']"),
+)
+
 
 def _on_disk_skill_dirs() -> set[str]:
     skills_root = REPO_ROOT / "skills"
@@ -125,6 +161,29 @@ def _on_disk_skill_dirs() -> set[str]:
         if (entry / "SKILL.md").is_file():
             out.add(entry.name)
     return out
+
+
+def _repo_referenced_splunkbase_ids() -> dict[str, list[str]]:
+    found: dict[str, list[str]] = {}
+    skills_root = REPO_ROOT / "skills"
+    for path in skills_root.rglob("*"):
+        if path.is_dir() or "__pycache__" in path.parts or path.suffix == ".pyc":
+            continue
+        try:
+            lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            continue
+
+        for line_number, line in enumerate(lines, 1):
+            for pattern in SPLUNKBASE_ID_PATTERNS:
+                for match in pattern.finditer(line):
+                    app_id = next(
+                        group for group in match.groups() if group and group.isdigit()
+                    )
+                    found.setdefault(app_id, []).append(
+                        f"{path.relative_to(REPO_ROOT)}:{line_number}"
+                    )
+    return found
 
 
 class RegistryRegressionTests(ShellScriptRegressionBase):
@@ -148,6 +207,24 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             "cisco-catalyst-enhanced-netflow-add-on-for-splunk_*",
             enhanced_netflow_entry.get("package_patterns", []),
         )
+
+    def test_oncall_registry_keeps_5863_as_soar_readiness_not_platform_install(self):
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        documentation = next(
+            item
+            for item in registry["documentation"]["cloud_matrix_rows"]
+            if item["label"] == "`splunk-oncall-setup`"
+        )
+
+        install_path = documentation["cloud_install_path"]
+        self.assertIn("Splunkbase 3546", install_path)
+        self.assertIn("Splunkbase 4886", install_path)
+        self.assertIn("Splunkbase 5863", install_path)
+        self.assertIn("SOAR asset-readiness handoff", install_path)
+        self.assertNotIn("Splunkbase 3546 / 4886 / 5863 apps", install_path)
+        self.assertNotIn("Splunkbase 5863 (splunkoncall, SOAR connector) installs through", install_path)
 
 
     def test_app_registry_declares_deployment_roles_and_complete_role_support(self):
@@ -460,8 +537,8 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(dbx["role_support"]["search-tier"], "supported")
         self.assertEqual(dbx["role_support"]["heavy-forwarder"], "supported")
         self.assertEqual(dbx["role_support"]["indexer"], "none")
-        self.assertEqual(dbx["latest_verified_version"], "4.2.4")
-        self.assertEqual(dbx["latest_verified_date"], "April 20, 2026")
+        self.assertEqual(dbx["latest_verified_version"], "4.3.0")
+        self.assertEqual(dbx["latest_verified_date"], "May 11, 2026")
 
         driver_expectations = {
             "6149": ("Amazon Redshift JDBC Driver Add-on for Splunk DB Connect", "1.2.2", "September 3, 2025"),
@@ -651,6 +728,64 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
 
         self.assertEqual(offenders, [], msg="Invalid Splunkbase latest metadata: " + ", ".join(offenders))
 
+    def test_splunkbase_apps_have_explicit_10_4_compatibility_status(self):
+        """Every public Splunkbase app must declare how it behaves on 10.4."""
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        allowed_statuses = {"supported", "unsupported"}
+        offenders = []
+
+        for app in registry.get("apps", []):
+            app_id = str(app.get("splunkbase_id", "")).strip()
+            if not app_id.isdigit():
+                continue
+            platform_versions = app.get("platform_versions")
+            status = app.get("compatibility_status")
+            latest_release_date = app.get("latest_release_date")
+            last_verified_date = app.get("last_verified_date")
+
+            if not isinstance(platform_versions, list) or not all(
+                isinstance(version, str) and version for version in platform_versions
+            ):
+                offenders.append(f"{app_id}/{app.get('app_name')}: missing platform_versions")
+            if status not in allowed_statuses:
+                offenders.append(f"{app_id}/{app.get('app_name')}: bad compatibility_status {status!r}")
+            if not isinstance(latest_release_date, str) or not latest_release_date:
+                offenders.append(f"{app_id}/{app.get('app_name')}: missing latest_release_date")
+            if not isinstance(last_verified_date, str) or not last_verified_date:
+                offenders.append(f"{app_id}/{app.get('app_name')}: missing last_verified_date")
+            if status == "supported" and "10.4" not in (platform_versions or []):
+                offenders.append(f"{app_id}/{app.get('app_name')}: supported without 10.4")
+            if status == "unsupported" and "10.4" in (platform_versions or []):
+                offenders.append(f"{app_id}/{app.get('app_name')}: unsupported while listing 10.4")
+
+        self.assertEqual(
+            offenders,
+            [],
+            msg="Splunkbase 10.4 compatibility metadata is incomplete: " + ", ".join(offenders),
+        )
+
+    def test_splunkbase_registry_offline_10_4_audit_passes(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(REPO_ROOT / "skills/shared/scripts/audit_splunkbase_registry.py"),
+                "--target-splunk-version",
+                "10.4",
+                "--json",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["offline_findings"], [])
+
     def test_splunkbase_app_coverage_ids_match_latest_audit_set(self):
         """The audited public Splunkbase app set should not shrink or grow silently."""
         registry = json.loads(
@@ -669,6 +804,38 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
             msg=(
                 "Public Splunkbase-backed app coverage changed. Re-audit Splunkbase latest "
                 "versions, update registry metadata, then update SPLUNKBASE_APP_COVERAGE_IDS."
+            ),
+        )
+
+    def test_repo_referenced_splunkbase_ids_are_audited_or_exempted(self):
+        """Every Splunkbase ID referenced by skills must be audited or exempted."""
+        registry = json.loads(
+            (REPO_ROOT / "skills/shared/app_registry.json").read_text(encoding="utf-8")
+        )
+        audited_ids = {
+            str(app.get("splunkbase_id", "")).strip()
+            for app in registry.get("apps", [])
+            if str(app.get("splunkbase_id", "")).strip().isdigit()
+        }
+        referenced_ids = _repo_referenced_splunkbase_ids()
+
+        missing = sorted(
+            app_id
+            for app_id in referenced_ids
+            if app_id not in audited_ids and app_id not in SPLUNKBASE_ID_SCAN_EXEMPTIONS
+        )
+
+        details = []
+        for app_id in missing:
+            refs = ", ".join(referenced_ids[app_id][:5])
+            details.append(f"{app_id}: {refs}")
+
+        self.assertEqual(
+            missing,
+            [],
+            msg=(
+                "Splunkbase IDs referenced under skills/ are not in app_registry.json "
+                "and are not explicitly exempted: " + "; ".join(details)
             ),
         )
 

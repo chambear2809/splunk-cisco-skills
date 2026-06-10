@@ -43,10 +43,10 @@ UI workflows rather than stable write APIs:
   payloads `api_apply` unless the renderer is explicitly updated for a
   documented public SLO write API and covered by live validation tests.
 - Splunk On-Call has its own public API, credential model, REST endpoint
-  integration, and Splunkbase companion apps (3546, 4886, 5863). All of those
-  live in the dedicated `splunk-oncall-setup` skill. This skill renders only
-  a deeplink-only handoff for the `on_call` section that points operators to
-  `skills/splunk-oncall-setup/SKILL.md`.
+  integration, Splunkbase companion apps 3546/4886, and SOAR connector 5863
+  readiness. All of those live in the dedicated `splunk-oncall-setup` skill.
+  This skill renders only a deeplink-only handoff for the `on_call` section
+  that points operators to `skills/splunk-oncall-setup/SKILL.md`.
 
 ## Source Anchors
 

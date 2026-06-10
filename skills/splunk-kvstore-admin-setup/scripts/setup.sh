@@ -15,6 +15,9 @@ APPLY=false
 OUTPUT_DIR=""
 SPLUNK_HOME_VALUE="/opt/splunk"
 TOPOLOGY="standalone"
+CURRENT_SPLUNK_VERSION=""
+TARGET_SPLUNK_VERSION="10.4.0"
+CURRENT_KVSTORE_VERSION=""
 APP_NAME="ZZZ_cisco_skills_kvstore"
 POINT_IN_TIME="true"
 BACKUP_ARCHIVE_NAME=""
@@ -45,6 +48,9 @@ Options:
   --output-dir PATH
   --splunk-home PATH
   --topology standalone|shc
+  --current-splunk-version VERSION
+  --target-splunk-version VERSION   (default: 10.4.0)
+  --current-kvstore-version VERSION
   --app-name NAME
   --point-in-time true|false
   --backup-archive-name NAME        (required for restore; include .tar.gz)
@@ -80,6 +86,9 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME_VALUE="$2"; shift 2 ;;
         --topology) require_arg "$1" $# || exit 1; TOPOLOGY="$2"; shift 2 ;;
+        --current-splunk-version) require_arg "$1" $# || exit 1; CURRENT_SPLUNK_VERSION="$2"; shift 2 ;;
+        --target-splunk-version) require_arg "$1" $# || exit 1; TARGET_SPLUNK_VERSION="$2"; shift 2 ;;
+        --current-kvstore-version) require_arg "$1" $# || exit 1; CURRENT_KVSTORE_VERSION="$2"; shift 2 ;;
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
         --point-in-time) require_arg "$1" $# || exit 1; POINT_IN_TIME="$2"; shift 2 ;;
         --backup-archive-name) require_arg "$1" $# || exit 1; BACKUP_ARCHIVE_NAME="$2"; shift 2 ;;
@@ -141,6 +150,9 @@ build_renderer_args() {
         --output-dir "${OUTPUT_DIR}"
         --splunk-home "${SPLUNK_HOME_VALUE}"
         --topology "${TOPOLOGY}"
+        --current-splunk-version "${CURRENT_SPLUNK_VERSION}"
+        --target-splunk-version "${TARGET_SPLUNK_VERSION}"
+        --current-kvstore-version "${CURRENT_KVSTORE_VERSION}"
         --app-name "${APP_NAME}"
         --point-in-time "${POINT_IN_TIME}"
         --backup-archive-name "${BACKUP_ARCHIVE_NAME}"

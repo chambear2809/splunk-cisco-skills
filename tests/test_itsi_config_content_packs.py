@@ -2110,6 +2110,25 @@ class ContentPackTests(unittest.TestCase):
         self.assertFalse(any(finding["status"] == "error" for finding in findings), findings)
         self.assertTrue(any("custom subdomain" in finding["message"].lower() for finding in findings))
 
+    def test_synthetic_monitoring_profile_is_legacy_handoff_for_10_4(self) -> None:
+        profile = PACK_PROFILES["splunk_synthetic_monitoring"]
+        self.assertEqual(profile["automation_scope"], "legacy_handoff_only")
+        self.assertEqual(profile["required_apps"], [])
+        self.assertIn("5608", profile["deprecated_reason"])
+        self.assertIn("Splunk 10.4", profile["deprecated_reason"])
+
+        findings = validate_profile(
+            FakeContentPackClient(),
+            {"profile": "splunk_synthetic_monitoring", "metrics_indexes": ["sim_metrics"]},
+            profile,
+            "DA-ITSI-CP-synthetic-monitoring",
+        )
+
+        messages = "\n".join(finding["message"] for finding in findings)
+        self.assertIn("5608", messages)
+        self.assertIn("does not advertise Splunk 10.4 support", messages)
+        self.assertNotIn("Splunk Synthetic Monitoring Add-on is not installed", messages)
+
     def test_preview_warns_when_pack_owned_macro_is_unavailable_before_install(self) -> None:
         client = FakeContentPackClient(
             apps=HEALTHY_ITSI_APPS | {CONTENT_LIBRARY_APP, "Splunk_TA_nix"},

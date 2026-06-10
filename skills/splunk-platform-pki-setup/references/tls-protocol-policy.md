@@ -1,11 +1,11 @@
 # TLS Protocol Policy
 
-Why this skill defaults to TLS 1.2 and refuses TLS 1.3 by
-default, and how the dual `sslVersions` / `sslVersionsForClient`
-knobs work.
+Why this skill keeps TLS 1.2 as the compatibility floor, auto-enables
+TLS 1.3 for Splunk 10.4+, and how the dual `sslVersions` /
+`sslVersionsForClient` knobs work.
 
 > Anchor:
-> [Configure TLS protocol version support for secure connections between Splunk platform instances](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances).
+> [Configure TLS protocol version support for secure connections between Splunk platform instances](https://help.splunk.com/splunk-enterprise/administer/manage-users-and-security/10.4/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-tls-protocol-version-support-for-secure-connections-between-splunk-platform-instances).
 
 ## Splunk's documented supported protocols
 
@@ -16,27 +16,18 @@ The TLS protocol version doc explicitly lists:
 | SSLv3 | Deprecated; warns in 9.4+ |
 | TLS 1.0 | Deprecated; warns in 9.4+ |
 | TLS 1.1 | Deprecated; warns in 9.4+ |
-| TLS 1.2 | Supported (the maximum documented version) |
-| TLS 1.3 | **Not in the documented supported set** |
+| TLS 1.2 | Supported compatibility floor |
+| TLS 1.3 | Supported for Splunk 10.4+ plans through `--enable-tls13` |
 
-**Splunk's docs do not yet list TLS 1.3 as a supported `sslVersions`
-value.** Even though OpenSSL 3.0 (which Splunk 10 uses for FIPS
-140-3) supports TLS 1.3 underneath, Splunk's `sslVersions` /
-`sslVersionsForClient` settings haven't yet been documented to
-accept `tls1.3`.
+This skill:
 
-Until Splunk explicitly documents TLS 1.3 support, this skill:
-
-- Defaults to `sslVersions = tls1.2` and
-  `sslVersionsForClient = tls1.2`.
-- Refuses `tls1.3` as a value.
-- Warns when the operator passes `--allow-deprecated-tls`
-  (which only relaxes the lower bound — the upper bound stays
-  at TLS 1.2).
-
-When Splunk eventually documents TLS 1.3 support, the
-`--tls-version-floor` flag will accept `tls1.3` and the algorithm
-presets will gain TLS 1.3 cipher suites.
+- Defaults to `sslVersions = tls1.2,tls1.3` and
+  `sslVersionsForClient = tls1.2,tls1.3` for Splunk 10.4+.
+- Falls back to `tls1.2` below Splunk 10.4 when `--enable-tls13=auto`.
+- Allows explicit opt-out with `--enable-tls13=false`.
+- Allows `--tls-version-floor=tls1.3` only for Splunk 10.4+.
+- Warns when the operator passes `--allow-deprecated-tls`, which only relaxes
+  the lower bound for legacy clients.
 
 ## `sslVersions` syntax
 
@@ -54,9 +45,16 @@ The TLS protocol doc supports several syntax forms:
 The skill emits the most explicit form:
 
 ```
+sslVersions = tls1.2,tls1.3
+```
+
+for Splunk 10.4+ when `--enable-tls13=auto|true`, or:
+
+```
 sslVersions = tls1.2
 ```
 
+when TLS 1.3 is explicitly disabled or the target Splunk version is below 10.4.
 Avoiding `sslVersions = *,-ssl3,-tls1.0,-tls1.1` because that
 syntax silently picks up new versions Splunk adds later
 (potentially breaking the operator's TLS posture without
@@ -72,11 +70,15 @@ These are TWO separate settings on `server.conf [sslConfig]`:
 | `sslVersionsForClient` | outbound (splunkd as **client**) | a deployment client connecting to a deployment server, an indexer connecting to a cluster manager |
 
 Most operators only set `sslVersions`. The skill defaults BOTH
-to `tls1.2` so that:
+to `tls1.2,tls1.3` for Splunk 10.4+ so that:
 
-- A splunkd-as-server inbound connection requires TLS 1.2.
-- A splunkd-as-client outbound connection requires TLS 1.2 from
+- A splunkd-as-server inbound connection requires TLS 1.2 or TLS 1.3.
+- A splunkd-as-client outbound connection requires TLS 1.2 or TLS 1.3 from
   the receiving end.
+
+For TLS 1.3, Splunk's TLS 1.2 `cipherSuite` setting does not select the TLS 1.3
+cipher suites; those are negotiated by the platform OpenSSL TLS 1.3 support.
+The renderer still emits `cipherSuite` for TLS 1.2 peers.
 
 ## Per-conf `sslVersions` location
 
@@ -95,30 +97,13 @@ it everywhere:
 The renderer touches all of them when `--target` includes the
 relevant role.
 
-## Why no TLS 1.3
+## TLS 1.3 Gate
 
-Reasons Splunk 10.0 / 10.2 hasn't documented TLS 1.3 yet:
-
-1. Some downstream consumers (older Universal Forwarders, custom
-   apps using the Splunk SDK) don't yet support TLS 1.3
-   handshake.
-2. KV Store's MongoDB requires careful TLS 1.3 testing (MongoDB
-   supports TLS 1.3 via OpenSSL 3.0 but the interop matrix is
-   complex).
-3. The Splunk docs team hasn't yet updated `sslVersions` syntax
-   examples to include `tls1.3`.
-
-When Splunk publishes a doc update saying "TLS 1.3 supported",
-this skill will:
-
-- Add `tls1.3` to the allowed values for `--tls-version-floor`.
-- Update `algorithm-policy.json` with TLS 1.3 cipher suites
-  (`TLS_AES_256_GCM_SHA384`, `TLS_CHACHA20_POLY1305_SHA256`,
-  `TLS_AES_128_GCM_SHA256`).
-- Update the `splunk-modern` preset to optionally include
-  `tls1.3`.
-
-Until then, TLS 1.2-only is the safe default.
+TLS 1.3 is version-gated because enterprise deployments often mix search
+heads, indexers, deployment servers, heavy forwarders, and Universal
+Forwarders during an upgrade window. Use `--enable-tls13 auto` for normal 10.4
+plans, `true` only after confirming every peer supports 10.4-era TLS, and
+`false` for mixed-version or legacy-client maintenance windows.
 
 ## Deprecation warnings
 
@@ -136,17 +121,10 @@ and flags any host still on a deprecated protocol.
 
 ## What `--allow-deprecated-tls` does
 
-`--allow-deprecated-tls` relaxes the lower bound to allow
-SSLv3 / TLS 1.0 / TLS 1.1 in `sslVersions`. It does NOT change
-the upper bound (still TLS 1.2). Use ONLY when:
-
-- An external TLS client is hard-stuck on a deprecated protocol.
-- Replacing the client is in flight but not yet possible.
-- The compensating control (network segmentation, cert pinning)
-  is in place.
-
-The renderer logs a loud warning and the rendered conf carries a
-comment explaining the deprecation acknowledgement.
+`--allow-deprecated-tls` is retained for old templates, but the 10.4 renderer
+does not accept SSLv3 / TLS 1.0 / TLS 1.1 as supported `sslVersions` floors.
+The only 10.4 floors are `tls1.2` and `tls1.3`; the TLS 1.3 gate remains
+controlled by `--enable-tls13`.
 
 ## FIPS interaction
 
@@ -156,8 +134,8 @@ underlying OpenSSL FIPS module:
 - SSLv3 / TLS 1.0 / TLS 1.1 are **always rejected** regardless
   of `sslVersions`.
 - TLS 1.2 is **always allowed**.
-- TLS 1.3 may be allowed by OpenSSL 3.0 FIPS but Splunk's
-  `sslVersions` parser doesn't expose `tls1.3` yet.
+- TLS 1.3 is allowed in this renderer for Splunk 10.4+ when the operator uses
+  `--enable-tls13 auto|true`.
 
-So for FIPS deployments the practical floor and ceiling are both
+So for FIPS deployments the practical floor is
 TLS 1.2.

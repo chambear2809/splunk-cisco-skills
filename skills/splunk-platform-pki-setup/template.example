@@ -101,12 +101,13 @@ leaf_days: 825              # ~27 months (Splunk EP doc precedent + CA/B baselin
 # version detail.
 tls_policy: splunk-modern
 
-# tls1.2 is the only currently-supported value. Splunk's docs do not yet
-# list tls1.3 as a supported sslVersions value.
+# tls1.2 is the default compatibility floor. Splunk 10.4+ can also render
+# tls1.2,tls1.3 through enable_tls13=auto/true.
 tls_version_floor: tls1.2
+enable_tls13: auto
 
-# Set to relax the lower bound (allow ssl3 / tls1.0 / tls1.1). Not
-# recommended; the upper bound stays at tls1.2.
+# Retained for old templates, but 10.4 renders do not accept ssl3 / tls1.0 /
+# tls1.1 as supported protocol floors.
 allow_deprecated_tls: false
 
 # rsa-2048 (default; KV-Store-friendly) | rsa-3072 | rsa-4096 |
@@ -163,7 +164,7 @@ fips_mode: none
 # ---------------------------------------------------------------------------
 
 splunk_home: /opt/splunk
-splunk_version: 10.2.2
+splunk_version: 10.4.0
 
 # Cert install directory under $SPLUNK_HOME/etc/auth/.
 cert_install_subdir: myssl

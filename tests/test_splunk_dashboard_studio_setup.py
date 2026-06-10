@@ -62,6 +62,22 @@ class DashboardStudioTests(unittest.TestCase):
             dashboard = json.loads((Path(tmpdir) / "dashboard-studio" / "dashboard.json").read_text(encoding="utf-8"))
             self.assertEqual(dashboard["title"], "Custom")
 
+    def test_auto_refresh_requirement_emits_capability_guidance(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                "--output-dir", tmpdir,
+                "--dashboard-name", "auto_refresh_dash",
+                "--search", "index=_internal | stats count",
+                "--requires-auto-refresh", "true",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "dashboard-studio"
+            metadata = json.loads((render_dir / "metadata.json").read_text(encoding="utf-8"))
+            readme = (render_dir / "README.md").read_text(encoding="utf-8")
+            self.assertTrue(metadata["requires_auto_refresh"])
+            self.assertEqual(metadata["capability_guidance"], ["auto_refresh_dashboards"])
+            self.assertIn("auto_refresh_dashboards", readme)
+
     def test_requires_search_or_definition(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             result = self.run_renderer("--output-dir", tmpdir, "--dashboard-name", "empty_dash")

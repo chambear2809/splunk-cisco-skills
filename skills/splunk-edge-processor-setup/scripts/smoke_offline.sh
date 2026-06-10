@@ -20,7 +20,7 @@ bash "${SCRIPT_DIR}/setup.sh" \
     --ep-instances "ep01.example.com=systemd,ep02.example.com=docker,ep03.example.com=nosystemd" \
     --ep-target-daily-gb 250 \
     --ep-source-types "syslog_router,hec_apps" \
-    --ep-destinations "primary=type=s2s;host=idx-cluster.example.com;port=9997;index_routing=specify_for_no_index:summary,archive=type=s3;bucket=splunk-archive;prefix=ep-overflow/;region=us-east-1,hec=type=hec;url=https://hec.example.com:8088;token_file=/tmp/ep_hec_token" \
+    --ep-destinations "primary=type=s2s;host=idx-cluster.example.com;port=9997;index_routing=specify_for_no_index:summary,archive=type=s3_dataset;bucket=splunk-archive;prefix=ep-overflow/;region=us-east-1,hec=type=hec;url=https://hec.example.com:8088;token_file=/tmp/ep_hec_token" \
     --ep-default-destination primary \
     --ep-pipelines "filter_dev=partition=Keep;sourcetype=app:dev;spl2_file=pipelines/filter_dev.spl2;destination=primary,archive_overflow=partition=Remove;sourcetype=app:dev;spl2_file=pipelines/archive.spl2;destination=archive" \
     >/dev/null
@@ -53,6 +53,7 @@ done < <(find "${TMP_OUT}" -name '*.sh')
 python3 -c "import json; json.load(open('${TMP_OUT}/control-plane/pipelines/filter_dev.json'))"
 python3 -c "import json; json.load(open('${TMP_OUT}/control-plane/destinations/primary.json'))"
 python3 -c "import json; json.load(open('${TMP_OUT}/control-plane/destinations/archive.json'))"
+python3 -c "import json; data=json.load(open('${TMP_OUT}/control-plane/destinations/archive.json')); assert data['type'] == 's3_dataset'; assert data['status'] == 'data_management_handoff'; assert data['api_crud'] == 'not_claimed'"
 
 # Default-destination guard appears in metadata.
 grep -q '"default_destination": "primary"' "${TMP_OUT}/metadata.json"

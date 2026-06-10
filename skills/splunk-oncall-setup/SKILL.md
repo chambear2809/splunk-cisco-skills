@@ -1,6 +1,6 @@
 ---
 name: splunk-oncall-setup
-description: Render, validate, and apply the full Splunk On-Call (formerly VictorOps) lifecycle — teams, users + contact methods, rotations, escalation policies, routing keys, scheduled overrides, personal paging policies, alert rules / Rules Engine, maintenance mode, incidents, notes, chat, stakeholder messages, REST endpoint and generic email alert payloads — plus Splunk-side companions (Splunkbase 3546 alert action, 4886 Add-on, 5863 SOAR connector, ITSI NEAP, ES Adaptive Response). Use when the user asks about Splunk On-Call, VictorOps, on-call schedules, escalation, paging, X-VO-Api-Id/X-VO-Api-Key, the alert.victorops.com REST endpoint, or victorops_app.
+description: Render, validate, and apply the full Splunk On-Call (formerly VictorOps) lifecycle — teams, users + contact methods, rotations, escalation policies, routing keys, scheduled overrides, personal paging policies, alert rules / Rules Engine, maintenance mode, incidents, notes, chat, stakeholder messages, REST endpoint and generic email alert payloads — plus Splunk-side companions (Splunkbase 3546 alert action, 4886 Add-on), SOAR connector 5863 readiness, ITSI NEAP, and ES Adaptive Response. Use when the user asks about Splunk On-Call, VictorOps, on-call schedules, escalation, paging, X-VO-Api-Id/X-VO-Api-Key, the alert.victorops.com REST endpoint, or victorops_app.
 ---
 
 # Splunk On-Call Setup
@@ -25,7 +25,9 @@ Every rendered object gets an explicit coverage status:
 - `handoff`: the skill renders deterministic operator steps for UI-only,
   Support-driven, or app-side workflows.
 - `install_apply`: the skill installs or configures a Splunk-side companion
-  app or saved search via Splunkbase + REST (Splunkbase 3546, 4886, 5863).
+  app or saved search via Splunkbase + REST (Splunkbase 3546 and 4886). The
+  Splunkbase 5863 SOAR connector is a SOAR asset-readiness handoff, not a
+  Splunk Enterprise/Cloud app install.
 
 Do not mark UI-only workflows as `api_apply`.
 

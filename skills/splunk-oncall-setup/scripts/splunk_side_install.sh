@@ -4,7 +4,7 @@
 # Reads a splunk-side YAML/JSON spec (see templates/splunk-side.example.yaml)
 # and renders the planned actions: install Splunkbase 3546 (victorops_app)
 # on a search head, install Splunkbase 4886 (TA-splunk-add-on-for-victorops)
-# on a heavy forwarder, install Splunkbase 5863 SOAR connector readiness,
+# on a heavy forwarder, render Splunkbase 5863 SOAR connector readiness,
 # pre-create the four required indexes the Add-on macros expect, seed the
 # alert-action's mycollection KV-store with the operator-supplied
 # api_id + routing_key, and configure the org slug on victorops_app.
@@ -32,7 +32,7 @@ UNINSTALL_APP_SH="${PROJECT_ROOT}/skills/splunk-app-install/scripts/uninstall_ap
 
 usage() {
     cat <<'EOF'
-Splunk-side install for Splunk On-Call.
+Splunk-side install and SOAR handoff for Splunk On-Call.
 
 Usage:
   bash skills/splunk-oncall-setup/scripts/splunk_side_install.sh \

@@ -303,7 +303,7 @@ payload = {
         "restricted_entitlement": "Splunkbase app 7180 is restricted to approved downloaders; use --file for entitled local packages.",
     },
     "compatibility": {
-        "splunkbase_latest": {"ari_version": "1.2.1", "splunk_platform": "9.0 through 10.3"},
+        "splunkbase_latest": {"ari_version": "1.2.1", "splunk_platform": "9.0 through 10.4"},
         "docs_signal": {"ari_versions": "1.2.x / 1.1.3", "splunk_platform": "9.1.3+ including 10.x"},
         "validation_behavior": "Warn, do not hard-fail, when the platform is below 9.1.3 because official sources have different compatibility signals.",
     },

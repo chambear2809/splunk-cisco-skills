@@ -180,7 +180,8 @@ an ITSI YAML spec or in chat.
 - `splunk_appdynamics`
 - `splunk_observability_cloud`
 - `splunk_as_a_service`
-- `splunk_synthetic_monitoring`
+- `splunk_synthetic_monitoring` (legacy handoff only; Add-on 5608 is archived
+  and not a Splunk 10.4 install target)
 - `third_party_apm`
 - `unix_dashboards_reports`
 - `vmware`

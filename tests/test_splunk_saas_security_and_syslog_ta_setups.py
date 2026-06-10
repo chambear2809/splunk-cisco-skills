@@ -146,7 +146,13 @@ class NewTaRendererTests(unittest.TestCase):
         self.assert_help_and_no_secret_args("splunk-syslog-web-proxy-ta-setup")
         render = SKILLS / "splunk-syslog-web-proxy-ta-setup/scripts/render_assets.py"
         with tempfile.TemporaryDirectory() as tmpdir:
-            result = run_cmd("python3", str(render), "--output-dir", tmpdir, "--json")
+            result = run_cmd(
+                "python3",
+                str(render),
+                "--output-dir",
+                tmpdir,
+                "--json",
+            )
             self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
             out = Path(tmpdir) / "splunk-syslog-web-proxy-ta"
             metadata = json.loads((out / "metadata.json").read_text(encoding="utf-8"))
@@ -161,6 +167,7 @@ class NewTaRendererTests(unittest.TestCase):
             self.assertIn("cp_log:syslog", handoff)
             self.assertIn("does not accept credential values", account)
             self.assertIn("SC4S/syslog", account)
+            self.assertEqual(metadata["warnings"], [])
             self.assert_no_unscoped_validation_or(out)
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -174,6 +181,26 @@ class NewTaRendererTests(unittest.TestCase):
             self.assertNotIn("ms:iis:auto", inputs)
             self.assertIn("bluecoat:proxysg:access:syslog", handoff)
             self.assertNotIn("cp_log:syslog", handoff)
+
+    def test_syslog_web_proxy_allows_tomcat_on_10_4_without_override(self) -> None:
+        render = SKILLS / "splunk-syslog-web-proxy-ta-setup/scripts/render_assets.py"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_cmd(
+                "python3",
+                str(render),
+                "--output-dir",
+                tmpdir,
+                "--products",
+                "tomcat",
+                "--splunk-version",
+                "10.4",
+                "--json",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            out = Path(tmpdir) / "splunk-syslog-web-proxy-ta"
+            metadata = json.loads((out / "metadata.json").read_text(encoding="utf-8"))
+            self.assertEqual(metadata["profiles"]["tomcat"]["id"], "2911")
+            self.assertEqual(metadata["warnings"], [])
 
     def test_renderers_reject_empty_selectors(self) -> None:
         cases = [

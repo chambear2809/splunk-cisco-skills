@@ -2,7 +2,7 @@
 
 ## Source Guidance
 
-This skill follows the Splunk Kubernetes Helm installation workflow, the official `splunk-otel-collector` Helm values, advanced chart configuration notes, the Linux installer script workflow, Splunk HEC exporter guidance, Splunkbase app `7125`, the Splunk Add-On for OpenTelemetry Collector docs, and upstream `signalfx/splunk-otel-collector` `v0.152.0` TA packaging.
+This skill follows the Splunk Kubernetes Helm installation workflow, the official `splunk-otel-collector` Helm values, advanced chart configuration notes, the Linux installer script workflow, Splunk HEC exporter guidance, Splunkbase app `7125`, the Splunk Add-On for OpenTelemetry Collector docs, and upstream `signalfx/splunk-otel-collector` `v0.153.0` TA packaging.
 
 ## Rendered Layout
 
@@ -165,9 +165,9 @@ Kubernetes Helm or standalone Linux installer paths.
 Audited app metadata:
 
 - Splunkbase app id: `7125`
-- Latest audited release: `0.152.0`
-- Published: `2026-05-14`
-- Splunk compatibility: `8.0` through `10.3`
+- Latest audited release: `0.153.0`
+- Published: `2026-05-27`
+- Splunk compatibility: `8.0` through `10.4`
 - Splunk Cloud compatible: `true`
 - FIPS-compatible: `false`
 - FedRAMP validated: `false`

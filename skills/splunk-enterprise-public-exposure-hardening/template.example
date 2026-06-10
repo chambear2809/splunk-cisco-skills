@@ -45,16 +45,16 @@ hec_mtls: false
 splunk_home: /opt/splunk
 service_user: splunk
 
-# Splunk version — used for SVD floor enforcement. The skill refuses to
-# apply if this is below the floor in references/cve-svd-floor.json.
-splunk_version: 10.2.2
+# Splunk version — used for SVD floor and TLS 1.3 auto behavior.
+splunk_version: 10.4.0
 
 # ---------------------------------------------------------------------------
 # Crypto / TLS
 # ---------------------------------------------------------------------------
 
-# tls12 (default) emits sslVersions = tls1.2; tls12_13 emits tls1.2,tls1.3.
-tls_policy: tls12
+# tls12_13 (default) emits sslVersions = tls1.2,tls1.3 for 10.4+.
+tls_policy: tls12_13
+enable_tls13: auto
 
 # Whether to render hardened S2S inputs.conf with requireClientCert=true.
 s2s_mtls: true

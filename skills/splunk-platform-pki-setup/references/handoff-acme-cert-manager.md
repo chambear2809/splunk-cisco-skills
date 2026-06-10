@@ -109,8 +109,10 @@ into `cabundle.pem`.
 (running the runbook every 60 days). Most operators wire this
 into:
 
-- A scheduled saved search that detects "cert expires in less
-  than 30 days" via the SSL Certificate Checker (Splunkbase 3172).
+- A scheduled job or saved search sourced from `pki/rotate/expire-watch.sh`
+  or enterprise certificate-inventory data. Do not rely on SSL Certificate
+  Checker 3172 for Splunk 10.4; that Splunkbase app is archived and does not
+  advertise 10.4 support.
 - An ITSI / Splunk On-Call notification that pages the platform
   team.
 - A scheduled job that runs the rotation runbook unattended in a

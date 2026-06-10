@@ -39,6 +39,12 @@ default from blacklist-style behavior to whitelist-style behavior. This skill
 renders `filterType` at both server-class and app levels to make behavior
 explicit during upgrades.
 
+For Splunk 10.4, also review
+`../shared/splunk_10_4_enterprise_deployment_notes.md`: do not use Agent
+Management/deployment server to manage indexer-cluster peers or SHC members,
+avoid removed/deprecated `serverclass.conf` parameters, and keep app-level
+`filterType` explicit for every server class app mapping.
+
 ## Deployment Client Notes
 
 The rendered `deploymentclient.conf` uses:
@@ -53,10 +59,10 @@ under the client-side `$SPLUNK_HOME/etc/apps` path.
 ## Official References
 
 - Agent management architecture:
-  <https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.2/agent-management/agent-management-architecture>
+  <https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.4/agent-management/agent-management-architecture>
 - Define server classes:
-  <https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.2/configure-the-agent-management-system/use-the-agent-management-interface-to-define-server-classes>
+  <https://help.splunk.com/en/splunk-enterprise/administer/update-your-deployment/10.4/configure-the-agent-management-system/use-the-agent-management-interface-to-define-server-classes>
 - `serverclass.conf` reference:
-  <https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.2/configuration-file-reference/10.2.0-configuration-file-reference/serverclass.conf>
+  <https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.4/configuration-file-reference/10.4.0-configuration-file-reference/serverclass.conf>
 - `deploymentclient.conf` reference:
-  <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.2/configuration-file-reference/10.2.0-configuration-file-reference/deploymentclient.conf>
+  <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/configuration-file-reference/10.4.0-configuration-file-reference/deploymentclient.conf>

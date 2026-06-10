@@ -5,8 +5,8 @@
 - Splunkbase app: `8704`
 - App/package ID: `splunk-connect-for-otlp`
 - Release: `0.4.1`
-- Published app record: May 6, 2026
-- Splunk compatibility: `9.4` through `10.3`
+- Published app record: May 1, 2026
+- Splunk compatibility: `9.4` through `10.4`
 - SHA256: `fde0d93532703e04ab5aa544815d52232ef62afae2c0a55e374dc74d2d58f9d1`
 - MD5: `6190585a3c12cb9f273f7f9f11cdb3be`
 

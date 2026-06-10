@@ -7,7 +7,7 @@
 | `apache` | `Splunk_TA_apache` | `3186` | `3.0.0` | Local file / UF monitor |
 | `nginx` | `Splunk_TA_nginx` | `3258` | `3.3.0` | Local file / UF monitor |
 | `iis` | `Splunk_TA_microsoft-iis` | `3185` | `2.0.0` | Windows UF / IIS log files |
-| `tomcat` | `Splunk_TA_tomcat` | `2911` | `4.0.0` | Local file / UF monitor; optional JMX input |
+| `tomcat` | `Splunk_TA_tomcat` | `2911` | `4.0.0` | Local file / UF monitor; optional JMX input; Splunkbase advertises Splunk 10.4 support for this release |
 | `haproxy` | `Splunk_TA_haproxy` | `3135` | `2.0.0` | Local file / UF monitor |
 | `squid` | `Splunk_TA_squid` | `2965` | `2.1.0` | SC4S/syslog handoff |
 | `bluecoat` | `Splunk_TA_bluecoat-proxysg` | `2758` | `3.9.0` | SC4S/syslog handoff |

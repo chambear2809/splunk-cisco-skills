@@ -211,6 +211,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--server-name", default="web01")
     p.add_argument("--log-root", default="/var/log")
     p.add_argument("--syslog-port", default="514")
+    p.add_argument("--splunk-version", default="10.4")
+    p.add_argument(
+        "--accept-unsupported-10-4-tomcat",
+        action="store_true",
+        help="Deprecated no-op retained for older automation; Tomcat app 2911 advertises Splunk 10.4 support.",
+    )
     p.add_argument("--json", action="store_true")
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
@@ -229,6 +235,27 @@ def parse_products(raw: str) -> list[str]:
             f"Choose from {', '.join(PROFILES)}."
         )
     return vals
+
+
+def version_at_least(raw: str, floor: str) -> bool:
+    def key(value: str) -> tuple[int, ...]:
+        parts = []
+        for token in value.split("."):
+            if not token.isdigit():
+                break
+            parts.append(int(token))
+        return tuple(parts)
+
+    left = key(raw or "0")
+    right = key(floor)
+    length = max(len(left), len(right))
+    left += (0,) * (length - len(left))
+    right += (0,) * (length - len(right))
+    return left >= right
+
+
+def validate_product_compatibility(args: argparse.Namespace, products: list[str]) -> list[str]:
+    return []
 
 
 def write_file(path: Path, content: str, executable: bool = False) -> None:
@@ -382,7 +409,7 @@ def render_validation_spl(args: argparse.Namespace, products: list[str]) -> str:
     )
 
 
-def render_plan(args: argparse.Namespace, products: list[str]) -> str:
+def render_plan(args: argparse.Namespace, products: list[str], warnings: list[str]) -> str:
     rows = []
     for product in products:
         profile = PROFILES[product]
@@ -400,6 +427,7 @@ def render_plan(args: argparse.Namespace, products: list[str]) -> str:
         "- IIS logs belong on the Windows UF owner.\n"
         "- Appliance profiles belong on SC4S/syslog or a reviewed heavy-forwarder parsing path.\n"
         "- Readiness matching must use exact package source types or constrained source/source-type pairs.\n"
+        + ("".join(f"- WARNING: {warning}\n" for warning in warnings) if warnings else "")
     )
 
 
@@ -434,7 +462,7 @@ def render_account_setup(args: argparse.Namespace, products: list[str]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_assets(args: argparse.Namespace, products: list[str]) -> dict[str, Any]:
+def render_assets(args: argparse.Namespace, products: list[str], warnings: list[str]) -> dict[str, Any]:
     out = Path(args.output_dir).expanduser().resolve() / "splunk-syslog-web-proxy-ta"
     files = [
         "account-setup.md",
@@ -455,11 +483,13 @@ def render_assets(args: argparse.Namespace, products: list[str]) -> dict[str, An
             "windows": args.windows_index,
         },
         "profiles": {p: PROFILES[p] for p in products},
+        "splunk_version": args.splunk_version,
+        "warnings": warnings,
     }
     write_file(
         out / "metadata.json", json.dumps(metadata, indent=2, sort_keys=True) + "\n"
     )
-    write_file(out / "profile-plan.md", render_plan(args, products))
+    write_file(out / "profile-plan.md", render_plan(args, products, warnings))
     write_file(out / "inputs.local.conf.template", render_inputs(args, products))
     write_file(out / "transport-handoff.md", render_transport(args, products))
     write_file(out / "account-setup.md", render_account_setup(args, products))
@@ -489,10 +519,11 @@ def emit(payload: dict[str, Any], json_output: bool) -> None:
 def main() -> int:
     args = parse_args()
     products = parse_products(args.products)
+    warnings = validate_product_compatibility(args, products)
     if args.phase == "list":
         emit({"ok": True, "products": list(PROFILES), "profiles": PROFILES}, args.json)
         return 0
-    emit(render_assets(args, products), args.json)
+    emit(render_assets(args, products, warnings), args.json)
     return 0
 
 

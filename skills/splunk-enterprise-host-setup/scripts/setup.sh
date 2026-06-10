@@ -8,6 +8,7 @@ source "${SCRIPT_DIR}/../../shared/lib/host_bootstrap_helpers.sh"
 PROJECT_PKG_DIR="${SCRIPT_DIR}/../../../splunk-ta"
 SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
 SERVICE_USER="${SERVICE_USER:-splunk}"
+WINDOWS_SPLUNK_HOME="C:\\Program Files\\Splunk"
 MGMT_PORT="${SPLUNK_MGMT_PORT:-8089}"
 RECEIVER_PORT="9997"
 REPLICATION_PORT="9887"
@@ -22,9 +23,11 @@ TCPOUT_GROUP="default-autolb-group"
 SPLUNK_REMOTE_SUDO="${SPLUNK_REMOTE_SUDO:-true}"
 
 PHASE="all"
+TARGET_OS="linux"
 SOURCE="auto"
 PACKAGE_TYPE="auto"
 EXECUTION_MODE="local"
+OUTPUT_DIR="${SCRIPT_DIR}/../../../splunk-enterprise-host-rendered"
 HOST_BOOTSTRAP_ROLE=""
 DEPLOYMENT_MODE="standalone"
 CLUSTER_SITE="single"
@@ -47,6 +50,9 @@ ADVERTISE_HOST=""
 ENABLE_WEB=""
 BOOT_START=true
 BOOTSTRAP_SHC=false
+WINDOWS_SERVICE_MODE="lsa"
+WINDOWS_SERVICE_USER=""
+WINDOWS_SERVICE_PASSWORD_FILE=""
 
 PACKAGE_PATH=""
 PACKAGE_ON_TARGET=""
@@ -70,13 +76,15 @@ Splunk Enterprise Host Setup
 Usage: $(basename "$0") [OPTIONS]
 
 Core options:
-  --phase download|install|configure|cluster|all
+  --phase render|download|install|configure|cluster|all
+  --target-os linux|windows|macos
   --source auto|splunk-auth|remote|local
   --url URL|latest
   --file PATH
-  --package-type auto|tgz|rpm|deb
+  --package-type auto|tgz|rpm|deb|msi
   --allow-stale-latest
-  --execution local|ssh
+  --execution local|ssh|render
+  --output-dir PATH
   --host-bootstrap-role standalone-search-tier|standalone-indexer|heavy-forwarder|cluster-manager|indexer-peer|shc-deployer|shc-member
   --deployment-mode standalone|clustered
   --cluster-site single
@@ -91,6 +99,10 @@ script resolves the latest official Splunk Enterprise Linux package from
 splunk.com. With --package-type auto, latest resolution prefers deb/rpm based
 on the target OS family and falls back to tgz. Latest official downloads also
 require successful verification against Splunk's official SHA512 checksum.
+Windows is render-only in this skill: use --phase render --target-os windows
+to create a reviewed MSI/PowerShell handoff. macOS Enterprise host bootstrap is
+non-production/out of scope here; use Linux, SOK, POD, or Splunk Cloud patterns
+for enterprise deployments.
 
 Security / auth:
   --admin-user USER
@@ -119,6 +131,11 @@ Role-specific options:
   --shc-members URI[,URI...]
   --current-shc-member-uri URI
   --bootstrap-shc
+
+Windows render-only options:
+  --windows-service-mode lsa|dua
+  --windows-service-user DOMAIN\\splunk_svc
+  --windows-service-password-file PATH
 
 Examples:
   $(basename "$0") --phase all --execution local --host-bootstrap-role standalone-search-tier \\
@@ -179,6 +196,10 @@ ensure_prompted_path() {
 
 phase_includes_download() {
     [[ "${PHASE}" == "download" || "${PHASE}" == "install" || "${PHASE}" == "all" ]]
+}
+
+phase_is_render() {
+    [[ "${PHASE}" == "render" ]]
 }
 
 phase_includes_install() {
@@ -283,6 +304,197 @@ resolve_latest_package_type() {
     fi
 
     hbs_preferred_latest_package_type "${EXECUTION_MODE}"
+}
+
+windows_package_path_for_render() {
+    if [[ -n "${LOCAL_FILE}" ]]; then
+        printf '%s' "${LOCAL_FILE}"
+    elif [[ -n "${PACKAGE_URL}" && "${PACKAGE_URL}" != "latest" ]]; then
+        printf '%s' "${PACKAGE_URL}"
+    else
+        printf '%s' "C:\\Temp\\splunk-enterprise-10.4.0-x64.msi"
+    fi
+}
+
+render_windows_enterprise_handoff() {
+    local render_root windows_dir metadata_path package_hint package_version
+    render_root="${OUTPUT_DIR%/}/splunk-enterprise-host"
+    windows_dir="${render_root}/windows"
+    package_hint="$(windows_package_path_for_render)"
+    package_version="$(hbs_extract_splunk_package_version "${package_hint}" 2>/dev/null || true)"
+    mkdir -p "${windows_dir}"
+
+    cat > "${windows_dir}/install-splunk-enterprise.ps1" <<'PS1'
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$PackagePath,
+    [string]$SplunkHome = "C:\Program Files\Splunk",
+    [ValidateSet("lsa", "dua")]
+    [string]$ServiceMode = "lsa",
+    [string]$ServiceUser = "",
+    [string]$ServicePasswordFile = "",
+    [string]$AdminUser = "admin",
+    [string]$AdminPasswordFile = "",
+    [ValidateSet("standalone-search-tier", "standalone-indexer", "heavy-forwarder", "cluster-manager", "indexer-peer", "shc-deployer", "shc-member")]
+    [string]$Role = "standalone-search-tier"
+)
+
+$ErrorActionPreference = "Stop"
+
+function Assert-NotAdminServiceUser {
+    param([string]$User)
+    if ([string]::IsNullOrWhiteSpace($User)) {
+        throw "DUA service mode requires -ServiceUser."
+    }
+    $leaf = ($User -split "\\")[-1]
+    if ($leaf -match "^(administrator|admin)$" -or $User -match "domain admins|enterprise admins|administrators") {
+        throw "DUA service user must be a dedicated non-admin account for Splunk 10.4+."
+    }
+    try {
+        $account = New-Object System.Security.Principal.NTAccount($User)
+        $sid = $account.Translate([System.Security.Principal.SecurityIdentifier])
+    } catch {
+        throw "Could not resolve DUA service user '$User' to a Windows account. Create and verify the dedicated non-admin account first."
+    }
+    try {
+        $adminMembers = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop
+    } catch {
+        throw "Could not inspect the local Administrators group: $($_.Exception.Message)"
+    }
+    $candidateValues = @($User, $sid.Value)
+    try {
+        $candidateValues += $sid.Translate([System.Security.Principal.NTAccount]).Value
+    } catch {
+        # SID comparison is enough when the account cannot be translated back.
+    }
+    foreach ($member in $adminMembers) {
+        $memberValues = @($member.Name)
+        if ($member.SID) {
+            $memberValues += $member.SID.Value
+        }
+        foreach ($candidate in $candidateValues) {
+            foreach ($memberValue in $memberValues) {
+                if ([string]::Equals($candidate, $memberValue, [System.StringComparison]::OrdinalIgnoreCase)) {
+                    throw "DUA service user '$User' is a member of the local Administrators group. Splunk Enterprise 10.4+ requires a dedicated non-admin account."
+                }
+            }
+        }
+    }
+}
+
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw "Run this script from an elevated PowerShell session on the Windows host."
+}
+if (-not (Test-Path -LiteralPath $PackagePath)) {
+    throw "MSI package not found: $PackagePath"
+}
+if ([System.IO.Path]::GetExtension($PackagePath).ToLowerInvariant() -ne ".msi") {
+    throw "Windows Enterprise render-only bootstrap expects a Splunk Enterprise .msi package."
+}
+
+$msiArgs = @("/i", $PackagePath, "AGREETOLICENSE=Yes", "LAUNCHSPLUNK=0", "SERVICESTARTTYPE=auto", "INSTALLDIR=$SplunkHome", "/qn", "/norestart")
+if ($ServiceMode -eq "dua") {
+    Assert-NotAdminServiceUser -User $ServiceUser
+    if (-not (Test-Path -LiteralPath $ServicePasswordFile)) {
+        throw "DUA service mode requires -ServicePasswordFile."
+    }
+    $servicePassword = (Get-Content -LiteralPath $ServicePasswordFile -Raw).Trim()
+    $msiArgs += @("LOGON_USERNAME=$ServiceUser", "LOGON_PASSWORD=$servicePassword")
+} else {
+    if (-not [string]::IsNullOrWhiteSpace($ServiceUser) -or -not [string]::IsNullOrWhiteSpace($ServicePasswordFile)) {
+        throw "LSA service mode uses the installer-managed local service account. Remove -ServiceUser/-ServicePasswordFile or choose -ServiceMode dua."
+    }
+    # Splunk Enterprise 10.4+ new installs use the installer-managed local
+    # service account when LOGON_* flags are omitted.
+}
+
+Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArgs -Wait -NoNewWindow
+
+$localDir = Join-Path $SplunkHome "etc\system\local"
+New-Item -ItemType Directory -Force -Path $localDir | Out-Null
+if ($AdminPasswordFile) {
+    if (-not (Test-Path -LiteralPath $AdminPasswordFile)) {
+        throw "Admin password file not found: $AdminPasswordFile"
+    }
+    $adminPassword = (Get-Content -LiteralPath $AdminPasswordFile -Raw).Trim()
+    @"
+[user_info]
+USERNAME = $AdminUser
+PASSWORD = $adminPassword
+"@ | Set-Content -LiteralPath (Join-Path $localDir "user-seed.conf") -Encoding ASCII
+}
+
+Write-Host "Splunk Enterprise MSI installed for role $Role. Review and apply role-specific cluster/server.conf settings before starting production traffic."
+PS1
+
+    cat > "${windows_dir}/README.md" <<'EOF'
+# Splunk Enterprise Windows 10.4 Render-Only Handoff
+
+This skill does not remotely apply Windows Enterprise installs. It renders a
+reviewed PowerShell/MSI handoff for operators to run on the Windows host.
+
+10.4 guardrails:
+
+- Use `-ServiceMode lsa` for the installer-managed local service account
+  (`NT SERVICE\Splunkd`), or `-ServiceMode dua` for a dedicated non-admin
+  domain/local service account.
+- DUA service users must not be local Administrator, Domain Admins, Enterprise
+  Admins, or members of the local Administrators group.
+- Do not use the removed Local System User path for new Splunk Enterprise 10.4+
+  Windows installs.
+- Keep passwords in files supplied at execution time; do not commit rendered
+  password files or inline secrets.
+- Apply role-specific `server.conf`, clustering, SHC, DS, LM, and MC settings
+  through reviewed deployment apps or post-install runbooks.
+
+macOS Splunk Enterprise packages are not a production bootstrap target for this
+skill; use Linux hosts, Splunk on Kubernetes, POD, or Splunk Cloud for
+enterprise deployment styles.
+EOF
+
+    metadata_path="${windows_dir}/metadata.json"
+    python3 - "${metadata_path}" "${package_hint}" "${package_version}" "${WINDOWS_SPLUNK_HOME}" "${HOST_BOOTSTRAP_ROLE}" "${WINDOWS_SERVICE_MODE}" "${WINDOWS_SERVICE_USER}" "${WINDOWS_SERVICE_PASSWORD_FILE}" "${ADMIN_PASSWORD_FILE}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+(
+    metadata_path,
+    package_hint,
+    package_version,
+    splunk_home,
+    role,
+    service_mode,
+    service_user,
+    service_password_file,
+    admin_password_file,
+) = sys.argv[1:]
+
+payload = {
+    "workflow": "splunk-enterprise-host-setup",
+    "target_os": "windows",
+    "phase": "render",
+    "v1_apply": "render-only",
+    "package_type": "msi",
+    "package_hint": package_hint,
+    "package_version": package_version,
+    "splunk_home": splunk_home,
+    "host_bootstrap_role": role,
+    "windows_service_mode": service_mode,
+    "windows_service_user": service_user,
+    "windows_service_password_file": service_password_file,
+    "admin_password_file": admin_password_file,
+    "splunk_10_4_guardrails": [
+        "render-only MSI handoff",
+        "installer-managed local service account (NT SERVICE\\Splunkd) or dedicated non-admin DUA service account",
+        "no inline service or admin passwords",
+        "macOS Enterprise bootstrap is non-production/out of scope",
+    ],
+}
+Path(metadata_path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+
+    log "Rendered Windows Enterprise MSI handoff to ${windows_dir}"
 }
 
 pick_package_path() {
@@ -439,6 +651,24 @@ determine_install_action() {
     fi
 }
 
+validate_supported_upgrade_path() {
+    [[ "${INSTALL_ACTION}" == "upgrade" ]] || return 0
+    [[ -n "${PACKAGE_VERSION}" ]] || return 0
+    hbs_version_ge "${PACKAGE_VERSION}" "10.4.0" || return 0
+
+    if [[ -z "${INSTALLED_VERSION}" ]]; then
+        log "WARN: Could not parse the installed Splunk Enterprise version; verify the 10.4 upgrade path manually before continuing."
+        return 0
+    fi
+
+    if hbs_version_lt "${INSTALLED_VERSION}" "10.0.0"; then
+        log "ERROR: Unsupported direct Splunk Enterprise upgrade from ${INSTALLED_VERSION} to ${PACKAGE_VERSION}."
+        log "       Splunk Enterprise 10.4 upgrades must start from 10.0.x or 10.2.x."
+        log "       Upgrade 9.3/9.4 deployments to a supported intermediate 10.x release first."
+        exit 1
+    fi
+}
+
 host_bootstrap_role_is_clustered() {
     case "${HOST_BOOTSTRAP_ROLE:-}" in
         cluster-manager|indexer-peer|shc-deployer|shc-member)
@@ -485,15 +715,49 @@ ensure_role_defaults() {
 }
 
 validate_inputs() {
-    validate_choice "${PHASE}" download install configure cluster all
+    validate_choice "${PHASE}" render download install configure cluster all
+    validate_choice "${TARGET_OS}" linux windows macos
     validate_choice "${SOURCE}" auto splunk-auth remote local
-    validate_choice "${PACKAGE_TYPE}" auto tgz rpm deb
-    validate_choice "${EXECUTION_MODE}" local ssh
+    validate_choice "${EXECUTION_MODE}" local ssh render
     validate_choice "${DEPLOYMENT_MODE}" standalone clustered
     validate_choice "${CLUSTER_SITE}" single
+    validate_choice "${WINDOWS_SERVICE_MODE}" lsa dua
+
+    case "${TARGET_OS}" in
+        linux)
+            validate_choice "${PACKAGE_TYPE}" auto tgz rpm deb
+            if [[ "${EXECUTION_MODE}" == "render" ]]; then
+                log "ERROR: Linux Enterprise host bootstrap supports --execution local|ssh; render execution is reserved for Windows handoffs."
+                exit 1
+            fi
+            ;;
+        windows)
+            validate_choice "${PACKAGE_TYPE}" auto msi
+            if [[ "${PHASE}" != "render" ]]; then
+                log "ERROR: Windows Enterprise host setup is render-only. Use --phase render --target-os windows."
+                exit 1
+            fi
+            EXECUTION_MODE="render"
+            PACKAGE_TYPE="msi"
+            ;;
+        macos)
+            log "ERROR: macOS Splunk Enterprise host bootstrap is non-production/out of scope for this skill. Use Linux, SOK, POD, or Splunk Cloud deployment paths."
+            exit 1
+            ;;
+    esac
 
     if [[ -n "${HOST_BOOTSTRAP_ROLE}" ]]; then
         validate_choice "${HOST_BOOTSTRAP_ROLE}" standalone-search-tier standalone-indexer heavy-forwarder cluster-manager indexer-peer shc-deployer shc-member
+    fi
+
+    if phase_is_render && [[ "${TARGET_OS}" == "windows" && -z "${HOST_BOOTSTRAP_ROLE}" ]]; then
+        log "ERROR: --host-bootstrap-role is required for Windows render-only handoffs."
+        exit 1
+    fi
+
+    if [[ "${TARGET_OS}" == "windows" && "${WINDOWS_SERVICE_MODE}" == "dua" && -z "${WINDOWS_SERVICE_USER}" ]]; then
+        log "ERROR: --windows-service-user is required when --windows-service-mode dua."
+        exit 1
     fi
 
     if [[ -n "${FORWARDING_MODE}" ]]; then
@@ -991,6 +1255,7 @@ perform_install_phase() {
             ;;
         upgrade)
             validate_install_constraints
+            validate_supported_upgrade_path
             if [[ -n "${INSTALLED_VERSION}" && -n "${PACKAGE_VERSION}" ]]; then
                 log "Upgrading Splunk from ${INSTALLED_VERSION} to ${PACKAGE_VERSION} for role ${HOST_BOOTSTRAP_ROLE}"
             elif [[ -n "${INSTALLED_VERSION}" ]]; then
@@ -1021,12 +1286,14 @@ perform_install_phase() {
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --phase) require_arg "$1" $# || exit 1; PHASE="$2"; shift 2 ;;
+        --target-os) require_arg "$1" $# || exit 1; TARGET_OS="$2"; shift 2 ;;
         --source) require_arg "$1" $# || exit 1; SOURCE="$2"; shift 2 ;;
         --url) require_arg "$1" $# || exit 1; PACKAGE_URL="$2"; shift 2 ;;
         --file) require_arg "$1" $# || exit 1; LOCAL_FILE="$2"; shift 2 ;;
         --package-type) require_arg "$1" $# || exit 1; PACKAGE_TYPE="$2"; shift 2 ;;
         --allow-stale-latest) ALLOW_STALE_LATEST=true; shift ;;
         --execution) require_arg "$1" $# || exit 1; EXECUTION_MODE="$2"; shift 2 ;;
+        --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --host-bootstrap-role) require_arg "$1" $# || exit 1; HOST_BOOTSTRAP_ROLE="$2"; shift 2 ;;
         --deployment-mode) require_arg "$1" $# || exit 1; DEPLOYMENT_MODE="$2"; shift 2 ;;
         --cluster-site) require_arg "$1" $# || exit 1; CLUSTER_SITE="$2"; shift 2 ;;
@@ -1059,6 +1326,9 @@ while [[ $# -gt 0 ]]; do
         --shc-members) require_arg "$1" $# || exit 1; SHC_MEMBERS="$2"; shift 2 ;;
         --current-shc-member-uri) require_arg "$1" $# || exit 1; CURRENT_SHC_MEMBER_URI="$2"; shift 2 ;;
         --bootstrap-shc) BOOTSTRAP_SHC=true; shift ;;
+        --windows-service-mode) require_arg "$1" $# || exit 1; WINDOWS_SERVICE_MODE="$2"; shift 2 ;;
+        --windows-service-user) require_arg "$1" $# || exit 1; WINDOWS_SERVICE_USER="$2"; shift 2 ;;
+        --windows-service-password-file) require_arg "$1" $# || exit 1; WINDOWS_SERVICE_PASSWORD_FILE="$2"; shift 2 ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -1066,6 +1336,11 @@ done
 
 ensure_role_defaults
 validate_inputs
+
+if phase_is_render && [[ "${TARGET_OS}" == "windows" ]]; then
+    render_windows_enterprise_handoff
+    exit 0
+fi
 
 if [[ "${EXECUTION_MODE}" == "ssh" ]]; then
     load_splunk_ssh_credentials

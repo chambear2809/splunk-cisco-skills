@@ -2,7 +2,7 @@
 
 Anchored to:
 
-- [Configure mutually authenticated TLS (mTLS) on the Splunk platform](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.2/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-mutually-authenticated-transport-layer-security-mtls-on-the-splunk-platform)
+- [Configure mutually authenticated TLS (mTLS) on the Splunk platform](https://help.splunk.com/en/splunk-enterprise/administer/manage-users-and-security/10.4/secure-splunk-platform-communications-with-transport-layer-security-certificates/configure-mutually-authenticated-transport-layer-security-mtls-on-the-splunk-platform)
 - [Configure TLS certificate host name validation](https://docs.splunk.com/Documentation/Splunk/latest/Security/EnableTLSCertHostnameValidation)
 
 ## mTLS surfaces

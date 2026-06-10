@@ -1,7 +1,7 @@
 # Cisco ThousandEyes App — Reference
 
 Detailed technical reference for the Cisco ThousandEyes App for Splunk
-(`ta_cisco_thousandeyes` v0.6.0).
+(`ta_cisco_thousandeyes` v0.8.0).
 
 ## OAuth 2.0 Device Code Flow
 

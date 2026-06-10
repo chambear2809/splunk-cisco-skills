@@ -91,7 +91,7 @@ These adjacent surfaces are intentionally NOT in this skill:
   `skills/shared/app_registry.json` for honesty.
 - Splunk On-Call wiring — handled by `splunk-oncall-setup`. That skill owns
   the API-id / X-VO-Api-Key flow, REST endpoint integration, and the
-  Splunk-side Splunkbase 3546 / 4886 / 5863 apps.
+  Splunk-side Splunkbase 3546 / 4886 apps plus SOAR connector 5863 readiness.
 - ITSI Content Pack content management (services, KPIs, entities) — handled
   by `splunk-itsi-config`. This skill only renders the install handoff.
 - Splunk Observability Cloud dashboards / detectors / Synthetics tests / RUM

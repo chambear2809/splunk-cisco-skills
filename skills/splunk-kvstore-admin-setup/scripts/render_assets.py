@@ -33,6 +33,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--topology", choices=("standalone", "shc"), default="standalone")
+    parser.add_argument("--current-splunk-version", default="")
+    parser.add_argument("--target-splunk-version", default="10.4.0")
+    parser.add_argument("--current-kvstore-version", default="")
     parser.add_argument("--app-name", default="ZZZ_cisco_skills_kvstore")
     parser.add_argument("--point-in-time", choices=("true", "false"), default="true")
     parser.add_argument("--backup-archive-name", default="")
@@ -64,6 +67,31 @@ def no_newline(value: str, option: str) -> None:
 
 def bool_value(value: str) -> bool:
     return value.lower() == "true"
+
+
+def parse_version(value: str, option: str) -> tuple[int, int, int]:
+    if not value:
+        return (0, 0, 0)
+    parts = value.split("-", 1)[0].split(".")
+    if len(parts) < 1:
+        die(f"{option} must look like 9.4.11, 10.4.0, 7.0, or 8.0.")
+    nums: list[int] = []
+    for part in parts:
+        if not part.isdigit():
+            die(f"{option} must look like 9.4.11, 10.4.0, 7.0, or 8.0.")
+        nums.append(int(part))
+    while len(nums) < 3:
+        nums.append(0)
+    return (nums[0], nums[1], nums[2])
+
+
+def direct_104_upgrade_with_old_kv(args: argparse.Namespace) -> bool:
+    if not args.current_splunk_version or not args.current_kvstore_version:
+        return False
+    current_splunk = parse_version(args.current_splunk_version, "--current-splunk-version")
+    target_splunk = parse_version(args.target_splunk_version, "--target-splunk-version")
+    current_kv = parse_version(args.current_kvstore_version, "--current-kvstore-version")
+    return current_splunk < (10, 0, 0) and target_splunk >= (10, 4, 0) and current_kv < (7, 0, 0)
 
 
 def write_file(path: Path, content: str, executable: bool = False) -> None:
@@ -106,6 +134,17 @@ def validate(args: argparse.Namespace) -> list[tuple[str, str]]:
         die("--backup-archive-name must contain only letters, numbers, dot, underscore, and hyphen.")
     if args.target_kvstore_version and not re.fullmatch(r"[0-9]+(\.[0-9]+){0,2}", args.target_kvstore_version):
         die("--target-kvstore-version must look like 7.0 or 8.0.x.")
+    parse_version(args.target_splunk_version, "--target-splunk-version")
+    if args.current_splunk_version:
+        parse_version(args.current_splunk_version, "--current-splunk-version")
+    if args.current_kvstore_version:
+        parse_version(args.current_kvstore_version, "--current-kvstore-version")
+    if direct_104_upgrade_with_old_kv(args):
+        die(
+            "direct upgrade from Splunk 9.x-or-below to 10.4 is blocked when "
+            "the current KV Store/Mongo server version is below 7.x. Upgrade "
+            "KV Store to 7.x or 8.x on the current supported Splunk release first."
+        )
     fields = parse_fields(args.collection_fields)
     if args.collection_name and not re.fullmatch(r"[A-Za-z0-9_]+", args.collection_name):
         die("--collection-name must contain only letters, numbers, and underscores.")
@@ -169,11 +208,41 @@ def render_transforms(args: argparse.Namespace, fields: list[tuple[str, str]]) -
 
 def render_preflight(args: argparse.Namespace) -> str:
     splunk_home = shell_quote(args.splunk_home)
+    target_splunk = shell_quote(args.target_splunk_version)
     return make_script(
         f"""splunk_home={splunk_home}
+target_splunk_version={target_splunk}
 # Authenticate first with: "${{splunk_home}}/bin/splunk" login
 test -x "${{splunk_home}}/bin/splunk"
-"${{splunk_home}}/bin/splunk" show kvstore-status || true
+current_splunk_version="$("${{splunk_home}}/bin/splunk" version 2>/dev/null | awk '{{print $2; exit}}' || true)"
+kv_status="$("${{splunk_home}}/bin/splunk" show kvstore-status 2>/dev/null || true)"
+printf '%s\\n' "$kv_status"
+current_kvstore_version="$(printf '%s\\n' "$kv_status" | awk -F': ' '
+  /serverVersion|server version|MongoDB version|KV Store server version/ {{
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit
+  }}')"
+python3 - "$current_splunk_version" "$target_splunk_version" "$current_kvstore_version" <<'PY'
+import re
+import sys
+
+def parse(value):
+    match = re.search(r"(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?", value or "")
+    if not match:
+        return None
+    nums = [int(part or 0) for part in match.groups()]
+    return tuple(nums)
+
+current_splunk = parse(sys.argv[1])
+target_splunk = parse(sys.argv[2])
+current_kv = parse(sys.argv[3])
+if target_splunk and target_splunk >= (10, 4, 0):
+    if current_splunk and current_splunk < (10, 0, 0) and current_kv and current_kv < (7, 0, 0):
+        print("ERROR: Direct Splunk 9.x-or-below to 10.4 upgrade is blocked while KV Store/Mongo is below 7.x.", file=sys.stderr)
+        print("Upgrade KV Store to 7.x or 8.x on the current supported Splunk release first.", file=sys.stderr)
+        sys.exit(1)
+    if current_splunk and current_splunk < (10, 0, 0) and not current_kv:
+        print("WARN: Could not parse current KV Store server version; verify it is 7.x or newer before a 10.4 upgrade.", file=sys.stderr)
+PY
 df -h "${{splunk_home}}/var/lib/splunk" 2>/dev/null || true
 echo "Preflight complete. Take a backup before any restore, migrate, or upgrade."
 """
@@ -294,6 +363,9 @@ def render_readme(args: argparse.Namespace) -> str:
 
 Topology: `{args.topology}`
 Splunk home: `{args.splunk_home}`
+Target Splunk version: `{args.target_splunk_version}`
+Current Splunk version: `{args.current_splunk_version or 'live preflight'}`
+Current KV Store server version: `{args.current_kvstore_version or 'live preflight'}`
 Point-in-time backup: `{args.point_in_time}`
 
 Lifecycle host scripts (run as the splunk user after `splunk login`):
@@ -313,6 +385,8 @@ Governance config (apply with `--phase apply --operation collections`, written v
 - `server.conf` - optional `[kvstore] kvstoreUpgradeOnStartupEnabled = false`
 
 Always take a point-in-time backup before a restore, migrate, or upgrade.
+For Splunk 10.4 upgrades, do not jump directly from Splunk 9.x-or-below when
+the current KV Store/Mongo server version is below 7.x; upgrade KV Store first.
 """
 
 
@@ -328,6 +402,9 @@ def render(args: argparse.Namespace, fields: list[tuple[str, str]]) -> dict:
                 {
                     "topology": args.topology,
                     "splunk_home": args.splunk_home,
+                    "current_splunk_version": args.current_splunk_version,
+                    "target_splunk_version": args.target_splunk_version,
+                    "current_kvstore_version": args.current_kvstore_version,
                     "app_name": args.app_name,
                     "point_in_time": args.point_in_time,
                     "storage_engine": args.storage_engine,

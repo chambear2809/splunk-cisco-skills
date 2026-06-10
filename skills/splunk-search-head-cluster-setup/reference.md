@@ -12,6 +12,12 @@ A Splunk SHC consists of:
 
 Minimum production topology: 1 deployer + 3 members (RF=3).
 
+For Splunk 10.4 deployments, review
+`../shared/splunk_10_4_enterprise_deployment_notes.md` before promotion. SHC
+members must be managed through the deployer/captain workflow, not deployment
+server/Agent Management, and KV Store 10.4 upgrades must satisfy the KV Store
+server-version guardrails before member binary upgrades.
+
 ## server.conf Stanzas
 
 ### Deployer (`etc/system/local/server.conf`)

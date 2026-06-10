@@ -192,7 +192,7 @@ validate_conf_stanza_token() {
 validate_target_arch() {
     case "${TARGET_OS}:${TARGET_ARCH}" in
         linux:amd64|linux:arm64|linux:ppc64le|linux:s390x) ;;
-        macos:intel|macos:universal2) ;;
+        macos:arm64|macos:intel|macos:universal2) ;;
         windows:x64|windows:x86) ;;
         freebsd:freebsd13-amd64|freebsd:freebsd14-amd64) ;;
         solaris:amd64|solaris:sparc) ;;
@@ -298,10 +298,11 @@ normalize_target_arch() {
                 if [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]]; then
                     case "$(uname -m 2>/dev/null || true)" in
                         x86_64|amd64) TARGET_ARCH="intel" ;;
-                        *) TARGET_ARCH="universal2" ;;
+                        arm64|aarch64) TARGET_ARCH="arm64" ;;
+                        *) TARGET_ARCH="arm64" ;;
                     esac
                 else
-                    TARGET_ARCH="universal2"
+                    TARGET_ARCH="arm64"
                 fi
                 ;;
             linux)
@@ -329,7 +330,8 @@ normalize_target_arch() {
         linux:x86_64|linux:x64) TARGET_ARCH="amd64" ;;
         linux:aarch64) TARGET_ARCH="arm64" ;;
         macos:x86_64|macos:amd64|macos:x64) TARGET_ARCH="intel" ;;
-        macos:arm64|macos:aarch64|macos:universal) TARGET_ARCH="universal2" ;;
+        macos:arm64|macos:aarch64|macos:m1|macos:m2|macos:m3) TARGET_ARCH="arm64" ;;
+        macos:universal) TARGET_ARCH="universal2" ;;
         freebsd:amd64|freebsd:x86_64|freebsd:x64) TARGET_ARCH="freebsd14-amd64" ;;
         freebsd:freebsd13-amd64|freebsd:freebsd14-amd64) TARGET_ARCH="${arch}" ;;
         solaris:x86_64|solaris:x64) TARGET_ARCH="amd64" ;;
@@ -878,6 +880,24 @@ determine_install_action() {
     fi
 }
 
+validate_supported_upgrade_path() {
+    [[ "${INSTALL_ACTION}" == "upgrade" ]] || return 0
+    [[ -n "${PACKAGE_VERSION}" ]] || return 0
+    hbs_version_ge "${PACKAGE_VERSION}" "10.4.0" || return 0
+
+    if [[ -z "${INSTALLED_VERSION}" ]]; then
+        log "WARN: Could not parse the installed Universal Forwarder version; verify the 10.4 upgrade path manually before continuing."
+        return 0
+    fi
+
+    if hbs_version_lt "${INSTALLED_VERSION}" "10.0.0"; then
+        log "ERROR: Unsupported direct Universal Forwarder upgrade from ${INSTALLED_VERSION} to ${PACKAGE_VERSION}."
+        log "       Universal Forwarder 10.4 direct upgrades require an installed UF 10.0.x or newer."
+        log "       Upgrade older endpoint fleets through a supported intermediate release first."
+        exit 1
+    fi
+}
+
 ensure_service_user_exists() {
     [[ "${TARGET_OS}" == "linux" && -n "${SERVICE_USER}" ]] || return 0
     local create_cmd sudo_prefix
@@ -1151,6 +1171,7 @@ perform_install_phase() {
             finalize_fresh_install
             ;;
         upgrade)
+            validate_supported_upgrade_path
             if [[ -n "${INSTALLED_VERSION}" && -n "${PACKAGE_VERSION}" ]]; then
                 log "Upgrading Universal Forwarder from ${INSTALLED_VERSION} to ${PACKAGE_VERSION}"
             else

@@ -22,6 +22,7 @@ VIZ_TYPE="splunk.table"
 DATASOURCE_NAME="Search_1"
 LAYOUT="grid"
 DEFINITION_FILE=""
+REQUIRES_AUTO_REFRESH="false"
 OWNER="nobody"
 SHARING="app"
 ACCEPT_OVERWRITE=false
@@ -47,6 +48,7 @@ Options:
   --datasource-name NAME
   --layout grid|absolute|freeform
   --definition-file PATH           (full Dashboard Studio JSON instead of building)
+  --requires-auto-refresh true|false
   --owner USER
   --sharing user|app|global
   --accept-overwrite               (required to overwrite an existing dashboard)
@@ -79,6 +81,7 @@ while [[ $# -gt 0 ]]; do
         --datasource-name) require_arg "$1" $# || exit 1; DATASOURCE_NAME="$2"; shift 2 ;;
         --layout) require_arg "$1" $# || exit 1; LAYOUT="$2"; shift 2 ;;
         --definition-file) require_arg "$1" $# || exit 1; DEFINITION_FILE="$2"; shift 2 ;;
+        --requires-auto-refresh) require_arg "$1" $# || exit 1; REQUIRES_AUTO_REFRESH="$2"; shift 2 ;;
         --owner) require_arg "$1" $# || exit 1; OWNER="$2"; shift 2 ;;
         --sharing) require_arg "$1" $# || exit 1; SHARING="$2"; shift 2 ;;
         --accept-overwrite) ACCEPT_OVERWRITE=true; shift ;;
@@ -109,6 +112,7 @@ validate_args() {
     validate_choice "${PHASE}" render preflight apply status all
     validate_choice "${THEME}" light dark
     validate_choice "${LAYOUT}" grid absolute freeform
+    validate_choice "${REQUIRES_AUTO_REFRESH}" true false
     validate_choice "${SHARING}" user app global
     [[ -n "${DASHBOARD_NAME}" ]] || { log "ERROR: --dashboard-name is required."; exit 1; }
     if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
@@ -135,6 +139,7 @@ build_renderer_args() {
         --datasource-name "${DATASOURCE_NAME}"
         --layout "${LAYOUT}"
         --definition-file "${DEFINITION_FILE}"
+        --requires-auto-refresh "${REQUIRES_AUTO_REFRESH}"
         --owner "${OWNER}"
         --sharing "${SHARING}"
     )

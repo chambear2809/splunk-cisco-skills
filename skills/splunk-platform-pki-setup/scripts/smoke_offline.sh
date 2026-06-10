@@ -263,17 +263,30 @@ else
     fi
 fi
 
-# --- 11. TLS 1.3 refusal
+# --- 11. TLS 1.3 version gate
 if python3 "$RENDERER" \
     --output-dir "$tmp/tls13" \
     --mode private \
     --target core5 \
     --single-sh-fqdn sh01.example.com \
+    --splunk-version 10.4.0 \
     --tls-version-floor tls1.3 \
     >/dev/null 2>"$tmp/tls13-err"; then
-    fail "tls-version-floor tls1.3 was accepted (Splunk docs do not yet support TLS 1.3)"
+    ok "tls-version-floor tls1.3 accepted for Splunk 10.4+"
 else
-    ok "tls-version-floor tls1.3 refused"
+    fail "tls-version-floor tls1.3 was refused for Splunk 10.4+"
+fi
+if python3 "$RENDERER" \
+    --output-dir "$tmp/tls13-old" \
+    --mode private \
+    --target core5 \
+    --single-sh-fqdn sh01.example.com \
+    --splunk-version 10.3.0 \
+    --tls-version-floor tls1.3 \
+    >/dev/null 2>"$tmp/tls13-old-err"; then
+    fail "tls-version-floor tls1.3 was accepted below Splunk 10.4"
+else
+    ok "tls-version-floor tls1.3 refused below Splunk 10.4"
 fi
 
 # --- 12. setup.sh apply requires --accept-pki-rotation
@@ -346,17 +359,17 @@ else
     fail "algorithm-policy.json invalid or missing required keys"
 fi
 
-# --- 16. Splunk-modern preset is the renderer default and emits TLS 1.2
+# --- 16. Splunk-modern preset is the renderer default and emits TLS 1.2 + 1.3 for Splunk 10.4+
 modern_server="$tmp/full-private/platform-pki/pki/distribute/cluster-bundle/master-apps/000_pki_trust/local/server.conf"
-if grep -q '^sslVersions          = tls1.2' "$modern_server"; then
-    ok "splunk-modern preset emits sslVersions = tls1.2"
+if grep -q '^sslVersions          = tls1.2,tls1.3' "$modern_server"; then
+    ok "splunk-modern preset emits sslVersions = tls1.2,tls1.3"
 else
-    fail "splunk-modern preset did not emit sslVersions = tls1.2"
+    fail "splunk-modern preset did not emit sslVersions = tls1.2,tls1.3"
 fi
-if grep -q '^sslVersionsForClient = tls1.2' "$modern_server"; then
-    ok "splunk-modern preset emits sslVersionsForClient = tls1.2"
+if grep -q '^sslVersionsForClient = tls1.2,tls1.3' "$modern_server"; then
+    ok "splunk-modern preset emits sslVersionsForClient = tls1.2,tls1.3"
 else
-    fail "splunk-modern preset did not emit sslVersionsForClient = tls1.2"
+    fail "splunk-modern preset did not emit sslVersionsForClient = tls1.2,tls1.3"
 fi
 
 # --- 17. fips-140-3 preset strips CBC / SHA-1

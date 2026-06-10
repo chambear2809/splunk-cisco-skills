@@ -47,7 +47,7 @@ matching `hec.example.com`, this is **not currently a self-service
 ACS operation**.
 
 The
-[Splunk Cloud ACS HEC token doc](https://help.splunk.com/splunk-cloud-platform/administer/admin-config-service-manual/10.1.2507/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-http-event-collector-hec-tokens-in-splunk-cloud-platform)
+[Splunk Cloud ACS HEC token doc](https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2604/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-http-event-collector-hec-tokens-in-splunk-cloud-platform)
 covers HEC token management but does NOT expose endpoints to
 upload a custom-domain certificate. Operators have two options:
 

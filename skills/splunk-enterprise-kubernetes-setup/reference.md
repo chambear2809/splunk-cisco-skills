@@ -10,13 +10,14 @@ running an apply phase.
 |------|---------|
 | Splunk Operator for Kubernetes | `3.1.0` |
 | Splunk Helm chart version | follows `--operator-version` |
-| Splunk Enterprise image | `splunk/splunk:10.2.0` |
-| Kubernetes compatibility from SOK 3.1.0 notes | `1.27` through `1.33` |
+| Splunk Enterprise image | `splunk/splunk:10.4.0` |
+| Kubernetes compatibility from SOK 3.1.0 notes | `1.25` through `1.34` |
 | Render directory | `./splunk-enterprise-k8s-rendered/` |
 
 Override these with `--operator-version`, `--chart-version`,
-`--splunk-version`, and `--splunk-image` when your platform standard requires a
-pinned build.
+`--kubernetes-version`, `--splunk-version`, and `--splunk-image` when your
+platform standard requires a pinned build. Kubernetes `1.34` renders require
+Splunk Enterprise `10.4+` in this skill.
 
 ## Splunk Operator Path
 
@@ -179,7 +180,7 @@ deployment and can write `termsConditionsAccepted: true` into
 - Splunk Validated Architecture guidance for SOK:
   <https://help.splunk.com/en/splunk-cloud-platform/splunk-validated-architectures/applied-svas/splunk-operator-for-kubernetes>
 - Splunk POD deployment guide:
-  <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.2/deploy-splunk-pod>
+  <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/deploy-splunk-pod>
 - Splunk POD architecture and ES app management:
-  <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.2/splunk-pod-architecture>
-  <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.2/manage-splunk-pod>
+  <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/splunk-pod-architecture>
+  <https://help.splunk.com/en/splunk-enterprise/splunk-pod-guide/10.4/manage-splunk-pod>
