@@ -19,6 +19,10 @@ This skill is the broad Splunk Cloud Admin Config Service workflow. It replaces
 the older allowlist-only workflow while preserving the proven IPv4/IPv6
 allowlist convergence logic and lock-out protection.
 
+Doc links and examples in this skill default to Cloud stack train
+**10.4.2603**. Stacks still on **10.3.2512** can substitute that train in help
+URLs; ACS API behavior is unchanged between those trains.
+
 ## Agent Behavior
 
 Never paste subnet lists, JWT tokens, stack identifiers, passwords, or HEC token

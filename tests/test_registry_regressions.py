@@ -818,3 +818,25 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("--- Catalog Sync Connectivity ---", validate_text)
         self.assertIn("--- Saved Searches ---", validate_text)
         self.assertIn("--- Scheduled Sync Job ---", validate_text)
+
+
+class PlatformVersionsContractTests(ShellScriptRegressionBase):
+    def test_shared_platform_versions_json_lists_10_4(self):
+        path = REPO_ROOT / "skills/shared/references/splunk_platform_versions.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        defaults = payload["defaults"]
+        self.assertEqual(defaults["enterprise_version"], "10.4.0")
+        self.assertEqual(defaults["cloud_doc_train"], "10.4.2603")
+        self.assertIn("10.4", payload["enterprise_platform_versions"])
+        self.assertIn("10.4", payload["svd_enterprise_floors"])
+        self.assertEqual(payload["svd_enterprise_floors"]["10.4"], "10.4.0")
+
+        import sys
+
+        sys.path.insert(0, str(REPO_ROOT / "skills/shared/lib"))
+        from platform_versions import load_platform_versions, platform_default, svd_enterprise_floors
+
+        loaded = load_platform_versions(path)
+        self.assertEqual(loaded["defaults"]["enterprise_version"], "10.4.0")
+        self.assertEqual(platform_default("enterprise_version", path=path), "10.4.0")
+        self.assertEqual(svd_enterprise_floors(path=path)["10.4"], "10.4.0")

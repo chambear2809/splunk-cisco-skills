@@ -7,11 +7,12 @@
 - Product: Splunk Asset and Risk Intelligence (ARI)
 - App ID: `7180`
 - App name: `SplunkAssetRiskIntelligence`
-- Latest researched version: `1.2.1` (October 9, 2025)
+- Latest researched version: `1.2.2` (June 10, 2026)
 - Package pattern: `splunk-asset-and-risk-intelligence_*`
 - Access: restricted downloaders only
 - Splunkbase compatibility researched: Splunk Enterprise / Cloud Platform
-  `9.0` through `10.3`
+  `9.0` through `10.4` (default `10.4`; also `10.3` Cloud / `10.2` / older
+  Enterprise trains)
 - Documentation compatibility signal: ARI `1.2.x` / `1.1.3` on `9.1.3+`
   including `10.x`; warn below `9.1.3`, do not hard-fail solely because the
   two official signals differ.

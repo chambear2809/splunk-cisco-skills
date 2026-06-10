@@ -13,10 +13,10 @@ from pathlib import Path
 
 
 TA_APP_ID = "7125"
-TA_LATEST_VERSION = "0.152.0"
-TA_PUBLISHED_DATE = "2026-05-14"
+TA_LATEST_VERSION = "0.153.0"
+TA_PUBLISHED_DATE = "2026-05-27"
 TA_SPLUNK_MIN_VERSION = "8.0"
-TA_SPLUNK_MAX_VERSION = "10.3"
+TA_SPLUNK_MAX_VERSION = "10.4"
 TA_SUPPORTED_ROOTS = (
     "Splunk_TA_otel",
     "Splunk_TA_otel_linux_x86_64",
@@ -51,6 +51,7 @@ TA_SPLUNKBASE_METADATA = {
         "min": TA_SPLUNK_MIN_VERSION,
         "max": TA_SPLUNK_MAX_VERSION,
         "listed": [
+            "10.4",
             "10.3",
             "10.2",
             "10.1",
@@ -72,7 +73,7 @@ TA_SPLUNKBASE_METADATA = {
     "sources": {
         "splunkbase": "https://splunkbase.splunk.com/app/7125",
         "docs_install": "https://help.splunk.com/en/splunk-observability-cloud/manage-data/splunk-distribution-of-the-opentelemetry-collector/get-started-with-the-splunk-distribution-of-the-opentelemetry-collector/splunk-add-on-for-opentelemetry-collector/install-the-technical-add-on",
-        "upstream": "https://github.com/signalfx/splunk-otel-collector/tree/v0.152.0/packaging/ta-v2",
+        "upstream": "https://github.com/signalfx/splunk-otel-collector/tree/v0.153.0/packaging/ta-v2",
     },
 }
 

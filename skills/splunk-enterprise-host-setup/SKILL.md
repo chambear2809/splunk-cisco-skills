@@ -163,6 +163,25 @@ bash skills/splunk-enterprise-host-setup/scripts/smoke_latest_resolution.sh \
 - SHC member adds require `--current-shc-member-uri` unless `--bootstrap-shc`
   is used to create a brand-new cluster
 
+## Enterprise upgrade ladder (10.4)
+
+Splunk Enterprise has **no 10.3 release train**. Supported paths to **10.4**
+include **10.2 → 10.4**, **10.0 → 10.2 → 10.4**, and fresh installs on
+**10.4.0** (default in this repo).
+
+Invalid or high-risk jumps this skill should warn about during planning:
+
+- **9.x → 10.4** without an intermediate **10.0** or **10.2** stop (KV Store
+  MongoDB 7+ prerequisite).
+- Any upgrade target below the SVD floor for the selected train (see
+  `splunk-enterprise-public-exposure-hardening` or
+  `skills/shared/references/splunk_platform_versions.json`).
+
+Enterprise **10.4** also removes TLS **1.0/1.1** negotiation and applies KV
+Store MongoDB **8** automatically when upgrading from **10.x**. Route PKI and
+KV Store preflight work to `splunk-platform-pki-setup` and
+`splunk-kvstore-admin-setup` before executing host upgrades.
+
 ## References
 
 - [reference.md](reference.md) for role placement, ports, and topology notes

@@ -90,7 +90,7 @@ obi_install_dir = ""
 [technical_addon]
 enabled = false
 target = "deployment-server" # deployment-server or universal-forwarder
-package_paths = ["./Splunk_TA_otel-0.152.0.tgz"]
+package_paths = ["./Splunk_TA_otel-0.153.0.tgz"]
 package_flavor = "auto" # auto, multi-os, linux-x86-64, windows-x86-64
 mode = "agent" # agent, gateway, agent-to-gateway
 listen_interface = "" # empty = localhost for agent, 0.0.0.0 for gateway

@@ -10,7 +10,8 @@
 | Splunk App for Splunk Attack Analyzer | `Splunk_App_SAA` | `7000` | `splunk-app-for-splunk-attack-analyzer_*` |
 
 Both researched versions were `1.2.1`, unrestricted, and Cloud compatible for
-Splunk platform versions 9.0 through 10.3.
+Splunk platform versions 9.0 through 10.4 (default 10.4; also 10.3 Cloud / 10.2 /
+older Enterprise trains).
 
 ## Configuration
 

@@ -1402,7 +1402,7 @@
       "cloud_pairing": [
         "external-collector"
       ],
-      "notes": "External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup."
+      "notes": "External OTel Collector workflow for Kubernetes and Linux runtimes that send data to Splunk Observability Cloud and optional Splunk Platform HEC, with HEC token handoff helpers delegated to splunk-hec-service-setup. Splunk Add-on for OpenTelemetry (Splunkbase 7125, Splunk_TA_otel) release 0.153.0 lists Splunk platform 10.4 (default target) through 9.1."
     },
     {
       "skill": "splunk-observability-ai-agent-monitoring-setup",
@@ -3865,7 +3865,8 @@
         "uf_safe": false
       },
       "latest_verified_version": "8.5.1",
-      "latest_verified_date": "April 16, 2026"
+      "latest_verified_date": "April 16, 2026",
+      "notes": "Splunkbase lists Splunk Enterprise / Splunk Cloud platform 10.4 (default target), 10.3, 10.2, 10.0, 9.4, and 9.3 for ES 8.5.1."
     },
     {
       "skill": "splunk-security-essentials-setup",
@@ -3920,8 +3921,9 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "latest_verified_version": "1.2.1",
-      "latest_verified_date": "October 9, 2025"
+      "latest_verified_version": "1.2.2",
+      "latest_verified_date": "June 10, 2026",
+      "notes": "Splunkbase lists Splunk Enterprise / Splunk Cloud platform 10.4 (default target), 10.3, 10.2, and older trains for ARI 1.2.2. Docs signal 9.1.3+."
     },
     {
       "skill": "splunk-asset-risk-intelligence-setup",
@@ -4647,7 +4649,7 @@
         "needs_packet_capture": false,
         "uf_safe": false
       },
-      "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only.",
+      "notes": "OTLP gRPC/HTTP modular input backed by HEC token authentication. Audited package contains Linux x86_64 and Windows x86_64 binaries only, no Darwin/default-bin executable, no dashboards, no setup page, no KV Store, no custom REST handlers, and no Python runtime. External-collector role means sender/client configuration only. Splunkbase lists platform 10.4 (default target) through 9.4 for release 0.4.1.",
       "latest_verified_version": "0.4.1",
       "latest_verified_date": "May 6, 2026"
     },

@@ -6,7 +6,7 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 APP_NAME="SplunkAssetRiskIntelligence"
 ES_APP_NAME="SplunkEnterpriseSecuritySuite"
-LATEST_RESEARCHED_VERSION="1.2.1"
+LATEST_RESEARCHED_VERSION="1.2.2"
 ARI_INDEXES=("ari_staging" "ari_asset" "ari_internal" "ari_ta")
 ARI_ROLES=("ari_admin" "ari_analyst")
 ARI_CAPABILITIES=(
@@ -187,7 +187,7 @@ if [[ ${FAIL} -eq 0 ]]; then
     if [[ -z "${platform_version}" ]]; then
         warn "Could not read Splunk platform version; verify ARI compatibility manually"
     elif version_lt "${platform_version}" "9.1.3"; then
-        warn "Splunk platform ${platform_version} is below 9.1.3; Splunkbase lists ARI 1.2.1 for 9.0-10.3, but ARI docs signal 9.1.3+"
+        warn "Splunk platform ${platform_version} is below 9.1.3; Splunkbase lists ARI 1.2.2 for 9.0-10.4, but ARI docs signal 9.1.3+"
     else
         pass "Splunk platform version ${platform_version} is compatible with ARI 1.2.x guidance"
     fi

@@ -72,8 +72,8 @@ extracted and verified.
   forwarder, and can feed ITSI and Enterprise Security.
 - The Splunkbase listing for Splunk Add-on for Unix and Linux shows version
   `10.2.0`, released October 8, 2025, with Splunk Enterprise/Splunk Cloud,
-  platform versions `10.3`, `10.2`, `10.1`, `10.0`, `9.4`, `9.3`, and `9.2`,
-  and CIM `6.x`.
+  platform versions `10.4` (default), `10.3`, `10.2`, `10.1`, `10.0`, `9.4`,
+  `9.3`, and `9.2`, and CIM `6.x`.
 - The Unix and Linux release notes list version `10.2.0` compatibility as
   Splunk platform `9.3.x`, `9.4.x`, and `10.x`, CIM `6.2.0`, and supported
   Unix operating systems. The Splunkbase compatibility table is broader for
@@ -92,7 +92,8 @@ extracted and verified.
   `nix_ta_custom_eventtype` escape hatch exists for required local events.
 - The Splunkbase listing for Splunk Add-on for Linux shows version `2.1.1`,
   released March 30, 2026, with Splunk Enterprise/Splunk Cloud, platform
-  versions `10.3`, `10.2`, `10.1`, `10.0`, `9.4`, and `9.3`, and CIM `5.x`.
+  versions `10.4` (default), `10.3`, `10.2`, `10.1`, `10.0`, `9.4`, and `9.3`,
+  and CIM `5.x`.
 - The Splunk Add-on for Linux GitHub Pages release notes still show an older
   compatibility table for version `2.1.1`. Treat Splunkbase as the current
   install compatibility source and verify before pinning older platforms.

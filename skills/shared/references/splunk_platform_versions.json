@@ -1,0 +1,73 @@
+{
+  "_comment": "Shared Splunk Platform version defaults and compatibility metadata. Defaults target 10.4; older Enterprise and Cloud trains remain supported.",
+  "defaults": {
+    "enterprise_version": "10.4.0",
+    "enterprise_image": "splunk/splunk:10.4.0",
+    "enterprise_doc_train": "10.4",
+    "cloud_doc_train": "10.4.2603",
+    "cloud_doc_train_previous": "10.3.2512"
+  },
+  "enterprise_platform_versions": [
+    "10.4",
+    "10.2",
+    "10.1",
+    "10.0",
+    "9.4",
+    "9.3",
+    "9.2",
+    "9.1",
+    "9.0",
+    "8.2",
+    "8.1",
+    "8.0"
+  ],
+  "cloud_doc_trains": [
+    "10.4.2603",
+    "10.3.2512"
+  ],
+  "enterprise_upgrade_ladder": [
+    "9.x",
+    "10.0",
+    "10.2",
+    "10.4"
+  ],
+  "svd_enterprise_floors": {
+    "10.4": "10.4.0",
+    "10.2": "10.2.2",
+    "10.0": "10.0.5",
+    "9.4": "9.4.10",
+    "9.3": "9.3.11"
+  },
+  "splunkbase_pins": {
+    "7125": {
+      "app_name": "Splunk_TA_otel",
+      "latest_version": "0.153.0",
+      "published_date": "2026-05-27",
+      "max_platform_version": "10.4"
+    },
+    "8704": {
+      "app_name": "splunk-connect-for-otlp",
+      "latest_version": "0.4.1",
+      "published_date": "2026-05-01",
+      "max_platform_version": "10.4"
+    },
+    "7180": {
+      "app_name": "SplunkAssetRiskIntelligence",
+      "latest_version": "1.2.2",
+      "published_date": "2026-06-10",
+      "max_platform_version": "10.4"
+    },
+    "263": {
+      "app_name": "SplunkEnterpriseSecuritySuite",
+      "latest_version": "8.5.1",
+      "published_date": "2026-04-16",
+      "max_platform_version": "10.4"
+    }
+  },
+  "upgrade_notes_10_4": {
+    "kvstore_mongodb": "Enterprise 10.4 removes MongoDB 4-6 binaries. Upgrade 9.x to 10.0 or 10.2 before 10.4. On 10.x, MongoDB 8 is applied automatically during upgrade.",
+    "tls": "Enterprise 10.4 removes TLS 1.0 and 1.1 negotiation between Splunk components. Use TLS 1.2 or higher.",
+    "config_validation": "Enterprise 10.4 introduces Config Validation for .conf changes before production impact.",
+    "enterprise_no_10_3_train": "There is no Splunk Enterprise 10.3 release train; Cloud 10.3.x stacks are Cloud-only."
+  }
+}

@@ -25,6 +25,13 @@ import stat
 import sys
 from pathlib import Path
 
+_SHARED_LIB = Path(__file__).resolve().parents[2] / "shared" / "lib"
+if str(_SHARED_LIB) not in sys.path:
+    sys.path.insert(0, str(_SHARED_LIB))
+from platform_versions import platform_default  # noqa: E402
+
+DEFAULT_SPLUNK_VERSION = platform_default("enterprise_version")
+
 # ---------------------------------------------------------------------------
 # Closed manifest of every file the renderer is allowed to emit.
 # Conditional files (per-host CSRs, per-fleet UF overlays, EP placeholders,
@@ -221,7 +228,7 @@ def parse_args() -> argparse.Namespace:
 
     # Splunk runtime
     p.add_argument("--splunk-home", default="/opt/splunk")
-    p.add_argument("--splunk-version", default="10.2.2")
+    p.add_argument("--splunk-version", default=DEFAULT_SPLUNK_VERSION)
     p.add_argument("--cert-install-subdir", default="myssl")
 
     # Secret file paths (file paths only, never values)

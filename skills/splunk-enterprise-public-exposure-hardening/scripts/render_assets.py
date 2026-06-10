@@ -14,7 +14,15 @@ import json
 import re
 import shlex
 import stat
+import sys
 from pathlib import Path
+
+_SHARED_LIB = Path(__file__).resolve().parents[2] / "shared" / "lib"
+if str(_SHARED_LIB) not in sys.path:
+    sys.path.insert(0, str(_SHARED_LIB))
+from platform_versions import platform_default, svd_enterprise_floors  # noqa: E402
+
+DEFAULT_SPLUNK_VERSION = platform_default("enterprise_version")
 
 
 # ---------------------------------------------------------------------------
@@ -87,12 +95,7 @@ GENERATED_FILES: set[str] = {
 # operator still gets the floor enforcement; --svd-floor-file overrides.
 # ---------------------------------------------------------------------------
 
-EMBEDDED_SVD_FLOOR: dict[str, str] = {
-    "10.2": "10.2.2",
-    "10.0": "10.0.5",
-    "9.4": "9.4.10",
-    "9.3": "9.3.11",
-}
+EMBEDDED_SVD_FLOOR: dict[str, str] = svd_enterprise_floors()
 
 # Splunk Secure Gateway app SVD floor (per-branch). Source:
 # advisory.splunk.com — SVD-2025-0302, SVD-2025-1208, SVD-2025-1202,
@@ -219,7 +222,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--forwarder-mtls", choices=("true", "false"), default="true")
     parser.add_argument("--splunk-home", default="/opt/splunk")
     parser.add_argument("--service-user", default="splunk")
-    parser.add_argument("--splunk-version", default="10.2.2")
+    parser.add_argument("--splunk-version", default=DEFAULT_SPLUNK_VERSION)
     parser.add_argument("--tls-policy", choices=("tls12", "tls12_13"), default="tls12")
     parser.add_argument("--enable-tls13", choices=("true", "false"), default="false")
     parser.add_argument("--ca-bundle-path", default="/opt/splunk/etc/auth/cabundle.pem")

@@ -4,7 +4,7 @@
 
 This skill follows Splunk's current HTTP Event Collector documentation:
 
-- Splunk Enterprise `inputs.conf` 10.2 reference documents the `[http]` global
+- Splunk Enterprise `inputs.conf` 10.4 reference documents the `[http]` global
   stanza and `[http://name]` token stanza, including `token`, `disabled`,
   `index`, `indexes`, `source`, `sourcetype`, `useACK`, and
   `s2s_indexes_validation`.
@@ -25,13 +25,16 @@ This skill follows Splunk's current HTTP Event Collector documentation:
 Official references:
 
 - Enterprise `inputs.conf` reference:
-  <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.2/configuration-file-reference/10.2.0-configuration-file-reference/inputs.conf>
+  <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/configuration-file-reference/10.4.0-configuration-file-reference/inputs.conf>
+  (older trains: substitute `/10.2/` or `/10.0/` in the path)
 - HEC token GUID and request format:
   <https://help.splunk.com/en/data-management/collect-http-event-data/use-hec-in-splunk-cloud-platform/format-events-for-http-event-collector>
 - Enterprise HEC REST endpoints:
-  <https://help.splunk.com/en/splunk-enterprise/get-started/get-data-in/10.2/get-data-with-http-event-collector/http-event-collector-rest-api-endpoints>
+  <https://help.splunk.com/en/splunk-enterprise/get-started/get-data-in/10.4/get-data-with-http-event-collector/http-event-collector-rest-api-endpoints>
+  (older trains: substitute `/10.2/` in the path)
 - Splunk Cloud ACS HEC token management:
-  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.3.2512/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-http-event-collector-hec-tokens-in-splunk-cloud-platform>
+  <https://help.splunk.com/en/splunk-cloud-platform/administer/admin-config-service-manual/10.4.2603/administer-splunk-cloud-platform-using-the-admin-config-service-acs-api/manage-http-event-collector-hec-tokens-in-splunk-cloud-platform>
+  (alternate Cloud train: `10.3.2512`)
 
 ## Enterprise Design
 
