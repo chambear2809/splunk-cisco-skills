@@ -119,10 +119,27 @@ def audit_offline(apps: list[dict[str, Any]], target: str) -> list[dict[str, Any
 
 def audit_live(apps: list[dict[str, Any]], target: str, max_workers: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     by_id = {str(app["splunkbase_id"]).strip(): app for app in apps}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        live_entries = list(executor.map(fetch_splunkbase, by_id))
-
+    live_entries: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_id = {
+            executor.submit(fetch_splunkbase, app_id): app_id for app_id in by_id
+        }
+        for future in concurrent.futures.as_completed(future_to_id):
+            app_id = future_to_id[future]
+            try:
+                live_entries.append(future.result())
+            except Exception as exc:  # noqa: BLE001 - surface fetch failure, keep auditing
+                findings.append(
+                    {
+                        "id": app_id,
+                        "app_name": by_id[app_id].get("app_name", ""),
+                        "severity": "error",
+                        "field": "live_fetch",
+                        "message": f"live fetch failed: {exc}",
+                    }
+                )
+
     for live in live_entries:
         app = by_id[live["splunkbase_id"]]
         expected_status = compatibility_status(live["platform_versions"], target)
