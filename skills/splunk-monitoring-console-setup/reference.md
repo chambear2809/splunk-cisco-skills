@@ -71,3 +71,12 @@ The official Splunk CLI command for adding peers uses `-remotePassword`. This
 skill does not generate automation that passes that value. Use Splunk Web or an
 operator-controlled secure method to add peers, then run `status.sh` and the
 Monitoring Console general setup page to verify roles.
+
+## Splunk 10.4 enterprise deployment notes
+
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+read this skill alongside
+[`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
+the prose companion to the
+[`../shared/references/splunk_platform_versions.json`](../shared/references/splunk_platform_versions.json)
+version contract.

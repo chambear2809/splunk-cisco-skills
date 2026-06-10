@@ -181,3 +181,12 @@ splunk transfer shcluster-captain \
 | `splunk-platform-pki-setup` | TLS for KV Store (dual-EKU), S2S, replication port 9887 | Cert paths |
 | `splunk-platform-restart-orchestrator` | Restart execution | Rolling restart phase |
 | `splunk-monitoring-console-setup` | SHC peer registration | Member + deployer URIs |
+
+## Splunk 10.4 enterprise deployment notes
+
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+read this skill alongside
+[`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
+the prose companion to the
+[`../shared/references/splunk_platform_versions.json`](../shared/references/splunk_platform_versions.json)
+version contract.

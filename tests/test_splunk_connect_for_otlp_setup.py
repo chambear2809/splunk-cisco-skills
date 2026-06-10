@@ -47,7 +47,7 @@ def test_registry_entry_covers_splunkbase_8704() -> None:
 
     assert entry["app_name"] == "splunk-connect-for-otlp"
     assert entry["latest_verified_version"] == "0.4.1"
-    assert entry["latest_verified_date"] == "May 6, 2026"
+    assert entry["latest_verified_date"] == "May 1, 2026"
     assert "splunk-connect-for-otlp*.tgz" in entry["package_patterns"]
     assert entry["capabilities"]["needs_custom_rest"] is False
     assert entry["capabilities"]["needs_kvstore"] is False
