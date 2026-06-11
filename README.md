@@ -89,6 +89,7 @@ Run commands from the repository root.
 | I need Splunk Platform paired with Splunk Observability Cloud | [`splunk-observability-cloud-integration-setup`](skills/splunk-observability-cloud-integration-setup/) | `bash skills/splunk-observability-cloud-integration-setup/scripts/setup.sh --help` |
 | I need Cisco Data Fabric routing | [`splunk-federated-search-setup`](skills/splunk-federated-search-setup/), [`splunk-edge-processor-setup`](skills/splunk-edge-processor-setup/), [`splunk-ingest-processor-setup`](skills/splunk-ingest-processor-setup/), [`splunk-ai-ml-toolkit-setup`](skills/splunk-ai-ml-toolkit-setup/), [`splunk-mcp-server-setup`](skills/splunk-mcp-server-setup/) | `rg "Cisco Data Fabric|Federated Search|Edge Processor|Ingest Processor|AI Toolkit|MCP" SKILL_UX_CATALOG.md` |
 | I need AppDynamics product coverage | [`splunk-appdynamics-setup`](skills/splunk-appdynamics-setup/) | `bash skills/splunk-appdynamics-setup/scripts/setup.sh --help` |
+| I need Galileo MCP in Cursor, VS Code, Codex, Claude Code, or Kiro | [`galileo-mcp-server-setup`](skills/galileo-mcp-server-setup/) | `bash skills/galileo-mcp-server-setup/scripts/setup.sh --help` |
 | I need Galileo or Agent Control wired to Splunk | [`galileo-platform-setup`](skills/galileo-platform-setup/) or [`galileo-agent-control-setup`](skills/galileo-agent-control-setup/) | `bash skills/galileo-platform-setup/scripts/setup.sh --help` |
 | I need a broad admin health check | [`splunk-admin-doctor`](skills/splunk-admin-doctor/) | `bash skills/splunk-admin-doctor/scripts/setup.sh --help` |
 
@@ -318,7 +319,7 @@ For a specific skill, read:
 
 This repo focuses on repeatable skills for Splunk apps and TAs, Splunk
 administration, customer-managed collectors, Observability Cloud integrations,
-Cisco product onboarding, AppDynamics, ThousandEyes, Salesforce, Box, CyberArk, RSA SecurID, shared web/proxy/parser add-ons, and Galileo workflows.
+Cisco product onboarding, AppDynamics, ThousandEyes, Salesforce, Box, CyberArk, RSA SecurID, shared web/proxy/parser add-ons, Galileo MCP tooling, and Galileo workflows.
 
 It does not try to replace vendor-managed control planes or UI-only product
 surfaces. When a workflow cannot safely apply a change through supported REST,
