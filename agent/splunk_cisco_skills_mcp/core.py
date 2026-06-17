@@ -423,12 +423,24 @@ READ_ONLY_UNLESS_FLAG_SCRIPTS: dict[tuple[str, str], tuple[str, ...]] = {
         "--apply",
         "--accept-remote-execution",
     ),
+    ("splunk-appdynamics-dual-agent-setup", "setup.sh"): (
+        "--apply",
+        "--accept-host-mutation",
+        "--accept-remote-execution",
+        "--accept-app-restart",
+        "--accept-full-restart",
+    ),
     ("splunk-appdynamics-apm-setup", "setup.sh"): ("--apply",),
     ("splunk-appdynamics-k8s-cluster-agent-setup", "setup.sh"): (
         "--apply",
         "--accept-k8s-rollout",
     ),
     ("splunk-appdynamics-infrastructure-visibility-setup", "setup.sh"): ("--apply",),
+    ("splunk-appdynamics-machine-agent-otel-collector-setup", "setup.sh"): (
+        "--apply",
+        "--accept-host-mutation",
+        "--accept-remote-execution",
+    ),
     ("splunk-appdynamics-database-visibility-setup", "setup.sh"): ("--apply",),
     ("splunk-appdynamics-analytics-setup", "setup.sh"): (
         "--apply",

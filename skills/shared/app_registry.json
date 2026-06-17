@@ -2397,6 +2397,18 @@
       "notes": "External AppDynamics Smart Agent workflow covering remote install/upgrade/rollback, software download/package validation, and managed agent lifecycle; host execution is gated and no Splunk app placement is required."
     },
     {
+      "skill": "splunk-appdynamics-dual-agent-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics Java Dual Signal host workflow. Applies persistent Java startup configuration only after collector preflight, writes backup/apply/rollback reports, and gates host mutation, SSH execution, app restarts, and full restart strategy explicitly; no Splunk app placement."
+    },
+    {
       "skill": "splunk-appdynamics-apm-setup",
       "role_support": {
         "search-tier": "none",
@@ -2431,6 +2443,18 @@
       },
       "cloud_pairing": [],
       "notes": "External AppDynamics Infrastructure Visibility workflow covering Machine Agent, Server Visibility, Network Visibility, Docker/container visibility, service availability, tags, GPU monitoring, Prometheus extension, and infrastructure health rules; no Splunk app placement."
+    },
+    {
+      "skill": "splunk-appdynamics-machine-agent-otel-collector-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "External AppDynamics Machine Agent bundled OTel Collector workflow. Applies collector YAML for RPM, ZIP, Docker, and Windows ZIP layouts with file-backed destination secrets, backup manifests, redacted apply reports, and rollback; no Splunk app placement."
     },
     {
       "skill": "splunk-appdynamics-database-visibility-setup",

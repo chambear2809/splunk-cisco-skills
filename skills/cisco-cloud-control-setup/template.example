@@ -11,6 +11,12 @@ api:
   workflows_api_enabled: true
 data_fabric:
   enabled: true
+  machine_data_lake:
+    enabled: true
+  data_catalog:
+    enabled: true
+  spl2_pipeline_kit:
+    enabled: true
   child_specs:
     federated_search: ""
     edge_processor: ""

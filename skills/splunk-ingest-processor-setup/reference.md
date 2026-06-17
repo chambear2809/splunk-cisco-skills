@@ -14,6 +14,8 @@ This skill covers the Splunk Cloud Platform Ingest Processor solution:
   extract, timestamp, JSON/XML, metrics, OCSF, decrypt, stats, and S3 patterns
 - custom pipeline templates under `default/data/spl2`
 - Automated Field Extraction UI handoff
+- AI-powered data management readiness for onboarding, schema, and pipeline
+  recommendations as UI handoff
 - Automated Field Extraction exact region allowlist: `us-east-1`,
   `eu-west-1`, `eu-west-2`, `ap-southeast-1`, `ap-southeast-2`,
   `eu-central-1`, `us-west-2`, and `eu-west-3`
@@ -25,6 +27,7 @@ This skill covers the Splunk Cloud Platform Ingest Processor solution:
 ## Non-Goals
 
 - No private Data Management or Ingest Processor API CRUD is claimed.
+- No AI-powered data management API CRUD is claimed.
 - No raw secret values are rendered.
 - No Splunk Enterprise destination is rendered for IP. Use Edge Processor for
   Splunk Enterprise destinations.

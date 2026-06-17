@@ -705,6 +705,7 @@ def render_metadata(args: argparse.Namespace, instances: list[dict], destination
             "pipeline_names": sorted(p["name"] for p in pipelines),
             "source_type_names": sorted(source_types),
             "target_daily_gb": args.ep_target_daily_gb,
+            "ai_powered_data_management_readiness": True,
         },
         indent=2,
         sort_keys=True,
@@ -745,6 +746,12 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
         "- Source type sync coverage is documented up to 4000 source types.\n"
         "- S2S destinations can use bulk indexer configuration in the UI.\n"
         "- S3 destinations should review Parquet and gzip compression settings.\n\n"
+        "## AI-powered data management readiness\n\n"
+        "Review assistant-generated onboarding, schema, field extraction, and\n"
+        "pipeline recommendations in the Splunk product UI before promoting\n"
+        "changes into rendered SPL2. This skill keeps those recommendations as\n"
+        "operator handoffs until Splunk publishes a stable public API for\n"
+        "accepting generated Edge Processor changes.\n\n"
         "## Default-destination guard\n\n"
         "Without a default destination, unprocessed data is silently dropped. The\n"
         "renderer requires `--ep-default-destination` to match a destination name.\n"

@@ -9,6 +9,10 @@ Supports the full Splunk Federated Search product surface:
 - Federated Search for Amazon S3 (FSS3, type=aws_s3, Splunk Cloud Platform
   only), rendered as a REST payload because FSS3 cannot be configured through
   federated.conf and is created by POSTing to /services/data/federated/provider.
+- Data Management app federation handoffs for current Amazon S3
+  connection/dataset workflows and Controlled Availability Microsoft Azure
+  and Azure Databricks workflows. These are rendered as readiness handoffs,
+  not legacy provider payloads.
 - File-based apply for Splunk Enterprise standalone search heads and SHC
   deployer bundles, plus a REST apply path that works on both Splunk
   Enterprise and Splunk Cloud Platform.
@@ -39,6 +43,7 @@ from typing import Any
 GENERATED_FILES = {
     "README.md",
     "metadata.json",
+    "data-management-federation-handoff.md",
     "federated.conf.template",
     "indexes.conf",
     "server.conf",
@@ -54,6 +59,35 @@ GENERATED_FILES = {
 S2S_DATASET_TYPES = ("index", "metricindex", "savedsearch", "lastjob", "datamodel")
 FSS3_DATASET_TYPES = ("glue_table",)
 ALL_DATASET_TYPES = S2S_DATASET_TYPES + FSS3_DATASET_TYPES
+DATA_MANAGEMENT_FEDERATION_HANDOFFS = [
+    {
+        "key": "amazon_s3_data_management",
+        "label": "Federated Search for Amazon S3 through the Data Management app",
+        "stage": "available by entitlement",
+        "availability": "Splunk Cloud Platform deployments in AWS regions",
+        "activation": "Contact Splunk sales or use the approved access path for existing FSS3/Federated Analytics users.",
+        "dataset_model": "Data Management app connections and datasets; datasets can support federated search and, where documented, data routing.",
+        "notes": "Use the legacy `aws_s3` REST payload path in this renderer only when that provider model is still the reviewed target for the tenant.",
+    },
+    {
+        "key": "microsoft_azure",
+        "label": "Federated Search for Microsoft Azure",
+        "stage": "Controlled Availability",
+        "availability": "Splunk Cloud Platform deployments in AWS regions",
+        "activation": "Contact a Splunk representative for activation and DSU entitlement review.",
+        "dataset_model": "Data Management app connection plus datasets over Azure Data Lake Storage and Azure Blob Storage containers.",
+        "notes": "Azure datasets can be federated-search-only or data-routing-plus-federated-search when the tenant supports the documented Data Management workflow.",
+    },
+    {
+        "key": "azure_databricks",
+        "label": "Federated Search for Azure Databricks",
+        "stage": "Controlled Availability",
+        "availability": "Splunk Cloud Platform deployments in AWS regions",
+        "activation": "Contact a Splunk representative; existing FSS3/Federated Analytics users apply through the documented access path.",
+        "dataset_model": "Data Management app connection using Azure Databricks Delta Sharing to Unity Catalog schemas and tables.",
+        "notes": "Searches use SPL2 and the `sdselect` command family. This renderer does not create Databricks Delta Sharing credentials or Unity Catalog datasets.",
+    },
+]
 
 PASSWORD_PLACEHOLDER_PREFIX = "__FEDERATED_PASSWORD_FILE_BASE64__"
 
@@ -744,6 +778,63 @@ def render_aws_s3_readme(spec: Spec) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def render_data_management_handoff() -> str:
+    lines = [
+        "# Data Management App Federation Handoff",
+        "",
+        "Current Splunk Cloud federated-search expansion is centered on Data",
+        "Management app connections and datasets. This renderer still automates",
+        "reviewable Splunk-to-Splunk assets and the legacy/reviewed `aws_s3`",
+        "provider payload path, but it does not invent Data Management app CRUD",
+        "for newer federation surfaces.",
+        "",
+        "| Surface | Stage | Availability | Operator action |",
+        "| --- | --- | --- | --- |",
+    ]
+    for item in DATA_MANAGEMENT_FEDERATION_HANDOFFS:
+        lines.append(
+            f"| {item['label']} | {item['stage']} | {item['availability']} | {item['activation']} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Readiness Checklist",
+            "",
+            "- Confirm the tenant has the required federated-search activation and Data Scan Unit entitlement.",
+            "- Confirm the Splunk Cloud deployment region and provider-region constraints before designing datasets.",
+            "- Define connections and datasets in the Data Management app where the current docs require UI-driven setup.",
+            "- For Azure datasets, decide whether each dataset is federated-search-only or data-routing-plus-federated-search.",
+            "- For Azure Databricks, collect Delta Sharing and Unity Catalog readiness without placing credentials in this repo.",
+            "- For current Amazon S3 workflows, prefer the Data Management app connection/dataset model unless the tenant is intentionally using the older provider payload path.",
+            "- Validate SPL2 or `sdselect` searches against representative time fields and partitions before production routing.",
+            "",
+            "## Per-Surface Notes",
+            "",
+        ]
+    )
+    for item in DATA_MANAGEMENT_FEDERATION_HANDOFFS:
+        lines.extend(
+            [
+                f"### {item['label']}",
+                "",
+                f"- Dataset model: {item['dataset_model']}",
+                f"- Notes: {item['notes']}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## Boundary",
+            "",
+            "No Microsoft Azure, Azure Databricks, Snowflake, Apache Iceberg, Delta Lake,",
+            "or Data Management app connection/dataset API writes are emitted by this",
+            "renderer. Add a first-class apply path only after Splunk publishes a stable",
+            "public contract that matches the tenant experience.",
+        ]
+    )
+    return "\n".join(lines).rstrip() + "\n"
+
+
 def render_readme(spec: Spec) -> str:
     s2s_count = len(spec.s2s_providers)
     fss3_count = len(spec.fss3_providers)
@@ -770,6 +861,7 @@ def render_readme(spec: Spec) -> str:
         "- `status.sh` — REST GET /services/data/federated/provider; reports connectivityStatus per provider",
         "- `global-enable.sh` / `global-disable.sh` — toggle the global federated-search switch",
         "- `aws-s3-providers/<name>.json` — REST payload for each FSS3 provider (Splunk Cloud only)",
+        "- `data-management-federation-handoff.md` — current Data Management app federation readiness for Amazon S3, Microsoft Azure, and Azure Databricks",
         "- `metadata.json` — machine-readable summary of the rendered plan",
         "",
         "Service-account passwords are never embedded. Apply scripts read them from",
@@ -780,6 +872,7 @@ def render_readme(spec: Spec) -> str:
         "",
         "- Splunk Cloud IP allow-lists (use Splunk Web → Settings → Server settings → IP allow list).",
         "- AWS Glue tables, S3 bucket policies, or KMS key policies (operator/AWS admin task).",
+        "- Data Management app connections or datasets for current Amazon S3, Microsoft Azure, Azure Databricks, Snowflake, Apache Iceberg, or Delta Lake workflows.",
         "- Service accounts on remote Splunk deployments. Standard mode requires the",
         "  service account role on the remote SH to read the mapped datasets;",
         "  transparent mode against an SHC additionally requires the",
@@ -1187,6 +1280,7 @@ def render_metadata(spec: Spec, *, render_dir: Path) -> str:
                 for name in unmapped_standard
             ]
         ),
+        "data_management_federation_handoffs": DATA_MANAGEMENT_FEDERATION_HANDOFFS,
     }
     return json.dumps(payload, indent=2, sort_keys=True) + "\n"
 
@@ -1318,6 +1412,7 @@ def render(spec: Spec, *, output_dir: Path, dry_run: bool) -> dict[str, Any]:
         files = {
             "README.md": render_readme(spec),
             "metadata.json": render_metadata(spec, render_dir=render_dir),
+            "data-management-federation-handoff.md": render_data_management_handoff(),
             "federated.conf.template": render_federated_template(spec),
             "indexes.conf": render_indexes(spec),
             "server.conf": render_server(spec),

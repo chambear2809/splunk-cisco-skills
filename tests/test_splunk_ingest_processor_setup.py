@@ -58,6 +58,7 @@ def test_feature_coverage_includes_current_ip_surface() -> None:
         "Decrypt private-key lookup",
         "Stats aggregation",
         "Custom pipeline templates",
+        "AI-powered data management readiness",
         "Automated Field Extraction",
         "Automated Field Extraction region allowlist",
         "SPL to SPL2 conversion review",

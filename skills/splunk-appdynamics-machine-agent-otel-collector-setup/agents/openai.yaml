@@ -1,0 +1,5 @@
+name: splunk-appdynamics-machine-agent-otel-collector-setup
+short_description: "Apply Machine Agent bundled OTel Collector configuration"
+entrypoint: "skills/splunk-appdynamics-machine-agent-otel-collector-setup/SKILL.md"
+safe_first_command: "bash skills/splunk-appdynamics-machine-agent-otel-collector-setup/scripts/setup.sh --help"
+validation_command: "bash skills/splunk-appdynamics-machine-agent-otel-collector-setup/scripts/validate.sh --help"

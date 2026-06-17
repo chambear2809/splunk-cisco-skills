@@ -4,6 +4,10 @@
 
 - Splunk Edge Processor is supported on **both** Splunk Cloud Platform tenants
   and Splunk Enterprise 10.0+ data management nodes.
+- Cisco Data Fabric AI-powered data management can assist with onboarding,
+  schema, field extraction, and pipeline recommendations in product UI
+  workflows. This skill treats those recommendations as review handoffs and
+  renders source-controlled SPL2/assets only after operator approval.
 - An EP instance is `splunk-edge` running as a Linux process or systemd
   service. The control plane provides token-bearing install commands the
   operator copies onto the host.
@@ -137,6 +141,7 @@ applies it before the destination becomes reachable.
 
 - Live automated SPL-to-SPL2 conversion (use Splunk's in-product tool; the
   shared kit renders static review warnings only).
+- Automatic acceptance of AI-powered data management recommendations.
 - Multi-tenant org management on Splunk Cloud.
 - Kafka and Azure Event Hubs destinations (not yet in the public EP catalog).
 - EP control-plane RBAC management.

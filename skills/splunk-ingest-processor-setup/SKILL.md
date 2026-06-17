@@ -4,7 +4,8 @@ description: >-
   Render Cisco Data Fabric ingest-time routing workflows and Splunk Cloud
   Platform Ingest Processor setup plans with SPL2 pipelines, source types,
   destinations, lifecycle handoffs, queue and monitoring searches, metrics,
-  OCSF, decrypt, S3 archive, custom pipeline templates, and downstream readiness checks. Use
+  OCSF, decrypt, S3 archive, custom pipeline templates, AI-powered data
+  management readiness, and downstream readiness checks. Use
   when the user asks to configure Ingest Processor, author Ingest Processor
   pipelines, route or transform data at ingest time, validate Ingest Processor
   readiness, or compare Ingest Processor with Edge Processor and Data Manager,
@@ -82,6 +83,8 @@ The default output directory is `splunk-ingest-processor-rendered/`:
   apply.
 - Treat Automated Field Extraction as region-gated UI assistance, not an API
   automation path.
+- Treat AI-powered data management as UI assistance for onboarding, schema, and
+  pipeline recommendations until Splunk publishes a stable public API.
 - Treat decrypt as a private-key lookup workflow and warn about throughput.
 - Treat S3 Object Lock as unsupported for rendered IP destination plans.
 - Render and review known issue guardrails: tenant-admin-only editing, no data

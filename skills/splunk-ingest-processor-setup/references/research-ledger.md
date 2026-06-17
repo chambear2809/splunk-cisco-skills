@@ -13,3 +13,7 @@
   is Edge Processor territory.
 - 2026-05-17: Queueing and delivery caveats require explicit operator review,
   especially for branch/route fan-out and blocked destinations.
+- 2026-06-17: Cisco Data Fabric/Cisco Live 2026 messaging adds AI-powered data
+  management and auto-schematization language around onboarding and pipeline
+  management. This skill treats those as UI handoffs and still refuses private
+  Data Management CRUD.

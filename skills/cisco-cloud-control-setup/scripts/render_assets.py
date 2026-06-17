@@ -81,7 +81,54 @@ SOURCE_URLS = {
     "app_builder": "https://blogs.cisco.com/ai/from-an-idea-to-a-live-app-on-cisco-in-minutes",
     "ai_defense": "https://blogs.cisco.com/ai/ai-agents-need-built-in-security-here-is-how-cisco-does-it",
     "splunk": "https://www.splunk.com/en_us/blog/leadership/splunk-cisco-live-agentic-operations.html",
+    "splunk_platform_innovations": "https://www.splunk.com/en_us/blog/platform/new-splunk-platform-innovations-cisco-live-2026.html",
+    "cisco_data_fabric_press": "https://newsroom.cisco.com/c/r/newsroom/en/us/a/y2025/m09/cisco-data-fabric-transforms-machine-data-into-ai-ready-intelligence.html",
+    "splunk_data_management": "https://www.splunk.com/en_us/blog/platform/the-complete-guide-to-splunk-data-management.html",
+    "federated_options": "https://help.splunk.com/?resourceId=Platform_FederatedSearch_fsoptions",
+    "ai_toolkit": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit",
 }
+DATA_FABRIC_2026_SURFACES = [
+    {
+        "key": "machine_data_lake_alpha",
+        "title": "Machine Data Lake alpha",
+        "status": "ui_handoff",
+        "owner": "Splunk Cloud Platform / Cisco Data Fabric product workflow",
+        "source": "splunk_platform_innovations",
+        "summary": "Render readiness for alpha Machine Data Lake storage, promotion, governance, and AI-training use cases; no direct provisioning is emitted.",
+    },
+    {
+        "key": "built_in_data_catalog",
+        "title": "Built-in Data Catalog",
+        "status": "ui_handoff",
+        "owner": "Splunk Data Management",
+        "source": "splunk_platform_innovations",
+        "summary": "Render discovery, ownership, schema/context, and governance checklist for cataloged machine data.",
+    },
+    {
+        "key": "ai_powered_data_management",
+        "title": "AI-powered data management",
+        "status": "render",
+        "owner": "splunk-ingest-processor-setup,splunk-edge-processor-setup,splunk-spl2-pipeline-kit",
+        "source": "splunk_platform_innovations",
+        "summary": "Route onboarding, auto-schematization, SPL2 pipeline, routing, redaction, and lifecycle planning to Data Management child skills.",
+    },
+    {
+        "key": "expanded_federated_search",
+        "title": "Expanded federated search",
+        "status": "render",
+        "owner": "splunk-federated-search-setup",
+        "source": "federated_options",
+        "summary": "Render handoffs for current Data Management app federation across Amazon S3, Microsoft Azure, and Azure Databricks; automated apply remains limited to supported provider contracts.",
+    },
+    {
+        "key": "machine_data_ai_activation",
+        "title": "Machine-data AI activation",
+        "status": "delegated_apply",
+        "owner": "splunk-ai-ml-toolkit-setup,splunk-mcp-server-setup",
+        "source": "cisco_data_fabric_press",
+        "summary": "Delegate AI Toolkit, Cisco Deep Time Series Model readiness, DSDL/runtime handoffs, and MCP tool access to child skills.",
+    },
+]
 PRODUCT_INTEGRATION_MATRIX = [
     ("Meraki", "Available", "Available", "Available"),
     ("Catalyst Center", "Q3 2026", "Q3 2026", "Q3 2026"),
@@ -510,6 +557,9 @@ def merge_config(spec: dict[str, Any]) -> dict[str, Any]:
         "studio_region": str(get_nested(spec, "cloud_control.studio_region", "us") or "us"),
         "data_fabric_enabled": as_bool(get_nested(spec, "data_fabric.enabled", True), True),
         "data_fabric_child_specs": {str(k): str(v or "") for k, v in child_specs.items()},
+        "spl2_pipeline_kit_enabled": as_bool(get_nested(spec, "data_fabric.spl2_pipeline_kit.enabled", True), True),
+        "machine_data_lake_enabled": as_bool(get_nested(spec, "data_fabric.machine_data_lake.enabled", True), True),
+        "data_catalog_enabled": as_bool(get_nested(spec, "data_fabric.data_catalog.enabled", True), True),
         "edge_processor_tenant_url": str(get_nested(spec, "data_fabric.edge_processor.tenant_url", "") or ""),
         "edge_processor_name": str(get_nested(spec, "data_fabric.edge_processor.name", "cloud-control-edge") or "cloud-control-edge"),
         "mcp_enabled": as_bool(get_nested(spec, "mcp.enabled", True), True),
@@ -571,6 +621,8 @@ def build_commands(config: dict[str, Any], output_dir: Path) -> dict[str, list[l
                 )
             )
         data_fabric.append(command(["bash", "skills/splunk-ingest-processor-setup/scripts/setup.sh", "--phase", "render", "--output-dir", str(delegated / "splunk-ingest-processor")]))
+        if config["spl2_pipeline_kit_enabled"]:
+            data_fabric.append(command(["bash", "skills/splunk-spl2-pipeline-kit/scripts/setup.sh", "--phase", "all", "--profile", "both", "--output-dir", str(delegated / "splunk-spl2-pipeline-kit")]))
         ai_ml = ["bash", "skills/splunk-ai-ml-toolkit-setup/scripts/setup.sh", "--render", "--output-dir", str(delegated / "splunk-ai-ml-toolkit")]
         if specs.get("ai_ml_toolkit"):
             ai_ml.extend(["--spec", specs["ai_ml_toolkit"]])
@@ -882,10 +934,42 @@ def render_data_fabric_handoffs(output_dir: Path, config: dict[str, Any]) -> Non
     lines.extend(
         [
             "- Ingest Processor: render command uses default child render mode.",
+            "- SPL2 Pipeline Kit: render command uses `--profile both` when `data_fabric.spl2_pipeline_kit.enabled` is true.",
             "- AI/ML Toolkit: render command uses child spec when `data_fabric.child_specs.ai_ml_toolkit` is set.",
+            "- Machine Data Lake: alpha/readiness handoff only; confirm entitlement, landing-zone governance, catalog, promotion, and AI/analytics access in Splunk Cloud before implementation.",
+            "- Built-in Data Catalog: readiness handoff only; collect data owner, schema/context, retention, promotion, and policy metadata before AI agent use.",
+            "- Expanded federation: use `splunk-federated-search-setup` for FSS2S and reviewed FSS3 payloads; current Amazon S3 Data Management, Microsoft Azure, and Azure Databricks paths render as handoffs.",
         ]
     )
     write_text(output_dir / "data-fabric/handoff.md", "\n".join(lines) + "\n")
+
+    readiness = [
+        "# Cisco Data Fabric 2026 Readiness",
+        "",
+        "This parent treats Cisco Data Fabric as an architecture powered by Splunk",
+        "Platform capabilities, not as a single package installer.",
+        "",
+        "| Surface | Status | Owner | Boundary |",
+        "| --- | --- | --- | --- |",
+    ]
+    for surface in DATA_FABRIC_2026_SURFACES:
+        readiness.append(
+            f"| {surface['title']} | `{surface['status']}` | `{surface['owner']}` | {surface['summary']} |"
+        )
+    readiness.extend(
+        [
+            "",
+            "## Review Checklist",
+            "",
+            "- Classify data by hot indexed, Machine Data Lake, archive, and external federated sources before routing.",
+            "- Confirm Machine Data Lake alpha availability and built-in Data Catalog access with the Splunk/Cisco account team before planning production dependencies.",
+            "- Use Ingest Processor, Edge Processor, and the SPL2 Pipeline Kit for AI-powered onboarding, filtering, shaping, redaction, routing, and data-tiering plans.",
+            "- Use Federated Search for Splunk and reviewed FSS3 where supported; use Data Management app handoffs for current Amazon S3, Microsoft Azure, and Azure Databricks connection/dataset workflows.",
+            "- Use AI Toolkit, Cisco Deep Time Series Model readiness, DSDL runtime handoffs, and Splunk MCP Server for model and agent access to machine data.",
+            "- Keep action execution, data promotion, and agent workflows behind RBAC, audit, and human approval gates until the child skill validation evidence is complete.",
+        ]
+    )
+    write_text(output_dir / "data-fabric/cisco-data-fabric-2026-readiness.md", "\n".join(readiness) + "\n")
 
 
 def coverage_rows(config: dict[str, Any]) -> list[dict[str, str]]:
@@ -897,12 +981,31 @@ def coverage_rows(config: dict[str, Any]) -> list[dict[str, str]]:
         ("ai_defense_guardrails", "governance", "render", "cisco-cloud-control-setup", SOURCE_URLS["ai_defense"], "Render guardrail review prompts; AI Defense configuration is a Cisco-side handoff."),
         ("ai_canvas_boards", "ai-canvas", "ca_handoff", "Cisco AI Canvas", SOURCE_URLS["ai_canvas_doc"], "Render board templates only."),
         ("data_fabric_prerequisites", "data-fabric", "delegated_apply" if config["data_fabric_enabled"] else "not_applicable", "Splunk Data Fabric child skills", SOURCE_URLS["splunk"], "Child skills own render/apply/validate."),
+        ("data_fabric_spl2_pipeline_kit", "data-fabric", "delegated_apply" if config["data_fabric_enabled"] and config["spl2_pipeline_kit_enabled"] else "not_applicable", "splunk-spl2-pipeline-kit", SOURCE_URLS["splunk_data_management"], "Render reusable SPL2 templates and lint reports for Ingest Processor and Edge Processor."),
         ("mcp_connectors", "mcp", "delegated_apply" if config["mcp_enabled"] else "not_applicable", "splunk-mcp-server-setup,cisco-thousandeyes-mcp-setup", SOURCE_URLS["agent_builder"], "Child MCP skills own client writes and token-file validation."),
         ("agent_observability", "observability", "delegated_apply" if config["agent_observability_enabled"] else "not_applicable", "splunk-observability-ai-agent-monitoring-setup", SOURCE_URLS["splunk"], "Child skill owns collector/runtime/content apply."),
         ("observability_content", "observability", "delegated_apply" if config["observability_content_enabled"] else "not_applicable", "splunk-observability-dashboard-builder,splunk-observability-native-ops", SOURCE_URLS["splunk"], "Child skills own Observability API writes."),
         ("domain_readiness", "domains", "render" if config["domain_readiness_enabled"] else "not_applicable", "Cisco product setup skills", SOURCE_URLS["splunk"], "Parent renders handoffs only; child skills own live work."),
         ("validation", "validation", "validate", "cisco-cloud-control-setup", SOURCE_URLS["platform"], "Static validation checks artifacts, coverage, and secret hygiene."),
     ]
+    for surface in DATA_FABRIC_2026_SURFACES:
+        status = surface["status"]
+        if not config["data_fabric_enabled"]:
+            status = "not_applicable"
+        if surface["key"] == "machine_data_lake_alpha" and not config["machine_data_lake_enabled"]:
+            status = "not_applicable"
+        if surface["key"] == "built_in_data_catalog" and not config["data_catalog_enabled"]:
+            status = "not_applicable"
+        rows.append(
+            (
+                f"data_fabric_{surface['key']}",
+                "data-fabric",
+                status,
+                surface["owner"],
+                SOURCE_URLS[surface["source"]],
+                surface["summary"],
+            )
+        )
     for key, area, status, owner, source_key, apply_boundary in OFFICIAL_FEATURES:
         if key == "workflows_api" and not config["workflows_api_enabled"]:
             status = "not_applicable"
@@ -1050,6 +1153,9 @@ def render_metadata(output_dir: Path, config: dict[str, Any]) -> None:
             "cloud_control_api_mutation": False,
             "official_cloud_control_docs_reviewed": True,
             "workflow_api_readiness_rendered": config["workflows_api_enabled"],
+            "data_fabric_2026_readiness_rendered": config["data_fabric_enabled"],
+            "machine_data_lake_readiness_enabled": config["machine_data_lake_enabled"],
+            "data_catalog_readiness_enabled": config["data_catalog_enabled"],
         },
     )
 

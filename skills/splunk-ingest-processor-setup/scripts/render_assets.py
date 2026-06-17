@@ -86,6 +86,7 @@ FEATURE_COVERAGE = [
     ("Decrypt private-key lookup", "rendered"),
     ("Stats aggregation", "rendered"),
     ("Custom pipeline templates", "rendered"),
+    ("AI-powered data management readiness", "ui_handoff"),
     ("Automated Field Extraction", "ui_handoff"),
     ("Automated Field Extraction region allowlist", "rendered"),
     ("SPL to SPL2 conversion review", "lint"),
@@ -318,6 +319,7 @@ def render_readiness(args: argparse.Namespace, findings: list[dict[str, str]]) -
         "- Automated Field Extraction: UI handoff only; supported regions are "
         + ", ".join(f"`{region}`" for region in AFE_SUPPORTED_REGIONS)
         + ".",
+        "- AI-powered data management: review assistant-generated onboarding, schema, and pipeline recommendations in the UI; this renderer keeps them as handoffs until Splunk publishes a stable public API.",
         "",
         "## Known Issue Guardrails",
         "",
@@ -374,8 +376,9 @@ def render_ui_handoff(source_types: list[str], destinations: list[dict[str, str]
         "5. Create pipelines from `pipelines/*.spl2` or the custom template app.",
         "6. Preview every pipeline with representative sample data.",
         "7. Confirm index routing and default destination behavior.",
-        "8. Confirm only one browser session is editing each pipeline.",
-        "9. Apply pipelines and immediately run the rendered monitoring searches.",
+        "8. Review any AI-powered data management or Automated Field Extraction recommendations before accepting generated schema or pipeline changes.",
+        "9. Confirm only one browser session is editing each pipeline.",
+        "10. Apply pipelines and immediately run the rendered monitoring searches.",
         "",
         "## Source Types",
         "",

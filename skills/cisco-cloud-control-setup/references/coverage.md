@@ -9,7 +9,7 @@
 | admin_console | `ui_handoff` | Cisco Cloud Control Admin Console | Onboarding, tenant, integration, SSO, audit, and support actions remain UI handoffs. |
 | cloud_control_studio | `ui_handoff` | Cisco Cloud Control Studio | Agent Builder and App Builder actions remain UI handoffs. |
 | ai_canvas | `ca_handoff` | Cisco AI Canvas | Board templates and readiness prompts only. |
-| data_fabric | `delegated_apply` | Splunk Data Fabric child skills | Child skills own render/apply/validate. |
+| data_fabric | `delegated_apply` | Splunk Data Fabric child skills | Child skills own render/apply/validate; Machine Data Lake/Data Catalog remain readiness handoffs. |
 | mcp | `delegated_apply` | Splunk MCP and ThousandEyes MCP child skills | Child skills own client writes and token-file handling. |
 | agent_observability | `delegated_apply` | `splunk-observability-ai-agent-monitoring-setup` | Child skill owns collector/runtime/dashboard/detector apply. |
 | observability_content | `delegated_apply` | Observability dashboard/native ops skills | Child skills own API writes when explicitly applied. |
@@ -23,6 +23,7 @@
 - Users, roles, Nexus Dashboard access, SSO, service-provider certificates, and audit logs.
 - AI Assistant, AI Canvas, Actions, Notifications, Favorites, and Help/support workflows.
 - Inventory, licensing, RBAC, topology, workflows/atomics, targets/account keys, webhooks, and Multicloud Fabric beta.
+- Cisco Data Fabric 2026 readiness: Machine Data Lake alpha, built-in Data Catalog, AI-powered data management, expanded federated search, SPL2 pipeline templates, AI Toolkit/CDTSM, and MCP access.
 - Release-note open issues.
 
 ## Official Product Checklist
