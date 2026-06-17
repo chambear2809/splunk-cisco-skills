@@ -20,6 +20,10 @@
 | https://blogs.cisco.com/ai/from-an-idea-to-a-live-app-on-cisco-in-minutes | Cloud Control Studio App Builder handoff coverage. |
 | https://blogs.cisco.com/ai/ai-agents-need-built-in-security-here-is-how-cisco-does-it | AI Defense and governed agent execution readiness. |
 | https://www.splunk.com/en_us/blog/leadership/splunk-cisco-live-agentic-operations.html | Splunk Platform, ITSI, Observability Cloud, and Cisco Data Fabric routing basis. |
+| https://www.splunk.com/en_us/blog/platform/new-splunk-platform-innovations-cisco-live-2026.html | Cisco Data Fabric 2026 feature refresh: AI-powered data management, expanded Federated Search, Machine Data Lake alpha, and built-in Data Catalog. |
+| https://newsroom.cisco.com/c/r/newsroom/en/us/a/y2025/m09/cisco-data-fabric-transforms-machine-data-into-ai-ready-intelligence.html | Cisco Data Fabric architecture, Machine Data Lake, AI Toolkit, MCP Server, Time Series Foundation Model, AI Canvas integration timeline, and availability framing. |
+| https://help.splunk.com/?resourceId=Platform_FederatedSearch_fsoptions | Current federated-search option routing for Amazon S3, Microsoft Azure, and Azure Databricks through the Data Management app. |
+| https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit | AI Toolkit 5.7.4 / PSC 4.3.2 and CDTSM readiness basis for Data Fabric AI activation. |
 
 ## API Basis
 

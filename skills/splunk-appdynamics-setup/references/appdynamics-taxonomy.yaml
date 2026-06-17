@@ -1015,6 +1015,54 @@ features:
     status: render_runbook
     validation_method: OTel Java agent config review and security signal readback
     apply_boundary: Java runtime changes are rendered and delegated to agent/APM owners.
+  - id: appd_java_dual_signal_mode
+    family: Splunk AppDynamics For OpenTelemetry
+    feature: Java Agent Dual Signal mode, AGENT_DEPLOYMENT_MODE=dual, and OTLP exporter startup settings
+    owner: splunk-appdynamics-dual-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent/enable-dual-signal-mode
+    status: cli_apply
+    validation_method: Rendered Java env and systemd/drop-in files include dual mode, OTLP HTTP endpoint, protocol, and service resource attributes
+    apply_boundary: Persistent Java startup file changes require --accept-host-mutation; service or container restarts require --accept-app-restart.
+  - id: appd_java_dual_signal_host_apply
+    family: Splunk AppDynamics For OpenTelemetry
+    feature: Production host apply and rollback for Java Dual Signal service startup configuration
+    owner: splunk-appdynamics-dual-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent
+    status: cli_apply
+    validation_method: Preflight target checks, atomic write checksum, backup manifest, redacted apply report, and rollback restore validation
+    apply_boundary: Local or SSH host execution is inventory-driven only; SSH requires --accept-remote-execution and no cloud-provider discovery is performed.
+  - id: appd_dual_agent_apply_sequence
+    family: Splunk AppDynamics For OpenTelemetry
+    feature: Collector-first then Java restart rollout sequencing for dual-agent production changes
+    owner: splunk-appdynamics-dual-agent-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.7.0/splunk-appdynamics-for-opentelemetry/configure-the-opentelemetry-collector/collector-configuration-sample
+    status: cli_apply
+    validation_method: Apply contract enforces --apply collector before --apply java for --apply all and records collector and Java health commands
+    apply_boundary: Collector restart is allowed by --accept-host-mutation; Java service or container restart remains separately gated.
+  - id: appd_machine_agent_bundled_otel_collector
+    family: Infrastructure Visibility
+    feature: Machine Agent combined mode with bundled OpenTelemetry Collector
+    owner: splunk-appdynamics-machine-agent-otel-collector-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.6.0/machine-agent/combined-agent-for-infrastructure-visibility
+    status: cli_apply
+    validation_method: Collector targets render install type, bundled collector path, loopback OTLP receiver ports, and combined-mode service or container restart plan
+    apply_boundary: Collector config writes and restarts require --accept-host-mutation; SSH hosts require --accept-remote-execution.
+  - id: appd_machine_agent_collector_host_apply
+    family: Infrastructure Visibility
+    feature: Host apply, checksum verification, backup manifest, and rollback for bundled collector configuration
+    owner: splunk-appdynamics-machine-agent-otel-collector-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.7.0/splunk-appdynamics-for-opentelemetry/configure-the-opentelemetry-collector/collector-configuration-sample
+    status: cli_apply
+    validation_method: Atomic collector config write, service/container restart command capture, OTLP receiver validation command, apply-report.json, and rollback-plan.sh
+    apply_boundary: Mutations are refused when collector_config_path or collector service/container identity is not confirmed in the inventory.
+  - id: appd_machine_agent_collector_runtime_matrix
+    family: Infrastructure Visibility
+    feature: Machine Agent RPM, ZIP, Docker, and Windows ZIP bundled collector runtime handling
+    owner: splunk-appdynamics-machine-agent-otel-collector-setup
+    source_url: https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.6.0/machine-agent/configure-the-machine-agent/access-machine-agent-docker-images
+    status: render_runbook
+    validation_method: Runtime matrix and discovery script distinguish Linux service paths, Docker container restarts, and Windows service handling before mutation
+    apply_boundary: Runtime-specific writes and restarts are gated by host mutation and remote execution flags; unsupported or undiscovered layouts remain render-only.
   - id: appd_observability_for_ai
     family: Security AI
     feature: Observability for AI, OpenAI, LangChain, Bedrock, GPU, and Cisco AI Pod checks

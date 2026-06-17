@@ -1,0 +1,35 @@
+change_ticket: CHG-APPD-COLLECTOR-001
+restart_strategy: collector_only
+max_concurrency: 1
+batch_size: 1
+targets:
+  - name: checkout-api-1
+    host: localhost
+    execution: local
+    os_family: linux
+    sudo: false
+    machine_agent_home: /opt/appdynamics/machine-agent
+    install_type: rpm
+    collector_config_path: /opt/appdynamics/machine-agent/otel-collector/config.yaml
+    collector_service_name: appdynamics-machine-agent
+    receiver_bind: 127.0.0.1
+    grpc_port: 4317
+    http_port: 4318
+destinations:
+  splunk_o11y:
+    realm: us1
+    token_file: /secure/splunk/o11y-access-token
+  appd_otel:
+    endpoint: https://otel.example.saas.appdynamics.com
+    api_key_file: /secure/appdynamics/otel-api-key
+collector:
+  destination: both
+  logs_enabled: false
+  receiver_bind: 127.0.0.1
+  grpc_port: 4317
+  http_port: 4318
+control:
+  restart_strategy: collector_only
+  max_concurrency: 1
+  batch_size: 1
+  change_ticket: CHG-APPD-COLLECTOR-001

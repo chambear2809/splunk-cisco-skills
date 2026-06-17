@@ -22,8 +22,11 @@ executable child-skill handoffs where supported.
 ## Supported Paths
 
 1. **Cisco Data Fabric prerequisites**: delegate render/apply planning to
-   Splunk Federated Search, Edge Processor, Ingest Processor, AI/ML Toolkit,
-   and MCP Server skills.
+   Splunk Federated Search, Edge Processor, Ingest Processor, SPL2 Pipeline
+   Kit, AI/ML Toolkit, and MCP Server skills. Render readiness for Machine
+   Data Lake alpha, built-in Data Catalog, AI-powered data management, and
+   expanded Data Management app federation without claiming unsupported
+   product API writes.
 2. **MCP connectors**: delegate Splunk MCP Server and ThousandEyes MCP client
    setup plans. Splunk MCP client rendering is emitted only when
    `mcp.splunk_mcp_url` is set, because the child skill otherwise needs

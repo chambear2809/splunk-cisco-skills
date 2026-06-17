@@ -1,0 +1,40 @@
+change_ticket: CHG-APPD-DUAL-001
+restart_strategy: collector_only
+max_concurrency: 1
+batch_size: 1
+environment: prod
+targets:
+  - name: checkout-api-1
+    host: localhost
+    execution: local
+    os_family: linux
+    runtime: systemd
+    sudo: false
+    java_agent_home: /opt/appdynamics/java
+    java_agent_version: 25.10.0
+    service_name: checkout-api
+    application_name: Checkout
+    tier_name: api
+    node_name: checkout-api-1
+    startup_config_path: /etc/systemd/system/checkout-api.service.d/appd-dual-agent.conf
+    restart_command: systemctl restart checkout-api
+    healthcheck_command: curl -fsS http://127.0.0.1:8080/health
+    machine_agent_home: /opt/appdynamics/machine-agent
+    install_type: rpm
+    collector_config_path: /opt/appdynamics/machine-agent/otel-collector/config.yaml
+    collector_service_name: appdynamics-machine-agent
+    receiver_bind: 127.0.0.1
+    grpc_port: 4317
+    http_port: 4318
+destinations:
+  splunk_o11y:
+    realm: us1
+    token_file: /secure/splunk/o11y-access-token
+  appd_otel:
+    endpoint: https://otel.example.saas.appdynamics.com
+    api_key_file: /secure/appdynamics/otel-api-key
+control:
+  restart_strategy: collector_only
+  max_concurrency: 1
+  batch_size: 1
+  change_ticket: CHG-APPD-DUAL-001

@@ -1,16 +1,20 @@
 # Splunk Federated Search Setup Worksheet
 #
 # Multi-provider, multi-federated-index spec covering both Federated Search
-# for Splunk (FSS2S, type=splunk) and Federated Search for Amazon S3
-# (FSS3, type=aws_s3, Splunk Cloud Platform only).
+# for Splunk (FSS2S, type=splunk) and the reviewed legacy Federated Search for
+# Amazon S3 provider-payload path (FSS3, type=aws_s3, Splunk Cloud Platform
+# only).
 #
 # Non-secret values only. Service-account passwords for FSS2S providers
 # go in local-only password files referenced by `password_file`.
 # Create them without shell-history exposure with:
 #   bash skills/shared/scripts/write_secret_file.sh /tmp/federated_provider_password
 #
-# Splunk Cloud admins must POST aws_s3 providers via REST or the Web UI;
-# FSS3 cannot be configured by editing federated.conf in Cloud.
+# Splunk Cloud admins must POST reviewed legacy aws_s3 providers via REST or
+# the Web UI; FSS3 cannot be configured by editing federated.conf in Cloud.
+# Current Data Management app federation for Amazon S3, Microsoft Azure, and
+# Azure Databricks is rendered as a handoff in
+# data-management-federation-handoff.md, not as `providers:` entries here.
 
 phase: render
 apply_target: search-head            # search-head | shc-deployer | rest
@@ -77,7 +81,8 @@ providers:
   #   password_file: /tmp/hybrid_provider_password
   #   disabled: false
 
-  # Federated Search for Amazon S3 (FSS3). Splunk Cloud Platform ONLY.
+  # Federated Search for Amazon S3 (FSS3), reviewed legacy provider path.
+  # Splunk Cloud Platform ONLY.
   # The renderer emits a REST payload (aws-s3-providers/<name>.json) and an
   # AWS prerequisites README; it does not write federated.conf for aws_s3
   # because FSS3 must be created through REST or Splunk Web. The Splunk

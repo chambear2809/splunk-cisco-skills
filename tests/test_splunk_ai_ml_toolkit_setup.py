@@ -65,6 +65,7 @@ def test_ai_ml_toolkit_render_validate_outputs_complete_tree(tmp_path: Path) -> 
         "ai_toolkit.permissions_and_safeguards",
         "ai_toolkit.assistants",
         "ai_toolkit.anomaly_cisco_deep_time_series",
+        "ai_toolkit.hosted_foundation_models",
         "ai_toolkit.llm_ai_command",
         "ai_toolkit.connections_tab",
         "ai_toolkit.container_management",

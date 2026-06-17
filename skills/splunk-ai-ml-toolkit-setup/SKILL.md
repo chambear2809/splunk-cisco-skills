@@ -41,7 +41,10 @@ This skill covers Splunk-owned and Splunk-supported AI/ML products:
 - AI Toolkit Smart Assistants, ML-SPL commands, model management, ONNX apply,
   LLM `ai` command readiness, Connections tab, Container Management tab,
   external LLM/provider connection handoffs, ML alerting, and Cisco Deep Time
-  Series anomaly detection readiness
+  Series forecasting/anomaly detection readiness
+- Hosted foundation model readiness where available in the Splunk Platform
+  boundary, including Foundation-Sec, Cisco Deep Time Series Model, and
+  GPT-OSS review handoffs; this skill never renders external model API keys
 - Legacy Splunk App for Anomaly Detection (`6843`) and Smart Alerts Assistant
   beta (`6415`) as audit and migration-only coverage
 

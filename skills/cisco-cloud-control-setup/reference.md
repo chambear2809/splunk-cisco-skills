@@ -31,6 +31,7 @@ a Splunkbase app installer and not as Cisco Security Cloud Control / CDO.
 - `studio/mcp-connector-plan.md`
 - `studio/app-builder-briefs/*.md`
 - `ai-canvas/board-templates/*.md`
+- `data-fabric/cisco-data-fabric-2026-readiness.md`
 
 ## Official Cisco Cloud Control Surfaces
 
@@ -54,7 +55,10 @@ Control Hub, and Cisco IQ.
 | Area | Owner |
 | --- | --- |
 | Cisco Workflows API readiness | Rendered API/OAS handoff; no direct API calls |
-| Cisco Data Fabric | `splunk-federated-search-setup`, `splunk-edge-processor-setup`, `splunk-ingest-processor-setup`, `splunk-ai-ml-toolkit-setup`, `splunk-mcp-server-setup` |
+| Cisco Data Fabric | `splunk-federated-search-setup`, `splunk-edge-processor-setup`, `splunk-ingest-processor-setup`, `splunk-spl2-pipeline-kit`, `splunk-ai-ml-toolkit-setup`, `splunk-mcp-server-setup` |
+| Machine Data Lake alpha | Rendered readiness handoff; no provisioning API calls |
+| Built-in Data Catalog | Rendered readiness handoff; no catalog CRUD calls |
+| Expanded Data Management app federation | `splunk-federated-search-setup` for supported FSS2S/reviewed FSS3 assets plus UI/entitlement handoffs for current Amazon S3, Microsoft Azure, and Azure Databricks |
 | MCP | `splunk-mcp-server-setup` when `mcp.splunk_mcp_url` is set; `cisco-thousandeyes-mcp-setup` can render without Splunk credentials |
 | AI agent monitoring | `splunk-observability-ai-agent-monitoring-setup` |
 | Observability dashboards | `splunk-observability-dashboard-builder` |

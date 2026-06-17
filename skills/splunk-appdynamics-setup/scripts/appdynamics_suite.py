@@ -15,6 +15,8 @@ from typing import Any
 
 import yaml
 
+from appdynamics_host_apply import ApplyRecorder, execution_mode, restore_entry, target_sudo
+
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SKILLS_DIR = REPO_ROOT / "skills"
@@ -133,6 +135,19 @@ SKILL_META: dict[str, dict[str, Any]] = {
         ],
         "gate": "remote_execution",
     },
+    "splunk-appdynamics-dual-agent-setup": {
+        "title": "Splunk AppDynamics Dual Agent Setup",
+        "target": "Production Java Dual Signal mode with collector-first rollout",
+        "purpose": "Render, preflight, apply, validate, and rollback Java Dual Signal startup configuration for local or SSH targets after the local Machine Agent bundled OTel Collector has been configured and validated.",
+        "apply": "Live host mutation is supported. --apply preflight is read-only. --apply collector writes collector config and restarts the collector. --apply java writes Java startup config and restarts only when restart gates are present. --apply all runs collector first, then Java.",
+        "validation": "Target inventory, file-backed secret references, OTLP receiver checks, collector exporter health, Java env/property checks, restart gate enforcement, and post-restart healthcheck commands.",
+        "sources": [
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.10.0/splunk-appdynamics-for-opentelemetry/instrument-applications-with-splunk-appdynamics-for-opentelemetry/enable-opentelemetry-in-the-java-agent/enable-dual-signal-mode",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.7.0/splunk-appdynamics-for-opentelemetry/configure-the-opentelemetry-collector/collector-configuration-sample",
+        ],
+        "gate": None,
+    },
     "splunk-appdynamics-apm-setup": {
         "title": "Splunk AppDynamics APM Setup",
         "target": "Business applications, tiers, nodes, transactions, service endpoints, remote services, information points, and Splunk AppDynamics for OpenTelemetry",
@@ -177,6 +192,20 @@ SKILL_META: dict[str, dict[str, Any]] = {
             "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/gpu-monitoring",
             "https://help.splunk.com/en/appdynamics-saas/infrastructure-visibility/26.4.0/gpu-monitoring/gpu-monitoring-supported-environments",
             "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/25.12.0/prometheus-extension-for-machine-agent",
+        ],
+        "gate": None,
+    },
+    "splunk-appdynamics-machine-agent-otel-collector-setup": {
+        "title": "Splunk AppDynamics Machine Agent OTel Collector Setup",
+        "target": "Machine Agent combined mode bundled OpenTelemetry Collector",
+        "purpose": "Render, preflight, apply, validate, and rollback the bundled collector config for Linux RPM, Linux ZIP, Docker, and Windows ZIP Machine Agent installs.",
+        "apply": "Live host mutation is supported. --apply preflight is read-only. --apply collector writes collector config, restarts the collector process/service/container, and validates OTLP receiver and exporter health.",
+        "validation": "Install-type discovery, config path and service/container confirmation, loopback receiver defaults, file-backed destination secrets, OTLP 4317/4318 checks, exporter placeholders, backup manifest, and rollback.",
+        "sources": [
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.6.0/machine-agent/combined-agent-for-infrastructure-visibility",
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.6.0/machine-agent/configure-the-machine-agent/access-machine-agent-docker-images",
+            "https://help.splunk.com/en/appdynamics-on-premises/infrastructure-visibility/26.6.0/machine-agent/install-the-machine-agent/windows-install-using-zip-with-bundled-jre",
+            "https://help.splunk.com/en/appdynamics-on-premises/virtual-appliance-self-hosted/25.7.0/splunk-appdynamics-for-opentelemetry/configure-the-opentelemetry-collector/collector-configuration-sample",
         ],
         "gate": None,
     },
@@ -1995,6 +2024,16 @@ REQUIRED_SKILL_ARTIFACTS = {
         "agent-upgrade-api-plan.sh",
         "smart-agent-validation-probes.sh",
     },
+    "splunk-appdynamics-dual-agent-setup": {
+        "dual-agent-targets.yaml",
+        "java-dual-agent-env.sh",
+        "java-systemd-dropin.conf",
+        "java-container-env.env",
+        "dual-agent-collector-first-runbook.md",
+        "dual-agent-apply-plan.sh",
+        "java-dual-agent-validation-probes.sh",
+        "apply-contract.md",
+    },
     "splunk-appdynamics-apm-setup": {
         "apm-application-model.json",
         "apm-controller-api-plan.sh",
@@ -2024,6 +2063,15 @@ REQUIRED_SKILL_ARTIFACTS = {
         "gpu-monitoring-runbook.md",
         "prometheus-extension-runbook.md",
         "infrastructure-validation-probes.sh",
+    },
+    "splunk-appdynamics-machine-agent-otel-collector-setup": {
+        "collector-targets.yaml",
+        "collector-config.yaml",
+        "collector-service-plan.sh",
+        "collector-validation-probes.sh",
+        "machine-agent-discovery.sh",
+        "machine-agent-collector-runbook.md",
+        "apply-contract.md",
     },
     "splunk-appdynamics-database-visibility-setup": {
         "database-collector-payloads.redacted.json",
@@ -3698,6 +3746,541 @@ def render_infrastructure_artifacts(out: Path, spec: dict[str, Any]) -> None:
     chmod_exec(probes)
 
 
+HOST_APPLY_SKILLS = {
+    "splunk-appdynamics-dual-agent-setup",
+    "splunk-appdynamics-machine-agent-otel-collector-setup",
+}
+
+HOST_APPLY_PHASES = {"preflight", "collector", "java", "all"}
+
+
+def control_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    control = as_dict(spec.get("control"))
+    return {
+        "restart_strategy": control.get("restart_strategy", spec.get("restart_strategy", "collector_only")),
+        "max_concurrency": int_or_default(control.get("max_concurrency", spec.get("max_concurrency", 1)), 1),
+        "batch_size": int_or_default(control.get("batch_size", spec.get("batch_size", 1)), 1),
+        "change_ticket": control.get("change_ticket", spec.get("change_ticket", "")),
+    }
+
+
+def restart_strategy(spec: dict[str, Any]) -> str:
+    value = str(control_spec(spec).get("restart_strategy") or "collector_only").strip().lower().replace("-", "_")
+    aliases = {
+        "collector": "collector_only",
+        "collectoronly": "collector_only",
+        "no_restart": "none",
+        "app": "canary",
+        "app_restart": "canary",
+    }
+    return aliases.get(value, value)
+
+
+def has_ssh_targets(spec: dict[str, Any]) -> bool:
+    return any(execution_mode(as_dict(target)) == "ssh" for target in host_apply_targets(spec))
+
+
+def destination_spec(spec: dict[str, Any]) -> dict[str, Any]:
+    destinations = as_dict(spec.get("destinations"))
+    splunk_o11y = merged_dict(spec.get("splunk_o11y"), destinations.get("splunk_o11y"))
+    appd_otel = merged_dict(spec.get("appd_otel"), destinations.get("appd_otel"))
+    collector = as_dict(spec.get("collector"))
+    realm = splunk_o11y.get("realm", "us1")
+    return {
+        "destination": collector.get("destination", spec.get("destination", "both")),
+        "splunk_o11y": {
+            "realm": realm,
+            "token_file": splunk_o11y.get("token_file", "/secure/splunk/o11y-access-token"),
+            "api_url": splunk_o11y.get("api_url", f"https://api.{realm}.signalfx.com"),
+            "ingest_url": splunk_o11y.get("ingest_url", f"https://ingest.{realm}.signalfx.com"),
+        },
+        "appd_otel": {
+            "endpoint": appd_otel.get("endpoint", "https://otel.example.saas.appdynamics.com"),
+            "api_key_file": appd_otel.get("api_key_file", "/secure/appdynamics/otel-api-key"),
+        },
+        "logs_enabled": to_bool(collector.get("logs_enabled"), False),
+    }
+
+
+def default_host_apply_target() -> dict[str, Any]:
+    return {
+        "name": "checkout-api-1",
+        "host": "localhost",
+        "execution": "local",
+        "os_family": "linux",
+        "runtime": "systemd",
+        "sudo": False,
+        "service_name": "checkout-api",
+        "application_name": "Checkout",
+        "tier_name": "api",
+        "node_name": "checkout-api-1",
+        "machine_agent_home": "/opt/appdynamics/machine-agent",
+        "install_type": "rpm",
+        "collector_config_path": "/opt/appdynamics/machine-agent/otel-collector/config.yaml",
+        "collector_service_name": "appdynamics-machine-agent",
+        "receiver_bind": "127.0.0.1",
+        "grpc_port": 4317,
+        "http_port": 4318,
+    }
+
+
+def host_apply_targets(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_targets = as_list(spec.get("targets")) or [default_host_apply_target()]
+    collector_defaults = as_dict(spec.get("collector"))
+    normalized: list[dict[str, Any]] = []
+    for index, target in enumerate(raw_targets, start=1):
+        row = merged_dict(default_host_apply_target(), collector_defaults, target)
+        row.setdefault("name", row.get("host") or f"target-{index}")
+        row.setdefault("host", "localhost")
+        row["execution"] = str(row.get("execution") or "local").lower()
+        row["os_family"] = str(row.get("os_family") or "linux").lower()
+        row["runtime"] = str(row.get("runtime") or "systemd").lower()
+        row["install_type"] = str(row.get("install_type") or "rpm").lower()
+        row["receiver_bind"] = str(row.get("receiver_bind") or collector_defaults.get("receiver_bind") or "127.0.0.1")
+        row["grpc_port"] = int_or_default(row.get("grpc_port"), 4317)
+        row["http_port"] = int_or_default(row.get("http_port"), 4318)
+        machine_home = str(row.get("machine_agent_home") or "/opt/appdynamics/machine-agent").rstrip("/")
+        row["machine_agent_home"] = machine_home
+        row.setdefault("collector_config_path", f"{machine_home}/otel-collector/config.yaml")
+        row.setdefault("collector_service_name", "appdynamics-machine-agent")
+        normalized.append(row)
+    return normalized
+
+
+def java_resource_attributes(target: dict[str, Any], spec: dict[str, Any]) -> str:
+    env = target.get("deployment_environment") or spec.get("environment") or "prod"
+    attributes = {
+        "service.name": target.get("tier_name", "api"),
+        "service.namespace": target.get("application_name", "AppDynamics"),
+        "deployment.environment": env,
+        "service.instance.id": target.get("node_name", target.get("name", "node")),
+    }
+    attributes.update(as_dict(target.get("resource_attributes")))
+    return ",".join(f"{key}={value}" for key, value in attributes.items())
+
+
+def java_env_map(target: dict[str, Any], spec: dict[str, Any]) -> dict[str, str]:
+    endpoint = target.get("otel_exporter_otlp_endpoint") or f"http://{target.get('receiver_bind', '127.0.0.1')}:{target.get('http_port', 4318)}"
+    return {
+        "AGENT_DEPLOYMENT_MODE": "dual",
+        "OTEL_TRACES_EXPORTER": "otlp",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": str(endpoint),
+        "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+        "OTEL_RESOURCE_ATTRIBUTES": java_resource_attributes(target, spec),
+    }
+
+
+def render_env_file(env: dict[str, str]) -> str:
+    lines = [
+        "# Rendered AppDynamics Java Dual Signal environment.",
+        "# Do not place token or API key values in this file.",
+    ]
+    lines.extend(f'{key}="{bash_default(value)}"' for key, value in env.items())
+    return "\n".join(lines) + "\n"
+
+
+def java_tool_options_value(target: dict[str, Any]) -> str:
+    existing = str(target.get("java_tool_options") or target.get("existing_java_tool_options") or "").strip()
+    base = "-Dagent.deployment.mode=dual"
+    return f"{base} {existing}" if existing else base
+
+
+def render_systemd_dropin(target: dict[str, Any], spec: dict[str, Any]) -> str:
+    env = java_env_map(target, spec)
+    lines = [
+        "# Rendered AppDynamics Java Dual Signal systemd drop-in.",
+        "# Apply only with --accept-host-mutation and restart only with --accept-app-restart.",
+        "[Service]",
+    ]
+    lines.extend(f'Environment="{key}={bash_default(value)}"' for key, value in env.items())
+    lines.append(f'Environment="JAVA_TOOL_OPTIONS={bash_default(java_tool_options_value(target))}"')
+    return "\n".join(lines) + "\n"
+
+
+def java_startup_uses_systemd(target: dict[str, Any]) -> bool:
+    path = str(target.get("startup_config_path") or f"/etc/systemd/system/{target.get('service_name', 'app')}.service.d/appd-dual-agent.conf")
+    runtime = str(target.get("runtime") or "systemd").lower()
+    return runtime == "systemd" or path.endswith(".conf")
+
+
+def java_systemd_reload_command(target: dict[str, Any]) -> str:
+    if not java_startup_uses_systemd(target):
+        return ""
+    return str(target.get("systemd_daemon_reload_command") or "systemctl daemon-reload")
+
+
+def java_startup_config_content(target: dict[str, Any], spec: dict[str, Any]) -> str:
+    path = str(target.get("startup_config_path") or "")
+    runtime = str(target.get("runtime") or "systemd").lower()
+    if runtime == "systemd" or path.endswith(".conf"):
+        return render_systemd_dropin(target, spec)
+    return render_env_file(java_env_map(target, spec))
+
+
+def collector_exporters(destination: dict[str, Any]) -> tuple[dict[str, Any], list[str], list[str], list[str]]:
+    destination_mode = str(destination.get("destination") or "both").lower()
+    exporters: dict[str, Any] = {}
+    traces_exporters: list[str] = []
+    metrics_exporters: list[str] = []
+    logs_exporters: list[str] = []
+    if destination_mode in {"both", "splunk", "splunk_o11y", "o11y"}:
+        exporters["signalfx"] = {
+            "access_token": "${SPLUNK_O11Y_ACCESS_TOKEN}",
+            "realm": destination["splunk_o11y"]["realm"],
+            "api_url": destination["splunk_o11y"]["api_url"],
+            "ingest_url": destination["splunk_o11y"]["ingest_url"],
+        }
+        traces_exporters.append("signalfx")
+        metrics_exporters.append("signalfx")
+        if destination.get("logs_enabled"):
+            logs_exporters.append("signalfx")
+    if destination_mode in {"both", "appd", "appd_otel", "appdynamics"}:
+        exporters["otlphttp/appdynamics"] = {
+            "endpoint": destination["appd_otel"]["endpoint"],
+            "headers": {
+                "x-api-key": "${APPD_OTEL_API_KEY}",
+            },
+        }
+        traces_exporters.append("otlphttp/appdynamics")
+    return exporters, traces_exporters, metrics_exporters, logs_exporters
+
+
+def render_collector_config(target: dict[str, Any], spec: dict[str, Any]) -> str:
+    destination = destination_spec(spec)
+    exporters, traces_exporters, metrics_exporters, logs_exporters = collector_exporters(destination)
+    service_pipelines: dict[str, Any] = {
+        "traces": {
+            "receivers": ["otlp"],
+            "processors": ["memory_limiter", "batch"],
+            "exporters": traces_exporters,
+        },
+        "metrics": {
+            "receivers": ["otlp"],
+            "processors": ["memory_limiter", "batch"],
+            "exporters": metrics_exporters,
+        },
+    }
+    if destination.get("logs_enabled"):
+        service_pipelines["logs"] = {
+            "receivers": ["otlp"],
+            "processors": ["memory_limiter", "batch"],
+            "exporters": logs_exporters,
+        }
+    payload = {
+        "receivers": {
+            "otlp": {
+                "protocols": {
+                    "grpc": {"endpoint": f"{target.get('receiver_bind', '127.0.0.1')}:{target.get('grpc_port', 4317)}"},
+                    "http": {"endpoint": f"{target.get('receiver_bind', '127.0.0.1')}:{target.get('http_port', 4318)}"},
+                }
+            }
+        },
+        "processors": {
+            "memory_limiter": {
+                "check_interval": "2s",
+                "limit_mib": int_or_default(as_dict(spec.get("collector")).get("memory_limit_mib"), 512),
+            },
+            "batch": {"timeout": "1s", "send_batch_size": 8192},
+        },
+        "exporters": exporters,
+        "service": {
+            "pipelines": service_pipelines,
+            "telemetry": {"logs": {"level": as_dict(spec.get("collector")).get("log_level", "info")}},
+        },
+    }
+    return dump_yaml(payload)
+
+
+def collector_restart_command(target: dict[str, Any]) -> str:
+    if target.get("collector_restart_command"):
+        return str(target["collector_restart_command"])
+    install_type = str(target.get("install_type") or "rpm").lower()
+    if install_type == "docker":
+        container = target.get("collector_container_name") or target.get("container_name")
+        return f"docker restart {shlex.quote(str(container))}" if container else ""
+    if target.get("os_family") == "windows":
+        service = target.get("collector_service_name")
+        return f"powershell -NoProfile -Command Restart-Service -Name {shlex.quote(str(service))}" if service else ""
+    service = target.get("collector_service_name")
+    return f"systemctl restart {shlex.quote(str(service))}" if service else ""
+
+
+def java_restart_command(target: dict[str, Any]) -> str:
+    if target.get("restart_command"):
+        return str(target["restart_command"])
+    runtime = str(target.get("runtime") or "systemd").lower()
+    if runtime == "docker":
+        container = target.get("container_name") or target.get("service_name")
+        return f"docker restart {shlex.quote(str(container))}" if container else ""
+    if target.get("os_family") == "windows":
+        service = target.get("service_name")
+        return f"powershell -NoProfile -Command Restart-Service -Name {shlex.quote(str(service))}" if service else ""
+    service = target.get("service_name")
+    return f"systemctl restart {shlex.quote(str(service))}" if service else ""
+
+
+def collector_preflight_commands(target: dict[str, Any], spec: dict[str, Any]) -> list[tuple[str, str]]:
+    destination = destination_spec(spec)
+    commands = [
+        ("collector config path present", f"test -n {shlex.quote(str(target.get('collector_config_path', '')))}"),
+        ("collector config parent exists", f"test -d {shlex.quote(str(Path(str(target.get('collector_config_path'))).parent))}"),
+        ("machine agent home exists", f"test -d {shlex.quote(str(target.get('machine_agent_home')))}"),
+        ("splunk token file exists", f"test -f {shlex.quote(str(destination['splunk_o11y']['token_file']))}"),
+        ("appd api key file exists", f"test -f {shlex.quote(str(destination['appd_otel']['api_key_file']))}"),
+    ]
+    install_type = str(target.get("install_type") or "rpm").lower()
+    if install_type == "docker":
+        container = target.get("collector_container_name") or target.get("container_name")
+        commands.append(("docker collector container declared", f"test -n {shlex.quote(str(container or ''))}"))
+    else:
+        commands.append(("collector service declared", f"test -n {shlex.quote(str(target.get('collector_service_name', '')))}"))
+    return commands
+
+
+def java_preflight_commands(target: dict[str, Any]) -> list[tuple[str, str]]:
+    config_path = str(target.get("startup_config_path") or f"/etc/systemd/system/{target.get('service_name', 'app')}.service.d/appd-dual-agent.conf")
+    target["startup_config_path"] = config_path
+    return [
+        ("java startup path present", f"test -n {shlex.quote(config_path)}"),
+        ("java startup parent exists", f"test -d {shlex.quote(str(Path(config_path).parent))}"),
+        ("java service declared", f"test -n {shlex.quote(str(target.get('service_name', '')))}"),
+    ]
+
+
+def render_apply_contract(skill: str) -> str:
+    return f"""# Production Apply Contract
+
+Skill: `{skill}`
+
+- `--render` creates reviewable artifacts only.
+- `--apply preflight` validates local or SSH targets without mutation.
+- `--apply collector` writes collector config, restarts the collector, and records validation.
+- `--apply java` writes persistent Java Dual Signal startup config and restarts only with restart gates.
+- `--apply all` runs collector first, then Java, then validation.
+- `--rollback` restores backed-up files from `backup-manifest.json`.
+
+Every live run writes:
+
+- `apply-report.json`
+- `backup-manifest.json`
+- `rollback-plan.sh`
+
+Required gates:
+
+- `--accept-host-mutation` for file or service changes.
+- `--accept-remote-execution` for SSH targets.
+- `--accept-app-restart` for Java service or container restarts.
+- `--accept-full-restart` when `restart_strategy: full`.
+"""
+
+
+def render_host_apply_rollback_plan(skill: str, phase: str) -> str:
+    return f"""#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
+PROJECT_ROOT="${{PROJECT_ROOT:-$(cd "${{SCRIPT_DIR}}/.." && pwd)}}"
+
+echo "Rollback for {skill} phase {phase}"
+echo "Review ${{SCRIPT_DIR}}/backup-manifest.json and ${{SCRIPT_DIR}}/apply-report.json first."
+echo "Then run:"
+echo "  bash skills/{skill}/scripts/setup.sh --rollback all --output-dir ${{SCRIPT_DIR}} --accept-host-mutation"
+"""
+
+
+def render_collector_service_plan(targets: list[dict[str, Any]]) -> str:
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "# Reviewed Machine Agent bundled collector service/container plan.",
+        "# Live mutation requires setup.sh --apply collector --accept-host-mutation.",
+    ]
+    for target in targets:
+        name = target.get("name")
+        restart = collector_restart_command(target) or "collector restart command missing"
+        lines.append(f"echo {shell_quote(f'{name}: {restart}')}")
+    return "\n".join(lines) + "\n"
+
+
+def render_collector_validation_probes(targets: list[dict[str, Any]]) -> str:
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "# Static by default. Set APPD_COLLECTOR_VALIDATE_PORTS=1 for local port probes.",
+    ]
+    for target in targets:
+        bind = target.get("receiver_bind", "127.0.0.1")
+        http_port = target.get("http_port", 4318)
+        grpc_port = target.get("grpc_port", 4317)
+        target_name = target.get("name")
+        lines.extend(
+            [
+                f"echo {shell_quote(f'Validate {target_name}: OTLP gRPC {bind}:{grpc_port}, HTTP {bind}:{http_port}')}",
+                "if [[ \"${APPD_COLLECTOR_VALIDATE_PORTS:-0}\" == \"1\" ]] && command -v nc >/dev/null 2>&1; then",
+                f"  nc -z {shlex.quote(str(bind))} {shlex.quote(str(grpc_port))}",
+                f"  nc -z {shlex.quote(str(bind))} {shlex.quote(str(http_port))}",
+                "fi",
+            ]
+        )
+    return "\n".join(lines) + "\n"
+
+
+def render_machine_agent_discovery(targets: list[dict[str, Any]]) -> str:
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "# Discovery helper. Review output before any apply.",
+    ]
+    for target in targets:
+        name = target.get("name")
+        install_type = target.get("install_type")
+        machine_agent_home = target.get("machine_agent_home")
+        collector_config_path = target.get("collector_config_path")
+        collector_service_name = target.get("collector_service_name", "")
+        lines.extend(
+            [
+                f"echo {shell_quote(f'Discover {name} ({install_type})')}",
+                f"echo {shell_quote(f'machine_agent_home={machine_agent_home}')}",
+                f"echo {shell_quote(f'collector_config_path={collector_config_path}')}",
+                f"echo {shell_quote(f'collector_service_name={collector_service_name}')}",
+            ]
+        )
+    return "\n".join(lines) + "\n"
+
+
+def render_machine_agent_collector_runbook(targets: list[dict[str, Any]], spec: dict[str, Any]) -> str:
+    destination = destination_spec(spec)
+    target_lines = "\n".join(
+        f"- `{target.get('name')}` `{target.get('install_type')}`: `{target.get('collector_config_path')}`, service/container `{target.get('collector_service_name') or target.get('collector_container_name') or target.get('container_name', 'missing')}`."
+        for target in targets
+    )
+    return f"""# Machine Agent Bundled OTel Collector Runbook
+
+## Targets
+
+{target_lines}
+
+## Defaults
+
+- OTLP gRPC: `127.0.0.1:4317` unless overridden.
+- OTLP HTTP: `127.0.0.1:4318` unless overridden.
+- Destination: `{destination['destination']}`.
+- Traces: Splunk Observability Cloud and AppDynamics OTel when destination is `both`.
+- Metrics: Splunk Observability Cloud.
+- Logs enabled: `{bool(destination['logs_enabled'])}`.
+
+## Secret Handling
+
+- Splunk Observability token file: `{destination['splunk_o11y']['token_file']}`.
+- AppDynamics OTel API key file: `{destination['appd_otel']['api_key_file']}`.
+- Rendered collector YAML uses `${{SPLUNK_O11Y_ACCESS_TOKEN}}` and `${{APPD_OTEL_API_KEY}}` placeholders only.
+"""
+
+
+def render_dual_agent_apply_plan(targets: list[dict[str, Any]], spec: dict[str, Any]) -> str:
+    control = control_spec(spec)
+    change_ticket = control.get("change_ticket", "")
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "# Reviewed Java Dual Signal apply plan.",
+        "# Production sequence: collector first, Java restart second.",
+        f"echo {shell_quote(f'change_ticket={change_ticket}')}",
+        "echo '1. setup.sh --apply preflight --spec <spec>'",
+        "echo '2. setup.sh --apply collector --spec <spec> --accept-host-mutation'",
+        "echo '3. setup.sh --apply java --spec <spec> --accept-host-mutation --accept-app-restart when restart_strategy permits app restart'",
+    ]
+    for target in targets:
+        name = target.get("name")
+        startup_config_path = target.get("startup_config_path")
+        service_name = target.get("service_name")
+        lines.append(f"echo {shell_quote(f'{name}: write {startup_config_path} and validate {service_name}')}")
+    return "\n".join(lines) + "\n"
+
+
+def render_java_dual_validation_probes(targets: list[dict[str, Any]], spec: dict[str, Any]) -> str:
+    lines = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "# Static validation for rendered Java Dual Signal settings.",
+    ]
+    for target in targets:
+        env = java_env_map(target, spec)
+        name = target.get("name")
+        service_name = target.get("service_name")
+        lines.append(f"echo {shell_quote(f'Validate {name} service={service_name}')}")
+        for key, value in env.items():
+            lines.append(f"echo {shell_quote(f'{key}={value}')}")
+    return "\n".join(lines) + "\n"
+
+
+def render_dual_agent_collector_first_runbook(targets: list[dict[str, Any]], spec: dict[str, Any]) -> str:
+    target_lines = "\n".join(
+        f"- `{target.get('name')}`: collector `{target.get('collector_config_path')}` before Java `{target.get('startup_config_path')}`."
+        for target in targets
+    )
+    return f"""# Collector-First Dual Agent Runbook
+
+## Sequence
+
+1. `--apply preflight`
+2. `--apply collector`
+3. Validate OTLP receiver and exporter health.
+4. `--apply java`
+5. Restart Java app services only with explicit restart gates.
+6. Run service health checks and confirm AppDynamics plus OTel traces.
+
+## Targets
+
+{target_lines}
+
+Default restart strategy: `{restart_strategy(spec)}`.
+"""
+
+
+def render_dual_agent_artifacts(out: Path, spec: dict[str, Any]) -> None:
+    targets = host_apply_targets(spec)
+    for target in targets:
+        target.setdefault(
+            "startup_config_path",
+            f"/etc/systemd/system/{target.get('service_name', 'app')}.service.d/appd-dual-agent.conf",
+        )
+    write(out / "dual-agent-targets.yaml", dump_yaml({"targets": redact(targets), "control": control_spec(spec), "destinations": redact(destination_spec(spec))}))
+    write(out / "java-dual-agent-env.sh", render_env_file(java_env_map(targets[0], spec)))
+    write(out / "java-systemd-dropin.conf", render_systemd_dropin(targets[0], spec))
+    write(out / "java-container-env.env", render_env_file(java_env_map(targets[0], spec)))
+    write(out / "dual-agent-collector-first-runbook.md", render_dual_agent_collector_first_runbook(targets, spec))
+    plan = out / "dual-agent-apply-plan.sh"
+    write(plan, render_dual_agent_apply_plan(targets, spec))
+    chmod_exec(plan)
+    probes = out / "java-dual-agent-validation-probes.sh"
+    write(probes, render_java_dual_validation_probes(targets, spec))
+    chmod_exec(probes)
+    write(out / "apply-contract.md", render_apply_contract("splunk-appdynamics-dual-agent-setup"))
+
+
+def render_machine_agent_collector_artifacts(out: Path, spec: dict[str, Any]) -> None:
+    targets = host_apply_targets(spec)
+    write(out / "collector-targets.yaml", dump_yaml({"targets": redact(targets), "destinations": redact(destination_spec(spec)), "control": control_spec(spec)}))
+    write(out / "collector-config.yaml", render_collector_config(targets[0], spec))
+    service_plan = out / "collector-service-plan.sh"
+    write(service_plan, render_collector_service_plan(targets))
+    chmod_exec(service_plan)
+    probes = out / "collector-validation-probes.sh"
+    write(probes, render_collector_validation_probes(targets))
+    chmod_exec(probes)
+    discovery = out / "machine-agent-discovery.sh"
+    write(discovery, render_machine_agent_discovery(targets))
+    chmod_exec(discovery)
+    write(out / "machine-agent-collector-runbook.md", render_machine_agent_collector_runbook(targets, spec))
+    write(out / "apply-contract.md", render_apply_contract("splunk-appdynamics-machine-agent-otel-collector-setup"))
+
+
 def render_database_artifacts(out: Path, spec: dict[str, Any]) -> None:
     collectors = spec.get("collectors") or [{"name": "orders-postgres", "type": "POSTGRESQL", "hostname": "db.example.com", "port": 5432, "username": "appd_monitor", "password_file": "/secure/appd/db_password"}]
     payloads = []
@@ -4482,6 +5065,10 @@ def render_skill_specific(skill: str, out: Path, spec: dict[str, Any]) -> None:
         render_agent_management_artifacts(out, spec)
         return
 
+    if skill == "splunk-appdynamics-dual-agent-setup":
+        render_dual_agent_artifacts(out, spec)
+        return
+
     if skill == "splunk-appdynamics-apm-setup":
         render_apm_artifacts(out, spec)
         return
@@ -4492,6 +5079,10 @@ def render_skill_specific(skill: str, out: Path, spec: dict[str, Any]) -> None:
 
     if skill == "splunk-appdynamics-infrastructure-visibility-setup":
         render_infrastructure_artifacts(out, spec)
+        return
+
+    if skill == "splunk-appdynamics-machine-agent-otel-collector-setup":
+        render_machine_agent_collector_artifacts(out, spec)
         return
 
     if skill == "splunk-appdynamics-database-visibility-setup":
@@ -4557,6 +5148,221 @@ def render(skill: str, spec_path: Path, out: Path, json_output: bool) -> int:
     else:
         print(f"Rendered {skill} to {out}")
     return 0
+
+
+def host_target_key(target: dict[str, Any]) -> str:
+    return str(target.get("name") or target.get("host") or "local")
+
+
+def validate_host_apply_gates(args: argparse.Namespace, spec: dict[str, Any], phase: str, *, rollback: bool = False) -> list[str]:
+    errors: list[str] = []
+    if phase not in HOST_APPLY_PHASES:
+        errors.append(f"--apply/--rollback phase must be one of {', '.join(sorted(HOST_APPLY_PHASES))}; got {phase!r}")
+    if args.skill == "splunk-appdynamics-machine-agent-otel-collector-setup" and phase == "java":
+        errors.append("collector skill does not support --apply java")
+    if has_ssh_targets(spec) and not args.accept_remote_execution:
+        errors.append("SSH targets require --accept-remote-execution")
+    if (rollback or phase != "preflight") and not args.accept_host_mutation:
+        errors.append("file or service mutation requires --accept-host-mutation")
+    strategy = restart_strategy(spec)
+    java_phase = args.skill == "splunk-appdynamics-dual-agent-setup" and phase in {"java", "all"}
+    if java_phase and strategy in {"canary", "full"} and not args.accept_app_restart:
+        errors.append("Java service/container restarts require --accept-app-restart")
+    if strategy == "full" and not args.accept_full_restart:
+        errors.append("restart_strategy: full requires --accept-full-restart")
+    return errors
+
+
+def host_apply_phase_for_skill(skill: str, phase: str) -> tuple[bool, bool]:
+    if skill == "splunk-appdynamics-machine-agent-otel-collector-setup":
+        return phase in {"preflight", "collector", "all"}, False
+    return phase in {"preflight", "collector", "all"}, phase in {"preflight", "java", "all"}
+
+
+def run_host_preflight(recorder: ApplyRecorder, spec: dict[str, Any], *, include_collector: bool, include_java: bool) -> None:
+    for target in host_apply_targets(spec):
+        if include_collector:
+            for label, command in collector_preflight_commands(target, spec):
+                recorder.run(target, command, sudo=False, label=label)
+        if include_java:
+            for label, command in java_preflight_commands(target):
+                recorder.run(target, command, sudo=False, label=label)
+
+
+def run_collector_apply(recorder: ApplyRecorder, spec: dict[str, Any]) -> None:
+    for target in host_apply_targets(spec):
+        config_path = str(target.get("collector_config_path") or "")
+        if not config_path:
+            recorder.errors.append(f"{host_target_key(target)}: collector_config_path is required")
+            continue
+        recorder.write_text(
+            target,
+            config_path,
+            render_collector_config(target, spec),
+            mode=0o640,
+            sudo=target_sudo(target),
+            label="collector config",
+        )
+        restart = collector_restart_command(target)
+        if restart:
+            recorder.run(target, restart, sudo=target_sudo(target), label="restart collector")
+        else:
+            recorder.errors.append(f"{host_target_key(target)}: collector restart command could not be determined")
+            continue
+        healthcheck = target.get("collector_healthcheck_command")
+        if healthcheck:
+            recorder.run(target, str(healthcheck), sudo=False, label="collector healthcheck")
+        else:
+            bind = target.get("receiver_bind", "127.0.0.1")
+            recorder.run(
+                target,
+                f"echo 'collector healthcheck not supplied; verify OTLP gRPC {bind}:{target.get('grpc_port', 4317)} and HTTP {bind}:{target.get('http_port', 4318)} plus exporter logs'",
+                sudo=False,
+                label="collector healthcheck skipped",
+            )
+
+
+def java_targets_for_restart(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    targets = host_apply_targets(spec)
+    strategy = restart_strategy(spec)
+    if strategy in {"none", "collector_only"}:
+        return []
+    if strategy == "canary":
+        return targets[:1]
+    if strategy == "full":
+        return targets
+    return []
+
+
+def run_java_apply(recorder: ApplyRecorder, spec: dict[str, Any], *, restart_allowed: bool) -> None:
+    restart_targets = {host_target_key(target) for target in java_targets_for_restart(spec)} if restart_allowed else set()
+    for target in host_apply_targets(spec):
+        target.setdefault(
+            "startup_config_path",
+            f"/etc/systemd/system/{target.get('service_name', 'app')}.service.d/appd-dual-agent.conf",
+        )
+        recorder.write_text(
+            target,
+            str(target["startup_config_path"]),
+            java_startup_config_content(target, spec),
+            mode=0o644,
+            sudo=target_sudo(target),
+            label="java dual signal startup config",
+        )
+        reload_command = java_systemd_reload_command(target)
+        if reload_command:
+            recorder.run(target, reload_command, sudo=target_sudo(target), label="reload systemd")
+        if host_target_key(target) not in restart_targets:
+            recorder.run(
+                target,
+                f"echo 'Java restart skipped for {host_target_key(target)}; restart_strategy={restart_strategy(spec)}'",
+                sudo=False,
+                label="java restart skipped",
+            )
+            continue
+        restart = java_restart_command(target)
+        if restart:
+            recorder.run(target, restart, sudo=target_sudo(target), label="restart java app")
+        else:
+            recorder.errors.append(f"{host_target_key(target)}: Java restart command could not be determined")
+            continue
+        healthcheck = target.get("healthcheck_command")
+        if healthcheck:
+            recorder.run(target, str(healthcheck), sudo=False, label="java healthcheck")
+
+
+def apply_host_skill(args: argparse.Namespace, spec_path: Path, out: Path) -> int:
+    phase = str(args.apply or "all").strip().lower()
+    spec = load_yaml_or_json(spec_path)
+    gates = validate_host_apply_gates(args, spec, phase)
+    if gates:
+        for error in gates:
+            print(f"FAIL: {error}", file=sys.stderr)
+        return 2
+    if phase == "all" and args.skill == "splunk-appdynamics-machine-agent-otel-collector-setup":
+        phase = "collector"
+    include_collector, include_java = host_apply_phase_for_skill(args.skill, phase)
+    out.mkdir(parents=True, exist_ok=True)
+    coverage = coverage_for_skill(args.skill)
+    errors = validate_coverage(coverage)
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+    render_common_artifacts(args.skill, out, spec, coverage)
+    render_skill_specific(args.skill, out, spec)
+    recorder = ApplyRecorder(out, args.skill, phase)
+    try:
+        run_host_preflight(recorder, spec, include_collector=include_collector, include_java=include_java)
+        if phase == "preflight":
+            status = "preflight_passed" if not recorder.errors else "preflight_failed"
+            recorder.write_outputs(status, render_host_apply_rollback_plan(args.skill, phase), {"control": control_spec(spec)})
+            return 0 if not recorder.errors else 1
+        if recorder.errors:
+            recorder.write_outputs("failed", render_host_apply_rollback_plan(args.skill, phase), {"control": control_spec(spec)})
+            return 1
+        if include_collector:
+            run_collector_apply(recorder, spec)
+        if include_java:
+            run_java_apply(recorder, spec, restart_allowed=bool(args.accept_app_restart))
+    except Exception as exc:  # noqa: BLE001 - capture into apply report
+        recorder.errors.append(str(exc))
+    status = "applied" if not recorder.errors else "failed"
+    recorder.write_outputs(status, render_host_apply_rollback_plan(args.skill, phase), {"control": control_spec(spec)})
+    if args.json:
+        print(json.dumps({"status": status, "skill": args.skill, "output_dir": str(out)}, sort_keys=True))
+    else:
+        print(f"{status}: {args.skill} {phase} at {out}")
+    return 0 if not recorder.errors else 1
+
+
+def rollback_host_skill(args: argparse.Namespace, spec_path: Path, out: Path) -> int:
+    phase = str(args.rollback or "all").strip().lower()
+    spec = load_yaml_or_json(spec_path)
+    gates = validate_host_apply_gates(args, spec, phase if phase in HOST_APPLY_PHASES else "all", rollback=True)
+    if gates:
+        for error in gates:
+            print(f"FAIL: {error}", file=sys.stderr)
+        return 2
+    manifest_path = out / "backup-manifest.json"
+    if not manifest_path.exists():
+        print(f"FAIL: missing backup manifest: {manifest_path}", file=sys.stderr)
+        return 1
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    targets = {host_target_key(target): target for target in host_apply_targets(spec)}
+    default_target = host_apply_targets(spec)[0]
+    recorder = ApplyRecorder(out, args.skill, "rollback")
+    for entry in reversed(as_list(manifest.get("files"))):
+        entry_dict = as_dict(entry)
+        target = targets.get(str(entry_dict.get("target")), default_target)
+        result = restore_entry(entry_dict, target, out)
+        if result is not None:
+            recorder.record_command(result)
+    if args.skill == "splunk-appdynamics-machine-agent-otel-collector-setup":
+        for target in host_apply_targets(spec):
+            restart = collector_restart_command(target)
+            if restart:
+                recorder.run(target, restart, sudo=target_sudo(target), label="rollback restart collector")
+    elif args.accept_app_restart:
+        for target in java_targets_for_restart(spec):
+            reload_command = java_systemd_reload_command(target)
+            if reload_command:
+                recorder.run(target, reload_command, sudo=target_sudo(target), label="rollback reload systemd")
+            restart = java_restart_command(target)
+            if restart:
+                recorder.run(target, restart, sudo=target_sudo(target), label="rollback restart java app")
+    status = "rolled_back" if not recorder.errors else "rollback_failed"
+    report = recorder.report(status, {"control": control_spec(spec)})
+    write_json(out / "rollback-report.json", report)
+    write_json(out / "apply-report.json", report)
+    rollback_path = out / "rollback-plan.sh"
+    write(rollback_path, render_host_apply_rollback_plan(args.skill, "rollback"))
+    chmod_exec(rollback_path)
+    if args.json:
+        print(json.dumps({"status": status, "skill": args.skill, "output_dir": str(out)}, sort_keys=True))
+    else:
+        print(f"{status}: {args.skill} at {out}")
+    return 0 if not recorder.errors else 1
 
 
 def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int:
@@ -4659,6 +5465,70 @@ def validate_output(skill: str, out: Path, live: bool, json_output: bool) -> int
         if live:
             notes.append(f"run live Kubernetes probes with bash {out / 'cluster-agent-validation-probes.sh'}")
             notes.append(f"run live O11y probes with bash {out / 'o11y-export-validation.sh'}")
+    elif skill == "splunk-appdynamics-dual-agent-setup":
+        targets_path = out / "dual-agent-targets.yaml"
+        if targets_path.exists():
+            targets_payload = yaml.safe_load(targets_path.read_text(encoding="utf-8")) or {}
+            targets = as_list(targets_payload.get("targets"))
+            if not targets:
+                errors.append("dual-agent-targets.yaml must include targets")
+            if "cloud_provider" in json.dumps(targets_payload).lower():
+                errors.append("dual-agent target inventory must not encode cloud-provider discovery")
+        env_path = out / "java-dual-agent-env.sh"
+        if env_path.exists():
+            env_text = env_path.read_text(encoding="utf-8")
+            for marker in (
+                "AGENT_DEPLOYMENT_MODE=\"dual\"",
+                "OTEL_TRACES_EXPORTER=\"otlp\"",
+                "OTEL_EXPORTER_OTLP_ENDPOINT=\"http://127.0.0.1:4318\"",
+                "OTEL_EXPORTER_OTLP_PROTOCOL=\"http/protobuf\"",
+                "service.name=",
+                "service.namespace=",
+                "deployment.environment=",
+            ):
+                if marker not in env_text:
+                    errors.append(f"java-dual-agent-env.sh missing {marker}")
+            if "OTEL_EXPORTER_OTLP_HEADERS" in env_text or "TOKEN" in env_text:
+                errors.append("Java Dual Signal env must not render token/header secrets")
+        systemd_path = out / "java-systemd-dropin.conf"
+        if systemd_path.exists():
+            systemd_text = systemd_path.read_text(encoding="utf-8")
+            if "-Dagent.deployment.mode=dual" not in systemd_text:
+                errors.append("java-systemd-dropin.conf must include -Dagent.deployment.mode=dual")
+        if live:
+            notes.append(f"run Java Dual Signal probes with bash {out / 'java-dual-agent-validation-probes.sh'}")
+    elif skill == "splunk-appdynamics-machine-agent-otel-collector-setup":
+        collector_config_path = out / "collector-config.yaml"
+        if collector_config_path.exists():
+            config = yaml.safe_load(collector_config_path.read_text(encoding="utf-8")) or {}
+            otlp = as_dict(as_dict(as_dict(config.get("receivers")).get("otlp")).get("protocols"))
+            grpc_endpoint = as_dict(otlp.get("grpc")).get("endpoint")
+            http_endpoint = as_dict(otlp.get("http")).get("endpoint")
+            if grpc_endpoint != "127.0.0.1:4317":
+                errors.append("collector-config.yaml must default OTLP gRPC to 127.0.0.1:4317")
+            if http_endpoint != "127.0.0.1:4318":
+                errors.append("collector-config.yaml must default OTLP HTTP to 127.0.0.1:4318")
+            exporters = as_dict(config.get("exporters"))
+            if "signalfx" not in exporters:
+                errors.append("collector-config.yaml must include Splunk Observability signalfx exporter")
+            appd_exporter = as_dict(exporters.get("otlphttp/appdynamics"))
+            headers = as_dict(appd_exporter.get("headers"))
+            if headers.get("x-api-key") != "${APPD_OTEL_API_KEY}":
+                errors.append("collector-config.yaml must use APPD_OTEL_API_KEY placeholder for AppDynamics x-api-key")
+            signalfx = as_dict(exporters.get("signalfx"))
+            if signalfx.get("access_token") != "${SPLUNK_O11Y_ACCESS_TOKEN}":
+                errors.append("collector-config.yaml must use SPLUNK_O11Y_ACCESS_TOKEN placeholder")
+            pipelines = as_dict(as_dict(config.get("service")).get("pipelines"))
+            traces_exporters = as_list(as_dict(pipelines.get("traces")).get("exporters"))
+            metrics_exporters = as_list(as_dict(pipelines.get("metrics")).get("exporters"))
+            if "signalfx" not in traces_exporters or "otlphttp/appdynamics" not in traces_exporters:
+                errors.append("traces pipeline must export to both Splunk Observability and AppDynamics by default")
+            if metrics_exporters != ["signalfx"]:
+                errors.append("metrics pipeline must export to Splunk Observability only by default")
+            if "logs" in pipelines:
+                errors.append("logs pipeline must be disabled unless logs_enabled is explicit")
+        if live:
+            notes.append(f"run collector probes with bash {out / 'collector-validation-probes.sh'}")
     elif skill == "splunk-appdynamics-thousandeyes-integration-setup":
         readiness_path = out / "appd-te-readiness.yaml"
         if readiness_path.exists():
@@ -4738,6 +5608,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--accept-eum-source-edit", action="store_true")
     parser.add_argument("--accept-analytics-event-publish", action="store_true")
     parser.add_argument("--accept-appd-te-mutation", action="store_true")
+    parser.add_argument("--accept-host-mutation", action="store_true")
+    parser.add_argument("--accept-app-restart", action="store_true")
+    parser.add_argument("--accept-full-restart", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -4767,6 +5640,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(result, sort_keys=True) if args.json else f"{args.skill}: doctor OK; render and validate child output.")
         return 0
     if args.apply is not None:
+        if args.skill in HOST_APPLY_SKILLS:
+            return apply_host_skill(args, spec, out)
         if not gate_accepted(args):
             gate = SKILL_META[args.skill]["gate"]
             print(f"FAIL: {args.skill} apply requires {GATE_FLAGS[gate]}", file=sys.stderr)
@@ -4776,6 +5651,8 @@ def main(argv: list[str] | None = None) -> int:
             print("Apply mode rendered a reviewed apply plan; no live mutation was executed by the generic suite.")
         return rc
     if args.rollback is not None:
+        if args.skill in HOST_APPLY_SKILLS:
+            return rollback_host_skill(args, spec, out)
         coverage = coverage_for_skill(args.skill)
         out.mkdir(parents=True, exist_ok=True)
         write(out / "rollback-plan.sh", render_apply_plan(args.skill, coverage).replace("APPLY", "ROLLBACK"))
