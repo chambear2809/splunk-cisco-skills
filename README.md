@@ -91,7 +91,8 @@ Run commands from the repository root.
 | I need AppDynamics product coverage | [`splunk-appdynamics-setup`](skills/splunk-appdynamics-setup/) | `bash skills/splunk-appdynamics-setup/scripts/setup.sh --help` |
 | I need Galileo MCP in Cursor, VS Code, Codex, Claude Code, or Kiro | [`galileo-mcp-server-setup`](skills/galileo-mcp-server-setup/) | `bash skills/galileo-mcp-server-setup/scripts/setup.sh --help` |
 | I need AppDynamics Java Dual Signal or Machine Agent bundled OTel Collector production host changes | [`splunk-appdynamics-dual-agent-setup`](skills/splunk-appdynamics-dual-agent-setup/), [`splunk-appdynamics-machine-agent-otel-collector-setup`](skills/splunk-appdynamics-machine-agent-otel-collector-setup/) | `bash skills/splunk-appdynamics-dual-agent-setup/scripts/setup.sh --help` |
-| I need Galileo or Agent Control wired to Splunk | [`galileo-platform-setup`](skills/galileo-platform-setup/) or [`galileo-agent-control-setup`](skills/galileo-agent-control-setup/) | `bash skills/galileo-platform-setup/scripts/setup.sh --help` |
+| I need Galileo Agent Observability, the Controls tab, or Galileo records wired to Splunk | [`galileo-platform-setup`](skills/galileo-platform-setup/) | `bash skills/galileo-platform-setup/scripts/setup.sh --help` |
+| I need standalone Agent Control runtime/server events wired to Splunk | [`galileo-agent-control-setup`](skills/galileo-agent-control-setup/) | `bash skills/galileo-agent-control-setup/scripts/setup.sh --help` |
 | I need a broad admin health check | [`splunk-admin-doctor`](skills/splunk-admin-doctor/) | `bash skills/splunk-admin-doctor/scripts/setup.sh --help` |
 
 For the exhaustive operator catalog, use

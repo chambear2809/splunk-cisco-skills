@@ -5,11 +5,18 @@
 - Agent Control overview: `https://docs.agentcontrol.dev/core/overview`
 - Agent Control controls: `https://docs.agentcontrol.dev/concepts/controls`
 - Agent Control repository: `https://github.com/agentcontrol/agent-control`
+- Galileo Agent Observability Controls handoff owner:
+  `../galileo-platform-setup/reference.md#agent-observability-controls`
 
 Re-check these docs before changing server env names, control policy shape,
 SDK snippets, or sink configuration.
 
 ## Apply Sections
+
+This skill owns standalone/external Agent Control runtime, server, and sink
+assets. It does not own the Galileo Agent Observability `Controls` console tab
+or Log stream control attachment workflow; use `galileo-platform-setup`
+`observability-controls` for that platform surface.
 
 | Section | Owner | Purpose |
 | --- | --- | --- |

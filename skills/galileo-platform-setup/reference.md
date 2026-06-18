@@ -11,6 +11,8 @@
 - Galileo experiments: `https://docs.galileo.ai/sdk-api/python/reference/experiments`
 - Galileo OpenTelemetry/OpenInference: `https://docs.galileo.ai/sdk-api/third-party-integrations/opentelemetry-and-openinference`
 - Galileo Agent Control target resolution: `https://docs.galileo.ai/sdk-api/python/reference/agent_control`
+- Galileo Agent Observability Controls: `https://docs.galileo.ai/how-to-guides/agent-control/create-a-control`
+- Galileo control monitoring: `https://docs.galileo.ai/how-to-guides/agent-control/monitor-a-control`
 - Galileo export records API: `https://docs.galileo.ai/api-reference/trace/export-records`
 - Galileo agentic metrics: `https://docs.galileo.ai/concepts/metrics/agentic/agentic-overview`
 - Galileo Protect invoke API: `https://docs.galileo.ai/api-reference/protect/invoke`
@@ -30,8 +32,9 @@ schema, HEC envelope shape, or collector handoff flags.
 | `object-lifecycle` | `galileo-platform-setup` | Create or validate Galileo projects, log streams, datasets, prompts, experiments, metrics, Protect stages, and Agent Control target resolution. |
 | `observe-export` | `galileo-platform-setup` | Pull Galileo records through `export_records` and send HEC JSON events. |
 | `observe-runtime` | `galileo-platform-setup` | Provide Python and Kubernetes OTel/OpenInference bootstrap snippets. |
-| `protect-runtime` | `galileo-platform-setup` | Provide a Python `/v2/protect/invoke` helper. |
+| `protect-runtime` | `galileo-platform-setup` | Provide a legacy Python `/v2/protect/invoke` helper for existing Protect users. |
 | `evaluate-assets` | `galileo-platform-setup` | Render Evaluate, experiment, dataset, metric, annotation, feedback, Signals, and Trends handoffs. |
+| `observability-controls` | `galileo-platform-setup` | Render Galileo Agent Observability Controls console inventory, Log stream attachment, control-span export, and Splunk search handoffs. |
 | `splunk-hec` | `splunk-hec-service-setup` | Prepare Splunk HEC service/token configuration. |
 | `splunk-otlp` | `splunk-connect-for-otlp-setup` | Configure the Splunk Platform OTLP receiver and sender handoff assets. |
 | `otel-collector` | `splunk-observability-otel-collector-setup` | Render Splunk OTel Collector Kubernetes/Linux assets. |
@@ -49,6 +52,7 @@ default render/apply selects only:
 - `observe-runtime`
 - `protect-runtime`
 - `evaluate-assets`
+- `observability-controls`
 - `otel-collector`
 - `dashboards`
 - `detectors`
@@ -130,6 +134,10 @@ Product coverage surfaces tracked in the matrix:
 - Protect stages, rules, rulesets, actions, notifications, and invocation
   runtime
 - Agent Control log stream target resolution
+- Agent Observability Controls dashboard, Log stream control attachment, control
+  span evidence, and Splunk field mapping. Public Galileo v2 OpenAPI does not
+  currently expose documented control CRUD endpoints, so control creation and
+  attachment remain console/operator actions in this skill.
 - Annotation templates, ratings, queues, feedback templates, feedback ratings,
   Signals, and Trends dashboards/widgets/sections
 - Run insights, health scores, token usage, search, runs, traces SDK utilities,
@@ -174,12 +182,33 @@ Preferred record fields:
 - `metric_info`
 - `feedback_rating_info`
 - `annotations`
+- `control_info`
+- `galileo_control_name`
+- `galileo_control_step_type`
+- `galileo_control_action`
+- `galileo_control_stage`
+- `galileo_control_source`
 - `redacted_input`
 - `redacted_output`
 
 Raw prompt/response fields are excluded unless the operator explicitly passes
 `--include-raw` to the bridge script and confirms Splunk is an approved
 destination.
+
+## Agent Observability Controls
+
+Use `observability-controls` for the Galileo console Controls surface shown in
+Agent Observability. The skill renders:
+
+- `controls/agent-observability-controls.md`
+- `controls/control-intake.example.json`
+- `controls/splunk-search-examples.spl`
+
+The handoff tracks control name, step, stage, execution, source, action,
+selector path, evaluator, threshold, owner, and enabled state. Because the
+public OpenAPI currently lacks documented control CRUD endpoints, this skill
+does not create or mutate controls. Export `span` records through
+`observe-export` to capture control-span evidence where Galileo includes it.
 
 ## HEC Event Shape
 

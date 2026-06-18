@@ -299,6 +299,198 @@ def download_records_from_url(url: str, headers: dict[str, str]) -> list[dict[st
         return parse_jsonl(text)
 
 
+def nested_lookup(node: dict[str, Any], path: str) -> Any:
+    current: Any = node
+    for part in path.split("."):
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current[part]
+    return current
+
+
+def nested_sources(record: dict[str, Any]) -> list[dict[str, Any]]:
+    sources: list[dict[str, Any]] = [record]
+    for key in (
+        "control_info",
+        "control",
+        "agent_control",
+        "attributes",
+        "span_attributes",
+        "metadata",
+        "user_metadata",
+        "metrics",
+        "metric_info",
+    ):
+        value = record.get(key)
+        if isinstance(value, dict):
+            sources.append(value)
+            for nested_key in ("control_info", "control", "agent_control", "evaluator", "condition"):
+                nested = value.get(nested_key)
+                if isinstance(nested, dict):
+                    sources.append(nested)
+    return sources
+
+
+def first_present(sources: list[dict[str, Any]], aliases: tuple[str, ...]) -> Any:
+    for alias in aliases:
+        for source in sources:
+            value = source.get(alias)
+            if value in (None, "") and "." in alias:
+                value = nested_lookup(source, alias)
+            if value not in (None, ""):
+                return value
+    return None
+
+
+def record_has_control_hints(record: dict[str, Any]) -> bool:
+    for key in ("control_info", "control", "agent_control", "control_name", "control_id"):
+        if key in record:
+            return True
+    for source in nested_sources(record):
+        for key in source:
+            normalized = str(key).lower().replace("-", "_").replace(".", "_")
+            if normalized.startswith("control_") or normalized in {
+                "evaluator_name",
+                "execution_environment",
+                "selector_path",
+            }:
+                return True
+    for key in ("type", "span_type", "kind"):
+        value = str(record.get(key, "")).lower()
+        if "control" in value:
+            return True
+    return False
+
+
+def record_is_control_span(record: dict[str, Any]) -> bool:
+    for key in ("type", "span_type", "kind"):
+        if "control" in str(record.get(key, "")).lower():
+            return True
+    return False
+
+
+def extract_control_info(record: dict[str, Any]) -> dict[str, Any]:
+    if not record_has_control_hints(record):
+        return {}
+
+    sources = nested_sources(record)
+    aliases: dict[str, tuple[str, ...]] = {
+        "control_id": ("control_id", "control.id", "control_info.control_id", "agent_control.control_id"),
+        "stage": (
+            "control_stage",
+            "control.stage",
+            "control_info.stage",
+            "agent_control.stage",
+            "check_stage",
+            "scope.stage",
+            "scope.stages",
+            "stage",
+        ),
+        "step_type": (
+            "control_step",
+            "control_step_type",
+            "control.step",
+            "control.step_type",
+            "control_info.step",
+            "control_info.step_type",
+            "agent_control.step",
+            "agent_control.step_type",
+            "step",
+            "step_type",
+            "step.type",
+            "scope.step",
+            "scope.steps",
+            "scope.step_type",
+            "scope.step_types",
+        ),
+        "execution": (
+            "control_execution",
+            "control.execution",
+            "control_info.execution",
+            "agent_control.execution",
+            "execution_environment",
+            "execution",
+        ),
+        "action": (
+            "control_action",
+            "control.action.decision",
+            "control.action",
+            "control_info.action.decision",
+            "control_info.action",
+            "agent_control.action",
+            "action.decision",
+            "action",
+            "decision",
+        ),
+        "matched": (
+            "control_matched",
+            "control.matched",
+            "control_info.matched",
+            "agent_control.matched",
+            "result.matched",
+            "matched",
+            "match",
+            "is_match",
+        ),
+        "confidence": (
+            "control_confidence",
+            "control.confidence",
+            "control_info.confidence",
+            "agent_control.confidence",
+            "result.confidence",
+            "confidence_score",
+            "confidence",
+            "score",
+        ),
+        "evaluator_name": (
+            "evaluator_name",
+            "control.evaluator.name",
+            "control_info.evaluator.name",
+            "control_info.evaluator_name",
+            "agent_control.evaluator_name",
+            "evaluator.name",
+            "condition.evaluator.name",
+            "control_evaluator_name",
+        ),
+        "selector_path": (
+            "selector_path",
+            "control.selector.path",
+            "control_info.selector.path",
+            "control_info.selector_path",
+            "agent_control.selector_path",
+            "selector.path",
+            "condition.selector.path",
+            "control_selector_path",
+        ),
+        "source": (
+            "control_source",
+            "control.source",
+            "control_info.source",
+            "agent_control.source",
+        ),
+    }
+    info = {
+        key: value
+        for key, value in ((name, first_present(sources, field_aliases)) for name, field_aliases in aliases.items())
+        if value not in (None, "")
+    }
+    control_name = first_present(
+        sources,
+        (
+            "control_name",
+            "control.name",
+            "control_info.control_name",
+            "control_info.name",
+            "agent_control.control_name",
+        ),
+    )
+    if control_name in (None, "") and record_is_control_span(record):
+        control_name = first_present([record], ("name", "span_name"))
+    if control_name not in (None, ""):
+        info["control_name"] = control_name
+    return info
+
+
 def query_galileo(args: argparse.Namespace, since: str | None) -> list[dict[str, Any]]:
     url = f"{args.galileo_api_base.rstrip('/')}/v2/projects/{args.project_id}/export_records"
     headers = galileo_headers(args)
@@ -351,12 +543,25 @@ def compact_record(record: dict[str, Any], args: argparse.Namespace) -> dict[str
         "redacted_input": record.get("redacted_input"),
         "redacted_output": record.get("redacted_output"),
     }
+    control_info = extract_control_info(record)
+    if control_info:
+        payload["control_info"] = control_info
+        for key, value in control_info.items():
+            if isinstance(value, (str, int, float, bool)):
+                field_key = key.removeprefix("control_")
+                payload[f"galileo_control_{field_key}"] = value
     if args.include_raw:
         payload["input"] = record.get("input")
         payload["output"] = record.get("output")
         payload["dataset_input"] = record.get("dataset_input")
         payload["dataset_output"] = record.get("dataset_output")
     return {key: value for key, value in payload.items() if value is not None}
+
+
+def hec_indexed_field_value(value: Any) -> str:
+    if isinstance(value, bool):
+        return str(value).lower()
+    return str(value)
 
 
 def hec_envelope(record: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
@@ -382,6 +587,14 @@ def hec_envelope(record: dict[str, Any], args: argparse.Namespace) -> dict[str, 
             "galileo_session_id": str(event.get("galileo_session_id", "")),
             "galileo_record_key": str(event.get("galileo_record_key", "")),
         }
+        for key in (
+            "galileo_control_name",
+            "galileo_control_stage",
+            "galileo_control_action",
+            "galileo_control_matched",
+        ):
+            if key in event:
+                envelope["fields"][key] = hec_indexed_field_value(event.get(key, ""))
     return envelope
 
 
