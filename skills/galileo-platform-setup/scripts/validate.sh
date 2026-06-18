@@ -60,6 +60,9 @@ check_file "${OUTPUT_DIR}/lifecycle/product-coverage-matrix.md"
 check_file "${OUTPUT_DIR}/runtime/python-opentelemetry-env.sh"
 check_file "${OUTPUT_DIR}/runtime/python-galileo-protect.py"
 check_file "${OUTPUT_DIR}/evaluate/evaluate-assets.yaml"
+check_file "${OUTPUT_DIR}/controls/agent-observability-controls.md"
+check_file "${OUTPUT_DIR}/controls/control-intake.example.json"
+check_file "${OUTPUT_DIR}/controls/splunk-search-examples.spl"
 check_file "${OUTPUT_DIR}/splunk-platform/hec-event-sample.json"
 check_file "${OUTPUT_DIR}/splunk-platform/export-records-request.json"
 check_file "${OUTPUT_DIR}/otel/collector-galileo-fanout.yaml"
@@ -69,6 +72,7 @@ check_exec "${OUTPUT_DIR}/scripts/apply-observe-export.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-observe-runtime.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-protect-runtime.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-evaluate-assets.sh"
+check_exec "${OUTPUT_DIR}/scripts/apply-observability-controls.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-splunk-hec.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-splunk-otlp.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-otel-collector.sh"
@@ -90,6 +94,7 @@ required = {
     "observe-runtime": "galileo-platform-setup",
     "protect-runtime": "galileo-platform-setup",
     "evaluate-assets": "galileo-platform-setup",
+    "observability-controls": "galileo-platform-setup",
     "splunk-hec": "splunk-hec-service-setup",
     "splunk-otlp": "splunk-connect-for-otlp-setup",
     "otel-collector": "splunk-observability-otel-collector-setup",
@@ -109,6 +114,9 @@ if coverage.get("secret_values_rendered") is not False:
 lifecycle = coverage.get("coverage", {}).get("galileo_object_lifecycle", {})
 if lifecycle.get("status") != "automated_create_or_get":
     raise SystemExit("coverage report must include automated Galileo object lifecycle coverage")
+controls = coverage.get("coverage", {}).get("galileo_agent_observability_controls", {})
+if controls.get("status") != "rendered_handoff":
+    raise SystemExit("coverage report must include Galileo Agent Observability Controls handoff coverage")
 full_matrix = coverage.get("coverage", {}).get("galileo_full_feature_coverage_matrix", {})
 if full_matrix.get("status") != "rendered" or full_matrix.get("domain_count", 0) < 45:
     raise SystemExit("coverage report must include the full Galileo feature coverage matrix")
@@ -147,6 +155,7 @@ for surface in (
     "Protect stages and invocation",
     "Protect rules, rulesets, actions, notifications, and LangChain/LangGraph runtime",
     "Agent Control targets",
+    "Agent Observability Controls dashboard and control spans",
     "Annotation templates, ratings, and queues",
     "Feedback templates and ratings",
     "Trends dashboards, widgets, sections, Signals, and insights",

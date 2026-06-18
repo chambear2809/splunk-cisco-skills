@@ -11,7 +11,7 @@ DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/galileo-platform-rendered"
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 VALIDATE_SCRIPT="${SCRIPT_DIR}/validate.sh"
 
-APPLY_SECTIONS_DEFAULT="readiness,object-lifecycle,observe-export,observe-runtime,protect-runtime,evaluate-assets,splunk-hec,splunk-otlp,otel-collector,dashboards,detectors"
+APPLY_SECTIONS_DEFAULT="readiness,object-lifecycle,observe-export,observe-runtime,protect-runtime,evaluate-assets,observability-controls,splunk-hec,splunk-otlp,otel-collector,dashboards,detectors"
 
 usage() {
     cat <<'EOF'
@@ -41,6 +41,7 @@ Apply sections:
   observe-runtime               Copy or point to Observe OpenTelemetry/OpenInference snippets
   protect-runtime               Copy or point to Protect invoke runtime snippets
   evaluate-assets               Render evaluation, experiment, dataset, metric, and annotation assets
+  observability-controls        Render Galileo Agent Observability Controls handoff and Splunk searches
   splunk-hec                    Delegate HEC token/service setup to splunk-hec-service-setup
   splunk-otlp                   Delegate Splunk Platform OTLP input to splunk-connect-for-otlp-setup
   otel-collector                Delegate Splunk OTel Collector setup to splunk-observability-otel-collector-setup
@@ -205,6 +206,7 @@ apply_section() {
         observe-runtime) script="apply-observe-runtime.sh" ;;
         protect-runtime) script="apply-protect-runtime.sh" ;;
         evaluate-assets) script="apply-evaluate-assets.sh" ;;
+        observability-controls) script="apply-observability-controls.sh" ;;
         splunk-hec) script="apply-splunk-hec.sh" ;;
         splunk-otlp) script="apply-splunk-otlp.sh" ;;
         otel-collector) script="apply-otel-collector.sh" ;;
@@ -242,7 +244,7 @@ if [[ "${MODE_APPLY}" == "true" ]]; then
         sections="${APPLY_SECTIONS_DEFAULT}"
     fi
     if [[ "${O11Y_ONLY}" == "true" && ( -z "${APPLY_SECTIONS}" || "${APPLY_SECTIONS}" == "all" ) ]]; then
-        sections="readiness,object-lifecycle,observe-runtime,protect-runtime,evaluate-assets,otel-collector,dashboards,detectors"
+        sections="readiness,object-lifecycle,observe-runtime,protect-runtime,evaluate-assets,observability-controls,otel-collector,dashboards,detectors"
     fi
     IFS=',' read -ra section_array <<< "${sections}"
     for section in "${section_array[@]}"; do

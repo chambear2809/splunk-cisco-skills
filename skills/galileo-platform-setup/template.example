@@ -27,6 +27,13 @@ hec_export:
   until: ""
   cursor_file: "./galileo-platform-rendered/state/cursor.json"
 
+observability_controls:
+  # Inventory only. Create and attach controls through the Galileo console until
+  # a documented public control CRUD API is available.
+  inventory_file: "./galileo-platform-rendered/controls/control-intake.example.json"
+  export_root_type_for_evidence: "span"
+  expected_fields: "control_name,step,stage,execution,source,action,evaluator,selector_path,matched,confidence"
+
 splunk:
   platform: "enterprise"
   hec_url: "https://splunk.example.com:8088/services/collector/event"

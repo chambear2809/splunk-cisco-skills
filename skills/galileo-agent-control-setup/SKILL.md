@@ -16,6 +16,11 @@ This skill renders Agent Control setup assets without exposing secret values.
 It owns the Agent Control runtime and sink examples, and delegates Splunk-side
 HEC, OTel Collector, dashboard, and detector work to the existing Splunk skills.
 
+Use `galileo-platform-setup` instead when the user is asking about the Galileo
+Agent Observability `Controls` console tab, Log stream control attachment, or
+exported control-span evidence. This skill is for external/open-source Agent
+Control runtime and server assets.
+
 ## Supported Paths
 
 1. **Server readiness**: render Docker/external server readiness notes, health

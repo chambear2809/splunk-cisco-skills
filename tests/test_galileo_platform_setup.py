@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import importlib.util
+from argparse import Namespace
 from pathlib import Path
 from types import ModuleType
 
@@ -240,6 +241,7 @@ def test_o11y_only_otel_collector_handoff_omits_platform_hec(tmp_path: Path) -> 
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
+        "observability-controls",
         "otel-collector",
         "dashboards",
         "detectors",
@@ -267,6 +269,7 @@ def test_o11y_only_default_apply_dry_run_selects_cloud_sections(tmp_path: Path) 
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
+        "observability-controls",
         "otel-collector",
         "dashboards",
         "detectors",
@@ -411,6 +414,61 @@ def test_export_records_request_shape_defaults_to_jsonl_and_redaction() -> None:
         "type": "date",
         "value": "2026-05-01T00:00:00Z",
     }
+
+
+def test_hec_envelope_extracts_flat_dotted_control_attributes() -> None:
+    bridge = load_bridge()
+    args = Namespace(
+        include_raw=False,
+        indexed_fields=True,
+        log_stream_id="log-stream-1",
+        project_id="project-1",
+        root_type="span",
+        splunk_host=None,
+        splunk_index="galileo",
+        splunk_source="galileo",
+        splunk_sourcetype="galileo:observe:json",
+        time_field="updated_at",
+    )
+    record = {
+        "id": "span-1",
+        "type": "span",
+        "project_id": "project-1",
+        "run_id": "log-stream-1",
+        "trace_id": "trace-1",
+        "updated_at": "2026-06-18T00:00:00Z",
+        "attributes": {
+            "control.id": "control-1",
+            "control.name": "block-output-pii",
+            "control.step": "LLM",
+            "control.stage": "Post",
+            "control.action.decision": "deny",
+            "control.matched": True,
+            "control.source": "custom",
+            "control.evaluator.name": "pii-detector",
+            "control.selector.path": "output",
+        },
+    }
+
+    envelope = bridge.hec_envelope(record, args)
+    event = envelope["event"]
+
+    assert event["control_info"] == {
+        "control_id": "control-1",
+        "stage": "Post",
+        "step_type": "LLM",
+        "action": "deny",
+        "matched": True,
+        "evaluator_name": "pii-detector",
+        "selector_path": "output",
+        "source": "custom",
+        "control_name": "block-output-pii",
+    }
+    assert event["galileo_control_id"] == "control-1"
+    assert event["galileo_control_name"] == "block-output-pii"
+    assert event["galileo_control_step_type"] == "LLM"
+    assert event["galileo_control_source"] == "custom"
+    assert envelope["fields"]["galileo_control_matched"] == "true"
 
 
 def test_object_lifecycle_dry_run_covers_core_galileo_objects(tmp_path: Path) -> None:
