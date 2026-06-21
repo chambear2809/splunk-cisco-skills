@@ -34,6 +34,18 @@ observability_controls:
   export_root_type_for_evidence: "span"
   expected_fields: "control_name,step,stage,execution,source,action,evaluator,selector_path,matched,confidence"
 
+multimodal:
+  enabled: true
+  input_modalities: "image,audio,document"
+  output_modalities: "image,audio,document,text"
+  capture_methods: "galileo_logger_external_url,galileo_logger_file_upload,langchain_handler"
+  quality_metrics: "visual_quality,visual_fidelity,interruption_detection"
+  # Splunk receives modality metadata, asset counts, safe MIME/dimension/duration
+  # fields, and metric results by default. Keep raw media, base64 payloads, and
+  # external media URLs out of Splunk unless the destination index is approved.
+  splunk_asset_policy: "metadata_only_no_raw_media"
+  allow_raw_media_in_splunk: false
+
 splunk:
   platform: "enterprise"
   hec_url: "https://splunk.example.com:8088/services/collector/event"

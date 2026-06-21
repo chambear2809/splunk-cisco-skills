@@ -1,0 +1,24 @@
+# WideField Okta integration profile
+# Non-secret values only. API tokens and hook auth secrets go in files.
+
+okta_org_url: https://example.okta.com
+receiver_url: https://widefield.example.com/okta/events
+hook_name: widefield_security_detect_and_remediate
+event_types: user.session.start,user.authentication.sso,user.account.privilege.grant,application.user_membership.add
+
+# File-backed secrets passed on the command line:
+# okta_token_file: /secure/okta/api_token
+# hook_auth_secret_file: /secure/widefield/hook_header_value
+hook_auth_header_name: authorization
+
+shared_signal:
+  provider: WideField Security
+  evidence_required: true
+
+oin_feature_review:
+  event_hooks: supported_apply
+  shared_signal_provider: handoff
+  federation_and_sso: handoff
+  universal_logout: handoff
+  provisioning: handoff
+  workflows: handoff

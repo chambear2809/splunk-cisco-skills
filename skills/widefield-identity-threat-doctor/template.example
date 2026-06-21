@@ -1,0 +1,23 @@
+# WideField identity threat doctor profile
+# Non-secret values only.
+
+environment: prod
+splunk:
+  index: widefield
+  sourcetype: widefield:security
+
+checks:
+  oauth_access_abuse: true
+  rogue_oauth_app: true
+  non_human_identity: true
+  non_human_identity_ownership: true
+  human_identity_posture: true
+  connected_application_permission_risk: true
+  ai_agent_identity: true
+  ai_identity_access_monitoring: true
+  session_anomaly: true
+  authentication_session_analysis: true
+
+evidence_file: ./widefield-identity-threat-evidence.local.json
+remediation:
+  render_packets_only: true

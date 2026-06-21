@@ -2,17 +2,13 @@
 name: galileo-platform-setup
 description: >-
   Render, validate, and optionally apply Galileo platform readiness, object
-  lifecycle, and Splunk wiring for Galileo SaaS or Enterprise deployments.
-  Covers Observe exports through export_records, project/log stream, dataset,
-  prompt, and experiment object lifecycle provisioning, OpenTelemetry/OpenInference
-  runtime snippets, legacy Protect invoke snippets, Evaluate metrics/annotation
-  handoffs, Luna Enterprise readiness, RBAC/project-sharing checks, Galileo
-  Agent Observability Controls console handoffs, control-span export evidence,
-  Splunk HEC/OTLP/OTel Collector handoffs, and Splunk Observability
-  dashboards/detectors. Use when the user asks to create Galileo
-  projects/log streams/datasets/prompts/experiments or connect Observe,
-  Evaluate, Controls, Luna, metrics, annotations, feedback, or GenAI
-  observability records to Splunk Platform or Splunk Observability Cloud.
+  lifecycle, Observe export/runtime, Evaluate, Luna, Controls, multimodal, and
+  Splunk wiring for Galileo SaaS or Enterprise deployments. Covers projects,
+  log streams, datasets, prompts, experiments, metrics, annotations, feedback,
+  RBAC, provider handoffs, trace maintenance/metrics APIs, Luna Studio training,
+  metadata-only media export, HEC/OTLP/OTel handoffs, dashboards, and detectors.
+  Use when configuring Galileo-to-Splunk Platform or Splunk Observability Cloud setup,
+  including multimodal traces and multi-model experiment comparison evidence.
 ---
 
 # Galileo Platform Setup
@@ -31,16 +27,23 @@ logic.
    datasets, prompts, experiments, log stream metrics, Protect stages, and
    Agent Control targets using `scripts/galileo_object_lifecycle.py`. The
    rendered coverage matrix also tracks auth/RBAC, integrations, costs,
-   custom scorers, Evaluate workflow runs, trace maintenance, annotation and
-   feedback templates, Trends dashboards, run insights, multimodal logging,
+   dataset query/preview/content maintenance, prompt rendering, custom scorers,
+   scorer governance, Evaluate workflow runs and experiment metrics APIs, trace
+   maintenance and trace metrics APIs, annotation and feedback templates,
+   Trends dashboards, run insights, multimodal logging,
    distributed tracing, tags/metadata, enterprise retention/TTL/privacy,
    Agent Graph and console debugging views, alerts, framework wrappers, Python
    and TypeScript SDK parity, REST API/custom deployment healthchecks,
-   SSO/OIDC/SAML, Luna-2 fine-tuning/evaluation handoffs, Galileo MCP tooling,
+   SSO/OIDC/SAML, Luna-2 fine-tuning/evaluation handoffs, Luna Studio training
+   lifecycle, Galileo MCP tooling,
    MCP tool-call logging, Agent Observability Controls inventory and control-span
    export validation, async job progress, playground/sample/CI workflows,
    official cookbook/use-case starter examples, troubleshooting, release/version
    checks, search/SDK utilities, and enterprise admin handoffs.
+   If the request says "multimodel", distinguish Galileo multimodal
+   observability from multi-model experiment comparison: this skill supports
+   both, with first-class multimodal assets under `multimodal/` and
+   multi-model comparison guidance under `evaluate/experiment-handoff.md`.
 3. **Observe export to Splunk HEC**: render and run
    `scripts/galileo_to_splunk_hec.py` against
    `/v2/projects/{project_id}/export_records` using JSONL by default.
@@ -50,10 +53,13 @@ logic.
    `/v2/protect/invoke` where an existing deployment still uses Protect.
 6. **Evaluate assets**: render handoffs for experiments, datasets, metrics
    testing, annotations, feedback, Signals, and Trends.
-7. **Agent Observability Controls**: render console inventory, Log stream
+7. **Multimodal observability**: render GalileoLogger, file/upload,
+   LangChain/LangGraph, multimodal quality metric, Splunk metadata-only export,
+   and validation-search handoffs for image, audio, and PDF/document traces.
+8. **Agent Observability Controls**: render console inventory, Log stream
    attachment, control-span export, and Splunk search evidence handoffs without
    claiming undocumented control CRUD API support.
-8. **Splunk handoffs**:
+9. **Splunk handoffs**:
    - HEC token/service: `splunk-hec-service-setup`
    - Splunk Platform OTLP input: `splunk-connect-for-otlp-setup`
    - Splunk OTel Collector: `splunk-observability-otel-collector-setup`
@@ -133,6 +139,7 @@ Apply sections:
 - `observe-runtime`
 - `protect-runtime`
 - `evaluate-assets`
+- `multimodal-assets`
 - `observability-controls`
 - `splunk-hec`
 - `splunk-otlp`
@@ -142,7 +149,8 @@ Apply sections:
 
 With `--o11y-only`, the default selected sections are `readiness`,
 `object-lifecycle`, `observe-runtime`, `protect-runtime`, `evaluate-assets`,
-`observability-controls`, `otel-collector`, `dashboards`, and `detectors`.
+`multimodal-assets`, `observability-controls`, `otel-collector`, `dashboards`,
+and `detectors`.
 Explicit Splunk Platform sections (`observe-export`, `splunk-hec`,
 `splunk-otlp`) are rejected in that mode.
 

@@ -63,6 +63,7 @@ def test_setup_help_lists_apply_sections() -> None:
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
+        "multimodal-assets",
         "splunk-hec",
         "splunk-otlp",
         "otel-collector",
@@ -95,8 +96,12 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     assert (output_dir / "runtime/python-opentelemetry-env.sh").is_file()
     assert (output_dir / "runtime/python-galileo-protect.py").is_file()
     assert (output_dir / "evaluate/evaluate-assets.yaml").is_file()
+    assert (output_dir / "evaluate/multimodal-metrics-handoff.yaml").is_file()
+    assert (output_dir / "multimodal/multimodal-observability.md").is_file()
+    assert (output_dir / "multimodal/multimodal-intake.example.json").is_file()
     assert (output_dir / "splunk-platform/hec-event-sample.json").is_file()
     assert (output_dir / "splunk-platform/export-records-request.json").is_file()
+    assert (output_dir / "splunk-platform/multimodal-search-examples.spl").is_file()
     assert (output_dir / "otel/collector-galileo-fanout.yaml").is_file()
     matrix = json.loads((output_dir / "lifecycle/product-coverage-matrix.json").read_text(encoding="utf-8"))
     surfaces = {item["surface"] for item in matrix}
@@ -104,18 +109,27 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
         "API keys, auth, users, groups, and RBAC",
         "REST API base URL, custom deployments, and healthcheck",
         "SSO, OIDC, SAML, and enterprise identity",
+        "Dataset query, preview, content mutation, and bulk maintenance",
+        "Prompt templates, rendering, and version utilities",
         "Evaluate workflow runs",
         "Python and TypeScript SDK parity",
+        "Experiment columns, metrics APIs, and paginated search",
         "Metric taxonomy, autotune, and use-case categories",
         "Custom scorers and scorer validation",
+        "Scorer governance, health scores, and restore flows",
         "Luna and model/provider integrations",
         "Luna-2 fine-tuning and metric evaluation workflows",
+        "Luna Studio UI and SDK training lifecycle",
         "Provider integrations, model aliases, costs, and pricing",
+        "Provider integration selection, status, and Databricks helpers",
         "Tags, metadata, run labels, and filter hygiene",
         "Enterprise data retention, TTL, redaction, and privacy controls",
         "Trace query, columns, recompute, update, and delete maintenance",
+        "Trace metrics, counts, partial queries, and live logging APIs",
         "Agent Graph, Logs UI, Messages UI, and console debugging views",
         "Distributed tracing and multi-service propagation",
+        "Multimodal observability",
+        "OpenTelemetry and OpenInference",
         "Third-party framework integrations and wrappers",
         "MCP tool-call logging and tool spans",
         "Galileo alerts and notifications",
@@ -140,6 +154,7 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
         "apply-observe-runtime.sh",
         "apply-protect-runtime.sh",
         "apply-evaluate-assets.sh",
+        "apply-multimodal-assets.sh",
         "apply-splunk-hec.sh",
         "apply-splunk-otlp.sh",
         "apply-otel-collector.sh",
@@ -241,6 +256,7 @@ def test_o11y_only_otel_collector_handoff_omits_platform_hec(tmp_path: Path) -> 
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
+        "multimodal-assets",
         "observability-controls",
         "otel-collector",
         "dashboards",
@@ -269,6 +285,7 @@ def test_o11y_only_default_apply_dry_run_selects_cloud_sections(tmp_path: Path) 
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
+        "multimodal-assets",
         "observability-controls",
         "otel-collector",
         "dashboards",
@@ -469,6 +486,92 @@ def test_hec_envelope_extracts_flat_dotted_control_attributes() -> None:
     assert event["galileo_control_step_type"] == "LLM"
     assert event["galileo_control_source"] == "custom"
     assert envelope["fields"]["galileo_control_matched"] == "true"
+
+
+def test_hec_envelope_extracts_multimodal_metadata_without_raw_payloads() -> None:
+    bridge = load_bridge()
+    args = Namespace(
+        include_raw=False,
+        indexed_fields=True,
+        log_stream_id="log-stream-1",
+        project_id="project-1",
+        root_type="trace",
+        splunk_host=None,
+        splunk_index="galileo",
+        splunk_source="galileo",
+        splunk_sourcetype="galileo:observe:json",
+        time_field="updated_at",
+    )
+    record = {
+        "id": "trace-1",
+        "type": "trace",
+        "project_id": "project-1",
+        "run_id": "log-stream-1",
+        "trace_id": "trace-1",
+        "updated_at": "2026-06-18T00:00:00Z",
+        "input": [
+            {"type": "text", "text": "Analyze these files"},
+            {
+                "modality": "image",
+                "mime_type": "image/png",
+                "url": "https://example.com/customer-photo.png",
+                "width": 640,
+                "height": 480,
+            },
+            {
+                "modality": "audio",
+                "mime_type": "audio/wav",
+                "base64": "RAW_AUDIO_BASE64_SHOULD_NOT_RENDER",
+                "duration_ms": 1200,
+            },
+            {
+                "modality": "document",
+                "mime_type": "application/pdf",
+                "file_name": "case-file.pdf",
+                "page_count": 3,
+                "data": "RAW_PDF_BYTES_SHOULD_NOT_RENDER",
+            },
+        ],
+        "output": {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": "The image is readable and the audio is clear."},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": "https://example.com/generated-image.png",
+                        "mime_type": "image/png",
+                    },
+                },
+            ],
+        },
+        "metrics": {
+            "visual_quality": True,
+            "interruption_detection": False,
+        },
+    }
+
+    envelope = bridge.hec_envelope(record, args)
+    event = envelope["event"]
+    serialized = json.dumps(envelope)
+
+    assert event["galileo_has_multimodal"] is True
+    assert event["galileo_modalities"] == ["audio", "document", "image"]
+    assert event["galileo_input_modalities"] == ["audio", "document", "image"]
+    assert event["galileo_output_modalities"] == ["image"]
+    assert event["galileo_multimodal_asset_count"] == 4
+    assert event["galileo_multimodal_metrics"] == ["interruption_detection", "visual_quality"]
+    assert event["multimodal_info"]["asset_counts"] == {
+        "audio": 1,
+        "document": 1,
+        "image": 2,
+    }
+    assert "RAW_AUDIO_BASE64_SHOULD_NOT_RENDER" not in serialized
+    assert "RAW_PDF_BYTES_SHOULD_NOT_RENDER" not in serialized
+    assert "https://example.com/customer-photo.png" not in serialized
+    assert "https://example.com/generated-image.png" not in serialized
+    assert envelope["fields"]["galileo_has_multimodal"] == "true"
+    assert envelope["fields"]["galileo_modalities"] == "audio,document,image"
 
 
 def test_object_lifecycle_dry_run_covers_core_galileo_objects(tmp_path: Path) -> None:

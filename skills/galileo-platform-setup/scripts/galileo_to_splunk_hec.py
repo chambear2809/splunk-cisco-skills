@@ -32,6 +32,45 @@ DIRECT_SECRET_FLAGS = {
     "--authorization",
     "--password",
 }
+MEDIA_PAYLOAD_KEYS = {
+    "base64",
+    "bytes",
+    "content_bytes",
+    "data",
+    "data_uri",
+    "document_text",
+    "raw",
+    "raw_content",
+    "text",
+    "transcript",
+    "url",
+}
+MEDIA_SAFE_KEYS = {
+    "content_length",
+    "duration",
+    "duration_ms",
+    "duration_seconds",
+    "file_name",
+    "file_size",
+    "format",
+    "height",
+    "id",
+    "mime_type",
+    "name",
+    "page_count",
+    "sha256",
+    "size",
+    "size_bytes",
+    "source",
+    "type",
+    "width",
+}
+MULTIMODAL_METRIC_KEYS = {
+    "interruption_detection",
+    "multimodal_quality",
+    "visual_fidelity",
+    "visual_quality",
+}
 
 
 def reject_direct_secret_flags(argv: list[str]) -> None:
@@ -491,6 +530,174 @@ def extract_control_info(record: dict[str, Any]) -> dict[str, Any]:
     return info
 
 
+def normalize_modality(value: Any) -> str | None:
+    text = str(value or "").strip().lower().replace("-", "_")
+    if not text:
+        return None
+    if text in {"image", "images", "input_image", "image_url"}:
+        return "image"
+    if text in {"audio", "voice", "input_audio", "audio_url"}:
+        return "audio"
+    if text in {"document", "documents", "pdf", "pdfs", "document_url", "file", "files"}:
+        return "document"
+    if text in {"text", "message"}:
+        return "text"
+    if text.startswith("image/"):
+        return "image"
+    if text.startswith("audio/"):
+        return "audio"
+    if text in {"application/pdf", "application/x_pdf"}:
+        return "document"
+    return None
+
+
+def modality_from_mapping(node: dict[str, Any], hint: str | None = None) -> str | None:
+    for key in ("modality", "media_type", "asset_type", "content_type", "mime_type", "type"):
+        modality = normalize_modality(node.get(key))
+        if modality:
+            return modality
+    for key in ("image_url", "input_image", "audio_url", "input_audio", "document_url", "pdf"):
+        if key in node:
+            return normalize_modality(key)
+    return hint
+
+
+def safe_media_item(node: dict[str, Any], *, field: str, modality: str) -> dict[str, Any]:
+    item: dict[str, Any] = {
+        "field": field,
+        "modality": modality,
+        "raw_media_omitted": True,
+    }
+    for key in MEDIA_SAFE_KEYS:
+        value = node.get(key)
+        if isinstance(value, (str, int, float, bool)) and value not in ("", None):
+            item[key] = value
+    for key in ("url", "base64", "bytes", "data", "data_uri", "raw", "content"):
+        if key in node and node.get(key) not in (None, ""):
+            item[f"has_{key}"] = True
+    for nested_key in ("image_url", "audio_url", "document_url"):
+        nested = node.get(nested_key)
+        if isinstance(nested, dict):
+            for key in MEDIA_SAFE_KEYS:
+                value = nested.get(key)
+                if isinstance(value, (str, int, float, bool)) and value not in ("", None):
+                    item.setdefault(key, value)
+            if nested.get("url"):
+                item["has_url"] = True
+    return item
+
+
+def collect_media_items(node: Any, *, field: str, hint: str | None = None) -> list[dict[str, Any]]:
+    if isinstance(node, list):
+        items: list[dict[str, Any]] = []
+        for child in node:
+            items.extend(collect_media_items(child, field=field, hint=hint))
+        return items
+    if not isinstance(node, dict):
+        return []
+
+    modality = modality_from_mapping(node, hint)
+    if modality and modality != "text":
+        return [safe_media_item(node, field=field, modality=modality)]
+
+    items = []
+    for key, value in node.items():
+        normalized_key = str(key).lower().replace("-", "_")
+        if normalized_key in MEDIA_PAYLOAD_KEYS and not isinstance(value, (dict, list)):
+            continue
+        child_hint = normalize_modality(normalized_key)
+        items.extend(collect_media_items(value, field=field, hint=child_hint or hint))
+    return items
+
+
+def add_modalities_from_value(target: set[str], value: Any) -> None:
+    if isinstance(value, str):
+        for part in value.replace(";", ",").split(","):
+            modality = normalize_modality(part)
+            if modality and modality != "text":
+                target.add(modality)
+        return
+    if isinstance(value, list):
+        for item in value:
+            add_modalities_from_value(target, item)
+        return
+    if isinstance(value, dict):
+        modality = modality_from_mapping(value)
+        if modality and modality != "text":
+            target.add(modality)
+
+
+def multimodal_metric_names(record: dict[str, Any]) -> list[str]:
+    found: set[str] = set()
+    for parent_key in ("metrics", "metric_info"):
+        value = record.get(parent_key)
+        if not isinstance(value, dict):
+            continue
+        for key, metric_value in value.items():
+            normalized = str(key).lower().replace("-", "_").replace(" ", "_")
+            if normalized in MULTIMODAL_METRIC_KEYS and metric_value not in (None, ""):
+                found.add(normalized)
+    return sorted(found)
+
+
+def extract_multimodal_info(record: dict[str, Any]) -> dict[str, Any]:
+    input_items: list[dict[str, Any]] = []
+    output_items: list[dict[str, Any]] = []
+    other_items: list[dict[str, Any]] = []
+    for field in ("input", "dataset_input"):
+        input_items.extend(collect_media_items(record.get(field), field=field))
+    for field in ("output", "dataset_output"):
+        output_items.extend(collect_media_items(record.get(field), field=field))
+    for field in ("messages", "attachments", "files", "media", "content_blocks"):
+        other_items.extend(collect_media_items(record.get(field), field=field))
+
+    input_modalities = {item["modality"] for item in input_items}
+    output_modalities = {item["modality"] for item in output_items}
+    modalities = set(input_modalities) | set(output_modalities) | {item["modality"] for item in other_items}
+
+    add_modalities_from_value(input_modalities, record.get("input_modalities"))
+    add_modalities_from_value(output_modalities, record.get("output_modalities"))
+    for key in ("modalities", "input_modalities", "output_modalities", "modality", "media_type", "mime_type"):
+        add_modalities_from_value(modalities, record.get(key))
+    for source_key in ("metadata", "user_metadata", "attributes", "span_attributes"):
+        source = record.get(source_key)
+        if isinstance(source, dict):
+            add_modalities_from_value(input_modalities, source.get("input_modalities"))
+            add_modalities_from_value(output_modalities, source.get("output_modalities"))
+            for key in (
+                "modalities",
+                "input_modalities",
+                "output_modalities",
+                "modality",
+                "media_type",
+                "mime_type",
+            ):
+                add_modalities_from_value(modalities, source.get(key))
+
+    assets = input_items + output_items + other_items
+    metric_names = multimodal_metric_names(record)
+    if not assets and not modalities and not metric_names:
+        return {}
+
+    asset_counts = {name: 0 for name in sorted(modalities)}
+    for item in assets:
+        asset_counts[item["modality"]] = asset_counts.get(item["modality"], 0) + 1
+    for name in list(asset_counts):
+        if asset_counts[name] == 0 and name not in modalities:
+            del asset_counts[name]
+
+    return {
+        "modalities": sorted(modalities),
+        "input_modalities": sorted(input_modalities),
+        "output_modalities": sorted(output_modalities),
+        "asset_count": len(assets),
+        "asset_counts": asset_counts,
+        "metrics": metric_names,
+        "assets": assets[:50],
+        "raw_media_policy": "omitted_by_default",
+    }
+
+
 def query_galileo(args: argparse.Namespace, since: str | None) -> list[dict[str, Any]]:
     url = f"{args.galileo_api_base.rstrip('/')}/v2/projects/{args.project_id}/export_records"
     headers = galileo_headers(args)
@@ -550,6 +757,16 @@ def compact_record(record: dict[str, Any], args: argparse.Namespace) -> dict[str
             if isinstance(value, (str, int, float, bool)):
                 field_key = key.removeprefix("control_")
                 payload[f"galileo_control_{field_key}"] = value
+    multimodal_info = extract_multimodal_info(record)
+    if multimodal_info:
+        payload["multimodal_info"] = multimodal_info
+        payload["galileo_has_multimodal"] = True
+        payload["galileo_modalities"] = multimodal_info.get("modalities", [])
+        payload["galileo_input_modalities"] = multimodal_info.get("input_modalities", [])
+        payload["galileo_output_modalities"] = multimodal_info.get("output_modalities", [])
+        payload["galileo_multimodal_asset_count"] = multimodal_info.get("asset_count", 0)
+        if multimodal_info.get("metrics"):
+            payload["galileo_multimodal_metrics"] = multimodal_info["metrics"]
     if args.include_raw:
         payload["input"] = record.get("input")
         payload["output"] = record.get("output")
@@ -592,9 +809,15 @@ def hec_envelope(record: dict[str, Any], args: argparse.Namespace) -> dict[str, 
             "galileo_control_stage",
             "galileo_control_action",
             "galileo_control_matched",
+            "galileo_has_multimodal",
+            "galileo_multimodal_asset_count",
         ):
             if key in event:
                 envelope["fields"][key] = hec_indexed_field_value(event.get(key, ""))
+        for key in ("galileo_modalities", "galileo_input_modalities", "galileo_output_modalities"):
+            value = event.get(key)
+            if isinstance(value, list):
+                envelope["fields"][key] = ",".join(str(item) for item in value)
     return envelope
 
 

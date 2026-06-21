@@ -1,0 +1,4 @@
+interface:
+  display_name: "WideField Saviynt Integration Setup"
+  short_description: "Map Saviynt remediation handoffs"
+  default_prompt: "Use $widefield-saviynt-integration-setup to render Saviynt remediation mappings and validation handoffs for WideField Security."

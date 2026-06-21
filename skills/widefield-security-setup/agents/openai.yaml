@@ -1,0 +1,4 @@
+interface:
+  display_name: "WideField Security Setup"
+  short_description: "Route WideField security adoption workflows"
+  default_prompt: "Use $widefield-security-setup to render a WideField Security adoption plan and delegate setup to the right child skills."
