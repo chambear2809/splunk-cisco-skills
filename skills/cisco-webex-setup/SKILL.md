@@ -81,8 +81,13 @@ bash skills/cisco-webex-setup/scripts/configure_account.sh \
 bash skills/cisco-webex-setup/scripts/configure_inputs.sh \
   --account WEBEX_PROD \
   --input-type core \
-  --start-time "2026-05-01T00:00:00Z"
+  --start-time "2026-05-01T00:00:00Z" \
+  --site-url "https://yoursite.webex.com"
 ```
+
+`--site-url` is required for the `core` batch because it includes the
+`meetings_summary_report` input. Omitting it makes the `core` run fail when it
+reaches that input.
 
 4. Validate:
 

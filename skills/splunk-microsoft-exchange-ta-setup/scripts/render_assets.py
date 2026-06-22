@@ -35,41 +35,35 @@ SOURCETYPES = [
 COMPONENTS: dict[str, dict[str, Any]] = {
     "client_access": {
         "app": "TA-Exchange-ClientAccess",
-        "sourcetypes": [
-            "MSExchange:2013:RPCClientAccess",
-            "MSExchange:2013:Topology",
-            "MSExchange:2013:ThrottlingPolicy",
-            "MSExchange:2013:AdminAudit",
-        ],
-        "stanzas": [
-            "[monitor://C:\\Program Files\\Microsoft\\Exchange Server\\V15\\Logging\\RPC Client Access]",
-            "[script://.\\bin\\exchangepowershell.cmd v15 get-hoststats_2013.ps1]",
-            "[script://.\\bin\\exchangepowershell.cmd v15 get-throttling-policies_2010_2013.ps1]",
+        # Each input is an explicit (stanza, sourcetype) pair so the renderer
+        # never silently drops or misorders entries.
+        "inputs": [
+            ("[monitor://C:\\Program Files\\Microsoft\\Exchange Server\\V15\\Logging\\RPC Client Access]", "MSExchange:2013:RPCClientAccess"),
+            ("[script://.\\bin\\exchangepowershell.cmd v15 get-hoststats_2013.ps1]", "MSExchange:2013:Topology"),
+            ("[script://.\\bin\\exchangepowershell.cmd v15 get-throttling-policies_2010_2013.ps1]", "MSExchange:2013:ThrottlingPolicy"),
+            ("[script://.\\bin\\exchangepowershell.cmd v15 read-audit-logs_2010_2013.ps1]", "MSExchange:2013:AdminAudit"),
         ],
     },
     "mailbox": {
         "app": "TA-Exchange-Mailbox",
-        "sourcetypes": [
-            "MSExchange:2013:MessageTracking",
-            "MSExchange:2013:MailboxAudit",
-            "MSExchange:2013:Database-Stats",
-            "WinEventLog:Exchange",
-        ],
-        "stanzas": [
-            "[WinEventLog://Exchange Auditing]",
-            "[monitor://C:\\Program Files\\Microsoft\\Exchange Server\\V15\\TransportRoles\\Logs\\MessageTracking]",
-            "[script://.\\bin\\exchangepowershell.cmd v15 get-mailboxstats_2013.ps1]",
+        "inputs": [
+            ("[WinEventLog://Exchange Auditing]", "WinEventLog:Exchange"),
+            ("[monitor://C:\\Program Files\\Microsoft\\Exchange Server\\V15\\TransportRoles\\Logs\\MessageTracking]", "MSExchange:2013:MessageTracking"),
+            ("[script://.\\bin\\exchangepowershell.cmd v15 read-mailbox-audit-logs_2010_2013.ps1]", "MSExchange:2013:MailboxAudit"),
+            ("[script://.\\bin\\exchangepowershell.cmd v15 get-mailboxstats_2013.ps1]", "MSExchange:2013:Database-Stats"),
         ],
     },
     "smtp_reputation": {
         "app": "TA-SMTP-Reputation",
-        "sourcetypes": ["MSExchange:Reputation"],
-        "stanzas": ["[script://.\\bin\\reputation.ps1]"],
+        "inputs": [
+            ("[script://.\\bin\\reputation.ps1]", "MSExchange:Reputation"),
+        ],
     },
     "iis": {
         "app": "TA-Windows-Exchange-IIS",
-        "sourcetypes": ["MSWindows:2013EWS:IIS"],
-        "stanzas": ["[monitor://C:\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log]"],
+        "inputs": [
+            ("[monitor://C:\\inetpub\\logs\\LogFiles\\W3SVC*\\*.log]", "MSWindows:2013EWS:IIS"),
+        ],
     },
 }
 
@@ -131,7 +125,7 @@ def render_inputs(args: argparse.Namespace) -> str:
     ]
     for component in COMPONENTS.values():
         lines += [f"# {component['app']}"]
-        for stanza, sourcetype in zip(component["stanzas"], component["sourcetypes"]):
+        for stanza, sourcetype in component["inputs"]:
             lines += [
                 stanza,
                 "disabled = 1",
@@ -161,7 +155,8 @@ def render_collection_placement(args: argparse.Namespace) -> str:
         "| --- | --- |",
     ]
     for component in COMPONENTS.values():
-        lines.append(f"| `{component['app']}` | {', '.join(f'`{item}`' for item in component['sourcetypes'])} |")
+        sourcetypes = [sourcetype for _stanza, sourcetype in component["inputs"]]
+        lines.append(f"| `{component['app']}` | {', '.join(f'`{item}`' for item in sourcetypes)} |")
     lines += [
         "",
         "Run Windows TA readiness for Event Log, Perfmon, and host inventory prerequisites before enabling high-volume Exchange inputs.",

@@ -125,6 +125,33 @@ def test_new_package_verified_renderers_list_help_and_render(
     assert not SECRET_ARG_RE.search(combined)
 
 
+def test_exchange_renderer_keeps_audit_scripted_inputs(tmp_path: Path) -> None:
+    rendered = run_setup(
+        "splunk-microsoft-exchange-ta-setup",
+        "--phase",
+        "render",
+        "--products",
+        "exchange",
+        "--index",
+        "msexchange",
+        "--output-dir",
+        str(tmp_path),
+        "--json",
+    )
+    assert rendered.returncode == 0, rendered.stdout + rendered.stderr
+
+    out = tmp_path / "splunk-microsoft-exchange-ta"
+    inputs = (out / "inputs.local.conf.template").read_text(encoding="utf-8")
+    placement = (out / "collection-placement.md").read_text(encoding="utf-8")
+
+    assert "read-audit-logs_2010_2013.ps1" in inputs
+    assert "sourcetype = MSExchange:2013:AdminAudit" in inputs
+    assert "read-mailbox-audit-logs_2010_2013.ps1" in inputs
+    assert "sourcetype = MSExchange:2013:MailboxAudit" in inputs
+    assert "`MSExchange:2013:AdminAudit`" in placement
+    assert "`MSExchange:2013:MailboxAudit`" in placement
+
+
 def test_unresolved_security_products_remain_install_only() -> None:
     catalog = json.loads(
         (REPO_ROOT / "skills/splunk-supported-addons-setup/catalog.json").read_text(encoding="utf-8")

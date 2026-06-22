@@ -92,7 +92,7 @@ if [[ "${LIVE}" == "true" ]]; then
                     warn "VMware package not detected: ${app}"
                 fi
             done
-            vmw_events=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| search index=${EVENT_INDEX} OR index=${ESXI_INDEX} sourcetype=vmware* | stats count" "count" 2>/dev/null || echo 0)
+            vmw_events=$(rest_oneshot_search "${SK}" "${SPLUNK_URI}" "| search (index=${EVENT_INDEX} OR index=${ESXI_INDEX}) sourcetype=vmware* | stats count" "count" 2>/dev/null || echo 0)
             [[ "${vmw_events}" -gt 0 ]] && pass "VMware events found: ${vmw_events}" || warn "No VMware events found in ${EVENT_INDEX}/${ESXI_INDEX}"
         fi
     fi

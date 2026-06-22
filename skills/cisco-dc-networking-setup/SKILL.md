@@ -188,10 +188,11 @@ To access them: **Apps → Cisco DC Networking App for Splunk**
 
 **Prerequisites for dashboards to show data:**
 
-1. Indexes (`cisco_aci`, `cisco_nd`, `cisco_nexus9k`) must exist and inputs
+1. Indexes (`cisco_aci`, `cisco_nd`, `cisco_nexus_9k`) must exist and inputs
    must be enabled.
-2. The `cisco_dc_index` macro family must be updated by the setup script
-   (Step 1) to point to the correct indexes.
+2. The `cisco_dc_*_index` macro family (`cisco_dc_aci_index`,
+   `cisco_dc_nd_index`, `cisco_dc_nexus_9k_index`) must be updated by the setup
+   script (Step 1) to point to the correct indexes.
 3. At least one account (APIC, Nexus Dashboard, or Nexus 9K) must be
    configured and actively polling.
 
