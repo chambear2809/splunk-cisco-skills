@@ -25,6 +25,7 @@ APPLY_SECTIONS = [
     "observe-runtime",
     "protect-runtime",
     "evaluate-assets",
+    "multimodal-assets",
     "observability-controls",
     "splunk-hec",
     "splunk-otlp",
@@ -38,6 +39,7 @@ O11Y_ONLY_SECTIONS = [
     "observe-runtime",
     "protect-runtime",
     "evaluate-assets",
+    "multimodal-assets",
     "observability-controls",
     "otel-collector",
     "dashboards",
@@ -96,6 +98,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--galileo-otel-endpoint", default="")
     parser.add_argument("--experiment-id", default="")
     parser.add_argument("--metrics-testing-id", default="")
+    parser.add_argument("--multimodal-enabled", choices=["true", "false"], default="")
+    parser.add_argument("--multimodal-input-modalities", default="")
+    parser.add_argument("--multimodal-output-modalities", default="")
+    parser.add_argument("--multimodal-capture-methods", default="")
+    parser.add_argument("--multimodal-quality-metrics", default="")
+    parser.add_argument("--multimodal-asset-policy", default="")
+    parser.add_argument("--allow-raw-media-in-splunk", action="store_true")
     parser.add_argument("--export-format", choices=["jsonl", "csv"], default="")
     parser.add_argument("--redact", choices=["true", "false"], default="")
     parser.add_argument("--galileo-api-key-file", default="")
@@ -255,6 +264,12 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
     if not otel_endpoint:
         otel_endpoint = api_base.rstrip("/") + "/otel/v1/traces"
 
+    multimodal_enabled_value = args.multimodal_enabled or str(
+        get_nested(spec, "multimodal.enabled", "true") or "true"
+    )
+    allow_raw_media = bool(args.allow_raw_media_in_splunk) or str(
+        get_nested(spec, "multimodal.allow_raw_media_in_splunk", "false") or "false"
+    ).lower() in {"1", "yes", "true"}
     return {
         "project_id": arg_or_spec("project_id", "galileo.project_id", ""),
         "project_name": arg_or_spec("project_name", "galileo.project_name", "galileo-project"),
@@ -356,6 +371,33 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
             )
             or ""
         ),
+        "multimodal_enabled": str(multimodal_enabled_value).lower() not in {"0", "false", "no"},
+        "multimodal_input_modalities": arg_or_spec(
+            "multimodal_input_modalities",
+            "multimodal.input_modalities",
+            "image,audio,document",
+        ),
+        "multimodal_output_modalities": arg_or_spec(
+            "multimodal_output_modalities",
+            "multimodal.output_modalities",
+            "image,audio,document,text",
+        ),
+        "multimodal_capture_methods": arg_or_spec(
+            "multimodal_capture_methods",
+            "multimodal.capture_methods",
+            "galileo_logger_external_url,galileo_logger_file_upload,langchain_handler",
+        ),
+        "multimodal_quality_metrics": arg_or_spec(
+            "multimodal_quality_metrics",
+            "multimodal.quality_metrics",
+            "visual_quality,visual_fidelity,interruption_detection",
+        ),
+        "multimodal_asset_policy": arg_or_spec(
+            "multimodal_asset_policy",
+            "multimodal.splunk_asset_policy",
+            "metadata_only_no_raw_media",
+        ),
+        "multimodal_allow_raw_media_in_splunk": allow_raw_media,
     }
 
 
@@ -411,6 +453,12 @@ def shell_double_default(value: str) -> str:
         .replace("$", "\\$")
         .replace("`", "\\`")
     )
+
+
+def csv_values(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in str(value or "").split(",") if item.strip()]
 
 
 def script_header() -> str:
@@ -643,9 +691,19 @@ echo "Review rendered Evaluate assets:"
 echo "  ${{OUTPUT_DIR}}/evaluate/evaluate-assets.yaml"
 echo "  ${{OUTPUT_DIR}}/evaluate/experiment-handoff.md"
 echo "  ${{OUTPUT_DIR}}/evaluate/annotation-feedback-handoff.md"
+echo "  ${{OUTPUT_DIR}}/evaluate/multimodal-metrics-handoff.yaml"
 """
     write_text(scripts_dir / "apply-evaluate-assets.sh", evaluate_assets, executable=True)
     scripts["evaluate-assets"] = "scripts/apply-evaluate-assets.sh"
+
+    multimodal_assets = f"""{script_header()}
+echo "Review rendered Galileo multimodal observability assets:"
+echo "  ${{OUTPUT_DIR}}/multimodal/multimodal-observability.md"
+echo "  ${{OUTPUT_DIR}}/multimodal/multimodal-intake.example.json"
+echo "  ${{OUTPUT_DIR}}/splunk-platform/multimodal-search-examples.spl"
+"""
+    write_text(scripts_dir / "apply-multimodal-assets.sh", multimodal_assets, executable=True)
+    scripts["multimodal-assets"] = "scripts/apply-multimodal-assets.sh"
 
     observability_controls = f"""{script_header()}
 echo "Review rendered Galileo Agent Observability Controls assets:"
@@ -704,6 +762,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-native-ops/scripts/setu
     observe-runtime) "${SCRIPT_DIR}/apply-observe-runtime.sh" ;;
     protect-runtime) "${SCRIPT_DIR}/apply-protect-runtime.sh" ;;
     evaluate-assets) "${SCRIPT_DIR}/apply-evaluate-assets.sh" ;;
+    multimodal-assets) "${SCRIPT_DIR}/apply-multimodal-assets.sh" ;;
     observability-controls) "${SCRIPT_DIR}/apply-observability-controls.sh" ;;
     splunk-hec) "${SCRIPT_DIR}/apply-splunk-hec.sh" ;;
     splunk-otlp) "${SCRIPT_DIR}/apply-splunk-otlp.sh" ;;
@@ -1012,12 +1071,41 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
             "docs": "https://docs.galileo.ai/sdk-api/experiments/datasets",
         },
         {
+            "surface": "Dataset query, preview, content mutation, and bulk maintenance",
+            "lifecycle": [
+                "query_datasets_handoff",
+                "preview_dataset_handoff",
+                "query_dataset_content_handoff",
+                "update_upsert_content_handoff",
+                "bulk_delete_guardrail",
+                "synthetic_extend_status_polling",
+            ],
+            "coverage": "rendered_handoff_for_dataset_query_preview_mutation_and_destructive_maintenance",
+            "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/api-reference/datasets/query-dataset-content",
+        },
+        {
             "surface": "Prompts",
             "lifecycle": ["create", "get", "list", "version_review", "delete_handoff"],
             "coverage": "automated_create_from_manifest",
             "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "evaluate/evaluate-assets.yaml"],
             "apply_script": "scripts/apply-object-lifecycle.sh",
             "docs": "https://docs.galileo.ai/sdk-api/experiments/prompts",
+        },
+        {
+            "surface": "Prompt templates, rendering, and version utilities",
+            "lifecycle": [
+                "prompt_template_version_handoff",
+                "render_prompt_handoff",
+                "prompt_parameter_validation",
+                "typescript_prompt_utility_handoff",
+                "prompt_delete_guardrail",
+            ],
+            "coverage": "rendered_handoff_for_prompt_template_rendering_and_version_review",
+            "rendered_assets": ["lifecycle/object-lifecycle-manifest.example.json", "evaluate/experiment-handoff.md"],
+            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "docs": "https://docs.galileo.ai/sdk-api/typescript/reference/README/functions/renderPrompt",
         },
         {
             "surface": "Experiments",
@@ -1039,6 +1127,21 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
             "rendered_assets": ["evaluate/experiment-handoff.md", "lifecycle/product-coverage-matrix.json"],
             "apply_script": "scripts/apply-evaluate-assets.sh",
             "docs": "https://docs.galileo.ai/sdk-api/python/reference/experiments",
+        },
+        {
+            "surface": "Experiment columns, metrics APIs, and paginated search",
+            "lifecycle": [
+                "experiments_available_columns_handoff",
+                "get_experiment_metrics_handoff",
+                "get_experiments_metrics_handoff",
+                "paginated_list_handoff",
+                "search_experiments_handoff",
+                "metric_settings_update_handoff",
+            ],
+            "coverage": "rendered_handoff_for_experiment_reporting_and_metric_api_surfaces",
+            "rendered_assets": ["evaluate/experiment-handoff.md", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/api-reference/experiment/get-experiments-metrics",
         },
         {
             "surface": "Evaluate workflow runs",
@@ -1107,6 +1210,21 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
             "docs": "https://docs.galileo.ai/sdk-api/python/reference/scorers",
         },
         {
+            "surface": "Scorer governance, health scores, and restore flows",
+            "lifecycle": [
+                "autogen_llm_scorer_handoff",
+                "manual_llm_validate_multipart_handoff",
+                "scorer_scope_rbac_handoff",
+                "restore_scorer_version_handoff",
+                "write_and_read_scorer_health_scores_handoff",
+                "project_association_review",
+            ],
+            "coverage": "rendered_handoff_for_scorer_visibility_version_restore_and_health_score_api_surfaces",
+            "rendered_assets": ["evaluate/evaluate-assets.yaml", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/api-reference/data/set-scorer-scope",
+        },
+        {
             "surface": "Luna and model/provider integrations",
             "lifecycle": ["tenant_feature_check", "model_alias_review", "provider_integration_handoff"],
             "coverage": "readiness_handoff_for_enterprise_features_and_model_alias_prereqs",
@@ -1128,17 +1246,53 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
             "docs": "https://docs.galileo.ai/concepts/luna/fine-tuning",
         },
         {
+            "surface": "Luna Studio UI and SDK training lifecycle",
+            "lifecycle": [
+                "enterprise_availability_review",
+                "dataset_validation_handoff",
+                "training_and_test_set_handoff",
+                "luna_studio_config_review",
+                "training_run_lifecycle_handoff",
+                "post_training_artifacts_handoff",
+                "metric_register_handoff",
+                "full_session_trace_rag_tool_retriever_tutorial_handoff",
+            ],
+            "coverage": "rendered_enterprise_handoff_for_luna_studio_ui_sdk_training_and_registration",
+            "rendered_assets": ["readiness/readiness-report.json", "evaluate/experiment-handoff.md"],
+            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "docs": "https://docs.galileo.ai/luna-studio/index",
+        },
+        {
             "surface": "Provider integrations, model aliases, costs, and pricing",
             "lifecycle": [
                 "available_integrations_review",
-                "openai_anthropic_bedrock_sagemaker_azure_databricks_vertex_nvidia_writer_custom_handoff",
+                "openai_anthropic_bedrock_sagemaker_azure_databricks_vertex_mistral_nvidia_writer_custom_handoff",
+                "vegas_gateway_handoff",
+                "named_custom_provider_handoff",
+                "integration_selection_handoff",
+                "integration_status_review",
                 "integration_collaborator_handoff",
                 "model_pricing_handoff",
             ],
             "coverage": "rendered_secret_safe_provider_and_cost_handoff",
             "rendered_assets": ["readiness/readiness-report.json", "lifecycle/product-coverage-matrix.json"],
             "apply_script": "scripts/apply-readiness.sh",
-            "docs": "https://docs.galileo.ai/concepts/metrics",
+            "docs": "https://docs.galileo.ai/api-reference/integrations/list-available-integrations",
+        },
+        {
+            "surface": "Provider integration selection, status, and Databricks helpers",
+            "lifecycle": [
+                "integration_selection_create_update_handoff",
+                "integration_status_polling_handoff",
+                "databricks_catalogs_handoff",
+                "databricks_database_cluster_handoff",
+                "legacy_databricks_integration_review",
+                "integration_collaborator_rbac_handoff",
+            ],
+            "coverage": "rendered_handoff_for_provider_selection_status_and_databricks_discovery_surfaces",
+            "rendered_assets": ["readiness/readiness-report.json", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-readiness.sh",
+            "docs": "https://docs.galileo.ai/api-reference/integrations/get-integration-status",
         },
         {
             "surface": "Observe traces, sessions, spans",
@@ -1184,12 +1338,30 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "available_columns_handoff",
                 "recompute_metrics_handoff",
                 "delete_records_guardrail",
+                "count_records_handoff",
                 "organization_job_status_handoff",
             ],
             "coverage": "export_automated_destructive_and_recompute_paths_handoff_only",
             "rendered_assets": ["splunk-platform/export-records-request.json", "readiness/readiness-report.json"],
             "apply_script": "scripts/apply-observe-export.sh",
             "docs": "https://docs.galileo.ai/api-reference/trace/export-records",
+        },
+        {
+            "surface": "Trace metrics, counts, partial queries, and live logging APIs",
+            "lifecycle": [
+                "log_spans_traces_api_handoff",
+                "query_metrics_v2_handoff",
+                "query_custom_metrics_handoff",
+                "metrics_testing_available_columns_handoff",
+                "count_sessions_traces_spans_handoff",
+                "partial_query_handoff",
+                "aggregated_trace_view_handoff",
+                "create_session_handoff",
+            ],
+            "coverage": "rendered_handoff_for_trace_metrics_reporting_live_logging_and_partial_query_surfaces",
+            "rendered_assets": ["splunk-platform/export-records-request.json", "lifecycle/product-coverage-matrix.json"],
+            "apply_script": "scripts/apply-observe-export.sh",
+            "docs": "https://docs.galileo.ai/api-reference/trace/query-metrics-v2",
         },
         {
             "surface": "Agent Graph, Logs UI, Messages UI, and console debugging views",
@@ -1220,10 +1392,22 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
         },
         {
             "surface": "Multimodal observability",
-            "lifecycle": ["image_audio_document_logging_handoff", "multimodal_metric_handoff", "redaction_review"],
-            "coverage": "rendered_runtime_and_redaction_handoff",
-            "rendered_assets": ["runtime/", "readiness/readiness-report.json"],
-            "apply_script": "scripts/apply-observe-runtime.sh",
+            "lifecycle": [
+                "image_audio_document_logging_handoff",
+                "galileo_logger_url_and_file_upload_handoff",
+                "langchain_handler_handoff",
+                "visual_quality_visual_fidelity_interruption_detection_handoff",
+                "splunk_metadata_only_export_validation",
+                "redaction_review",
+            ],
+            "coverage": "rendered_multimodal_logging_metrics_and_splunk_metadata_handoff",
+            "rendered_assets": [
+                "multimodal/multimodal-observability.md",
+                "multimodal/multimodal-intake.example.json",
+                "evaluate/multimodal-metrics-handoff.yaml",
+                "splunk-platform/multimodal-search-examples.spl",
+            ],
+            "apply_script": "scripts/apply-multimodal-assets.sh",
             "docs": "https://docs.galileo.ai/concepts/logging/multimodal-observability",
         },
         {
@@ -1240,7 +1424,11 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "a2a_protocol_handoff",
                 "crewai_handoff",
                 "google_adk_handoff",
+                "google_adk_opentelemetry_handoff",
                 "langchain_langgraph_handoff",
+                "langgraph_command_and_send_handoff",
+                "langchain_middleware_handoff",
+                "langchain_runtime_protection_handoff",
                 "mastra_handoff",
                 "microsoft_agent_framework_handoff",
                 "openai_wrapper_handoff",
@@ -1248,6 +1436,8 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "pydantic_ai_handoff",
                 "strands_agents_handoff",
                 "vercel_ai_sdk_handoff",
+                "aws_bedrock_inference_profiles_handoff",
+                "gemini_enterprise_credentials_handoff",
                 "custom_span_handoff",
                 "openinference_handoff",
             ],
@@ -1394,7 +1584,13 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
         },
         {
             "surface": "Enterprise deployment, system users, and organization jobs",
-            "lifecycle": ["security_readiness", "system_user_handoff", "organization_job_status_handoff"],
+            "lifecycle": [
+                "security_readiness",
+                "system_user_handoff",
+                "system_user_social_handoff",
+                "organization_job_status_handoff",
+                "delete_by_metadata_guardrail",
+            ],
             "coverage": "readiness_handoff_for_enterprise_admin_surfaces",
             "rendered_assets": ["readiness/readiness-report.json"],
             "apply_script": "scripts/apply-readiness.sh",
@@ -1468,7 +1664,7 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def render_object_lifecycle(output_dir: Path, config: dict[str, Any]) -> None:
-    metrics = [item.strip() for item in str(config["metrics"]).split(",") if item.strip()]
+    metrics = csv_values(config["metrics"])
     manifest = {
         "api_version": f"{SKILL_NAME}/object-lifecycle/v1",
         "project": {
@@ -1554,9 +1750,12 @@ def render_object_lifecycle(output_dir: Path, config: dict[str, Any]) -> None:
             "settings": "handoff",
         },
         "multimodal_observability": {
-            "images": "handoff",
-            "audio": "handoff",
-            "documents": "handoff",
+            "enabled": config["multimodal_enabled"],
+            "input_modalities": csv_values(config["multimodal_input_modalities"]),
+            "output_modalities": csv_values(config["multimodal_output_modalities"]),
+            "capture_methods": csv_values(config["multimodal_capture_methods"]),
+            "quality_metrics": csv_values(config["multimodal_quality_metrics"]),
+            "splunk_asset_policy": config["multimodal_asset_policy"],
             "redaction_review_required": True,
         },
     }
@@ -1589,6 +1788,7 @@ def render_object_lifecycle(output_dir: Path, config: dict[str, Any]) -> None:
 
 
 def render_evaluate_assets(output_dir: Path, config: dict[str, Any]) -> None:
+    multimodal_metrics = csv_values(config["multimodal_quality_metrics"])
     write_text(
         output_dir / "evaluate/evaluate-assets.yaml",
         f"""api_version: galileo-platform-setup/evaluate/v1
@@ -1608,6 +1808,7 @@ coverage:
     agentic: operator_review
     sampling: operator_review
     filtering: operator_review
+    multimodal_quality: {json.dumps(multimodal_metrics)}
   datasets: operator_review
   annotations_feedback: rendered_handoff
   signals_trends: rendered_handoff
@@ -1626,7 +1827,10 @@ coverage:
 - Redaction default: `{str(config["redact"]).lower()}`
 
 Review metric sampling, filtering, dataset lineage, and experiment comparison
-coverage before enabling production dashboards or detectors.
+coverage before enabling production dashboards or detectors. For multi-model
+comparison, run the same dataset and metric set across model variants, then
+track model name, provider, prompt version, and experiment group in tags or
+metadata so Splunk searches can compare outputs without mixing cohorts.
 """,
     )
     write_text(
@@ -1636,6 +1840,162 @@ coverage before enabling production dashboards or detectors.
 Track annotation coverage, feedback completeness, fully annotated filters, and
 reviewer group ownership alongside the exported Observe records. Keep free-form
 feedback text redacted unless the destination Splunk index is approved for it.
+""",
+    )
+    write_text(
+        output_dir / "evaluate/multimodal-metrics-handoff.yaml",
+        f"""api_version: galileo-platform-setup/multimodal-metrics/v1
+project:
+  id: {json.dumps(config["project_id"])}
+  name: {json.dumps(config["project_name"])}
+log_stream:
+  id: {json.dumps(config["log_stream_id"])}
+  name: {json.dumps(config["log_stream"])}
+enabled: {json.dumps(config["multimodal_enabled"])}
+quality_metrics:
+  configured: {json.dumps(multimodal_metrics)}
+  visual_quality:
+    modalities: ["image", "document"]
+    level: "llm_span"
+    splunk_signal: "metrics.visual_quality OR metric_info.visual_quality"
+  visual_fidelity:
+    modalities: ["image", "document"]
+    level: "llm_span"
+    splunk_signal: "metrics.visual_fidelity OR metric_info.visual_fidelity"
+  interruption_detection:
+    modalities: ["audio"]
+    level: "session"
+    splunk_signal: "metrics.interruption_detection OR metric_info.interruption_detection"
+validation:
+  export_root_types: ["trace", "span", "session"]
+  splunk_searches: "splunk-platform/multimodal-search-examples.spl"
+  media_policy: {json.dumps(config["multimodal_asset_policy"])}
+""",
+    )
+
+
+def render_multimodal_assets(output_dir: Path, config: dict[str, Any]) -> None:
+    input_modalities = csv_values(config["multimodal_input_modalities"])
+    output_modalities = csv_values(config["multimodal_output_modalities"])
+    capture_methods = csv_values(config["multimodal_capture_methods"])
+    quality_metrics = csv_values(config["multimodal_quality_metrics"])
+    write_json(
+        output_dir / "multimodal/multimodal-intake.example.json",
+        {
+            "api_version": f"{SKILL_NAME}/multimodal/v1",
+            "enabled": config["multimodal_enabled"],
+            "project": {
+                "id": config["project_id"],
+                "name": config["project_name"],
+            },
+            "log_stream": {
+                "id": config["log_stream_id"],
+                "name": config["log_stream"],
+            },
+            "modalities": {
+                "input": input_modalities,
+                "output": output_modalities,
+                "supported_formats": {
+                    "image": ["png", "jpeg"],
+                    "audio": ["mp3", "wav"],
+                    "document": ["pdf"],
+                },
+            },
+            "capture_methods": capture_methods,
+            "quality_metrics": quality_metrics,
+            "splunk": {
+                "asset_policy": config["multimodal_asset_policy"],
+                "allow_raw_media_in_splunk": config["multimodal_allow_raw_media_in_splunk"],
+                "index": config["splunk_index"],
+                "sourcetype": config["splunk_sourcetype"],
+                "metadata_fields": [
+                    "galileo_modalities",
+                    "galileo_input_modalities",
+                    "galileo_output_modalities",
+                    "galileo_multimodal_asset_count",
+                    "multimodal_info.asset_counts",
+                    "multimodal_info.metrics",
+                ],
+            },
+            "operator_review": [
+                "Confirm raw images, audio, PDFs, file names, and external URLs are approved for Galileo logging.",
+                "Keep Splunk exports redacted and metadata-only unless the Splunk index is approved for raw media references.",
+                "Use GalileoLogger or the LangChain/LangGraph handler for multimodal attachments; OpenTelemetry-only paths do not carry attachments.",
+                "Enable multimodal metrics on the Log stream before validating Splunk searches.",
+            ],
+        },
+    )
+    write_text(
+        output_dir / "multimodal/multimodal-observability.md",
+        f"""# Galileo Multimodal Observability Handoff
+
+This handoff covers Galileo multimodal logging and Splunk validation for image,
+audio, and PDF/document workflows.
+
+## Scope
+
+- Project: `{config["project_name"]}` / `{config["project_id"] or "<project-id>"}`
+- Log stream: `{config["log_stream"]}` / `{config["log_stream_id"] or "<log-stream-id>"}`
+- Input modalities: `{", ".join(input_modalities) or "operator-review"}`
+- Output modalities: `{", ".join(output_modalities) or "operator-review"}`
+- Capture methods: `{", ".join(capture_methods) or "operator-review"}`
+- Quality metrics: `{", ".join(quality_metrics) or "operator-review"}`
+- Splunk media policy: `{config["multimodal_asset_policy"]}`
+
+## Logging Paths
+
+Use GalileoLogger when the application needs to log external media URLs or
+local files. Use the LangChain or LangGraph handler when the application already
+passes multimodal messages through LangChain message content. Do not rely on
+OpenTelemetry-only runtime snippets for media attachments; use them for trace
+context and text/tool spans, then add GalileoLogger or the LangChain handler for
+actual image, audio, and document content.
+
+## Splunk Boundary
+
+Default Splunk export remains `redact=true` and metadata-only. The HEC bridge
+extracts modality names, asset counts, MIME types, safe dimensions/duration/page
+metadata, and metric names. It does not copy raw base64 content, bytes, external
+media URLs, or document text into Splunk unless an operator deliberately changes
+the export policy and the destination index is approved for that data.
+
+## Metrics
+
+- Visual Quality: image/PDF quality for task completion on LLM spans.
+- Visual Fidelity: generated image/PDF compliance with visible brand or style
+  requirements on LLM spans.
+- Interruption Detection: turn-taking violations in audio conversations at the
+  session level.
+
+## Validation
+
+1. Log one known image, one known PDF, and one known audio example to the target
+   Log stream.
+2. Confirm the Galileo trace viewer renders media inline and the configured
+   multimodal metrics compute.
+3. Export `trace`, `span`, and `session` records with `redact=true`.
+4. Run `splunk-platform/multimodal-search-examples.spl` and confirm modality
+   counts, metric fields, and trace/session IDs are present.
+5. Verify searches do not contain raw base64 payloads, media URLs, or document
+   text unless the operator has approved that Splunk data flow.
+""",
+    )
+    write_text(
+        output_dir / "splunk-platform/multimodal-search-examples.spl",
+        f"""sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}" galileo_has_multimodal=true
+| stats count sum(galileo_multimodal_asset_count) as assets by galileo_record_type galileo_modalities
+
+sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}" galileo_has_multimodal=true
+| spath path=multimodal_info.asset_counts output=asset_counts
+| table _time galileo_trace_id galileo_session_id galileo_record_id galileo_input_modalities galileo_output_modalities galileo_multimodal_asset_count asset_counts
+
+sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}" galileo_has_multimodal=true
+| where isnotnull('metrics.visual_quality') OR isnotnull('metrics.visual_fidelity') OR isnotnull('metrics.interruption_detection') OR isnotnull('metric_info.visual_quality') OR isnotnull('metric_info.visual_fidelity') OR isnotnull('metric_info.interruption_detection')
+| table _time galileo_trace_id galileo_session_id galileo_record_id galileo_record_type metrics metric_info multimodal_info.metrics
+
+sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}" galileo_has_multimodal=true
+| regex _raw="(?i)(data:[a-z0-9/+.-]+;base64,|\\\"base64\\\"\\s*:|https?://[^\\\" ]+\\.(png|jpe?g|pdf|mp3|wav))"
+| table _time galileo_record_key galileo_trace_id galileo_record_id
 """,
     )
 
@@ -1866,6 +2226,38 @@ SPLUNK_SOURCETYPE={shell_quote(config["splunk_sourcetype"])}
                 "redacted_input": "<redacted>",
                 "redacted_output": "<redacted>",
                 "metrics": {},
+                "multimodal_info": {
+                    "modalities": ["image", "document"],
+                    "input_modalities": ["image", "document"],
+                    "output_modalities": ["text"],
+                    "asset_count": 2,
+                    "asset_counts": {
+                        "image": 1,
+                        "document": 1,
+                    },
+                    "metrics": ["visual_quality"],
+                    "assets": [
+                        {
+                            "field": "input",
+                            "modality": "image",
+                            "mime_type": "image/png",
+                            "has_url": True,
+                            "raw_media_omitted": True,
+                        },
+                        {
+                            "field": "input",
+                            "modality": "document",
+                            "mime_type": "application/pdf",
+                            "page_count": 3,
+                            "raw_media_omitted": True,
+                        },
+                    ],
+                },
+                "galileo_has_multimodal": True,
+                "galileo_modalities": ["image", "document"],
+                "galileo_input_modalities": ["image", "document"],
+                "galileo_output_modalities": ["text"],
+                "galileo_multimodal_asset_count": 2,
                 "control_info": {
                     "control_name": "block-output-pii",
                     "stage": "post",
@@ -1894,6 +2286,9 @@ SPLUNK_SOURCETYPE={shell_quote(config["splunk_sourcetype"])}
 
 sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}"
 | stats latest(updated_at) as latest_update by galileo_project_id galileo_log_stream_id
+
+sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}" galileo_has_multimodal=true
+| stats count sum(galileo_multimodal_asset_count) as assets by galileo_record_type galileo_modalities
 """,
     )
 
@@ -2034,6 +2429,7 @@ def build_apply_plan(
         "observe-runtime": "galileo-platform-setup",
         "protect-runtime": "galileo-platform-setup",
         "evaluate-assets": "galileo-platform-setup",
+        "multimodal-assets": "galileo-platform-setup",
         "observability-controls": "galileo-platform-setup",
         "splunk-hec": "splunk-hec-service-setup",
         "splunk-otlp": "splunk-connect-for-otlp-setup",
@@ -2071,6 +2467,7 @@ def build_apply_plan(
             "readiness": "readiness/",
             "lifecycle": "lifecycle/",
             "evaluate": "evaluate/",
+            "multimodal": "multimodal/",
             "controls": "controls/",
             "splunk_platform": "splunk-platform/",
             "otel": "otel/",
@@ -2100,13 +2497,19 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
                     "projects",
                     "log_streams",
                     "datasets",
+                    "dataset_query_preview_bulk_maintenance",
                     "prompts",
+                    "prompt_rendering",
                     "experiments",
+                    "experiment_metrics_and_columns",
                     "metrics",
+                    "scorer_governance",
                     "protect_stages",
                     "agent_control_targets",
                     "luna_readiness",
+                    "luna_studio_training_lifecycle",
                     "provider_integrations",
+                    "trace_metrics_and_live_logging",
                 ],
             },
             "galileo_full_feature_coverage_matrix": {
@@ -2134,6 +2537,16 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
             "galileo_evaluate_experiments_datasets_annotations": {
                 "status": "automated_lifecycle_plus_rendered_handoff",
                 "assets": ["evaluate/", "lifecycle/"],
+            },
+            "galileo_multimodal_observability": {
+                "status": "rendered_handoff",
+                "assets": [
+                    "multimodal/multimodal-observability.md",
+                    "multimodal/multimodal-intake.example.json",
+                    "evaluate/multimodal-metrics-handoff.yaml",
+                    "splunk-platform/multimodal-search-examples.spl",
+                ],
+                "splunk_policy": config["multimodal_asset_policy"],
             },
             "galileo_agent_observability_controls": {
                 "status": "rendered_handoff",
@@ -2227,6 +2640,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     render_object_lifecycle(output_dir, config)
     render_runtime(output_dir, config)
     render_evaluate_assets(output_dir, config)
+    render_multimodal_assets(output_dir, config)
     render_observability_controls(output_dir, config)
     render_splunk_platform(output_dir, config)
     render_otel(output_dir, config)

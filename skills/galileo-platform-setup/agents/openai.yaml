@@ -1,12 +1,13 @@
 interface:
   display_name: "Galileo Platform Setup"
-  short_description: "Render Galileo readiness, Agent Observability Controls handoffs, object lifecycle, Observe/Evaluate assets, Splunk handoffs, and O11y-only mode."
+  short_description: "Render Galileo readiness, multimodal observability, Agent Observability Controls, object lifecycle, Observe/Evaluate assets, Splunk handoffs, and O11y-only mode."
   default_prompt: >-
     Use $galileo-platform-setup to render, validate, and optionally apply
     Galileo platform workflows: readiness, project/log stream/dataset/prompt
     and experiment lifecycle provisioning, export_records to Splunk HEC,
     OpenTelemetry/OpenInference runtime snippets, Agent Observability Controls
-    console inventory and control-span export validation, legacy Protect
+    console inventory and control-span export validation, multimodal
+    image/audio/document logging and quality metric handoffs, legacy Protect
     invoke coverage, Evaluate metric/annotation handoffs, SSO/RBAC, Luna-2,
     tags/metadata, retention/privacy controls, Agent Graph and console
     debugging views, MCP tool-call logging, cookbook/use-case coverage, async

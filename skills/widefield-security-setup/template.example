@@ -1,0 +1,32 @@
+# WideField Security parent profile
+# Copy to template.local and keep only non-secret values here.
+
+widefield_workspace: prod
+environment: prod
+children: okta,saviynt,splunk,google,doctor
+
+splunk:
+  index: widefield
+  sourcetype: widefield:security
+  hec_source: widefield
+  hec_token_name: widefield_security_hec
+
+okta:
+  org_url: https://example.okta.com
+  receiver_url: https://widefield.example.com/okta/events
+
+saviynt:
+  tenant_url: https://example.saviyntcloud.com
+
+google_secops:
+  project: example-project
+  region: us
+  feed_name: widefield-security
+
+capability_coverage:
+  identity_visibility_posture: true
+  non_human_identity_ownership: true
+  human_identity_posture: true
+  connected_application_permission_risk: true
+  ai_identity_access_monitoring: true
+  authentication_session_analysis: true

@@ -1,0 +1,25 @@
+# WideField Splunk SIEM profile
+# Non-secret values only. HEC token values go in files.
+
+splunk_platform: enterprise
+index: widefield
+sourcetype: widefield:security
+hec_source: widefield
+hec_token_name: widefield_security_hec
+
+# File-backed token values passed on the command line:
+# hec_token_file: /secure/splunk/widefield_hec_token
+# write_hec_token_file: /secure/splunk/widefield_hec_token
+
+knowledge_objects:
+  macro: widefield_security_events
+  saved_search: WideField Security - Event Type Summary
+  dashboard: widefield_security_overview
+
+validation_coverage:
+  identity_visibility_posture: true
+  non_human_identity_ownership: true
+  human_identity_posture: true
+  connected_application_permission_risk: true
+  ai_identity_access_monitoring: true
+  authentication_session_analysis: true

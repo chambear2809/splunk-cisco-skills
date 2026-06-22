@@ -10,6 +10,10 @@
 - Galileo prompts: `https://docs.galileo.ai/sdk-api/experiments/prompts`
 - Galileo experiments: `https://docs.galileo.ai/sdk-api/python/reference/experiments`
 - Galileo OpenTelemetry/OpenInference: `https://docs.galileo.ai/sdk-api/third-party-integrations/opentelemetry-and-openinference`
+- Galileo multimodal observability:
+  `https://docs.galileo.ai/concepts/logging/multimodal-observability`
+- Galileo multimodal quality metrics:
+  `https://docs.galileo.ai/concepts/metrics/multimodal-quality/multimodal-quality-overview`
 - Galileo Agent Control target resolution: `https://docs.galileo.ai/sdk-api/python/reference/agent_control`
 - Galileo Agent Observability Controls: `https://docs.galileo.ai/how-to-guides/agent-control/create-a-control`
 - Galileo control monitoring: `https://docs.galileo.ai/how-to-guides/agent-control/monitor-a-control`
@@ -34,6 +38,7 @@ schema, HEC envelope shape, or collector handoff flags.
 | `observe-runtime` | `galileo-platform-setup` | Provide Python and Kubernetes OTel/OpenInference bootstrap snippets. |
 | `protect-runtime` | `galileo-platform-setup` | Provide a legacy Python `/v2/protect/invoke` helper for existing Protect users. |
 | `evaluate-assets` | `galileo-platform-setup` | Render Evaluate, experiment, dataset, metric, annotation, feedback, Signals, and Trends handoffs. |
+| `multimodal-assets` | `galileo-platform-setup` | Render multimodal logging, quality metric, Splunk metadata-only export, and validation-search handoffs. |
 | `observability-controls` | `galileo-platform-setup` | Render Galileo Agent Observability Controls console inventory, Log stream attachment, control-span export, and Splunk search handoffs. |
 | `splunk-hec` | `splunk-hec-service-setup` | Prepare Splunk HEC service/token configuration. |
 | `splunk-otlp` | `splunk-connect-for-otlp-setup` | Configure the Splunk Platform OTLP receiver and sender handoff assets. |
@@ -52,6 +57,7 @@ default render/apply selects only:
 - `observe-runtime`
 - `protect-runtime`
 - `evaluate-assets`
+- `multimodal-assets`
 - `observability-controls`
 - `otel-collector`
 - `dashboards`
@@ -98,9 +104,13 @@ Product coverage surfaces tracked in the matrix:
 - Log streams and metric enablement
 - Datasets, dataset versions, sharing, prompt-evaluation datasets, and
   synthetic extension
-- Prompts and prompt-version review
+- Dataset query, preview, content mutation/upsert, bulk delete guardrails, and
+  synthetic extension status polling
+- Prompts, prompt-version review, prompt-template rendering, and TypeScript
+  prompt utility handoffs
 - Experiments, experiment groups, tags, comparison, search, metric settings,
-  and optional experiment runs
+  available columns, metrics APIs, paginated search, and optional experiment
+  runs
 - Evaluate workflow runs
 - Python and TypeScript SDK parity, Observe/Evaluate workflow classes, package
   versioning, and runtime package handoffs
@@ -109,10 +119,17 @@ Product coverage surfaces tracked in the matrix:
   and Autotune/metric-improvement handoffs
 - Evaluate metrics, built-in scorers, custom scorers, scorer validation, and
   scorer settings
+- Scorer governance including Autogen LLM scorers, multipart validation, scorer
+  RBAC/scope, version restore, and scorer health-score read/write handoffs
 - Luna Enterprise, model/provider integrations, model aliases, costs, and
   pricing readiness
 - Luna-2 fine-tuning, Luna metric evaluation, experiment use, and feature
   availability readiness
+- Luna Studio UI and SDK training lifecycle across datasets, test/training sets,
+  config files, run lifecycle, output artifacts, registration, and full
+  session/trace/RAG/tool/retriever tutorials
+- Provider integration selection/status, named custom providers, Vegas Gateway,
+  Databricks catalog/database helpers, and integration collaborator handoffs
 - Observe traces, sessions, spans, OpenTelemetry, and OpenInference
 - Tags, metadata, run labels, and filter hygiene for sessions, traces, spans,
   prompt runs, and Splunk fields
@@ -120,14 +137,21 @@ Product coverage surfaces tracked in the matrix:
   controls, and compliance handoffs
 - Trace query, columns, recompute, update, delete, and organization-job
   maintenance handoffs
+- Trace metrics APIs, custom metrics, count endpoints, partial queries,
+  aggregated trace view, create-session, and live log-spans/log-traces API
+  handoffs
 - Agent Graph, Logs UI, Messages UI, large-log filtering, and console
   debugging views
 - Distributed tracing and multi-service trace propagation
 - Multimodal observability for images, audio, and documents
+- Multimodal quality metrics for Visual Quality, Visual Fidelity, and
+  Interruption Detection
 - Third-party framework integrations and wrappers including A2A, CrewAI,
   Google ADK, LangChain/LangGraph, Microsoft Agent Framework, OpenAI,
   OpenAI Agents SDK, Mastra, Pydantic AI, Strands Agents, Vercel AI SDK,
-  custom spans, and OpenInference
+  custom spans, OpenInference, AWS Bedrock inference profiles, Gemini
+  Enterprise credentials, LangGraph Command/Send, LangChain middleware, and
+  LangChain/LangGraph runtime protection
 - MCP tool-call logging and tool spans
 - Galileo alerts, email notifications, Slack webhooks, and Splunk detector
   mapping
@@ -143,7 +167,8 @@ Product coverage surfaces tracked in the matrix:
 - Run insights, health scores, token usage, search, runs, traces SDK utilities,
   decorators, handlers, and wrappers
 - Jobs, async tasks, validation status, and progress polling
-- Enterprise deployment, system users, and organization jobs
+- Enterprise deployment, system users/social users, organization jobs, and
+  delete-by-metadata guardrails
 - Galileo MCP Server and IDE developer tooling
 - Playgrounds, sample projects, unit-test experiments, and CI experiment gates
 - Official cookbooks, use-case guides, starter examples, and applied agent/RAG
@@ -194,6 +219,33 @@ Preferred record fields:
 Raw prompt/response fields are excluded unless the operator explicitly passes
 `--include-raw` to the bridge script and confirms Splunk is an approved
 destination.
+
+## Multimodal Observability
+
+Rendered assets:
+
+- `multimodal/multimodal-observability.md`
+- `multimodal/multimodal-intake.example.json`
+- `evaluate/multimodal-metrics-handoff.yaml`
+- `splunk-platform/multimodal-search-examples.spl`
+
+Use GalileoLogger for external media URLs or local file uploads, and use the
+LangChain/LangGraph handler when multimodal content already flows through
+LangChain messages. OpenTelemetry/OpenInference snippets remain useful for
+trace context and span telemetry, but they do not carry multimodal attachments
+by themselves.
+
+The Splunk bridge keeps `redact=true` by default and emits safe metadata:
+modality names, input/output modality sets, asset counts, MIME types, dimensions
+or duration/page counts where present, and multimodal metric names/results.
+Raw base64 payloads, bytes, media URLs, and document text stay out of Splunk by
+default. Treat `--include-raw` as a separate data-governance approval, not as a
+normal multimodal setup step.
+
+If a user says "multimodel" and means comparing more than one model, use the
+Evaluate and experiment assets instead: run the same dataset and metric set
+across model variants, preserve model/provider/prompt-version tags, and compare
+the resulting experiment groups.
 
 ## Agent Observability Controls
 

@@ -1,0 +1,4 @@
+interface:
+  display_name: "WideField Identity Threat Doctor"
+  short_description: "Diagnose OAuth and NHI identity threats"
+  default_prompt: "Use $widefield-identity-threat-doctor to run read-only identity threat checks and render gated remediation packets."

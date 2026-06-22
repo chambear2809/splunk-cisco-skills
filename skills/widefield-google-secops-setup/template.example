@@ -1,0 +1,19 @@
+# WideField Google SecOps profile
+# Non-secret values only.
+
+google_secops_project: example-project
+google_secops_region: us
+feed_name: widefield-security
+log_type: WIDEFIELD_SECURITY
+source_type: webhook
+
+evidence:
+  required: true
+  file: ./widefield-google-secops-evidence.local.json
+  capability_coverage:
+    identity_visibility_posture: false
+    non_human_identity_ownership: false
+    human_identity_posture: false
+    connected_application_permission_risk: false
+    ai_identity_access_monitoring: false
+    authentication_session_analysis: false
