@@ -1,0 +1,42 @@
+# Galileo MCP Server Setup intake template.
+#
+# Copy to template.local for planning. Keep secrets out of this file.
+# If you need to validate a key, put it in a chmod-600 file and pass
+# --galileo-api-key-file /path/to/file.
+
+api_version: galileo-mcp-server-setup/v1
+
+# Client configs to render. Valid values: cursor, claude, codex, vscode, kiro.
+# Aliases: all, claude-code, vs-code, aws-kiro.
+clients:
+  - cursor
+  - claude
+  - codex
+  - vscode
+  - kiro
+
+galileo:
+  # Leave mcp_url empty for Galileo Cloud.
+  mcp_url: ""
+  # For self-hosted deployments, set console_url and the renderer derives
+  # the MCP URL by replacing "console" with "api" and appending /mcp/http/mcp.
+  console_url: ""
+
+client_options:
+  cursor:
+    scope: user
+    use_env_placeholder: true
+  vscode:
+    use_input_prompt: true
+  codex:
+    server_name: galileo
+    replace_existing: true
+  claude:
+    server_name: galileo
+  kiro:
+    server_name: galileo
+
+# Write/generation tools create tenant objects or synthetic content. Keep false
+# unless the operator has reviewed this risk and wants the rendered README to
+# document explicit enablement guidance.
+accept_galileo_mcp_write_tools: false

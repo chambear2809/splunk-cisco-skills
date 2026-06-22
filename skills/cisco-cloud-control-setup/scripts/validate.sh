@@ -74,6 +74,7 @@ for rel in \
     api/cloud-control-api-boundary.md \
     api/workflows-api-readiness.md \
     data-fabric/handoff.md \
+    data-fabric/cisco-data-fabric-2026-readiness.md \
     studio/mcp-connector-plan.md \
     observability/cloud-control-dashboard.yaml \
     observability/cloud-control-native-ops.yaml

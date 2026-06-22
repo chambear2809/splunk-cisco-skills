@@ -60,3 +60,12 @@ Before considering a restart handled:
 - management API is reachable again,
 - the post-restart condition was validated,
 - any expected ports or product-specific probes passed.
+
+## Splunk 10.4 enterprise deployment notes
+
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+read this skill alongside
+[`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
+the prose companion to the
+[`../shared/references/splunk_platform_versions.json`](../shared/references/splunk_platform_versions.json)
+version contract.

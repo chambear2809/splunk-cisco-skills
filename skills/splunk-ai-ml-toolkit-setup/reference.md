@@ -6,11 +6,11 @@ Current first-class installable coverage:
 
 | Product | Splunkbase | Package ID | Latest audited release | Placement |
 | --- | --- | --- | --- | --- |
-| Splunk AI Toolkit / MLTK | `2890` | `Splunk_ML_Toolkit` | `5.7.3`, April 19, 2026 | Search tier |
-| PSC Linux 64-bit | `2882` | `Splunk_SA_Scientific_Python_linux_x86_64` | `4.3.1`, February 27, 2026 | Search tier |
-| PSC Windows 64-bit | `2883` | `Splunk_SA_Scientific_Python_windows_x86_64` | `4.3.1`, February 27, 2026 | Search tier |
-| PSC Mac Intel | `2881` | `Splunk_SA_Scientific_Python_darwin_x86_64` | `4.3.1`, February 27, 2026 | Search tier |
-| PSC Mac Apple Silicon | `6785` | `Splunk_SA_Scientific_Python_darwin_arm64` | `4.3.1`, February 27, 2026 | Search tier |
+| Splunk AI Toolkit / MLTK | `2890` | `Splunk_ML_Toolkit` | `5.7.4`, May 20, 2026 | Search tier |
+| PSC Linux 64-bit | `2882` | `Splunk_SA_Scientific_Python_linux_x86_64` | `4.3.2`, May 20, 2026 | Search tier |
+| PSC Windows 64-bit | `2883` | `Splunk_SA_Scientific_Python_windows_x86_64` | `4.3.2`, May 20, 2026 | Search tier |
+| PSC Mac Intel | `2881` | `Splunk_SA_Scientific_Python_darwin_x86_64` | `4.3.2`, May 20, 2026 | Search tier |
+| PSC Mac Apple Silicon | `6785` | `Splunk_SA_Scientific_Python_darwin_arm64` | `4.3.2`, May 20, 2026 | Search tier |
 | DSDL | `4607` | `mltk-container` | `5.2.3`, February 5, 2026 | Search tier plus external runtime |
 
 Legacy/migration-only coverage:
@@ -29,13 +29,16 @@ The coverage report must include these surfaces:
 - PSC dependency selection and install order
 - ML-SPL commands: `fit`, `apply`, `summary`, `score`, `listmodels`,
   `deletemodel`, and the AI Toolkit `ai` command
-- AI Toolkit 5.7.3 compatibility with PSC 4.3.1, Python 3.13 PSC runtime,
+- AI Toolkit 5.7.4 compatibility with PSC 4.3.2, Python 3.13 PSC runtime,
   and the current supported Splunk platform matrix
 - ML command permissions, algorithm access, search safeguards, and performance
   cost settings
 - Smart Assistants and Experiment Management for prediction, clustering,
   outlier detection, forecasting, and anomaly workflows
-- Cisco Deep Time Series anomaly detection readiness in AI Toolkit `5.7.3`
+- Cisco Deep Time Series forecasting and anomaly detection readiness in AI
+  Toolkit `5.7.4`
+- Hosted foundation model readiness for Foundation-Sec, Cisco Deep Time Series
+  Model, and GPT-OSS where available inside the Splunk Platform boundary
 - Connections tab readiness for LLM providers and container endpoints
 - Container Management tab readiness for DSDL-backed workflows
 - model object inventory, lookup permissions, and retraining risk after the
@@ -103,7 +106,7 @@ The renderer and validator must never emit `unknown`.
 - Splunk Cloud search heads use Linux PSC.
 - Live Enterprise installs should prefer explicit `--psc-target` unless the
   operator has separately confirmed the search head OS.
-- AI Toolkit `5.7.3` and PSC `4.3.1` are the current audited pair.
+- AI Toolkit `5.7.4` and PSC `4.3.2` are the current audited pair.
 - Live install commands intentionally omit `--app-version` so
   `splunk-app-install` pulls the latest compatible Splunkbase release; the
   audited version values in this reference are validation metadata, not pins.
@@ -113,7 +116,10 @@ The renderer and validator must never emit `unknown`.
 ## Source Links
 
 - Splunk AI Toolkit Splunkbase: https://splunkbase.splunk.com/app/2890
-- Splunk AI Toolkit 5.7.3 install and version dependencies: https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.3/install-and-upgrade-the-ai-toolkit/install-the-ai-toolkit
+- Splunk AI Toolkit 5.7.4 install and version dependencies: https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/install-and-upgrade-the-ai-toolkit/install-the-ai-toolkit
+- Splunk AI Toolkit 5.7.4 release notes: https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit
+- Cisco Deep Time Series Model preview: https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/ai-toolkit-models/feature-preview-cisco-deep-time-series-model
+- Splunk AI Toolkit product page: https://www.splunk.com/en_us/products/ai-toolkit.html
 - PSC Linux 64-bit Splunkbase: https://splunkbase.splunk.com/app/2882
 - PSC Windows 64-bit Splunkbase: https://splunkbase.splunk.com/app/2883
 - PSC Mac Intel Splunkbase: https://splunkbase.splunk.com/app/2881

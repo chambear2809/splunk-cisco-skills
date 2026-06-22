@@ -8,7 +8,7 @@ package and reading its `default/` and `README/*.spec` files.
 - App folder name: **`victorops_app`** (the package retained the legacy id;
   the skill must reference this exact id for `passwords.conf`, ACS install,
   and `is_configured` checks).
-- Splunkbase v1.0.42 (2026-01-28). Splunk Enterprise / Splunk Cloud 8.0–10.3.
+- Splunkbase v1.0.42 (2026-01-28). Splunk Enterprise / Splunk Cloud 8.0–10.4 (default 10.4; also 10.3 Cloud / 10.2 / older trains).
   Requires Python 3.13.
 - Install target: search head, or SHC deployer for SHC deployments.
 
@@ -125,7 +125,7 @@ writes it via the REST API.
 ## Splunkbase 4886 — Splunk Add-on for On-Call (VictorOps)
 
 - App folder name: **`TA-splunk-add-on-for-victorops`**.
-- Splunkbase v2.0.0. Splunk Enterprise / Splunk Cloud 8.0–10.3.
+- Splunkbase v2.0.0. Splunk Enterprise / Splunk Cloud 8.0–10.4 (default 10.4; also 10.3 Cloud / 10.2 / older trains).
 - Install target: **heavy forwarder** (the Add-on calls the public API and
   produces JSON events that flow into Splunk indexes).
 

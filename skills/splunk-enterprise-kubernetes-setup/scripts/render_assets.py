@@ -18,7 +18,13 @@ from typing import Iterable
 
 
 DEFAULT_OPERATOR_VERSION = "3.1.0"
-DEFAULT_SPLUNK_VERSION = "10.2.0"
+
+_SHARED_LIB = Path(__file__).resolve().parents[2] / "shared" / "lib"
+if str(_SHARED_LIB) not in sys.path:
+    sys.path.insert(0, str(_SHARED_LIB))
+from platform_versions import platform_default  # noqa: E402
+
+DEFAULT_SPLUNK_VERSION = platform_default("enterprise_version")
 SGT_ACCEPTANCE = "--accept-sgt-current-at-splunk-com"
 SOK_ARCHITECTURES = {"s1", "c3", "m4"}
 POD_PROFILES = {

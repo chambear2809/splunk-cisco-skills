@@ -60,3 +60,12 @@ under the client-side `$SPLUNK_HOME/etc/apps` path.
   <https://help.splunk.com/en/data-management/splunk-enterprise-admin-manual/10.2/configuration-file-reference/10.2.0-configuration-file-reference/serverclass.conf>
 - `deploymentclient.conf` reference:
   <https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.2/configuration-file-reference/10.2.0-configuration-file-reference/deploymentclient.conf>
+
+## Splunk 10.4 enterprise deployment notes
+
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+read this skill alongside
+[`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
+the prose companion to the
+[`../shared/references/splunk_platform_versions.json`](../shared/references/splunk_platform_versions.json)
+version contract.

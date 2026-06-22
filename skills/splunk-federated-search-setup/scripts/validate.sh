@@ -25,7 +25,8 @@ Options:
 Validates that:
 - All required rendered files exist (README.md, metadata.json, federated.conf.template,
   indexes.conf, server.conf, preflight.sh, apply-search-head.sh, apply-shc-deployer.sh,
-  apply-rest.sh, status.sh, global-enable.sh, global-disable.sh).
+  apply-rest.sh, status.sh, global-enable.sh, global-disable.sh,
+  data-management-federation-handoff.md).
 - federated.conf.template has at least one provider stanza OR a clear "no FSS2S
   providers" comment.
 - federated.conf.template contains a per-provider password placeholder
@@ -74,6 +75,7 @@ render_dir="${OUTPUT_DIR}/federated-search"
 required=(
     README.md
     metadata.json
+    data-management-federation-handoff.md
     federated.conf.template
     indexes.conf
     server.conf

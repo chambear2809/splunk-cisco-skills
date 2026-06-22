@@ -47,7 +47,7 @@ service_user: splunk
 
 # Splunk version — used for SVD floor enforcement. The skill refuses to
 # apply if this is below the floor in references/cve-svd-floor.json.
-splunk_version: 10.2.2
+splunk_version: 10.4.0
 
 # ---------------------------------------------------------------------------
 # Crypto / TLS

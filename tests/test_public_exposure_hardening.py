@@ -330,6 +330,9 @@ def test_svd_floor_accepts_at_or_above_floor(tmp_path: Path) -> None:
     result = run_render(*base_render_args(out, **{"--splunk-version": "10.2.2"}))
     assert result.returncode == 0, result.stderr
 
+    result_104 = run_render(*base_render_args(out, **{"--splunk-version": "10.4.0"}))
+    assert result_104.returncode == 0, result_104.stderr
+
 
 def test_svd_floor_unknown_series_does_not_refuse(tmp_path: Path) -> None:
     out = tmp_path / "out"

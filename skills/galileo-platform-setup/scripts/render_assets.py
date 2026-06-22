@@ -25,6 +25,7 @@ APPLY_SECTIONS = [
     "observe-runtime",
     "protect-runtime",
     "evaluate-assets",
+    "observability-controls",
     "splunk-hec",
     "splunk-otlp",
     "otel-collector",
@@ -37,6 +38,7 @@ O11Y_ONLY_SECTIONS = [
     "observe-runtime",
     "protect-runtime",
     "evaluate-assets",
+    "observability-controls",
     "otel-collector",
     "dashboards",
     "detectors",
@@ -335,6 +337,25 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
         "cursor_file": arg_or_spec("cursor_file", "hec_export.cursor_file", ""),
         "since": arg_or_spec("since", "hec_export.since", ""),
         "until": arg_or_spec("until", "hec_export.until", ""),
+        "controls_inventory_file": str(
+            get_nested(
+                spec,
+                "observability_controls.inventory_file",
+                "./galileo-platform-rendered/controls/control-intake.example.json",
+            )
+            or ""
+        ),
+        "controls_export_root_type": str(
+            get_nested(spec, "observability_controls.export_root_type_for_evidence", "span") or "span"
+        ),
+        "controls_expected_fields": str(
+            get_nested(
+                spec,
+                "observability_controls.expected_fields",
+                "control_name,step,stage,execution,source,action,evaluator,selector_path,matched,confidence",
+            )
+            or ""
+        ),
     }
 
 
@@ -538,14 +559,15 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-connect-for-otlp-setup/scripts/setup.
     if config["o11y_only"]:
         otel_collector = f"""{script_header()}
 {require_file_var("O11Y_TOKEN_FILE", config["o11y_token_file"], "--o11y-token-file")}
-if [[ -z {shell_quote(config["realm"])} ]]; then
+REALM={shell_quote(config["realm"])}
+if [[ -z "${{REALM}}" ]]; then
   echo "ERROR: --realm is required for the otel-collector handoff." >&2
   exit 1
 fi
 exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/scripts/setup.sh" \\
   --render-k8s \\
   --render-linux \\
-  --realm {shell_quote(config["realm"])} \\
+  --realm "${{REALM}}" \\
   --cluster-name {shell_quote(config["collector_cluster_name"])} \\
   --deployment-environment {shell_quote(config["deployment_environment"])} \\
   --service-name {shell_quote(config["service_name"])} \\
@@ -557,7 +579,8 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/sc
 {require_file_var("O11Y_TOKEN_FILE", config["o11y_token_file"], "--o11y-token-file")}
 {require_file_var("SPLUNK_HEC_TOKEN_FILE", config["splunk_hec_token_file"], "--splunk-hec-token-file")}
 SPLUNK_HEC_URL="${{SPLUNK_HEC_URL:-{shell_double_default(config["splunk_hec_url"])}}}"
-if [[ -z {shell_quote(config["realm"])} ]]; then
+REALM={shell_quote(config["realm"])}
+if [[ -z "${{REALM}}" ]]; then
   echo "ERROR: --realm is required for the otel-collector handoff." >&2
   exit 1
 fi
@@ -565,7 +588,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-otel-collector-setup/sc
   --render-k8s \\
   --render-linux \\
   --render-platform-hec-helper \\
-  --realm {shell_quote(config["realm"])} \\
+  --realm "${{REALM}}" \\
   --cluster-name {shell_quote(config["collector_cluster_name"])} \\
   --deployment-environment {shell_quote(config["deployment_environment"])} \\
   --service-name {shell_quote(config["service_name"])} \\
@@ -624,16 +647,30 @@ echo "  ${{OUTPUT_DIR}}/evaluate/annotation-feedback-handoff.md"
     write_text(scripts_dir / "apply-evaluate-assets.sh", evaluate_assets, executable=True)
     scripts["evaluate-assets"] = "scripts/apply-evaluate-assets.sh"
 
+    observability_controls = f"""{script_header()}
+echo "Review rendered Galileo Agent Observability Controls assets:"
+echo "  ${{OUTPUT_DIR}}/controls/agent-observability-controls.md"
+echo "  ${{OUTPUT_DIR}}/controls/control-intake.example.json"
+echo "  ${{OUTPUT_DIR}}/controls/splunk-search-examples.spl"
+"""
+    write_text(
+        scripts_dir / "apply-observability-controls.sh",
+        observability_controls,
+        executable=True,
+    )
+    scripts["observability-controls"] = "scripts/apply-observability-controls.sh"
+
     dashboards = f"""{script_header()}
 {require_file_var("O11Y_TOKEN_FILE", config["o11y_token_file"], "--o11y-token-file")}
-if [[ -z {shell_quote(config["realm"])} ]]; then
+REALM={shell_quote(config["realm"])}
+if [[ -z "${{REALM}}" ]]; then
   echo "ERROR: --realm is required for dashboard apply." >&2
   exit 1
 fi
 exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-dashboard-builder/scripts/setup.sh" \\
   --apply \\
   --spec "${{OUTPUT_DIR}}/dashboards/galileo-dashboard.yaml" \\
-  --realm {shell_quote(config["realm"])} \\
+  --realm "${{REALM}}" \\
   --token-file "${{O11Y_TOKEN_FILE}}" \\
   --output-dir "${{OUTPUT_DIR}}/delegated/dashboards"
 """
@@ -642,14 +679,15 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-dashboard-builder/scrip
 
     detectors = f"""{script_header()}
 {require_file_var("O11Y_TOKEN_FILE", config["o11y_token_file"], "--o11y-token-file")}
-if [[ -z {shell_quote(config["realm"])} ]]; then
+REALM={shell_quote(config["realm"])}
+if [[ -z "${{REALM}}" ]]; then
   echo "ERROR: --realm is required for detector apply." >&2
   exit 1
 fi
 exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-native-ops/scripts/setup.sh" \\
   --apply \\
   --spec "${{OUTPUT_DIR}}/detectors/galileo-detectors.yaml" \\
-  --realm {shell_quote(config["realm"])} \\
+  --realm "${{REALM}}" \\
   --token-file "${{O11Y_TOKEN_FILE}}" \\
   --output-dir "${{OUTPUT_DIR}}/delegated/detectors"
 """
@@ -666,6 +704,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-native-ops/scripts/setu
     observe-runtime) "${SCRIPT_DIR}/apply-observe-runtime.sh" ;;
     protect-runtime) "${SCRIPT_DIR}/apply-protect-runtime.sh" ;;
     evaluate-assets) "${SCRIPT_DIR}/apply-evaluate-assets.sh" ;;
+    observability-controls) "${SCRIPT_DIR}/apply-observability-controls.sh" ;;
     splunk-hec) "${SCRIPT_DIR}/apply-splunk-hec.sh" ;;
     splunk-otlp) "${SCRIPT_DIR}/apply-splunk-otlp.sh" ;;
     otel-collector) "${SCRIPT_DIR}/apply-otel-collector.sh" ;;
@@ -1268,6 +1307,23 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
             "docs": "https://docs.galileo.ai/sdk-api/python/reference/agent_control",
         },
         {
+            "surface": "Agent Observability Controls dashboard and control spans",
+            "lifecycle": [
+                "console_control_inventory",
+                "log_stream_control_attachment_review",
+                "control_span_export_validation",
+                "splunk_control_field_mapping",
+            ],
+            "coverage": "rendered_platform_handoff_without_undocumented_control_crud_claims",
+            "rendered_assets": [
+                "controls/agent-observability-controls.md",
+                "controls/control-intake.example.json",
+                "controls/splunk-search-examples.spl",
+            ],
+            "apply_script": "scripts/apply-observability-controls.sh",
+            "docs": "https://docs.galileo.ai/how-to-guides/agent-control/create-a-control",
+        },
+        {
             "surface": "Annotation templates, ratings, and queues",
             "lifecycle": [
                 "annotation_template_handoff",
@@ -1584,6 +1640,165 @@ feedback text redacted unless the destination Splunk index is approved for it.
     )
 
 
+def render_observability_controls(output_dir: Path, config: dict[str, Any]) -> None:
+    """Render the Galileo console Controls surface as a platform handoff.
+
+    Galileo does not currently publish public v2 control CRUD endpoints in the
+    OpenAPI spec, so this artifact is intentionally operator/UI oriented. The
+    HEC bridge still preserves control metadata when it appears on exported
+    records or control spans.
+    """
+
+    write_text(
+        output_dir / "controls/agent-observability-controls.md",
+        f"""# Galileo Agent Observability Controls Handoff
+
+This handoff covers the Galileo Agent Observability `Controls` console surface
+for project Log streams. It is separate from this repo's standalone
+`galileo-agent-control-setup` skill, which renders external/open-source Agent
+Control server, SDK, and sink assets.
+
+## Boundary
+
+- Official public Galileo OpenAPI checked: `https://api.galileo.ai/public/v2/openapi.json`
+- Documented control CRUD endpoints in public v2 OpenAPI: `not present`
+- Supported here: render intake, console checklist, export validation, and
+  Splunk field/search guidance
+- Not claimed here: creating, attaching, cloning, deleting, or mutating
+  controls through undocumented Galileo or Cisco Cloud Control APIs
+- Operator intake file: `{config["controls_inventory_file"]}`
+- Recommended export root type for control evidence: `{config["controls_export_root_type"]}`
+- Expected inventory fields: `{config["controls_expected_fields"]}`
+
+## Console Checklist
+
+1. Open the target project and Log stream:
+   `{config["project_name"]}` / `{config["log_stream"]}`.
+2. Open the global `Controls` dashboard to review reusable control definitions.
+3. For each control, record the displayed fields: control name, step, stage,
+   execution environment, source, enabled state, action, selector path,
+   evaluator, match threshold, and owner.
+4. Attach reviewed controls to the Log stream from its `Controls` tab. Treat
+   Log stream attachments as clones when the console presents them that way.
+5. Generate a known-safe request and a known-match request, then inspect the
+   trace or span detail view for control execution evidence.
+6. Export `{config["controls_export_root_type"]}` records when you need
+   control evidence in Splunk Platform. Keep `redact=true` unless raw prompt or
+   response content is approved for the destination index.
+
+## Fields To Preserve In Splunk
+
+When Galileo export records include these values, the HEC bridge maps them into
+`control_info` and top-level `galileo_control_*` fields:
+
+- `control_name`
+- `control_id`
+- `stage`
+- `step` or `step_type`
+- `execution`
+- `source`
+- `action` or `decision`
+- `matched`
+- `confidence`
+- `evaluator_name`
+- `selector_path`
+
+Missing fields mean Galileo did not include those values in the exported
+record. In that case, keep the console inventory as review evidence and rely on
+trace/span IDs for correlation.
+
+## Validation Searches
+
+Use `controls/splunk-search-examples.spl` after running `observe-export` with
+`--root-type {config["controls_export_root_type"]}`.
+""",
+    )
+    write_json(
+        output_dir / "controls/control-intake.example.json",
+        {
+            "api_version": f"{SKILL_NAME}/observability-controls/v1",
+            "project": {
+                "id": config["project_id"],
+                "name": config["project_name"],
+            },
+            "log_stream": {
+                "id": config["log_stream_id"],
+                "name": config["log_stream"],
+            },
+            "inventory_file": config["controls_inventory_file"],
+            "export_root_type_for_evidence": config["controls_export_root_type"],
+            "expected_fields": [
+                item.strip()
+                for item in str(config["controls_expected_fields"]).split(",")
+                if item.strip()
+            ],
+            "controls": [
+                {
+                    "control_name": "block-prompt-injection",
+                    "enabled": True,
+                    "step": "LLM",
+                    "stage": "Pre",
+                    "execution": "Server",
+                    "source": "custom",
+                    "action": "deny",
+                    "selector_path": "input",
+                    "evaluator": {
+                        "name": "configured-in-console",
+                        "threshold": "operator-review",
+                    },
+                    "owner": "ai-platform",
+                    "notes": "Inventory example only; create and attach through the Galileo console.",
+                },
+                {
+                    "control_name": "block-output-pii",
+                    "enabled": True,
+                    "step": "LLM",
+                    "stage": "Post",
+                    "execution": "Server",
+                    "source": "custom",
+                    "action": "deny",
+                    "selector_path": "output",
+                    "evaluator": {
+                        "name": "configured-in-console",
+                        "threshold": "operator-review",
+                    },
+                    "owner": "ai-platform",
+                    "notes": "Inventory example only; create and attach through the Galileo console.",
+                },
+                {
+                    "control_name": "observe-tool-decisions",
+                    "enabled": True,
+                    "step": "Tool",
+                    "stage": "Pre",
+                    "execution": "Server",
+                    "source": "custom",
+                    "action": "observe",
+                    "selector_path": "*",
+                    "evaluator": {
+                        "name": "configured-in-console",
+                        "threshold": "operator-review",
+                    },
+                    "owner": "ai-platform",
+                    "notes": "Inventory example only; create and attach through the Galileo console.",
+                },
+            ],
+        },
+    )
+    write_text(
+        output_dir / "controls/splunk-search-examples.spl",
+        f"""sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}" galileo_control_name=*
+| stats count latest(updated_at) as latest_update by galileo_control_name galileo_control_stage galileo_control_action galileo_control_matched
+
+sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}" galileo_record_type="{config["controls_export_root_type"]}"
+| where isnotnull('control_info.control_name') OR isnotnull(galileo_control_name)
+| table _time galileo_trace_id galileo_record_id name galileo_control_name galileo_control_step_type galileo_control_stage galileo_control_action galileo_control_confidence galileo_control_evaluator_name
+
+sourcetype="{config["splunk_sourcetype"]}" index="{config["splunk_index"]}" galileo_control_matched=true
+| stats count by galileo_project_id galileo_log_stream_id galileo_control_name galileo_control_source
+""",
+    )
+
+
 def render_splunk_platform(output_dir: Path, config: dict[str, Any]) -> None:
     write_text(
         output_dir / "splunk-platform/galileo-hec-export.env.example",
@@ -1651,6 +1866,24 @@ SPLUNK_SOURCETYPE={shell_quote(config["splunk_sourcetype"])}
                 "redacted_input": "<redacted>",
                 "redacted_output": "<redacted>",
                 "metrics": {},
+                "control_info": {
+                    "control_name": "block-output-pii",
+                    "stage": "post",
+                    "step_type": "llm",
+                    "execution": "server",
+                    "source": "custom",
+                    "action": "deny",
+                    "matched": True,
+                    "confidence": 0.99,
+                    "evaluator_name": "configured-in-console",
+                    "selector_path": "output",
+                },
+                "galileo_control_name": "block-output-pii",
+                "galileo_control_step_type": "llm",
+                "galileo_control_stage": "post",
+                "galileo_control_source": "custom",
+                "galileo_control_action": "deny",
+                "galileo_control_matched": True,
             },
         },
     )
@@ -1801,6 +2034,7 @@ def build_apply_plan(
         "observe-runtime": "galileo-platform-setup",
         "protect-runtime": "galileo-platform-setup",
         "evaluate-assets": "galileo-platform-setup",
+        "observability-controls": "galileo-platform-setup",
         "splunk-hec": "splunk-hec-service-setup",
         "splunk-otlp": "splunk-connect-for-otlp-setup",
         "otel-collector": "splunk-observability-otel-collector-setup",
@@ -1837,6 +2071,7 @@ def build_apply_plan(
             "readiness": "readiness/",
             "lifecycle": "lifecycle/",
             "evaluate": "evaluate/",
+            "controls": "controls/",
             "splunk_platform": "splunk-platform/",
             "otel": "otel/",
             "scripts": "scripts/",
@@ -1899,6 +2134,15 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
             "galileo_evaluate_experiments_datasets_annotations": {
                 "status": "automated_lifecycle_plus_rendered_handoff",
                 "assets": ["evaluate/", "lifecycle/"],
+            },
+            "galileo_agent_observability_controls": {
+                "status": "rendered_handoff",
+                "assets": [
+                    "controls/agent-observability-controls.md",
+                    "controls/control-intake.example.json",
+                    "controls/splunk-search-examples.spl",
+                ],
+                "note": "Public Galileo v2 OpenAPI currently exposes no documented controls CRUD path; use the console and validate exported control-span evidence.",
             },
             "splunk_observability_operations": {
                 "status": "delegated",
@@ -1983,6 +2227,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     render_object_lifecycle(output_dir, config)
     render_runtime(output_dir, config)
     render_evaluate_assets(output_dir, config)
+    render_observability_controls(output_dir, config)
     render_splunk_platform(output_dir, config)
     render_otel(output_dir, config)
     render_o11y_specs(output_dir, config)

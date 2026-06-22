@@ -370,7 +370,7 @@ def test_security_skill_dry_runs_emit_json_without_secret_values(tmp_path: Path)
     )
     assert ari["restricted_download"] is True
     assert ari["app_id"] == "7180"
-    assert ari["latest_researched_version"] == "1.2.1"
+    assert ari["latest_researched_version"] == "1.2.2"
     assert ari["indexes"]["required"] == ARI_REQUIRED_INDEXES
     assert ari["required_indexes"] == ARI_REQUIRED_INDEXES
     assert set(ari["roles"]["included"]) == {"ari_admin", "ari_analyst"}

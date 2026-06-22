@@ -29,10 +29,13 @@ ALLOWED_STATUSES = {
 AI_TOOLKIT = {
     "app_id": "2890",
     "app_name": "Splunk_ML_Toolkit",
-    "version": "5.7.3",
-    "date": "April 19, 2026",
+    "version": "5.7.4",
+    "date": "May 20, 2026",
     "source_url": "https://splunkbase.splunk.com/app/2890",
-    "install_doc_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.3/install-and-upgrade-the-ai-toolkit/install-the-ai-toolkit",
+    "install_doc_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/install-and-upgrade-the-ai-toolkit/install-the-ai-toolkit",
+    "release_notes_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/release-notes/whats-new-in-the-ai-toolkit",
+    "cdtsm_url": "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4/ai-toolkit-models/feature-preview-cisco-deep-time-series-model",
+    "product_url": "https://www.splunk.com/en_us/products/ai-toolkit.html",
 }
 
 DSDL = {
@@ -49,8 +52,8 @@ PSC_TARGETS = {
         "app_id": "2882",
         "app_name": "Splunk_SA_Scientific_Python_linux_x86_64",
         "label": "PSC Linux 64-bit",
-        "version": "4.3.1",
-        "date": "February 27, 2026",
+        "version": "4.3.2",
+        "date": "May 20, 2026",
         "source_url": "https://splunkbase.splunk.com/app/2882",
         "legacy": False,
     },
@@ -58,8 +61,8 @@ PSC_TARGETS = {
         "app_id": "2883",
         "app_name": "Splunk_SA_Scientific_Python_windows_x86_64",
         "label": "PSC Windows 64-bit",
-        "version": "4.3.1",
-        "date": "February 27, 2026",
+        "version": "4.3.2",
+        "date": "May 20, 2026",
         "source_url": "https://splunkbase.splunk.com/app/2883",
         "legacy": False,
     },
@@ -67,8 +70,8 @@ PSC_TARGETS = {
         "app_id": "2881",
         "app_name": "Splunk_SA_Scientific_Python_darwin_x86_64",
         "label": "PSC Mac Intel",
-        "version": "4.3.1",
-        "date": "February 27, 2026",
+        "version": "4.3.2",
+        "date": "May 20, 2026",
         "source_url": "https://splunkbase.splunk.com/app/2881",
         "legacy": False,
     },
@@ -76,8 +79,8 @@ PSC_TARGETS = {
         "app_id": "6785",
         "app_name": "Splunk_SA_Scientific_Python_darwin_arm64",
         "label": "PSC Mac Apple Silicon",
-        "version": "4.3.1",
-        "date": "February 27, 2026",
+        "version": "4.3.2",
+        "date": "May 20, 2026",
         "source_url": "https://splunkbase.splunk.com/app/6785",
         "legacy": False,
     },
@@ -286,7 +289,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "AI Toolkit and PSC compatibility",
             "manual_handoff",
             AI_TOOLKIT["install_doc_url"],
-            f"Validate AI Toolkit {AI_TOOLKIT['version']} with PSC 4.3.1 and supported Splunk platform versions before upgrade.",
+            f"Validate AI Toolkit {AI_TOOLKIT['version']} with PSC 4.3.2 and supported Splunk platform versions before upgrade.",
         )
     )
     coverage.append(
@@ -303,7 +306,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.permissions_and_safeguards",
             "ML command permissions and safeguards",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.3",
+            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4",
             "Review ML command permissions, algorithm access, search safeguards, and performance-cost settings for production users.",
         )
     )
@@ -321,8 +324,17 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.anomaly_cisco_deep_time_series",
             "Cisco Deep Time Series anomaly detection",
             "manual_handoff",
-            AI_TOOLKIT["source_url"],
-            "AI Toolkit 5.7.3 introduced anomaly detection through Cisco Deep Time Series Model; validate workflow availability in the app UI.",
+            AI_TOOLKIT["cdtsm_url"],
+            "AI Toolkit 5.7.4 keeps CDTSM forecasting and anomaly detection in preview; validate supported region, app UI availability, and optional access controls.",
+        )
+    )
+    coverage.append(
+        coverage_entry(
+            "ai_toolkit.hosted_foundation_models",
+            "Hosted foundation model readiness",
+            "manual_handoff",
+            AI_TOOLKIT["product_url"],
+            "Review native hosted-model boundaries for Foundation-Sec, Cisco Deep Time Series Model, and GPT-OSS; no external API keys are rendered by this skill.",
         )
     )
     coverage.append(
@@ -339,7 +351,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.connections_tab",
             "Connections tab readiness",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.3",
+            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4",
             "Validate AI Toolkit Connections entries for LLM providers and DSDL container endpoints without exposing provider secrets.",
         )
     )
@@ -348,7 +360,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.container_management",
             "Container Management tab readiness",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.3",
+            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4",
             "Confirm container connection visibility, DSDL linkage, and runtime ownership before enabling container-backed workflows.",
         )
     )
@@ -375,7 +387,7 @@ def build_coverage(ctx: dict[str, Any]) -> list[dict[str, str]]:
             "ai_toolkit.alerting",
             "Alerts from ML and anomaly outputs",
             "manual_handoff",
-            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.3",
+            "https://help.splunk.com/en/splunk-cloud-platform/apply-machine-learning/use-ai-toolkit/5.7.4",
             "Review saved searches, scheduled retraining, adaptive thresholds, alert ownership, and downstream ITSI/ES/SOAR handoffs.",
         )
     )

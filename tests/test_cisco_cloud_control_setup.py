@@ -75,6 +75,7 @@ def test_render_template_creates_required_artifacts(tmp_path: Path) -> None:
         "platform/admin-readiness.md",
         "api/cloud-control-api-boundary.md",
         "api/workflows-api-readiness.md",
+        "data-fabric/cisco-data-fabric-2026-readiness.md",
         "studio/agent-blueprints/network-incident-triage.md",
         "studio/mcp-connector-plan.md",
         "studio/app-builder-briefs/operations-console.md",
@@ -145,6 +146,12 @@ def test_coverage_rows_use_allowed_statuses_and_required_fields(tmp_path: Path) 
         "workflows_api",
         "workflow_targets_account_keys",
         "release_notes_open_issues",
+        "data_fabric_machine_data_lake_alpha",
+        "data_fabric_built_in_data_catalog",
+        "data_fabric_ai_powered_data_management",
+        "data_fabric_expanded_federated_search",
+        "data_fabric_machine_data_ai_activation",
+        "data_fabric_spl2_pipeline_kit",
     }:
         assert key in keys
 
@@ -191,6 +198,7 @@ def test_execute_dry_run_json_emits_secret_free_command_arrays(tmp_path: Path) -
     data_fabric_text = json.dumps(data_fabric["commands"])
     assert "splunk-federated-search-setup" not in data_fabric_text
     assert "splunk-edge-processor-setup" not in data_fabric_text
+    assert "splunk-spl2-pipeline-kit" in data_fabric_text
 
 
 def test_splunk_mcp_render_command_requires_explicit_mcp_url(tmp_path: Path) -> None:

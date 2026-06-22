@@ -7,7 +7,7 @@ source "${PROJECT_ROOT}/skills/shared/lib/credential_helpers.sh"
 
 APP_ID="7180"
 APP_NAME="SplunkAssetRiskIntelligence"
-LATEST_RESEARCHED_VERSION="1.2.1"
+LATEST_RESEARCHED_VERSION="1.2.2"
 INSTALL_APP_SCRIPT="${PROJECT_ROOT}/skills/splunk-app-install/scripts/install_app.sh"
 VALIDATE_SCRIPT="${SCRIPT_DIR}/validate.sh"
 ARI_INDEXES=("ari_staging" "ari_asset" "ari_internal" "ari_ta")
@@ -303,7 +303,7 @@ payload = {
         "restricted_entitlement": "Splunkbase app 7180 is restricted to approved downloaders; use --file for entitled local packages.",
     },
     "compatibility": {
-        "splunkbase_latest": {"ari_version": "1.2.1", "splunk_platform": "9.0 through 10.3"},
+        "splunkbase_latest": {"ari_version": "1.2.2", "splunk_platform": "9.0 through 10.4 (default 10.4; also 10.3 Cloud / 10.2 / older Enterprise trains)"},
         "docs_signal": {"ari_versions": "1.2.x / 1.1.3", "splunk_platform": "9.1.3+ including 10.x"},
         "validation_behavior": "Warn, do not hard-fail, when the platform is below 9.1.3 because official sources have different compatibility signals.",
     },

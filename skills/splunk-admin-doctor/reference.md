@@ -64,3 +64,12 @@ fix in v1.
 Do not change `apply` to execute another skill or Splunk command unless the
 operation is separately designed, tested, gated by explicit flags, classified
 in the MCP safety map, and documented here.
+
+## Splunk 10.4 enterprise deployment notes
+
+For Splunk Enterprise `10.4.0` and Splunk Cloud Platform `10.4.2603` planning,
+read this skill alongside
+[`../shared/splunk_10_4_enterprise_deployment_notes.md`](../shared/splunk_10_4_enterprise_deployment_notes.md),
+the prose companion to the
+[`../shared/references/splunk_platform_versions.json`](../shared/references/splunk_platform_versions.json)
+version contract.

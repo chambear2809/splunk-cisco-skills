@@ -6,10 +6,11 @@ description: >-
   10.0+ data management control planes. Covers EP objects, TLS / mTLS, Linux or
   Docker instances, multi-instance scale-out, source types, destinations,
   SPL2 pipelines with splunk-spl2-pipeline-kit linting, apply handoffs, default
-  destination guardrails, sizing preflight, and ACS allowlist stubs. Use when
-  installing Edge Processor, managing EP pipelines, routing forwarders, or
-  handling Cisco Data Fabric / telemetry pipeline management requests that need
-  Splunk Platform edge routing and transformation.
+  destination guardrails, sizing preflight, ACS allowlist stubs, and
+  AI-powered data management readiness handoffs. Use when installing Edge
+  Processor, managing EP pipelines, routing forwarders, or handling Cisco Data
+  Fabric / telemetry pipeline management requests that need Splunk Platform
+  edge routing and transformation.
 ---
 
 # Splunk Edge Processor Setup
@@ -22,6 +23,11 @@ For newer Cisco Data Fabric wording, this is the Splunk Platform edge-routing
 and data-shaping route. Keep native Observability Metrics Pipeline Management
 requests in `splunk-observability-deep-native-workflows` unless the user needs
 log/event pipelines, forwarder routing, or edge transformation.
+
+Treat AI-powered data management recommendations as UI/operator handoffs until
+Splunk publishes a stable public API for accepting generated schema, field
+extraction, or pipeline changes. Review generated SPL2 through
+`splunk-spl2-pipeline-kit` before promoting it into Edge Processor pipelines.
 
 ## Architecture First
 
@@ -144,6 +150,7 @@ Under `splunk-edge-processor-rendered/`:
 
 - Live automated SPL→SPL2 conversion (use Splunk's in-product tool; this repo
   renders compatibility lint and review guidance only).
+- Automatic acceptance of AI-powered data management recommendations.
 - Multi-tenant org management on Splunk Cloud.
 - Destinations not yet documented in Splunk's public EP destination catalog
   (Kafka, Azure Event Hubs).

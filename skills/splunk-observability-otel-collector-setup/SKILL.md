@@ -112,7 +112,7 @@ The workflow is render-first by default. Live changes only happen when the user 
    bash skills/splunk-observability-otel-collector-setup/scripts/setup.sh \
      --render-ta \
      --realm us0 \
-     --ta-package-path ./Splunk_TA_otel-0.152.0.tgz \
+     --ta-package-path ./Splunk_TA_otel-0.153.0.tgz \
      --ta-target deployment-server \
      --ta-mode agent
    ```
@@ -146,8 +146,9 @@ supports app roots `Splunk_TA_otel`, `Splunk_TA_otel_linux_x86_64`, and
 `Splunk_TA_otel_windows_x86_64`, and audits required files, config files, OS
 binaries, version, package flavor, token field style, and default stanza shape.
 
-The audited Splunkbase baseline is app `7125` version `0.152.0`, published
-May 14, 2026, compatible with Splunk `8.0` through `10.3`, cloud-compatible,
+The audited Splunkbase baseline is app `7125` version `0.153.0`, published
+May 27, 2026, compatible with Splunk `8.0` through `10.4` (default target
+`10.4`; older Enterprise and Cloud trains remain supported), cloud-compatible,
 not FIPS-compatible, and not FedRAMP validated.
 
 Current `0.152.x` packages use `splunk_access_token`; older docs and legacy

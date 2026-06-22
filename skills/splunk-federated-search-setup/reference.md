@@ -3,8 +3,9 @@
 ## Research Basis
 
 This skill follows current Splunk Federated Search documentation and
-configuration references for Splunk Enterprise 10.2 and Splunk Cloud Platform
-10.0.2503:
+configuration references for Splunk Enterprise and Splunk Cloud Platform. It
+distinguishes automated legacy/configuration paths from newer Data Management
+app connection/dataset handoffs:
 
 - `federated.conf` provider stanza: `provider://<name>` with `type`,
   `hostPort`, `serviceAccount`, `password`, `mode`, `appContext`,
@@ -19,20 +20,32 @@ configuration references for Splunk Enterprise 10.2 and Splunk Cloud Platform
   - `/services/data/federated/index` — federated index CRUD.
   - Each provider entity supports `/_reload`, `/enable`, and `/disable`.
 
-## Provider Types
+## Provider Types And Handoffs
 
-Splunk Federated Search ships two provider types:
+The renderer automates the provider types with stable configuration contracts
+that this repo already supports:
 
 | `type` | Product | Available on | Configuration surface |
 |---|---|---|---|
 | `splunk` | Federated Search for Splunk (FSS2S) | Splunk Enterprise + Splunk Cloud | `federated.conf` and REST |
-| `aws_s3` | Federated Search for Amazon S3 (FSS3) | Splunk Cloud Platform only | REST + Splunk Web only |
+| `aws_s3` | Federated Search for Amazon S3 legacy/reviewed provider path (FSS3) | Splunk Cloud Platform only | REST + Splunk Web only |
 
-FSS3 cannot be configured through `federated.conf`. Splunk Cloud admins must
-POST FSS3 provider definitions to `/services/data/federated/provider` (the
-admin user must hold `admin_all_objects`). This skill renders one JSON payload
-per FSS3 provider under `aws-s3-providers/<name>.json` plus an AWS
-prerequisites README.
+Current Splunk Cloud federation expansion is centered on the Data Management
+app connection/dataset model. The skill renders
+`data-management-federation-handoff.md` for these surfaces instead of
+inventing unsupported API writes:
+
+| Surface | Stage | Notes |
+|---|---|---|
+| Federated Search for Amazon S3 through Data Management | Available by entitlement | Define connections and datasets in the Data Management app; prefer this model for new tenants unless the older provider-payload path is explicitly reviewed. |
+| Federated Search for Microsoft Azure | Controlled Availability | Searches Azure Data Lake Storage and Azure Blob Storage datasets; activation and DSU entitlement require Splunk representative review. |
+| Federated Search for Azure Databricks | Controlled Availability | Searches Azure Databricks Unity Catalog tables through Delta Sharing; searches use SPL2 and `sdselect` command behavior. |
+
+FSS3 cannot be configured through `federated.conf`. For tenants still using the
+reviewed legacy provider model, Splunk Cloud admins POST FSS3 provider
+definitions to `/services/data/federated/provider` (the admin user must hold
+`admin_all_objects`). This skill renders one JSON payload per FSS3 provider
+under `aws-s3-providers/<name>.json` plus an AWS prerequisites README.
 
 ## FSS2S Settings (`type = splunk`)
 
@@ -64,7 +77,10 @@ prerequisites README.
 The renderer's AWS prerequisites README documents the Splunk Web "Generate
 policy" workflow that produces the Glue Data Catalog resource policy, S3
 bucket policies, and KMS key policies the AWS administrator must attach
-before the FSS3 provider works.
+before the reviewed legacy FSS3 provider works.
+
+For the current Data Management app S3 connection/dataset workflow, use the
+rendered handoff and configure the connection and dataset in Splunk Cloud.
 
 ## Mode Selection
 
@@ -140,6 +156,11 @@ The service-account role on each remote deployment must:
   see the Splunk Cloud Service Description.
 - **FSS3 region binding**: AWS Glue database, S3 buckets, and KMS keys must
   be in the same region as the Splunk Cloud deployment.
+- **Data Management app federation**: Current Amazon S3, Microsoft Azure, and
+  Azure Databricks workflows are activated by entitlement and configured as
+  connections/datasets in the Data Management app. Microsoft Azure and Azure
+  Databricks are Controlled Availability and documented for Splunk Cloud
+  Platform deployments in AWS regions.
 
 ## Search Head Cluster (FSS2S)
 
@@ -177,6 +198,8 @@ Static validation (`validate.sh`) checks:
   `[provider://X]` stanza.
 - Each `aws-s3-providers/*.json` payload is valid JSON, has `type=aws_s3`,
   and includes the required FSS3 keys.
+- `data-management-federation-handoff.md` is rendered so Azure/Databricks and
+  current Data Management app S3 requests have an explicit non-automated path.
 
 Live validation (`validate.sh --live`) additionally runs `status.sh`, which
 GETs `/services/data/federated/provider`, `/services/data/federated/index`,
@@ -197,3 +220,11 @@ authentication:
 | `SPLUNK_REST_PASSWORD_FILE` | Local-only file containing the admin password. |
 | `SPLUNK_VERIFY_SSL` | `true` (default) or `false` for self-signed dev clusters. Canonical name shared with the rest of the skill suite. |
 | `SPLUNK_REST_VERIFY_SSL` | Legacy alias for `SPLUNK_VERIFY_SSL`. Honored as a fallback when the canonical variable is unset. Prefer `SPLUNK_VERIFY_SSL` in new automation. |
+
+## Source Links
+
+- Federated Search options overview: https://help.splunk.com/?resourceId=Platform_FederatedSearch_fsoptions
+- Federated Search for Microsoft Azure: https://help.splunk.com/?resourceId=c4c3bc139-7e3d-4340-a596-59691b399b2e
+- Federated Search for Azure Databricks: https://help.splunk.com/?resourceId=cea9c5a52-95d8-4a01-9e16-4548b24059e8-splunkcloud_federatedsearch
+- Define a Microsoft Azure dataset: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.4.2604/run-federated-searches-over-microsoft-azure-datasets/define-a-microsoft-azure-dataset
+- Create an Azure Databricks connection: https://help.splunk.com/en/splunk-cloud-platform/search/federated-search/10.4.2604/run-federated-searches-over-azure-databricks-datasets/create-an-azure-databricks-connection

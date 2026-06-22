@@ -13,6 +13,24 @@ SKILL_TOPOLOGY_EXEMPTIONS: set[str] = set()
 
 SPLUNKBASE_APP_COVERAGE_IDS = {
     "263",
+    "742",
+    "1876",
+    "1928",
+    "2884",
+    "3172",
+    "3215",
+    "3546",
+    "4055",
+    "4603",
+    "4886",
+    "5089",
+    "5608",
+    "5863",
+    "6415",
+    "6553",
+    "6841",
+    "6843",
+    "7125",
     "833",
     "1143",
     "1620",
@@ -460,8 +478,8 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertEqual(dbx["role_support"]["search-tier"], "supported")
         self.assertEqual(dbx["role_support"]["heavy-forwarder"], "supported")
         self.assertEqual(dbx["role_support"]["indexer"], "none")
-        self.assertEqual(dbx["latest_verified_version"], "4.2.4")
-        self.assertEqual(dbx["latest_verified_date"], "April 20, 2026")
+        self.assertEqual(dbx["latest_verified_version"], "4.3.0")
+        self.assertEqual(dbx["latest_verified_date"], "May 11, 2026")
 
         driver_expectations = {
             "6149": ("Amazon Redshift JDBC Driver Add-on for Splunk DB Connect", "1.2.2", "September 3, 2025"),
@@ -818,3 +836,25 @@ class RegistryRegressionTests(ShellScriptRegressionBase):
         self.assertIn("--- Catalog Sync Connectivity ---", validate_text)
         self.assertIn("--- Saved Searches ---", validate_text)
         self.assertIn("--- Scheduled Sync Job ---", validate_text)
+
+
+class PlatformVersionsContractTests(ShellScriptRegressionBase):
+    def test_shared_platform_versions_json_lists_10_4(self):
+        path = REPO_ROOT / "skills/shared/references/splunk_platform_versions.json"
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        defaults = payload["defaults"]
+        self.assertEqual(defaults["enterprise_version"], "10.4.0")
+        self.assertEqual(defaults["cloud_doc_train"], "10.4.2603")
+        self.assertIn("10.4", payload["enterprise_platform_versions"])
+        self.assertIn("10.4", payload["svd_enterprise_floors"])
+        self.assertEqual(payload["svd_enterprise_floors"]["10.4"], "10.4.0")
+
+        import sys
+
+        sys.path.insert(0, str(REPO_ROOT / "skills/shared/lib"))
+        from platform_versions import load_platform_versions, platform_default, svd_enterprise_floors
+
+        loaded = load_platform_versions(path)
+        self.assertEqual(loaded["defaults"]["enterprise_version"], "10.4.0")
+        self.assertEqual(platform_default("enterprise_version", path=path), "10.4.0")
+        self.assertEqual(svd_enterprise_floors(path=path)["10.4"], "10.4.0")

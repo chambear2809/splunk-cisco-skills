@@ -163,7 +163,7 @@ fips_mode: none
 # ---------------------------------------------------------------------------
 
 splunk_home: /opt/splunk
-splunk_version: 10.2.2
+splunk_version: 10.4.0
 
 # Cert install directory under $SPLUNK_HOME/etc/auth/.
 cert_install_subdir: myssl

@@ -50,12 +50,14 @@ def test_edge_processor_fips_and_release_guardrails_render(tmp_path: Path) -> No
     readme = (out / "README.md").read_text()
 
     assert metadata["ep_fips_mode"] == "enabled"
+    assert metadata["ai_powered_data_management_readiness"] is True
     assert ep_object["fips"]["mode"] == "enabled"
     assert "FIPS-compliant mode requires non-containerized" in readme
     assert "export_destination_errors_total" in readme
     assert "4000 source types" in readme
     assert "bulk indexer" in readme
     assert "Parquet and gzip" in readme
+    assert "AI-powered data management readiness" in readme
 
 
 def test_edge_processor_fips_refuses_docker(tmp_path: Path) -> None:

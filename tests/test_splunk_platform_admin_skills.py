@@ -98,6 +98,7 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             federated_conf = (render_dir / "federated.conf.template").read_text(encoding="utf-8")
             indexes_conf = (render_dir / "indexes.conf").read_text(encoding="utf-8")
             server_conf = (render_dir / "server.conf").read_text(encoding="utf-8")
+            data_management_handoff = (render_dir / "data-management-federation-handoff.md").read_text(encoding="utf-8")
             all_assets = self.read_all_assets(render_dir)
 
             self.assertIn("[provider://remote_prod]", federated_conf)
@@ -112,6 +113,8 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             self.assertIn("[federated:remote_metrics]", indexes_conf)
             self.assertIn("federated.dataset = metricindex:metrics", indexes_conf)
             self.assertIn("conf_replication_include.indexes = true", server_conf)
+            self.assertIn("Federated Search for Microsoft Azure", data_management_handoff)
+            self.assertIn("Federated Search for Azure Databricks", data_management_handoff)
             self.assertNotIn("SUPER_SECRET_FEDERATED_PASSWORD", all_assets)
 
     def test_federated_rejects_standard_mode_fsh_knowledge_objects(self) -> None:

@@ -490,7 +490,7 @@ class SplunkDbConnectSetupTests(unittest.TestCase):
         registry = json.loads(REGISTRY.read_text(encoding="utf-8"))
         apps_by_id = {app["splunkbase_id"]: app for app in registry["apps"]}
         self.assertEqual(apps_by_id["2686"]["app_name"], "splunk_app_db_connect")
-        self.assertEqual(apps_by_id["2686"]["latest_verified_version"], "4.2.4")
+        self.assertEqual(apps_by_id["2686"]["latest_verified_version"], "4.3.0")
         self.assertNotIn("6759", apps_by_id)
 
         topology = next(item for item in registry["skill_topologies"] if item["skill"] == "splunk-db-connect-setup")

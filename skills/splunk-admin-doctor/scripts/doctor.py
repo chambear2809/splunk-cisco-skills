@@ -54,7 +54,8 @@ SOURCE_DOCS = {
     "cloud_rest": "https://help.splunk.com/en?resourceId=Splunk_RESTTUT_RESTandCloud&version=splunk-9_0",
     "cloud_cmc": "https://help.splunk.com/?resourceId=SplunkCloud_Admin_MonitoringIntro",
     "splunkd_health": "https://help.splunk.com/en/splunk-enterprise/administer/monitor/9.3/proactive-splunk-component-monitoring-with-the-splunkd-health-report/about-proactive-splunk-component-monitoring",
-    "btool": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/10.2/first-steps/use-btool-to-troubleshoot-configurations",
+    "btool": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/10.4/first-steps/use-btool-to-troubleshoot-configurations",
+    "config_validation": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.4/administer-splunk-enterprise-with-configuration-files/validate-configuration-changes",
     "kvstore": "https://help.splunk.com/en?resourceId=Splunk_Admin_TroubleshootKVstore",
     "diag": "https://help.splunk.com/en/splunk-enterprise/administer/troubleshoot/9.1/contact-splunk-support/generate-a-diagnostic-file",
     "backup": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/10.2/administer-splunk-enterprise-with-configuration-files/back-up-configuration-information",
@@ -85,6 +86,12 @@ COVERAGE_MANIFEST = [
         "platforms": ["enterprise"],
         "coverage_by_platform": {"cloud": "not_applicable", "enterprise": "delegated_fix"},
         "policy": "Inspect splunkd health, server info/sysinfo hints, health.log, and btool errors.",
+    },
+    {
+        "domain": "Config validation",
+        "platforms": ["enterprise"],
+        "coverage_by_platform": {"cloud": "not_applicable", "enterprise": "diagnose_only"},
+        "policy": "On Splunk Enterprise 10.4+, remind operators to run Config Validation before applying rendered .conf assets.",
     },
     {
         "domain": "Monitoring Console",
@@ -440,6 +447,20 @@ RULE_CATALOG = [
         handoff_skill="",
         rollback_or_validation="Run splunk btool check --debug and rerun doctor after fixing config.",
         trigger={"any": [{"path": "btool.errors", "truthy": True}]},
+    ),
+    rule(
+        rule_id="SAD-ENT-CONFIG-VALIDATION-104",
+        domain="Config validation",
+        platform="enterprise",
+        severity="info",
+        evidence="server.version is 10.4 or newer; run Splunk Config Validation before applying rendered .conf assets.",
+        source_doc=SOURCE_DOCS["config_validation"],
+        fix_kind="diagnose_only",
+        preview_command="Review rendered .conf assets with Splunk Config Validation before apply.",
+        apply_command="No doctor-side apply; use Splunk Config Validation in Splunk Web or CLI per Splunk documentation.",
+        handoff_skill="",
+        rollback_or_validation="Re-run Config Validation after changes and before restart.",
+        trigger={"any": [{"path": "server.version", "prefix": "10.4"}]},
     ),
     rule(
         rule_id="SAD-ENT-HEALTH-RED",
@@ -931,6 +952,8 @@ def predicate_matches(predicate: dict[str, Any], evidence: dict[str, Any]) -> bo
         normalized = normalize_status(actual)
         expected = {normalize_status(item) for item in predicate["not_in"]}
         return normalized not in expected
+    if "prefix" in predicate:
+        return str(actual or "").startswith(str(predicate["prefix"]))
     return False
 
 
