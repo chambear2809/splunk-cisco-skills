@@ -112,6 +112,12 @@ Environment-specific notes:
 | `splunk-security-portfolio-setup` | Shared baseline. | Product routing access; requirements inherit from the selected ES, SOAR, SSE, UBA, Attack Analyzer, or ARI workflow. |
 | `splunk-soar-setup` | `docker` or `podman`; `systemctl`; optional `ssh`, `scp`, and `sudo` for remote/on-prem setup. | SOAR package or Cloud onboarding details; external PostgreSQL/GlusterFS/Elasticsearch details when clustering; Automation Broker host access. |
 | `splunk-uba-setup` | Shared baseline. | Splunk UBA/UEBA environment details; optional Kafka app placement; ES Premier UEBA migration context. |
+| `widefield-security-setup` | Shared baseline. | WideField adoption context; child-skill requirements inherit from Okta, Saviynt, Splunk SIEM, Google SecOps, and identity-threat doctor workflows. |
+| `widefield-okta-integration-setup` | Shared baseline. | Okta org URL; Okta API token in a chmod 600 file; WideField receiver URL for documented event hook apply; Shared Signals/OIN setup evidence for UI handoffs. |
+| `widefield-saviynt-integration-setup` | Shared baseline. | Saviynt tenant URL and remediation evidence; live mutation requires official Saviynt or customer-provided API documentation before enabling apply. |
+| `widefield-splunk-siem-setup` | Shared baseline; `splunk-hec-service-setup` for token lifecycle. | Splunk Enterprise REST or Splunk Cloud ACS access; HEC token value file for Enterprise or write-token file for Cloud; target WideField index/source/sourcetype plan. |
+| `widefield-google-secops-setup` | Shared baseline. | Google SecOps project/feed context and evidence for log type `WIDEFIELD_SECURITY`; live feed creation requires documented API coverage before enabling apply. |
+| `widefield-identity-threat-doctor` | Shared baseline. | WideField events in Splunk, Okta System Log access via token file, Google SecOps/Saviynt evidence JSON; destructive remediation is target-skill gated. |
 
 ## Splunk Observability
 

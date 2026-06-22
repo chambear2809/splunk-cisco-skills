@@ -1914,6 +1914,81 @@
       "notes": "Security product router/audit workflow that resolves product names and delegates to first-class setup skills, existing ES workflows, generic install-only routes, or explicit handoff classifications."
     },
     {
+      "skill": "widefield-security-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "WideField Security adoption router for Okta, Saviynt, Splunk SIEM, Google SecOps, and identity-threat doctor child workflows. No Splunk Platform runtime placement; delegates target-specific Splunk work to widefield-splunk-siem-setup."
+    },
+    {
+      "skill": "widefield-okta-integration-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Okta-side WideField Security integration workflow for event hooks, OIN/shared-signal evidence, and guarded Okta API operations. No Splunk Platform runtime placement."
+    },
+    {
+      "skill": "widefield-saviynt-integration-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Saviynt remediation-mapping handoff for WideField Security findings. No Splunk Platform runtime placement; live Saviynt mutation remains disabled without documented API coverage."
+    },
+    {
+      "skill": "widefield-google-secops-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Google SecOps ingestion/feed/parser evidence workflow for WideField Security log type WIDEFIELD_SECURITY. No Splunk Platform runtime placement."
+    },
+    {
+      "skill": "widefield-identity-threat-doctor",
+      "role_support": {
+        "search-tier": "supported",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Read-only WideField identity-threat coverage doctor using Splunk search-tier evidence, Okta evidence, and supplied JSON evidence to render gated remediation packets."
+    },
+    {
+      "skill": "widefield-splunk-siem-setup",
+      "role_support": {
+        "search-tier": "required",
+        "indexer": "supported",
+        "heavy-forwarder": "supported",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [
+        "indexer",
+        "heavy-forwarder"
+      ],
+      "notes": "Splunk SIEM readiness workflow for WideField Security events: widefield index, HEC handoff, schema-light searches, saved search, macro, and starter dashboard assets."
+    },
+    {
       "skill": "splunk-security-essentials-setup",
       "role_support": {
         "search-tier": "required",

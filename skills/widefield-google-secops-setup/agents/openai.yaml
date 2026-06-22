@@ -1,0 +1,4 @@
+interface:
+  display_name: "WideField Google SecOps Setup"
+  short_description: "Render Google SecOps ingestion readiness"
+  default_prompt: "Use $widefield-google-secops-setup to render Google SecOps feed, webhook, parser, and evidence assets for WideField Security."

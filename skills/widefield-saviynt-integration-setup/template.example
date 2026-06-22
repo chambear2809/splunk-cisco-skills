@@ -1,0 +1,17 @@
+# WideField Saviynt remediation profile
+# Non-secret values only.
+
+saviynt_tenant_url: https://example.saviyntcloud.com
+environment: prod
+
+remediation_map:
+  compromised_identity: revoke_access
+  stale_or_weak_credential: password_reset
+  anomalous_session_or_entitlement: micro_certification
+  orphaned_non_human_identity: micro_certification
+  over_privileged_connected_app: revoke_access
+  ai_identity_access_risk: micro_certification
+
+evidence:
+  required: true
+  file: ./widefield-saviynt-evidence.local.json

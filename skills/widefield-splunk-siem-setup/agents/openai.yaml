@@ -1,0 +1,4 @@
+interface:
+  display_name: "WideField Splunk SIEM Setup"
+  short_description: "Prepare Splunk SIEM ingest for WideField"
+  default_prompt: "Use $widefield-splunk-siem-setup to render or apply Splunk HEC, index, search, and dashboard readiness for WideField Security events."

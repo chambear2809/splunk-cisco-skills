@@ -152,6 +152,12 @@ projects/tmp-*
 /splunk-pci-compliance-rendered/
 /splunk-infosec-app-rendered/
 /splunk-lookup-file-editing-rendered/
+/widefield-security-rendered/
+/widefield-okta-integration-rendered/
+/widefield-saviynt-integration-rendered/
+/widefield-splunk-siem-rendered/
+/widefield-google-secops-rendered/
+/widefield-identity-threat-doctor-rendered/
 /splunk-mcp-rendered/*
 !/splunk-mcp-rendered/run-splunk-mcp.js
 error.log

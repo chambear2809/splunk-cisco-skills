@@ -1,0 +1,4 @@
+interface:
+  display_name: "WideField Okta Integration Setup"
+  short_description: "Render Okta hooks and shared-signal handoffs"
+  default_prompt: "Use $widefield-okta-integration-setup to render and validate Okta event hook and shared-signal setup for WideField Security."

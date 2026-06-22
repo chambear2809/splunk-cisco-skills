@@ -60,11 +60,15 @@ check_file "${OUTPUT_DIR}/lifecycle/product-coverage-matrix.md"
 check_file "${OUTPUT_DIR}/runtime/python-opentelemetry-env.sh"
 check_file "${OUTPUT_DIR}/runtime/python-galileo-protect.py"
 check_file "${OUTPUT_DIR}/evaluate/evaluate-assets.yaml"
+check_file "${OUTPUT_DIR}/evaluate/multimodal-metrics-handoff.yaml"
+check_file "${OUTPUT_DIR}/multimodal/multimodal-observability.md"
+check_file "${OUTPUT_DIR}/multimodal/multimodal-intake.example.json"
 check_file "${OUTPUT_DIR}/controls/agent-observability-controls.md"
 check_file "${OUTPUT_DIR}/controls/control-intake.example.json"
 check_file "${OUTPUT_DIR}/controls/splunk-search-examples.spl"
 check_file "${OUTPUT_DIR}/splunk-platform/hec-event-sample.json"
 check_file "${OUTPUT_DIR}/splunk-platform/export-records-request.json"
+check_file "${OUTPUT_DIR}/splunk-platform/multimodal-search-examples.spl"
 check_file "${OUTPUT_DIR}/otel/collector-galileo-fanout.yaml"
 check_exec "${OUTPUT_DIR}/scripts/apply-readiness.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-object-lifecycle.sh"
@@ -72,6 +76,7 @@ check_exec "${OUTPUT_DIR}/scripts/apply-observe-export.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-observe-runtime.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-protect-runtime.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-evaluate-assets.sh"
+check_exec "${OUTPUT_DIR}/scripts/apply-multimodal-assets.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-observability-controls.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-splunk-hec.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-splunk-otlp.sh"
@@ -94,6 +99,7 @@ required = {
     "observe-runtime": "galileo-platform-setup",
     "protect-runtime": "galileo-platform-setup",
     "evaluate-assets": "galileo-platform-setup",
+    "multimodal-assets": "galileo-platform-setup",
     "observability-controls": "galileo-platform-setup",
     "splunk-hec": "splunk-hec-service-setup",
     "splunk-otlp": "splunk-connect-for-otlp-setup",
@@ -117,8 +123,11 @@ if lifecycle.get("status") != "automated_create_or_get":
 controls = coverage.get("coverage", {}).get("galileo_agent_observability_controls", {})
 if controls.get("status") != "rendered_handoff":
     raise SystemExit("coverage report must include Galileo Agent Observability Controls handoff coverage")
+multimodal = coverage.get("coverage", {}).get("galileo_multimodal_observability", {})
+if multimodal.get("status") != "rendered_handoff":
+    raise SystemExit("coverage report must include Galileo multimodal observability handoff coverage")
 full_matrix = coverage.get("coverage", {}).get("galileo_full_feature_coverage_matrix", {})
-if full_matrix.get("status") != "rendered" or full_matrix.get("domain_count", 0) < 45:
+if full_matrix.get("status") != "rendered" or full_matrix.get("domain_count", 0) < 53:
     raise SystemExit("coverage report must include the full Galileo feature coverage matrix")
 matrix = json.loads(Path(sys.argv[1]).with_name("lifecycle").joinpath("product-coverage-matrix.json").read_text(encoding="utf-8"))
 surfaces = {item.get("surface") for item in matrix}
@@ -130,21 +139,28 @@ for surface in (
     "Log streams",
     "Datasets",
     "Dataset versions, sharing, prompt datasets, and synthetic extension",
+    "Dataset query, preview, content mutation, and bulk maintenance",
     "Prompts",
+    "Prompt templates, rendering, and version utilities",
     "Experiments",
     "Experiment groups, tags, comparison, search, and metric settings",
+    "Experiment columns, metrics APIs, and paginated search",
     "Evaluate workflow runs",
     "Python and TypeScript SDK parity",
     "Evaluate metrics and scorers",
     "Metric taxonomy, autotune, and use-case categories",
     "Custom scorers and scorer validation",
+    "Scorer governance, health scores, and restore flows",
     "Luna and model/provider integrations",
     "Luna-2 fine-tuning and metric evaluation workflows",
+    "Luna Studio UI and SDK training lifecycle",
     "Provider integrations, model aliases, costs, and pricing",
+    "Provider integration selection, status, and Databricks helpers",
     "Observe traces, sessions, spans",
     "Tags, metadata, run labels, and filter hygiene",
     "Enterprise data retention, TTL, redaction, and privacy controls",
     "Trace query, columns, recompute, update, and delete maintenance",
+    "Trace metrics, counts, partial queries, and live logging APIs",
     "Agent Graph, Logs UI, Messages UI, and console debugging views",
     "Distributed tracing and multi-service propagation",
     "Multimodal observability",
