@@ -515,6 +515,7 @@ def test_hec_envelope_extracts_multimodal_metadata_without_raw_payloads() -> Non
                 "modality": "image",
                 "mime_type": "image/png",
                 "url": "https://example.com/customer-photo.png",
+                "source": "/private/customer-photo.png",
                 "width": 640,
                 "height": 480,
             },
@@ -570,6 +571,8 @@ def test_hec_envelope_extracts_multimodal_metadata_without_raw_payloads() -> Non
     assert "RAW_PDF_BYTES_SHOULD_NOT_RENDER" not in serialized
     assert "https://example.com/customer-photo.png" not in serialized
     assert "https://example.com/generated-image.png" not in serialized
+    assert "/private/customer-photo.png" not in serialized
+    assert event["multimodal_info"]["assets"][0]["has_source"] is True
     assert envelope["fields"]["galileo_has_multimodal"] == "true"
     assert envelope["fields"]["galileo_modalities"] == "audio,document,image"
 

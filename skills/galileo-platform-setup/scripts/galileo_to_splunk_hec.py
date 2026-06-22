@@ -41,6 +41,7 @@ MEDIA_PAYLOAD_KEYS = {
     "document_text",
     "raw",
     "raw_content",
+    "source",
     "text",
     "transcript",
     "url",
@@ -58,10 +59,10 @@ MEDIA_SAFE_KEYS = {
     "mime_type",
     "name",
     "page_count",
+    "path_hash",
     "sha256",
     "size",
     "size_bytes",
-    "source",
     "type",
     "width",
 }
@@ -572,7 +573,7 @@ def safe_media_item(node: dict[str, Any], *, field: str, modality: str) -> dict[
         value = node.get(key)
         if isinstance(value, (str, int, float, bool)) and value not in ("", None):
             item[key] = value
-    for key in ("url", "base64", "bytes", "data", "data_uri", "raw", "content"):
+    for key in ("url", "source", "path", "file_path", "base64", "bytes", "data", "data_uri", "raw", "content"):
         if key in node and node.get(key) not in (None, ""):
             item[f"has_{key}"] = True
     for nested_key in ("image_url", "audio_url", "document_url"):

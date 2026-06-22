@@ -61,8 +61,8 @@ EOF
 
 widefield_reject_inline_secret_option() {
     case "$1" in
-        --token|--password|--api-key|--apikey|--client-secret|--secret|--okta-token|--hec-token)
-            echo "ERROR: $1 is not allowed. Use a file-backed option such as --okta-token-file or --hec-token-file." >&2
+        --token|--token=*|--password|--password=*|--api-key|--api-key=*|--apikey|--apikey=*|--client-secret|--client-secret=*|--secret|--secret=*|--okta-token|--okta-token=*|--hec-token|--hec-token=*|--bearer-token|--bearer-token=*|--authorization|--authorization=*)
+            echo "ERROR: ${1%%=*} is not allowed. Use a file-backed option such as --okta-token-file or --hec-token-file." >&2
             exit 1
             ;;
     esac
@@ -97,27 +97,52 @@ widefield_file_secret() {
     fi
 }
 
+widefield_output_secret_path() {
+    local path="$1" label="$2" parent
+    if [[ -z "${path}" ]]; then
+        echo "ERROR: ${label} is required." >&2
+        exit 1
+    fi
+    parent="$(dirname "${path}")"
+    mkdir -p "${parent}"
+    if [[ -e "${path}" && ! -w "${path}" ]]; then
+        echo "ERROR: ${label} is not writable: ${path}" >&2
+        exit 1
+    fi
+    if [[ ! -w "${parent}" ]]; then
+        echo "ERROR: ${label} parent directory is not writable: ${parent}" >&2
+        exit 1
+    fi
+}
+
+widefield_add_renderer_arg() {
+    local explicit="$1" default_value="$2" option="$3" value="$4"
+    if [[ -z "${SPEC}" || "${explicit}" == "true" || "${value}" != "${default_value}" ]]; then
+        RENDER_ARGS+=("${option}" "${value}")
+    fi
+}
+
 widefield_renderer_args() {
     RENDER_ARGS=(
         --output-dir "${OUTPUT_DIR}"
-        --index "${INDEX}"
-        --sourcetype "${SOURCETYPE}"
-        --hec-source "${HEC_SOURCE}"
-        --hec-token-name "${HEC_TOKEN_NAME}"
-        --okta-org-url "${OKTA_ORG_URL}"
-        --receiver-url "${RECEIVER_URL}"
-        --hook-name "${HOOK_NAME}"
-        --event-types "${EVENT_TYPES}"
-        --saviynt-tenant-url "${SAVIYNT_TENANT_URL}"
-        --google-secops-project "${GOOGLE_SECOPS_PROJECT}"
-        --google-secops-region "${GOOGLE_SECOPS_REGION}"
-        --feed-name "${FEED_NAME}"
-        --evidence-file "${EVIDENCE_FILE}"
-        --children "${CHILDREN}"
     )
     if [[ -n "${SPEC}" ]]; then
         RENDER_ARGS+=(--spec "${SPEC}")
     fi
+    widefield_add_renderer_arg "${INDEX_SET}" "widefield" --index "${INDEX}"
+    widefield_add_renderer_arg "${SOURCETYPE_SET}" "widefield:security" --sourcetype "${SOURCETYPE}"
+    widefield_add_renderer_arg "${HEC_SOURCE_SET}" "widefield" --hec-source "${HEC_SOURCE}"
+    widefield_add_renderer_arg "${HEC_TOKEN_NAME_SET}" "widefield_security_hec" --hec-token-name "${HEC_TOKEN_NAME}"
+    widefield_add_renderer_arg "${OKTA_ORG_URL_SET}" "" --okta-org-url "${OKTA_ORG_URL}"
+    widefield_add_renderer_arg "${RECEIVER_URL_SET}" "" --receiver-url "${RECEIVER_URL}"
+    widefield_add_renderer_arg "${HOOK_NAME_SET}" "widefield_security_detect_and_remediate" --hook-name "${HOOK_NAME}"
+    widefield_add_renderer_arg "${EVENT_TYPES_SET}" "user.session.start,user.authentication.sso,user.account.privilege.grant,application.user_membership.add" --event-types "${EVENT_TYPES}"
+    widefield_add_renderer_arg "${SAVIYNT_TENANT_URL_SET}" "" --saviynt-tenant-url "${SAVIYNT_TENANT_URL}"
+    widefield_add_renderer_arg "${GOOGLE_SECOPS_PROJECT_SET}" "" --google-secops-project "${GOOGLE_SECOPS_PROJECT}"
+    widefield_add_renderer_arg "${GOOGLE_SECOPS_REGION_SET}" "us" --google-secops-region "${GOOGLE_SECOPS_REGION}"
+    widefield_add_renderer_arg "${FEED_NAME_SET}" "widefield-security" --feed-name "${FEED_NAME}"
+    widefield_add_renderer_arg "${EVIDENCE_FILE_SET}" "" --evidence-file "${EVIDENCE_FILE}"
+    widefield_add_renderer_arg "${CHILDREN_SET}" "okta,saviynt,splunk,google,doctor" --children "${CHILDREN}"
     if [[ "${DRY_RUN}" == "true" ]]; then
         RENDER_ARGS+=(--dry-run)
     fi
@@ -421,7 +446,7 @@ widefield_apply_splunk() {
     if [[ "${SPLUNK_PLATFORM}" == "enterprise" ]]; then
         widefield_file_secret "${HEC_TOKEN_FILE}" "--hec-token-file"
     else
-        widefield_file_secret "${WRITE_HEC_TOKEN_FILE}" "--write-hec-token-file"
+        widefield_output_secret_path "${WRITE_HEC_TOKEN_FILE}" "--write-hec-token-file"
     fi
     widefield_render
     widefield_splunk_session || exit 1
@@ -542,6 +567,20 @@ widefield_parse_common() {
     GOOGLE_SECOPS_REGION="us"
     FEED_NAME="widefield-security"
     SAVIYNT_TENANT_URL=""
+    INDEX_SET=false
+    SOURCETYPE_SET=false
+    HEC_SOURCE_SET=false
+    HEC_TOKEN_NAME_SET=false
+    CHILDREN_SET=false
+    EVIDENCE_FILE_SET=false
+    OKTA_ORG_URL_SET=false
+    RECEIVER_URL_SET=false
+    HOOK_NAME_SET=false
+    EVENT_TYPES_SET=false
+    SAVIYNT_TENANT_URL_SET=false
+    GOOGLE_SECOPS_PROJECT_SET=false
+    GOOGLE_SECOPS_REGION_SET=false
+    FEED_NAME_SET=false
     ACCEPT_OKTA_REMEDIATION=false
     ACCEPT_SAVIYNT_REMEDIATION=false
     ACCEPT_SPLUNK_REMEDIATION=false
@@ -557,17 +596,17 @@ widefield_parse_common() {
             --json) JSON_OUTPUT=true; shift ;;
             --spec) widefield_require_arg "$1" $# "$2" || exit 1; SPEC="$2"; shift 2 ;;
             --output-dir) widefield_require_arg "$1" $# "$2" || exit 1; OUTPUT_DIR="$(widefield_abs_path "$2")"; shift 2 ;;
-            --index) widefield_require_arg "$1" $# "$2" || exit 1; INDEX="$2"; shift 2 ;;
-            --sourcetype) widefield_require_arg "$1" $# "$2" || exit 1; SOURCETYPE="$2"; shift 2 ;;
-            --hec-source) widefield_require_arg "$1" $# "$2" || exit 1; HEC_SOURCE="$2"; shift 2 ;;
-            --hec-token-name) widefield_require_arg "$1" $# "$2" || exit 1; HEC_TOKEN_NAME="$2"; shift 2 ;;
-            --children) widefield_require_arg "$1" $# "$2" || exit 1; CHILDREN="$2"; shift 2 ;;
-            --evidence-file) widefield_require_arg "$1" $# "$2" || exit 1; EVIDENCE_FILE="$(widefield_abs_path "$2")"; shift 2 ;;
-            --okta-org-url) widefield_require_arg "$1" $# "$2" || exit 1; OKTA_ORG_URL="$2"; shift 2 ;;
+            --index) widefield_require_arg "$1" $# "$2" || exit 1; INDEX="$2"; INDEX_SET=true; shift 2 ;;
+            --sourcetype) widefield_require_arg "$1" $# "$2" || exit 1; SOURCETYPE="$2"; SOURCETYPE_SET=true; shift 2 ;;
+            --hec-source) widefield_require_arg "$1" $# "$2" || exit 1; HEC_SOURCE="$2"; HEC_SOURCE_SET=true; shift 2 ;;
+            --hec-token-name) widefield_require_arg "$1" $# "$2" || exit 1; HEC_TOKEN_NAME="$2"; HEC_TOKEN_NAME_SET=true; shift 2 ;;
+            --children) widefield_require_arg "$1" $# "$2" || exit 1; CHILDREN="$2"; CHILDREN_SET=true; shift 2 ;;
+            --evidence-file) widefield_require_arg "$1" $# "$2" || exit 1; EVIDENCE_FILE="$(widefield_abs_path "$2")"; EVIDENCE_FILE_SET=true; shift 2 ;;
+            --okta-org-url) widefield_require_arg "$1" $# "$2" || exit 1; OKTA_ORG_URL="$2"; OKTA_ORG_URL_SET=true; shift 2 ;;
             --okta-token-file) widefield_require_arg "$1" $# "$2" || exit 1; OKTA_TOKEN_FILE="$(widefield_abs_path "$2")"; shift 2 ;;
-            --receiver-url) widefield_require_arg "$1" $# "$2" || exit 1; RECEIVER_URL="$2"; shift 2 ;;
-            --hook-name) widefield_require_arg "$1" $# "$2" || exit 1; HOOK_NAME="$2"; shift 2 ;;
-            --event-types) widefield_require_arg "$1" $# "$2" || exit 1; EVENT_TYPES="$2"; shift 2 ;;
+            --receiver-url) widefield_require_arg "$1" $# "$2" || exit 1; RECEIVER_URL="$2"; RECEIVER_URL_SET=true; shift 2 ;;
+            --hook-name) widefield_require_arg "$1" $# "$2" || exit 1; HOOK_NAME="$2"; HOOK_NAME_SET=true; shift 2 ;;
+            --event-types) widefield_require_arg "$1" $# "$2" || exit 1; EVENT_TYPES="$2"; EVENT_TYPES_SET=true; shift 2 ;;
             --event-hook-id) widefield_require_arg "$1" $# "$2" || exit 1; EVENT_HOOK_ID="$2"; shift 2 ;;
             --verify-event-hook-id) widefield_require_arg "$1" $# "$2" || exit 1; VERIFY_EVENT_HOOK_ID="$2"; shift 2 ;;
             --deactivate-event-hook-id) widefield_require_arg "$1" $# "$2" || exit 1; DEACTIVATE_EVENT_HOOK_ID="$2"; shift 2 ;;
@@ -576,15 +615,22 @@ widefield_parse_common() {
             --splunk-platform) widefield_require_arg "$1" $# "$2" || exit 1; SPLUNK_PLATFORM="$2"; shift 2 ;;
             --hec-token-file) widefield_require_arg "$1" $# "$2" || exit 1; HEC_TOKEN_FILE="$(widefield_abs_path "$2")"; shift 2 ;;
             --write-hec-token-file) widefield_require_arg "$1" $# "$2" || exit 1; WRITE_HEC_TOKEN_FILE="$(widefield_abs_path "$2")"; shift 2 ;;
-            --google-secops-project) widefield_require_arg "$1" $# "$2" || exit 1; GOOGLE_SECOPS_PROJECT="$2"; shift 2 ;;
-            --google-secops-region) widefield_require_arg "$1" $# "$2" || exit 1; GOOGLE_SECOPS_REGION="$2"; shift 2 ;;
-            --feed-name) widefield_require_arg "$1" $# "$2" || exit 1; FEED_NAME="$2"; shift 2 ;;
-            --saviynt-tenant-url) widefield_require_arg "$1" $# "$2" || exit 1; SAVIYNT_TENANT_URL="$2"; shift 2 ;;
+            --google-secops-project) widefield_require_arg "$1" $# "$2" || exit 1; GOOGLE_SECOPS_PROJECT="$2"; GOOGLE_SECOPS_PROJECT_SET=true; shift 2 ;;
+            --google-secops-region) widefield_require_arg "$1" $# "$2" || exit 1; GOOGLE_SECOPS_REGION="$2"; GOOGLE_SECOPS_REGION_SET=true; shift 2 ;;
+            --feed-name) widefield_require_arg "$1" $# "$2" || exit 1; FEED_NAME="$2"; FEED_NAME_SET=true; shift 2 ;;
+            --saviynt-tenant-url) widefield_require_arg "$1" $# "$2" || exit 1; SAVIYNT_TENANT_URL="$2"; SAVIYNT_TENANT_URL_SET=true; shift 2 ;;
             --accept-okta-remediation) ACCEPT_OKTA_REMEDIATION=true; shift ;;
             --accept-saviynt-remediation) ACCEPT_SAVIYNT_REMEDIATION=true; shift ;;
             --accept-splunk-remediation) ACCEPT_SPLUNK_REMEDIATION=true; shift ;;
             --help|-h) widefield_usage 0 ;;
-            *) echo "ERROR: Unknown option: $1" >&2; widefield_usage 1 ;;
+            *)
+                if [[ "$1" == *=* && "$1" =~ (token|password|secret|api-key|apikey|authorization|bearer) ]]; then
+                    echo "ERROR: Unknown secret-looking option: ${1%%=*}" >&2
+                else
+                    echo "ERROR: Unknown option: $1" >&2
+                fi
+                widefield_usage 1
+                ;;
         esac
     done
 

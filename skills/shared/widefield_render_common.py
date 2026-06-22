@@ -29,6 +29,40 @@ DEFAULTS = {
     "google_secops_log_type": "WIDEFIELD_SECURITY",
 }
 
+ARG_DEFAULTS = {
+    "index": DEFAULTS["index"],
+    "sourcetype": DEFAULTS["sourcetype"],
+    "hec_source": DEFAULTS["hec_source"],
+    "hec_token_name": DEFAULTS["hec_token_name"],
+    "okta_org_url": "",
+    "receiver_url": "",
+    "hook_name": DEFAULTS["okta_hook_name"],
+    "event_types": DEFAULTS["okta_event_types"],
+    "saviynt_tenant_url": "",
+    "google_secops_project": "",
+    "google_secops_region": "us",
+    "feed_name": "widefield-security",
+    "evidence_file": "",
+    "children": "okta,saviynt,splunk,google,doctor",
+}
+
+SPEC_ARG_PATHS = {
+    "index": (("splunk", "index"), ("index",)),
+    "sourcetype": (("splunk", "sourcetype"), ("sourcetype",)),
+    "hec_source": (("splunk", "hec_source"), ("hec_source",)),
+    "hec_token_name": (("splunk", "hec_token_name"), ("hec_token_name",)),
+    "okta_org_url": (("okta", "org_url"), ("okta_org_url",)),
+    "receiver_url": (("okta", "receiver_url"), ("receiver_url",)),
+    "hook_name": (("okta", "hook_name"), ("hook_name",)),
+    "event_types": (("okta", "event_types"), ("event_types",)),
+    "saviynt_tenant_url": (("saviynt", "tenant_url"), ("saviynt_tenant_url",)),
+    "google_secops_project": (("google_secops", "project"), ("google_secops_project",)),
+    "google_secops_region": (("google_secops", "region"), ("google_secops_region",)),
+    "feed_name": (("google_secops", "feed_name"), ("feed_name",)),
+    "evidence_file": (("evidence", "file"), ("evidence_file",)),
+    "children": (("children",),),
+}
+
 SOURCE_LEDGER = [
     (
         "WideField platform",
@@ -195,23 +229,113 @@ def parse_args(profile: dict[str, Any]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=f"Render {profile['display_name']} assets.")
     parser.add_argument("--output-dir", default=str(REPO_ROOT / profile["render_root"]))
     parser.add_argument("--spec", default="", help="Optional non-secret JSON/YAML spec file.")
-    parser.add_argument("--index", default=DEFAULTS["index"])
-    parser.add_argument("--sourcetype", default=DEFAULTS["sourcetype"])
-    parser.add_argument("--hec-source", default=DEFAULTS["hec_source"])
-    parser.add_argument("--hec-token-name", default=DEFAULTS["hec_token_name"])
-    parser.add_argument("--okta-org-url", default="")
-    parser.add_argument("--receiver-url", default="")
-    parser.add_argument("--hook-name", default=DEFAULTS["okta_hook_name"])
-    parser.add_argument("--event-types", default=DEFAULTS["okta_event_types"])
-    parser.add_argument("--saviynt-tenant-url", default="")
-    parser.add_argument("--google-secops-project", default="")
-    parser.add_argument("--google-secops-region", default="us")
-    parser.add_argument("--feed-name", default="widefield-security")
-    parser.add_argument("--evidence-file", default="")
-    parser.add_argument("--children", default="okta,saviynt,splunk,google,doctor")
+    parser.add_argument("--index", default=None)
+    parser.add_argument("--sourcetype", default=None)
+    parser.add_argument("--hec-source", default=None)
+    parser.add_argument("--hec-token-name", default=None)
+    parser.add_argument("--okta-org-url", default=None)
+    parser.add_argument("--receiver-url", default=None)
+    parser.add_argument("--hook-name", default=None)
+    parser.add_argument("--event-types", default=None)
+    parser.add_argument("--saviynt-tenant-url", default=None)
+    parser.add_argument("--google-secops-project", default=None)
+    parser.add_argument("--google-secops-region", default=None)
+    parser.add_argument("--feed-name", default=None)
+    parser.add_argument("--evidence-file", default=None)
+    parser.add_argument("--children", default=None)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
-    return parser.parse_args()
+    args = parser.parse_args()
+    apply_spec_defaults(args)
+    return args
+
+
+def parse_spec_scalar(value: str) -> Any:
+    value = value.strip()
+    if not value:
+        return ""
+    if value[0:1] in {"'", '"'} and value[-1:] == value[0]:
+        return value[1:-1]
+    lowered = value.lower()
+    if lowered in {"true", "false"}:
+        return lowered == "true"
+    if lowered in {"null", "none"}:
+        return None
+    return value
+
+
+def parse_simple_yaml(text: str) -> dict[str, Any]:
+    root: dict[str, Any] = {}
+    stack: list[tuple[int, dict[str, Any]]] = [(-1, root)]
+    for raw_line in text.splitlines():
+        if not raw_line.strip() or raw_line.lstrip().startswith("#"):
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        stripped = raw_line.strip()
+        if ":" not in stripped:
+            continue
+        key, raw_value = stripped.split(":", 1)
+        key = key.strip().strip("'\"")
+        value = raw_value.strip()
+        while stack and indent <= stack[-1][0]:
+            stack.pop()
+        parent = stack[-1][1]
+        if value == "":
+            child: dict[str, Any] = {}
+            parent[key] = child
+            stack.append((indent, child))
+        else:
+            parent[key] = parse_spec_scalar(value)
+    return root
+
+
+def load_spec(path_value: str) -> dict[str, Any]:
+    if not path_value:
+        return {}
+    path = Path(path_value).expanduser()
+    text = path.read_text(encoding="utf-8")
+    if path.suffix.lower() == ".json":
+        data = json.loads(text)
+        return data if isinstance(data, dict) else {}
+    try:
+        import yaml  # type: ignore[import-not-found]
+
+        data = yaml.safe_load(text)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return parse_simple_yaml(text)
+
+
+def spec_value(spec: dict[str, Any], paths: tuple[tuple[str, ...], ...]) -> Any:
+    for path in paths:
+        node: Any = spec
+        for key in path:
+            if not isinstance(node, dict) or key not in node:
+                node = None
+                break
+            node = node[key]
+        if node not in (None, ""):
+            return node
+    return None
+
+
+def stringify_spec_value(value: Any) -> str:
+    if isinstance(value, list):
+        return ",".join(str(item).strip() for item in value if str(item).strip())
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def apply_spec_defaults(args: argparse.Namespace) -> None:
+    check_spec_for_secrets(args.spec)
+    spec = load_spec(args.spec)
+    for attr, default in ARG_DEFAULTS.items():
+        current = getattr(args, attr)
+        if current not in (None, ""):
+            continue
+        value = spec_value(spec, SPEC_ARG_PATHS[attr])
+        setattr(args, attr, stringify_spec_value(value) if value not in (None, "") else default)
 
 
 def check_spec_for_secrets(path_value: str) -> None:
