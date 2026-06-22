@@ -41,6 +41,7 @@ COMPONENTS: dict[str, dict[str, Any]] = {
             ("[monitor://C:\\Program Files\\Microsoft\\Exchange Server\\V15\\Logging\\RPC Client Access]", "MSExchange:2013:RPCClientAccess"),
             ("[script://.\\bin\\exchangepowershell.cmd v15 get-hoststats_2013.ps1]", "MSExchange:2013:Topology"),
             ("[script://.\\bin\\exchangepowershell.cmd v15 get-throttling-policies_2010_2013.ps1]", "MSExchange:2013:ThrottlingPolicy"),
+            ("[script://.\\bin\\exchangepowershell.cmd v15 read-audit-logs_2010_2013.ps1]", "MSExchange:2013:AdminAudit"),
         ],
     },
     "mailbox": {
@@ -48,6 +49,7 @@ COMPONENTS: dict[str, dict[str, Any]] = {
         "inputs": [
             ("[WinEventLog://Exchange Auditing]", "WinEventLog:Exchange"),
             ("[monitor://C:\\Program Files\\Microsoft\\Exchange Server\\V15\\TransportRoles\\Logs\\MessageTracking]", "MSExchange:2013:MessageTracking"),
+            ("[script://.\\bin\\exchangepowershell.cmd v15 read-mailbox-audit-logs_2010_2013.ps1]", "MSExchange:2013:MailboxAudit"),
             ("[script://.\\bin\\exchangepowershell.cmd v15 get-mailboxstats_2013.ps1]", "MSExchange:2013:Database-Stats"),
         ],
     },
