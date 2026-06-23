@@ -26,7 +26,7 @@ Authentication, choose one:
   --client-secret-file FILE             chmod-600 API client secret file, or APPD_OAUTH_CLIENT_SECRET_FILE
 
 Options:
-  --server-alerting-application-id ID   Server health-rule scope ID. Default: 3
+  --server-alerting-application-id ID   Server health-rule scope ID. Default: auto
                                         or APPD_SERVER_ALERTING_APPLICATION_ID.
   --name NAME                           Default: Cluster Agent Availability
   --server-name-match TEXT              Default: cluster-agent
@@ -61,7 +61,7 @@ ACCOUNT_NAME="${APPD_ACCOUNT_NAME:-}"
 CLIENT_NAME="${APPD_API_CLIENT_NAME:-}"
 CLIENT_SECRET_FILE="${APPD_OAUTH_CLIENT_SECRET_FILE:-}"
 TOKEN_FILE="${APPD_OAUTH_TOKEN_FILE:-}"
-SERVER_ALERTING_APPLICATION_ID="${APPD_SERVER_ALERTING_APPLICATION_ID:-3}"
+SERVER_ALERTING_APPLICATION_ID="${APPD_SERVER_ALERTING_APPLICATION_ID:-auto}"
 RULE_NAME="${APPD_CLUSTER_AGENT_HEALTH_RULE_NAME:-Cluster Agent Availability}"
 SERVER_NAME_MATCH="${APPD_CLUSTER_AGENT_SERVER_NAME_MATCH:-cluster-agent}"
 MATCH_TO="${APPD_CLUSTER_AGENT_SERVER_MATCH_TO:-CONTAINS}"
@@ -123,13 +123,17 @@ is_positive_int() {
     [[ "$1" =~ ^[1-9][0-9]*$ ]]
 }
 
-for item in SERVER_ALERTING_APPLICATION_ID DURATION_MINS WAIT_MINS; do
+for item in DURATION_MINS WAIT_MINS; do
     value="${!item}"
     if ! is_positive_int "${value}"; then
         echo "FAIL: ${item} must be a positive integer; got '${value}'." >&2
         exit 2
     fi
 done
+if [[ "${SERVER_ALERTING_APPLICATION_ID}" != "auto" ]] && ! is_positive_int "${SERVER_ALERTING_APPLICATION_ID}"; then
+    echo "FAIL: SERVER_ALERTING_APPLICATION_ID must be a positive integer or auto; got '${SERVER_ALERTING_APPLICATION_ID}'." >&2
+    exit 2
+fi
 
 case "${MATCH_TO}" in
     STARTS_WITH|ENDS_WITH|CONTAINS|EQUALS|MATCH_REG_EX) ;;
@@ -184,6 +188,51 @@ if [[ -z "${ACCESS_TOKEN}" ]]; then
 fi
 printf 'header = "Authorization: Bearer %s"\n' "${ACCESS_TOKEN}" > "${AUTH_CONFIG}"
 unset ACCESS_TOKEN TOKEN_JSON
+
+url_path_segment() {
+    python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
+}
+
+discover_server_alerting_application_id() {
+    local role_name="Server Monitoring Administrator"
+    local encoded_role_name
+    local role_file
+    encoded_role_name="$(url_path_segment "${role_name}")"
+    role_file="$(mktemp)"
+    TMP_FILES+=("${role_file}")
+    chmod 600 "${role_file}"
+
+    if ! appd_curl -fsS -K "${AUTH_CONFIG}" \
+        "$(appd_controller_api_url "${CONTROLLER_URL}" "/controller/api/rbac/v1/roles/name/${encoded_role_name}?include-permissions=true")" \
+        > "${role_file}"; then
+        echo "FAIL: could not auto-discover Server Visibility health-rule application id from RBAC role '${role_name}'." >&2
+        echo "Pass --server-alerting-application-id ID if the API client cannot read RBAC roles." >&2
+        exit 1
+    fi
+
+    python3 - "${role_file}" <<'PY'
+import json
+import sys
+
+role = json.load(open(sys.argv[1], encoding="utf-8"))
+for permission in role.get("permissions") or []:
+    if permission.get("entityType") != "APPLICATION":
+        continue
+    if permission.get("action") not in {"CONFIG_SIM", "VIEW_SIM"}:
+        continue
+    entity_id = permission.get("entityId")
+    if isinstance(entity_id, int) and entity_id > 0:
+        print(entity_id)
+        raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+if [[ "${SERVER_ALERTING_APPLICATION_ID}" == "auto" ]]; then
+    if ! SERVER_ALERTING_APPLICATION_ID="$(discover_server_alerting_application_id)"; then
+        exit 1
+    fi
+fi
 
 CREATE_URL="$(appd_controller_api_url "${CONTROLLER_URL}" "/controller/alerting/rest/v1/applications/${SERVER_ALERTING_APPLICATION_ID}/health-rules")"
 
@@ -256,6 +305,96 @@ PY
         echo "DRY_RUN: health rule defaults to enabled=${ENABLED}"
         python3 -m json.tool "${PAYLOAD_FILE}"
     fi
+    exit 0
+fi
+
+EXISTING_LIST_FILE="$(mktemp)"
+TMP_FILES+=("${EXISTING_LIST_FILE}")
+chmod 600 "${EXISTING_LIST_FILE}"
+HTTP_CODE="$(appd_curl -sS -o "${EXISTING_LIST_FILE}" -w '%{http_code}' -K "${AUTH_CONFIG}" "${CREATE_URL}")"
+if [[ "${HTTP_CODE}" != "200" ]]; then
+    if [[ "${OUTPUT_JSON}" == "1" ]]; then
+        python3 - "${HTTP_CODE}" "${CREATE_URL}" "${EXISTING_LIST_FILE}" <<'PY'
+import json
+import sys
+
+http_code, url, path = sys.argv[1:]
+text = open(path, errors="replace").read()
+try:
+    body = json.loads(text)
+except Exception:
+    body = {"raw": text}
+print(json.dumps({"status": "FAIL", "http_code": int(http_code), "url": url, "response": body}, sort_keys=True))
+PY
+    else
+        echo "FAIL: AppDynamics health rule list returned HTTP ${HTTP_CODE}."
+        sed -n '1,240p' "${EXISTING_LIST_FILE}"
+    fi
+    exit 1
+fi
+
+EXISTING_RULE_ID="$(python3 - "${EXISTING_LIST_FILE}" "${RULE_NAME}" <<'PY'
+import json
+import sys
+
+rules = json.load(open(sys.argv[1], encoding="utf-8"))
+for rule in rules if isinstance(rules, list) else []:
+    if rule.get("name") == sys.argv[2]:
+        print(rule.get("id"))
+        break
+PY
+)"
+
+if [[ -n "${EXISTING_RULE_ID}" ]]; then
+    EXISTING_DETAIL_FILE="$(mktemp)"
+    TMP_FILES+=("${EXISTING_DETAIL_FILE}")
+    chmod 600 "${EXISTING_DETAIL_FILE}"
+    EXISTING_URL="$(appd_controller_api_url "${CONTROLLER_URL}" "/controller/alerting/rest/v1/applications/${SERVER_ALERTING_APPLICATION_ID}/health-rules/${EXISTING_RULE_ID}")"
+    HTTP_CODE="$(appd_curl -sS -o "${EXISTING_DETAIL_FILE}" -w '%{http_code}' -K "${AUTH_CONFIG}" "${EXISTING_URL}")"
+    if [[ "${HTTP_CODE}" != "200" ]]; then
+        if [[ "${OUTPUT_JSON}" == "1" ]]; then
+            python3 - "${HTTP_CODE}" "${EXISTING_URL}" "${EXISTING_DETAIL_FILE}" <<'PY'
+import json
+import sys
+
+http_code, url, path = sys.argv[1:]
+text = open(path, errors="replace").read()
+try:
+    body = json.loads(text)
+except Exception:
+    body = {"raw": text}
+print(json.dumps({"status": "FAIL", "http_code": int(http_code), "url": url, "response": body}, sort_keys=True))
+PY
+        else
+            echo "FAIL: AppDynamics existing health rule readback returned HTTP ${HTTP_CODE}."
+            sed -n '1,240p' "${EXISTING_DETAIL_FILE}"
+        fi
+        exit 1
+    fi
+
+    python3 - "${SERVER_ALERTING_APPLICATION_ID}" "${EXISTING_DETAIL_FILE}" "${OUTPUT_JSON}" <<'PY'
+import json
+import sys
+
+app_id, path, as_json = sys.argv[1:]
+body = json.load(open(path, encoding="utf-8"))
+summary = {
+    "status": "EXISTS",
+    "server_alerting_application_id": int(app_id),
+    "id": body.get("id"),
+    "name": body.get("name"),
+    "enabled": body.get("enabled"),
+    "affects": body.get("affects"),
+}
+if as_json == "1":
+    print(json.dumps(summary, sort_keys=True))
+else:
+    print(
+        "OK: health rule already exists "
+        f"id={summary['id']} name={summary['name']} enabled={summary['enabled']} "
+        f"server_alerting_application_id={summary['server_alerting_application_id']}"
+    )
+PY
     exit 0
 fi
 
