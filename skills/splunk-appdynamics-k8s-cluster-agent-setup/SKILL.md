@@ -32,6 +32,17 @@ bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/poll_cluster_agen
   --duration-mins 5
 ```
 
+A disabled Server Visibility health rule for Cluster Agent availability can be
+rendered first, then applied after the API client has Server health-rule
+permissions:
+
+```bash
+bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/create_cluster_agent_availability_health_rule.sh
+
+bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/create_cluster_agent_availability_health_rule.sh \
+  --apply
+```
+
 Typical flow:
 
 1. Edit `template.example` or pass `--spec <file>` with Controller, cluster,
