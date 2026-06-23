@@ -1,0 +1,60 @@
+# Cisco Meraki Active Application Monitoring + ThousandEyes intake
+#
+# Copy to template.local and fill in non-secret values. Do not store Meraki
+# passwords, ThousandEyes passwords, API keys, OAuth tokens, cookies, CSRF
+# values, or raw HAR contents in this file.
+
+api_version: cisco-meraki-aam-thousandeyes-setup/v1
+
+meraki:
+  organization_name: "Example Org"
+  organization_id: "123456"
+  dashboard_url: "https://dashboard.meraki.com/"
+  dashboard_region: "north-america"   # north-america | emea | apj | unknown
+  full_org_admins_confirmed: false
+  notes: ""
+
+thousandeyes:
+  account_group_id: "1234"
+  account_group_name: "Example Account Group"
+  account_region: "north-america"     # north-america | emea | unknown
+  account_admin_confirmed: false
+  local_auth_available_confirmed: false
+
+application:
+  name: "Checkout"
+  target_url: "https://app.example.com/checkout"
+  tenant_or_subdomain: ""
+  profile: "custom-http-server"       # verified-template | custom-http-server | custom-network | custom-dns | both
+  template_name: ""
+  interval_seconds: 300
+  expected_status_code: 200
+  verify_content: ""
+  alerts_enabled: false
+
+networks:
+  - name: "Branch 001"
+    network_id: "N_123"
+    mx_serial: "Q2XX-XXXX-XXXX"
+    mx_model: "MX85"
+    firmware: "18.107.2"
+    nat_mode_confirmed: false
+    license: "sd-wan-plus"            # sd-wan-plus | advanced-security | enterprise | unknown
+    topology: "direct-internet-access" # direct-internet-access | autovpn-split | autovpn-full | secure-connect-full-tunnel | unknown
+    notes: ""
+
+capture:
+  capture_har: false
+  har_path: ""
+  expected_ui_steps:
+    - "account-link"
+    - "application-template"
+    - "eligible-networks"
+    - "start-monitoring"
+
+validation:
+  meraki_network_filter: "Branch 001"
+  meraki_mx_serial_filter: ""
+  agent_name_filter: "Branch 001"
+  test_name_filter: "Checkout"
+  wait_minutes_after_start: 15

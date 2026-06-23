@@ -31,6 +31,7 @@ TA_COMPANION_SKILLS = {
 
 TA_MENTION_EXCLUDED_SKILLS = {
     "cisco-isovalent-platform-setup",
+    "cisco-meraki-aam-thousandeyes-setup",
     "cisco-thousandeyes-mcp-setup",
     "splunk-ai-ml-toolkit-setup",
     "splunk-app-install",

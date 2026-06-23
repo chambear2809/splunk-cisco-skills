@@ -52,6 +52,21 @@ print(json.dumps(sys.argv[1:]), end="")
 PY
 }
 
+metadata_value() {
+    local path="$1" key="$2" default="$3"
+    python3 - "$path" "$key" "$default" <<'PY'
+import json
+import sys
+path, key, default = sys.argv[1:4]
+try:
+    data = json.load(open(path, encoding="utf-8"))
+except Exception:
+    print(default, end="")
+    raise SystemExit(0)
+print(data.get(key, default), end="")
+PY
+}
+
 if [[ -n "${OUTPUT_DIR}" ]]; then
     OUTPUT_DIR="$(resolve_abs_path "${OUTPUT_DIR}")"
 else
@@ -59,7 +74,52 @@ else
 fi
 
 render_dir="${OUTPUT_DIR}/smartstore"
-required=(README.md metadata.json indexes.conf.template server.conf limits.conf preflight.sh apply-cluster-manager.sh apply-standalone-indexer.sh status.sh)
+metadata="${render_dir}/metadata.json"
+operation="$(metadata_value "${metadata}" operation smartstore)"
+
+common_required=(
+    README.md
+    metadata.json
+    index-lifecycle-report.md
+    index-lifecycle-report.json
+    index-dependency-report.md
+    index-dependency-report.json
+    collection-searches.spl
+    collect-evidence.sh
+    retention-change-plan.md
+    destructive-action-plan.md
+)
+smartstore_required=(
+    indexes.conf.template
+    server.conf
+    limits.conf
+    preflight.sh
+    apply-cluster-manager.sh
+    apply-standalone-indexer.sh
+    status.sh
+)
+lifecycle_required=(
+    retention-indexes.conf.template
+    indexes-disable.conf.template
+    acs-index-update-payload.json
+    apply-retention-enterprise.sh
+    apply-retention-cloud.sh
+    apply-disable-index.sh
+    apply-delete-index.sh
+    apply-clean-data.sh
+    archive-handoff.sh
+    restore-handoff.sh
+    restore-handoff.md
+    peer-cleanup-runbook.md
+)
+
+required=("${common_required[@]}" "${lifecycle_required[@]}")
+if [[ "${operation}" == "smartstore" ]]; then
+    required+=("${smartstore_required[@]}")
+else
+    required+=(status.sh preflight.sh)
+fi
+
 missing=()
 for file in "${required[@]}"; do
     [[ -f "${render_dir}/${file}" ]] || missing+=("${file}")
@@ -68,7 +128,7 @@ done
 ok=true
 (( ${#missing[@]} == 0 )) || ok=false
 
-if [[ -f "${render_dir}/indexes.conf.template" ]]; then
+if [[ "${operation}" == "smartstore" && -f "${render_dir}/indexes.conf.template" ]]; then
     if ! grep -q "storageType = remote" "${render_dir}/indexes.conf.template"; then
         missing+=("indexes.conf.template remote volume")
         ok=false
@@ -76,12 +136,12 @@ if [[ -f "${render_dir}/indexes.conf.template" ]]; then
 fi
 
 if [[ "${JSON_OUTPUT}" == "true" ]]; then
-    printf '{"target":"smartstore","render_dir":"%s","ok":%s,"missing":%s}\n' "${render_dir}" "${ok}" "$(json_array "${missing[@]}")"
+    printf '{"target":"index-lifecycle","operation":"%s","render_dir":"%s","ok":%s,"missing":%s}\n' "${operation}" "${render_dir}" "${ok}" "$(json_array "${missing[@]}")"
 else
     if [[ "${ok}" == "true" ]]; then
-        log "Rendered SmartStore assets are present under ${render_dir}."
+        log "Rendered index lifecycle assets are present under ${render_dir}."
     else
-        log "ERROR: Missing or invalid SmartStore assets under ${render_dir}: ${missing[*]}"
+        log "ERROR: Missing or invalid index lifecycle assets under ${render_dir}: ${missing[*]}"
     fi
 fi
 

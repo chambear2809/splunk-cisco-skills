@@ -1,0 +1,4 @@
+interface:
+  display_name: "Meraki AAM ThousandEyes"
+  short_description: "Configure Meraki AAM ThousandEyes tests"
+  default_prompt: "Use $cisco-meraki-aam-thousandeyes-setup to deploy ThousandEyes monitoring from Meraki MX agents for my application."

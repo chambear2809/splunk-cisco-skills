@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
@@ -280,6 +281,213 @@ class SplunkPlatformAdminRendererTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("remote.s3 settings", result.stderr)
+
+    def test_index_lifecycle_inventory_renders_reports_without_remote_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--operation",
+                "inventory",
+                "--indexes",
+                "all",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            render_dir = Path(tmpdir) / "smartstore"
+            self.assertTrue((render_dir / "index-lifecycle-report.md").exists())
+            self.assertTrue((render_dir / "index-dependency-report.json").exists())
+            searches = (render_dir / "collection-searches.spl").read_text(encoding="utf-8")
+            metadata = json.loads((render_dir / "metadata.json").read_text(encoding="utf-8"))
+            self.assertIn("/services/data/indexes", searches)
+            self.assertIn("splunk_httpinput", searches)
+            self.assertIn("/services/authorization/roles", searches)
+            self.assertEqual(metadata["operation"], "inventory")
+            self.assertEqual(metadata["indexes"], "all")
+
+    def test_index_lifecycle_cloud_retention_renders_acs_payload(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--platform",
+                "cloud",
+                "--operation",
+                "retention",
+                "--stack",
+                "my-stack",
+                "--indexes",
+                "rtp_idx",
+                "--searchable-days",
+                "90",
+                "--archival-retention-days",
+                "365",
+                "--max-data-size-mb",
+                "2048",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            payload = json.loads((Path(tmpdir) / "smartstore" / "acs-index-update-payload.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["operation"], "retention")
+            self.assertEqual(
+                payload["indexes"][0],
+                {
+                    "datatype": "event",
+                    "maxDataSizeMB": 2048,
+                    "name": "rtp_idx",
+                    "searchableDays": 90,
+                    "splunkArchivalRetentionDays": 365,
+                },
+            )
+
+    def test_index_lifecycle_rejects_delete_all(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--operation",
+                "delete-index",
+                "--indexes",
+                "all",
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("--indexes all is not allowed", result.stderr)
+
+    def test_index_lifecycle_delete_apply_fails_without_accept_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evidence = Path(tmpdir) / "evidence.json"
+            owner = Path(tmpdir) / "owner.txt"
+            backup = Path(tmpdir) / "backup.txt"
+            evidence.write_text('{"safe_to_delete_indexes":["old_logs"]}', encoding="utf-8")
+            owner.write_text("approved\n", encoding="utf-8")
+            backup.write_text("backup complete\n", encoding="utf-8")
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--operation",
+                "delete-index",
+                "--deployment",
+                "standalone",
+                "--indexes",
+                "old_logs",
+                "--evidence-file",
+                str(evidence),
+                "--owner-approval-file",
+                str(owner),
+                "--backup-evidence-file",
+                str(backup),
+                "--confirm-token",
+                "DELETE_INDEX:old_logs",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            script = Path(tmpdir) / "smartstore" / "apply-delete-index.sh"
+            apply_result = subprocess.run(
+                ["bash", str(script)],
+                cwd=script.parent,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            self.assertNotEqual(apply_result.returncode, 0)
+            self.assertIn("--accept-destructive-index-delete is required", apply_result.stderr)
+
+    def test_index_lifecycle_delete_apply_blocks_protected_default_index(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evidence = Path(tmpdir) / "evidence.json"
+            owner = Path(tmpdir) / "owner.txt"
+            backup = Path(tmpdir) / "backup.txt"
+            evidence.write_text('{"safe_to_delete_indexes":["main"]}', encoding="utf-8")
+            owner.write_text("approved\n", encoding="utf-8")
+            backup.write_text("backup complete\n", encoding="utf-8")
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--operation",
+                "delete-index",
+                "--deployment",
+                "standalone",
+                "--indexes",
+                "main",
+                "--evidence-file",
+                str(evidence),
+                "--owner-approval-file",
+                str(owner),
+                "--backup-evidence-file",
+                str(backup),
+                "--accept-destructive-index-delete",
+                "--confirm-token",
+                "DELETE_INDEX:main",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            script = Path(tmpdir) / "smartstore" / "apply-delete-index.sh"
+            apply_result = subprocess.run(
+                ["bash", str(script)],
+                cwd=script.parent,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            self.assertNotEqual(apply_result.returncode, 0)
+            self.assertIn("default index requires non-production test evidence", apply_result.stderr)
+
+    def test_index_lifecycle_blocks_internal_and_sensitive_delete_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            internal = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--operation",
+                "delete-index",
+                "--indexes",
+                "_internal",
+            )
+            self.assertNotEqual(internal.returncode, 0)
+            self.assertIn("internal index", internal.stderr)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            evidence = Path(tmpdir) / "evidence.json"
+            owner = Path(tmpdir) / "owner.txt"
+            backup = Path(tmpdir) / "backup.txt"
+            evidence.write_text('{"safe_to_delete_indexes":["risk"]}', encoding="utf-8")
+            owner.write_text("approved\n", encoding="utf-8")
+            backup.write_text("backup complete\n", encoding="utf-8")
+            result = self.run_renderer(
+                SMARTSTORE_RENDERER,
+                "--output-dir",
+                tmpdir,
+                "--operation",
+                "delete-index",
+                "--deployment",
+                "standalone",
+                "--indexes",
+                "risk",
+                "--evidence-file",
+                str(evidence),
+                "--owner-approval-file",
+                str(owner),
+                "--backup-evidence-file",
+                str(backup),
+                "--accept-destructive-index-delete",
+                "--confirm-token",
+                "DELETE_INDEX:risk",
+            )
+            self.assertEqual(result.returncode, 0, msg=result.stdout + result.stderr)
+            script = Path(tmpdir) / "smartstore" / "apply-delete-index.sh"
+            apply_result = subprocess.run(
+                ["bash", str(script)],
+                cwd=script.parent,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=30,
+            )
+            self.assertNotEqual(apply_result.returncode, 0)
+            self.assertIn("ES/ITSI/ARI-sensitive index", apply_result.stderr)
 
     def test_monitoring_console_distributed_render_avoids_password_cli(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

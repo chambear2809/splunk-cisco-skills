@@ -55,6 +55,8 @@ projects/tmp-*
 
 # --- Local rendered deployment assets ---
 /cisco-isovalent-platform-rendered/
+/meraki-aam-live-validation/
+/meraki-aam-thousandeyes-rendered/
 /cisco-cloud-control-rendered/
 /cisco-thousandeyes-mcp-rendered/
 /galileo-agent-control-rendered/

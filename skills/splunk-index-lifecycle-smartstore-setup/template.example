@@ -1,22 +1,46 @@
 # Splunk Index Lifecycle / SmartStore Setup Worksheet
 #
-# Non-secret values only. Do not store object-store keys here.
+# Non-secret values only. Do not store ACS tokens, session keys, object-store
+# keys, or approval artifacts here; store only local file paths to them.
 
 deployment: cluster
+platform: enterprise
+operation: inventory
 scope: per-index
 phase: render
 
 splunk_home: /opt/splunk
 app_name: ZZZ_cisco_skills_smartstore
+stack:
+acs_base: https://admin.splunk.com
+datatype: event
 
+indexes: all
+evidence_file:
+session_key_file:
+splunk_uri: https://localhost:8089
+acs_token_file: /tmp/acs_token
+owner_approval_file:
+backup_evidence_file:
+accept_destructive_index_delete: false
+confirm_token:
+
+# Enterprise retention / local lifecycle
+max_total_data_size_mb:
+frozen_time_period_in_secs:
+
+# Splunk Cloud retention / DDAA handoff
+searchable_days:
+archival_retention_days:
+max_data_size_mb:
+
+# SmartStore
 remote_provider: s3
 volume_name: remote_store
 remote_path: s3://splunk-prod-smartstore/cluster-a
-indexes: main,summary
-
+smartstore_indexes: main,summary
 max_global_data_size_mb:
 max_global_raw_data_size_mb:
-frozen_time_period_in_secs:
 
 cache_size_mb:
 eviction_policy:
@@ -52,6 +76,7 @@ clean_remote_storage_by_default: false
 apply_cluster_bundle: false
 restart_splunk: true
 
-# If static S3 keys are unavoidable:
+# Secret-file helpers:
+# bash skills/shared/scripts/write_secret_file.sh /tmp/acs_token
 # bash skills/shared/scripts/write_secret_file.sh /tmp/smartstore_s3_access_key
 # bash skills/shared/scripts/write_secret_file.sh /tmp/smartstore_s3_secret_key
