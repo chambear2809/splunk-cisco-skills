@@ -8,6 +8,9 @@ RENDERER="${SCRIPT_DIR}/render_assets.py"
 DEFAULT_RENDER_DIR_NAME="splunk-smartstore-rendered"
 
 DEPLOYMENT="cluster"
+PLATFORM="enterprise"
+OPERATION="smartstore"
+OPERATION_SET=false
 SCOPE="per-index"
 PHASE="render"
 DRY_RUN=false
@@ -16,13 +19,20 @@ APPLY=false
 OUTPUT_DIR=""
 SPLUNK_HOME_VALUE="/opt/splunk"
 APP_NAME="ZZZ_cisco_skills_smartstore"
+STACK=""
+ACS_BASE="https://admin.splunk.com"
+DATATYPE="event"
 REMOTE_PROVIDER="s3"
 VOLUME_NAME="remote_store"
 REMOTE_PATH=""
 INDEXES="main"
+MAX_TOTAL_DATA_SIZE_MB=""
 MAX_GLOBAL_DATA_SIZE_MB=""
 MAX_GLOBAL_RAW_DATA_SIZE_MB=""
 FROZEN_TIME_PERIOD_IN_SECS=""
+SEARCHABLE_DAYS=""
+ARCHIVAL_RETENTION_DAYS=""
+MAX_DATA_SIZE_MB=""
 CACHE_SIZE_MB=""
 EVICTION_POLICY=""
 EVICTION_PADDING_MB=""
@@ -51,6 +61,14 @@ BUCKET_LOCALIZE_MAX_TIMEOUT_SEC=""
 CLEAN_REMOTE_STORAGE_BY_DEFAULT="false"
 APPLY_CLUSTER_BUNDLE="false"
 RESTART_SPLUNK="true"
+EVIDENCE_FILE=""
+SESSION_KEY_FILE=""
+SPLUNK_URI="https://localhost:8089"
+ACS_TOKEN_FILE="/tmp/acs_token"
+OWNER_APPROVAL_FILE=""
+BACKUP_EVIDENCE_FILE=""
+ACCEPT_DESTRUCTIVE_INDEX_DELETE=false
+CONFIRM_TOKENS=()
 
 usage() {
     local exit_code="${1:-0}"
@@ -61,21 +79,30 @@ Usage: $(basename "$0") [OPTIONS]
 
 Options:
   --deployment cluster|standalone
+  --platform enterprise|cloud
+  --operation inventory|retention|smartstore|archive|disable-index|delete-index|clean-data|restore-handoff
   --scope per-index|global
-  --phase render|preflight|apply|status|all
+  --phase inventory|plan|render|preflight|apply|status|all
   --apply
   --dry-run
   --json
   --output-dir PATH
   --splunk-home PATH
   --app-name NAME
+  --stack NAME
+  --acs-base URL
+  --datatype event|metric
   --remote-provider s3|gcs|azure
   --volume-name NAME
   --remote-path URI
-  --indexes CSV
+  --indexes CSV|all
+  --max-total-data-size-mb N
   --max-global-data-size-mb N
   --max-global-raw-data-size-mb N
   --frozen-time-period-in-secs N
+  --searchable-days N
+  --archival-retention-days N
+  --max-data-size-mb N
   --cache-size-mb N
   --eviction-policy NAME
   --eviction-padding-mb N
@@ -104,6 +131,14 @@ Options:
   --clean-remote-storage-by-default true|false
   --apply-cluster-bundle true|false
   --restart-splunk true|false
+  --evidence-file PATH
+  --session-key-file PATH
+  --splunk-uri URL
+  --acs-token-file PATH
+  --owner-approval-file PATH
+  --backup-evidence-file PATH
+  --accept-destructive-index-delete
+  --confirm-token TOKEN
   --help
 
 EOF
@@ -113,6 +148,8 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --deployment) require_arg "$1" $# || exit 1; DEPLOYMENT="$2"; shift 2 ;;
+        --platform) require_arg "$1" $# || exit 1; PLATFORM="$2"; shift 2 ;;
+        --operation) require_arg "$1" $# || exit 1; OPERATION="$2"; OPERATION_SET=true; shift 2 ;;
         --scope) require_arg "$1" $# || exit 1; SCOPE="$2"; shift 2 ;;
         --phase) require_arg "$1" $# || exit 1; PHASE="$2"; shift 2 ;;
         --apply) APPLY=true; shift ;;
@@ -121,13 +158,20 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" $# || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --splunk-home) require_arg "$1" $# || exit 1; SPLUNK_HOME_VALUE="$2"; shift 2 ;;
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
+        --stack) require_arg "$1" $# || exit 1; STACK="$2"; shift 2 ;;
+        --acs-base) require_arg "$1" $# || exit 1; ACS_BASE="$2"; shift 2 ;;
+        --datatype) require_arg "$1" $# || exit 1; DATATYPE="$2"; shift 2 ;;
         --remote-provider) require_arg "$1" $# || exit 1; REMOTE_PROVIDER="$2"; shift 2 ;;
         --volume-name) require_arg "$1" $# || exit 1; VOLUME_NAME="$2"; shift 2 ;;
         --remote-path) require_arg "$1" $# || exit 1; REMOTE_PATH="$2"; shift 2 ;;
         --indexes) require_arg "$1" $# || exit 1; INDEXES="$2"; shift 2 ;;
+        --max-total-data-size-mb) require_arg "$1" $# || exit 1; MAX_TOTAL_DATA_SIZE_MB="$2"; shift 2 ;;
         --max-global-data-size-mb) require_arg "$1" $# || exit 1; MAX_GLOBAL_DATA_SIZE_MB="$2"; shift 2 ;;
         --max-global-raw-data-size-mb) require_arg "$1" $# || exit 1; MAX_GLOBAL_RAW_DATA_SIZE_MB="$2"; shift 2 ;;
         --frozen-time-period-in-secs) require_arg "$1" $# || exit 1; FROZEN_TIME_PERIOD_IN_SECS="$2"; shift 2 ;;
+        --searchable-days) require_arg "$1" $# || exit 1; SEARCHABLE_DAYS="$2"; shift 2 ;;
+        --archival-retention-days) require_arg "$1" $# || exit 1; ARCHIVAL_RETENTION_DAYS="$2"; shift 2 ;;
+        --max-data-size-mb) require_arg "$1" $# || exit 1; MAX_DATA_SIZE_MB="$2"; shift 2 ;;
         --cache-size-mb) require_arg "$1" $# || exit 1; CACHE_SIZE_MB="$2"; shift 2 ;;
         --eviction-policy) require_arg "$1" $# || exit 1; EVICTION_POLICY="$2"; shift 2 ;;
         --eviction-padding-mb) require_arg "$1" $# || exit 1; EVICTION_PADDING_MB="$2"; shift 2 ;;
@@ -156,6 +200,14 @@ while [[ $# -gt 0 ]]; do
         --clean-remote-storage-by-default) require_arg "$1" $# || exit 1; CLEAN_REMOTE_STORAGE_BY_DEFAULT="$2"; shift 2 ;;
         --apply-cluster-bundle) require_arg "$1" $# || exit 1; APPLY_CLUSTER_BUNDLE="$2"; shift 2 ;;
         --restart-splunk) require_arg "$1" $# || exit 1; RESTART_SPLUNK="$2"; shift 2 ;;
+        --evidence-file) require_arg "$1" $# || exit 1; EVIDENCE_FILE="$2"; shift 2 ;;
+        --session-key-file) require_arg "$1" $# || exit 1; SESSION_KEY_FILE="$2"; shift 2 ;;
+        --splunk-uri) require_arg "$1" $# || exit 1; SPLUNK_URI="$2"; shift 2 ;;
+        --acs-token-file) require_arg "$1" $# || exit 1; ACS_TOKEN_FILE="$2"; shift 2 ;;
+        --owner-approval-file) require_arg "$1" $# || exit 1; OWNER_APPROVAL_FILE="$2"; shift 2 ;;
+        --backup-evidence-file) require_arg "$1" $# || exit 1; BACKUP_EVIDENCE_FILE="$2"; shift 2 ;;
+        --accept-destructive-index-delete) ACCEPT_DESTRUCTIVE_INDEX_DELETE=true; shift ;;
+        --confirm-token) require_arg "$1" $# || exit 1; CONFIRM_TOKENS+=("$2"); shift 2 ;;
         --help) usage 0 ;;
         *) echo "Unknown option: $1" >&2; usage 1 ;;
     esac
@@ -180,9 +232,18 @@ PY
 }
 
 validate_args() {
+    if [[ "${PHASE}" == "inventory" && "${OPERATION_SET}" == "false" ]]; then
+        OPERATION="inventory"
+    fi
+    if [[ "${PHASE}" == "plan" && "${OPERATION_SET}" == "false" ]]; then
+        OPERATION="inventory"
+    fi
     validate_choice "${DEPLOYMENT}" cluster standalone
+    validate_choice "${PLATFORM}" enterprise cloud
+    validate_choice "${OPERATION}" inventory retention smartstore archive disable-index delete-index clean-data restore-handoff
     validate_choice "${SCOPE}" per-index global
-    validate_choice "${PHASE}" render preflight apply status all
+    validate_choice "${PHASE}" inventory plan render preflight apply status all
+    validate_choice "${DATATYPE}" event metric
     validate_choice "${REMOTE_PROVIDER}" s3 gcs azure
     validate_choice "${S3_SUPPORTS_VERSIONING}" true false unset
     validate_choice "${S3_TSIDX_COMPRESSION}" true false unset
@@ -191,12 +252,12 @@ validate_args() {
     validate_choice "${CLEAN_REMOTE_STORAGE_BY_DEFAULT}" true false
     validate_choice "${APPLY_CLUSTER_BUNDLE}" true false
     validate_choice "${RESTART_SPLUNK}" true false
-    if [[ -z "${REMOTE_PATH}" ]]; then
-        log "ERROR: --remote-path is required."
+    if [[ "${OPERATION}" == "smartstore" && -z "${REMOTE_PATH}" ]]; then
+        log "ERROR: --remote-path is required for --operation smartstore."
         exit 1
     fi
-    if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && ( "${PHASE}" != "render" || "${APPLY}" == "true" ) ]]; then
-        log "ERROR: --json is supported only for render-only or --dry-run workflows."
+    if [[ "${JSON_OUTPUT}" == "true" && "${DRY_RUN}" != "true" && "${PHASE}" != "render" && "${PHASE}" != "inventory" && "${PHASE}" != "plan" ]]; then
+        log "ERROR: --json is supported only for render/inventory/plan or --dry-run workflows."
         exit 1
     fi
     if [[ -n "${OUTPUT_DIR}" ]]; then
@@ -209,17 +270,26 @@ validate_args() {
 build_renderer_args() {
     RENDER_ARGS=(
         --deployment "${DEPLOYMENT}"
+        --platform "${PLATFORM}"
+        --operation "${OPERATION}"
         --scope "${SCOPE}"
         --output-dir "${OUTPUT_DIR}"
         --splunk-home "${SPLUNK_HOME_VALUE}"
         --app-name "${APP_NAME}"
+        --stack "${STACK}"
+        --acs-base "${ACS_BASE}"
+        --datatype "${DATATYPE}"
         --remote-provider "${REMOTE_PROVIDER}"
         --volume-name "${VOLUME_NAME}"
         --remote-path "${REMOTE_PATH}"
         --indexes "${INDEXES}"
+        --max-total-data-size-mb "${MAX_TOTAL_DATA_SIZE_MB}"
         --max-global-data-size-mb "${MAX_GLOBAL_DATA_SIZE_MB}"
         --max-global-raw-data-size-mb "${MAX_GLOBAL_RAW_DATA_SIZE_MB}"
         --frozen-time-period-in-secs "${FROZEN_TIME_PERIOD_IN_SECS}"
+        --searchable-days "${SEARCHABLE_DAYS}"
+        --archival-retention-days "${ARCHIVAL_RETENTION_DAYS}"
+        --max-data-size-mb "${MAX_DATA_SIZE_MB}"
         --cache-size-mb "${CACHE_SIZE_MB}"
         --eviction-policy "${EVICTION_POLICY}"
         --eviction-padding-mb "${EVICTION_PADDING_MB}"
@@ -248,7 +318,20 @@ build_renderer_args() {
         --clean-remote-storage-by-default "${CLEAN_REMOTE_STORAGE_BY_DEFAULT}"
         --apply-cluster-bundle "${APPLY_CLUSTER_BUNDLE}"
         --restart-splunk "${RESTART_SPLUNK}"
+        --evidence-file "${EVIDENCE_FILE}"
+        --session-key-file "${SESSION_KEY_FILE}"
+        --splunk-uri "${SPLUNK_URI}"
+        --acs-token-file "${ACS_TOKEN_FILE}"
+        --owner-approval-file "${OWNER_APPROVAL_FILE}"
+        --backup-evidence-file "${BACKUP_EVIDENCE_FILE}"
     )
+    if [[ "${ACCEPT_DESTRUCTIVE_INDEX_DELETE}" == "true" ]]; then
+        RENDER_ARGS+=(--accept-destructive-index-delete)
+    fi
+    local token
+    for token in "${CONFIRM_TOKENS[@]}"; do
+        RENDER_ARGS+=(--confirm-token "${token}")
+    done
 }
 
 render_dir() {
@@ -276,11 +359,28 @@ run_rendered_script() {
 }
 
 apply_script() {
-    if [[ "${DEPLOYMENT}" == "cluster" ]]; then
-        printf '%s' "apply-cluster-manager.sh"
-    else
-        printf '%s' "apply-standalone-indexer.sh"
-    fi
+    case "${OPERATION}" in
+        smartstore)
+            if [[ "${DEPLOYMENT}" == "cluster" ]]; then
+                printf '%s' "apply-cluster-manager.sh"
+            else
+                printf '%s' "apply-standalone-indexer.sh"
+            fi
+            ;;
+        retention)
+            if [[ "${PLATFORM}" == "cloud" ]]; then
+                printf '%s' "apply-retention-cloud.sh"
+            else
+                printf '%s' "apply-retention-enterprise.sh"
+            fi
+            ;;
+        archive) printf '%s' "archive-handoff.sh" ;;
+        disable-index) printf '%s' "apply-disable-index.sh" ;;
+        delete-index) printf '%s' "apply-delete-index.sh" ;;
+        clean-data) printf '%s' "apply-clean-data.sh" ;;
+        restore-handoff) printf '%s' "restore-handoff.sh" ;;
+        inventory) printf '%s' "status.sh" ;;
+    esac
 }
 
 main() {
@@ -294,7 +394,7 @@ main() {
         exit 0
     fi
     case "${PHASE}" in
-        render)
+        inventory|plan|render)
             render_assets
             if [[ "${APPLY}" == "true" ]]; then
                 run_rendered_script "$(apply_script)"

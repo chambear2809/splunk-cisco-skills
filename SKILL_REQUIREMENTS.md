@@ -52,6 +52,7 @@ Environment-specific notes:
 | `cisco-intersight-setup` | Shared baseline. | Splunk app workflow access; Cisco Intersight account/API material stored in files. |
 | `cisco-isovalent-platform-setup` | `kubectl`, `helm`; optional `aws` for EKS helpers. | Kubernetes cluster-admin style access; Cilium/Tetragon chart access; Isovalent Enterprise chart/license/pull secret when using Enterprise mode. |
 | `cisco-meraki-ta-setup` | Shared baseline. | Splunk app workflow access; Meraki organization details and API key file. |
+| `cisco-meraki-aam-thousandeyes-setup` | Shared baseline; `curl` for ThousandEyes validation; browser/DevTools for Meraki Dashboard HAR capture. | Meraki Dashboard full-org admin UI access; ThousandEyes Account Admin/local-auth access for linking; non-secret application/network details; optional ThousandEyes token file for public API validation. |
 | `cisco-product-setup` | Shared baseline. | SCAN catalog present; requirements inherit from the routed product setup skill. |
 | `cisco-scan-setup` | Shared baseline. | Splunk app workflow access; SCAN package/catalog sync access when refreshing the Cisco product catalog. |
 | `cisco-secure-access-setup` | Shared baseline. | Splunk app workflow access; Secure Access org/account details; event add-on prerequisites; client secrets in files. |

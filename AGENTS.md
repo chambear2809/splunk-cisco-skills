@@ -73,6 +73,7 @@ record explicit evidence that the package ships no pre-built dashboards.
 | `cisco-dc-networking-setup` | `cisco_dc_networking_app_for_splunk` | Configure ACI, Nexus Dashboard, and Nexus 9K data collection |
 | `cisco-intersight-setup` | `Splunk_TA_Cisco_Intersight` | Configure Cisco Intersight account, index, and inputs |
 | `cisco-meraki-ta-setup` | `Splunk_TA_cisco_meraki` | Configure Meraki organization account, index, and polling inputs |
+| `cisco-meraki-aam-thousandeyes-setup` | Meraki Active Application Monitoring + ThousandEyes MX agents | Render, capture, validate, and safely operate Meraki AAM workflows that link Meraki Dashboard to ThousandEyes, deploy MX-hosted agents, create application monitoring tests, and summarize private Dashboard POSTs from HAR evidence |
 | `cisco-enterprise-networking-setup` | `cisco-catalyst-app` | Configure the visualization app's macros and related app settings |
 | `cisco-thousandeyes-setup` | `ta_cisco_thousandeyes` | Configure ThousandEyes OAuth, HEC, streaming/polling inputs, and dashboards |
 | `cisco-thousandeyes-mcp-setup` | Official ThousandEyes MCP Server (`https://api.thousandeyes.com/mcp`) | Render and apply Model Context Protocol client configurations for Cursor / Claude Code / Codex / VS Code / AWS Kiro; gates the write/Instant-Test tool group behind `--accept-te-mcp-write-tools` |

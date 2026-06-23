@@ -42,6 +42,7 @@ For Cloud-specific install and API behavior, see
 | `cisco-enterprise-networking-setup` | Required | None | None | None | None | None | Search-time visualization app with macros, saved searches, and KV Store content. |
 | `cisco-intersight-setup` | Supported | None | Supported | None | None | None | API collector app; run on the search tier or a heavy forwarder. |
 | `cisco-meraki-ta-setup` | Supported | None | Supported | None | None | None | Meraki collector app with dashboard alignment; place on the search tier or a heavy forwarder. |
+| `cisco-meraki-aam-thousandeyes-setup` | None | None | None | None | None | None | Operator-side Meraki Active Application Monitoring and ThousandEyes MX-agent workflow. Renders runbooks, summarizes HAR evidence, and validates public Meraki/ThousandEyes API readiness without Splunk Platform runtime placement. |
 | `cisco-webex-setup` | Required | None | None | None | None | None | Search-head Webex REST API collection and dashboard setup for the Webex Add-on plus Webex App. |
 | `cisco-ucs-ta-setup` | Supported | None | Supported | None | None | None | Cisco UCS Manager API collection through Splunk_TA_cisco-ucs server/template/task handlers. |
 | `cisco-secure-email-web-gateway-setup` | Supported | Supported | Supported | None | Supported | External collector | Cisco ESA/WSA parser and ingestion-handoff workflow. Use SC4S or file monitors for collection; install TAs on search and parsing tiers. |

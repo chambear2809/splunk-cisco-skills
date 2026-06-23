@@ -1228,6 +1228,18 @@
       "notes": "Meraki collector app with dashboard alignment; place on the search tier or a heavy forwarder."
     },
     {
+      "skill": "cisco-meraki-aam-thousandeyes-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Operator-side Meraki Active Application Monitoring and ThousandEyes MX-agent workflow. Renders runbooks, summarizes HAR evidence, and validates public Meraki/ThousandEyes API readiness without Splunk Platform runtime placement."
+    },
+    {
       "skill": "cisco-webex-setup",
       "role_support": {
         "search-tier": "required",
