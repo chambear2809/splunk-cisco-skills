@@ -22,6 +22,16 @@ bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/setup.sh --render
 bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/validate.sh
 ```
 
+Read-only Controller API validation for Cluster Agent availability can be run
+with file-backed credentials:
+
+```bash
+bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/poll_cluster_agent_availability.sh \
+  --application 'Server & Infrastructure Monitoring' \
+  --metric-path 'Application Infrastructure Performance|Root|Individual Nodes|cluster-agent-demo1-appdynamics|Cluster Agent|Availability' \
+  --duration-mins 5
+```
+
 Typical flow:
 
 1. Edit `template.example` or pass `--spec <file>` with Controller, cluster,
