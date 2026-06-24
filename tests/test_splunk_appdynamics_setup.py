@@ -1050,6 +1050,17 @@ def test_cluster_agent_values_rendering(tmp_path: Path) -> None:
     } <= ids
 
 
+def test_cluster_agent_availability_probe_defaults_to_server_visibility_path() -> None:
+    script = SKILLS_DIR / "splunk-appdynamics-k8s-cluster-agent-setup/scripts/poll_cluster_agent_availability.sh"
+    text = script.read_text(encoding="utf-8")
+    default_path = "Application Infrastructure Performance|Root|Individual Nodes|*|Cluster Agent|Availability"
+    assert f"METRIC_PATH=\"${{APPD_CLUSTER_AGENT_AVAILABILITY_METRIC_PATH:-{default_path}}}\"" in text
+
+    help_result = run_script(script, "--help")
+    assert help_result.returncode == 0
+    assert default_path in help_result.stdout
+
+
 def test_dual_agent_and_machine_collector_render_contracts(tmp_path: Path) -> None:
     dual = render_skill("splunk-appdynamics-dual-agent-setup", tmp_path / "dual")
     env = (dual / "java-dual-agent-env.sh").read_text(encoding="utf-8")

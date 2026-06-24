@@ -22,6 +22,32 @@ bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/setup.sh --render
 bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/validate.sh
 ```
 
+Read-only Controller API validation for Cluster Agent availability can be run
+with file-backed credentials:
+
+```bash
+bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/poll_cluster_agent_availability.sh \
+  --application 'Server & Infrastructure Monitoring' \
+  --duration-mins 5
+```
+
+The probe defaults to
+`Application Infrastructure Performance|Root|Individual Nodes|*|Cluster Agent|Availability`
+so it can read every visible Cluster Agent under Server Visibility. Pass
+`--metric-path` only when you want to pin validation to a copied full path for
+one Cluster Agent.
+
+A disabled Server Visibility health rule for Cluster Agent availability can be
+rendered first, then applied after the API client has Server health-rule
+permissions:
+
+```bash
+bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/create_cluster_agent_availability_health_rule.sh
+
+bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/create_cluster_agent_availability_health_rule.sh \
+  --apply
+```
+
 Typical flow:
 
 1. Edit `template.example` or pass `--spec <file>` with Controller, cluster,
