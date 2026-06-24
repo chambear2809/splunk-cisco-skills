@@ -29,9 +29,9 @@ Discovery alternatives:
 
 Options:
   --list-applications           List visible applications and exit
-  --metric-path PATH            Default: Cluster Agent|Availability. For Cluster Agent
-                                server metrics, use the full Application Infrastructure
-                                Performance|Root|Individual Nodes|... path.
+  --metric-path PATH            Default path:
+                                Application Infrastructure Performance|Root|Individual Nodes|*|Cluster Agent|Availability
+                                Override with a copied full metric path for one Cluster Agent.
   --duration-mins N             Metric window. Default: 5
   --interval-seconds N          Seconds between polls. Default: 0
   --iterations N                Poll count. Default: 1
@@ -67,7 +67,7 @@ ACCOUNT_NAME="${APPD_ACCOUNT_NAME:-}"
 CLIENT_NAME="${APPD_API_CLIENT_NAME:-}"
 CLIENT_SECRET_FILE="${APPD_OAUTH_CLIENT_SECRET_FILE:-}"
 TOKEN_FILE="${APPD_OAUTH_TOKEN_FILE:-}"
-METRIC_PATH="${APPD_CLUSTER_AGENT_AVAILABILITY_METRIC_PATH:-Cluster Agent|Availability}"
+METRIC_PATH="${APPD_CLUSTER_AGENT_AVAILABILITY_METRIC_PATH:-Application Infrastructure Performance|Root|Individual Nodes|*|Cluster Agent|Availability}"
 DURATION_MINS=5
 INTERVAL_SECONDS=0
 ITERATIONS=1

@@ -28,9 +28,14 @@ with file-backed credentials:
 ```bash
 bash skills/splunk-appdynamics-k8s-cluster-agent-setup/scripts/poll_cluster_agent_availability.sh \
   --application 'Server & Infrastructure Monitoring' \
-  --metric-path 'Application Infrastructure Performance|Root|Individual Nodes|cluster-agent-demo1-appdynamics|Cluster Agent|Availability' \
   --duration-mins 5
 ```
+
+The probe defaults to
+`Application Infrastructure Performance|Root|Individual Nodes|*|Cluster Agent|Availability`
+so it can read every visible Cluster Agent under Server Visibility. Pass
+`--metric-path` only when you want to pin validation to a copied full path for
+one Cluster Agent.
 
 A disabled Server Visibility health rule for Cluster Agent availability can be
 rendered first, then applied after the API client has Server health-rule
