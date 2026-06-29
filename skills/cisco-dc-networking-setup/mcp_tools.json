@@ -53,7 +53,7 @@
       "tags": ["cisco", "aci", "faults", "alerts", "troubleshooting"],
       "time_range": true,
       "row_limiter": true,
-      "spl": "search index=cisco_aci sourcetype=\"cisco:apic:faultInst\" | spath | table _time, code, severity, descr, dn, lc, cause | sort -_time",
+      "spl": "search index=cisco_aci sourcetype=\"cisco:dc:aci:class\" component=faultInst | spath | table _time, code, severity, descr, dn, lc, cause | sort -_time",
       "arguments": [],
       "examples": [
         {
@@ -73,7 +73,7 @@
       "tags": ["cisco", "aci", "endpoints", "inventory", "network"],
       "time_range": true,
       "row_limiter": true,
-      "spl": "search index=cisco_aci sourcetype=\"cisco:apic:fvCEp\" | spath | table _time, mac, ip, encap, dn | sort -_time",
+      "spl": "search index=cisco_aci sourcetype=\"cisco:dc:aci:class\" component=fvCEp | spath | table _time, mac, ip, encap, dn | sort -_time",
       "arguments": [],
       "examples": [
         {
@@ -93,7 +93,7 @@
       "tags": ["cisco", "aci", "health", "fabric", "monitoring"],
       "time_range": true,
       "row_limiter": true,
-      "spl": "search index=cisco_aci sourcetype=\"cisco:apic:fabricHealthTotal\" | spath | table _time, healthAvg, healthMax, healthMin, dn | sort -_time",
+      "spl": "search index=cisco_aci sourcetype=\"cisco:dc:aci:health\" component=fabricHealthTotal | spath | table _time, healthAvg, healthMax, healthMin, dn | sort -_time",
       "arguments": [],
       "examples": [
         {
@@ -113,7 +113,7 @@
       "tags": ["cisco", "aci", "audit", "changes", "compliance"],
       "time_range": true,
       "row_limiter": true,
-      "spl": "search index=cisco_aci sourcetype=\"cisco:apic:aaaModLR\" | spath | table _time, user, action, descr, affected, changeSet | sort -_time",
+      "spl": "search index=cisco_aci sourcetype=\"cisco:dc:aci:class\" component=aaaModLR | spath | table _time, user, action, descr, affected, changeSet | sort -_time",
       "arguments": [],
       "examples": [
         {
@@ -133,7 +133,7 @@
       "tags": ["cisco", "nexus-dashboard", "anomalies", "insights", "monitoring"],
       "time_range": true,
       "row_limiter": true,
-      "spl": "search index=cisco_nd sourcetype=\"cisco:nd:anomalies\" | spath | table _time, severity, category, description, affectedObject | sort -_time",
+      "spl": "search index=cisco_nd sourcetype=\"cisco:dc:nd:anomalies\" | spath | table _time, severity, category, description, affectedObject | sort -_time",
       "arguments": [],
       "examples": [
         {
@@ -153,7 +153,7 @@
       "tags": ["cisco", "nexus-9k", "interfaces", "stats", "performance"],
       "time_range": true,
       "row_limiter": true,
-      "spl": "search index=cisco_nexus_9k sourcetype=\"cisco:nexus9k:nxinterface\" | spath | table _time, interface, state, speed, input_rate, output_rate, input_errors, output_errors | sort -_time",
+      "spl": "search index=cisco_nexus_9k sourcetype=\"cisco:dc:nexus9k\" component=nxinterface | spath | table _time, interface, state, speed, input_rate, output_rate, input_errors, output_errors | sort -_time",
       "arguments": [],
       "examples": [
         {

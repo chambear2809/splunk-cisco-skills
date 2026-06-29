@@ -236,6 +236,11 @@ sb_pass_q=$(quote_credential_value "${sb_pass}")
 splunk_com_user_q=$(quote_credential_value "${splunk_com_user}")
 splunk_com_pass_q=$(quote_credential_value "${splunk_com_pass}")
 
+# Pre-create the file with mode 600 so secrets are never briefly written to a
+# world-readable file. The '>' redirect below truncates without changing the
+# existing file mode, so the credential contents are always written 600.
+install -m 600 /dev/null "${CRED_FILE}"
+
 cat > "${CRED_FILE}" <<EOF
 # Splunk credential file — chmod 600
 # Used by skill scripts for REST API, ACS, and Splunkbase authentication.

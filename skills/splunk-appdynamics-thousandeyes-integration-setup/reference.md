@@ -33,7 +33,7 @@ The custom webhook fallback targets the documented AppDynamics Events API:
 - Method: `POST`
 - Path: `/controller/rest/applications/{application_id_or_name}/events`
 - Required query values: `summary`, `severity`, `eventtype=CUSTOM`
-- Optional custom type: `customeventtype=ThousandEyesAlert`
+- Required when `eventtype=CUSTOM`: `customeventtype=ThousandEyesAlert`
 - Permission: Create Events on the target application
 
 Use OAuth client credentials or another approved AppDynamics API identity.

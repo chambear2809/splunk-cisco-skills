@@ -51,6 +51,7 @@ Version pins:
   --flutter-agent-version VERSION
   --flutter-session-replay-version VERSION
   --allow-latest-version           Permit latest, +, or otherwise unpinned versions
+  --allow-lower-android-api        Permit Android minSdk below API 24 (default guard)
 
 Session Replay:
   --enable-session-replay

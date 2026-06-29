@@ -259,18 +259,11 @@ def overlay_values(
         # production-validated path (see references/tetragon-hostpath-coordination.md).
         overlay["agent"]["extraVolumes"] = [{"name": "tetragon", "hostPath": {"path": host_path}}]
         overlay["agent"]["extraVolumeMounts"] = [{"name": "tetragon", "mountPath": host_path}]
-        overlay["agent"]["config"]["receivers"]["filelog/tetragon"] = {
-            "include": [f"{host_path}/{filename_pattern}"],
-            "start_at": "beginning",
-            "include_file_path": True,
-            "include_file_name": False,
-            "resource": {
-                "com.splunk.index": index,
-                "com.splunk.source": f"{host_path}/",
-                "host.name": 'EXPR(env("K8S_NODE_NAME"))',
-                "com.splunk.sourcetype": sourcetype,
-            },
-        }
+        # The filelog/tetragon receiver is declared once, below, via the chart's
+        # logsCollection.extraFileLogs block (which both defines the receiver and
+        # wires it into the logs pipeline). We deliberately do NOT also add a
+        # standalone agent.config.receivers.filelog/tetragon entry, which the
+        # chart would treat as a redundant duplicate.
         overlay["splunkPlatform"] = {
             "logsEnabled": True,
         }

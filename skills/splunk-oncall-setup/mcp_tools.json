@@ -37,7 +37,7 @@
       ],
       "time_range": false,
       "row_limiter": true,
-      "spl": "| rest /services/data/indexes count=0 | search title=victorops_incidents OR title=victorops_chats OR title=victorops_reports OR title=victorops_webhooks | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server | sort title",
+      "spl": "| rest /services/data/indexes count=0 | search title=victorops_users OR title=victorops_teams OR title=victorops_oncall OR title=victorops_incidents | table title disabled datatype totalEventCount currentDBSizeMB maxTotalDataSizeMB splunk_server | sort title",
       "arguments": [],
       "examples": [
         "List On-Call indexes"
@@ -132,7 +132,7 @@
       ],
       "time_range": true,
       "row_limiter": true,
-      "spl": "| tstats count latest(_time) as latest where index=victorops_incidents OR index=victorops_chats OR index=victorops_reports OR index=victorops_webhooks by index sourcetype host | eval latest=strftime(latest,\"%Y-%m-%dT%H:%M:%SZ\") | sort -count",
+      "spl": "| tstats count latest(_time) as latest where index=victorops_users OR index=victorops_teams OR index=victorops_oncall OR index=victorops_incidents by index sourcetype host | eval latest=strftime(latest,\"%Y-%m-%dT%H:%M:%SZ\") | sort -count",
       "arguments": [],
       "examples": [
         "Show recent On-Call data"

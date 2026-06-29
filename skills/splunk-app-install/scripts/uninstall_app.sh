@@ -7,12 +7,14 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
 APP_NAME=""
 RESTART_SPLUNK=true
+ASSUME_YES=false
 
 # Accept flags for non-interactive use; anything missing gets prompted
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --app-name) require_arg "$1" $# || exit 1; APP_NAME="$2"; shift 2 ;;
         --no-restart) RESTART_SPLUNK=false; shift ;;
+        --yes|--force|--non-interactive) ASSUME_YES=true; shift ;;
         --help)
             cat <<EOF
 Uninstall a Splunk App (interactive)
@@ -22,6 +24,8 @@ Usage: $(basename "$0") [OPTIONS]
 Optional flags (skip the corresponding prompt):
   --app-name NAME    Name of the app to remove
   --no-restart       Skip the automatic restart after uninstall
+  --yes              Skip the destructive-action confirmation prompt
+                     (aliases: --force, --non-interactive). Requires --app-name.
 
 Credentials are read from the project-root credentials file automatically.
 Run: bash ${SCRIPT_DIR}/../../shared/scripts/setup_credentials.sh
@@ -30,6 +34,11 @@ EOF
         *) log "Unknown option: $1"; exit 1 ;;
     esac
 done
+
+if [[ "${ASSUME_YES}" == "true" && -z "${APP_NAME}" ]]; then
+    log "ERROR: --yes requires --app-name (refusing to auto-confirm an unspecified app)."
+    exit 1
+fi
 
 restart_splunk_or_exit() {
     : "${RESTART_SPLUNK}"  # Consumed by app_restart_splunk_or_exit.
@@ -148,12 +157,16 @@ except Exception:
         fi
     fi
 
-    echo ""
-    read -rp "Remove app '${APP_NAME}'? This cannot be undone. [y/N]: " confirm
-    case "${confirm}" in
-        [yY]|[yY][eE][sS]) ;;
-        *) log "Cancelled."; exit 0 ;;
-    esac
+    if [[ "${ASSUME_YES}" == "true" ]]; then
+        log "Non-interactive mode (--yes): removing app '${APP_NAME}' without prompting."
+    else
+        echo ""
+        read -rp "Remove app '${APP_NAME}'? This cannot be undone. [y/N]: " confirm
+        case "${confirm}" in
+            [yY]|[yY][eE][sS]) ;;
+            *) log "Cancelled."; exit 0 ;;
+        esac
+    fi
 
     log "Checking if app '${APP_NAME}' exists in Splunk Cloud..."
     if ! acs_command apps describe "${APP_NAME}" >/dev/null 2>&1; then
@@ -294,12 +307,16 @@ except Exception:
     fi
 fi
 
-echo ""
-read -rp "Remove app '${APP_NAME}'? This cannot be undone. [y/N]: " confirm
-case "${confirm}" in
-    [yY]|[yY][eE][sS]) ;;
-    *) log "Cancelled."; exit 0 ;;
-esac
+if [[ "${ASSUME_YES}" == "true" ]]; then
+    log "Non-interactive mode (--yes): removing app '${APP_NAME}' without prompting."
+else
+    echo ""
+    read -rp "Remove app '${APP_NAME}'? This cannot be undone. [y/N]: " confirm
+    case "${confirm}" in
+        [yY]|[yY][eE][sS]) ;;
+        *) log "Cancelled."; exit 0 ;;
+    esac
+fi
 
 log "Checking if app '${APP_NAME}' exists..."
 check_response="$(app_lookup_http_code "${SK}" "${SPLUNK_URI}" "${APP_NAME}")"

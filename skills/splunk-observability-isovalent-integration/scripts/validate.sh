@@ -114,18 +114,10 @@ print(inc[0] if inc else '')
             exit 1
         fi
     fi
-    FILELOG_RECEIVER="$(PYTHONPATH="${PROJECT_ROOT}/skills/shared/lib${PYTHONPATH:+:${PYTHONPATH}}" python3 -c "
-import sys
-from pathlib import Path
-from yaml_compat import load_yaml_or_json
-data = load_yaml_or_json(Path(sys.argv[1]).read_text(encoding='utf-8'), source=sys.argv[1])
-receiver = data.get('agent', {}).get('config', {}).get('receivers', {}).get('filelog/tetragon')
-print('present' if receiver else '')
-" "${OUTPUT_DIR}/splunk-otel-overlay/values.overlay.yaml")"
-    if [[ -n "${LOG_INCLUDE}" && "${FILELOG_RECEIVER}" != "present" ]]; then
-        log "ERROR: logsCollection references filelog/tetragon but agent.config.receivers.filelog/tetragon is missing."
-        exit 1
-    fi
+    # The filelog/tetragon receiver is provided by the chart's
+    # logsCollection.extraFileLogs block, which both declares the receiver and
+    # wires it into the logs pipeline. We intentionally do not require a
+    # duplicate agent.config.receivers.filelog/tetragon entry.
 fi
 
 # Dashboards: every JSON in dashboards/ must parse cleanly and not contain

@@ -27,9 +27,12 @@ Based on current Splunk Platform knowledge object and REST documentation:
 
 Apply writes the object via REST `configs/conf-<file>/<stanza>` (the shared
 `rest_set_conf` helper is search head cluster deployer-bundle aware) and then
-POSTs sharing/ownership to `.../configs/conf-<file>/<stanza>/acl`. Knowledge
-object changes generally take effect after a configuration reload; the skill
-prints platform-appropriate restart/reload guidance.
+POSTs sharing/ownership to `.../configs/conf-<file>/<stanza>/acl`. For lookups
+with `--auto-lookup-sourcetype`, apply also writes the `LOOKUP-<name>` binding to
+`props.conf` on that source type (app-scoped), matching the rendered
+`props.conf`. Knowledge object changes generally take effect after a
+configuration reload; the skill prints platform-appropriate restart/reload
+guidance.
 
 ## CSV Lookup Content
 
@@ -42,7 +45,10 @@ On a search head cluster, distribute lookup files through the deployer.
 
 - Default `--sharing app --owner nobody` for shared content; reserve
   `--sharing global` (gated) for content that must be visible across all apps.
-- Use `--read-roles`/`--write-roles` to scope access; default read is `*`.
+- Use `--read-roles`/`--write-roles` to scope access. With no `--read-roles`, the
+  apply step sends no `perms.read`, so Splunk's defaults apply: app- and
+  global-scoped objects are readable by all roles (`*`), while `--sharing user`
+  objects stay private to the owner.
 
 ## Validation
 

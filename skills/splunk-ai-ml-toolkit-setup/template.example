@@ -1,23 +1,31 @@
 api_version: splunk-ai-ml-toolkit-setup/v1
-platform: enterprise
+# Keys consumed by render_assets.py:
+platform: enterprise            # enterprise|cloud
 splunk_version: "9.4"
-psc_target: linux64
-include_ai_toolkit: true
-include_dsdl: true
-dsdl_runtime: kubernetes
-legacy_anomaly_audit: true
-features:
-  ml_spl: true
-  smart_assistants: true
-  anomaly_workflows: true
-  llm_ai_command: true
-  connections_tab: true
-  container_management: true
-  onnx: true
-  alerts: true
-dsdl:
-  runtime_endpoint: ""
-  runtime_namespace: ""
-  require_gpu: false
-  airgap: false
-  notebook_governance: true
+psc_target: linux64             # linux64|windows64|mac-intel|mac-arm|linux32|auto
+include_dsdl: true              # plan the DSDL app + runtime handoff surfaces
+dsdl_runtime: kubernetes        # handoff|docker|kubernetes|openshift|hpc|gpu|airgap
+legacy_anomaly_audit: true      # add legacy anomaly-migration guidance
+
+# NOTE: The keys below are DESCRIPTIVE ONLY and are not consumed by the
+# renderer. This skill renders full coverage/doctor surfaces for AI Toolkit,
+# PSC, every feature area, and every DSDL surface regardless of these toggles,
+# so they do not gate rendering. They are retained for human documentation of
+# the intended deployment and may be honored by a future version.
+#
+# include_ai_toolkit: true      # AI Toolkit is always planned (core dependency)
+# features:
+#   ml_spl: true
+#   smart_assistants: true
+#   anomaly_workflows: true
+#   llm_ai_command: true
+#   connections_tab: true
+#   container_management: true
+#   onnx: true
+#   alerts: true
+# dsdl:
+#   runtime_endpoint: ""
+#   runtime_namespace: ""
+#   require_gpu: false
+#   airgap: false
+#   notebook_governance: true

@@ -57,7 +57,8 @@ apply changes until the operator passes `--accept-pki-rotation`.
   lists `tls1.2` as the maximum supported version; the skill
   defaults to and refuses anything below `tls1.2`.
 - It does not build the FIPS-validated OpenSSL module. The
-  operator owns the FIPS module; the skill flips
+  operator owns the FIPS module; the skill flips FIPS on by
+  setting both `SPLUNK_FIPS=1` (the master enable switch) and
   `SPLUNK_FIPS_VERSION` in `splunk-launch.conf`.
 - It does not issue certificates for Splunk Cloud. It refuses and
   emits the
@@ -427,8 +428,9 @@ for the upstream support table and the guarded
 ## FIPS mode
 
 `--fips-mode {none|140-2|140-3}` — when set, the renderer emits a
-`splunk-launch.conf` overlay with `SPLUNK_FIPS_VERSION = 140-3` (or
-`140-2`). Read
+`splunk-launch.conf` overlay with `SPLUNK_FIPS = 1` (the master enable
+switch, which defaults to 0) plus `SPLUNK_FIPS_VERSION = 140-3` (or
+`140-2`). Both keys are required for FIPS to engage. Read
 [references/fips-and-common-criteria.md](references/fips-and-common-criteria.md)
 before apply; the skill refuses mid-migration states.
 

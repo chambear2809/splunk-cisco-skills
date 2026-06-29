@@ -271,7 +271,7 @@ cp local.meta "${{app_root}}/metadata/local.meta"
 echo "Staged governed conf and metadata into ${{app_root}}."
 echo "Reload to apply (or restart on an SHC deployer push):"
 "${{splunk}}" _internal call /services/configs/conf-savedsearches/_reload >/dev/null 2>&1 || true
-"${{splunk}}" _internal call /services/admin/conf-times/_reload >/dev/null 2>&1 || true
+"${{splunk}}" _internal call /services/configs/conf-macros/_reload >/dev/null 2>&1 || true
 echo "Review effective sharing in Settings > All configurations after reload."
 """
     )

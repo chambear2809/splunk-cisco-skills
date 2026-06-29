@@ -540,9 +540,11 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
     local = spec.get("local_collector_enabled", True)
     xray = spec.get("xray_coexistence", False)
 
-    # {{resolve:...}} is CloudFormation-only syntax and must NOT appear in AWS
-    # CLI commands — the CLI would pass the literal string as the token value.
-    # Fetch the token from the secret backend at apply time instead.
+    # The access token must never reach any command's argv. We fetch it into a
+    # shell variable at apply time, then inject it into a chmod-600 temp JSON file
+    # via the printf builtin + stdin (no child-process argv), and pass that file to
+    # the AWS CLI with --cli-input-json file://... So the literal token never
+    # appears in argv (ps/cmdline), shell history, or logs.
     if backend == "secretsmanager":
         token_fetch_lines = [
             'echo "==> Fetching SPLUNK_ACCESS_TOKEN from Secrets Manager..."',
@@ -563,8 +565,11 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
 
     lines = ["#!/usr/bin/env bash", "set -euo pipefail", "# AWS CLI apply plan — review before running", ""]
     lines.append(f"# Run scripts/write-splunk-token.sh once to store the token in {backend}.")
-    lines.append("# Token is fetched from the secret backend at apply time; it never appears")
-    lines.append("# as a literal value in process arguments.")
+    lines.append("# The token is fetched from the secret backend at apply time, written into a")
+    lines.append("# chmod-600 temp JSON file via stdin, and passed to the AWS CLI as")
+    lines.append("#   --cli-input-json file://...")
+    lines.append("# so the literal token NEVER appears in argv (ps/cmdline), shell history, or logs.")
+    lines.append("# Temp files are chmod 600 and removed on exit via a trap.")
     lines.append("")
     lines.extend(token_fetch_lines)
     lines.append("")
@@ -573,6 +578,13 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
     lines.append('  echo "Run scripts/write-splunk-token.sh first." >&2')
     lines.append('  exit 2')
     lines.append('fi')
+    lines.append("")
+    lines.append('_CFG_FILE=""')
+    lines.append("cleanup() {")
+    lines.append('  [[ -n "${_CFG_FILE:-}" ]] && rm -f "${_CFG_FILE}"')
+    lines.append("  unset _SPLUNK_TOKEN 2>/dev/null || true")
+    lines.append("}")
+    lines.append("trap cleanup EXIT")
     lines.append("")
 
     for tgt in spec.get("targets", []):
@@ -590,38 +602,51 @@ def _render_aws_cli_plan(spec: dict[str, Any], manifest: dict[str, Any], wrapper
             lines.append("")
             continue
 
-        # Build env var pairs. Token is injected last via shell variable so the
-        # value is never visible in ps output or shell history.
-        env_var_pairs: list[tuple[str, str]] = [
-            ("AWS_LAMBDA_EXEC_WRAPPER", wrapper),
-            ("SPLUNK_REALM", realm),
-            ("OTEL_SERVICE_NAME", fn),
-        ]
+        variables: dict[str, str] = {
+            "AWS_LAMBDA_EXEC_WRAPPER": wrapper,
+            "SPLUNK_REALM": realm,
+            "OTEL_SERVICE_NAME": fn,
+        }
         if not local:
-            env_var_pairs.append(("SPLUNK_LAMBDA_LOCAL_COLLECTOR_ENABLED", "false"))
-            env_var_pairs.append((
-                "OTEL_EXPORTER_OTLP_ENDPOINT",
-                f"https://ingest.{realm}.observability.splunkcloud.com/v2/trace/otlp",
-            ))
+            variables["SPLUNK_LAMBDA_LOCAL_COLLECTOR_ENABLED"] = "false"
+            variables["OTEL_EXPORTER_OTLP_ENDPOINT"] = (
+                f"https://ingest.{realm}.observability.splunkcloud.com/v2/trace/otlp"
+            )
         if xray:
-            env_var_pairs.append(("OTEL_LAMBDA_DISABLE_AWS_CONTEXT_PROPAGATION", "true"))
+            variables["OTEL_LAMBDA_DISABLE_AWS_CONTEXT_PROPAGATION"] = "true"
         if _runtime_family(runtime) == "nodejs":
-            env_var_pairs.append(("SPLUNK_TRACE_RESPONSE_HEADER_ENABLED", "true"))
+            variables["SPLUNK_TRACE_RESPONSE_HEADER_ENABLED"] = "true"
+        # Placeholder is overwritten at runtime with the real token (injected via stdin).
+        variables["SPLUNK_ACCESS_TOKEN"] = "__REPLACED_AT_RUNTIME__"
 
-        env_parts = [f"{k}={v}" for k, v in env_var_pairs]
-        env_parts.append("SPLUNK_ACCESS_TOKEN=${_SPLUNK_TOKEN}")
-        env_json = ",".join(env_parts)
+        cli_input = {
+            "FunctionName": fn,
+            "Layers": [layer_arn],
+            "Environment": {"Variables": variables},
+        }
+        cli_json = json.dumps(cli_input, indent=2)
 
         lines.append(f"# --- {fn} ---")
         lines.append(f'echo "==> Updating {fn} in {region}..."')
+        lines.append('_CFG_FILE="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-cfg.XXXXXX")"')
+        lines.append('chmod 600 "${_CFG_FILE}"')
+        lines.append('cat > "${_CFG_FILE}" <<\'CLIJSON\'')
+        lines.append(cli_json)
+        lines.append("CLIJSON")
+        lines.append("# Inject the real token via stdin (never on argv); rewrite the file in place.")
+        lines.append(
+            'printf \'%s\' "${_SPLUNK_TOKEN}" | python3 -c '
+            '\'import json, sys; p = sys.argv[1]; c = json.load(open(p)); '
+            'c["Environment"]["Variables"]["SPLUNK_ACCESS_TOKEN"] = sys.stdin.read(); '
+            'json.dump(c, open(p, "w"))\' "${_CFG_FILE}"'
+        )
         lines.append("aws lambda update-function-configuration \\")
-        lines.append(f"  --function-name {fn} \\")
         lines.append(f"  --region {region} \\")
-        lines.append(f"  --layers '{layer_arn}' \\")
-        lines.append(f'  --environment "Variables={{{env_json}}}"')
+        lines.append('  --cli-input-json "file://${_CFG_FILE}"')
+        lines.append('rm -f "${_CFG_FILE}"')
+        lines.append('_CFG_FILE=""')
         lines.append("")
 
-    lines.append("unset _SPLUNK_TOKEN")
     lines.append('echo "==> apply-plan: done"')
     return "\n".join(lines)
 
@@ -788,20 +813,36 @@ def _render_cloudformation(spec: dict[str, Any], manifest: dict[str, Any], wrapp
 
 def _render_write_token_sh(spec: dict[str, Any]) -> str:
     backend = spec.get("secret_backend", "secretsmanager")
+    # The token is read from TOKEN_FILE into a chmod-600 --cli-input-json file
+    # (built via python, trailing newline stripped to match historical "$(cat)"
+    # behavior) so the literal token never appears on any command's argv.
+    _mk_input = (
+        '_SECRET_JSON="$(mktemp "${TMPDIR:-/tmp}/splunk-lambda-secret.XXXXXX")"\n'
+        'chmod 600 "${_SECRET_JSON}"\n'
+        'trap \'rm -f "${_SECRET_JSON}"\' EXIT\n'
+    )
     if backend == "secretsmanager":
         apply_cmd = (
-            'aws secretsmanager create-secret \\\n'
-            '  --name splunk-lambda-access-token \\\n'
-            '  --secret-string "$(cat "${TOKEN_FILE}")"'
+            _mk_input
+            + 'python3 - "${TOKEN_FILE}" "${_SECRET_JSON}" <<\'PY\'\n'
+            'import json, sys\n'
+            'token = open(sys.argv[1]).read().rstrip("\\n")\n'
+            'json.dump({"Name": "splunk-lambda-access-token", "SecretString": token}, open(sys.argv[2], "w"))\n'
+            'PY\n'
+            'aws secretsmanager create-secret --cli-input-json "file://${_SECRET_JSON}"\n'
+            'rm -f "${_SECRET_JSON}"'
         )
         note = "Secret name: splunk-lambda-access-token"
     else:
         apply_cmd = (
-            'aws ssm put-parameter \\\n'
-            '  --name /splunk/lambda/access-token \\\n'
-            '  --value "$(cat "${TOKEN_FILE}")" \\\n'
-            '  --type SecureString \\\n'
-            '  --overwrite'
+            _mk_input
+            + 'python3 - "${TOKEN_FILE}" "${_SECRET_JSON}" <<\'PY\'\n'
+            'import json, sys\n'
+            'token = open(sys.argv[1]).read().rstrip("\\n")\n'
+            'json.dump({"Name": "/splunk/lambda/access-token", "Value": token, "Type": "SecureString", "Overwrite": True}, open(sys.argv[2], "w"))\n'
+            'PY\n'
+            'aws ssm put-parameter --cli-input-json "file://${_SECRET_JSON}"\n'
+            'rm -f "${_SECRET_JSON}"'
         )
         note = "Parameter name: /splunk/lambda/access-token (SecureString)"
     return f"""#!/usr/bin/env bash
@@ -809,7 +850,8 @@ set -euo pipefail
 
 # Write the Splunk Observability Cloud access token to {backend}.
 # Run this ONCE before applying Lambda function updates.
-# The token value never enters shell history; it is read from TOKEN_FILE.
+# The token value never enters shell history or any command's argv; it is read
+# from TOKEN_FILE into a chmod-600 --cli-input-json file that is removed on exit.
 #
 # {note}
 #

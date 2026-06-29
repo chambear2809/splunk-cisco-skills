@@ -35,6 +35,8 @@ smart_agent:
     ssh_user: appdynamics
     ssh_private_key_file: /secure/appdynamics/id_rsa
     ssh_known_hosts_file: /secure/appdynamics/known_hosts
+    # Names the env var holding the SSH password (smartagentctl mechanism);
+    # stores only the variable name here, never the password value.
     ssh_password_env_var: SSH_PASSWORD
     ssh_proxy:
       enabled: false

@@ -354,7 +354,7 @@ main() {
 
     if [[ -z "${ENABLE_LIST}" && -z "${DISABLE_LIST}" ]]; then
         log "ERROR: Specify --enable, --disable, or --list"
-        usage
+        usage 1
     fi
 
     local exit_code=0

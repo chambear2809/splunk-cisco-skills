@@ -180,7 +180,7 @@ while [[ $# -gt 0 ]]; do
 
         --spec) require_arg "$1" "$#" || exit 1; SPEC="$2"; shift 2 ;;
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
-        --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; shift 2 ;;
+        --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; _pass --kube-context "$2"; shift 2 ;;
         --rum-token-file) require_arg "$1" "$#" || exit 1; RUM_TOKEN_FILE="$2"; shift 2 ;;
         --o11y-token-file) require_arg "$1" "$#" || exit 1; O11Y_TOKEN_FILE="$2"; shift 2 ;;
 
@@ -497,7 +497,11 @@ run_uninstall() {
         log "ERROR: Rendered output not found at ${OUTPUT_DIR}/k8s-rum/. Run --render first."
         exit 1
     fi
-    bash "${OUTPUT_DIR}/k8s-rum/uninstall-injection.sh"
+    if [[ -n "${KUBE_CONTEXT}" ]]; then
+        KUBECTL_CONTEXT="${KUBE_CONTEXT}" bash "${OUTPUT_DIR}/k8s-rum/uninstall-injection.sh"
+    else
+        bash "${OUTPUT_DIR}/k8s-rum/uninstall-injection.sh"
+    fi
 }
 
 run_discover() {

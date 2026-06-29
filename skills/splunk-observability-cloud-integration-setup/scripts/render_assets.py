@@ -1838,7 +1838,7 @@ def main() -> int:
 
     if args.make_default_deeplink:
         realm = args.realm or "us0"
-        host = "app.signalfx.com" if realm == "us2-gcp" else f"app.{realm}.signalfx.com"
+        host = "app.us2.signalfx.com" if realm == "us2-gcp" else f"app.{realm}.signalfx.com"
         print(f"Make Default UI: https://{host}/#/myprofile/orgs (admin opens 3-dot menu next to {realm})")
         return 0
 

@@ -217,6 +217,8 @@ set -euo pipefail
 
 # Requires telemetrygen from the OpenTelemetry Collector contrib project.
 # The token value is read from a local-only file at runtime.
+# CAVEAT: telemetrygen has no file-based header option, so --otlp-header below
+# exposes the HEC token in process args (ps). Use ONLY for ephemeral local testing.
 SPLUNK_HEC_TOKEN_FILE="${{SPLUNK_HEC_TOKEN_FILE:-{args.hec_token_file}}}"
 SPLUNK_HEC_TOKEN="$(cat "${{SPLUNK_HEC_TOKEN_FILE}}")"
 COMMON_ATTRS="com.splunk.index={args.index},com.splunk.sourcetype={args.sourcetype},com.splunk.source={args.source},host.name=$(hostname)"

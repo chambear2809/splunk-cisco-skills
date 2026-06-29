@@ -589,7 +589,10 @@ def test_cli_plan_fetches_token_from_secret_backend_secretsmanager(tmp_path: Pat
     cli_plan = (tmp_path / "aws-cli" / "apply-plan.sh").read_text()
     assert "secretsmanager get-secret-value" in cli_plan
     assert "_SPLUNK_TOKEN" in cli_plan
-    assert "SPLUNK_ACCESS_TOKEN=${_SPLUNK_TOKEN}" in cli_plan
+    assert '"SPLUNK_ACCESS_TOKEN": "__REPLACED_AT_RUNTIME__"' in cli_plan
+    assert 'c["Environment"]["Variables"]["SPLUNK_ACCESS_TOKEN"] = sys.stdin.read()' in cli_plan
+    assert 'printf \'%s\' "${_SPLUNK_TOKEN}" | python3 -c' in cli_plan
+    assert "--cli-input-json" in cli_plan
 
 
 def test_cli_plan_fetches_token_from_secret_backend_ssm(tmp_path: Path) -> None:
@@ -599,7 +602,10 @@ def test_cli_plan_fetches_token_from_secret_backend_ssm(tmp_path: Path) -> None:
     cli_plan = (tmp_path / "aws-cli" / "apply-plan.sh").read_text()
     assert "ssm get-parameter" in cli_plan
     assert "_SPLUNK_TOKEN" in cli_plan
-    assert "SPLUNK_ACCESS_TOKEN=${_SPLUNK_TOKEN}" in cli_plan
+    assert '"SPLUNK_ACCESS_TOKEN": "__REPLACED_AT_RUNTIME__"' in cli_plan
+    assert 'c["Environment"]["Variables"]["SPLUNK_ACCESS_TOKEN"] = sys.stdin.read()' in cli_plan
+    assert 'printf \'%s\' "${_SPLUNK_TOKEN}" | python3 -c' in cli_plan
+    assert "--cli-input-json" in cli_plan
 
 
 def test_cli_plan_unsets_token_variable(tmp_path: Path) -> None:
@@ -620,7 +626,7 @@ def test_cli_plan_nodejs_emits_trace_response_header(tmp_path: Path) -> None:
     }]))
     renderer.render(spec, tmp_path)
     cli_plan = (tmp_path / "aws-cli" / "apply-plan.sh").read_text()
-    assert "SPLUNK_TRACE_RESPONSE_HEADER_ENABLED=true" in cli_plan
+    assert '"SPLUNK_TRACE_RESPONSE_HEADER_ENABLED": "true"' in cli_plan
 
 
 def test_cli_plan_python_does_not_emit_trace_response_header(tmp_path: Path) -> None:

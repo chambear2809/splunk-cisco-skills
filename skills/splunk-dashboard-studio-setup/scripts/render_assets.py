@@ -41,6 +41,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--viz-type", choices=sorted(VIZ_TYPES), default="splunk.table")
     parser.add_argument("--datasource-name", default="Search_1")
     parser.add_argument("--layout", choices=("grid", "absolute", "freeform"), default="grid")
+    parser.add_argument("--default-earliest", default="-24h@h")
+    parser.add_argument("--default-latest", default="now")
     parser.add_argument("--definition-file", default="")
     parser.add_argument("--owner", default="nobody")
     parser.add_argument("--sharing", choices=("user", "app", "global"), default="app")
@@ -108,9 +110,11 @@ def build_definition(args: argparse.Namespace) -> dict:
     viz_id = "viz_primary"
     ds_id = "ds_primary"
     layout_options = {"width": 1440, "height": 960} if args.layout == "absolute" else {}
-    structure_item: dict = {"item": viz_id, "type": "block"}
-    if args.layout in ("absolute", "freeform"):
-        structure_item["position"] = {"x": 0, "y": 0, "w": 600, "h": 300}
+    structure_item: dict = {
+        "item": viz_id,
+        "type": "block",
+        "position": {"x": 0, "y": 0, "w": 1200, "h": 400},
+    }
     return {
         "title": title,
         "description": args.description,
@@ -128,9 +132,30 @@ def build_definition(args: argparse.Namespace) -> dict:
                 "options": {"query": args.search},
             }
         },
-        "inputs": {},
+        "inputs": {
+            "input_global_trp": {
+                "type": "input.timerange",
+                "title": "Time",
+                "options": {
+                    "token": "global_time",
+                    "defaultValue": f"{args.default_earliest},{args.default_latest}",
+                },
+            }
+        },
+        "defaults": {
+            "dataSources": {
+                "ds.search": {
+                    "options": {
+                        "queryParameters": {
+                            "earliest": "$global_time.earliest$",
+                            "latest": "$global_time.latest$",
+                        }
+                    }
+                }
+            }
+        },
         "layout": {
-            "globalInputs": [],
+            "globalInputs": ["input_global_trp"],
             "layoutDefinitions": {
                 "layout_1": {
                     "type": args.layout,
@@ -140,7 +165,6 @@ def build_definition(args: argparse.Namespace) -> dict:
             },
             "tabs": {"items": [{"label": "New tab", "layoutId": "layout_1"}]},
         },
-        "defaults": {},
     }
 
 

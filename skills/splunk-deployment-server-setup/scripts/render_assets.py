@@ -25,6 +25,49 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SKILL_NAME = "splunk-deployment-server-setup"
 
+
+def _lib_dir_block() -> str:
+    """Locate skills/shared/lib at runtime so rendered scripts can mint a
+    Splunk session key from the admin password file instead of putting the
+    password on argv (no `-u admin:pw`, no password in `ps`)."""
+    return (
+        '_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+        'LIB_DIR="${SKILLS_SHARED_LIB_DIR:-}"\n'
+        'if [[ -z "${LIB_DIR}" ]]; then\n'
+        '  for candidate in \\\n'
+        '    "${_SCRIPT_DIR}/../../../../skills/shared/lib" \\\n'
+        '    "${_SCRIPT_DIR}/../../../skills/shared/lib" \\\n'
+        '    "${_SCRIPT_DIR}/../../skills/shared/lib"; do\n'
+        '    if [[ -d "${candidate}" ]]; then\n'
+        '      LIB_DIR="$(cd "${candidate}" && pwd)"\n'
+        "      break\n"
+        "    fi\n"
+        "  done\n"
+        "fi\n"
+        'if [[ -z "${LIB_DIR}" || ! -d "${LIB_DIR}" ]]; then\n'
+        '  echo "ERROR: Could not locate skills/shared/lib. Set SKILLS_SHARED_LIB_DIR=/path/to/skills/shared/lib." >&2\n'
+        "  exit 1\n"
+        "fi\n"
+    )
+
+
+def _rest_head(pw_file: str) -> str:
+    """Shebang + lib sourcing + admin-password-file resolution. The password is
+    handed to get_session_key_from_password_file / splunk_curl, keeping it off
+    argv. Mirrors the splunk-license-manager-setup pattern."""
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + _lib_dir_block()
+        + "# shellcheck disable=SC1091\n"
+        'source "${LIB_DIR}/credential_helpers.sh"\n'
+        'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
+        f'ADMIN_PASS_FILE="${{ADMIN_PASS_FILE:-{pw_file}}}"\n'
+        'if [[ ! -s "${ADMIN_PASS_FILE}" ]]; then\n'
+        '  echo "ERROR: Splunk admin password file is empty or missing: ${ADMIN_PASS_FILE}" >&2\n'
+        "  exit 1\n"
+        "fi\n"
+    )
+
 # phoneHome scaling recommendations
 PHONE_HOME_SCALE = [
     (0,    500,  60,  "default — acceptable at this scale"),
@@ -54,6 +97,9 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     ha_enabled = args.ha_enabled
     ds_host2 = args.ds_host2 or "ds02.example.com"
     ds_vip = args.ds_vip or "ds-vip.example.com"
+    # Admin password file baked as the default for rendered REST scripts
+    # (still overridable at runtime via ADMIN_PASS_FILE).
+    pw_file = args.admin_password_file or "/tmp/splunk_admin_password"
 
     for subdir in [
         ds / "bootstrap",
@@ -67,22 +113,27 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
     # bootstrap/enable-deploy-server.sh
     (ds / "bootstrap" / "enable-deploy-server.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "# Enable the Splunk Deployment Server on this host.\n"
-        "# Run as the splunk OS user (or via sudo -u splunk).\n\n"
-        "SPLUNK_HOME=\"${SPLUNK_HOME:-/opt/splunk}\"\n"
-        "ADMIN_PASS_FILE=\"${ADMIN_PASS_FILE:-/tmp/splunk_admin_password}\"\n\n"
-        "# Step 1: Enable the deploy-server feature\n"
-        "sudo -u splunk \"${SPLUNK_HOME}/bin/splunk\" enable deploy-server \\\n"
-        "  -auth admin:\"$(cat \"${ADMIN_PASS_FILE}\")\"\n\n"
-        "# Step 2: Restart to activate\n"
-        "sudo systemctl restart SplunkForwarder 2>/dev/null || \\\n"
-        "  sudo -u splunk \"${SPLUNK_HOME}/bin/splunk\" restart\n\n"
-        "# Step 3: Verify\n"
-        f"curl -s -k -u admin:\"$(cat \"${{ADMIN_PASS_FILE}}\")\" \\\n"
-        f"  '{ds_uri}/services/deployment/server/clients?count=1&output_mode=json' | \\\n"
-        "  python3 -m json.tool | head -5\n"
-        "echo 'Deployment server enabled. Add apps to ${SPLUNK_HOME}/etc/deployment-apps/'\n",
+        _rest_head(pw_file)
+        + "# Enable the Splunk Deployment Server on this host.\n"
+        + "# Run as the splunk OS user (or via sudo -u splunk).\n"
+        + 'SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"\n'
+        + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n\n'
+        + "# Step 1: Enable the deploy-server feature (CLI requires inline -auth;\n"
+        + "# the password is read from the file, briefly visible only in this\n"
+        + "# host's local process table during the enable call).\n"
+        + 'sudo -u splunk "${SPLUNK_HOME}/bin/splunk" enable deploy-server \\\n'
+        + '  -auth "${AUTH_USER}:$(cat "${ADMIN_PASS_FILE}")"\n\n'
+        + "# Step 2: Restart to activate. A Deployment Server is full Splunk\n"
+        + "# Enterprise, so the systemd unit is Splunkd (NOT SplunkForwarder);\n"
+        + "# fall back to the splunk CLI if systemd is not managing the service.\n"
+        + "sudo systemctl restart Splunkd 2>/dev/null || \\\n"
+        + '  sudo -u splunk "${SPLUNK_HOME}/bin/splunk" restart\n\n'
+        + "# Step 3: Verify (session-key auth keeps the password off argv)\n"
+        + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${DS_URI}/services/deployment/server/clients?count=1&output_mode=json" | \\\n'
+        + "  python3 -m json.tool | head -5\n"
+        + 'echo "Deployment server enabled. Add apps to ${SPLUNK_HOME}/etc/deployment-apps/"\n',
         encoding="utf-8",
     )
 
@@ -119,36 +170,35 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
     # reload/reload-deploy-server.sh
     (ds / "reload" / "reload-deploy-server.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "# Reload the deployment server configuration without a full restart.\n"
-        "# Triggers re-read of serverclass.conf and pushes updated app assignments.\n\n"
-        "ADMIN_PASS_FILE=\"${ADMIN_PASS_FILE:-/tmp/splunk_admin_password}\"\n\n"
-        f"curl -s -k -u admin:\"$(cat \"${{ADMIN_PASS_FILE}}\")\" \\\n"
-        f"  -X POST '{ds_uri}/services/deployment/server/_reload' \\\n"
-        "  -d '' | python3 -m json.tool\n"
-        "echo 'Deployment server reloaded.'\n",
+        _rest_head(pw_file)
+        + "# Reload the deployment server configuration without a full restart.\n"
+        + "# Triggers re-read of serverclass.conf and pushes updated app assignments.\n"
+        + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n'
+        + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
+        + 'splunk_curl_post "${SK}" "" \\\n'
+        + '  -X POST "${DS_URI}/services/deployment/server/_reload" | python3 -m json.tool\n'
+        + 'echo "Deployment server reloaded."\n',
         encoding="utf-8",
     )
 
     # inspect/inspect-fleet.sh
     (ds / "inspect" / "inspect-fleet.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "# Inspect the deployment server fleet: clients, check-in lag, app versions.\n\n"
-        "ADMIN_PASS_FILE=\"${ADMIN_PASS_FILE:-/tmp/splunk_admin_password}\"\n"
-        f"DS_URI=\"${{{ds_uri}}}\"\n"
-        "DS_URI=\"${DS_URI:-" + ds_uri + "}\"\n\n"
-        "echo '=== Deployment Server Clients (first 20) ==='\n"
-        "curl -s -k -u admin:\"$(cat \"${ADMIN_PASS_FILE}\")\" \\\n"
-        "  \"${DS_URI}/services/deployment/server/clients?count=20&output_mode=json\" | \\\n"
-        "  python3 -m json.tool\n\n"
-        "echo '=== Server Classes ==='\n"
-        "curl -s -k -u admin:\"$(cat \"${ADMIN_PASS_FILE}\")\" \\\n"
-        "  \"${DS_URI}/services/deployment/server/serverclasses?output_mode=json\" | \\\n"
-        "  python3 -m json.tool\n\n"
-        "echo '=== Deployment Applications ==='\n"
-        "curl -s -k -u admin:\"$(cat \"${ADMIN_PASS_FILE}\")\" \\\n"
-        "  \"${DS_URI}/services/deployment/server/applications/local?output_mode=json\" | \\\n"
-        "  python3 -m json.tool\n",
+        _rest_head(pw_file)
+        + "# Inspect the deployment server fleet: clients, check-in lag, app versions.\n"
+        + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n'
+        + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n\n'
+        + 'echo "=== Deployment Server Clients (first 20) ==="\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${DS_URI}/services/deployment/server/clients?count=20&output_mode=json" | \\\n'
+        + "  python3 -m json.tool\n\n"
+        + 'echo "=== Server Classes ==="\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${DS_URI}/services/deployment/server/serverclasses?output_mode=json" | \\\n'
+        + "  python3 -m json.tool\n\n"
+        + 'echo "=== Deployment Applications ==="\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${DS_URI}/services/deployment/server/applications/local?output_mode=json" | \\\n'
+        + "  python3 -m json.tool\n",
         encoding="utf-8",
     )
 
@@ -158,9 +208,23 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         '"""Report clients with stale check-in (lag > threshold)."""\n\n'
         "import json\nimport sys\nimport urllib.request\nimport urllib.error\n"
         "from datetime import datetime, timezone\n\n"
+        "import os\n"
         "DS_URI = sys.argv[1] if len(sys.argv) > 1 else '" + ds_uri + "'\n"
         "LAG_WARN = int(sys.argv[2]) if len(sys.argv) > 2 else 300  # seconds\n"
-        "CREDS = sys.argv[3] if len(sys.argv) > 3 else 'admin:changeme'\n\n"
+        "# Read the admin password from a file (never argv) so it does not show\n"
+        "# up in `ps`. Override via ADMIN_PASS_FILE / SPLUNK_AUTH_USER.\n"
+        "ADMIN_PASS_FILE = os.environ.get('ADMIN_PASS_FILE', '/tmp/splunk_admin_password')\n"
+        "AUTH_USER = os.environ.get('SPLUNK_AUTH_USER', 'admin')\n"
+        "try:\n"
+        "    with open(ADMIN_PASS_FILE, 'r', encoding='utf-8') as _pf:\n"
+        "        _pw = _pf.read().strip()\n"
+        "except OSError as exc:\n"
+        "    print(f'ERROR: cannot read admin password file {ADMIN_PASS_FILE}: {exc}', file=sys.stderr)\n"
+        "    sys.exit(2)\n"
+        "if not _pw:\n"
+        "    print(f'ERROR: admin password file is empty: {ADMIN_PASS_FILE}', file=sys.stderr)\n"
+        "    sys.exit(2)\n"
+        "CREDS = f'{AUTH_USER}:{_pw}'\n\n"
         "import base64, ssl\n"
         "ctx = ssl.create_default_context()\nctx.check_hostname = False\n"
         "ctx.verify_mode = ssl.CERT_NONE\n"
@@ -218,23 +282,23 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
     # ha/sync-deployment-apps.sh
     (ds / "ha" / "sync-deployment-apps.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "# Sync deployment-apps from primary DS to secondary DS.\n"
-        "# Run on the primary DS after any app change, before reload.\n"
-        "# For production, consider Git-based sync (pull on both DS nodes from a shared repo).\n\n"
-        f"PRIMARY=\"{ds_host}\"\n"
-        f"SECONDARY=\"{ds_host2}\"\n"
-        "SPLUNK_HOME=\"${SPLUNK_HOME:-/opt/splunk}\"\n\n"
-        "rsync -avz --delete \\\n"
-        "  \"${SPLUNK_HOME}/etc/deployment-apps/\" \\\n"
-        "  \"splunk@${SECONDARY}:${SPLUNK_HOME}/etc/deployment-apps/\"\n\n"
-        "# Then reload on both nodes\n"
-        f"ADMIN_PASS_FILE=\"${{ADMIN_PASS_FILE:-/tmp/splunk_admin_password}}\"\n"
-        f"for uri in 'https://{ds_host}:8089' 'https://{ds_host2}:8089'; do\n"
-        '  curl -s -k -u admin:"$(cat "${ADMIN_PASS_FILE}")" \\\n'
-        '    -X POST "${uri}/services/deployment/server/_reload" -d "" > /dev/null\n'
-        "done\n"
-        "echo 'Sync and reload complete.'\n",
+        _rest_head(pw_file)
+        + "# Sync deployment-apps from primary DS to secondary DS.\n"
+        + "# Run on the primary DS after any app change, before reload.\n"
+        + "# For production, consider Git-based sync (pull on both DS nodes from a shared repo).\n"
+        + f"# Primary (this host): {ds_host}\n"
+        + f'SECONDARY="{ds_host2}"\n'
+        + 'SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"\n\n'
+        + "rsync -avz --delete \\\n"
+        + '  "${SPLUNK_HOME}/etc/deployment-apps/" \\\n'
+        + '  "splunk@${SECONDARY}:${SPLUNK_HOME}/etc/deployment-apps/"\n\n'
+        + "# Then reload on both nodes (one session key per node).\n"
+        + f"for uri in 'https://{ds_host}:8089' 'https://{ds_host2}:8089'; do\n"
+        + '  sk="$(get_session_key_from_password_file "${uri}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
+        + '  splunk_curl_post "${sk}" "" \\\n'
+        + '    -X POST "${uri}/services/deployment/server/_reload" > /dev/null\n'
+        + "done\n"
+        + 'echo "Sync and reload complete."\n',
         encoding="utf-8",
     )
 
@@ -259,20 +323,19 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
     # migrate/staged-rollout.sh
     (ds / "migrate" / "staged-rollout.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "# Staged app rollout: push a new app to a canary server class first,\n"
-        "# then expand to full fleet.\n\n"
-        "APP_NAME=\"${APP_NAME:-}\"\n"
-        "CANARY_CLASS=\"${CANARY_CLASS:-canary_uf_class}\"\n"
-        "ADMIN_PASS_FILE=\"${ADMIN_PASS_FILE:-/tmp/splunk_admin_password}\"\n"
-        f"DS_URI=\"${{{ds_uri}}}\"\n"
-        "DS_URI=\"${DS_URI:-" + ds_uri + "}\"\n\n"
-        "if [[ -z \"${APP_NAME}\" ]]; then echo 'Set APP_NAME'; exit 1; fi\n\n"
-        "echo \"Step 1: Apply ${APP_NAME} to canary class ${CANARY_CLASS}\"\n"
-        "curl -s -k -u admin:\"$(cat \"${ADMIN_PASS_FILE}\")\" \\\n"
-        "  -X POST \"${DS_URI}/services/deployment/server/_reload\" -d '' > /dev/null\n\n"
-        "echo 'Step 2: Monitor canary for 30 minutes before proceeding'\n"
-        "echo 'Step 3: Expand server class to full fleet and reload again'\n",
+        _rest_head(pw_file)
+        + "# Staged app rollout: push a new app to a canary server class first,\n"
+        + "# then expand to full fleet.\n"
+        + 'APP_NAME="${APP_NAME:-}"\n'
+        + 'CANARY_CLASS="${CANARY_CLASS:-canary_uf_class}"\n'
+        + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n\n'
+        + 'if [[ -z "${APP_NAME}" ]]; then echo "Set APP_NAME" >&2; exit 1; fi\n\n'
+        + 'echo "Step 1: Apply ${APP_NAME} to canary class ${CANARY_CLASS}"\n'
+        + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
+        + 'splunk_curl_post "${SK}" "" \\\n'
+        + '  -X POST "${DS_URI}/services/deployment/server/_reload" > /dev/null\n\n'
+        + 'echo "Step 2: Monitor canary for 30 minutes before proceeding"\n'
+        + 'echo "Step 3: Expand server class to full fleet and reload again"\n',
         encoding="utf-8",
     )
 
@@ -307,17 +370,16 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
     # validate.sh (in rendered tree, for quick operator use)
     (ds / "validate.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "ADMIN_PASS_FILE=\"${ADMIN_PASS_FILE:-/tmp/splunk_admin_password}\"\n"
-        f"DS_URI=\"${{{ds_uri}}}\"\n"
-        "DS_URI=\"${DS_URI:-" + ds_uri + "}\"\n"
-        "echo '=== DS Server Info ==='\n"
-        "curl -s -k -u admin:\"$(cat \"${ADMIN_PASS_FILE}\")\" \\\n"
-        "  \"${DS_URI}/services/server/info?output_mode=json\" | python3 -m json.tool | head -20\n"
-        "echo '=== DS Clients Count ==='\n"
-        "curl -s -k -u admin:\"$(cat \"${ADMIN_PASS_FILE}\")\" \\\n"
-        "  \"${DS_URI}/services/deployment/server/clients?count=1&output_mode=json\" | \\\n"
-        "  python3 -c \"import json,sys; d=json.load(sys.stdin); print('Total clients:', d.get('paging', {}).get('total', 'unknown'))\"\n",
+        _rest_head(pw_file)
+        + 'DS_URI="${DS_URI:-' + ds_uri + '}"\n'
+        + 'SK="$(get_session_key_from_password_file "${DS_URI}" "${ADMIN_PASS_FILE}" "${AUTH_USER}")"\n'
+        + 'echo "=== DS Server Info ==="\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${DS_URI}/services/server/info?output_mode=json" | python3 -m json.tool | head -20\n'
+        + 'echo "=== DS Clients Count ==="\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${DS_URI}/services/deployment/server/clients?count=1&output_mode=json" | \\\n'
+        + '  python3 -c "import json,sys; d=json.load(sys.stdin); print(\'Total clients:\', d.get(\'paging\', {}).get(\'total\', \'unknown\'))"\n',
         encoding="utf-8",
     )
 
@@ -383,11 +445,21 @@ def main() -> None:
     parser.add_argument("--phone-home-interval", default="")
     parser.add_argument("--handshake-retry-interval", default="60")
     parser.add_argument("--max-client-apps", default="100")
-    parser.add_argument("--ha-enabled", action="store_true")
-    parser.add_argument("--ds-host2", default="")
-    parser.add_argument("--ds-vip", default="")
+    # --ha-pair / --ds-secondary-host / --lb-uri are the flag names emitted by
+    # setup.sh (and documented in SKILL.md); --ha-enabled / --ds-host2 / --ds-vip
+    # are retained as aliases so direct-renderer callers keep working.
+    parser.add_argument("--ha-pair", "--ha-enabled", dest="ha_enabled", action="store_true")
+    parser.add_argument("--ds-secondary-host", "--ds-host2", dest="ds_host2", default="")
+    parser.add_argument("--ds-vip", "--lb-uri", dest="ds_vip", default="")
     parser.add_argument("--accept-cascading-ds-workaround", action="store_true")
     parser.add_argument("--admin-password-file", default="")
+    # Accepted for compatibility with setup.sh; not consumed by the renderer.
+    parser.add_argument("--splunk-home", default="/opt/splunk")
+    parser.add_argument("--staged-rollout-pct", default="10")
+    parser.add_argument("--lb-type", default="haproxy")
+    parser.add_argument("--ds-secondary-uri", default="")
+    parser.add_argument("--new-ds-uri", default="")
+    parser.add_argument("--live", action="store_true")
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")

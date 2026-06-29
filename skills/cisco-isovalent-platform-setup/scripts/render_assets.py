@@ -172,7 +172,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--render-eksctl-example", default="false")
     parser.add_argument("--distribution", default="", help="Distribution profile, e.g. generic, eks-byocni, openshift")
     parser.add_argument("--apply-sections", default="", help="Comma-separated scoped apply sections for apply-plan.json")
-    parser.add_argument("--feature-matrix", action="store_true", help="Emit feature-matrix payload in dry-run/json mode")
+    parser.add_argument("--feature-matrix", action="store_true", help="Accepted for compatibility with setup.sh --feature-matrix mode; feature-matrix.md and coverage-report.json are always rendered regardless of this flag")
     parser.add_argument("--private-chart-access-verified", action="store_true", help="Operator confirms private Isovalent chart access was verified.")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true")

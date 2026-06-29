@@ -1609,7 +1609,11 @@ fi
 
 
 def _install_fips_launch_conf_sh(args: argparse.Namespace) -> str:
-    return _sh(f"""# Idempotently set SPLUNK_FIPS_VERSION in splunk-launch.conf.
+    return _sh(f"""# Idempotently set SPLUNK_FIPS=1 and SPLUNK_FIPS_VERSION in splunk-launch.conf.
+#
+# SPLUNK_FIPS is the master enable switch and defaults to 0; FIPS does NOT
+# engage unless SPLUNK_FIPS=1 is present. SPLUNK_FIPS_VERSION only selects
+# 140-2 vs 140-3. Both keys must be written together.
 #
 # NIST deprecates FIPS 140-2 on 2026-09-21. New deployments default to 140-3.
 # See references/fips-and-common-criteria.md for the Phase 1 / Phase 2
@@ -1620,13 +1624,13 @@ TARGET_FIPS_VERSION="${{1:-{args.fips_mode}}}"
 LAUNCH_CONF="$SPLUNK_HOME/etc/splunk-launch.conf"
 
 if [[ "$TARGET_FIPS_VERSION" == "none" ]]; then
-    # Removing the line idempotently
-    if grep -q '^SPLUNK_FIPS_VERSION' "$LAUNCH_CONF" 2>/dev/null; then
+    # Removing both keys idempotently
+    if grep -qE '^SPLUNK_FIPS(_VERSION)?' "$LAUNCH_CONF" 2>/dev/null; then
         cp -p "$LAUNCH_CONF" "$LAUNCH_CONF.pki-backup-$(date -u +%Y%m%dT%H%M%SZ)"
-        sed -i.bak '/^SPLUNK_FIPS_VERSION/d' "$LAUNCH_CONF"
+        sed -i.bak -E '/^SPLUNK_FIPS(_VERSION)?[[:space:]]*=/d' "$LAUNCH_CONF"
         rm -f "$LAUNCH_CONF.bak"
     fi
-    echo "OK: FIPS disabled (line removed from splunk-launch.conf if present)"
+    echo "OK: FIPS disabled (SPLUNK_FIPS / SPLUNK_FIPS_VERSION removed from splunk-launch.conf if present)"
     exit 0
 fi
 
@@ -1638,15 +1642,28 @@ fi
 mkdir -p "$(dirname "$LAUNCH_CONF")"
 [[ -f "$LAUNCH_CONF" ]] || touch "$LAUNCH_CONF"
 
-if grep -q '^SPLUNK_FIPS_VERSION' "$LAUNCH_CONF"; then
+# Back up once before mutating either key.
+if grep -qE '^SPLUNK_FIPS(_VERSION)?[[:space:]]*=' "$LAUNCH_CONF"; then
     cp -p "$LAUNCH_CONF" "$LAUNCH_CONF.pki-backup-$(date -u +%Y%m%dT%H%M%SZ)"
-    sed -i.bak "s/^SPLUNK_FIPS_VERSION.*/SPLUNK_FIPS_VERSION = $TARGET_FIPS_VERSION/" "$LAUNCH_CONF"
+fi
+
+# SPLUNK_FIPS is the master enable switch (defaults to 0).
+if grep -qE '^SPLUNK_FIPS[[:space:]]*=' "$LAUNCH_CONF"; then
+    sed -i.bak -E "s/^SPLUNK_FIPS[[:space:]]*=.*/SPLUNK_FIPS = 1/" "$LAUNCH_CONF"
+    rm -f "$LAUNCH_CONF.bak"
+else
+    echo "SPLUNK_FIPS = 1" >> "$LAUNCH_CONF"
+fi
+
+# SPLUNK_FIPS_VERSION selects the validated module (140-2 vs 140-3).
+if grep -qE '^SPLUNK_FIPS_VERSION[[:space:]]*=' "$LAUNCH_CONF"; then
+    sed -i.bak -E "s/^SPLUNK_FIPS_VERSION[[:space:]]*=.*/SPLUNK_FIPS_VERSION = $TARGET_FIPS_VERSION/" "$LAUNCH_CONF"
     rm -f "$LAUNCH_CONF.bak"
 else
     echo "SPLUNK_FIPS_VERSION = $TARGET_FIPS_VERSION" >> "$LAUNCH_CONF"
 fi
 
-echo "OK: SPLUNK_FIPS_VERSION = $TARGET_FIPS_VERSION written to $LAUNCH_CONF"
+echo "OK: SPLUNK_FIPS = 1 and SPLUNK_FIPS_VERSION = $TARGET_FIPS_VERSION written to $LAUNCH_CONF"
 echo "    Restart Splunk for the change to take effect."
 """)
 
@@ -1726,7 +1743,7 @@ def _install_readme(args: argparse.Namespace) -> str:
 | `verify-leaf.sh` | `openssl verify -x509_strict` against the CA bundle + reject default Splunk subject tokens. |
 | `kv-store-eku-check.sh` | Documented KV Store 7.0+ check: chain validity + dual `serverAuth`/`clientAuth` EKU. Refuses if either is missing. |
 | `align-cli-trust.sh` | Copy CA bundle to `$SPLUNK_HOME/etc/auth/cacert.pem` so the local `splunk` CLI trusts the new chain. |
-| `install-fips-launch-conf.sh` | Idempotently flip `SPLUNK_FIPS_VERSION` in `splunk-launch.conf` ({args.fips_mode}). |
+| `install-fips-launch-conf.sh` | Idempotently set `SPLUNK_FIPS=1` (master enable switch) and `SPLUNK_FIPS_VERSION` in `splunk-launch.conf` ({args.fips_mode}). |
 | `prepare-key.sh` | PKCS#1 ↔ PKCS#8 conversion + chain concatenation. |
 """
 
@@ -1992,6 +2009,9 @@ def _standalone_splunk_launch_conf(args: argparse.Namespace) -> str:
         return "# Rendered by splunk-platform-pki-setup.\n# FIPS not requested via --fips-mode; this file is intentionally empty.\n"
     return f"""# Rendered by splunk-platform-pki-setup.
 # Flip Splunk into FIPS mode. NIST deprecates FIPS 140-2 on 2026-09-21.
+# SPLUNK_FIPS is the master enable switch (defaults to 0); FIPS does not
+# engage without it. SPLUNK_FIPS_VERSION only selects 140-2 vs 140-3.
+SPLUNK_FIPS = 1
 SPLUNK_FIPS_VERSION = {args.fips_mode}
 """
 
@@ -2640,8 +2660,9 @@ Current run: `--fips-mode {args.fips_mode}`
 - Required by 2026-09-21 (NIST 140-2 deprecation).
 - Requires KV Store on MongoDB 7.0.17+ with OpenSSL 3.0.
 - Requires all forwarders on Splunk 10.
-- Edit `splunk-launch.conf` to set `SPLUNK_FIPS_VERSION = 140-3`. The
-  renderer's `pki/install/install-fips-launch-conf.sh` does this
+- Edit `splunk-launch.conf` to set `SPLUNK_FIPS = 1` (the master enable
+  switch, which defaults to 0) and `SPLUNK_FIPS_VERSION = 140-3`. The
+  renderer's `pki/install/install-fips-launch-conf.sh` writes both keys
   idempotently.
 - Restart each Splunk host.
 
@@ -2758,10 +2779,19 @@ if [[ -f "$SPLUNK_HOME/etc/auth/splunk.secret" ]]; then
     ok "splunk.secret sha256: $sha (compare across cluster members)"
 fi
 
-# 6. FIPS posture
+# 6. FIPS posture. SPLUNK_FIPS=1 is the master enable switch (defaults to 0);
+#    SPLUNK_FIPS_VERSION only selects 140-2 vs 140-3. Both must be present for
+#    FIPS to actually engage.
 if [[ -f "$SPLUNK_HOME/etc/splunk-launch.conf" ]]; then
-    fips_v="$(awk -F= '/^SPLUNK_FIPS_VERSION/ {{gsub(/ /,"",$2); print $2}}' "$SPLUNK_HOME/etc/splunk-launch.conf")"
-    ok "FIPS posture: ${{fips_v:-disabled}}"
+    fips_enable="$(awk -F= '/^SPLUNK_FIPS[[:space:]]*=/ {{gsub(/ /,"",$2); print $2}}' "$SPLUNK_HOME/etc/splunk-launch.conf")"
+    fips_v="$(awk -F= '/^SPLUNK_FIPS_VERSION[[:space:]]*=/ {{gsub(/ /,"",$2); print $2}}' "$SPLUNK_HOME/etc/splunk-launch.conf")"
+    if [[ -z "$fips_enable" && -z "$fips_v" ]]; then
+        ok "FIPS posture: disabled (SPLUNK_FIPS / SPLUNK_FIPS_VERSION not set)"
+    elif [[ "$fips_enable" == "1" && -n "$fips_v" ]]; then
+        ok "FIPS posture: enabled (SPLUNK_FIPS=1, SPLUNK_FIPS_VERSION=$fips_v)"
+    else
+        fail "FIPS posture: incomplete (SPLUNK_FIPS='${{fips_enable:-unset}}', SPLUNK_FIPS_VERSION='${{fips_v:-unset}}'); FIPS requires BOTH SPLUNK_FIPS=1 and SPLUNK_FIPS_VERSION"
+    fi
 fi
 
 if [[ "$failed" -gt 0 ]]; then

@@ -105,6 +105,13 @@ bash skills/splunk-ai-ml-toolkit-setup/scripts/setup.sh \
 
 ## Apply Model
 
+- `--install` renders, runs the offline structural check, delegates package
+  delivery, then runs a **live** post-install validation (skipped under
+  `--dry-run`) that confirms the PSC prerequisite is installed (a missing PSC
+  add-on fails) and that AI Toolkit — and DSDL when planned — are present in
+  Splunk. Live validation requires Splunk credentials.
+- `--validate` always renders before validating, so the offline structural
+  check never runs against a stale or missing rendered directory.
 - Package delivery delegates to `splunk-app-install`.
 - Package delivery intentionally omits `--app-version` so Splunkbase/ACS pulls
   the latest compatible release; audited version metadata is used for reports

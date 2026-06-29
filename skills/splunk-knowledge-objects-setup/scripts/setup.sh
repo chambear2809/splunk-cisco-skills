@@ -294,6 +294,9 @@ apply_live() {
     stanza="$(stanza_name)"
     if [[ "${DRY_RUN}" == "true" ]]; then
         log "DRY RUN: would write conf-${conf}/[${stanza}] in app ${APP_NAME} and set ACL sharing=${SHARING} owner=${OWNER}."
+        if [[ "${OBJECT_KIND}" == "lookup" && -n "${AUTO_LOOKUP_SOURCETYPE}" ]]; then
+            log "DRY RUN: would also bind LOOKUP-${NAME} on source type ${AUTO_LOOKUP_SOURCETYPE} (props.conf)."
+        fi
         return 0
     fi
     load_splunk_credentials || { log "ERROR: Splunk credentials are required."; exit 1; }
@@ -306,7 +309,38 @@ apply_live() {
     fi
     log "Wrote ${OBJECT_KIND} '${stanza}' to app ${APP_NAME}."
     apply_acl "${sk}" "${conf}" "${stanza}"
+    apply_auto_lookup_props "${sk}"
     log "$(log_platform_restart_guidance "knowledge object changes")"
+}
+
+# Bind an automatic lookup in props.conf when --auto-lookup-sourcetype is set.
+# Mirrors render_props() so the live apply matches the rendered props.conf.
+apply_auto_lookup_props() {
+    local sk="$1"
+    [[ "${OBJECT_KIND}" == "lookup" && -n "${AUTO_LOOKUP_SOURCETYPE}" ]] || return 0
+    local spec="${NAME}" item parts
+    if [[ -n "${LOOKUP_INPUT_FIELDS}" ]]; then
+        IFS=',' read -ra parts <<<"${LOOKUP_INPUT_FIELDS}"
+        for item in "${parts[@]}"; do
+            item="$(echo "${item}" | tr -d '[:space:]')"
+            [[ -n "${item}" ]] && spec="${spec} ${item}"
+        done
+    fi
+    if [[ -n "${LOOKUP_OUTPUT_FIELDS}" ]]; then
+        spec="${spec} OUTPUT"
+        IFS=',' read -ra parts <<<"${LOOKUP_OUTPUT_FIELDS}"
+        for item in "${parts[@]}"; do
+            item="$(echo "${item}" | tr -d '[:space:]')"
+            [[ -n "${item}" ]] && spec="${spec} ${item}"
+        done
+    fi
+    local pbody
+    pbody=$(form_urlencode_pairs "LOOKUP-${NAME}" "${spec}")
+    if ! rest_set_conf "${sk}" "${SPLUNK_URI}" "${APP_NAME}" "props" "${AUTO_LOOKUP_SOURCETYPE}" "${pbody}"; then
+        log "ERROR: Failed to bind LOOKUP-${NAME} on ${AUTO_LOOKUP_SOURCETYPE} (props.conf)."
+        exit 1
+    fi
+    log "Bound automatic lookup LOOKUP-${NAME} on source type ${AUTO_LOOKUP_SOURCETYPE} (props.conf)."
 }
 
 apply_acl() {

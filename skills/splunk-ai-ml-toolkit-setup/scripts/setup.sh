@@ -168,7 +168,17 @@ for step in plan.get("steps", []):
     if result.returncode != 0:
         raise SystemExit(result.returncode)
 PY
-    bash "${VALIDATE_SCRIPT}" --rendered-dir "${OUTPUT_DIR}"
+    if [[ "${DRY_RUN}" == "true" ]]; then
+        log "DRY-RUN: skipping live post-install validation."
+        exit 0
+    fi
+    # Post-install LIVE validation: the --rendered-dir check above is offline and
+    # structural only, so it cannot confirm the install actually landed. Run the
+    # live validator to verify the PSC prerequisite (fails if missing) and that
+    # AI Toolkit (and DSDL, when planned) are present in Splunk.
+    plan_psc_target="$("${PYTHON_BIN}" -c 'import json,sys; print(json.load(open(sys.argv[1])).get("psc_target") or "linux64")' "${OUTPUT_DIR}/apply-plan.json")"
+    plan_expect_dsdl="$("${PYTHON_BIN}" -c 'import json,sys; print("true" if any(s.get("section")=="dsdl" for s in json.load(open(sys.argv[1])).get("steps",[])) else "false")' "${OUTPUT_DIR}/apply-plan.json")"
+    bash "${VALIDATE_SCRIPT}" --psc-target "${plan_psc_target}" --expect-ai-toolkit true --expect-dsdl "${plan_expect_dsdl}"
     exit $?
 fi
 

@@ -53,6 +53,11 @@ def no_newline(value: str, option: str) -> None:
         die(f"{option} must not contain newlines.")
 
 
+def spl_escape(value: str) -> str:
+    """Escape a value for embedding inside a double-quoted SPL string literal."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def write_file(path: Path, content: str, executable: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
@@ -129,10 +134,12 @@ def render_transforms(args: argparse.Namespace) -> str:
     if args.rule_type == "eval":
         lines.append(f"INGEST_EVAL = {args.eval_expression}")
     elif args.rule_type == "mask":
-        replacement = args.mask_replacement.replace('"', '\\"')
-        lines.append(f'INGEST_EVAL = _raw=replace(_raw, "{args.mask_regex}", "{replacement}")')
+        regex = spl_escape(args.mask_regex)
+        replacement = spl_escape(args.mask_replacement)
+        lines.append(f'INGEST_EVAL = _raw=replace(_raw, "{regex}", "{replacement}")')
     elif args.rule_type == "drop":
-        lines.append(f'INGEST_EVAL = queue=if(match(_raw, "{args.drop_regex}"), "nullQueue", queue)')
+        drop_regex = spl_escape(args.drop_regex)
+        lines.append(f'INGEST_EVAL = queue=if(match(_raw, "{drop_regex}"), "nullQueue", queue)')
     lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
@@ -160,7 +167,7 @@ def render_outputs(args: argparse.Namespace) -> str:
         return "\n".join(lines) + "\n"
     lines.append(f"[rfs:{args.s3_destination_name}]")
     lines.append(f"path = {args.s3_path}")
-    lines.append("remote.s3.bucket_name = REVIEW_BUCKET_FROM_PATH")
+    # The S3 bucket is taken from `path`; RFS S3 stanzas do not use remote.s3.bucket_name.
     if args.s3_auth_region:
         lines.append(f"remote.s3.auth_region = {args.s3_auth_region}")
     if args.s3_encryption != "unset":

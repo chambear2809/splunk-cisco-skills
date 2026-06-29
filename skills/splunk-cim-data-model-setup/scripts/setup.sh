@@ -15,7 +15,7 @@ OUTPUT_DIR=""
 APP_NAME="Splunk_SA_CIM"
 DATAMODEL=""
 ALLOW_CUSTOM_DATAMODEL="false"
-ACCELERATION="false"
+ACCELERATION="unset"
 EARLIEST_TIME="-7d"
 BACKFILL_TIME=""
 MAX_CONCURRENT=""
@@ -43,7 +43,7 @@ Options:
   --app-name NAME                 (default Splunk_SA_CIM)
   --datamodel NAME                (required; CIM model id or custom)
   --allow-custom-datamodel true|false
-  --acceleration true|false
+  --acceleration true|false|unset   (false disables; unset leaves it unmanaged)
   --earliest-time SPL_TIME        (acceleration summary range)
   --backfill-time SPL_TIME
   --max-concurrent N
@@ -113,7 +113,7 @@ PY
 validate_args() {
     validate_choice "${PHASE}" render preflight apply status all
     validate_choice "${ALLOW_CUSTOM_DATAMODEL}" true false
-    validate_choice "${ACCELERATION}" true false
+    validate_choice "${ACCELERATION}" true false unset
     validate_choice "${MANUAL_REBUILDS}" true false unset
     if [[ -z "${DATAMODEL}" ]]; then
         log "ERROR: --datamodel is required."
@@ -182,6 +182,12 @@ apply_live() {
             exit 1
         fi
         log "Acceleration enabled for ${DATAMODEL} (earliest ${EARLIEST_TIME})."
+    elif [[ "${ACCELERATION}" == "false" ]]; then
+        if ! rest_set_conf "${sk}" "${SPLUNK_URI}" "${APP_NAME}" "datamodels" "${DATAMODEL}" "acceleration=0"; then
+            log "ERROR: Failed to disable acceleration for data model '${DATAMODEL}'."
+            exit 1
+        fi
+        log "Acceleration disabled for ${DATAMODEL}."
     fi
     if [[ -n "${CONSTRAIN_INDEXES}" ]]; then
         local idx_def parts

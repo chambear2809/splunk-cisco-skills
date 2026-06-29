@@ -44,6 +44,7 @@ Cyber Vision:
   --host URL         Cyber Vision portal URL (e.g., https://192.168.1.100)
   --api-token-file FILE Read API token from FILE
 
+  --use-ca-cert      Enable CA certificate validation (sets use_ca_cert=true) on the account
   --no-verify-ssl    Disable SSL certificate verification for TA API calls
   --verify-ssl       Re-enable SSL certificate verification for TA API calls
 

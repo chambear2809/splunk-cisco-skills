@@ -941,8 +941,34 @@ def render_synthetic_waterfall(ctx: RenderContext, workflow: dict[str, Any]) -> 
     )
 
 
+def _slo_target_is_complete(target: Any) -> bool:
+    return (
+        isinstance(target, dict)
+        and target.get("slo") is not None
+        and bool(target.get("compliancePeriod"))
+    )
+
+
 def slo_payload_is_applyable(payload: dict[str, Any]) -> bool:
-    return all(payload.get(key) for key in ("name", "type", "inputs", "targets"))
+    """True only when the payload matches the real Observability ``/slo`` schema.
+
+    Requires ``name``, a known ``type``, an ``inputs`` object carrying
+    ``programText``, and a non-empty ``targets`` list whose entries define
+    ``slo`` and ``compliancePeriod``. Render-first intake shapes (list-style
+    ``inputs`` or ``target``/``window`` keys) are intentionally rejected so they
+    route to the render-only handoff instead of a misleading apply action.
+    """
+    if not payload.get("name"):
+        return False
+    if payload.get("type") not in ("RequestBased", "WindowsBased"):
+        return False
+    inputs = payload.get("inputs")
+    if not isinstance(inputs, dict) or not inputs.get("programText"):
+        return False
+    targets = payload.get("targets")
+    if not isinstance(targets, list) or not targets:
+        return False
+    return all(_slo_target_is_complete(target) for target in targets)
 
 
 def render_slo_creation(ctx: RenderContext, workflow: dict[str, Any]) -> None:
@@ -962,7 +988,7 @@ def render_slo_creation(ctx: RenderContext, workflow: dict[str, Any]) -> None:
                 "slo_creation",
                 name,
                 "api_apply",
-                "SLO API supports validation and create/update when payload includes name, type, inputs, and targets.",
+                "SLO API supports validation and create/update when payload includes name, type, inputs.programText, and targets with slo and compliancePeriod.",
                 [rel],
                 DOC_SOURCES["slo_api"],
             )
@@ -971,7 +997,7 @@ def render_slo_creation(ctx: RenderContext, workflow: dict[str, Any]) -> None:
                 "slo_creation",
                 name,
                 "Complete required SLO API fields before apply.",
-                [f"Rendered incomplete SLO intent: {rel}", "Add name, type, inputs, and targets before using /slo/validate or /slo."],
+                [f"Rendered incomplete SLO intent: {rel}", "Provide a RequestBased/WindowsBased payload with inputs.programText and targets[].slo + compliancePeriod before using /slo/validate or /slo."],
                 DOC_SOURCES["slo_api"],
             )
     if workflow.get("search"):

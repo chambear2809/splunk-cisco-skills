@@ -818,11 +818,15 @@ render_shc_member_server_conf() {
 [shclustering]
 disabled = 0
 mgmt_uri = ${local_mgmt_uri}
-replication_port = ${SHC_REPLICATION_PORT}
 replication_factor = ${SHC_REPLICATION_FACTOR}
 conf_deploy_fetch_url = ${DEPLOYER_URI}
 pass4SymmKey = ${SHC_SECRET}
 shcluster_label = ${SHCLUSTER_LABEL}
+
+# Dedicated replication_port stanza matches 'splunk init shcluster-config'
+# canonical output (and the indexer-peer path above), not a [shclustering] key.
+[replication_port://${SHC_REPLICATION_PORT}]
+disabled = false
 EOF
 
     if [[ -n "${CLUSTER_MANAGER_URI}" ]]; then

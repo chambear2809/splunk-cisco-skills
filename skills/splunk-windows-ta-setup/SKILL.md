@@ -60,7 +60,7 @@ bash skills/splunk-windows-ta-setup/scripts/setup.sh --render \
 2. Install the add-on on the search tier and create indexes:
 
 ```bash
-bash skills/splunk-windows-ta-setup/scripts/setup.sh --install \
+bash skills/splunk-windows-ta-setup/scripts/setup.sh --install --create-index \
   --event-index wineventlog --perfmon-index perfmon
 ```
 

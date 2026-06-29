@@ -81,12 +81,17 @@ REST endpoint:
   `eai:data=<v2 xml>`.
 - Update: `POST /servicesNS/<owner>/<app>/data/ui/views/<id>` with `eai:data`.
 
-The rendered `apply.sh` uses the local `splunk` CLI `_internal call` (which uses
-your authenticated CLI session — no secrets in argv), checks whether the view
-exists, and creates or updates accordingly. It is gated behind a typed `APPLY`
-confirmation. On Splunk Cloud, the underlying REST runs on the search tier;
-ensure the `search-api` IP allow list permits your host
-(`splunk-cloud-acs-admin-setup`).
+The rendered `apply.sh` posts to `data/ui/views` with `curl`, reading the view
+XML from `dashboard.xml` via `--data-urlencode "eai:data@dashboard.xml"` (the
+definition is never passed on the command line, avoiding argv size limits and
+quoting hazards). Authenticate without secrets in argv by exporting
+`SPLUNK_CURL_CONFIG=/path/to/curl.cfg` (chmod 600; e.g. a line
+`user = "admin:<password>"`) or `SPLUNK_USERNAME=<user>` (curl prompts for the
+password); override the management endpoint with `SPLUNK_MGMT_URI`
+(default `https://localhost:8089`). It checks whether the view exists, creates or
+updates accordingly, and is gated behind a typed `APPLY` confirmation. On Splunk
+Cloud, the underlying REST runs on the search tier; ensure the `search-api` IP
+allow list permits your host (`splunk-cloud-acs-admin-setup`).
 
 Owner `nobody` creates an app-level (shared) view; a username creates it as that
 user's private object (manage sharing with `splunk-knowledge-objects`).

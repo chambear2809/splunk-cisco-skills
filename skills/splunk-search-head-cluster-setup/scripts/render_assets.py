@@ -29,6 +29,83 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 SKILL_NAME = "splunk-search-head-cluster-setup"
 
 
+def _lib_dir_block() -> str:
+    """Locate skills/shared/lib at runtime so rendered scripts can mint a
+    Splunk session key from the admin password file instead of putting the
+    password on argv. Mirrors the splunk-license-manager-setup pattern."""
+    return (
+        '_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\n'
+        'LIB_DIR="${SKILLS_SHARED_LIB_DIR:-}"\n'
+        'if [[ -z "${LIB_DIR}" ]]; then\n'
+        '  for candidate in \\\n'
+        '    "${_SCRIPT_DIR}/../../../../skills/shared/lib" \\\n'
+        '    "${_SCRIPT_DIR}/../../../skills/shared/lib" \\\n'
+        '    "${_SCRIPT_DIR}/../../skills/shared/lib"; do\n'
+        '    if [[ -d "${candidate}" ]]; then\n'
+        '      LIB_DIR="$(cd "${candidate}" && pwd)"\n'
+        "      break\n"
+        "    fi\n"
+        "  done\n"
+        "fi\n"
+        'if [[ -z "${LIB_DIR}" || ! -d "${LIB_DIR}" ]]; then\n'
+        '  echo "ERROR: Could not locate skills/shared/lib. Set SKILLS_SHARED_LIB_DIR=/path/to/skills/shared/lib." >&2\n'
+        "  exit 1\n"
+        "fi\n"
+    )
+
+
+def _rest_script_head(pw_file: str) -> str:
+    """Shebang + lib sourcing + admin-password-file resolution. The password is
+    handed to get_session_key_from_password_file / splunk_curl, which keep it
+    off argv (no `-u admin:pw` and no password in `ps`)."""
+    return (
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        + _lib_dir_block()
+        + "# shellcheck disable=SC1091\n"
+        'source "${LIB_DIR}/credential_helpers.sh"\n'
+        'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
+        f'AUTH_PW_FILE="${{SPLUNK_ADMIN_PASSWORD_FILE:-{pw_file}}}"\n'
+        'if [[ ! -s "${AUTH_PW_FILE}" ]]; then\n'
+        '  echo "ERROR: Splunk admin password file is empty or missing: ${AUTH_PW_FILE}" >&2\n'
+        "  exit 1\n"
+        "fi\n"
+    )
+
+
+def _rolling_restart_script(pw_file: str, captain_uri: str, mode: str,
+                            label: str, extra_guard: str = "") -> str:
+    """Render a rolling-restart script that targets the REAL trigger.
+
+    Sets the documented ``rolling_restart`` mode via ``shcluster/config/config``
+    (restart | searchable | searchable_force), then POSTs the captain control
+    ``restart`` endpoint — NOT ``restart_inactivity_timeout`` (which only sets a
+    timeout and never restarts). Success is reported only on HTTP 200.
+    """
+    return (
+        _rest_script_head(pw_file)
+        + 'CAPTAIN_URI="${CAPTAIN_URI:-' + captain_uri + '}"\n'
+        + extra_guard
+        + 'SK="$(get_session_key_from_password_file "${CAPTAIN_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+        + "# Set the documented rolling_restart mode, then trigger the real\n"
+        + "# rolling restart via the captain control endpoint.\n"
+        + 'mode_code="$(splunk_curl_post "${SK}" "rolling_restart=' + mode + '" \\\n'
+        + "  -o /dev/null -w '%{http_code}' \\\n"
+        + '  "${CAPTAIN_URI}/services/shcluster/config/config")"\n'
+        + 'if [[ "${mode_code}" != "200" ]]; then\n'
+        + '  echo "ERROR: failed to set rolling_restart=' + mode + ' (HTTP ${mode_code})." >&2\n'
+        + "  exit 1\n"
+        + "fi\n"
+        + 'rr_code="$(splunk_curl_post "${SK}" "" \\\n'
+        + "  -o /dev/null -w '%{http_code}' \\\n"
+        + '  "${CAPTAIN_URI}/services/shcluster/captain/control/control/restart")"\n'
+        + 'if [[ "${rr_code}" != "200" ]]; then\n'
+        + '  echo "ERROR: ' + label + ' request failed (HTTP ${rr_code})." >&2\n'
+        + "  exit 1\n"
+        + "fi\n"
+        + 'echo "' + label + ' initiated (HTTP 200). Monitor: splunk show shcluster-status"\n'
+    )
+
+
 def render(args: argparse.Namespace) -> dict[str, Any]:
     now = datetime.now(timezone.utc).isoformat()
     out = Path(args.output_dir)
@@ -45,6 +122,14 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     hb_timeout = args.heartbeat_timeout
     hb_period = args.heartbeat_period
     restart_timeout = args.restart_inactivity_timeout
+    # Admin password file baked as the default for rendered REST scripts
+    # (still overridable at runtime via SPLUNK_ADMIN_PASSWORD_FILE).
+    pw_file = args.admin_password_file or "/tmp/splunk_admin_password"
+    # CAPTAIN_URI / TARGET defaults for restart, member, kvstore, transfer
+    # scripts. --captain-uri wires the captain's mgmt URI; without it we fall
+    # back to the deployer URI (env CAPTAIN_URI / TARGET still override).
+    captain_uri = args.captain_uri or deployer_uri
+    target_captain_uri = args.target_captain_uri or ""
 
     # Create directory structure
     for subdir in [
@@ -127,41 +212,49 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
             encoding="utf-8",
         )
 
-    # restart scripts
+    # restart scripts (REST against the SHC captain; auth via session key so
+    # the admin password never lands on argv / `ps`).
     (shc / "restart" / "rolling-restart.sh").write_text(
-        f"#!/usr/bin/env bash\nset -euo pipefail\n"
-        f"# Run on captain or via deployer REST\n"
-        f"curl -s -k --insecure -u admin:$(cat /tmp/splunk_admin_password) \\\n"
-        f"  -X POST '{deployer_uri}/services/shcluster/captain/control/control/restart_inactivity_timeout' \\\n"
-        f"  -d 'restart_timeout={restart_timeout}'\n"
-        f"echo 'Rolling restart initiated. Monitor: splunk show shcluster-status'\n",
+        _rolling_restart_script(pw_file, captain_uri, "restart", "Rolling restart"),
         encoding="utf-8",
     )
     (shc / "restart" / "searchable-rolling-restart.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "# Searchable rolling restart — transfer captain first, then restart members\n"
-        "echo 'Step 1: Transfer captain to a stable member before first restart.'\n"
-        "echo 'Step 2: Restart members one at a time (managed by SHC captain).'\n"
-        "echo 'Monitor: splunk show shcluster-status --verbose'\n",
+        _rolling_restart_script(pw_file, captain_uri, "searchable",
+                                "Searchable rolling restart"),
         encoding="utf-8",
+    )
+    force_guard = (
+        '# Forced searchable restart overrides cluster health checks. Require\n'
+        '# explicit confirmation so this never runs by accident.\n'
+        'if [[ "${ACCEPT_FORCE_RESTART:-false}" != "true" ]]; then\n'
+        '  echo "ERROR: forced restart overrides health checks. Re-run with ACCEPT_FORCE_RESTART=true to proceed." >&2\n'
+        "  exit 1\n"
+        "fi\n"
     )
     (shc / "restart" / "force-searchable.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "# Forced searchable restart — skips inactivity timeout\n"
-        "# Requires --accept-force-restart\n"
-        "echo 'Forced searchable restart initiated.'\n",
+        _rolling_restart_script(pw_file, captain_uri, "searchable_force",
+                                "Forced searchable rolling restart",
+                                extra_guard=force_guard),
         encoding="utf-8",
     )
+    # Captain transfer has NO REST endpoint per Splunk docs; the documented
+    # method is the CLI `splunk transfer shcluster-captain -mgmt_uri <uri>`,
+    # which can run from any member. The splunk CLI requires the password
+    # inline via -auth, so it is briefly visible in the LOCAL process table on
+    # the host that runs this script (there is no session-key alternative for
+    # the CLI). Run it on a cluster member.
     (shc / "restart" / "transfer-captain.sh").write_text(
-        f"#!/usr/bin/env bash\nset -euo pipefail\n"
-        f"# Transfer SHC captain\n"
-        f"# Usage: CAPTAIN_URI=https://sh01:8089 TARGET=https://sh02:8089 bash transfer-captain.sh\n"
-        f"CAPTAIN_URI=\"${{CAPTAIN_URI:-{deployer_uri}}}\"\n"
-        f"TARGET=\"${{TARGET:-}}\"\n"
-        f"if [[ -z \"$TARGET\" ]]; then echo 'Set TARGET=https://sh0X:8089'; exit 1; fi\n"
-        f"curl -s -k -u admin:$(cat /tmp/splunk_admin_password) \\\n"
-        f"  -X POST \"${{CAPTAIN_URI}}/services/shcluster/captain/control/control/transfer-captain\" \\\n"
-        f"  -d \"target=${{TARGET}}\"\n",
+        "#!/usr/bin/env bash\nset -euo pipefail\n"
+        "# Transfer the SHC captain to TARGET via the documented CLI\n"
+        "# (splunk transfer shcluster-captain -mgmt_uri <TARGET>). Run on a member.\n"
+        'SPLUNK_BIN="${SPLUNK_BIN:-/opt/splunk/bin/splunk}"\n'
+        'AUTH_USER="${SPLUNK_AUTH_USER:-admin}"\n'
+        f'AUTH_PW_FILE="${{SPLUNK_ADMIN_PASSWORD_FILE:-{pw_file}}}"\n'
+        'TARGET="${TARGET:-' + target_captain_uri + '}"\n'
+        'if [[ ! -s "${AUTH_PW_FILE}" ]]; then echo "ERROR: admin password file missing: ${AUTH_PW_FILE}" >&2; exit 1; fi\n'
+        'if [[ -z "${TARGET}" ]]; then echo "Set TARGET=https://sh0X:8089 (or pass --target-captain-uri at render time)." >&2; exit 1; fi\n'
+        '"${SPLUNK_BIN}" transfer shcluster-captain -mgmt_uri "${TARGET}" -auth "${AUTH_USER}:$(cat "${AUTH_PW_FILE}")"\n'
+        'echo "Captain transfer to ${TARGET} requested. Verify: splunk show shcluster-status"\n',
         encoding="utf-8",
     )
 
@@ -182,42 +275,46 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
         encoding="utf-8",
     )
     (shc / "members" / "decommission-member.sh").write_text(
-        f"#!/usr/bin/env bash\nset -euo pipefail\n"
-        f"# Gracefully decommission a member (moves to GracefulShutdown).\n"
-        f"MEMBER_UUID=\"${{MEMBER_UUID:-}}\"\n"
-        f"CAPTAIN_URI=\"${{CAPTAIN_URI:-{deployer_uri}}}\"\n"
-        f"if [[ -z \"$MEMBER_UUID\" ]]; then echo 'Set MEMBER_UUID from splunk list shcluster-members'; exit 1; fi\n"
-        f"curl -s -k -u admin:$(cat /tmp/splunk_admin_password) \\\n"
-        f"  -X POST \"${{CAPTAIN_URI}}/services/shcluster/member/members/${{MEMBER_UUID}}/control/control/graceful_shutdown\"\n",
+        _rest_script_head(pw_file)
+        + "# Gracefully decommission a member (moves to GracefulShutdown).\n"
+        + 'CAPTAIN_URI="${CAPTAIN_URI:-' + captain_uri + '}"\n'
+        + 'MEMBER_UUID="${MEMBER_UUID:-}"\n'
+        + 'if [[ -z "${MEMBER_UUID}" ]]; then echo "Set MEMBER_UUID from splunk list shcluster-members" >&2; exit 1; fi\n'
+        + 'SK="$(get_session_key_from_password_file "${CAPTAIN_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+        + 'splunk_curl_post "${SK}" "" \\\n'
+        + '  "${CAPTAIN_URI}/services/shcluster/member/members/${MEMBER_UUID}/control/control/graceful_shutdown"\n',
         encoding="utf-8",
     )
     (shc / "members" / "remove-member.sh").write_text(
-        f"#!/usr/bin/env bash\nset -euo pipefail\n"
-        f"# Administrative removal after decommission.\n"
-        f"MEMBER_UUID=\"${{MEMBER_UUID:-}}\"\n"
-        f"CAPTAIN_URI=\"${{CAPTAIN_URI:-{deployer_uri}}}\"\n"
-        f"if [[ -z \"$MEMBER_UUID\" ]]; then echo 'Set MEMBER_UUID from splunk list shcluster-members'; exit 1; fi\n"
-        f"curl -s -k -u admin:$(cat /tmp/splunk_admin_password) \\\n"
-        f"  -X DELETE \"${{CAPTAIN_URI}}/services/shcluster/member/members/${{MEMBER_UUID}}\"\n",
+        _rest_script_head(pw_file)
+        + "# Administrative removal after decommission.\n"
+        + 'CAPTAIN_URI="${CAPTAIN_URI:-' + captain_uri + '}"\n'
+        + 'MEMBER_UUID="${MEMBER_UUID:-}"\n'
+        + 'if [[ -z "${MEMBER_UUID}" ]]; then echo "Set MEMBER_UUID from splunk list shcluster-members" >&2; exit 1; fi\n'
+        + 'SK="$(get_session_key_from_password_file "${CAPTAIN_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+        + 'splunk_curl "${SK}" -X DELETE \\\n'
+        + '  "${CAPTAIN_URI}/services/shcluster/member/members/${MEMBER_UUID}"\n',
         encoding="utf-8",
     )
 
     # kvstore scripts
     (shc / "kvstore" / "status.sh").write_text(
-        f"#!/usr/bin/env bash\nset -euo pipefail\n"
-        f"CAPTAIN_URI=\"${{CAPTAIN_URI:-{deployer_uri}}}\"\n"
-        f"curl -s -k -u admin:$(cat /tmp/splunk_admin_password) \\\n"
-        f"  \"${{CAPTAIN_URI}}/services/kvstore/status?output_mode=json\" | python3 -m json.tool\n",
+        _rest_script_head(pw_file)
+        + 'CAPTAIN_URI="${CAPTAIN_URI:-' + captain_uri + '}"\n'
+        + 'SK="$(get_session_key_from_password_file "${CAPTAIN_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${CAPTAIN_URI}/services/kvstore/status?output_mode=json" | python3 -m json.tool\n',
         encoding="utf-8",
     )
     (shc / "kvstore" / "reset-status.sh").write_text(
-        "#!/usr/bin/env bash\nset -euo pipefail\n"
-        "# DANGER: Forces full KV Store re-sync on this member. Use only when replication is stuck.\n"
-        "# Requires --accept-kvstore-reset passed to setup.sh.\n"
-        "MEMBER_URI=\"${MEMBER_URI:-}\"\n"
-        "if [[ -z \"$MEMBER_URI\" ]]; then echo 'Set MEMBER_URI=https://sh0X:8089'; exit 1; fi\n"
-        "curl -s -k -u admin:$(cat /tmp/splunk_admin_password) \\\n"
-        "  -X POST \"${MEMBER_URI}/services/kvstore/control/control/reset\"\n",
+        _rest_script_head(pw_file)
+        + "# DANGER: Forces full KV Store re-sync on this member. Use only when replication is stuck.\n"
+        + "# Requires --accept-kvstore-reset passed to setup.sh.\n"
+        + 'MEMBER_URI="${MEMBER_URI:-}"\n'
+        + 'if [[ -z "${MEMBER_URI}" ]]; then echo "Set MEMBER_URI=https://sh0X:8089" >&2; exit 1; fi\n'
+        + 'SK="$(get_session_key_from_password_file "${MEMBER_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+        + 'splunk_curl_post "${SK}" "" \\\n'
+        + '  "${MEMBER_URI}/services/kvstore/control/control/reset"\n',
         encoding="utf-8",
     )
 
@@ -239,14 +336,15 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
 
     # validate.sh
     (shc / "validate.sh").write_text(
-        f"#!/usr/bin/env bash\nset -euo pipefail\n"
-        f"CAPTAIN_URI=\"${{CAPTAIN_URI:-{deployer_uri}}}\"\n"
-        f"echo '=== SHC Status ==='\n"
-        f"curl -s -k -u admin:$(cat /tmp/splunk_admin_password) \\\n"
-        f"  \"${{CAPTAIN_URI}}/services/shcluster/captain/info?output_mode=json\" | python3 -m json.tool\n"
-        f"echo '=== KV Store Status ==='\n"
-        f"curl -s -k -u admin:$(cat /tmp/splunk_admin_password) \\\n"
-        f"  \"${{CAPTAIN_URI}}/services/kvstore/status?output_mode=json\" | python3 -m json.tool\n",
+        _rest_script_head(pw_file)
+        + 'CAPTAIN_URI="${CAPTAIN_URI:-' + captain_uri + '}"\n'
+        + 'SK="$(get_session_key_from_password_file "${CAPTAIN_URI}" "${AUTH_PW_FILE}" "${AUTH_USER}")"\n'
+        + 'echo "=== SHC Captain Info ==="\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${CAPTAIN_URI}/services/shcluster/captain/info?output_mode=json" | python3 -m json.tool\n'
+        + 'echo "=== KV Store Status ==="\n'
+        + 'splunk_curl "${SK}" \\\n'
+        + '  "${CAPTAIN_URI}/services/kvstore/status?output_mode=json" | python3 -m json.tool\n',
         encoding="utf-8",
     )
 

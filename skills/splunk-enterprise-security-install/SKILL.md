@@ -124,6 +124,8 @@ Useful flags:
 | `--dry-run` | Run `essinstall --dry-run` |
 | `--skip-essinstall` | Install package but skip post-install setup |
 | `--no-validate` | Skip validation |
+| `--no-restart` | Pass `--no-restart` to the generic installer (skip the post-install restart) |
+| `--allow-cloud` | Permit an install attempt on Splunk Cloud targets (otherwise aborts; ES Cloud is normally coordinated with Splunk Support) |
 
 ### generate_ta_for_indexers.sh
 

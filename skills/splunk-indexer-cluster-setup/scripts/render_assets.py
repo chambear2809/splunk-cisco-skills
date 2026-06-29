@@ -929,7 +929,7 @@ Search heads: {len(shs)}
 - `redundancy/{{lb-haproxy.cfg,dns-record-template.txt,ha-health-check.sh}}` (when redundancy enabled).
 - `forwarder-outputs/<host>/outputs.conf` — indexer-discovery snippets.
 - `handoffs/license-peers.txt` — hand-off stub for `splunk-license-manager-setup`.
-- `validate.sh` — full health snapshot (cluster-status, bundle-status, REST `/health`, `/info`, `/peers`).
+- `validate.sh` — REST cluster-manager audit snapshot (info/health/peers/sites/buckets/generation/status + bundle status) under `audit/<timestamp>/`, gating on `/services/cluster/manager/info` `preflight_check_passed`.
 
 ## $IDXC_SECRET substitution
 

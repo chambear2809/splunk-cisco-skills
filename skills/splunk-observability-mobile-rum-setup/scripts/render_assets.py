@@ -464,7 +464,7 @@ def normalize_spec(
             any_replay = True
             raw_rate = replay.get("sampling_rate")
             if raw_rate in (None, ""):
-                replay["sampling_rate"] = 0.2 if platform in {"react_native", "flutter"} else 0.2
+                replay["sampling_rate"] = 0.2
             try:
                 rate = float(replay["sampling_rate"])
                 if not 0 <= rate <= 1:

@@ -89,13 +89,18 @@ if (output_dir / "collector/values-ai-agent-monitoring.yaml").exists():
     if "send_otlp_histograms: true" not in values:
         errors.append("collector overlay does not enforce send_otlp_histograms: true")
 
+loc_enabled = True
+if (output_dir / "normalized-spec.json").exists():
+    normalized = json.loads((output_dir / "normalized-spec.json").read_text(encoding="utf-8"))
+    loc_enabled = bool(normalized.get("ai_agent_monitoring", {}).get("log_observer_connect", {}).get("enabled"))
+
 if (output_dir / "apply-plan.json").exists():
     plan = json.loads((output_dir / "apply-plan.json").read_text(encoding="utf-8"))
     commands = [" ".join(step.get("command", [])) for step in plan.get("steps", [])]
     joined = "\n".join(commands)
     if "--apply-k8s" not in joined and "--apply-linux" not in joined:
         errors.append("apply plan does not delegate collector through --apply-k8s or --apply-linux")
-    if "--apply log_observer_connect" not in joined:
+    if loc_enabled and "--apply log_observer_connect" not in joined:
         errors.append("apply plan does not delegate LOC through --apply log_observer_connect")
     forbidden_secret_flags = [" --token ", " --access-token ", " --api-token ", " --o11y-token ", " --sf-token ", " --hec-token ", " --password "]
     for flag in forbidden_secret_flags:

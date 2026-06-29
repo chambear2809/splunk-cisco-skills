@@ -319,9 +319,10 @@ PY
 # Resolve a Splunk session for index/KV-store mutations.
 load_splunk_credentials >/dev/null 2>&1 || true
 SESSION_KEY=""
-if resolve_splunk_session_key >/dev/null 2>&1; then
-    SESSION_KEY="${SPLUNK_SESSION_KEY:-}"
+if SESSION_KEY="$(get_session_key "${SPLUNK_URI:-https://localhost:8089}" 2>/dev/null)" && [[ -n "${SESSION_KEY}" ]]; then
+    :
 else
+    SESSION_KEY=""
     log "WARN: Could not resolve a Splunk session key. Index/KV-store mutations skipped."
 fi
 

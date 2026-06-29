@@ -93,7 +93,7 @@ Do not mark UI-only workflows as `api_apply`.
    ```bash
    bash skills/splunk-oncall-setup/scripts/setup.sh \
      --install-splunk-app \
-     --splunk-side-spec skills/splunk-oncall-setup/templates/splunk-side.example.yaml \
+     --spec skills/splunk-oncall-setup/templates/splunk-side.example.yaml \
      --api-id "$SPLUNK_ONCALL_API_ID" \
      --api-key-file /tmp/splunk_oncall_api_key
    ```

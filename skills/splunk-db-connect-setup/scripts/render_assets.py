@@ -806,8 +806,15 @@ if [[ -z "${SPLUNK_PASSWORD:-}" ]]; then
   exit 0
 fi
 
-curl -sk -u "${SPLUNK_USERNAME}:${SPLUNK_PASSWORD}" "${SPLUNK_URI}/services/apps/local/splunk_app_db_connect?output_mode=json" >/dev/null
-curl -sk -u "${SPLUNK_USERNAME}:${SPLUNK_PASSWORD}" "${SPLUNK_URI}/servicesNS/nobody/splunk_app_db_connect/db_connect/dbxserverstatus?output_mode=json" >/dev/null
+# Pass credentials via a chmod 600 curl config file so the password is never
+# visible in process args (ps) or shell history.
+CURL_CFG="$(mktemp)"
+chmod 600 "${CURL_CFG}"
+trap 'rm -f "${CURL_CFG}"' EXIT
+printf 'user = "%s:%s"\\n' "${SPLUNK_USERNAME}" "${SPLUNK_PASSWORD}" >"${CURL_CFG}"
+
+curl -sk -K "${CURL_CFG}" "${SPLUNK_URI}/services/apps/local/splunk_app_db_connect?output_mode=json" >/dev/null
+curl -sk -K "${CURL_CFG}" "${SPLUNK_URI}/servicesNS/nobody/splunk_app_db_connect/db_connect/dbxserverstatus?output_mode=json" >/dev/null
 echo "OK: DB Connect REST probes completed."
 """
 

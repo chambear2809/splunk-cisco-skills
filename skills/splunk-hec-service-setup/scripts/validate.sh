@@ -91,7 +91,7 @@ if [[ -f "${render_dir}/inputs.conf.template" ]]; then
 fi
 
 if [[ "${JSON_OUTPUT}" == "true" ]]; then
-    printf '{"target":"hec-service","platform":"%s","render_dir":"%s","ok":%s,"missing":%s}\n' "${PLATFORM}" "${render_dir}" "${ok}" "$(json_array "${missing[@]}")"
+    printf '{"target":"hec-service","platform":"%s","render_dir":"%s","ok":%s,"missing":%s}\n' "${PLATFORM}" "${render_dir}" "${ok}" "$(json_array ${missing[@]+"${missing[@]}"})"
 else
     if [[ "${ok}" == "true" ]]; then
         log "Rendered HEC service assets are present under ${render_dir}."

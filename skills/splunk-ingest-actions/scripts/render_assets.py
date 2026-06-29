@@ -193,7 +193,6 @@ def render_outputs(args: argparse.Namespace) -> str:
     ]
     if args.destination_type == "s3":
         lines.append(f"path = {args.s3_path}")
-        lines.append("remote.s3.bucket_name = __SET_FROM_PATH__")
         if args.s3_endpoint:
             lines.append(f"remote.s3.endpoint = {args.s3_endpoint}")
         if args.s3_auth_region:
@@ -215,7 +214,7 @@ def render_outputs(args: argparse.Namespace) -> str:
         lines.append(f"batchSizeThresholdKB = {args.batch_size_kb}")
     lines.append(f"dropEventsOnUploadError = {args.drop_events_on_upload_error}")
     lines.append("")
-    lines.append("# remote.s3.bucket_name: replace __SET_FROM_PATH__ or remove if path includes the bucket.")
+    lines.append("# The S3 bucket is taken from `path`; RFS S3 stanzas do not use remote.s3.bucket_name.")
     lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 

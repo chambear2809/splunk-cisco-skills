@@ -449,14 +449,19 @@ fi
 helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
     --namespace "${{NAMESPACE}}" \\
     --values "${{TMPDIR_LOCAL}}/merged.yaml" \\
-    --set "splunkObservability.accessToken=$(cat "${{O11Y_TOKEN_FILE}}")" \\
+    --set-file "splunkObservability.accessToken=${{O11Y_TOKEN_FILE}}" \\
     --atomic \\
     --timeout 5m \\
     "${{DRY_RUN_FLAG[@]}}"
 
 if [[ "${{K8S_APPLY_DRY_RUN:-false}}" != "true" ]]; then
-    kubectl -n "${{NAMESPACE}}" rollout status daemonset/${{RELEASE}}-agent --timeout=180s || true
-    kubectl -n "${{NAMESPACE}}" rollout status deployment/${{RELEASE}}-cluster-receiver --timeout=180s || true
+    # Helm fullname collapses to the release name when it already contains the
+    # chart name (the common "splunk-otel-collector" release), otherwise it is
+    # "<release>-splunk-otel-collector-*". Try both forms.
+    kubectl -n "${{NAMESPACE}}" rollout status daemonset/"${{RELEASE}}-agent" --timeout=180s \\
+        || kubectl -n "${{NAMESPACE}}" rollout status daemonset/"${{RELEASE}}-splunk-otel-collector-agent" --timeout=180s || true
+    kubectl -n "${{NAMESPACE}}" rollout status deployment/"${{RELEASE}}-k8s-cluster-receiver" --timeout=180s \\
+        || kubectl -n "${{NAMESPACE}}" rollout status deployment/"${{RELEASE}}-splunk-otel-collector-k8s-cluster-receiver" --timeout=180s || true
 fi
 """
     )

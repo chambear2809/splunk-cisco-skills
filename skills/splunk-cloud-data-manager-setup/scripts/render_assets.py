@@ -573,12 +573,20 @@ def collect_findings(spec: dict[str, Any]) -> list[dict[str, str]]:
         wants_migration = bool_value(mscs.get("enabled")) or bool_value(
             migration.get("azure_event_hubs_from_mscs")
         )
-        if wants_migration and not bool_value(mscs.get("duplicate_migration_checked")):
+        # Migration can be requested via azure.mscs_migration.enabled or the
+        # top-level migration.azure_event_hubs_from_mscs; honor the duplicate-check
+        # acknowledgement from either location so it matches both enable paths.
+        duplicate_checked = bool_value(mscs.get("duplicate_migration_checked")) or bool_value(
+            migration.get("duplicate_event_hub_migration_checked")
+        )
+        if wants_migration and not duplicate_checked:
             findings.append(
                 {
                     "severity": "ERROR",
                     "area": "azure",
-                    "message": "Duplicate Azure Event Hub migration check is required.",
+                    "message": "Duplicate Azure Event Hub migration check is required "
+                    "(set azure.mscs_migration.duplicate_migration_checked or "
+                    "migration.duplicate_event_hub_migration_checked to true).",
                 }
             )
         if wants_migration and not (

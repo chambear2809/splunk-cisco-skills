@@ -688,11 +688,11 @@ echo "      ${{BASE_OUTPUT_DIR}}/k8s/values.yaml \\\\"
 echo "      ${{OVERLAY}} \\\\"
 echo "      > /tmp/merged-values.yaml"
 echo
-echo "Step 4: Apply via helm using --reuse-values --set token pattern."
+echo "Step 4: Apply via helm using --reuse-values --set-file token pattern (keeps the token off argv)."
 echo "    helm upgrade --install splunk-otel-collector splunk-otel-collector-chart/splunk-otel-collector \\\\"
 echo "      -n splunk-otel --create-namespace --reuse-values \\\\"
 echo "      -f /tmp/merged-values.yaml \\\\"
-echo '      --set splunkObservability.accessToken="$(cat $O11Y_TOKEN_FILE)"'
+echo '      --set-file splunkObservability.accessToken=$O11Y_TOKEN_FILE'
 echo
 echo "Step 5: OpenShift SCC (if applicable)."
 echo "    bash $(dirname \\${{BASH_SOURCE[0]}})/../openshift/scc.sh"

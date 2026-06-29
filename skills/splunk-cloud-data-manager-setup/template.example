@@ -56,6 +56,8 @@ aws:
     - s3
     - s3_promote
   cloudformation_template_path: ""
+  # Required when iac.aws_cloudformation_apply_enabled is true (names the CFN stack).
+  cloudformation_stack_name: ""
   stackset_template_path: ""
   iam_roles_region: us-east-1
   organizations:

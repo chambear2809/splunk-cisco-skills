@@ -17,6 +17,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import sys
 from pathlib import Path
 from typing import Any
@@ -1406,6 +1407,26 @@ def render_backup_configmap(spec: dict[str, Any], workloads: list[dict[str, Any]
     }
 
 
+def _kubectl_ctx_preamble(spec: dict[str, Any]) -> str:
+    """Emit a bash preamble that threads --kube-context into every kubectl call.
+
+    Prefers the KUBECTL_CONTEXT env var (exported by setup.sh from
+    --kube-context), falling back to the render-time value baked below. When
+    both are empty the wrapper expands to a plain ``kubectl`` invocation, so
+    default behavior is preserved byte-for-byte at runtime.
+    """
+    quoted = shlex.quote(spec.get("kube_context", "") or "")
+    return (
+        "# Honor --kube-context: prefer the KUBECTL_CONTEXT env var (exported by\n"
+        "# setup.sh from --kube-context); fall back to the render-time value baked\n"
+        "# below. When both are empty, kubectl runs against the current context.\n"
+        "KUBE_CONTEXT=\"${KUBECTL_CONTEXT:-}\"\n"
+        f"if [[ -z \"${{KUBE_CONTEXT}}\" ]]; then KUBE_CONTEXT={quoted}; fi\n"
+        "# shellcheck disable=SC2086  # intentional split to add --context only when set\n"
+        "kubectl() { command kubectl ${KUBE_CONTEXT:+--context \"${KUBE_CONTEXT}\"} \"$@\"; }\n"
+    )
+
+
 def render_apply_script(spec: dict[str, Any], workloads: list[dict[str, Any]]) -> str:
     target_lines = ["TARGETS=("]
     for w in workloads:
@@ -1421,6 +1442,7 @@ def render_apply_script(spec: dict[str, Any], workloads: list[dict[str, Any]]) -
         "# annotation patch with `kubectl patch --type=merge --patch-file=`, and\n"
         "# triggers a rollout restart so the pods pick up the injected snippet.\n"
         "set -euo pipefail\n"
+        + _kubectl_ctx_preamble(spec) +
         "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
         "cd \"${SCRIPT_DIR}\"\n"
         + "\n".join(target_lines) + "\n"
@@ -1500,6 +1522,7 @@ def render_uninstall_script(spec: dict[str, Any], workloads: list[dict[str, Any]
         "#   - It does not undo any changes the operator made between apply\n"
         "#     and uninstall (the backup restore approach would).\n"
         "set -euo pipefail\n"
+        + _kubectl_ctx_preamble(spec) +
         "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
         "cd \"${SCRIPT_DIR}\"\n"
         + "\n".join(target_lines) + "\n"
@@ -1552,6 +1575,7 @@ def render_verify_script(spec: dict[str, Any], workloads: list[dict[str, Any]]) 
         "# For each workload, picks a Pod and curls the served HTML through\n"
         "# kubectl port-forward, asserting that SplunkRum.init( appears.\n"
         "set -euo pipefail\n"
+        + _kubectl_ctx_preamble(spec) +
         "for target in " + " ".join(f"\"{w['kind']}/{w['namespace']}/{w['name']}\"" for w in workloads) + "; do\n"
         "    kind=\"${target%%/*}\"; rest=\"${target#*/}\"; ns=\"${rest%%/*}\"; name=\"${rest#*/}\"\n"
         "    pod=\"$(kubectl -n \"${ns}\" get pods -l app=\"${name}\" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)\"\n"
@@ -1579,6 +1603,7 @@ def render_status_script(spec: dict[str, Any], workloads: list[dict[str, Any]]) 
         "#!/usr/bin/env bash",
         "# Splunk Browser RUM injection status snapshot.",
         "set -euo pipefail",
+        *_kubectl_ctx_preamble(spec).rstrip("\n").split("\n"),
         "echo 'Backup ConfigMap:'",
         "kubectl get configmap splunk-rum-injection-backup -o wide 2>&1 || true",
         "echo",
@@ -2110,6 +2135,7 @@ def main() -> int:
     )
     spec = load_spec(spec_path)
     spec = normalize_spec(spec, args)
+    spec["kube_context"] = getattr(args, "kube_context", "") or ""
 
     findings, fail_msgs = run_preflight(spec, args)
 

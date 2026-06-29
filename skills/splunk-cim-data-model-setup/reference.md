@@ -7,6 +7,10 @@ Based on current Splunk Common Information Model add-on documentation:
 - The CIM add-on ships as `Splunk_SA_CIM` (Splunkbase app 1621) and provides the
   standard CIM data models (Authentication, Network_Traffic, Web, Malware,
   Endpoint, Change, Intrusion_Detection, Vulnerabilities, and others).
+- `--acceleration` is three-state: `true` writes `acceleration = 1` (gated by
+  `--accept-acceleration`), `false` writes `acceleration = 0` to disable, and the
+  default `unset` leaves acceleration unmanaged (only macros/eventtypes/tags are
+  governed).
 - Data model acceleration is configured in `datamodels.conf` with
   `acceleration = 1` plus `acceleration.earliest_time`,
   `acceleration.backfill_time`, `acceleration.max_concurrent`,

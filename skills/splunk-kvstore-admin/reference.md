@@ -19,7 +19,7 @@ state, Enterprise Security, ITSI, and many apps.
 
 ## Backup
 
-`splunk backup kvstore --archiveName <name>` creates an archive under
+`splunk backup kvstore -archiveName <name>` creates an archive under
 `$SPLUNK_HOME/var/lib/splunk/kvstorebackup/`. Notes:
 
 - Run backups on the captain in an SHC; the captain holds the authoritative
@@ -32,7 +32,7 @@ state, Enterprise Security, ITSI, and many apps.
 
 ## Restore
 
-`splunk restore kvstore --archiveName <name>` overwrites current collection
+`splunk restore kvstore -archiveName <name>` overwrites current collection
 data with the archive contents. Guardrails the rendered `restore.sh` enforces:
 
 - Lists available archives and requires typing `RESTORE` to proceed.

@@ -492,8 +492,11 @@ def main() -> int:
     cleanup_parser.add_argument("--dry-run", action="store_true")
 
     discover_parser = subparsers.add_parser("discover-metrics")
-    discover_parser.add_argument("--realm", required=True)
-    discover_parser.add_argument("--token-file", required=True, type=Path)
+    # --realm / --token-file fall back to SPLUNK_O11Y_REALM / SPLUNK_O11Y_TOKEN_FILE,
+    # consistent with the apply/cleanup subcommands; required only if neither
+    # the flag nor the env var is set.
+    discover_parser.add_argument("--realm", default=os.environ.get("SPLUNK_O11Y_REALM", ""))
+    discover_parser.add_argument("--token-file", type=Path, default=None)
     discover_parser.add_argument("--query", default="")
     discover_parser.add_argument("--limit", type=int, default=25)
 
@@ -519,7 +522,16 @@ def main() -> int:
                 args.dry_run,
             )
         elif args.command == "discover-metrics":
-            result = discover_metrics(args.realm, args.token_file, args.query, args.limit)
+            realm = args.realm or os.environ.get("SPLUNK_O11Y_REALM", "")
+            token_file = args.token_file
+            if token_file is None:
+                env_token_file = os.environ.get("SPLUNK_O11Y_TOKEN_FILE", "")
+                token_file = Path(env_token_file) if env_token_file else None
+            if not realm:
+                parser.error("discover-metrics requires --realm or SPLUNK_O11Y_REALM.")
+            if token_file is None:
+                parser.error("discover-metrics requires --token-file or SPLUNK_O11Y_TOKEN_FILE.")
+            result = discover_metrics(realm, token_file, args.query, args.limit)
         else:
             parser.error("unknown command")
         print(json.dumps(result, indent=2, sort_keys=True))
