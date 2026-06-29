@@ -111,7 +111,11 @@ appd_prepare_curl_tls_args() {
 
 appd_curl() {
     appd_prepare_curl_tls_args || return $?
-    curl "${APPD_CURL_TLS_ARGS[@]}" "$@"
+    if ((${#APPD_CURL_TLS_ARGS[@]})); then
+        curl "${APPD_CURL_TLS_ARGS[@]}" "$@"
+    else
+        curl "$@"
+    fi
 }
 
 appd_controller_oauth_token() {
@@ -120,12 +124,47 @@ appd_controller_oauth_token() {
     local client_name="$3"
     local client_secret_file="$4"
     appd_assert_secret_file "${client_secret_file}" "AppDynamics OAuth client secret file"
+
+    local auth_config body_file rc
+    auth_config="$(mktemp)"
+    body_file="$(mktemp)"
+    chmod 600 "${auth_config}" "${body_file}"
+
+    python3 - "${client_name}" "${account_name}" "${client_secret_file}" "${auth_config}" "${body_file}" <<'PY'
+from pathlib import Path
+from urllib.parse import urlencode
+import sys
+
+client_name, account_name, secret_file, auth_config, body_file = sys.argv[1:]
+secret = Path(secret_file).read_text(encoding="utf-8").rstrip("\r\n")
+client_id = client_name if "@" in client_name else f"{client_name}@{account_name}"
+basic_user = client_name.split("@", 1)[0]
+
+escaped_user = basic_user.replace("\\", "\\\\").replace('"', '\\"')
+escaped_secret = secret.replace("\\", "\\\\").replace('"', '\\"')
+Path(auth_config).write_text(f'user = "{escaped_user}:{escaped_secret}"\n', encoding="utf-8")
+Path(body_file).write_text(
+    urlencode(
+        {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": secret,
+        }
+    ),
+    encoding="utf-8",
+)
+PY
+
+    set +e
     appd_curl -fsS \
         -X POST "$(appd_controller_api_url "${controller_url}" "/controller/api/oauth/access_token")" \
+        -K "${auth_config}" \
         -H "Content-Type: application/x-www-form-urlencoded" \
-        --data-urlencode "grant_type=client_credentials" \
-        --data-urlencode "client_id=${client_name}@${account_name}" \
-        --data-urlencode "client_secret@${client_secret_file}"
+        --data-binary @"${body_file}"
+    rc=$?
+    set -e
+    rm -f "${auth_config}" "${body_file}"
+    return "${rc}"
 }
 
 appd_events_api_headers_file() {
