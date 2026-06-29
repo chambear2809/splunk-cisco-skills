@@ -910,11 +910,20 @@ def render_apply_script(
 APPLY_STREAM_BODY = """\
 # Apply: POST /v7/streams (or PUT if --te-stream-id supplied).
 # Substitutes the X-SF-Token placeholder in stream.json with the live token.
+# The substituted payload carries the live Splunk ingest token, so it is written
+# to a chmod-600 temp file and sent with --data-binary @file (never on argv).
 PAYLOAD_FILE="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/stream.json"
-SUBST_PAYLOAD="$(python3 -c "import json,sys;
+# The substituted payload and the API response can both contain token-shaped
+# values, so they go in chmod-600 temp files that are removed on exit (never a
+# predictable world-readable /tmp path).
+SUBST_FILE="$(mktemp)"
+RESP_FILE="$(mktemp)"
+chmod 600 "${SUBST_FILE}" "${RESP_FILE}"
+trap 'rm -f "${TE_CURL_CONFIG}" "${SUBST_FILE}" "${RESP_FILE}"' EXIT
+python3 -c "import json,sys;
 data=json.load(open(sys.argv[1]));
 data['customHeaders']['X-SF-Token']=open(sys.argv[2]).read().strip();
-print(json.dumps(data))" "${PAYLOAD_FILE}" "${O11Y_INGEST_TOKEN_FILE}")"
+open(sys.argv[3],'w').write(json.dumps(data))" "${PAYLOAD_FILE}" "${O11Y_INGEST_TOKEN_FILE}" "${SUBST_FILE}"
 if [[ -n "${TE_STREAM_ID:-}" ]]; then
     METHOD=PUT
     URL="https://api.thousandeyes.com/v7/streams/${TE_STREAM_ID}"
@@ -925,26 +934,37 @@ fi
 curl -sS -X "${METHOD}" "${URL}" \\
     -K "${TE_CURL_CONFIG}" \\
     -H "Content-Type: application/json" \\
-    --data-binary "${SUBST_PAYLOAD}" \\
-    -o /tmp/te-stream-response.json -w '%{http_code}\\n'
+    --data-binary @"${SUBST_FILE}" \\
+    -o "${RESP_FILE}" -w '%{http_code}\\n'
 """
 
 APPLY_APM_CONNECTOR_BODY = """\
 # Apply: POST /v7/connectors/generic, then enable splunk-observability-apm operation.
 CONNECTOR_FILE="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/connector.json"
 OPERATION_FILE="$(dirname "${BASH_SOURCE[0]}")/../te-payloads/apm-operation.json"
-SUBST_CONNECTOR="$(python3 -c "import json,sys;
+# The connector payload carries the live Splunk API token, so it is written to a
+# chmod-600 temp file and sent with --data-binary @file (never on argv).
+SUBST_CONNECTOR_FILE="$(mktemp)"
+# The connector POST response can echo back the X-SF-Token header value, so it is
+# captured into a chmod-600 temp file (not a predictable /tmp path) and parsed
+# from that file rather than passed on argv. The operation response file is held
+# the same way.
+CONNECTOR_RESPONSE_FILE="$(mktemp)"
+OPERATION_RESPONSE_FILE="$(mktemp)"
+chmod 600 "${SUBST_CONNECTOR_FILE}" "${CONNECTOR_RESPONSE_FILE}" "${OPERATION_RESPONSE_FILE}"
+trap 'rm -f "${TE_CURL_CONFIG}" "${SUBST_CONNECTOR_FILE}" "${CONNECTOR_RESPONSE_FILE}" "${OPERATION_RESPONSE_FILE}"' EXIT
+python3 -c "import json,sys;
 data=json.load(open(sys.argv[1]));
 for h in data.get('headers', []):
     if h.get('name')=='X-SF-Token':
         h['value']=open(sys.argv[2]).read().strip();
-print(json.dumps(data))" "${CONNECTOR_FILE}" "${O11Y_API_TOKEN_FILE}")"
-CONNECTOR_RESPONSE="$(curl -sS -X POST 'https://api.thousandeyes.com/v7/connectors/generic' \\
+open(sys.argv[3],'w').write(json.dumps(data))" "${CONNECTOR_FILE}" "${O11Y_API_TOKEN_FILE}" "${SUBST_CONNECTOR_FILE}"
+curl -sS -X POST 'https://api.thousandeyes.com/v7/connectors/generic' \\
     -K "${TE_CURL_CONFIG}" \\
     -H "Content-Type: application/json" \\
-    --data-binary "${SUBST_CONNECTOR}")"
-echo "${CONNECTOR_RESPONSE}" > /tmp/te-connector-response.json
-CONNECTOR_ID="$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get('id',''))" "${CONNECTOR_RESPONSE}")"
+    --data-binary @"${SUBST_CONNECTOR_FILE}" \\
+    -o "${CONNECTOR_RESPONSE_FILE}"
+CONNECTOR_ID="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('id',''))" "${CONNECTOR_RESPONSE_FILE}")"
 if [[ -z "${CONNECTOR_ID}" ]]; then
     echo "ERROR: connector POST did not return an id." >&2
     exit 1
@@ -957,7 +977,7 @@ curl -sS -X PUT "https://api.thousandeyes.com/v7/operations/splunk-observability
     -K "${TE_CURL_CONFIG}" \\
     -H "Content-Type: application/json" \\
     --data-binary "${SUBST_OPERATION}" \\
-    -o /tmp/te-apm-operation-response.json -w '%{http_code}\\n'
+    -o "${OPERATION_RESPONSE_FILE}" -w '%{http_code}\\n'
 """
 
 APPLY_TESTS_BODY = """\

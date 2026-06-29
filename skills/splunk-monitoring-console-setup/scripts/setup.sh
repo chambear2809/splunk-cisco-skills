@@ -186,7 +186,7 @@ main() {
             ;;
         preflight) render_assets; run_rendered_script preflight.sh ;;
         apply) render_assets; run_rendered_script apply.sh; run_rendered_script add-search-peers.sh ;;
-        status) run_rendered_script status.sh ;;
+        status) render_assets; run_rendered_script status.sh ;;
         all) render_assets; run_rendered_script preflight.sh; run_rendered_script apply.sh; run_rendered_script add-search-peers.sh; run_rendered_script status.sh ;;
     esac
 }

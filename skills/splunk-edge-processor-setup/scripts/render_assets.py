@@ -222,7 +222,9 @@ def render_pipeline_payload(spec: dict) -> str:
             "mode": spec["partition"],
         },
         "destination": spec["destination"],
-        "spl2_file": spec["spl2_file"],
+        # Point at the SPL2 file this renderer actually emits (the input spl2_file
+        # is a label; the generated starter is always written to <name>.spl2).
+        "spl2_file": f"control-plane/pipelines/{spec['name']}.spl2",
     }
     field = payload["partition"]["field"]
     if field:
@@ -407,7 +409,10 @@ def render_instance_install(args: argparse.Namespace, instance: dict) -> str:
             'install -m 0700 "${INSTALL_CMD_FILE}" "${INSTALL_DIR}/install_cmd.sh"\n'
             '(cd "${INSTALL_DIR}" && ./install_cmd.sh)\n'
             'shred -u "${INSTALL_DIR}/install_cmd.sh" 2>/dev/null || rm -f "${INSTALL_DIR}/install_cmd.sh"\n'
-            'nohup ./splunk-edge/bin/splunk-edge run >> ./splunk-edge/var/log/install-splunk-edge.out 2>&1 </dev/null &\n'
+            '# Use absolute paths: the install command above ran in a subshell, so the\n'
+            '# current working directory here is NOT ${INSTALL_DIR}.\n'
+            'mkdir -p "${INSTALL_DIR}/splunk-edge/var/log"\n'
+            'nohup "${INSTALL_DIR}/splunk-edge/bin/splunk-edge" run >> "${INSTALL_DIR}/splunk-edge/var/log/install-splunk-edge.out" 2>&1 </dev/null &\n'
             'echo "OK: splunk-edge running in background. PID file in ${INSTALL_DIR}/splunk-edge/var/run/."\n'
         )
     else:  # docker
@@ -756,6 +761,11 @@ def render_readme(args: argparse.Namespace, instances: list[dict], destinations:
         "Without a default destination, unprocessed data is silently dropped. The\n"
         "renderer requires `--ep-default-destination` to match a destination name.\n"
         "`validate.sh` re-checks this on every run.\n\n"
+        "## Re-rendering\n\n"
+        "Re-running render overwrites the generated files in this directory\n"
+        "(pipeline SPL2/JSON, control-plane objects, and install scripts). Preserve\n"
+        "any manual edits in source control or a separate path and reapply them\n"
+        "after re-rendering.\n\n"
         "## Next steps\n\n"
         "1. After `apply-objects.sh` succeeds, run `host/<host>/install-with-systemd.sh` on each instance host.\n"
         "2. Promote `handoffs/acs-allowlist.json` into `splunk-cloud-acs-admin-setup` so destinations on Splunk Cloud become reachable.\n"

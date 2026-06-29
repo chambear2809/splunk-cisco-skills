@@ -52,7 +52,7 @@ bash skills/splunk-cim-data-model/scripts/validate.sh --live
 - `datamodels.conf` — per-model `acceleration`, `acceleration.earliest_time`,
   `acceleration.backfill_time`, and `acceleration.max_concurrent` overrides
 - `apply.sh` — stages `datamodels.conf` into an app `local/` and reloads it
-- `rebuild.sh` — rebuild/backfill accelerated models (gated)
+- `rebuild.sh` — documented rebuild/backfill options (automatic / UI / disable-enable)
 - `status.sh` — acceleration status via the summarization REST endpoint
 - `audit.sh` — per-model population checks via `tstats` and CIM compliance hints
 - `README.md` / `metadata.json` — review context

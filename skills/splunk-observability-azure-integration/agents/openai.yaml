@@ -17,7 +17,7 @@ interface:
     with credential-hash sidecar (appId/secretKey redacted on GET); conflict
     matrix (services non-empty, poll-rate bounds, namedToken ForceNew);
     GovCloud realm guard for AZURE_US_GOVERNMENT; and cross-skill handoffs to
-    splunk-app-install (Splunk_TA_microsoft_cloud_services Splunkbase 3110 logs),
+    splunk-app-install (Splunk_TA_microsoft-cloudservices Splunkbase 3110 logs),
     splunk-observability-otel-collector-setup (AKS host telemetry),
     splunk-observability-dashboard-builder (Azure dashboards), and
     splunk-observability-native-ops (Azure detectors).

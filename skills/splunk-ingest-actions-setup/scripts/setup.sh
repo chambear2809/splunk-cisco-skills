@@ -162,6 +162,14 @@ transform_stanza() {
     printf '%s_%s' "${RULESET_NAME}" "${RULE_TYPE//-/_}"
 }
 
+# Escape a value for embedding inside a double-quoted SPL string literal.
+spl_escape() {
+    local value="$1"
+    value="${value//\\/\\\\}"
+    value="${value//\"/\\\"}"
+    printf '%s' "${value}"
+}
+
 apply_live() {
     if [[ "${ACCEPT_IRREVERSIBLE_INGEST}" != "true" ]]; then
         log "ERROR: Ingest Actions transform data before indexing and cannot be reverted."
@@ -207,8 +215,8 @@ apply_live() {
     stanza="$(transform_stanza)"
     case "${RULE_TYPE}" in
         eval) tbody=$(form_urlencode_pairs INGEST_EVAL "${EVAL_EXPRESSION}") ;;
-        mask) tbody=$(form_urlencode_pairs INGEST_EVAL "_raw=replace(_raw, \"${MASK_REGEX}\", \"${MASK_REPLACEMENT}\")") ;;
-        drop) tbody=$(form_urlencode_pairs INGEST_EVAL "queue=if(match(_raw, \"${DROP_REGEX}\"), \"nullQueue\", queue)") ;;
+        mask) tbody=$(form_urlencode_pairs INGEST_EVAL "_raw=replace(_raw, \"$(spl_escape "${MASK_REGEX}")\", \"$(spl_escape "${MASK_REPLACEMENT}")\")") ;;
+        drop) tbody=$(form_urlencode_pairs INGEST_EVAL "queue=if(match(_raw, \"$(spl_escape "${DROP_REGEX}")\"), \"nullQueue\", queue)") ;;
     esac
     if ! rest_set_conf "${sk}" "${SPLUNK_URI}" "${APP_NAME}" "transforms" "${stanza}" "${tbody}"; then
         log "ERROR: Failed to write transform ${stanza}."

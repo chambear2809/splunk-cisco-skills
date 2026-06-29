@@ -453,9 +453,9 @@ fi
 APP_SPECS_FILE="$(mktemp)"
 TMP_FILES+=("${APP_SPECS_FILE}")
 if [[ -n "${APP_LIST_FILE}" ]]; then
-    normalize_applications "${APP_LIST_FILE}" "${APPLICATIONS[@]}" > "${APP_SPECS_FILE}"
+    normalize_applications "${APP_LIST_FILE}" ${APPLICATIONS[@]+"${APPLICATIONS[@]}"} > "${APP_SPECS_FILE}"
 else
-    normalize_applications /dev/null "${APPLICATIONS[@]}" > "${APP_SPECS_FILE}"
+    normalize_applications /dev/null ${APPLICATIONS[@]+"${APPLICATIONS[@]}"} > "${APP_SPECS_FILE}"
 fi
 
 if [[ ! -s "${APP_SPECS_FILE}" ]]; then

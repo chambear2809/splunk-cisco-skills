@@ -84,8 +84,7 @@ not a marketing region label.
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /services/apps/local/Splunk_AI_Assistant_Cloud` | App installed and enabled |
-| `GET /servicesNS/nobody/Splunk_AI_Assistant_Cloud/configs/conf-app/install` | App-side configured/`is_configured` state |
+| `GET /services/apps/local/Splunk_AI_Assistant_Cloud` | App installed/enabled, plus the configured/`is_configured` state read from the app entry's `configured` field |
 | `GET /servicesNS/nobody/Splunk_AI_Assistant_Cloud/storage/collections/config` | KV Store reachable for AI Assistant namespace |
 | `GET /services/server/info` | Splunk REST + auth health |
 

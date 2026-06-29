@@ -150,9 +150,12 @@ Creates six indexes:
 | `thousandeyes_pathvis` | Path visualization | `cisco:thousandeyes:path-vis` |
 
 When you enable metrics inputs, the setup script now enables related path
-collection into `thousandeyes_pathvis` by default. Use `--no-pathvis` if you
-need a metrics-only stream, or override the defaults with
-`--pathvis-index` / `--pathvis-interval`.
+collection into `thousandeyes_pathvis` by default. Although it is configured on
+the metrics stream input, path visualization data is collected via API polling
+on its own `--pathvis-interval` (default 3600s) — hence the "API polling"
+delivery shown for `cisco:thousandeyes:path-vis` in the sourcetype table below.
+Use `--no-pathvis` if you need a metrics-only stream, or override the defaults
+with `--pathvis-index` / `--pathvis-interval`.
 
 ### Step 3: Authenticate via OAuth
 

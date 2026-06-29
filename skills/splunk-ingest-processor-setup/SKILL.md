@@ -53,6 +53,11 @@ bash skills/splunk-ingest-processor-setup/scripts/setup.sh \
   --pipelines "redact_auth=template=redact;sourcetype=json_app;destination=splunk_indexer,http_metrics=template=metrics;destination=metrics"
 ```
 
+`--phase` accepts `render`, `doctor`, `status`, `validate`, and `all`. Because
+Ingest Processor exposes no public REST API for live status, `doctor` and
+`status` are offline aliases of `validate` (render plus structural validation);
+they do not query a live tenant.
+
 Validate the skill offline:
 
 ```bash

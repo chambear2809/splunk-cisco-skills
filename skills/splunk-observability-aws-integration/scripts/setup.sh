@@ -127,7 +127,7 @@ while [[ $# -gt 0 ]]; do
         --quickstart) MODE="quickstart" ;;
         --quickstart-from-live) MODE="quickstart_from_live" ;;
         --explain) MODE="explain" ;;
-        --rollback) MODE="rollback"; SECTIONS="$2"; shift ;;
+        --rollback) MODE="rollback"; SECTIONS="${2:-}"; [[ -n "${SECTIONS:-}" ]] && shift ;;
         --list-namespaces) MODE="list_namespaces" ;;
         --list-recommended-stats) MODE="list_recommended_stats" ;;
         --spec) SPEC="$2"; shift ;;
@@ -355,7 +355,7 @@ EOF
                 cat <<EOF
 # Rollback (render-only): streams
 # Tear down the per-region CloudFormation stacks deployed for Metric Streams.
-for region in $(bash -c "tail -n +1 ${OUTPUT_DIR}/03-regions-services.md | grep -Eo 'us-[a-z0-9-]+|eu-[a-z0-9-]+|ap-[a-z0-9-]+|ca-[a-z0-9-]+' | sort -u"); do
+for region in $(bash -c "tail -n +1 ${OUTPUT_DIR}/03-regions-services.md | grep -Eo '[a-z]{2}-[a-z-]+-[0-9]+' | sort -u"); do
   aws cloudformation delete-stack \\
     --stack-name SplunkObservability-MetricStreams-\${region} \\
     --region \${region}

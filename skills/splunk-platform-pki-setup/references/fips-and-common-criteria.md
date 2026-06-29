@@ -43,11 +43,16 @@ FIPS 140-2), the operator stops Splunk on each host, edits
 `splunk-launch.conf`:
 
 ```
+SPLUNK_FIPS = 1
 SPLUNK_FIPS_VERSION = 140-3
 ```
 
-The renderer's `pki/install/install-fips-launch-conf.sh` performs
-this exact edit idempotently. The skill drops it into
+`SPLUNK_FIPS` is the master enable switch and defaults to `0`; FIPS
+does NOT engage unless `SPLUNK_FIPS=1` is present. `SPLUNK_FIPS_VERSION`
+only selects 140-2 vs 140-3, so both keys must be written together.
+
+The renderer's `pki/install/install-fips-launch-conf.sh` writes both
+keys idempotently. The skill drops the same pair into
 `pki/distribute/standalone/000_pki_trust/local/splunk-launch.conf`
 when `--fips-mode 140-3` is set.
 
@@ -109,8 +114,9 @@ that are CC-friendly and cites the relevant NIST controls in
 Per the upgrade doc, rolling back from 140-3 to 140-2 is manual:
 
 1. Stop Splunk on every host.
-2. Revert `SPLUNK_FIPS_VERSION` in `splunk-launch.conf` (or
-   delete the line — 140-2 is the default).
+2. Revert `SPLUNK_FIPS_VERSION` in `splunk-launch.conf` to `140-2`
+   (or delete both `SPLUNK_FIPS` and `SPLUNK_FIPS_VERSION` lines to
+   disable FIPS entirely — `SPLUNK_FIPS` defaults to `0`).
 3. Restart Splunk.
 
 The renderer's `install-fips-launch-conf.sh` is idempotent and

@@ -195,8 +195,8 @@ target_dir="${{splunk_home}}/etc/apps/${{app_name}}/local"
 mkdir -p "${{target_dir}}"
 cp datamodels.conf "${{target_dir}}/datamodels.conf"
 echo "Staged datamodels.conf into ${{target_dir}}."
-# Reload data model config without a full restart where supported.
-"${{splunk}}" _internal call /services/data/models/_reload >/dev/null 2>&1 \\
+# Reload datamodels.conf without a full restart where supported.
+"${{splunk}}" _internal call /services/configs/conf-datamodels/_reload >/dev/null 2>&1 \\
   || echo "Reload endpoint not available; restart Splunk or reload datamodels to apply."
 "${{splunk}}" btool datamodels list --debug 2>/dev/null | grep -i acceleration || true
 """
@@ -210,16 +210,20 @@ def render_rebuild(args: argparse.Namespace) -> str:
     return make_script(
         f"""splunk={splunk}
 models={model_csv}
-echo "Rebuilding/backfilling accelerated data models: ${{models}}"
-echo "Rebuilds re-summarize historical data and consume search/indexer resources."
-read -r -p "Type REBUILD to continue: " confirm
-[[ "${{confirm}}" == "REBUILD" ]] || {{ echo "Aborted."; exit 1; }}
+# Splunk does not expose a supported public REST endpoint to trigger a data model
+# acceleration rebuild. Use one of the documented mechanisms below.
+echo "Data model acceleration rebuild options for: ${{models}}"
+echo
+echo "1) Automatic (default): Splunk rebuilds an accelerated model on its own when"
+echo "   the data model definition changes (Automatic Rebuilds, on unless disabled)."
+echo "2) Manual (UI): Settings > Data models > <model> > Edit > Rebuild."
+echo "3) Force re-summarization via config: disable then re-enable acceleration -"
+echo "     re-render with --acceleration false and run ./apply.sh, then"
+echo "     re-render with --acceleration true  and run ./apply.sh again."
+echo
 IFS=',' read -r -a model_arr <<< "${{models}}"
 for model in "${{model_arr[@]}}"; do
-  echo "== rebuild ${{model}} =="
-  # Trigger a rebuild via the summarization controls for this model.
-  "${{splunk}}" _internal call "/services/data/models/${{model}}/acceleration/rebuild" -method POST \\
-    || echo "Could not trigger rebuild for ${{model}} via REST; use Settings > Data models > ${{model}} > Rebuild."
+  echo "  - ${{model}}: Settings > Data models > ${{model}} > Rebuild"
 done
 """
     )
@@ -250,7 +254,7 @@ models={model_csv}
 IFS=',' read -r -a model_arr <<< "${{models}}"
 for model in "${{model_arr[@]}}"; do
   echo "== CIM population: ${{model}} (accelerated tstats, earliest ${{summary_range}}) =="
-  "${{splunk}}" search "| tstats count from datamodel=${{model}} where _time>=${{summary_range}} by index sourcetype | sort - count | head 20" -maxout 0 \\
+  "${{splunk}}" search "| tstats count from datamodel=${{model}} where earliest=${{summary_range}} by index sourcetype | sort - count | head 20" -maxout 0 \\
     || echo "tstats failed for ${{model}} (model may be unaccelerated or empty)."
   echo
 done
@@ -274,7 +278,7 @@ Files:
 
 - `datamodels.conf` — acceleration overrides (stage into the app `local/`)
 - `apply.sh` — copy `datamodels.conf` into `etc/apps/{args.app_name}/local` and reload
-- `rebuild.sh` — rebuild/backfill the selected accelerated models (gated)
+- `rebuild.sh` — documented rebuild options (automatic / UI / disable-enable) for the models
 - `status.sh` — acceleration summarization status
 - `audit.sh` — per-model population checks via `tstats`
 

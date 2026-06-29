@@ -166,7 +166,7 @@ Disables the integration in Splunk O11y (sets `enabled: false`). Use
 ## Hand-offs
 
 - Logs path → [`splunk-app-install`](../splunk-app-install/SKILL.md) for
-  `Splunk_TA_microsoft_cloud_services` (Splunkbase 3110)
+  `Splunk_TA_microsoft-cloudservices` (Splunkbase 3110)
 - AKS host telemetry → [`splunk-observability-otel-collector-setup`](../splunk-observability-otel-collector-setup/SKILL.md)
 - Azure dashboards → [`splunk-observability-dashboard-builder`](../splunk-observability-dashboard-builder/SKILL.md)
 - Azure detectors → [`splunk-observability-native-ops`](../splunk-observability-native-ops/SKILL.md)
@@ -178,7 +178,7 @@ Disables the integration in Splunk O11y (sets `enabled: false`). Use
 
 - Azure Event Hub streaming (not in the Splunk O11y wire contract as a separate
   integration type; `importAzureMonitor` controls metric-vs-metadata-only)
-- Azure log ingestion (Splunk_TA_microsoft_cloud_services, Splunkbase 3110 — handed off)
+- Azure log ingestion (Splunk_TA_microsoft-cloudservices, Splunkbase 3110 — handed off)
 - Managed Identity authentication (Splunk O11y requires a Service Principal)
 - Workload Identity Federation for Azure (not in the wire contract)
 - Azure China (AzureChinaCloud) — not supported by this integration

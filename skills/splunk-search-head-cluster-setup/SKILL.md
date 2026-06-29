@@ -183,7 +183,7 @@ Under `splunk-search-head-cluster-rendered/shc/`:
 | `bundle-apply-skip-validation` | Bypass bundle validator (requires `--accept-skip-validation`). |
 | `bundle-rollback` | Restore previous bundle from `$SPLUNK_HOME/etc/shcluster-deploy-apps/`. |
 | `rolling-restart` | Restart members one at a time while maintaining search capability. |
-| `transfer-captain` | `splunk transfer-shcluster-captain` to target member. |
+| `transfer-captain` | `splunk transfer shcluster-captain -mgmt_uri <target>` (CLI; no REST endpoint exists). |
 | `add-member` | Non-disruptive join with quorum preflight. |
 | `decommission-member` | Graceful decommission → `GracefulShutdown`. |
 | `remove-member` | Administrative removal after decommission. |

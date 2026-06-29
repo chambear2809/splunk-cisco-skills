@@ -2,13 +2,13 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-source "${PROJECT_ROOT}/shared/lib/credential_helpers.sh"
+SKILLS_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+source "${SKILLS_ROOT}/shared/lib/credential_helpers.sh"
 load_observability_cloud_settings
 
 RENDER=false
 JSON_OUTPUT=false
-OUTPUT_DIR="${PROJECT_ROOT}/../splunk-observability-browser-rum-rendered"
+OUTPUT_DIR="${SKILLS_ROOT}/../splunk-observability-browser-rum-rendered"
 APPLICATION_NAME="frontend"
 ENVIRONMENT_NAME="prod"
 VERSION="1.0.0"

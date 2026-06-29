@@ -28,7 +28,7 @@ CIM_MODELS = {
     "Compute_Inventory",
     "Data_Access",
     "Databases",
-    "Data_Loss_Prevention",
+    "DLP",
     "Email",
     "Endpoint",
     "Event_Signatures",
@@ -73,7 +73,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--app-name", default="Splunk_SA_CIM")
     parser.add_argument("--datamodel", required=True)
     parser.add_argument("--allow-custom-datamodel", choices=("true", "false"), default="false")
-    parser.add_argument("--acceleration", choices=("true", "false"), default="false")
+    parser.add_argument("--acceleration", choices=("true", "false", "unset"), default="unset")
     parser.add_argument("--earliest-time", default="-7d")
     parser.add_argument("--backfill-time", default="")
     parser.add_argument("--max-concurrent", default="")
@@ -155,9 +155,14 @@ def validate(args: argparse.Namespace) -> None:
 
 def render_datamodels(args: argparse.Namespace) -> str:
     lines = ["# Rendered by splunk-cim-data-model-setup. Review before applying."]
-    if args.acceleration != "true":
-        lines.append(f"# Acceleration not requested for data model {args.datamodel}.")
+    if args.acceleration == "unset":
+        lines.append(f"# Acceleration not managed for data model {args.datamodel} (use --acceleration true|false).")
         return "\n".join(lines) + "\n"
+    if args.acceleration == "false":
+        lines.append(f"[{args.datamodel}]")
+        lines.append("acceleration = 0")
+        lines.append("")
+        return "\n".join(lines).rstrip() + "\n"
     lines.append(f"[{args.datamodel}]")
     lines.append("acceleration = 1")
     lines.append(f"acceleration.earliest_time = {args.earliest_time}")

@@ -5966,7 +5966,7 @@
     },
     {
       "skill": "splunk-observability-azure-integration",
-      "app_name": "Splunk_TA_microsoft_cloud_services",
+      "app_name": "Splunk_TA_microsoft-cloudservices",
       "splunkbase_id": "3110",
       "label": "Splunk Add-on for Microsoft Cloud Services",
       "package_patterns": [
@@ -6046,7 +6046,7 @@
     },
     {
       "skill": "splunk-observability-gcp-integration",
-      "app_name": "Splunk_TA_google_cloud_platform",
+      "app_name": "Splunk_TA_google-cloudplatform",
       "splunkbase_id": "3088",
       "label": "Splunk Add-on for Google Cloud Platform",
       "package_patterns": [

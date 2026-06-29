@@ -66,7 +66,8 @@ def cloud_plan(args: argparse.Namespace) -> dict[str, Any]:
             },
         )
     if args.support_case:
-        steps[2]["details"].append(f"Track Cloud-side progress in support case {args.support_case}.")
+        gate_step = next(step for step in steps if step["automation"] == "manual-gate")
+        gate_step["details"].append(f"Track Cloud-side progress in support case {args.support_case}.")
     return {
         "workflow": "splunk-ai-assistant-cloud-onboarding",
         "mode": "plan-only",

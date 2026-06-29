@@ -9,5 +9,7 @@ api_monitors:
     url: https://example.com/health
 private_synthetic_agent:
   enabled: true
+  # Defaults to the SaaS synthetic API host (matches the renderer default);
+  # override with your region-specific PSA Shepherd URL if it differs.
   shepherd_url: https://synthetic.api.appdynamics.com
   secret_name: appdynamics-synthetic-agent-secret

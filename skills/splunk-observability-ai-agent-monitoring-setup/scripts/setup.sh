@@ -240,7 +240,11 @@ case "${MODE}" in
         "${PYTHON_BIN}" "${SCRIPT_DIR}/render_assets.py" --discover
         ;;
     refresh-package-catalog)
-        "${PYTHON_BIN}" "${SCRIPT_DIR}/refresh_package_catalog.py" --output-dir "${OUTPUT_DIR}" ${JSON_OUTPUT:+--json}
+        if [[ "${JSON_OUTPUT}" == "true" ]]; then
+            "${PYTHON_BIN}" "${SCRIPT_DIR}/refresh_package_catalog.py" --output-dir "${OUTPUT_DIR}" --json
+        else
+            "${PYTHON_BIN}" "${SCRIPT_DIR}/refresh_package_catalog.py" --output-dir "${OUTPUT_DIR}"
+        fi
         ;;
 	    apply)
 	        run_render

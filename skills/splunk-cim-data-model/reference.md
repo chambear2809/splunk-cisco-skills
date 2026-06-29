@@ -8,7 +8,7 @@ acceleration configuration is an operational prerequisite, not a nicety.
 ## What This Skill Manages
 
 - Per-model acceleration settings in `datamodels.conf`.
-- Acceleration enable/disable and rebuild/backfill.
+- Acceleration enable/disable and rebuild/backfill guidance.
 - CIM population and compliance audits.
 
 It does not change the model definitions (constraints, fields) shipped by
@@ -45,9 +45,16 @@ Stage these overrides into a dedicated app `local/` directory. Never edit
 
 Changing `earliest_time` to a larger range, or enabling acceleration on a model
 with existing data, requires a rebuild/backfill to populate historical
-summaries. The rendered `rebuild.sh` is gated (requires typing `REBUILD`) and
-triggers a rebuild per model. You can also rebuild from
-**Settings > Data models > _model_ > Edit > Rebuild**.
+summaries. Splunk does not expose a supported public REST endpoint to trigger a
+rebuild, so the rendered `rebuild.sh` documents the supported mechanisms instead
+of calling an unofficial endpoint:
+
+- Automatic: Splunk rebuilds an accelerated model when its definition changes
+  (Automatic Rebuilds, on unless disabled).
+- Manual (UI): **Settings > Data models > _model_ > Edit > Rebuild**.
+- Force re-summarization via config: disable then re-enable acceleration by
+  re-rendering with `--acceleration false` then `--acceleration true` and running
+  `apply.sh` each time.
 
 Rebuilds consume search and indexer resources; schedule them off-peak.
 
@@ -60,7 +67,7 @@ the data is not CIM-mapped.
 The rendered `audit.sh` runs, per model:
 
 ```
-| tstats count from datamodel=<Model> where _time>=<range> by index sourcetype
+| tstats count from datamodel=<Model> where earliest=<range> by index sourcetype
 ```
 
 - Non-empty results: data is mapped and accelerated.

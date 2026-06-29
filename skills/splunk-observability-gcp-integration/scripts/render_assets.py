@@ -456,7 +456,7 @@ def render_terraform_main(spec: dict[str, Any]) -> str:
 
     named_token_line = f'  named_token = "{spec["named_token"]}"\n' if spec["named_token"] else ""
 
-    poll_rate_comment = "  # poll_rate is in MILLISECONDS for signalfx_gcp_integration"
+    poll_rate_comment = "  # poll_rate is in SECONDS for signalfx_gcp_integration (60-600)"
 
     if auth_mode == "service_account_key":
         psk = auth.get("project_service_keys") or []
@@ -496,7 +496,7 @@ resource "signalfx_gcp_integration" "this" {{
   enabled = true
 
 {poll_rate_comment}
-  poll_rate = {conn['poll_rate_seconds'] * 1000}
+  poll_rate = {conn['poll_rate_seconds']}
 
   import_gcp_metrics                    = {str(conn['import_gcp_metrics']).lower()}
   use_metric_source_project_for_quota   = {str(conn['use_metric_source_project_for_quota']).lower()}

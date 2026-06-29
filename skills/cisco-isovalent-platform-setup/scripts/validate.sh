@@ -13,6 +13,8 @@ KUBE_CONTEXT=""
 ALLOW_CURRENT_CONTEXT=false
 CILIUM_NAMESPACE="kube-system"
 TETRAGON_NAMESPACE="tetragon"
+CILIUM_NS_SET=false
+TETRAGON_NS_SET=false
 
 usage() {
     cat <<'EOF'
@@ -27,9 +29,11 @@ Options:
   --allow-current-context
                    Permit --live to use kubectl's active context
   --cilium-namespace NS
-                     Namespace for Cilium services (default: kube-system)
+                     Namespace for Cilium services (default: from rendered
+                     apply-plan.json, else kube-system)
   --tetragon-namespace NS
-                     Namespace for Tetragon services (default: tetragon)
+                     Namespace for Tetragon services (default: from rendered
+                     apply-plan.json, else tetragon)
   --live             Run helm status / kubectl probes against the cluster
   --help             Show this help
 EOF
@@ -40,8 +44,8 @@ while [[ $# -gt 0 ]]; do
         --output-dir) require_arg "$1" "$#" || exit 1; OUTPUT_DIR="$2"; shift 2 ;;
         --kube-context) require_arg "$1" "$#" || exit 1; KUBE_CONTEXT="$2"; shift 2 ;;
         --allow-current-context) ALLOW_CURRENT_CONTEXT=true; shift ;;
-        --cilium-namespace) require_arg "$1" "$#" || exit 1; CILIUM_NAMESPACE="$2"; shift 2 ;;
-        --tetragon-namespace) require_arg "$1" "$#" || exit 1; TETRAGON_NAMESPACE="$2"; shift 2 ;;
+        --cilium-namespace) require_arg "$1" "$#" || exit 1; CILIUM_NAMESPACE="$2"; CILIUM_NS_SET=true; shift 2 ;;
+        --tetragon-namespace) require_arg "$1" "$#" || exit 1; TETRAGON_NAMESPACE="$2"; TETRAGON_NS_SET=true; shift 2 ;;
         --live) LIVE=true; shift ;;
         --help|-h) usage; exit 0 ;;
         *) log "ERROR: Unknown option: $1"; usage; exit 1 ;;
@@ -51,6 +55,22 @@ done
 if [[ ! -d "${OUTPUT_DIR}" ]]; then
     log "ERROR: Rendered output directory not found: ${OUTPUT_DIR}"
     exit 1
+fi
+
+# Adopt the namespaces recorded in the rendered apply-plan when the operator did
+# not pass explicit flags. This lets setup.sh-driven validation (which only
+# passes --output-dir) honor non-default namespaces from the spec; explicit
+# --cilium-namespace/--tetragon-namespace still win, and the kube-system/tetragon
+# defaults remain when the plan is absent or omits them.
+if [[ -f "${OUTPUT_DIR}/apply-plan.json" ]]; then
+    rendered_cilium_ns=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print((d.get("live_action_state_contract",{}).get("namespaces") or {}).get("cilium",""))' "${OUTPUT_DIR}/apply-plan.json" 2>/dev/null || true)
+    rendered_tetragon_ns=$(python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); print((d.get("live_action_state_contract",{}).get("namespaces") or {}).get("tetragon",""))' "${OUTPUT_DIR}/apply-plan.json" 2>/dev/null || true)
+    if [[ "${CILIUM_NS_SET}" == "false" && -n "${rendered_cilium_ns}" ]]; then
+        CILIUM_NAMESPACE="${rendered_cilium_ns}"
+    fi
+    if [[ "${TETRAGON_NS_SET}" == "false" && -n "${rendered_tetragon_ns}" ]]; then
+        TETRAGON_NAMESPACE="${rendered_tetragon_ns}"
+    fi
 fi
 
 check_file() {

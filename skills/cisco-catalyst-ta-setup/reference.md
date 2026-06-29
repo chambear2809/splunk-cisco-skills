@@ -2,6 +2,11 @@
 
 Complete catalog of all data inputs, default arguments, and recommended index mapping.
 
+> Note: The "Default Interval" columns below reflect the TA package's shipped
+> per-input defaults. `setup.sh` enables inputs with a uniform `interval=3600`
+> (overriding these defaults); adjust the interval per input afterward if a
+> higher-frequency source (e.g., audit logs) needs it.
+
 ## Catalyst Center (DNAC) Inputs
 
 Input type prefix: `cisco_catalyst_dnac_`

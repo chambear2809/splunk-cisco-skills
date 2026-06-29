@@ -102,8 +102,12 @@ index={{transaction_index}}
         "expected_indexes": ["{{transaction_index}}", "{{risk_index}}"],
         "expected_macros": ["fraud_indexes", "risk_index"],
         "products": {"es": {"installed": True}},
-        "es": {"risk_index": "{{risk_index}}", "correlation_search_activation_policy": "review-only"},
-        "cim": {"expected_models": ["Authentication", "Change", "Risk", "Transaction"]},
+        # "Risk" is an ES-shipped data model (not a Splunk_SA_CIM model); group it under "es".
+        "es": {"risk_index": "{{risk_index}}", "correlation_search_activation_policy": "review-only", "expected_data_models": ["Risk"]},
+        # CIM lists only genuine Splunk_SA_CIM data models.
+        "cim": {"expected_models": ["Authentication", "Change"]},
+        # "Transaction" is defined by the Splunk_Fraud_Analytics app itself, not CIM.
+        "app": {"name": "Splunk_Fraud_Analytics", "expected_data_models": ["Transaction"]},
         "handoffs": ["splunk-fraud-analytics-setup", "splunk-enterprise-security-config", "splunk-lookup-file-editing-setup"],
     },
 }

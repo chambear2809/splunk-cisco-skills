@@ -123,7 +123,6 @@ script_with_integrity_re = re.compile(r"<script\s+src=\"[^\"]+\"\s+integrity=\"s
 exact_script_re = re.compile(r'<script\s+src="https://[^"]+/o11y-gdi-rum/v\d+\.\d+\.\d+/[^"]+"[^>]*>')
 session_replay_init_re = re.compile(r"SplunkSessionRecorder\.init\(")
 rum_init_re = re.compile(r"SplunkRum\.init\(")
-allow_latest = bool(json.loads((root / "metadata.json").read_text(encoding="utf-8")).get("allow_latest_version"))
 
 # rrweb-legacy options that should not appear when recorder=splunk.
 rrweb_legacy_keys = re.compile(r"\b(maskTextSelector|maskInputOptions|maskTextClass|inlineImages|collectFonts)\b")
@@ -161,7 +160,7 @@ if metadata.get("session_replay_enabled"):
 
 # Mode A.i nginx config invariants
 for path, text in content_corpus:
-    if "splunk-rum.conf" in path.name and "ConfigMap" in text:
+    if "splunk-rum.conf" in text and "kind: ConfigMap" in text:
         if "sub_filter_types text/html;" not in text:
             errors.append(f"{path}: nginx ConfigMap missing 'sub_filter_types text/html;'.")
         if "Accept-Encoding" not in text:

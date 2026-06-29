@@ -122,7 +122,7 @@ def render_backup(args: argparse.Namespace) -> str:
         f"""splunk={splunk}
 archive_name={archive}
 # Add -auth user:"$(cat /path/to/secret)" if not authenticating interactively.
-"${{splunk}}" backup kvstore --archiveName "${{archive_name}}"
+"${{splunk}}" backup kvstore -archiveName "${{archive_name}}"
 echo "Backup archive '${{archive_name}}' created under \\$SPLUNK_HOME/var/lib/splunk/kvstorebackup/."
 """
     )
@@ -144,7 +144,7 @@ echo "This OVERWRITES current KV Store collection data. A fresh backup is strong
 read -r -p "Type RESTORE to continue: " confirm
 [[ "${{confirm}}" == "RESTORE" ]] || {{ echo "Aborted."; exit 1; }}
 # Add -auth user:"$(cat /path/to/secret)" if not authenticating interactively.
-"${{splunk}}" restore kvstore --archiveName "${{archive_name}}"
+"${{splunk}}" restore kvstore -archiveName "${{archive_name}}"
 echo "Restore requested. Re-run status.sh to confirm collections and replication."
 """
     )

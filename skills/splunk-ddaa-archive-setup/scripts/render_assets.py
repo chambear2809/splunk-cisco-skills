@@ -137,7 +137,10 @@ Index type: `{args.index_type}`
 
 Files:
 
-- `acs-payload.json` - ACS index body with `splunkArchivalRetentionDays`
+- `acs-payload.json` - ACS create body (POST a NEW index): `name`, `datatype`,
+  `searchableDays`, `splunkArchivalRetentionDays`. To enable/update DDAA on an
+  EXISTING index, PATCH `/<stack>/adminconfig/v2/indexes/<name>` with only
+  `splunkArchivalRetentionDays` (do not resend `searchableDays`).
 - `restore-runbook.md` - UI-only restore steps (30-day searchable copy)
 - `disable-runbook.md` - UI-only disable steps
 - `status.sh` - `acs indexes describe {args.index}`

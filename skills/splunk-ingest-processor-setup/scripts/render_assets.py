@@ -101,7 +101,16 @@ FEATURE_COVERAGE = [
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--phase", choices=("render", "doctor", "status", "validate", "all"), default="render")
+    parser.add_argument(
+        "--phase",
+        choices=("render", "doctor", "status", "validate", "all"),
+        default="render",
+        help=(
+            "render emits the offline packet; doctor/status/validate/all additionally "
+            "run the same offline structural validation (Ingest Processor has no public "
+            "REST API for live status, so doctor and status are offline aliases of validate)."
+        ),
+    )
     parser.add_argument("--output-dir", default=str(DEFAULT_OUTPUT_DIR))
     parser.add_argument("--tenant-name", default="example-prod")
     parser.add_argument("--stack-url", default="https://example-prod.scs.splunk.com")

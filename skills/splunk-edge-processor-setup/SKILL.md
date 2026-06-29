@@ -6,7 +6,7 @@ description: >-
   10.0+ data management control planes. Covers EP objects, TLS / mTLS, Linux or
   Docker instances, multi-instance scale-out, source types, destinations,
   SPL2 pipelines with splunk-spl2-pipeline-kit linting, apply handoffs, default
-  destination guardrails, sizing preflight, ACS allowlist stubs, and
+  destination guardrails, ACS allowlist stubs, and
   AI-powered data management readiness handoffs. Use when installing Edge
   Processor, managing EP pipelines, routing forwarders, or handling Cisco Data
   Fabric / telemetry pipeline management requests that need Splunk Platform
@@ -143,7 +143,7 @@ Under `splunk-edge-processor-rendered/`:
 - `forwarder-templates/outputs.conf` — DNS-driven forwarder outputs.
 - `pipelines/templates/*.spl2` — shared SPL2 starters from
   `splunk-spl2-pipeline-kit` for the `edgeProcessor` profile.
-- `validate.sh` — control-plane health, default-destination guard, sizing check.
+- `validate.sh` — control-plane health and default-destination guard.
 - `handoffs/acs-allowlist.json` — ACS allowlist plan stub for `s2s` + `hec` features.
 
 ## Out of Scope
@@ -162,6 +162,6 @@ Under `splunk-edge-processor-rendered/`:
 ## References
 
 - [reference.md](reference.md) for full source-type / destination /
-  pipeline syntax, the systemd unit template, the sizing-preflight table,
+  pipeline syntax, the systemd unit template,
   and the ACS allowlist hand-off contract.
 - [template.example](template.example) for the non-secret intake worksheet.

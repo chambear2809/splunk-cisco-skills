@@ -196,8 +196,8 @@ Input type: `custom_input` (up to 10 total)
 | CIM Data Model | Eventtype | Sourcetype | Events |
 |---|---|---|---|
 | Alerts | `alerts` | `cisco:intersight:alarms` | All alarms |
-| Authentication | `authentication` | `cisco:intersight:auditRecords` | Login, Logout |
-| Change | `change` | `cisco:intersight:auditRecords` | Created, Modified, Deleted, Permission changes |
+| Authentication | `authentication` | `cisco:intersight:auditrecords` | Login, Logout |
+| Change | `change` | `cisco:intersight:auditrecords` | Created, Modified, Deleted, Permission changes |
 | Performance (Facilities) | `performance_facilities` | `cisco:intersight:metrics` | fan, host, temperature |
 | Performance (Memory) | `performance_memory` | `cisco:intersight:metrics` | memory |
 | Performance (Network) | `performance_network` | `cisco:intersight:metrics` | network |

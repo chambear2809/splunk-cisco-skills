@@ -165,7 +165,7 @@ Under `splunk-indexer-cluster-rendered/cluster/`:
 - `redundancy/{lb-haproxy.cfg, dns-record-template.txt, ha-health-check.sh}` (when redundancy enabled).
 - `migration/{single-to-multisite.sh, replace-manager.sh, decommission-site.sh, move-peer-to-site.sh, migrate-non-clustered.sh}`.
 - `forwarder-outputs/<host>/outputs.conf` — indexer-discovery snippets for HF/UF.
-- `validate.sh` — `splunk show cluster-status --verbose`, REST `/services/cluster/manager/health`, peer count vs. RF, bundle status, version compat.
+- `validate.sh` — REST cluster-manager audit snapshot (info/health/peers/sites/buckets/generation/status + bundle status) saved under `audit/<timestamp>/`, then gates on the `/services/cluster/manager/info` `preflight_check_passed` field (PASS/FAIL).
 
 ## Hand-off Contracts
 

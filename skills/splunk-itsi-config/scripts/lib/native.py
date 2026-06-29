@@ -1401,29 +1401,37 @@ class NativeWorkflow:
             discovery["notable_event_action_details"] = action_details
         if discovery:
             inventory["discovery"] = discovery
+        retirable_info: dict[str, Any] | None = None
+        # entity/count_retirable is a count-only endpoint ({"count": N}); the count is
+        # authoritative. The list helper only contributes item titles when the
+        # endpoint actually returns objects, so inventory matches what retire applies.
+        if hasattr(self.client, "count_retirable_entities"):
+            try:
+                retirable_info = {"count": self.client.count_retirable_entities()}
+            except Exception as exc:
+                retirable_info = {"status": "unavailable", "message": str(exc)}
         if hasattr(self.client, "retirable_entities"):
             try:
-                retirable_entities = self.client.retirable_entities()
-                inventory["retirable_entities"] = {
-                    "count": len(retirable_entities),
-                    "items": [
+                listed = self.client.retirable_entities()
+                if listed:
+                    items = [
                         compact(
                             {
                                 "_key": item.get("_key"),
                                 "title": item.get("title") or item.get("name"),
                             }
                         )
-                        for item in retirable_entities
+                        for item in listed
                         if isinstance(item, dict)
-                    ],
-                }
+                    ]
+                    if retirable_info is None or "count" not in retirable_info:
+                        retirable_info = {"count": len(listed)}
+                    retirable_info["items"] = items
             except Exception as exc:
-                inventory["retirable_entities"] = {"status": "unavailable", "message": str(exc)}
-        elif hasattr(self.client, "count_retirable_entities"):
-            try:
-                inventory["retirable_entities"] = {"count": self.client.count_retirable_entities()}
-            except Exception as exc:
-                inventory["retirable_entities"] = {"status": "unavailable", "message": str(exc)}
+                if retirable_info is None:
+                    retirable_info = {"status": "unavailable", "message": str(exc)}
+        if retirable_info is not None:
+            inventory["retirable_entities"] = retirable_info
         entity_discovery_keys = _unique_nonblank_strings(
             inventory_options.get("entity_discovery_entity_keys") or inventory_options.get("entity_discovery_keys"),
             "inventory.entity_discovery_entity_keys",
@@ -2728,20 +2736,10 @@ class NativeWorkflow:
                     )
                 retirable_count = None
                 retirable_entities = None
-                if hasattr(self.client, "retirable_entities"):
-                    try:
-                        retirable_entities = self.client.retirable_entities()
-                        retirable_count = len(retirable_entities)
-                    except Exception as exc:
-                        result.diagnostics.append(
-                            {
-                                "status": "warn",
-                                "object_type": "operational_action",
-                                "title": title,
-                                "message": f"Could not read entity/count_retirable target list before retire_retirable: {exc}",
-                            }
-                        )
-                if retirable_count is None and hasattr(self.client, "count_retirable_entities"):
+                # entity/count_retirable returns a count-only body ({"count": N}); make the
+                # count authoritative so preview and apply agree, and only treat the list
+                # helper as a source of item titles when it actually returns objects.
+                if hasattr(self.client, "count_retirable_entities"):
                     try:
                         retirable_count = self.client.count_retirable_entities()
                     except Exception as exc:
@@ -2751,6 +2749,22 @@ class NativeWorkflow:
                                 "object_type": "operational_action",
                                 "title": title,
                                 "message": f"Could not read entity/count_retirable before retire_retirable: {exc}",
+                            }
+                        )
+                if hasattr(self.client, "retirable_entities"):
+                    try:
+                        listed = self.client.retirable_entities()
+                        if listed:
+                            retirable_entities = listed
+                            if retirable_count is None:
+                                retirable_count = len(listed)
+                    except Exception as exc:
+                        result.diagnostics.append(
+                            {
+                                "status": "warn",
+                                "object_type": "operational_action",
+                                "title": title,
+                                "message": f"Could not read entity/count_retirable target list before retire_retirable: {exc}",
                             }
                         )
                 if retirable_entities is not None:

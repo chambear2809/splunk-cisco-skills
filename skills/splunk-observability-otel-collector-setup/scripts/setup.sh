@@ -74,6 +74,8 @@ Kubernetes options:
   --render-priority-class       Render a priority class manifest helper
   --windows-nodes               Render values for Windows worker nodes
   --disable-cluster-receiver    Disable the cluster receiver deployment
+  --gateway                     Enable the collector gateway deployment
+  --gateway-replicas N          Gateway replica count (default: 1)
   --disable-agent-host-network  Set agent.hostNetwork=false
   --enable-platform-persistent-queue
   --platform-persistent-queue-path PATH

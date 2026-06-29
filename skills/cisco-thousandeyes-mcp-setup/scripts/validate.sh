@@ -82,14 +82,22 @@ if [[ -f "${OUTPUT_DIR}/mcp/codex-register-te-mcp.sh" ]]; then
         log "ERROR: codex-register-te-mcp.sh is not executable."
         exit 1
     fi
-    grep -q 'api.thousandeyes.com/mcp' "${OUTPUT_DIR}/mcp/codex-register-te-mcp.sh" || {
-        log "ERROR: codex-register-te-mcp.sh does not reference api.thousandeyes.com/mcp."
-        exit 1
-    }
-    grep -q 'codex mcp add' "${OUTPUT_DIR}/mcp/codex-register-te-mcp.sh" || {
-        log "ERROR: codex-register-te-mcp.sh does not invoke 'codex mcp add'."
-        exit 1
-    }
+    # The bearer-auth Codex helper is an intentional stub: it refuses to
+    # auto-register (mcp-remote --header would leak the token on argv) and so
+    # contains neither the MCP URL nor a 'codex mcp add' invocation. Only the
+    # oauth2 rendering performs registration, so apply the URL/add checks there.
+    if grep -q 'auto-registration is disabled' "${OUTPUT_DIR}/mcp/codex-register-te-mcp.sh"; then
+        :
+    else
+        grep -q 'api.thousandeyes.com/mcp' "${OUTPUT_DIR}/mcp/codex-register-te-mcp.sh" || {
+            log "ERROR: codex-register-te-mcp.sh does not reference api.thousandeyes.com/mcp."
+            exit 1
+        }
+        grep -q 'codex mcp add' "${OUTPUT_DIR}/mcp/codex-register-te-mcp.sh" || {
+            log "ERROR: codex-register-te-mcp.sh does not invoke 'codex mcp add'."
+            exit 1
+        }
+    fi
 fi
 
 if [[ "${ANY_CLIENT_FOUND}" != "true" ]]; then

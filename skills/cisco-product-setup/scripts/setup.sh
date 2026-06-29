@@ -1538,7 +1538,7 @@ run_security_cloud_configure() {
 }
 
 run_secure_access_configure() {
-    local account_cmd settings_cmd tmp_output status effective_org_id
+    local account_cmd settings_cmd tmp_output status effective_org_id=""
     account_cmd=(bash "${SCRIPT_DIR}/../../cisco-secure-access-setup/scripts/configure_account.sh")
     settings_cmd=(bash "${SCRIPT_DIR}/../../cisco-secure-access-setup/scripts/configure_settings.sh")
 

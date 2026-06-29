@@ -470,7 +470,7 @@ def oauth_token(controller_url: str, account_name: str, api_client_name: str, cl
     data = parse.urlencode(
         {
             "grant_type": "client_credentials",
-            "client_id": f"{api_client_name}@{account_name}",
+            "client_id": api_client_name if "@" in api_client_name else f"{api_client_name}@{account_name}",
             "client_secret": secret,
         }
     ).encode("utf-8")

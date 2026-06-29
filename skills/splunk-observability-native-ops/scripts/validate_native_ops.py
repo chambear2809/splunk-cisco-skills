@@ -74,7 +74,12 @@ def validate_rendered_output(output_dir: Path) -> dict[str, Any]:
             raise SpecError(f"apply-plan.json actions[{index}] cannot use coverage {coverage!r}.")
         path = str(action.get("path", ""))
         service = str(action.get("service", "o11y"))
-        if service not in {"o11y", "synthetics", "on_call"}:
+        if service == "on_call":
+            raise SpecError(
+                f"apply-plan.json actions[{index}] uses service 'on_call'; this skill renders On-Call "
+                "as handoffs only. Use the splunk-oncall-setup skill for Splunk On-Call API actions."
+            )
+        if service not in {"o11y", "synthetics"}:
             raise SpecError(f"apply-plan.json actions[{index}] uses unsupported service {service!r}.")
         if not path.startswith("/"):
             raise SpecError(f"apply-plan.json actions[{index}] path must start with '/': {path}")

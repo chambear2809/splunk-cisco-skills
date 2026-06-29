@@ -41,8 +41,8 @@ AI_TOOLKIT = {
 DSDL = {
     "app_id": "4607",
     "app_name": "mltk-container",
-    "version": "5.2.3",
-    "date": "February 5, 2026",
+    "version": "5.2.4",
+    "date": "May 22, 2026",
     "source_url": "https://splunkbase.splunk.com/app/4607",
     "components_doc_url": "https://help.splunk.com/en/splunk-enterprise/apply-machine-learning/use-splunk-app-for-data-science-and-deep-learning/5.2/about-the-splunk-app-for-data-science-and-deep-learning/splunk-app-for-data-science-and-deep-learning-components",
 }

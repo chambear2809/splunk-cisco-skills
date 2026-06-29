@@ -633,6 +633,11 @@ trap 'rm -rf "${{TMPDIR_LOCAL}}"' EXIT
 helm get values "${{RELEASE}}" -n "${{NAMESPACE}}" -o yaml > "${{TMPDIR_LOCAL}}/current-values.yaml"
 yq eval-all '. as $i ireduce ({{}}; . * $i)' "${{TMPDIR_LOCAL}}/current-values.yaml" "${{OVERLAY}}" > "${{TMPDIR_LOCAL}}/merged.yaml"
 
+# Stage the access token in a temp file (no trailing newline) so it is passed
+# to helm via --set-file and never appears in process arguments.
+printf '%s' "$(cat "${{O11Y_TOKEN_FILE}}")" > "${{TMPDIR_LOCAL}}/o11y-access-token"
+chmod 600 "${{TMPDIR_LOCAL}}/o11y-access-token"
+
 DRY_RUN_FLAG=()
 if [[ "${{K8S_APPLY_DRY_RUN:-false}}" == "true" ]]; then
     DRY_RUN_FLAG=(--dry-run)
@@ -642,7 +647,7 @@ fi
 helm upgrade --install "${{RELEASE}}" "${{CHART_REF}}" \\
     --namespace "${{NAMESPACE}}" \\
     --values "${{TMPDIR_LOCAL}}/merged.yaml" \\
-    --set "splunkObservability.accessToken=$(cat "${{O11Y_TOKEN_FILE}}")" \\
+    --set-file "splunkObservability.accessToken=${{TMPDIR_LOCAL}}/o11y-access-token" \\
     --atomic \\
     --timeout 5m \\
     "${{DRY_RUN_FLAG[@]}}"

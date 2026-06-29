@@ -643,13 +643,13 @@ resource raReader 'Microsoft.Authorization/roleAssignments@2022-04-01' = {{
 
 def render_handoff_ta_3110(spec: dict[str, Any]) -> str:
     return """#!/usr/bin/env bash
-# Hand-off: Azure log ingestion via Splunk_TA_microsoft_cloud_services (Splunkbase 3110).
+# Hand-off: Azure log ingestion via Splunk_TA_microsoft-cloudservices (Splunkbase 3110).
 # Azure Monitor metrics go through Splunk Observability; Azure logs land in Splunk Platform.
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
-echo "==> Install Splunk_TA_microsoft_cloud_services (Splunkbase 3110) for Azure log ingestion:"
+echo "==> Install Splunk_TA_microsoft-cloudservices (Splunkbase 3110) for Azure log ingestion:"
 echo "    bash ${PROJECT_ROOT}/skills/splunk-app-install/scripts/install_app.sh --source splunkbase --app-id 3110"
 echo ""
 echo "==> After install, configure Azure AD inputs in the TA for:"

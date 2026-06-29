@@ -110,7 +110,7 @@ ok=true
 (( ${#missing[@]} == 0 )) || ok=false
 
 if [[ "${JSON_OUTPUT}" == "true" ]]; then
-    printf '{"target":"agent-management","render_dir":"%s","ok":%s,"missing":%s}\n' "${render_dir}" "${ok}" "$(json_array "${missing[@]}")"
+    printf '{"target":"agent-management","render_dir":"%s","ok":%s,"missing":%s}\n' "${render_dir}" "${ok}" "$(json_array ${missing[@]+"${missing[@]}"})"
 else
     if [[ "${ok}" == "true" ]]; then
         log "Rendered agent management assets are present under ${render_dir}."

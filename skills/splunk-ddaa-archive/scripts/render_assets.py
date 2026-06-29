@@ -76,8 +76,8 @@ def int_arg(value: str, option: str) -> int:
 def validate(args: argparse.Namespace) -> None:
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", args.stack or ""):
         die("--stack must be a valid Splunk Cloud stack name.")
-    if not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9_-]*", args.index or ""):
-        die("--index must be a valid index name.")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,79}", args.index or ""):
+        die("--index must be a valid Splunk index name (lowercase letters, numbers, underscore, hyphen).")
     if "kvstore" in args.index:
         die("--index must not contain 'kvstore'.")
     searchable = int_arg(args.searchable_days, "--searchable-days")

@@ -11,11 +11,12 @@ ingestion validation is emitted in validation-searches.spl.
 EOF
     exit 0
 fi
+source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 
 INDEX="scom"
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --index) INDEX="$2"; shift 2 ;;
+        --index) require_arg "$1" $# || exit 1; INDEX="$2"; shift 2 ;;
         *) echo "ERROR: Unknown option: $1" >&2; exit 1 ;;
     esac
 done

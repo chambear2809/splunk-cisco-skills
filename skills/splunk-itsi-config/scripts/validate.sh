@@ -47,6 +47,19 @@ if [[ -z "${WORKFLOW}" || -z "${SPEC_PATH}" ]]; then
   exit 1
 fi
 
+case "${WORKFLOW}" in
+  native|content-packs|topology) ;;
+  *)
+    echo "Unsupported workflow: ${WORKFLOW} (expected native|content-packs|topology)" >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! -f "${SPEC_PATH}" ]]; then
+  echo "Spec file not found: ${SPEC_PATH}" >&2
+  exit 1
+fi
+
 load_splunk_connection_settings >/dev/null 2>&1 || true
 if [[ -n "${SPLUNK_USER:-}" ]]; then
   SPLUNK_USERNAME="${SPLUNK_USER}"

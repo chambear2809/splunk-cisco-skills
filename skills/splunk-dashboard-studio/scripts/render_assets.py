@@ -251,29 +251,43 @@ def build_xml(args: argparse.Namespace, definition: dict) -> str:
 
 
 def render_apply(args: argparse.Namespace, dashboard_id: str) -> str:
-    splunk = shell_quote(f"{args.splunk_home}/bin/splunk")
     owner = shell_quote(args.owner)
     app = shell_quote(args.app)
     did = shell_quote(dashboard_id)
     return make_script(
-        f"""splunk={splunk}
-owner={owner}
+        f"""owner={owner}
 app={app}
 dashboard_id={did}
-xml="$(cat dashboard.xml)"
-base="/servicesNS/${{owner}}/${{app}}/data/ui/views"
+mgmt_uri="${{SPLUNK_MGMT_URI:-https://localhost:8089}}"
+base="${{mgmt_uri}}/servicesNS/${{owner}}/${{app}}/data/ui/views"
+
+# Authenticate without putting secrets on the command line:
+#   SPLUNK_CURL_CONFIG=/path/to/curl.cfg  # chmod 600; e.g. a line: user = "admin:<password>"
+# or SPLUNK_USERNAME=<user>               # curl prompts for the password interactively
+auth=()
+if [[ -n "${{SPLUNK_CURL_CONFIG:-}}" ]]; then
+  auth=(--config "${{SPLUNK_CURL_CONFIG}}")
+elif [[ -n "${{SPLUNK_USERNAME:-}}" ]]; then
+  auth=(--user "${{SPLUNK_USERNAME}}")
+else
+  echo "Set SPLUNK_CURL_CONFIG=/path/to/curl.cfg (chmod 600) or SPLUNK_USERNAME=<user> first." >&2
+  exit 1
+fi
 
 echo "Publishing Dashboard Studio view '${{dashboard_id}}' to app '${{app}}' (owner ${{owner}})."
 read -r -p "Type APPLY to continue: " confirm
 [[ "${{confirm}}" == "APPLY" ]] || {{ echo "Aborted."; exit 1; }}
 
-# Authenticate against splunkd interactively or via an existing session.
-if "${{splunk}}" _internal call "${{base}}/${{dashboard_id}}" >/dev/null 2>&1; then
+# eai:data is read from dashboard.xml; the definition is never passed on the command line.
+if curl -ks -f "${{auth[@]}}" "${{base}}/${{dashboard_id}}" -o /dev/null; then
   echo "View exists; updating definition."
-  "${{splunk}}" _internal call "${{base}}/${{dashboard_id}}" -post:"eai:data" "${{xml}}" -method POST
+  curl -ks -f "${{auth[@]}}" "${{base}}/${{dashboard_id}}" \\
+    --data-urlencode "eai:data@dashboard.xml" -o /dev/null
 else
   echo "Creating new view."
-  "${{splunk}}" _internal call "${{base}}" -post:name "${{dashboard_id}}" -post:"eai:data" "${{xml}}" -method POST
+  curl -ks -f "${{auth[@]}}" "${{base}}" \\
+    --data-urlencode "name=${{dashboard_id}}" \\
+    --data-urlencode "eai:data@dashboard.xml" -o /dev/null
 fi
 echo "Done. Open Apps > ${{app}} to view '${{dashboard_id}}'."
 """

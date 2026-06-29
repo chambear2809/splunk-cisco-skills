@@ -7,6 +7,7 @@ source "${SCRIPT_DIR}/../../shared/lib/credential_helpers.sh"
 APP_NAME="SplunkEnterpriseSecuritySuite"
 APP_ID="263"
 APP_INSTALL_SCRIPT="${APP_INSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/install_app.sh}"
+APP_UNINSTALL_SCRIPT="${APP_UNINSTALL_SCRIPT:-${SCRIPT_DIR}/../../splunk-app-install/scripts/uninstall_app.sh}"
 VALIDATE_SCRIPT="${VALIDATE_SCRIPT:-${SCRIPT_DIR}/validate.sh}"
 
 DO_INSTALL=false
@@ -879,12 +880,12 @@ run_uninstall() {
     log "  Keeping missioncontrol installed; Splunk ES 8.x documents it as part of Enterprise Security."
     log "  Uninstalling ${APP_NAME} and removable support apps..."
     local apps_to_remove=("${APP_NAME}" "${framework_apps[@]}")
-    local remover="${APP_INSTALL_SCRIPT}"
+    local remover="${APP_UNINSTALL_SCRIPT}"
     local uninstall_log
     for app in "${apps_to_remove[@]}"; do
         if rest_check_app "${SK}" "${SPLUNK_URI}" "${app}" 2>/dev/null; then
             uninstall_log="$(mktemp)"
-            if bash "${remover}" --uninstall --app-name "${app}" --no-restart \
+            if bash "${remover}" --app-name "${app}" --no-restart --yes \
                 >"${uninstall_log}" 2>&1; then
                 log "    removed ${app}"
             else

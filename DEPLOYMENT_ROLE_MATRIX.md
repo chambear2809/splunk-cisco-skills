@@ -266,9 +266,9 @@ For Cloud-specific install and API behavior, see
 | `MongoDB JDBC Driver Add-on for Splunk DB Connect` | `splunk-db-connect-setup` | Supported | None | Supported | None | None |
 | `Amazon Athena JDBC Driver Add-on for Splunk DB Connect` | `splunk-db-connect-setup` | Supported | None | Supported | None | None |
 | `Splunk_TA_sim` | `splunk-observability-cloud-integration-setup` | Required | None | Supported | None | None |
-| `Splunk_TA_microsoft_cloud_services` | `splunk-observability-azure-integration` | Supported | None | Required | None | None |
+| `Splunk_TA_microsoft-cloudservices` | `splunk-observability-azure-integration` | Supported | None | Required | None | None |
 | `microsoft_azure_app` | `splunk-observability-azure-integration` | Required | None | None | None | None |
-| `Splunk_TA_google_cloud_platform` | `splunk-observability-gcp-integration` | Supported | None | Required | None | None |
+| `Splunk_TA_google-cloudplatform` | `splunk-observability-gcp-integration` | Supported | None | Required | None | None |
 | `Splunk_TA_Google_Workspace` | `splunk-google-workspace-ta-setup` | Required | None | Supported | None | None |
 | `Splunk_TA_MS_Security` | `splunk-microsoft-security-ta-setup` | Required | None | Supported | None | None |
 | `Splunk_TA_microsoft_sysmon` | `splunk-sysmon-ta-setup` | Required | Supported | Supported | Supported | None |

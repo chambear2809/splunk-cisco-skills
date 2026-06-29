@@ -115,15 +115,15 @@ agent:
 
 **Symptom**: A grep over the production values file (`6-splunk-otel-collector-values.yaml`) revealed a HEC token in plaintext at line 412.
 
-**Root cause**: An operator hand-edited the values file to put the token inline instead of using the `--set splunkObservability.accessToken=$(cat $TOKEN_FILE)` pattern.
+**Root cause**: An operator hand-edited the values file to put the token inline instead of using the `--set-file splunkObservability.accessToken=$TOKEN_FILE` pattern (which keeps the token out of both the values file and the process command line).
 
 **Fix**:
 
 1. Rotated the leaked token immediately.
 2. Removed the inline token from the values file.
-3. Established the convention: NEVER hand-edit a values file with secrets; always use `helm upgrade ... --reuse-values --set ...accessToken="$(cat $TOKEN_FILE)"`.
+3. Established the convention: NEVER hand-edit a values file with secrets; always use `helm upgrade ... --reuse-values --set-file splunkObservability.accessToken=$TOKEN_FILE`. (Avoid `--set ...=$(cat $TOKEN_FILE)`, which exposes the token in `ps`/argv.)
 
-**Prevention**: The umbrella's renderer NEVER writes tokens to the rendered overlay. The validate.sh script rejects any rendered file containing token-shaped strings. The handoff scripts include the `--set ...accessToken="$(cat $TOKEN_FILE)"` pattern explicitly.
+**Prevention**: The umbrella's renderer NEVER writes tokens to the rendered overlay. The validate.sh script rejects any rendered file containing token-shaped strings. The handoff scripts use the `--set-file splunkObservability.accessToken=$TOKEN_FILE` pattern explicitly.
 
 ## Issue 6: cluster-receiver pod evicted (OOMKilled)
 

@@ -111,13 +111,13 @@ fi
 # Validate IAM JSON shape (must parse + have Version + Statement[]).
 if [[ -d "${OUTPUT_DIR}/iam" ]]; then
     while IFS= read -r -d '' file; do
-        if ! "${PYTHON_BIN}" -c "
+        if ! "${PYTHON_BIN}" - "${file}" >/dev/null 2>&1 <<'PY'; then
 import json, sys
-data = json.loads(open('${file}').read())
+data = json.loads(open(sys.argv[1]).read())
 assert isinstance(data, dict), 'must be object'
 assert data.get('Version') == '2012-10-17', 'Version mismatch'
 assert isinstance(data.get('Statement'), list), 'Statement must be a list'
-" >/dev/null 2>&1; then
+PY
             failures+=("malformed IAM policy: ${file#"${OUTPUT_DIR}"/}")
         fi
     done < <(find "${OUTPUT_DIR}/iam" -type f -name "*.json" -print0)
@@ -125,8 +125,13 @@ fi
 
 # Live checks (best-effort; do not FAIL when external state is unknown).
 if [[ "${LIVE}" == "true" ]]; then
-    # Verify the CFN template URL responds.
-    cfn_url="https://o11y-public.s3.amazonaws.com/aws-cloudformation-templates/release/template_metric_streams_regional.yaml"
+    # Verify the CFN template URL responds. Prefer the URL actually rendered into
+    # the plan (honors spec.metric_streams.cloudformation_template_url and the
+    # --cfn-template-url override); fall back to the canonical default.
+    cfn_url="$(grep -hoE 'https://[A-Za-z0-9.-]+/[A-Za-z0-9/_.-]*template_metric_streams[A-Za-z0-9/_.-]*\.yaml' "${OUTPUT_DIR}/05-metric-streams.md" 2>/dev/null | head -n1 || true)"
+    if [[ -z "${cfn_url}" ]]; then
+        cfn_url="https://o11y-public.s3.amazonaws.com/aws-cloudformation-templates/release/template_metric_streams_regional.yaml"
+    fi
     if command -v curl >/dev/null 2>&1; then
         status_code=$(curl -sS -o /dev/null -w "%{http_code}" -I "${cfn_url}" 2>/dev/null || echo "000")
         if [[ "${status_code}" =~ ^(200|301|302)$ ]]; then
