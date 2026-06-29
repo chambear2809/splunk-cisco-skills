@@ -1,0 +1,6 @@
+{
+  "api_version": "splunk-observability-coding-agent-instrumentation-setup/v1",
+  "agent": "codex",
+  "destination": "local-collector"
+}
+

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Splunk O11y Codex Instrumentation"
+  short_description: "Instrument Codex with Splunk O11y."
+  default_prompt: "Use $splunk-observability-codex-instrumentation-setup to render, validate, or safely apply Codex telemetry profiles for Splunk Observability."
+
+policy:
+  allow_implicit_invocation: true

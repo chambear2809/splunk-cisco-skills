@@ -1,0 +1,26 @@
+{
+  "api_version": "splunk-observability-codex-instrumentation-setup/v1",
+  "codex": {
+    "codex_home": "",
+    "environment": "prod",
+    "service_name": "codex-cli",
+    "realm": "us0",
+    "destination": "local-collector",
+    "enable_native_logs": false,
+    "enable_advanced_genai_spans": true,
+    "content_capture": false,
+    "accept_content_capture": false,
+    "enable_ai_defense": false,
+    "accept_ai_defense_content_inspection": false,
+    "local_collector_endpoint": "http://127.0.0.1:14318",
+    "external_collector_protocol": "otlp-http",
+    "external_trace_endpoint": "",
+    "external_metric_endpoint": "",
+    "external_log_endpoint": "",
+    "external_headers": {
+      "x-otlp-routing": "codex"
+    },
+    "external_tls": {}
+  }
+}
+

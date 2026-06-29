@@ -1433,6 +1433,32 @@
       "notes": "Render-first orchestration for Splunk AI Agent Monitoring and AI Infrastructure Monitoring. Requires external collector runtime for traces/metrics/logs, Splunk Platform HEC and Log Observer Connect prerequisites for evaluation/content event correlation, and delegates dashboards/detectors to native Observability skills. UI-only AI Agent Monitoring connection/index selection remains a deeplink handoff."
     },
     {
+      "skill": "splunk-observability-coding-agent-instrumentation-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "none"
+      },
+      "cloud_pairing": [],
+      "notes": "Coding-agent telemetry parent router only. Emits child orchestration plans and does not mutate Splunk Platform, collector, or agent runtime placement."
+    },
+    {
+      "skill": "splunk-observability-codex-instrumentation-setup",
+      "role_support": {
+        "search-tier": "none",
+        "indexer": "none",
+        "heavy-forwarder": "none",
+        "universal-forwarder": "none",
+        "external-collector": "supported"
+      },
+      "cloud_pairing": [
+        "external-collector"
+      ],
+      "notes": "Codex CLI host instrumentation workflow. Renders user-level CODEX_HOME OTel profiles, local/external collector or direct Splunk Observability destinations, JSONL runtime helpers, and optional hooks without Splunk Platform tier placement."
+    },
+    {
       "skill": "splunk-observability-database-monitoring-setup",
       "role_support": {
         "search-tier": "none",

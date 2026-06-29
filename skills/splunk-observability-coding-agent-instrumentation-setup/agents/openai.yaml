@@ -1,0 +1,8 @@
+interface:
+  display_name: "Splunk O11y Coding Agent Instrumentation"
+  short_description: "Route coding-agent telemetry setup."
+  default_prompt: "Use $splunk-observability-coding-agent-instrumentation-setup to route a coding-agent telemetry request to the right child skill."
+
+policy:
+  allow_implicit_invocation: true
+
