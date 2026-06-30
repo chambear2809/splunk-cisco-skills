@@ -34,6 +34,7 @@ schema, HEC envelope shape, or collector handoff flags.
 | --- | --- | --- |
 | `readiness` | `galileo-platform-setup` | Render endpoint derivation, `/v2/healthcheck`, auth/RBAC/Luna/Protect/Evaluate coverage checks. |
 | `object-lifecycle` | `galileo-platform-setup` | Create or validate Galileo projects, log streams, datasets, prompts, experiments, metrics, Protect stages, and Agent Control target resolution. |
+| `luna-scorers` | `galileo-platform-setup` | Inventory Luna/SLM scorers, PATCH log-stream metric settings for mapped scorers, preserve unavailable targets, and optionally recompute metrics. |
 | `observe-export` | `galileo-platform-setup` | Pull Galileo records through `export_records` and send HEC JSON events. |
 | `observe-runtime` | `galileo-platform-setup` | Provide Python and Kubernetes OTel/OpenInference bootstrap snippets. |
 | `protect-runtime` | `galileo-platform-setup` | Provide a legacy Python `/v2/protect/invoke` helper for existing Protect users. |
@@ -54,6 +55,7 @@ default render/apply selects only:
 
 - `readiness`
 - `object-lifecycle`
+- `luna-scorers`
 - `observe-runtime`
 - `protect-runtime`
 - `evaluate-assets`
@@ -88,10 +90,36 @@ Lifecycle inputs:
 Rendered lifecycle assets:
 
 - `lifecycle/object-lifecycle-manifest.example.json`
+- `lifecycle/luna-scorer-map.example.json`
 - `lifecycle/product-coverage-matrix.json`
 - `lifecycle/product-coverage-matrix.md`
 - `scripts/apply-object-lifecycle.sh`
+- `scripts/apply-luna-scorers.sh`
 - `scripts/galileo_object_lifecycle.py`
+- `scripts/galileo_luna_scorers.py`
+
+## Luna Scorer Settings
+
+Use `luna-scorers` after `object-lifecycle` has created or validated the
+project and log stream. The default `lifecycle/luna-scorer-map.example.json`
+maps common LLM-backed preset metric names to matching Luna/SLM preset names
+where the tenant exposes them. Missing targets are preserved by default so a
+partial tenant rollout does not remove existing columns.
+
+Operator controls:
+
+- `--luna-list-only true`: inventory current log-stream scorers and available
+  SLM scorers without PATCHing metric settings.
+- `--luna-scorer-map PATH`: provide a JSON map with `replacements` entries of
+  `{ "from": "metric_name", "to": "metric_name_luna" }`.
+- `remove: true`: optional replacement flag to drop a known-bad scorer from
+  metric settings when no replacement should be enabled.
+- `custom_luna_scorer_ids`: optional entries in the map with `from`, `to_id`,
+  `scorer_type`, and `model_type` for custom registered Luna scorer IDs.
+- `--luna-strict true`: fail instead of preserving a scorer when a requested
+  Luna target is unavailable.
+- `--luna-recompute true`: call Galileo recompute-metrics for attached scorer
+  IDs after a successful settings update.
 
 Product coverage surfaces tracked in the matrix:
 
