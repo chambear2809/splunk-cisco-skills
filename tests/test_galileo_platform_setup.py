@@ -19,6 +19,7 @@ VALIDATE = SKILL_DIR / "scripts/validate.sh"
 RENDER = SKILL_DIR / "scripts/render_assets.py"
 BRIDGE = SKILL_DIR / "scripts/galileo_to_splunk_hec.py"
 LIFECYCLE = SKILL_DIR / "scripts/galileo_object_lifecycle.py"
+LUNA = SKILL_DIR / "scripts/galileo_luna_scorers.py"
 
 
 def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -56,9 +57,11 @@ def test_setup_help_lists_apply_sections() -> None:
     combined = result.stdout + result.stderr
 
     assert "--o11y-only" in combined
+    assert "--luna-list-only" in combined
     for section in [
         "readiness",
         "object-lifecycle",
+        "luna-scorers",
         "observe-export",
         "observe-runtime",
         "protect-runtime",
@@ -91,6 +94,7 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     assert (output_dir / "handoff.md").is_file()
     assert (output_dir / "readiness/readiness-report.json").is_file()
     assert (output_dir / "lifecycle/object-lifecycle-manifest.example.json").is_file()
+    assert (output_dir / "lifecycle/luna-scorer-map.example.json").is_file()
     assert (output_dir / "lifecycle/product-coverage-matrix.json").is_file()
     assert (output_dir / "lifecycle/product-coverage-matrix.md").is_file()
     assert (output_dir / "runtime/python-opentelemetry-env.sh").is_file()
@@ -156,6 +160,7 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     for script in [
         "apply-readiness.sh",
         "apply-object-lifecycle.sh",
+        "apply-luna-scorers.sh",
         "apply-observe-export.sh",
         "apply-observe-runtime.sh",
         "apply-protect-runtime.sh",
@@ -259,6 +264,7 @@ def test_o11y_only_otel_collector_handoff_omits_platform_hec(tmp_path: Path) -> 
     assert plan["selected_sections"] == [
         "readiness",
         "object-lifecycle",
+        "luna-scorers",
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
@@ -288,6 +294,7 @@ def test_o11y_only_default_apply_dry_run_selects_cloud_sections(tmp_path: Path) 
     assert payload["selected_sections"] == [
         "readiness",
         "object-lifecycle",
+        "luna-scorers",
         "observe-runtime",
         "protect-runtime",
         "evaluate-assets",
@@ -626,6 +633,97 @@ def test_object_lifecycle_dry_run_covers_core_galileo_objects(tmp_path: Path) ->
     assert output.is_file()
 
 
+def test_luna_scorer_script_dry_run_builds_partial_replacement_plan(tmp_path: Path) -> None:
+    token_file = tmp_path / "galileo.token"
+    token_file.write_text("unused", encoding="utf-8")
+    output = tmp_path / "luna-result.json"
+    module = importlib.util.module_from_spec(
+        importlib.util.spec_from_file_location("galileo_luna_scorers", LUNA)
+    )
+    assert module.__spec__ and module.__spec__.loader
+    module.__spec__.loader.exec_module(module)
+
+    settings = {
+        "scorers": [
+            {
+                "id": "00000000-0000-4000-8000-000000000001",
+                "name": "completeness",
+                "scorer_type": "preset",
+                "model_type": "llm",
+                "input_type": "llm_spans",
+                "output_type": "percentage",
+                "scoreable_node_types": ["llm", "chat"],
+            },
+            {
+                "id": "00000000-0000-4000-8000-000000000002",
+                "name": "correctness",
+                "scorer_type": "preset",
+                "model_type": "llm",
+                "input_type": "llm_spans",
+                "output_type": "boolean_multilabel",
+                "scoreable_node_types": ["llm", "chat"],
+            },
+            {
+                "id": "00000000-0000-4000-8000-000000000005",
+                "name": "agent_efficiency",
+                "scorer_type": "preset",
+                "model_type": "llm",
+                "input_type": "sessions_normalized",
+                "output_type": "boolean_multilabel",
+                "scoreable_node_types": ["session"],
+            },
+        ],
+        "segment_filters": None,
+    }
+    targets = {
+        "completeness_luna": {
+            "id": "00000000-0000-4000-8000-000000000003",
+            "name": "completeness_luna",
+            "scorer_type": "preset",
+            "model_type": "slm",
+            "output_type": "percentage",
+        }
+    }
+
+    plan = module.build_metric_settings_plan(
+        settings,
+        module.normalize_replacements(
+            {
+                "strict": "false",
+                "replacements": module.DEFAULT_REPLACEMENTS
+                + [{"from": "agent_efficiency", "remove": True}],
+                "custom_luna_scorer_ids": [
+                    {
+                        "from": "correctness",
+                        "to_id": "00000000-0000-4000-8000-000000000004",
+                        "scorer_type": "luna",
+                        "model_type": "slm",
+                    },
+                    {"from": "agent_efficiency", "to_id": ""},
+                ],
+            }
+        ),
+        targets,
+        strict=False,
+    )
+
+    assert plan["errors"] == []
+    assert plan["applied"][0]["from"]["name"] == "completeness"
+    assert plan["applied"][0]["to"]["name"] == "completeness_luna"
+    assert plan["applied"][1]["from"]["name"] == "correctness"
+    assert plan["applied"][1]["to"]["id"].endswith("0004")
+    assert plan["unavailable"] == []
+    assert plan["patch_body"]["scorers"][0]["id"].endswith("0003")
+    assert plan["patch_body"]["scorers"][0]["model_type"] == "slm"
+    assert plan["patch_body"]["scorers"][0]["input_type"] == "llm_spans"
+    assert plan["patch_body"]["scorers"][1]["id"].endswith("0004")
+    assert plan["patch_body"]["scorers"][1]["scorer_type"] == "luna"
+    assert [item["status"] for item in plan["applied"]] == ["planned", "planned", "removed"]
+    assert all(not item["id"].endswith("0005") for item in plan["patch_body"]["scorers"])
+    module.write_result(str(output), {"status": "planned"})
+    assert json.loads(output.read_text(encoding="utf-8"))["status"] == "planned"
+
+
 def test_repo_has_no_legacy_galileo_skill_references() -> None:
     legacy = "splunk-" + "galileo-integration"
     result = run_cmd("git", "grep", "-n", legacy, "--", ".", check=False)
@@ -633,4 +731,4 @@ def test_repo_has_no_legacy_galileo_skill_references() -> None:
 
 
 def test_python_scripts_compile() -> None:
-    run_cmd(sys.executable, "-m", "py_compile", str(RENDER), str(BRIDGE), str(LIFECYCLE))
+    run_cmd(sys.executable, "-m", "py_compile", str(RENDER), str(BRIDGE), str(LIFECYCLE), str(LUNA))

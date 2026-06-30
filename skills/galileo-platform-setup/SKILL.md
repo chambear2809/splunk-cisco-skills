@@ -44,27 +44,31 @@ logic.
    observability from multi-model experiment comparison: this skill supports
    both, with first-class multimodal assets under `multimodal/` and
    multi-model comparison guidance under `evaluate/experiment-handoff.md`.
-3. **Observe export to Splunk HEC**: render and run
+3. **Luna scorer settings**: inventory available Luna/SLM preset scorers,
+   replace mapped OpenAI/LLM-backed log-stream metric settings with Luna/SLM
+   preset or custom scorer IDs using `scripts/galileo_luna_scorers.py`, preserve
+   unmapped scorers, and optionally request metric recomputation.
+4. **Observe export to Splunk HEC**: render and run
    `scripts/galileo_to_splunk_hec.py` against
    `/v2/projects/{project_id}/export_records` using JSONL by default.
-4. **Observe runtime**: render Python and Kubernetes Galileo
+5. **Observe runtime**: render Python and Kubernetes Galileo
    OpenTelemetry/OpenInference snippets.
    For Codex itself, use the rendered `runtime/codex-notify-galileo-handoff.md`
    guidance: Galileo MCP connectivity does not automatically populate Observe
    log streams, so interactive Codex turn logging requires a separate
    `notify`-based bridge that writes `codex.turn` traces through Galileo direct
    trace ingest.
-5. **Protect runtime**: render a file-secret-backed legacy Python helper for
+6. **Protect runtime**: render a file-secret-backed legacy Python helper for
    `/v2/protect/invoke` where an existing deployment still uses Protect.
-6. **Evaluate assets**: render handoffs for experiments, datasets, metrics
+7. **Evaluate assets**: render handoffs for experiments, datasets, metrics
    testing, annotations, feedback, Signals, and Trends.
-7. **Multimodal observability**: render GalileoLogger, file/upload,
+8. **Multimodal observability**: render GalileoLogger, file/upload,
    LangChain/LangGraph, multimodal quality metric, Splunk metadata-only export,
    and validation-search handoffs for image, audio, and PDF/document traces.
-8. **Agent Observability Controls**: render console inventory, Log stream
+9. **Agent Observability Controls**: render console inventory, Log stream
    attachment, control-span export, and Splunk search evidence handoffs without
    claiming undocumented control CRUD API support.
-9. **Splunk handoffs**:
+10. **Splunk handoffs**:
    - HEC token/service: `splunk-hec-service-setup`
    - Splunk Platform OTLP input: `splunk-connect-for-otlp-setup`
    - Splunk OTel Collector: `splunk-observability-otel-collector-setup`
@@ -140,6 +144,7 @@ Apply sections:
 
 - `readiness`
 - `object-lifecycle`
+- `luna-scorers`
 - `observe-export`
 - `observe-runtime`
 - `protect-runtime`
@@ -153,15 +158,19 @@ Apply sections:
 - `detectors`
 
 With `--o11y-only`, the default selected sections are `readiness`,
-`object-lifecycle`, `observe-runtime`, `protect-runtime`, `evaluate-assets`,
-`multimodal-assets`, `observability-controls`, `otel-collector`, `dashboards`,
-and `detectors`.
+`object-lifecycle`, `luna-scorers`, `observe-runtime`, `protect-runtime`,
+`evaluate-assets`, `multimodal-assets`, `observability-controls`,
+`otel-collector`, `dashboards`, and `detectors`.
 Explicit Splunk Platform sections (`observe-export`, `splunk-hec`,
 `splunk-otlp`) are rejected in that mode.
 
 Use `--lifecycle-manifest`, `--dataset-dir`, `--prompt-manifest`,
 `--experiment-manifest`, `--protect-stage-manifest`, and `--metrics` when the
 tenant needs Galileo objects provisioned before export or runtime handoff.
+Use `--luna-list-only true` to inventory current and available scorers without
+patching metric settings. Use `--luna-scorer-map`, `--luna-recompute true`, and
+`--luna-strict true` when replacing preset LLM judge scorers with Luna/SLM
+preset or custom scorer IDs.
 
 ## Codex Turn Logging Note
 

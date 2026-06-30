@@ -16,6 +16,11 @@ galileo:
   experiment_manifest: ""
   protect_stage_manifest: ""
   metrics: "correctness,completeness"
+  luna_scorer_map: "./galileo-platform-rendered/lifecycle/luna-scorer-map.example.json"
+  luna_list_only: true
+  luna_recompute: false
+  luna_strict: false
+  luna_recompute_limit: "100"
   experiment_id: ""
   metrics_testing_id: ""
 

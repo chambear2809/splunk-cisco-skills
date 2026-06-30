@@ -21,6 +21,7 @@ SKILL_NAME = "galileo-platform-setup"
 APPLY_SECTIONS = [
     "readiness",
     "object-lifecycle",
+    "luna-scorers",
     "observe-export",
     "observe-runtime",
     "protect-runtime",
@@ -36,6 +37,7 @@ APPLY_SECTIONS = [
 O11Y_ONLY_SECTIONS = [
     "readiness",
     "object-lifecycle",
+    "luna-scorers",
     "observe-runtime",
     "protect-runtime",
     "evaluate-assets",
@@ -93,6 +95,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--experiment-manifest", default="")
     parser.add_argument("--protect-stage-manifest", default="")
     parser.add_argument("--metrics", default="")
+    parser.add_argument("--luna-scorer-map", default="")
+    parser.add_argument("--luna-list-only", choices=["true", "false"], default="")
+    parser.add_argument("--luna-recompute", choices=["true", "false"], default="")
+    parser.add_argument("--luna-strict", choices=["true", "false"], default="")
+    parser.add_argument("--luna-recompute-limit", default="")
     parser.add_argument("--galileo-api-base", default="")
     parser.add_argument("--galileo-console-url", default="")
     parser.add_argument("--galileo-otel-endpoint", default="")
@@ -293,6 +300,28 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
             "",
         ),
         "metrics": arg_or_spec("metrics", "galileo.metrics", ""),
+        "luna_scorer_map": arg_or_spec(
+            "luna_scorer_map",
+            "galileo.luna_scorer_map",
+            "",
+        ),
+        "luna_list_only": str(
+            args.luna_list_only or get_nested(spec, "galileo.luna_list_only", "false") or "false"
+        ).lower()
+        in {"1", "yes", "true"},
+        "luna_recompute": str(
+            args.luna_recompute or get_nested(spec, "galileo.luna_recompute", "false") or "false"
+        ).lower()
+        in {"1", "yes", "true"},
+        "luna_strict": str(
+            args.luna_strict or get_nested(spec, "galileo.luna_strict", "false") or "false"
+        ).lower()
+        in {"1", "yes", "true"},
+        "luna_recompute_limit": arg_or_spec(
+            "luna_recompute_limit",
+            "galileo.luna_recompute_limit",
+            "100",
+        ),
         "galileo_api_base": api_base,
         "galileo_console_url": console_url,
         "galileo_otel_endpoint": otel_endpoint,
@@ -536,6 +565,32 @@ cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_ob
     write_text(scripts_dir / "apply-object-lifecycle.sh", object_lifecycle, executable=True)
     scripts["object-lifecycle"] = "scripts/apply-object-lifecycle.sh"
 
+    luna_scorers = f"""{script_header()}
+{require_file_var("GALILEO_API_KEY_FILE", config["galileo_api_key_file"], "--galileo-api-key-file")}
+cmd=(python3 "${{PROJECT_ROOT}}/skills/galileo-platform-setup/scripts/galileo_luna_scorers.py"
+  --galileo-api-key-file "${{GALILEO_API_KEY_FILE}}"
+  --api-base {shell_quote(config["galileo_api_base"])}
+  --project-id {shell_quote(config["project_id"])}
+  --log-stream-id {shell_quote(config["log_stream_id"])}
+  --lifecycle-result "${{OUTPUT_DIR}}/lifecycle/object-lifecycle-result.json"
+  --output "${{OUTPUT_DIR}}/lifecycle/luna-scorer-settings-result.json")
+"""
+    if config["luna_scorer_map"]:
+        luna_scorers += f'cmd+=(--scorer-map {shell_quote(config["luna_scorer_map"])})\n'
+    else:
+        luna_scorers += 'cmd+=(--scorer-map "${OUTPUT_DIR}/lifecycle/luna-scorer-map.example.json")\n'
+    if config["luna_recompute"]:
+        luna_scorers += "cmd+=(--recompute)\n"
+    if config["luna_list_only"]:
+        luna_scorers += "cmd+=(--list-only)\n"
+    if config["luna_strict"]:
+        luna_scorers += "cmd+=(--strict)\n"
+    if config["luna_recompute_limit"]:
+        luna_scorers += f'cmd+=(--recompute-limit {shell_quote(config["luna_recompute_limit"])})\n'
+    luna_scorers += 'exec "${cmd[@]}"\n'
+    write_text(scripts_dir / "apply-luna-scorers.sh", luna_scorers, executable=True)
+    scripts["luna-scorers"] = "scripts/apply-luna-scorers.sh"
+
     splunk_hec = f"""{script_header()}
 {require_file_var("SPLUNK_HEC_TOKEN_FILE", config["splunk_hec_token_file"], "--splunk-hec-token-file")}
 exec bash "${{PROJECT_ROOT}}/skills/splunk-hec-service-setup/scripts/setup.sh" \\
@@ -758,6 +813,7 @@ exec bash "${{PROJECT_ROOT}}/skills/splunk-observability-native-ops/scripts/setu
   case "${section}" in
     readiness) "${SCRIPT_DIR}/apply-readiness.sh" ;;
     object-lifecycle) "${SCRIPT_DIR}/apply-object-lifecycle.sh" ;;
+    luna-scorers) "${SCRIPT_DIR}/apply-luna-scorers.sh" ;;
     observe-export) "${SCRIPT_DIR}/apply-observe-export.sh" ;;
     observe-runtime) "${SCRIPT_DIR}/apply-observe-runtime.sh" ;;
     protect-runtime) "${SCRIPT_DIR}/apply-protect-runtime.sh" ;;
@@ -1253,10 +1309,19 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
         },
         {
             "surface": "Evaluate metrics and scorers",
-            "lifecycle": ["enable_log_stream_metrics", "run_experiment_metrics", "custom_scorer_handoff"],
-            "coverage": "automated_built_in_metric_enablement_and_manifest_handoff",
-            "rendered_assets": ["evaluate/evaluate-assets.yaml", "lifecycle/product-coverage-matrix.json"],
-            "apply_script": "scripts/apply-object-lifecycle.sh",
+            "lifecycle": [
+                "enable_log_stream_metrics",
+                "attach_luna_slm_scorers",
+                "run_experiment_metrics",
+                "custom_scorer_handoff",
+            ],
+            "coverage": "automated_built_in_metric_enablement_luna_scorer_attach_and_manifest_handoff",
+            "rendered_assets": [
+                "evaluate/evaluate-assets.yaml",
+                "lifecycle/luna-scorer-map.example.json",
+                "lifecycle/product-coverage-matrix.json",
+            ],
+            "apply_script": "scripts/apply-luna-scorers.sh",
             "docs": "https://docs.galileo.ai/sdk-api/python/reference/log_streams",
         },
         {
@@ -1286,8 +1351,12 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
                 "validate_scorer_handoff",
             ],
             "coverage": "rendered_handoff_for_scorer_authoring_validation_and_settings",
-            "rendered_assets": ["evaluate/evaluate-assets.yaml", "lifecycle/product-coverage-matrix.json"],
-            "apply_script": "scripts/apply-evaluate-assets.sh",
+            "rendered_assets": [
+                "evaluate/evaluate-assets.yaml",
+                "lifecycle/luna-scorer-map.example.json",
+                "lifecycle/product-coverage-matrix.json",
+            ],
+            "apply_script": "scripts/apply-luna-scorers.sh",
             "docs": "https://docs.galileo.ai/sdk-api/python/reference/scorers",
         },
         {
@@ -1307,10 +1376,20 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
         },
         {
             "surface": "Luna and model/provider integrations",
-            "lifecycle": ["tenant_feature_check", "model_alias_review", "provider_integration_handoff"],
-            "coverage": "readiness_handoff_for_enterprise_features_and_model_alias_prereqs",
-            "rendered_assets": ["readiness/readiness-report.json", "evaluate/experiment-handoff.md"],
-            "apply_script": "scripts/apply-readiness.sh",
+            "lifecycle": [
+                "tenant_feature_check",
+                "model_alias_review",
+                "list_slm_scorers",
+                "attach_existing_luna_presets",
+                "provider_integration_handoff",
+            ],
+            "coverage": "automated_luna_slm_scorer_inventory_and_metric_settings_patch_plus_provider_handoff",
+            "rendered_assets": [
+                "readiness/readiness-report.json",
+                "lifecycle/luna-scorer-map.example.json",
+                "evaluate/experiment-handoff.md",
+            ],
+            "apply_script": "scripts/apply-luna-scorers.sh",
             "docs": "https://docs.galileo.ai/sdk-api/python/sdk-reference",
         },
         {
@@ -1820,9 +1899,25 @@ def render_object_lifecycle(output_dir: Path, config: dict[str, Any]) -> None:
         "scorers": {
             "custom_code": [],
             "custom_llm": [],
-            "luna": [],
+            "luna": [
+                {
+                    "from": "completeness",
+                    "to": "completeness_luna",
+                    "mode": "attach_existing_slm_preset",
+                },
+                {
+                    "from": "tool_selection_quality",
+                    "to": "tool_selection_quality_luna",
+                    "mode": "attach_existing_slm_preset",
+                },
+                {
+                    "from": "tool_error_rate",
+                    "to": "tool_error_rate_luna",
+                    "mode": "attach_existing_slm_preset",
+                },
+            ],
             "preset": [],
-            "note": "Validate and register scorers with a deliberate operator step before enabling on production log streams.",
+            "note": "Use scripts/apply-luna-scorers.sh to replace OpenAI/LLM-backed preset scorer settings with available Luna/SLM preset or custom scorer IDs.",
         },
         "annotation_templates": [],
         "feedback_templates": [],
@@ -1849,6 +1944,53 @@ def render_object_lifecycle(output_dir: Path, config: dict[str, Any]) -> None:
         },
     }
     write_json(output_dir / "lifecycle/object-lifecycle-manifest.example.json", manifest)
+    write_json(
+        output_dir / "lifecycle/luna-scorer-map.example.json",
+        {
+            "api_version": f"{SKILL_NAME}/luna-scorer-map/v1",
+            "strict": False,
+            "list_only": config["luna_list_only"],
+            "recompute": config["luna_recompute"],
+            "replacements": [
+                {"from": "correctness", "to": "correctness_luna"},
+                {"from": "completeness", "to": "completeness_luna"},
+                {"from": "instruction_adherence", "to": "instruction_adherence_luna"},
+                {"from": "tool_selection_quality", "to": "tool_selection_quality_luna"},
+                {"from": "tool_error_rate", "to": "tool_error_rate_luna"},
+                {"from": "agent_efficiency", "to": "agent_efficiency_luna"},
+            ],
+            "custom_luna_scorer_ids": [
+                {
+                    "from": "correctness",
+                    "to_id": "",
+                    "scorer_type": "luna",
+                    "model_type": "slm",
+                    "note": "Fill to_id with a registered custom Luna scorer when no built-in correctness_luna preset exists.",
+                },
+                {
+                    "from": "instruction_adherence",
+                    "to_id": "",
+                    "scorer_type": "luna",
+                    "model_type": "slm",
+                    "note": "Fill to_id with a registered custom Luna scorer when no built-in instruction_adherence_luna preset exists.",
+                },
+                {
+                    "from": "agent_efficiency",
+                    "to_id": "",
+                    "scorer_type": "luna",
+                    "model_type": "slm",
+                    "note": "Fill to_id with a registered custom Luna scorer when no built-in agent_efficiency_luna preset exists.",
+                },
+            ],
+            "notes": [
+                "The apply script preserves current scorers when a requested Luna target is unavailable.",
+                "Set list_only=true or pass --luna-list-only true to inventory current and available scorers without patching metric settings.",
+                "Set strict=true or pass --luna-strict true when partial replacement should fail.",
+                "Set remove=true on a replacement to drop a known-bad scorer when no Luna target should be enabled.",
+                "Set recompute=true or pass --luna-recompute true to request metric recomputation after a successful patch.",
+            ],
+        },
+    )
     write_json(output_dir / "lifecycle/product-coverage-matrix.json", product_coverage_matrix(config))
     write_text(
         output_dir / "lifecycle/product-coverage-matrix.md",
@@ -2514,6 +2656,7 @@ def build_apply_plan(
     targets = {
         "readiness": "galileo-platform-setup",
         "object-lifecycle": "galileo-platform-setup",
+        "luna-scorers": "galileo-platform-setup",
         "observe-export": "galileo-platform-setup",
         "observe-runtime": "galileo-platform-setup",
         "protect-runtime": "galileo-platform-setup",
@@ -2599,6 +2742,21 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
                     "luna_studio_training_lifecycle",
                     "provider_integrations",
                     "trace_metrics_and_live_logging",
+                ],
+            },
+            "galileo_luna_scorer_settings": {
+                "status": "automated_inventory_and_metric_settings_patch",
+                "script": "scripts/galileo_luna_scorers.py",
+                "assets": [
+                    "lifecycle/luna-scorer-map.example.json",
+                    "lifecycle/luna-scorer-settings-result.json",
+                ],
+                "covers": [
+                    "list_slm_scorers",
+                    "replace_openai_llm_scorers_with_luna_slm_targets",
+                    "preserve_unmapped_scorers",
+                    "optional_recompute_metrics",
+                    "custom_luna_scorer_id_mapping",
                 ],
             },
             "galileo_full_feature_coverage_matrix": {
@@ -2703,7 +2861,7 @@ def render_handoff(output_dir: Path, config: dict[str, Any], scripts: dict[str, 
 
 
 def maybe_copy_runtime_scripts(output_dir: Path) -> None:
-    for name in ("galileo_to_splunk_hec.py", "galileo_object_lifecycle.py"):
+    for name in ("galileo_to_splunk_hec.py", "galileo_object_lifecycle.py", "galileo_luna_scorers.py"):
         source = Path(__file__).with_name(name)
         if not source.is_file():
             continue

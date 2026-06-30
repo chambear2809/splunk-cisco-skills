@@ -55,6 +55,7 @@ check_file "${OUTPUT_DIR}/handoff.md"
 check_file "${OUTPUT_DIR}/readiness/readiness-report.json"
 check_exec "${OUTPUT_DIR}/readiness/healthcheck.sh"
 check_file "${OUTPUT_DIR}/lifecycle/object-lifecycle-manifest.example.json"
+check_file "${OUTPUT_DIR}/lifecycle/luna-scorer-map.example.json"
 check_file "${OUTPUT_DIR}/lifecycle/product-coverage-matrix.json"
 check_file "${OUTPUT_DIR}/lifecycle/product-coverage-matrix.md"
 check_file "${OUTPUT_DIR}/runtime/python-opentelemetry-env.sh"
@@ -72,6 +73,7 @@ check_file "${OUTPUT_DIR}/splunk-platform/multimodal-search-examples.spl"
 check_file "${OUTPUT_DIR}/otel/collector-galileo-fanout.yaml"
 check_exec "${OUTPUT_DIR}/scripts/apply-readiness.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-object-lifecycle.sh"
+check_exec "${OUTPUT_DIR}/scripts/apply-luna-scorers.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-observe-export.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-observe-runtime.sh"
 check_exec "${OUTPUT_DIR}/scripts/apply-protect-runtime.sh"
@@ -95,6 +97,7 @@ sections = {item["name"]: item for item in plan["sections"]}
 required = {
     "readiness": "galileo-platform-setup",
     "object-lifecycle": "galileo-platform-setup",
+    "luna-scorers": "galileo-platform-setup",
     "observe-export": "galileo-platform-setup",
     "observe-runtime": "galileo-platform-setup",
     "protect-runtime": "galileo-platform-setup",
@@ -120,6 +123,9 @@ if coverage.get("secret_values_rendered") is not False:
 lifecycle = coverage.get("coverage", {}).get("galileo_object_lifecycle", {})
 if lifecycle.get("status") != "automated_create_or_get":
     raise SystemExit("coverage report must include automated Galileo object lifecycle coverage")
+luna = coverage.get("coverage", {}).get("galileo_luna_scorer_settings", {})
+if luna.get("status") != "automated_inventory_and_metric_settings_patch":
+    raise SystemExit("coverage report must include automated Galileo Luna scorer settings coverage")
 controls = coverage.get("coverage", {}).get("galileo_agent_observability_controls", {})
 if controls.get("status") != "rendered_handoff":
     raise SystemExit("coverage report must include Galileo Agent Observability Controls handoff coverage")

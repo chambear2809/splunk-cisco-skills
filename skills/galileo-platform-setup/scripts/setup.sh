@@ -11,7 +11,7 @@ DEFAULT_OUTPUT_DIR="${PROJECT_ROOT}/galileo-platform-rendered"
 RENDERER="${SCRIPT_DIR}/render_assets.py"
 VALIDATE_SCRIPT="${SCRIPT_DIR}/validate.sh"
 
-APPLY_SECTIONS_DEFAULT="readiness,object-lifecycle,observe-export,observe-runtime,protect-runtime,evaluate-assets,multimodal-assets,observability-controls,splunk-hec,splunk-otlp,otel-collector,dashboards,detectors"
+APPLY_SECTIONS_DEFAULT="readiness,object-lifecycle,luna-scorers,observe-export,observe-runtime,protect-runtime,evaluate-assets,multimodal-assets,observability-controls,splunk-hec,splunk-otlp,otel-collector,dashboards,detectors"
 
 usage() {
     cat <<'EOF'
@@ -37,6 +37,8 @@ Apply sections:
   readiness                     Render/optionally probe Galileo endpoint and readiness checklist
   object-lifecycle              Create/validate Galileo projects, log streams, datasets, prompts,
                                 experiments, metrics, Protect stages, and Agent Control targets
+  luna-scorers                  Attach available Luna/SLM preset or custom scorers to log stream
+                                metric settings and optionally recompute metrics
   observe-export                Run the Galileo export_records to Splunk HEC bridge
   observe-runtime               Copy or point to Observe OpenTelemetry/OpenInference snippets
   protect-runtime               Copy or point to Protect invoke runtime snippets
@@ -62,6 +64,11 @@ Configuration:
   --experiment-manifest PATH    Experiment manifest to create or run
   --protect-stage-manifest PATH Protect stage manifest to create or validate
   --metrics CSV                 Built-in metric names to enable on the log stream or experiments
+  --luna-scorer-map PATH        JSON scorer replacement map for Luna/SLM metric settings
+  --luna-list-only true|false   Inventory current and available scorers without patching
+  --luna-recompute true|false   Request metric recomputation after Luna scorer attach
+  --luna-strict true|false      Fail if any mapped Luna scorer target is unavailable
+  --luna-recompute-limit NUM    Log-record recompute batch limit (default: 100)
   --galileo-api-base URL        Galileo REST API base (default: https://api.galileo.ai)
   --galileo-console-url URL     Galileo console URL; used to derive API base when supplied
   --galileo-otel-endpoint URL   Galileo OTLP traces endpoint
@@ -164,7 +171,7 @@ while [[ $# -gt 0 ]]; do
         --allow-raw-media-in-splunk) RENDER_ARGS+=("$1"); shift ;;
         --spec) require_value "$1" "$#"; SPEC="$2"; shift 2 ;;
         --output-dir) require_value "$1" "$#"; OUTPUT_DIR="$2"; shift 2 ;;
-        --project-id|--project-name|--log-stream-id|--log-stream|--lifecycle-manifest|--dataset-dir|--prompt-manifest|--experiment-manifest|--protect-stage-manifest|--metrics|--galileo-api-base|--galileo-console-url|--galileo-otel-endpoint|--experiment-id|--metrics-testing-id|--multimodal-enabled|--multimodal-input-modalities|--multimodal-output-modalities|--multimodal-capture-methods|--multimodal-quality-metrics|--multimodal-asset-policy|--export-format|--redact|--root-type|--since|--until|--cursor-file|--splunk-platform|--splunk-hec-url|--splunk-index|--splunk-source|--splunk-sourcetype|--splunk-host|--hec-token-name|--hec-allowed-indexes|--realm|--service-name|--deployment-environment|--otlp-receiver-host|--otlp-grpc-port|--otlp-http-port|--collector-cluster-name|--kube-namespace|--kube-workload|--runtime-target-dir|--galileo-api-key-file|--splunk-hec-token-file|--o11y-token-file)
+        --project-id|--project-name|--log-stream-id|--log-stream|--lifecycle-manifest|--dataset-dir|--prompt-manifest|--experiment-manifest|--protect-stage-manifest|--metrics|--luna-scorer-map|--luna-list-only|--luna-recompute|--luna-strict|--luna-recompute-limit|--galileo-api-base|--galileo-console-url|--galileo-otel-endpoint|--experiment-id|--metrics-testing-id|--multimodal-enabled|--multimodal-input-modalities|--multimodal-output-modalities|--multimodal-capture-methods|--multimodal-quality-metrics|--multimodal-asset-policy|--export-format|--redact|--root-type|--since|--until|--cursor-file|--splunk-platform|--splunk-hec-url|--splunk-index|--splunk-source|--splunk-sourcetype|--splunk-host|--hec-token-name|--hec-allowed-indexes|--realm|--service-name|--deployment-environment|--otlp-receiver-host|--otlp-grpc-port|--otlp-http-port|--collector-cluster-name|--kube-namespace|--kube-workload|--runtime-target-dir|--galileo-api-key-file|--splunk-hec-token-file|--o11y-token-file)
             require_value "$1" "$#"
             RENDER_ARGS+=("$1" "$2")
             shift 2
@@ -212,6 +219,7 @@ apply_section() {
     case "${section}" in
         readiness) script="apply-readiness.sh" ;;
         object-lifecycle) script="apply-object-lifecycle.sh" ;;
+        luna-scorers) script="apply-luna-scorers.sh" ;;
         observe-export) script="apply-observe-export.sh" ;;
         observe-runtime) script="apply-observe-runtime.sh" ;;
         protect-runtime) script="apply-protect-runtime.sh" ;;
@@ -255,7 +263,7 @@ if [[ "${MODE_APPLY}" == "true" ]]; then
         sections="${APPLY_SECTIONS_DEFAULT}"
     fi
     if [[ "${O11Y_ONLY}" == "true" && ( -z "${APPLY_SECTIONS}" || "${APPLY_SECTIONS}" == "all" ) ]]; then
-        sections="readiness,object-lifecycle,observe-runtime,protect-runtime,evaluate-assets,multimodal-assets,observability-controls,otel-collector,dashboards,detectors"
+        sections="readiness,object-lifecycle,luna-scorers,observe-runtime,protect-runtime,evaluate-assets,multimodal-assets,observability-controls,otel-collector,dashboards,detectors"
     fi
     IFS=',' read -ra section_array <<< "${sections}"
     for section in "${section_array[@]}"; do
