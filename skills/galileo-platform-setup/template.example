@@ -68,6 +68,15 @@ runtime:
   deployment_environment: "production"
   target_dir: ""
 
+coding_agent:
+  # Galileo MCP does not automatically populate log streams. Use a Codex
+  # notify bridge for completed interactive turn logging.
+  codex_notify_handoff: true
+  codex_trace_name: "codex.turn"
+  codex_tags: "codex,codex-cli,turn-ended"
+  codex_duplicate_state_file: "~/.codex/log/codex-galileo-emitted-turns.json"
+  codex_notify_log_file: "~/.codex/log/codex-galileo-notify.log"
+
 otlp:
   receiver_host: "otlp.example.com"
   grpc_port: "4317"

@@ -794,6 +794,87 @@ export GALILEO_CONSOLE_URL={shell_quote(config["galileo_console_url"])}
 """,
     )
     write_text(
+        output_dir / "runtime/codex-notify-galileo-handoff.md",
+        f"""# Codex Notify to Galileo Runtime Handoff
+
+Use this handoff when Codex itself should write completed interactive turns into
+this Galileo project and log stream.
+
+## What This Solves
+
+Configuring the Galileo MCP server lets Codex call Galileo MCP tools. It does
+not automatically send Codex conversations, tool calls, or turn results into a
+Galileo log stream.
+
+For interactive Codex, the proven runtime path is a fail-soft `notify` bridge:
+
+1. Codex finishes a turn and invokes its configured `notify` command.
+2. The notifier parses the newest completed turn from
+   `CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`, or the session JSONL path
+   in the notify payload when available.
+3. The notifier writes one Galileo trace named `codex.turn` with child spans
+   for the LLM turn, tool calls, and web retrievals.
+4. The notifier exits `0` even if Galileo is unavailable, and records local
+   non-secret evidence in `CODEX_HOME/log/codex-galileo-notify.log`.
+
+## Target Galileo Objects
+
+- API base: `{config["galileo_api_base"]}`
+- Project: `{config["project_name"]}` (`{config["project_id"]}`)
+- Log stream: `{config["log_stream"]}` (`{config["log_stream_id"]}`)
+
+## Direct Ingest Contract
+
+Send completed turns to:
+
+```text
+POST /v2/projects/{{project_id}}/traces
+```
+
+Recommended request settings:
+
+- `log_stream_id`: target Codex log stream ID
+- `logging_method`: `api_direct`
+- `reliable`: `true`
+- `include_trace_ids`: `true`
+- `session_external_id`: Codex session ID
+- trace name: `codex.turn`
+- trace tags: `codex`, `codex-cli`, `turn-ended`
+
+Use `redacted_input` and `redacted_output` when sending any content. Keep
+metadata-only placeholders unless the operator explicitly accepts prompt,
+response, tool argument, and tool output capture.
+
+Galileo `user_metadata` values must be strings. Convert values such as
+`tool_count`, `retrieval_count`, booleans, or numeric IDs before sending.
+
+## Verification Contract
+
+API acceptance is not enough. Verify storage by filtering on the returned trace
+ID with:
+
+```text
+POST /v2/projects/{{project_id}}/traces/count
+POST /v2/projects/{{project_id}}/export_records
+```
+
+Expected evidence:
+
+- ingest response has `records_count`, `traces_count`, `spans_count`, and
+  `trace_ids`
+- count response has `total_count >= 1`
+- export response returns a JSONL record whose `id` equals the returned trace ID
+
+## Guardrails
+
+- Read the Galileo key from `GALILEO_API_KEY_FILE`; never pass it on argv.
+- Redact obvious secrets, bearer tokens, JWTs, and high-entropy strings.
+- Keep duplicate suppression state locally, for example
+  `CODEX_HOME/log/codex-galileo-emitted-turns.json`.
+- Keep the bridge fail-soft. Telemetry must not block Codex.
+""",
+    )
+    write_text(
         output_dir / "runtime/python-opentelemetry-galileo.py",
         f'''"""Minimal Galileo OpenTelemetry/OpenInference setup.
 
@@ -1301,6 +1382,14 @@ def product_coverage_matrix(config: dict[str, Any]) -> list[dict[str, Any]]:
             "rendered_assets": ["runtime/", "splunk-platform/export-records-request.json"],
             "apply_script": "scripts/apply-observe-export.sh",
             "docs": "https://docs.galileo.ai/sdk-api/logging/logging-basics",
+        },
+        {
+            "surface": "Codex notify turn logging",
+            "lifecycle": ["codex_notify_handoff", "direct_trace_ingest", "count_and_export_validation"],
+            "coverage": "rendered_handoff_for_fail_soft_codex_turn_logging_into_galileo_observe",
+            "rendered_assets": ["runtime/codex-notify-galileo-handoff.md"],
+            "apply_script": "scripts/apply-observe-runtime.sh",
+            "docs": "https://docs.galileo.ai/api-reference/trace/log-traces",
         },
         {
             "surface": "Tags, metadata, run labels, and filter hygiene",

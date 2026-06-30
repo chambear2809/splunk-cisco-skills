@@ -49,6 +49,11 @@ logic.
    `/v2/projects/{project_id}/export_records` using JSONL by default.
 4. **Observe runtime**: render Python and Kubernetes Galileo
    OpenTelemetry/OpenInference snippets.
+   For Codex itself, use the rendered `runtime/codex-notify-galileo-handoff.md`
+   guidance: Galileo MCP connectivity does not automatically populate Observe
+   log streams, so interactive Codex turn logging requires a separate
+   `notify`-based bridge that writes `codex.turn` traces through Galileo direct
+   trace ingest.
 5. **Protect runtime**: render a file-secret-backed legacy Python helper for
    `/v2/protect/invoke` where an existing deployment still uses Protect.
 6. **Evaluate assets**: render handoffs for experiments, datasets, metrics
@@ -158,6 +163,21 @@ Use `--lifecycle-manifest`, `--dataset-dir`, `--prompt-manifest`,
 `--experiment-manifest`, `--protect-stage-manifest`, and `--metrics` when the
 tenant needs Galileo objects provisioned before export or runtime handoff.
 
+## Codex Turn Logging Note
+
+When instrumenting Codex as a coding agent, expect three separate surfaces:
+
+- Galileo MCP server: tool access only.
+- Codex native `[otel]` profile: Codex-managed OTel export.
+- Codex `notify` bridge: post-turn session JSONL parsing and direct Galileo
+  trace ingest.
+
+Use the `notify` bridge when the requirement is "every completed Codex turn
+appears in a Galileo log stream." The bridge should read the Galileo API key
+from `--galileo-api-key-file`, send `POST /v2/projects/{project_id}/traces`
+with `reliable=true` and `include_trace_ids=true`, and verify storage through
+`traces/count` plus `export_records`.
+
 ## Secret Handling
 
 Use file-based flags only:
@@ -172,6 +192,10 @@ flags such as `--galileo-api-key`, `--splunk-hec-token`, `--o11y-token`,
 
 Rendered output must not contain token values. Apply wrappers read token files
 at runtime and keep secret material out of argv.
+
+For Codex notify turn logging, the same rule applies: the notifier reads
+`GALILEO_API_KEY_FILE` at runtime, logs only non-secret local failure evidence,
+and exits `0` if Galileo is temporarily unavailable.
 
 ## Validation
 

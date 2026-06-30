@@ -13,6 +13,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import SplitResult, urlsplit
 
 from skills.shared.coding_agent_o11y.common import (
     REPO_ROOT,
@@ -93,6 +94,43 @@ def destinations_for(value: str) -> list[str]:
     return ["local-collector", "external-collector", "direct"] if value == "all" else [value]
 
 
+def parse_local_collector_endpoint(value: object) -> SplitResult:
+    raw = str(value or "").strip()
+    if not raw:
+        raise UsageError("local_collector_endpoint is required")
+    parsed = urlsplit(raw)
+    if parsed.scheme != "http":
+        raise UsageError(
+            "local_collector_endpoint must use http:// because the rendered local collector receiver is plain OTLP HTTP"
+        )
+    if not parsed.hostname:
+        raise UsageError("local_collector_endpoint must include a host")
+    if parsed.username or parsed.password:
+        raise UsageError("local_collector_endpoint must not include credentials")
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise UsageError(f"local_collector_endpoint has an invalid port: {exc}") from exc
+    if port is None:
+        raise UsageError("local_collector_endpoint must include an explicit port")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise UsageError("local_collector_endpoint must be a base URL such as http://localhost:14318")
+    return parsed
+
+
+def normalize_local_collector_endpoint(value: object) -> str:
+    parsed = parse_local_collector_endpoint(value)
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def local_collector_receiver_endpoint(value: object) -> str:
+    parsed = parse_local_collector_endpoint(value)
+    host = parsed.hostname or ""
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    return f"{host}:{parsed.port}"
+
+
 def resolve_codex_home(config: dict[str, Any]) -> Path:
     configured = str(config.get("codex", {}).get("codex_home") or "").strip()
     if configured:
@@ -116,6 +154,7 @@ def load_spec_with_args(args: argparse.Namespace) -> dict[str, Any]:
         "service_name": args.service_name,
         "realm": args.realm,
         "destination": args.destination,
+        "local_collector_endpoint": args.local_collector_endpoint,
         "external_collector_protocol": args.external_collector_protocol,
         "external_trace_endpoint": args.external_trace_endpoint,
         "external_metric_endpoint": args.external_metric_endpoint,
@@ -170,6 +209,11 @@ def validate_config(config: dict[str, Any]) -> tuple[list[str], list[str]]:
     protocol = str(codex.get("external_collector_protocol", "otlp-http"))
     if protocol not in VALID_PROTOCOLS:
         errors.append("external_collector_protocol must be otlp-http or otlp-grpc")
+
+    try:
+        normalize_local_collector_endpoint(codex.get("local_collector_endpoint"))
+    except UsageError as exc:
+        errors.append(str(exc))
 
     if codex.get("content_capture") and not codex.get("accept_content_capture"):
         errors.append("prompt/response/tool-output capture requires --accept-content-capture")
@@ -237,7 +281,7 @@ def exporter_inline(protocol: str, endpoint: str, *, headers: dict[str, str] | N
 
 def local_profile(config: dict[str, Any]) -> str:
     codex = config["codex"]
-    endpoint = str(codex["local_collector_endpoint"]).rstrip("/")
+    endpoint = normalize_local_collector_endpoint(codex["local_collector_endpoint"])
     native = bool(codex.get("enable_native_logs"))
     exporter = exporter_inline("otlp-http", endpoint + "/v1/logs") if native else toml_quote("none")
     lines = [
@@ -310,6 +354,7 @@ def render_collector_overlay(config: dict[str, Any]) -> str:
     codex = config["codex"]
     realm = str(codex.get("realm") or "us0")
     native_logs = bool(codex.get("enable_native_logs"))
+    receiver_endpoint = local_collector_receiver_endpoint(codex["local_collector_endpoint"])
     logs_pipeline = (
         """    logs/codex:
       receivers: [otlp/codex]
@@ -325,7 +370,7 @@ receivers:
   otlp/codex:
     protocols:
       http:
-        endpoint: 127.0.0.1:14318
+        endpoint: {yaml_quote(receiver_endpoint)}
 
 processors:
   batch/codex: {{}}
@@ -839,6 +884,90 @@ export CODEX_O11Y_CAPTURE_CONTENT={shell_quote(capture)}
 """
 
 
+def render_galileo_notify_handoff(config: dict[str, Any]) -> str:
+    codex = config["codex"]
+    return f"""# Codex Notify to Galileo Handoff
+
+This handoff captures the proven path for sending completed Codex turns into a
+Galileo Observe log stream. It is separate from Codex native `[otel]` profile
+export and from the Galileo MCP server.
+
+## Key Behavior
+
+- A configured Galileo MCP server gives Codex access to Galileo tools, but it
+  does not automatically subscribe to or mirror Codex turns.
+- Codex native `[otel]` profile export is controlled by the active Codex
+  profile. If `[otel].exporter = "none"`, native Codex log export is disabled;
+  a `notify` command can still run at turn end.
+- The practical interactive path is a fail-soft `notify` wrapper that runs on
+  `turn-ended`, parses the local session JSONL under `CODEX_HOME/sessions`, and
+  logs one Galileo trace per completed turn.
+- Use Galileo direct trace ingest for this bridge:
+  `POST /v2/projects/{{project_id}}/traces`.
+- Set `reliable=true` and `include_trace_ids=true` so the notifier can log
+  non-secret acknowledgement evidence.
+- Verify storage, not only ingest acceptance, with:
+  `POST /v2/projects/{{project_id}}/traces/count` and
+  `POST /v2/projects/{{project_id}}/export_records`.
+- Galileo `user_metadata` values must be strings. Convert counts and booleans
+  before sending them.
+
+## Recommended Trace Shape
+
+- Trace name: `codex.turn`
+- Tags: `codex`, `codex-cli`, `turn-ended`
+- User metadata: `turn_id`, `session_id`, `event`, `model`,
+  `collaboration_mode`, `host`, `session_file`, `tool_count`,
+  `retrieval_count`
+- One LLM child span for the turn summary
+- Tool child spans for terminal, patch, MCP, browser, or other tool calls
+- Retriever child spans for web-search events when present
+
+## Secret And Content Guardrails
+
+- Read the Galileo API key from a file such as `GALILEO_API_KEY_FILE`; never
+  pass the key on argv.
+- Keep the notifier fail-soft: local failures should write a log and exit `0`
+  so telemetry cannot block Codex.
+- Keep a local emitted-turn state file to avoid duplicate turn export. A common
+  path is `CODEX_HOME/log/codex-galileo-emitted-turns.json`.
+- Log non-secret local failures to a separate file, for example
+  `CODEX_HOME/log/codex-galileo-notify.log`.
+- Redact obvious secrets, bearer tokens, JWTs, and high-entropy strings before
+  sending content to Galileo.
+- Prompt, response, tool argument, and tool output capture is data capture. Use
+  metadata-only placeholders unless the operator explicitly accepts content
+  capture.
+
+## Local Verification Pattern
+
+After a turn completes, the notifier should print or log non-secret evidence
+similar to:
+
+```json
+{{
+  "ok": true,
+  "turn_id": "019f...",
+  "trace_id": "uuid",
+  "galileo_trace_ids": ["uuid"],
+  "records_count": 22,
+  "spans_count": 21
+}}
+```
+
+Then verify by filtering on the returned trace ID through `traces/count` and
+`export_records`. A stored turn should export as a `codex.turn` trace with
+`event=turn-ended`.
+
+## Splunk O11y Relationship
+
+This skill still renders Splunk Observability profiles, collector overlays, and
+JSONL helpers for `{codex.get("service_name", "codex-cli")}`. The Galileo
+notify bridge is a companion handoff for Galileo Observe; it does not replace
+the Splunk OTel profile or collector path.
+"""
+
+
 def render_handoff(config: dict[str, Any], output_dir: Path) -> str:
     codex = config["codex"]
     lines = [
@@ -860,6 +989,10 @@ def render_handoff(config: dict[str, Any], output_dir: Path) -> str:
         "",
         f"Use `{output_dir / 'bin' / 'codex-o11y-exec'}` for `codex exec --json` metadata capture.",
         f"Content capture is `{str(bool(codex.get('content_capture'))).lower()}`.",
+        "",
+        "## Galileo Notify Bridge",
+        "",
+        "Review `runtime/codex-notify-galileo-handoff.md` when Codex turns must appear in a Galileo Observe log stream. Galileo MCP connectivity alone does not emit Codex turns.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -907,6 +1040,7 @@ def render(config: dict[str, Any], output_dir: Path, json_output: bool = False) 
         hooks_json(resolve_codex_home(config) / "hooks" / "codex-o11y-stop-hook.py"),
     )
     write_text(output_dir / "runtime" / "codex-o11y.env", render_runtime_env(config, output_dir))
+    write_text(output_dir / "runtime" / "codex-notify-galileo-handoff.md", render_galileo_notify_handoff(config))
 
     plan = apply_plan(config, output_dir)
     coverage = coverage_report(config)
@@ -952,6 +1086,7 @@ def validate_output(output_dir: Path, json_output: bool = False) -> dict[str, An
         "handoff.md",
         "collector/codex-o11y-local-collector.yaml",
         "runtime/codex-o11y.env",
+        "runtime/codex-notify-galileo-handoff.md",
         "bin/codex-o11y-exec",
         "bin/codex-o11y-jsonl-to-spans.py",
         "hooks/hooks.json",
@@ -985,8 +1120,10 @@ def validate_output(output_dir: Path, json_output: bool = False) -> dict[str, An
                 errors.append("direct profile missing Splunk OTLP trace or metric endpoints")
             if '"X-SF-TOKEN" = "${SPLUNK_ACCESS_TOKEN}"' not in text:
                 errors.append("direct profile missing safe X-SF-TOKEN environment placeholder")
-        if profile.name.endswith("local.config.toml") and "http://127.0.0.1:14318" not in text:
-            errors.append("local profile missing loopback collector endpoint")
+        if profile.name.endswith("local.config.toml") and (
+            "/v1/traces" not in text or "/v1/metrics" not in text
+        ):
+            errors.append("local profile missing local collector trace or metric endpoints")
 
     if (output_dir / "collector/codex-o11y-local-collector.yaml").exists():
         values = (output_dir / "collector/codex-o11y-local-collector.yaml").read_text(encoding="utf-8")
@@ -1164,6 +1301,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--service-name", default="")
     parser.add_argument("--realm", default="")
     parser.add_argument("--destination", choices=sorted(VALID_DESTINATIONS), default="")
+    parser.add_argument("--local-collector-endpoint", default="")
     parser.add_argument("--external-trace-endpoint", default="")
     parser.add_argument("--external-metric-endpoint", default="")
     parser.add_argument("--external-log-endpoint", default="")

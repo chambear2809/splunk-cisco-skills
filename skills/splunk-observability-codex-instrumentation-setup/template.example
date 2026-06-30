@@ -12,7 +12,7 @@
     "accept_content_capture": false,
     "enable_ai_defense": false,
     "accept_ai_defense_content_inspection": false,
-    "local_collector_endpoint": "http://127.0.0.1:14318",
+    "local_collector_endpoint": "http://localhost:14318",
     "external_collector_protocol": "otlp-http",
     "external_trace_endpoint": "",
     "external_metric_endpoint": "",
@@ -23,4 +23,3 @@
     "external_tls": {}
   }
 }
-
