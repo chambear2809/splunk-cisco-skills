@@ -181,6 +181,34 @@ class GalileoClient:
         )
 
 
+TARGET_DEFAULT_FIELDS = [
+    "filters",
+    "cot_enabled",
+    "num_judges",
+    "scoreable_node_types",
+    "roll_up_method",
+    "input_type",
+    "output_type",
+    "model_name",
+]
+
+
+def section_defaults(section: Any) -> dict[str, Any]:
+    if not isinstance(section, dict):
+        return {}
+    return {field: section[field] for field in TARGET_DEFAULT_FIELDS if section.get(field) is not None}
+
+
+def target_default(target: dict[str, Any] | None, field: str) -> Any:
+    if not target:
+        return None
+    for section_name in ("defaults", "latest_version", "default_version"):
+        section = target.get(section_name)
+        if isinstance(section, dict) and section.get(field) is not None:
+            return section[field]
+    return target.get(field)
+
+
 def scorer_identity(scorer: dict[str, Any]) -> dict[str, Any]:
     latest = scorer.get("latest_version") or {}
     default = scorer.get("default_version") or {}
@@ -190,6 +218,9 @@ def scorer_identity(scorer: dict[str, Any]) -> dict[str, Any]:
         "label": scorer.get("label"),
         "scorer_type": scorer.get("scorer_type"),
         "model_type": scorer.get("model_type"),
+        "defaults": section_defaults(scorer.get("defaults")),
+        "latest_version": section_defaults(latest),
+        "default_version": section_defaults(default),
         "input_type": scorer.get("input_type") or latest.get("input_type") or default.get("input_type"),
         "output_type": scorer.get("output_type") or latest.get("output_type") or default.get("output_type"),
         "default_version_id": scorer.get("default_version_id"),
@@ -242,9 +273,7 @@ def scorer_config_from_target(
     for field in optional_fields:
         value = replacement.get(field)
         if value is None:
-            value = (target or {}).get(field)
-        if value is None:
-            value = current.get(field)
+            value = target_default(target, field)
         if value is not None:
             config[field] = value
 
@@ -254,13 +283,13 @@ def scorer_config_from_target(
     model_type = replacement.get("model_type") or (target or {}).get("model_type") or "slm"
     if model_type:
         config["model_type"] = model_type
-    output_type = replacement.get("output_type") or (target or {}).get("output_type") or current.get("output_type")
+    output_type = replacement.get("output_type") or target_default(target, "output_type") or current.get("output_type")
     if output_type:
         config["output_type"] = output_type
-    input_type = replacement.get("input_type") or (target or {}).get("input_type") or current.get("input_type")
+    input_type = replacement.get("input_type") or target_default(target, "input_type") or current.get("input_type")
     if input_type:
         config["input_type"] = input_type
-    model_name = replacement.get("model_name") or (target or {}).get("model_name")
+    model_name = replacement.get("model_name") or target_default(target, "model_name")
     if model_name:
         config["model_name"] = model_name
     return config

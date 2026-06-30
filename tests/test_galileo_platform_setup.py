@@ -652,6 +652,8 @@ def test_luna_scorer_script_dry_run_builds_partial_replacement_plan(tmp_path: Pa
                 "model_type": "llm",
                 "input_type": "llm_spans",
                 "output_type": "percentage",
+                "filters": [{"name": "old_filter"}],
+                "num_judges": 3,
                 "scoreable_node_types": ["llm", "chat"],
             },
             {
@@ -677,13 +679,18 @@ def test_luna_scorer_script_dry_run_builds_partial_replacement_plan(tmp_path: Pa
     }
     targets = {
         "completeness_luna": {
-            "id": "00000000-0000-4000-8000-000000000003",
-            "name": "completeness_luna",
-            "scorer_type": "preset",
-            "model_type": "slm",
-            "output_type": "percentage",
+                "id": "00000000-0000-4000-8000-000000000003",
+                "name": "completeness_luna",
+                "scorer_type": "preset",
+                "model_type": "slm",
+                "output_type": "percentage",
+                "defaults": {
+                    "filters": [{"name": "luna_filter"}],
+                    "num_judges": 1,
+                    "scoreable_node_types": ["session"],
+                },
+            }
         }
-    }
 
     plan = module.build_metric_settings_plan(
         settings,
@@ -716,8 +723,12 @@ def test_luna_scorer_script_dry_run_builds_partial_replacement_plan(tmp_path: Pa
     assert plan["patch_body"]["scorers"][0]["id"].endswith("0003")
     assert plan["patch_body"]["scorers"][0]["model_type"] == "slm"
     assert plan["patch_body"]["scorers"][0]["input_type"] == "llm_spans"
+    assert plan["patch_body"]["scorers"][0]["filters"] == [{"name": "luna_filter"}]
+    assert plan["patch_body"]["scorers"][0]["num_judges"] == 1
+    assert plan["patch_body"]["scorers"][0]["scoreable_node_types"] == ["session"]
     assert plan["patch_body"]["scorers"][1]["id"].endswith("0004")
     assert plan["patch_body"]["scorers"][1]["scorer_type"] == "luna"
+    assert "scoreable_node_types" not in plan["patch_body"]["scorers"][1]
     assert [item["status"] for item in plan["applied"]] == ["planned", "planned", "removed"]
     assert all(not item["id"].endswith("0005") for item in plan["patch_body"]["scorers"])
     module.write_result(str(output), {"status": "planned"})
