@@ -99,8 +99,10 @@ def parse_local_collector_endpoint(value: object) -> SplitResult:
     if not raw:
         raise UsageError("local_collector_endpoint is required")
     parsed = urlsplit(raw)
-    if parsed.scheme not in {"http", "https"}:
-        raise UsageError("local_collector_endpoint must use http:// or https://")
+    if parsed.scheme != "http":
+        raise UsageError(
+            "local_collector_endpoint must use http:// because the rendered local collector receiver is plain OTLP HTTP"
+        )
     if not parsed.hostname:
         raise UsageError("local_collector_endpoint must include a host")
     if parsed.username or parsed.password:

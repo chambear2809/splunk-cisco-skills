@@ -143,6 +143,19 @@ def test_codex_local_collector_endpoint_rejects_full_signal_path(tmp_path: Path)
     assert "base URL" in result.stdout + result.stderr
 
 
+def test_codex_local_collector_endpoint_rejects_https_without_tls_receiver(tmp_path: Path) -> None:
+    result = run_codex(
+        "--render",
+        "--local-collector-endpoint",
+        "https://localhost:14318",
+        "--output-dir",
+        str(tmp_path / "bad-local-https-endpoint"),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "plain OTLP HTTP" in result.stdout + result.stderr
+
+
 def test_codex_external_collector_http_and_grpc_profiles(tmp_path: Path) -> None:
     http_out = tmp_path / "http"
     run_codex(

@@ -22,9 +22,11 @@ Rendered file:
   `http://127.0.0.1:14318`. Override with
   `--local-collector-endpoint http://localhost:14318` or the spec key
   `codex.local_collector_endpoint`.
-- The endpoint must be an `http://` or `https://` base URL with an explicit
-  port, no credentials, and no `/v1/...` path. The renderer appends
-  `/v1/traces`, `/v1/metrics`, and `/v1/logs` as needed.
+- The endpoint must be an `http://` base URL with an explicit port, no
+  credentials, and no `/v1/...` path. The rendered collector receiver is plain
+  OTLP HTTP, so `https://` is rejected unless future TLS receiver rendering is
+  added. The renderer appends `/v1/traces`, `/v1/metrics`, and `/v1/logs` as
+  needed.
 - `trace_exporter` is an `otlp-http` inline exporter table
 - `metrics_exporter` is an `otlp-http` inline exporter table
 - default trace endpoint: `http://127.0.0.1:14318/v1/traces`
