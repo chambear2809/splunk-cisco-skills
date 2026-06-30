@@ -94,6 +94,7 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
     assert (output_dir / "lifecycle/product-coverage-matrix.json").is_file()
     assert (output_dir / "lifecycle/product-coverage-matrix.md").is_file()
     assert (output_dir / "runtime/python-opentelemetry-env.sh").is_file()
+    assert (output_dir / "runtime/codex-notify-galileo-handoff.md").is_file()
     assert (output_dir / "runtime/python-galileo-protect.py").is_file()
     assert (output_dir / "evaluate/evaluate-assets.yaml").is_file()
     assert (output_dir / "evaluate/multimodal-metrics-handoff.yaml").is_file()
@@ -122,6 +123,7 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
         "Luna Studio UI and SDK training lifecycle",
         "Provider integrations, model aliases, costs, and pricing",
         "Provider integration selection, status, and Databricks helpers",
+        "Codex notify turn logging",
         "Tags, metadata, run labels, and filter hygiene",
         "Enterprise data retention, TTL, redaction, and privacy controls",
         "Trace query, columns, recompute, update, and delete maintenance",
@@ -147,6 +149,10 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
         "Splunk destinations",
     ]:
         assert surface in surfaces
+    codex_notify = (output_dir / "runtime/codex-notify-galileo-handoff.md").read_text(encoding="utf-8")
+    assert "Galileo MCP server" in codex_notify
+    assert "POST /v2/projects/{project_id}/traces" in codex_notify
+    assert "traces/count" in codex_notify
     for script in [
         "apply-readiness.sh",
         "apply-object-lifecycle.sh",

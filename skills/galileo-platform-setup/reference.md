@@ -220,6 +220,71 @@ Raw prompt/response fields are excluded unless the operator explicitly passes
 `--include-raw` to the bridge script and confirms Splunk is an approved
 destination.
 
+## Codex Notify Runtime Logging
+
+Use this pattern when the agent being instrumented is Codex itself and the
+operator expects completed interactive turns to appear in a Galileo Observe log
+stream.
+
+Galileo MCP and Galileo logging are separate:
+
+- Galileo MCP lets Codex call Galileo tools.
+- It does not automatically mirror Codex turns into Galileo Observe.
+- A Codex `notify` bridge is needed for post-turn logging.
+
+The bridge should run after `turn-ended`, parse the completed turn from the
+local Codex session JSONL, and write one trace to Galileo direct ingest:
+
+```text
+POST /v2/projects/{project_id}/traces
+```
+
+Recommended payload fields:
+
+- `log_stream_id`: target coding-agent log stream
+- `logging_method`: `api_direct`
+- `reliable`: `true`
+- `include_trace_ids`: `true`
+- `session_external_id`: Codex session ID
+- trace `name`: `codex.turn`
+- trace `tags`: `codex`, `codex-cli`, `turn-ended`
+- child spans: one `llm` span for the turn and `tool` / `retriever` spans for
+  tool calls or web-search events when present
+
+Use `redacted_input` and `redacted_output` when sending captured content.
+Prompt, response, tool argument, and tool output capture requires explicit
+operator acceptance; otherwise prefer metadata-only placeholders.
+
+`user_metadata` values must be strings. Convert counts, booleans, numeric IDs,
+and similar values before sending. Non-string metadata values can produce HTTP
+`422` validation errors.
+
+Keep the notifier fail-soft:
+
+- read the Galileo key from `GALILEO_API_KEY_FILE`
+- never pass API keys on argv
+- redact obvious secrets, bearer tokens, JWTs, and high-entropy strings
+- maintain a local duplicate-suppression state file such as
+  `CODEX_HOME/log/codex-galileo-emitted-turns.json`
+- write local non-secret failure evidence to
+  `CODEX_HOME/log/codex-galileo-notify.log`
+- exit `0` if Galileo is unavailable so telemetry cannot block Codex
+
+Verify that a turn is stored, not merely accepted, by filtering on the returned
+trace ID:
+
+```text
+POST /v2/projects/{project_id}/traces/count
+POST /v2/projects/{project_id}/export_records
+```
+
+Expected proof:
+
+- ingest returns `records_count`, `traces_count`, `spans_count`, and
+  `trace_ids`
+- count returns `total_count >= 1`
+- export returns one JSONL trace whose `id` matches the returned trace ID
+
 ## Multimodal Observability
 
 Rendered assets:

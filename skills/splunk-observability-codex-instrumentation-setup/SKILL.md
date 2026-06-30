@@ -14,7 +14,9 @@ settings in project `.codex/config.toml`.
 
 The skill renders three destination profiles:
 
-- `local-collector`: traces and metrics to `http://127.0.0.1:14318`.
+- `local-collector`: traces and metrics to
+  `http://127.0.0.1:14318` by default. Override the base endpoint with
+  `--local-collector-endpoint http://localhost:14318`.
 - `external-collector`: traces, metrics, and optional native logs to explicit
   external OTLP collector endpoints.
 - `direct`: traces to
@@ -24,6 +26,12 @@ The skill renders three destination profiles:
 
 Direct native Codex logs are refused. Native logs are allowed only through local
 or external collector destinations.
+
+For Galileo Observe, do not assume a configured Galileo MCP server means Codex
+turns are being logged. MCP enables tool access only. Interactive Codex turn
+logging needs a separate `notify`-based bridge that runs after `turn-ended`,
+parses the local Codex session JSONL, and writes a Galileo `codex.turn` trace
+through the Galileo trace ingest API.
 
 ## Safety Rules
 
@@ -40,6 +48,10 @@ or external collector destinations.
   `--accept-content-capture`.
 - AI Defense content inspection requires `--enable-ai-defense` plus
   `--accept-ai-defense-content-inspection`.
+- Galileo turn mirroring must be fail-soft and secret-file based. The notifier
+  should read the Galileo key from a file, redact obvious secrets/high-entropy
+  values, write local non-secret failure evidence, and exit `0` if Galileo is
+  unavailable.
 
 ## Primary Workflow
 
@@ -49,6 +61,7 @@ Render local collector assets:
 bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh \
   --render \
   --destination local-collector \
+  --local-collector-endpoint http://localhost:14318 \
   --realm us0 \
   --output-dir splunk-observability-codex-instrumentation-rendered
 ```
@@ -108,6 +121,10 @@ bash skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh \
   wrapper.
 - `hooks/hooks.json` and `hooks/codex-o11y-stop-hook.py`: optional fail-soft
   interactive Stop hook.
+- `runtime/codex-notify-galileo-handoff.md`: companion handoff for sending
+  completed Codex turns into Galileo Observe. It documents the `notify`
+  strategy, trace shape, secret handling, duplicate suppression, and read-back
+  validation using `traces/count` plus `export_records`.
 - `apply-plan.json`, `coverage-report.json`, `coverage-report.md`,
   `doctor-report.md`, and `handoff.md`.
 

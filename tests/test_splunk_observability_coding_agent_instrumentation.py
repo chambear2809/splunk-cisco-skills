@@ -106,6 +106,43 @@ def test_codex_local_direct_and_external_profiles_render_valid_toml(tmp_path: Pa
     assert 'exporter = "none"' in direct_text
 
 
+def test_codex_local_collector_endpoint_is_configurable(tmp_path: Path) -> None:
+    out = tmp_path / "custom-localhost"
+    run_codex(
+        "--render",
+        "--destination",
+        "local-collector",
+        "--local-collector-endpoint",
+        "http://localhost:24318",
+        "--enable-native-logs",
+        "--output-dir",
+        str(out),
+    )
+
+    profile = (out / "profiles/codex-o11y-local.config.toml").read_text(encoding="utf-8")
+    assert "http://localhost:24318/v1/traces" in profile
+    assert "http://localhost:24318/v1/metrics" in profile
+    assert "http://localhost:24318/v1/logs" in profile
+
+    overlay = (out / "collector/codex-o11y-local-collector.yaml").read_text(encoding="utf-8")
+    assert 'endpoint: "localhost:24318"' in overlay
+
+    run_codex("--validate", "--output-dir", str(out))
+
+
+def test_codex_local_collector_endpoint_rejects_full_signal_path(tmp_path: Path) -> None:
+    result = run_codex(
+        "--render",
+        "--local-collector-endpoint",
+        "http://localhost:14318/v1/traces",
+        "--output-dir",
+        str(tmp_path / "bad-local-endpoint"),
+        check=False,
+    )
+    assert result.returncode != 0
+    assert "base URL" in result.stdout + result.stderr
+
+
 def test_codex_external_collector_http_and_grpc_profiles(tmp_path: Path) -> None:
     http_out = tmp_path / "http"
     run_codex(
@@ -243,6 +280,7 @@ def test_codex_reports_apply_plan_strict_config_hooks_and_histograms(tmp_path: P
         "bin/codex-o11y-jsonl-to-spans.py",
         "hooks/hooks.json",
         "hooks/codex-o11y-stop-hook.py",
+        "runtime/codex-notify-galileo-handoff.md",
     ]
     for rel in required:
         assert (out / rel).is_file(), rel
@@ -278,6 +316,11 @@ def test_codex_reports_apply_plan_strict_config_hooks_and_histograms(tmp_path: P
     assert "send_otlp_histograms: true" in (out / "collector/codex-o11y-local-collector.yaml").read_text(
         encoding="utf-8"
     )
+    galileo_handoff = (out / "runtime/codex-notify-galileo-handoff.md").read_text(encoding="utf-8")
+    assert "Galileo MCP server" in galileo_handoff
+    assert "POST /v2/projects/{project_id}/traces" in galileo_handoff
+    assert "user_metadata" in galileo_handoff
+    assert "traces/count" in galileo_handoff
 
 
 def test_codex_apply_uses_concrete_codex_home_installs_runtime_and_merges_hooks(tmp_path: Path) -> None:

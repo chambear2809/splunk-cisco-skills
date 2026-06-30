@@ -18,15 +18,25 @@
 Rendered file:
 `profiles/codex-o11y-local.config.toml`
 
+- Base endpoint: `local_collector_endpoint`, default
+  `http://127.0.0.1:14318`. Override with
+  `--local-collector-endpoint http://localhost:14318` or the spec key
+  `codex.local_collector_endpoint`.
+- The endpoint must be an `http://` or `https://` base URL with an explicit
+  port, no credentials, and no `/v1/...` path. The renderer appends
+  `/v1/traces`, `/v1/metrics`, and `/v1/logs` as needed.
 - `trace_exporter` is an `otlp-http` inline exporter table
 - `metrics_exporter` is an `otlp-http` inline exporter table
-- trace endpoint: `http://127.0.0.1:14318/v1/traces`
-- metric endpoint: `http://127.0.0.1:14318/v1/metrics`
-- native log endpoint, when enabled: `http://127.0.0.1:14318/v1/logs`
+- default trace endpoint: `http://127.0.0.1:14318/v1/traces`
+- default metric endpoint: `http://127.0.0.1:14318/v1/metrics`
+- default native log endpoint, when enabled:
+  `http://127.0.0.1:14318/v1/logs`
 - native log exporter remains `none` unless `--enable-native-logs` is set
 - collector overlay exports traces through OTLP/HTTP APM ingest, metrics through
   SignalFx with `send_otlp_histograms: true`, adds a logs pipeline when native
-  logs are enabled, and reads the token with `${env:SPLUNK_ACCESS_TOKEN}`
+  logs are enabled, binds its OTLP HTTP receiver to the host and port parsed
+  from `local_collector_endpoint`, and reads the token with
+  `${env:SPLUNK_ACCESS_TOKEN}`
 
 ### External Collector
 
@@ -88,6 +98,65 @@ managed Codex O11y Stop hook is replaced.
 `--output-dir`. This prevents an apply-only command from re-rendering the output
 with default options and installing a different profile than the operator
 reviewed.
+
+## Interactive Notify Bridge
+
+Codex has two different telemetry surfaces that are easy to conflate:
+
+- Native `[otel]` profile export sends Codex-managed traces, metrics, and
+  optionally native logs to the configured OTel destination. If
+  `[otel].exporter = "none"`, native log export is disabled.
+- `notify = [...]` runs an operator command when a Codex turn ends. It can be
+  used as a fail-soft post-turn bridge even when native `[otel]` log export is
+  disabled.
+
+Use `notify` for Galileo Observe turn mirroring. A configured Galileo MCP
+server only exposes Galileo tools to Codex; it does not automatically populate
+Galileo log streams with Codex turns.
+
+The proven bridge shape is:
+
+1. Keep the existing notifier chain intact when one exists.
+2. Run a background Python logger from the notifier on `turn-ended`.
+3. Parse the local Codex session JSONL under
+   `CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`, preferring a session path
+   from the notify payload when Codex supplies one.
+4. Build one Galileo trace named `codex.turn` for the completed turn.
+5. Add one LLM child span for the turn and child spans for tool calls and web
+   retrievals when present.
+6. Read the Galileo API key from `GALILEO_API_KEY_FILE`; never pass it on argv.
+7. Suppress duplicates with a local state file such as
+   `CODEX_HOME/log/codex-galileo-emitted-turns.json`.
+8. Log non-secret failures to `CODEX_HOME/log/codex-galileo-notify.log` and
+   exit `0` so telemetry does not block Codex.
+
+For Galileo direct ingest, call:
+
+```text
+POST /v2/projects/{project_id}/traces
+```
+
+Use `reliable=true` and `include_trace_ids=true`. The response should include
+`records_count`, `traces_count`, `spans_count`, and `trace_ids`.
+
+Verify persistence, not just API acceptance, with:
+
+```text
+POST /v2/projects/{project_id}/traces/count
+POST /v2/projects/{project_id}/export_records
+```
+
+Filter both calls by the returned trace ID. A successful export returns a
+`codex.turn` trace with `tags=["codex","codex-cli","turn-ended"]`.
+
+Galileo `user_metadata` values must be strings. Convert values such as
+`tool_count`, `retrieval_count`, booleans, and numeric IDs before sending the
+payload. A non-string metadata value returns HTTP `422`.
+
+Prompt, response, tool argument, and tool output capture is content capture. Use
+metadata-only placeholders by default, or require explicit operator acceptance
+before sending content to Galileo. Always redact obvious secrets, bearer
+tokens, JWTs, and high-entropy strings before exporting any captured text.
 
 ## Strict Config
 
