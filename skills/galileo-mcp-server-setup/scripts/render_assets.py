@@ -505,6 +505,7 @@ def build_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
     return {
         "clients": selected_clients(clients_raw),
         "mcp_url": derive_mcp_url(mcp_url, console_url),
+        "galileo_console_url": console_url,
         "accept_write_tools": accept_write,
         "server_names": server_names,
         "galileo_api_key_file": args.galileo_api_key_file,
@@ -1004,10 +1005,12 @@ def render_metadata(
     accept_write_tools: bool,
     key_file: str,
     server_names: dict[str, str],
+    console_url: str,
 ) -> str:
     payload = {
         "skill": SKILL_NAME,
         "mcp_url": mcp_url,
+        "galileo_console_url": console_url,
         "clients": clients,
         "server_names": {client: server_names[client] for client in clients},
         "accept_galileo_mcp_write_tools": accept_write_tools,
@@ -1039,6 +1042,7 @@ def rendered_plan(
     mcp_url: str,
     accept_write_tools: bool,
     server_names: dict[str, str],
+    console_url: str,
 ) -> dict[str, Any]:
     files: list[str] = [
         "mcp/README.md",
@@ -1065,6 +1069,7 @@ def rendered_plan(
         "skill": SKILL_NAME,
         "output_dir": str(Path(args.output_dir).resolve()),
         "mcp_url": mcp_url,
+        "galileo_console_url": console_url,
         "clients": clients,
         "server_names": {client: server_names[client] for client in clients},
         "accept_galileo_mcp_write_tools": accept_write_tools,
@@ -1077,17 +1082,19 @@ def main() -> int:
     config = build_config(args, load_spec(args.spec))
     clients = config["clients"]
     mcp_url = config["mcp_url"]
+    console_url = config["galileo_console_url"]
     accept_write_tools = config["accept_write_tools"]
     server_names = config["server_names"]
 
     if args.dry_run:
-        plan = rendered_plan(args, clients, mcp_url, accept_write_tools, server_names)
+        plan = rendered_plan(args, clients, mcp_url, accept_write_tools, server_names, console_url)
         if args.json:
             print(json_text(plan), end="")
         else:
             print("Galileo MCP Server render plan")
             print(f"Output directory: {plan['output_dir']}")
             print(f"MCP URL: {plan['mcp_url']}")
+            print(f"Galileo console URL: {plan['galileo_console_url'] or '<not supplied>'}")
             print(f"Clients: {', '.join(plan['clients'])}")
             for file_name in plan["rendered_files"]:
                 print(f"  render: {file_name}")
@@ -1141,6 +1148,7 @@ def main() -> int:
             accept_write_tools,
             config["galileo_api_key_file"],
             server_names,
+            console_url,
         ),
     )
     print(f"Rendered Galileo MCP assets to {output_dir.resolve()}")

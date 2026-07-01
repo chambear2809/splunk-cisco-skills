@@ -11,6 +11,7 @@ configuration.
 | Agent | Status | Child skill |
 |---|---|---|
 | `codex` | implemented | `splunk-observability-codex-instrumentation-setup` |
+| `claude-code` | implemented | `splunk-observability-claude-code-instrumentation-setup` |
 | `future` | placeholder | none |
 
 ## Destination Matrix

@@ -20,6 +20,7 @@ RENDER = SKILL_DIR / "scripts/render_assets.py"
 BRIDGE = SKILL_DIR / "scripts/galileo_to_splunk_hec.py"
 LIFECYCLE = SKILL_DIR / "scripts/galileo_object_lifecycle.py"
 LUNA = SKILL_DIR / "scripts/galileo_luna_scorers.py"
+GALILEO_CONSOLE_ARGS = ("--galileo-console-url", "https://console.demo-v2.galileocloud.io/")
 
 
 def run_cmd(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -84,6 +85,7 @@ def test_default_render_emits_plan_coverage_and_handoff_scripts(tmp_path: Path) 
         "--render",
         "--output-dir",
         str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
         "--json",
     )
     payload = json.loads(result.stdout)
@@ -191,6 +193,7 @@ def test_hec_handoff_delegates_to_hec_service_with_token_file_only(tmp_path: Pat
         "--render",
         "--output-dir",
         str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
         "--splunk-hec-token-file",
         str(token_file),
         "--splunk-index",
@@ -207,7 +210,7 @@ def test_hec_handoff_delegates_to_hec_service_with_token_file_only(tmp_path: Pat
 
 def test_otlp_handoff_delegates_to_splunk_connect_for_otlp(tmp_path: Path) -> None:
     output_dir = tmp_path / "rendered"
-    run_cmd("bash", str(SETUP), "--render", "--output-dir", str(output_dir))
+    run_cmd("bash", str(SETUP), "--render", "--output-dir", str(output_dir), *GALILEO_CONSOLE_ARGS)
 
     script = (output_dir / "scripts/apply-splunk-otlp.sh").read_text(encoding="utf-8")
     assert "splunk-connect-for-otlp-setup/scripts/setup.sh" in script
@@ -223,6 +226,7 @@ def test_otel_collector_handoff_delegates_to_splunk_otel_collector(tmp_path: Pat
         "--render",
         "--output-dir",
         str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
         "--realm",
         "us0",
     )
@@ -242,6 +246,7 @@ def test_o11y_only_otel_collector_handoff_omits_platform_hec(tmp_path: Path) -> 
         "--render",
         "--output-dir",
         str(output_dir),
+        *GALILEO_CONSOLE_ARGS,
         "--o11y-only",
         "--realm",
         "us0",
@@ -284,6 +289,7 @@ def test_o11y_only_default_apply_dry_run_selects_cloud_sections(tmp_path: Path) 
         "--o11y-only",
         "--dry-run",
         "--json",
+        *GALILEO_CONSOLE_ARGS,
         "--output-dir",
         str(tmp_path / "rendered"),
     )
@@ -317,6 +323,7 @@ def test_o11y_only_apply_all_uses_cloud_sections_before_apply(tmp_path: Path) ->
         "--o11y-only",
         "--realm",
         "us0",
+        *GALILEO_CONSOLE_ARGS,
         "--output-dir",
         str(tmp_path / "rendered"),
         check=False,
@@ -336,6 +343,7 @@ def test_o11y_only_rejects_explicit_platform_sections(tmp_path: Path) -> None:
         "observe-export",
         "--o11y-only",
         "--dry-run",
+        *GALILEO_CONSOLE_ARGS,
         "--output-dir",
         str(tmp_path / "rendered"),
         check=False,
@@ -387,6 +395,7 @@ def test_rendered_files_do_not_contain_token_values_or_direct_authorization(tmp_
         str(output_dir),
         "--galileo-api-key-file",
         str(galileo_file),
+        *GALILEO_CONSOLE_ARGS,
         "--splunk-hec-token-file",
         str(hec_file),
         "--o11y-token-file",

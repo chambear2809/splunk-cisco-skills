@@ -19,6 +19,18 @@ is render-first and client-tooling focused: it prepares MCP client
 configuration, validates that no secrets were written, inventories the live MCP
 tool surface, and points broader Galileo/Splunk work to the existing skills.
 
+## Required Intake
+
+Before rendering, validating, doctoring, probing, or auditing this skill, ask
+the user for the Galileo instance console URL and record the exact value they
+provide, for example `https://console.demo-v2.galileocloud.io/`. Do not assume
+`https://api.galileo.ai/mcp/http/mcp` unless the user explicitly confirms the
+default Galileo Cloud instance.
+
+Pass the URL as `--galileo-console-url "$GALILEO_CONSOLE_URL"` or set
+`galileo.console_url` in the spec. The renderer derives the MCP URL from that
+console URL unless the user provides a specific `--mcp-url`.
+
 ## Supported Paths
 
 1. **Client setup**: render Cursor, VS Code, Codex, Claude Code, and AWS Kiro
@@ -58,6 +70,7 @@ Render the full client matrix:
 ```bash
 bash skills/galileo-mcp-server-setup/scripts/setup.sh \
   --render \
+  --galileo-console-url "$GALILEO_CONSOLE_URL" \
   --client cursor,claude,codex,vscode,kiro \
   --output-dir galileo-mcp-rendered
 ```

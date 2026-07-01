@@ -68,6 +68,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--spec", default="")
     parser.add_argument("--apply", default="")
     parser.add_argument("--server-url", default="")
+    parser.add_argument("--galileo-console-url", default="")
     parser.add_argument("--server-host", default="")
     parser.add_argument("--server-port", default="")
     parser.add_argument("--agent-name", default="")
@@ -207,6 +208,7 @@ def merge_config(args: argparse.Namespace, spec: dict[str, Any]) -> dict[str, An
     index = arg_or_spec("splunk_index", "splunk.index", "agent_control")
     allowed = arg_or_spec("hec_allowed_indexes", "splunk.hec_allowed_indexes", "") or index
     return {
+        "galileo_console_url": arg_or_spec("galileo_console_url", "galileo.console_url", ""),
         "server_url": arg_or_spec("server_url", "agent_control.server_url", "http://localhost:8000"),
         "server_host": arg_or_spec("server_host", "agent_control.server_host", "0.0.0.0"),
         "server_port": arg_or_spec("server_port", "agent_control.server_port", "8000"),
@@ -325,6 +327,7 @@ def render_metadata(output_dir: Path, config: dict[str, Any]) -> None:
         output_dir / "metadata.json",
         {
             "api_version": f"{SKILL_NAME}/v1",
+            "galileo_console_url": config["galileo_console_url"],
             "server_url": config["server_url"],
             "agent_name": config["agent_name"],
             "secret_values_rendered": False,
@@ -347,6 +350,7 @@ AGENT_CONTROL_POSTGRES_PASSWORD_FILE=/path/to/postgres_password
         f"""# Agent Control Server Readiness
 
 - Server URL: `{config["server_url"]}`
+- Galileo console URL: `{config["galileo_console_url"] or "<prompt-required>"}`
 - Health endpoint: `{config["server_url"].rstrip("/")}/health`
 - Auth enabled: expected for production
 - Agent API key file: `{config["agent_control_api_key_file"] or "<path-required>"}`
@@ -792,6 +796,7 @@ def build_apply_plan(
             "sinks": "sinks/",
             "scripts": "scripts/",
         },
+        "galileo_console_url": config["galileo_console_url"],
     }
 
 
@@ -819,6 +824,7 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
             },
         },
         "defaults": {
+            "galileo_console_url": config["galileo_console_url"],
             "server_url": config["server_url"],
             "agent_name": config["agent_name"],
             "sourcetype": config["splunk_sourcetype"],
@@ -827,11 +833,15 @@ def build_coverage_report(config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def render_handoff(output_dir: Path, scripts: dict[str, str]) -> None:
+def render_handoff(output_dir: Path, config: dict[str, Any], scripts: dict[str, str]) -> None:
     lines = [
         "# Galileo Agent Control Handoff",
         "",
         "Rendered assets are offline by default and keep secret values in local files.",
+        "",
+        "## Galileo Instance",
+        f"- Console URL: `{config['galileo_console_url'] or '<prompt-required>'}`",
+        "- Ask the user for this URL before rendering or applying tenant-specific work.",
         "",
         "## Apply Sections",
     ]
@@ -875,7 +885,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     scripts = render_scripts(output_dir, config, sections)
     write_json(output_dir / "apply-plan.json", build_apply_plan(config, scripts, sections, output_dir))
     write_json(output_dir / "coverage-report.json", build_coverage_report(config))
-    render_handoff(output_dir, scripts)
+    render_handoff(output_dir, config, scripts)
     return {
         "output_dir": str(output_dir),
         "apply_plan": str(output_dir / "apply-plan.json"),

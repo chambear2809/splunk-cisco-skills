@@ -45,6 +45,7 @@ Configuration:
   --spec PATH                   Optional YAML/JSON spec (api_version: galileo-agent-control-setup/v1)
   --output-dir DIR              Rendered output directory
   --server-url URL              Agent Control server URL (default: http://localhost:8000)
+  --galileo-console-url URL     Galileo instance console URL for tenant context
   --server-host HOST            Server bind host for rendered env
   --server-port PORT            Server port for rendered env
   --agent-name NAME             Agent Control agent name
@@ -127,7 +128,7 @@ while [[ $# -gt 0 ]]; do
         --json) JSON_OUTPUT=true; shift ;;
         --spec) require_value "$1" "$#"; SPEC="$2"; shift 2 ;;
         --output-dir) require_value "$1" "$#"; OUTPUT_DIR="$2"; shift 2 ;;
-        --server-url|--server-host|--server-port|--agent-name|--agent-description|--deployment-environment|--service-name|--otlp-endpoint|--splunk-platform|--splunk-hec-url|--splunk-index|--splunk-source|--splunk-sourcetype|--hec-token-name|--hec-allowed-indexes|--realm|--collector-cluster-name|--runtime-target-dir|--agent-control-api-key-file|--agent-control-admin-key-file|--splunk-hec-token-file|--o11y-token-file)
+        --server-url|--galileo-console-url|--server-host|--server-port|--agent-name|--agent-description|--deployment-environment|--service-name|--otlp-endpoint|--splunk-platform|--splunk-hec-url|--splunk-index|--splunk-source|--splunk-sourcetype|--hec-token-name|--hec-allowed-indexes|--realm|--collector-cluster-name|--runtime-target-dir|--agent-control-api-key-file|--agent-control-admin-key-file|--splunk-hec-token-file|--o11y-token-file)
             require_value "$1" "$#"
             RENDER_ARGS+=("$1" "$2")
             shift 2

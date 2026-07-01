@@ -13,4 +13,6 @@ interface:
     debugging views, MCP tool-call logging, cookbook/use-case coverage, async
     job progress, release compatibility checks, Splunk HEC and OTLP handoffs,
     Splunk OTel Collector handoff, dashboard/detector handoffs, and --o11y-only
-    Observability Cloud mode without Splunk Platform HEC.
+    Observability Cloud mode without Splunk Platform HEC. Before tenant-specific
+    work, ask for the Galileo instance console URL and pass it as
+    --galileo-console-url.

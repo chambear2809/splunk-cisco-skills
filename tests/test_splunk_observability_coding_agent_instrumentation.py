@@ -67,6 +67,29 @@ def test_parent_execute_dry_run_json_returns_exact_child_command() -> None:
     assert "direct Splunk ingest" in payload["warnings"][0]
 
 
+def test_parent_execute_codex_splunk_direct_maps_to_direct() -> None:
+    result = run_cmd(
+        "bash",
+        str(PARENT),
+        "--execute",
+        "--dry-run",
+        "--json",
+        "--agent",
+        "codex",
+        "--destination",
+        "splunk-direct",
+    )
+    payload = json.loads(result.stdout)
+    assert payload["destination"] == "splunk-direct"
+    assert payload["would_execute"] == [
+        "bash",
+        "skills/splunk-observability-codex-instrumentation-setup/scripts/setup.sh",
+        "--render",
+        "--destination",
+        "direct",
+    ]
+
+
 def test_codex_local_direct_and_external_profiles_render_valid_toml(tmp_path: Path) -> None:
     out = tmp_path / "all"
     run_codex(
